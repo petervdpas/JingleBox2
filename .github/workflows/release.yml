@@ -77,12 +77,19 @@ jobs:
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
-          dotnet publish "$PROJECT_PATH" \
+            EXTRA_PROPS=""
+            if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
+            # Clear any forced x64 PlatformTarget in the csproj/solution
+            EXTRA_PROPS="-p:PlatformTarget=AnyCPU"
+            fi
+
+            dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r "${{ matrix.rid }}" \
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
       # --------------------
