@@ -32,8 +32,6 @@ jobs:
     env:
       APP_NAME: JingleBox2
       CONFIGURATION: Release
-      # Your logs show the csproj is at repo root:
-      # /home/runner/work/JingleBox2/JingleBox2/JingleBox2.csproj
       PROJECT_PATH: ./JingleBox2.csproj
 
     steps:
@@ -46,6 +44,14 @@ jobs:
 
       - name: Restore
         run: dotnet restore
+
+      # ---------- Linux deps (arm64 only) ----------
+      - name: Install ARM64 build deps (Linux arm64 only)
+        if: matrix.rid == 'linux-arm64'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
 
       # --------------------
       # Publish (Windows)
@@ -80,19 +86,18 @@ jobs:
       # --------------------
       # Windows installer via Inno Setup
       # --------------------
-      - name: Install Inno Setup (Windows only)
+      - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
         run: choco install innosetup -y
 
-      - name: Build installer (Windows only)
+      - name: Build installer
         if: startsWith(matrix.os, 'windows')
         shell: pwsh
         run: |
-          # Expect an installer script at installer/windows/JingleBox2.iss
           iscc installer/windows/JingleBox2.iss
 
       # --------------------
-      # Package Linux artifacts
+      # Package Linux artifacts (tar.gz)
       # --------------------
       - name: Create tar.gz (Linux)
         if: startsWith(matrix.rid, 'linux')
@@ -111,14 +116,25 @@ jobs:
         run: |
           Compress-Archive -Path "out/${{ matrix.name }}\*" -DestinationPath "$env:APP_NAME-${{ matrix.name }}.zip"
 
-      - name: Upload build artifacts
+      # --------------------
+      # Upload artifacts (per leg)
+      # --------------------
+      - name: Upload artifacts (Windows)
+        if: startsWith(matrix.rid, 'win')
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.name }}
           path: |
-            *.zip
-            *.tar.gz
+            JingleBox2-windows-x64.zip
             installer/windows/output/*.exe
+
+      - name: Upload artifacts (Linux)
+        if: startsWith(matrix.rid, 'linux')
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.name }}
+          path: |
+            JingleBox2-${{ matrix.name }}.tar.gz
 
   release:
     name: Publish GitHub Release
@@ -131,11 +147,19 @@ jobs:
         with:
           path: artifacts
 
+      - name: Show downloaded files
+        shell: bash
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f -maxdepth 6 -print
+
       - name: Flatten artifacts
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f -maxdepth 6 -print -exec cp {} dist/ \;
+          find artifacts -type f -maxdepth 6 -exec cp "{}" dist/ \;
+          echo "Dist contents:"
+          ls -la dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
