@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=JingleBox2
+Comment=Audio pad launcher
+Exec=/usr/bin/jinglebox2
+Icon=jinglebox2
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupWMClass=JingleBox2

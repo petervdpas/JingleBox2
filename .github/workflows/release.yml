@@ -135,9 +135,80 @@ jobs:
           path: |
             JingleBox2-${{ matrix.name }}.tar.gz
 
+  rpm_fedora:
+    name: Fedora RPM (x64, self-contained)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+
+    env:
+      APP_NAME: JingleBox2
+      CONFIGURATION: Release
+      PROJECT_PATH: ./JingleBox2.csproj
+
+    steps:
+      - name: Install build tooling
+        run: |
+          dnf -y update
+          dnf -y install git rpm-build rpmdevtools tar gzip findutils
+          dnf -y install dotnet-sdk-9.0
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish (linux-x64 self-contained, NOT single-file)
+        run: |
+          dotnet publish "$PROJECT_PATH" \
+            -c "$CONFIGURATION" \
+            -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -o out/linux-x64
+
+      - name: Prepare RPM sources
+        run: |
+          rpmdev-setuptree
+
+          VER="${GITHUB_REF_NAME#v}"
+          PKGROOT="jinglebox2-${VER}"
+
+          mkdir -p "$PKGROOT/payload"
+          mkdir -p "$PKGROOT/packaging/fedora/icons"
+
+          cp -a out/linux-x64/. "$PKGROOT/payload/"
+          cp -a packaging/fedora/jinglebox2.sh "$PKGROOT/packaging/fedora/"
+          cp -a packaging/fedora/jinglebox2.desktop "$PKGROOT/packaging/fedora/"
+          cp -a packaging/fedora/icons/jinglebox2.png "$PKGROOT/packaging/fedora/icons/"
+          cp -a packaging/fedora/jinglebox2.spec ~/rpmbuild/SPECS/jinglebox2.spec
+          cp -a LICENSE "$PKGROOT/" || true
+
+          tar -czf ~/rpmbuild/SOURCES/jinglebox2-${VER}.tar.gz "$PKGROOT"
+
+      - name: Build RPM
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          rpmbuild -ba ~/rpmbuild/SPECS/jinglebox2.spec --define "version ${VER}"
+
+      - name: Collect RPM
+        run: |
+          mkdir -p dist
+          find ~/rpmbuild/RPMS -name "*.rpm" -exec cp {} dist/ \;
+          ls -la dist
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-fedora-rpm-x64
+          path: dist/*.rpm
+
   release:
     name: Publish GitHub Release
-    needs: build
+    needs: [build, rpm_fedora]
     runs-on: ubuntu-latest
 
     steps:
@@ -150,7 +221,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f -maxdepth 6 -exec cp "{}" dist/ \;
+          find artifacts -type f -maxdepth 8 -exec cp "{}" dist/ \;
           ls -la dist
 
       - name: Create Release
