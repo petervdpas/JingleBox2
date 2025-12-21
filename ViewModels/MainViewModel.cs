@@ -26,12 +26,13 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
 
-    // Profiles UI (CONFIG view header)
-    public ObservableCollection<string> ProfileNames { get; } = new();
+    // Profiles (bind ComboBox to objects, not strings)
+    public ObservableCollection<ConfigProfile> Profiles { get; } = new();
 
     [ObservableProperty] private OutputDevice? selectedOutputDevice;
 
-    [ObservableProperty] private string selectedProfileName = "default";
+    [ObservableProperty] private ConfigProfile? selectedProfile;
+
     [ObservableProperty] private string newProfileName = "";
 
     public IRelayCommand AddProfileCommand { get; }
@@ -44,6 +45,9 @@ public sealed partial class MainViewModel : ObservableObject
         _store = store;
         _cfg = cfg;
 
+        AddProfileCommand = new RelayCommand(AddProfile);
+        DeleteProfileCommand = new RelayCommand(DeleteProfile);
+
         // Devices
         foreach (var d in _audio.GetOutputDevices())
             OutputDevices.Add(d);
@@ -55,41 +59,48 @@ public sealed partial class MainViewModel : ObservableObject
         if (SelectedOutputDevice != null)
             _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
-        // Profiles
-        RefreshProfilesList();
-        SelectedProfileName = string.IsNullOrWhiteSpace(_cfg.SelectedProfile) ? "default" : _cfg.SelectedProfile;
+        // Ensure config baseline + profiles exist
+        EnsureProfilesInitialized(padCount: 8);
+        RefreshProfilesCollection();
 
-        // Pads from selected profile
-        BuildPadsFromSelectedProfile(padCount: 8);
-
-        PropertyChanged += OnMainChanged;
-
-        AddProfileCommand = new RelayCommand(AddProfile);
-        DeleteProfileCommand = new RelayCommand(DeleteProfile);
-    }
-
-    partial void OnSelectedProfileNameChanged(string value)
-    {
-        if (_suspendSave) return;
-        if (string.IsNullOrWhiteSpace(value)) return;
-
-        SavePadsIntoSelectedProfile(); // persist edits from current pads into current profile
-
-        _cfg.SelectedProfile = value.Trim();
-        EnsureSelectedProfileExists(padCount: Pads.Count == 0 ? 8 : Pads.Count);
-
-        _store.Save(_cfg);
+        // Select persisted profile (by name), otherwise default
+        var wanted = string.IsNullOrWhiteSpace(_cfg.SelectedProfile) ? "default" : _cfg.SelectedProfile.Trim();
 
         _suspendSave = true;
         try
         {
-            RefreshProfilesList();
-            ApplySelectedProfileToPads();
+            SelectedProfile =
+                Profiles.FirstOrDefault(p => string.Equals(p.Name, wanted, StringComparison.OrdinalIgnoreCase))
+                ?? Profiles.FirstOrDefault(p => string.Equals(p.Name, "default", StringComparison.OrdinalIgnoreCase))
+                ?? Profiles.FirstOrDefault();
         }
         finally
         {
             _suspendSave = false;
         }
+
+        // Build pads
+        BuildPadsFromSelectedProfile(padCount: 8);
+
+        PropertyChanged += OnMainChanged;
+    }
+
+    partial void OnSelectedProfileChanged(ConfigProfile? value)
+    {
+        if (_suspendSave) return;
+        if (value == null) return;
+
+        // Save current pad edits into the OLD selected profile (based on cfg.SelectedProfile)
+        SavePadsIntoSelectedProfile();
+
+        // Persist selection
+        _cfg.SelectedProfile = value.Name ?? "default";
+        EnsureSelectedProfileExists(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+
+        // Apply new profile data into pads
+        ApplySelectedProfileToPads();
+
+        _store.Save(_cfg);
     }
 
     private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
@@ -116,53 +127,58 @@ public sealed partial class MainViewModel : ObservableObject
         var raw = (NewProfileName ?? "").Trim();
         if (string.IsNullOrWhiteSpace(raw)) return;
 
-        var name = NormalizeProfileName(raw);
-        if (string.IsNullOrWhiteSpace(name)) return;
+        var name = raw; // keep user-facing name exactly as typed (no normalization)
+        var padCount = Pads.Count == 0 ? 8 : Pads.Count;
 
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount);
 
         if (_cfg.Profiles.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
             return;
 
+        // Save current edits into current profile before switching away
         SavePadsIntoSelectedProfile();
 
-        var cloneFrom = GetSelectedProfile();
-        var newProfile = new ConfigProfile
+        // CLEAN SLATE
+        var created = new ConfigProfile
         {
             Name = name,
-            Pads = cloneFrom.Pads.Select(ClonePad).ToList()
+            Pads = CreateDefaultPads(padCount)
         };
 
-        _cfg.Profiles.Add(newProfile);
+        _cfg.Profiles.Add(created);
         _cfg.SelectedProfile = name;
 
         _store.Save(_cfg);
 
+        RefreshProfilesCollection();
+
         _suspendSave = true;
         try
         {
-            RefreshProfilesList();
-            SelectedProfileName = name;
-            ApplySelectedProfileToPads();
+            SelectedProfile = Profiles.First(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
             NewProfileName = "";
         }
         finally
         {
             _suspendSave = false;
         }
+
+        ApplySelectedProfileToPads(); // blank defaults
     }
 
     private void DeleteProfile()
     {
-        var cur = (SelectedProfileName ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(cur)) return;
-        if (string.Equals(cur, "default", StringComparison.OrdinalIgnoreCase)) return;
+        if (SelectedProfile == null) return;
+
+        var curName = (SelectedProfile.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(curName)) return;
+        if (string.Equals(curName, "default", StringComparison.OrdinalIgnoreCase)) return;
 
         EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
 
         SavePadsIntoSelectedProfile();
 
-        var idx = _cfg.Profiles.FindIndex(p => string.Equals(p.Name, cur, StringComparison.OrdinalIgnoreCase));
+        var idx = _cfg.Profiles.FindIndex(p => string.Equals(p.Name, curName, StringComparison.OrdinalIgnoreCase));
         if (idx < 0) return;
 
         _cfg.Profiles.RemoveAt(idx);
@@ -170,24 +186,32 @@ public sealed partial class MainViewModel : ObservableObject
 
         _store.Save(_cfg);
 
+        RefreshProfilesCollection();
+
         _suspendSave = true;
         try
         {
-            RefreshProfilesList();
-            SelectedProfileName = "default";
-            ApplySelectedProfileToPads();
+            SelectedProfile =
+                Profiles.FirstOrDefault(p => string.Equals(p.Name, "default", StringComparison.OrdinalIgnoreCase))
+                ?? Profiles.FirstOrDefault();
         }
         finally
         {
             _suspendSave = false;
         }
+
+        ApplySelectedProfileToPads();
     }
 
     private void SaveNow()
     {
         _cfg.SelectedOutputDeviceId = SelectedOutputDevice?.Id ?? -1;
+
         SavePadsIntoSelectedProfile();
-        _cfg.SelectedProfile = string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName.Trim();
+
+        if (SelectedProfile != null && !string.IsNullOrWhiteSpace(SelectedProfile.Name))
+            _cfg.SelectedProfile = SelectedProfile.Name;
+
         _store.Save(_cfg);
     }
 
@@ -245,7 +269,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
 
-        var profile = GetSelectedProfile();
+        var profile = GetProfileByName(_cfg.SelectedProfile) ?? GetProfileByName("default") ?? _cfg.Profiles[0];
 
         for (int i = 0; i < Pads.Count && i < profile.Pads.Count; i++)
         {
@@ -259,21 +283,23 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RefreshProfilesList()
+    private void RefreshProfilesCollection()
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        Profiles.Clear();
 
-        ProfileNames.Clear();
         foreach (var p in _cfg.Profiles
-                     .Select(x => x.Name)
-                     .Where(n => !string.IsNullOrWhiteSpace(n))
-                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                     .OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+                     .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                     .OrderBy(p => string.Equals(p.Name, "default", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                     .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
         {
-            ProfileNames.Add(p);
+            Profiles.Add(p);
         }
 
-        if (!ProfileNames.Any(n => string.Equals(n, _cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase)))
+        // keep cfg.SelectedProfile valid
+        if (string.IsNullOrWhiteSpace(_cfg.SelectedProfile))
+            _cfg.SelectedProfile = "default";
+
+        if (!_cfg.Profiles.Any(p => string.Equals(p.Name, _cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase)))
             _cfg.SelectedProfile = "default";
     }
 
@@ -299,7 +325,7 @@ public sealed partial class MainViewModel : ObservableObject
             pr.Pads ??= new System.Collections.Generic.List<PadConfig>();
 
             while (pr.Pads.Count < padCount)
-                pr.Pads.Add(new PadConfig { Name = $"Pad {pr.Pads.Count + 1}" });
+                pr.Pads.Add(new PadConfig { Name = $"Pad {pr.Pads.Count + 1}", Kind = PadSourceKind.None, Source = "", Volume = 1.0 });
 
             while (pr.Pads.Count > padCount)
                 pr.Pads.RemoveAt(pr.Pads.Count - 1);
@@ -332,16 +358,30 @@ public sealed partial class MainViewModel : ObservableObject
     {
         EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
 
+        var selectedName = SelectedProfile?.Name;
+        if (!string.IsNullOrWhiteSpace(selectedName))
+            _cfg.SelectedProfile = selectedName;
+
         var name = string.IsNullOrWhiteSpace(_cfg.SelectedProfile) ? "default" : _cfg.SelectedProfile.Trim();
 
-        return _cfg.Profiles.First(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        return GetProfileByName(name)
+               ?? GetProfileByName("default")
+               ?? _cfg.Profiles[0];
+    }
+
+    private ConfigProfile? GetProfileByName(string? name)
+    {
+        name = (name ?? "").Trim();
+        if (name.Length == 0) return null;
+
+        return _cfg.Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
     private static System.Collections.Generic.List<PadConfig> CreateDefaultPads(int padCount)
     {
         var pads = new System.Collections.Generic.List<PadConfig>(padCount);
         for (int i = 0; i < padCount; i++)
-            pads.Add(new PadConfig { Name = $"Pad {i + 1}" });
+            pads.Add(new PadConfig { Name = $"Pad {i + 1}", Kind = PadSourceKind.None, Source = "", Volume = 1.0 });
         return pads;
     }
 
@@ -352,26 +392,4 @@ public sealed partial class MainViewModel : ObservableObject
         Source = p.Source,
         Volume = p.Volume
     };
-
-    private static string NormalizeProfileName(string name)
-    {
-        name = (name ?? "").Trim();
-        if (name.Length == 0) return "";
-
-        // keep it simple + stable for JSON keys / filenames later
-        var lower = name.ToLowerInvariant();
-        var chars = lower.Select(c =>
-            (c >= 'a' && c <= 'z') ||
-            (c >= '0' && c <= '9') ||
-            c == '-' || c == '_'
-                ? c
-                : '-').ToArray();
-
-        var cleaned = new string(chars);
-        while (cleaned.Contains("--"))
-            cleaned = cleaned.Replace("--", "-");
-
-        cleaned = cleaned.Trim('-', '_');
-        return cleaned.Length == 0 ? "" : cleaned;
-    }
 }
