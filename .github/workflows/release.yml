@@ -2,8 +2,10 @@ name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [ "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "master" ]
 
 permissions:
   contents: write
