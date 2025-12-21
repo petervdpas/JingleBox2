@@ -1,12 +1,13 @@
 // ===============================
 // ViewModels/PadViewModel.cs
 // ===============================
+using System;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
-using System;
-using System.Threading.Tasks;
+using JingleBox2.Models;
 
 namespace JingleBox2.ViewModels;
 
@@ -28,22 +29,15 @@ public sealed partial class PadViewModel : ObservableObject
     [ObservableProperty] private bool isPlaying;
 
     public bool IsFile => SourceKind == PadSourceKind.File;
-    public bool IsWeb  => SourceKind == PadSourceKind.StreamUrl;
+    public bool IsWeb => SourceKind == PadSourceKind.StreamUrl;
 
     public string Title => string.IsNullOrWhiteSpace(Name) ? $"Pad {Index + 1}" : Name;
 
-    // CONFIG bindings
     public IRelayCommand PlayCommand { get; }
     public IRelayCommand StopCommand { get; }
     public IAsyncRelayCommand AssignCommand { get; }
-
-    // USE bindings
     public IRelayCommand TogglePlayCommand { get; }
     public IRelayCommand ClearCommand { get; }
-
-    // USE helper
-    public string UseButtonText => IsPlaying ? "STOP" : Title;
-    public bool IsNotPlaying => !IsPlaying;
 
     public PadViewModel(int index, IAudioEngine audio, Func<Task<string?>> pickFileAsync)
     {
@@ -61,80 +55,25 @@ public sealed partial class PadViewModel : ObservableObject
 
             if (e.State == PadPlaybackState.Error && !string.IsNullOrWhiteSpace(e.Message))
                 Status = e.Message;
-
-            OnPropertyChanged(nameof(UseButtonText));
-            OnPropertyChanged(nameof(IsNotPlaying));
         };
 
         PlayCommand = new RelayCommand(() =>
         {
             Status = "";
-
-            try
-            {
-                if (string.IsNullOrWhiteSpace(FilePath))
-                {
-                    Status = "No source set.";
-                    return;
-                }
-
-                if (SourceKind == PadSourceKind.File)
-                {
-                    _audio.PlaySample(Index, FilePath, Volume);
-                    Status = "Playing file.";
-                }
-                else if (SourceKind == PadSourceKind.StreamUrl)
-                {
-                    _audio.PlayStream(Index, FilePath, Volume);
-                    Status = "Playing stream.";
-                }
-            }
-            catch (Exception ex)
-            {
-                Status = ex.Message;
-            }
+            TryStart();
         });
 
         StopCommand = new RelayCommand(() =>
         {
             Status = "";
-            try
-            {
-                _audio.StopSample(Index);
-            }
-            catch (Exception ex)
-            {
-                Status = ex.Message;
-            }
+            TryStop();
         });
 
         TogglePlayCommand = new RelayCommand(() =>
         {
             Status = "";
-
-            try
-            {
-                if (IsPlaying)
-                {
-                    _audio.StopSample(Index);
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(FilePath))
-                {
-                    Status = "No source set.";
-                    return;
-                }
-
-                if (SourceKind == PadSourceKind.File)
-                    _audio.PlaySample(Index, FilePath, Volume);
-                else
-                    _audio.PlayStream(Index, FilePath, Volume);
-            }
-            catch (Exception ex)
-            {
-                Status = ex.Message;
-            }
+            if (IsPlaying) TryStop();
+            else TryStart();
         });
 
         AssignCommand = new AsyncRelayCommand(async () =>
@@ -154,6 +93,7 @@ public sealed partial class PadViewModel : ObservableObject
 
         ClearCommand = new RelayCommand(() =>
         {
+            Status = "";
             try
             {
                 _audio.StopSample(Index);
@@ -161,7 +101,6 @@ public sealed partial class PadViewModel : ObservableObject
                 FilePath = null;
                 SourceKind = PadSourceKind.File;
                 Volume = 1.0f;
-                Status = "Cleared.";
             }
             catch (Exception ex)
             {
@@ -170,11 +109,40 @@ public sealed partial class PadViewModel : ObservableObject
         });
     }
 
-    partial void OnNameChanged(string value)
+    private void TryStart()
     {
-        OnPropertyChanged(nameof(Title));
-        OnPropertyChanged(nameof(UseButtonText));
+        try
+        {
+            if (string.IsNullOrWhiteSpace(FilePath))
+            {
+                Status = "No source set.";
+                return;
+            }
+
+            if (SourceKind == PadSourceKind.File)
+                _audio.PlaySample(Index, FilePath, Volume);
+            else
+                _audio.PlayStream(Index, FilePath, Volume);
+        }
+        catch (Exception ex)
+        {
+            Status = ex.Message;
+        }
     }
+
+    private void TryStop()
+    {
+        try
+        {
+            _audio.StopSample(Index);
+        }
+        catch (Exception ex)
+        {
+            Status = ex.Message;
+        }
+    }
+
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(Title));
 
     partial void OnFilePathChanged(string? value) =>
         _audio.SetPadSource(Index, SourceKind, value);
@@ -190,5 +158,11 @@ public sealed partial class PadViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFile));
         OnPropertyChanged(nameof(IsWeb));
         _audio.SetPadSource(Index, SourceKind, FilePath);
+    }
+
+    public void SetSourceFromConfig(PadSourceKind kind, string source)
+    {
+        SourceKind = kind;
+        FilePath = string.IsNullOrWhiteSpace(source) ? null : source;
     }
 }
