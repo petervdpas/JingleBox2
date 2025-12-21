@@ -10,13 +10,17 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
-OutputDir=installer\windows\output
+
+; IMPORTANT: OutputDir is relative to this .iss file location (installer\windows)
+OutputDir=output
+
 OutputBaseFilename=JingleBox2-Setup
 Compression=lzma
 SolidCompression=yes
 
 [Files]
-Source: "out\windows-x64\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+; IMPORTANT: out/windows-x64 is at repo root (two levels up from installer\windows)
+Source: "..\..\out\windows-x64\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
