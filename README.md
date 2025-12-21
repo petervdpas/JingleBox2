@@ -1,7 +1,7 @@
 # JingleBox2
 
 <p align="center">
-  <img src="Assets/icon.png" alt="JingleBox2 icon" width="128" height="128" />
+  <img src="Assets/icon.ico" alt="JingleBox2 icon" width="128" height="128" />
 </p>
 
 **JingleBox2** is a lightweight, cross-platform audio pad launcher built with **.NET** and **Avalonia UI**, designed for **radio, streaming, and live audio workflows**.
