@@ -1,16 +1,23 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
+
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-    <!-- Develop on Windows; keep local runs simple -->
-    <PlatformTarget>x64</PlatformTarget>
+
     <!-- Enable publishing for Windows + Linux -->
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
+
+  <!-- Optional: if you really want x64 for Windows builds only (not for Linux ARM64) -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(OS)' == 'Windows_NT'">
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.10" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
@@ -20,6 +27,7 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="ManagedBass" Version="4.0.2" />
   </ItemGroup>
@@ -30,23 +38,35 @@
 
   <!-- Native BASS binaries per RID -->
   <ItemGroup>
-    <!-- Windows -->
-    <None Include="native\win-x64\bass.dll" CopyToOutputDirectory="PreserveNewest"
-      CopyToPublishDirectory="PreserveNewest" Visible="false"
-      Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == ''" />
+    <!-- Windows (publish win-x64, also local builds without -r on Windows) -->
+    <None Include="native\win-x64\bass.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' OR ('$(RuntimeIdentifier)' == '' AND '$(OS)' == 'Windows_NT')" />
+
     <!-- Linux x64 -->
-    <None Include="native\linux-x64\libbass.so" CopyToOutputDirectory="PreserveNewest"
-      CopyToPublishDirectory="PreserveNewest" Visible="false"
-      Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
+    <None Include="native\linux-x64\libbass.so"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
+
     <!-- Linux ARM64 -->
-    <None Include="native\linux-arm64\libbass.so" CopyToOutputDirectory="PreserveNewest"
-      CopyToPublishDirectory="PreserveNewest" Visible="false"
-      Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
+    <None Include="native\linux-arm64\libbass.so"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
   </ItemGroup>
-  <!-- Copy for local Debug runs (no -r) on Windows: ensure bass.dll is next to exe -->
-  <Target Name="CopyBassToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
-    <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)"
-      SkipUnchangedFiles="true" />
+
+  <!-- Extra safety: local builds on Windows sometimes don't evaluate item conditions the way you expect -->
+  <Target Name="CopyBassToOutput"
+          AfterTargets="Build"
+          Condition="'$(RuntimeIdentifier)' == '' AND '$(OS)' == 'Windows_NT'">
+    <Copy SourceFiles="native\win-x64\bass.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

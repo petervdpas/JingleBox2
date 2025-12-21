@@ -2,8 +2,11 @@
 #define AppVersion "1.0.0"
 #define AppPublisher "Peter van de Pas"
 #define AppExeName "JingleBox2.exe"
+#define AppIcon "assets\app.ico"
 
 [Setup]
+; Use a real GUID. Create one once and keep it forever for upgrades.
+; Inno syntax needs double {{ ... }}
 AppId={{A1B2C3D4-E5F6-47A1-ABCD-123456789000}
 AppName={#AppName}
 AppVersion={#AppVersion}
@@ -11,15 +14,19 @@ AppPublisher={#AppPublisher}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 
-; IMPORTANT: OutputDir is relative to this .iss file location (installer\windows)
-OutputDir=output
+; Installer EXE icon
+SetupIconFile={#AppIcon}
 
+; Wizard branding (ICO may work, BMP is recommended for best look)
+WizardSmallImageFile={#AppIcon}
+; WizardImageFile={#AppIcon}
+
+OutputDir=output
 OutputBaseFilename=JingleBox2-Setup
 Compression=lzma
 SolidCompression=yes
 
 [Files]
-; IMPORTANT: out/windows-x64 is at repo root (two levels up from installer\windows)
 Source: "..\..\out\windows-x64\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
 
 [Icons]
