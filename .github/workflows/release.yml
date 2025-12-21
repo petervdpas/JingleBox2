@@ -171,28 +171,46 @@ jobs:
             -o out/linux-x64
 
       - name: Prepare RPM sources
+        shell: bash
         run: |
+          set -euo pipefail
+
+          RPMTOP="$HOME/rpmbuild"
           rpmdev-setuptree
 
           VER="${GITHUB_REF_NAME#v}"
           PKGROOT="jinglebox2-${VER}"
+          TARBALL="${PKGROOT}.tar.gz"
 
-          mkdir -p "$PKGROOT/payload"
-          mkdir -p "$PKGROOT/packaging/fedora/icons"
+          STAGE="$(mktemp -d)"
+          mkdir -p "$STAGE/$PKGROOT/payload"
+          mkdir -p "$STAGE/$PKGROOT/packaging/fedora/icons"
 
-          cp -a out/linux-x64/. "$PKGROOT/payload/"
-          cp -a packaging/fedora/jinglebox2.sh "$PKGROOT/packaging/fedora/"
-          cp -a packaging/fedora/jinglebox2.desktop "$PKGROOT/packaging/fedora/"
-          cp -a packaging/fedora/icons/jinglebox2.png "$PKGROOT/packaging/fedora/icons/"
-          cp -a packaging/fedora/jinglebox2.spec ~/rpmbuild/SPECS/jinglebox2.spec
-          cp -a LICENSE "$PKGROOT/" || true
+          cp -a out/linux-x64/. "$STAGE/$PKGROOT/payload/"
+          cp -a packaging/fedora/jinglebox2.sh "$STAGE/$PKGROOT/packaging/fedora/"
+          cp -a packaging/fedora/jinglebox2.desktop "$STAGE/$PKGROOT/packaging/fedora/"
+          cp -a packaging/fedora/icons/jinglebox2.png "$STAGE/$PKGROOT/packaging/fedora/icons/"
+          cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
+          cp -a LICENSE "$STAGE/$PKGROOT/" || true
 
-          tar -czf ~/rpmbuild/SOURCES/jinglebox2-${VER}.tar.gz "$PKGROOT"
+          # Create Source0 tarball exactly where rpmbuild expects it
+          tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
+
+          echo "SOURCES dir:"
+          ls -la "$RPMTOP/SOURCES"
+          test -f "$RPMTOP/SOURCES/$TARBALL"
 
       - name: Build RPM
+        shell: bash
         run: |
+          set -euo pipefail
+
+          RPMTOP="$HOME/rpmbuild"
           VER="${GITHUB_REF_NAME#v}"
-          rpmbuild -ba ~/rpmbuild/SPECS/jinglebox2.spec --define "version ${VER}"
+
+          rpmbuild -ba "$RPMTOP/SPECS/jinglebox2.spec" \
+            --define "_topdir ${RPMTOP}" \
+            --define "version ${VER}"
 
       - name: Collect RPM
         run: |
