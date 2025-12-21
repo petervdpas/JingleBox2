@@ -2,10 +2,8 @@ name: release
 
 on:
   push:
-    branches: [ "master" ]
-    tags: [ "v*" ]
-  pull_request:
-    branches: [ "master" ]
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -38,16 +36,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "9.0.x"
 
       - name: Restore
         run: dotnet restore
 
-      # ---------- Linux deps (arm64 only) ----------
       - name: Install ARM64 build deps (Linux arm64 only)
         if: matrix.rid == 'linux-arm64'
         shell: bash
@@ -55,9 +54,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
 
-      # --------------------
-      # Publish (Windows) - IMPORTANT: no single-file, so bass.dll stays next to exe
-      # --------------------
       - name: Publish (Windows)
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
@@ -74,21 +70,18 @@ jobs:
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
         run: |
+          Write-Host "Publish output:"
+          Get-ChildItem "out\${{ matrix.name }}" | Select-Object Name,Length | Format-Table -AutoSize
           $p = "out\${{ matrix.name }}\bass.dll"
           if (!(Test-Path $p)) { throw "bass.dll missing at $p" }
           Write-Host "OK: bass.dll present"
-          Get-ChildItem "out\${{ matrix.name }}" | Select-Object Name,Length | Format-Table -AutoSize
 
-      # --------------------
-      # Publish (Linux)
-      # --------------------
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
           EXTRA_PROPS=""
           if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
-            # Clear any forced x64 PlatformTarget in the csproj/solution
             EXTRA_PROPS="-p:PlatformTarget=AnyCPU"
           fi
 
@@ -101,9 +94,6 @@ jobs:
             $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
-      # --------------------
-      # Windows installer via Inno Setup
-      # --------------------
       - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
         run: choco install innosetup -y
@@ -114,9 +104,6 @@ jobs:
         run: |
           iscc installer/windows/JingleBox2.iss
 
-      # --------------------
-      # Package Linux artifacts (tar.gz)
-      # --------------------
       - name: Create tar.gz (Linux)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
@@ -125,18 +112,12 @@ jobs:
           tar -czf "../../${APP_NAME}-${{ matrix.name }}.tar.gz" .
           cd ../..
 
-      # --------------------
-      # Package Windows portable zip
-      # --------------------
       - name: Create zip (Windows portable)
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
         run: |
-          Compress-Archive -Path "out/${{ matrix.name }}\*" -DestinationPath "$env:APP_NAME-${{ matrix.name }}.zip"
+          Compress-Archive -Path "out\${{ matrix.name }}\*" -DestinationPath "$env:APP_NAME-${{ matrix.name }}.zip"
 
-      # --------------------
-      # Upload artifacts (per leg)
-      # --------------------
       - name: Upload artifacts (Windows)
         if: startsWith(matrix.rid, 'win')
         uses: actions/upload-artifact@v4
@@ -159,31 +140,22 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
-    # IMPORTANT: only create a GitHub Release when this run is for a tag push.
-    if: startsWith(github.ref, 'refs/tags/v')
-
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Show downloaded files
-        shell: bash
-        run: |
-          echo "Downloaded artifacts:"
-          find artifacts -type f -maxdepth 6 -print
-
       - name: Flatten artifacts
         shell: bash
         run: |
           mkdir -p dist
           find artifacts -type f -maxdepth 6 -exec cp "{}" dist/ \;
-          echo "Dist contents:"
           ls -la dist
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           files: dist/*
           generate_release_notes: true

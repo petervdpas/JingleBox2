@@ -13,8 +13,8 @@
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
-  <!-- Optional: if you really want x64 for Windows builds only (not for Linux ARM64) -->
-  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(OS)' == 'Windows_NT'">
+  <!-- Optional: force x64 when building on Windows (but do NOT force it for Linux builds) -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
 
@@ -38,7 +38,7 @@
 
   <!-- Native BASS binaries per RID -->
   <ItemGroup>
-    <!-- Windows (publish win-x64, also local builds without -r on Windows) -->
+    <!-- Windows (publish win-x64, and local runs without -r on Windows) -->
     <None Include="native\win-x64\bass.dll"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
@@ -60,12 +60,23 @@
           Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
   </ItemGroup>
 
-  <!-- Extra safety: local builds on Windows sometimes don't evaluate item conditions the way you expect -->
+  <!-- Safety: local builds on Windows (no -r) -->
   <Target Name="CopyBassToOutput"
           AfterTargets="Build"
           Condition="'$(RuntimeIdentifier)' == '' AND '$(OS)' == 'Windows_NT'">
+    <Message Importance="high" Text="Copying native\win-x64\bass.dll -> $(OutDir)" />
     <Copy SourceFiles="native\win-x64\bass.dll"
           DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- CRITICAL: publish fix for win-x64 (this is what makes the installer run) -->
+  <Target Name="EnsureBassDllInPublish"
+          AfterTargets="Publish"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <Message Importance="high" Text="Copying native\win-x64\bass.dll -> $(PublishDir)" />
+    <Copy SourceFiles="native\win-x64\bass.dll"
+          DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
   </Target>
 
