@@ -2,7 +2,7 @@
 #define AppVersion "1.0.0"
 #define AppPublisher "Peter van de Pas"
 #define AppExeName "JingleBox2.exe"
-#define AppIcon "assets\app.ico"
+#define SetupIco "assets\app.ico"
 
 [Setup]
 ; Use a real GUID. Create one once and keep it forever for upgrades.
@@ -15,11 +15,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 
 ; Installer EXE icon
-SetupIconFile={#AppIcon}
-
-; Wizard branding (ICO may work, BMP is recommended for best look)
-WizardSmallImageFile={#AppIcon}
-; WizardImageFile={#AppIcon}
+SetupIconFile={#SetupIco}
 
 OutputDir=output
 OutputBaseFilename=JingleBox2-Setup
