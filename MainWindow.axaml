@@ -7,7 +7,7 @@
   Width="520" Height="920"
   MinWidth="520" MinHeight="520"
   Title="JingleBox2"
-  Icon="Assets/icon.ico"
+  Icon="/Assets/icon.ico"
   Background="{DynamicResource BgBrush}">
 
   <DockPanel Margin="16">
