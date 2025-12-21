@@ -6,16 +6,19 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <!-- Develop on Windows; keep local runs simple -->
     <PlatformTarget>x64</PlatformTarget>
+
+    <!-- Enable publishing for Windows + Linux -->
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.10" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.10" />
-    <!--Condition
-    below is needed to remove Avalonia.Diagnostics package from build output in Release
-    configuration.-->
     <PackageReference Include="Avalonia.Diagnostics" Version="11.3.10">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
@@ -24,13 +27,35 @@
     <PackageReference Include="ManagedBass" Version="4.0.2" />
   </ItemGroup>
 
+  <!-- Native BASS binaries per RID -->
   <ItemGroup>
-    <None Include="native\win-x64\bass.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <!-- Windows -->
+    <None Include="native\win-x64\bass.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == ''" />
+
+    <!-- Linux x64 -->
+    <None Include="native\linux-x64\libbass.so"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
+
+    <!-- Linux ARM64 -->
+    <None Include="native\linux-arm64\libbass.so"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false"
+          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
   </ItemGroup>
-  <Target Name="CopyBassToOutput" AfterTargets="Build">
-    <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)"
-      SkipUnchangedFiles="true" />
+
+  <!-- Copy for local Debug runs (no -r) on Windows: ensure bass.dll is next to exe -->
+  <Target Name="CopyBassToOutput" AfterTargets="Build"
+          Condition="'$(RuntimeIdentifier)' == ''">
+    <Copy SourceFiles="native\win-x64\bass.dll"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
   </Target>
 </Project>
