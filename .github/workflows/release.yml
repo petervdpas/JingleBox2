@@ -56,7 +56,7 @@ jobs:
           sudo apt-get install -y clang zlib1g-dev
 
       # --------------------
-      # Publish (Windows)
+      # Publish (Windows) - IMPORTANT: no single-file, so bass.dll stays next to exe
       # --------------------
       - name: Publish (Windows)
         if: startsWith(matrix.rid, 'win')
@@ -66,9 +66,18 @@ jobs:
             -c $env:CONFIGURATION `
             -r ${{ matrix.rid }} `
             --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishSingleFile=false `
+            -p:IncludeNativeLibrariesForSelfExtract=false `
             -o "out/${{ matrix.name }}"
+
+      - name: Verify bass.dll exists (Windows)
+        if: startsWith(matrix.rid, 'win')
+        shell: pwsh
+        run: |
+          $p = "out\${{ matrix.name }}\bass.dll"
+          if (!(Test-Path $p)) { throw "bass.dll missing at $p" }
+          Write-Host "OK: bass.dll present"
+          Get-ChildItem "out\${{ matrix.name }}" | Select-Object Name,Length | Format-Table -AutoSize
 
       # --------------------
       # Publish (Linux)
@@ -77,13 +86,13 @@ jobs:
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
-            EXTRA_PROPS=""
-            if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
+          EXTRA_PROPS=""
+          if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
             # Clear any forced x64 PlatformTarget in the csproj/solution
             EXTRA_PROPS="-p:PlatformTarget=AnyCPU"
-            fi
+          fi
 
-            dotnet publish "$PROJECT_PATH" \
+          dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r "${{ matrix.rid }}" \
             --self-contained true \
@@ -149,6 +158,9 @@ jobs:
     name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
+
+    # IMPORTANT: only create a GitHub Release when this run is for a tag push.
+    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Download all artifacts
