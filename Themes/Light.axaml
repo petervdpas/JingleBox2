@@ -1,0 +1,24 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Color x:Key="Color.Background">#F6F7F8</Color>
+  <Color x:Key="Color.Surface">#FFFFFF</Color>
+
+  <Color x:Key="Color.Border">#D2D6DB</Color>
+  <Color x:Key="Color.BorderMuted">#E1E4E8</Color>
+
+  <Color x:Key="Color.Pad">#E0E0E0</Color>
+  <Color x:Key="Color.PadHover">#D4D4D4</Color>
+  <Color x:Key="Color.PadChecked">#BFE8D8</Color>
+
+  <Color x:Key="Color.TextPrimary">#0E0E0E</Color>
+  <Color x:Key="Color.TextMuted">#4A5560</Color>
+
+  <Color x:Key="Color.Accent">#0B6BFF</Color>
+  <Color x:Key="Color.Danger">#B63E3E</Color>
+
+  <Color x:Key="SystemAccentColor">#0B6BFF</Color>
+  <Color x:Key="SystemAccentColorLight1">#4A93FF</Color>
+  <Color x:Key="SystemAccentColorDark1">#0850BF</Color>
+
+</ResourceDictionary>

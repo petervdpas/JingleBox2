@@ -6,7 +6,8 @@
         x:DataType="vm:MainViewModel"
         MinWidth="520" MinHeight="520"
         Width="520" Height="920"
-        Title="Audio Control (Prototype)">
+        Title="JingleBox2" 
+        Background="{DynamicResource BgBrush}">
 
   <DockPanel Margin="16">
 

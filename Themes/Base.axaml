@@ -1,0 +1,43 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ========= Semantic brushes (your app uses these) ========= -->
+
+  <SolidColorBrush x:Key="BgBrush" Color="{DynamicResource Color.Background}" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource Color.Surface}" />
+
+  <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource Color.Border}" />
+  <SolidColorBrush x:Key="BorderMutedBrush" Color="{DynamicResource Color.BorderMuted}" />
+
+  <SolidColorBrush x:Key="PadBrush" Color="{DynamicResource Color.Pad}" />
+  <SolidColorBrush x:Key="PadHoverBrush" Color="{DynamicResource Color.PadHover}" />
+  <SolidColorBrush x:Key="PadCheckedBrush" Color="{DynamicResource Color.PadChecked}" />
+
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource Color.TextPrimary}" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource Color.TextMuted}" />
+
+  <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource Color.Accent}" />
+  <SolidColorBrush x:Key="DangerBrush" Color="{DynamicResource Color.Danger}" />
+
+  <!-- ========= Make Fluent controls follow your theme ========= -->
+  <!-- Backgrounds -->
+  <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush"
+                   Color="{DynamicResource Color.Background}" />
+  <SolidColorBrush x:Key="SystemControlBackgroundBaseMediumLowBrush"
+                   Color="{DynamicResource Color.Background}" />
+
+  <!-- Surfaces / cards -->
+  <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumLowBrush"
+                   Color="{DynamicResource Color.Surface}" />
+  <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush"
+                   Color="{DynamicResource Color.Surface}" />
+  <SolidColorBrush x:Key="SystemControlBackgroundAltMediumBrush"
+                   Color="{DynamicResource Color.Surface}" />
+
+  <!-- Text -->
+  <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush"
+                   Color="{DynamicResource Color.TextPrimary}" />
+  <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush"
+                   Color="{DynamicResource Color.TextMuted}" />
+
+</ResourceDictionary>
