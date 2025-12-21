@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Models;
+using JingleBox2.UI;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -28,6 +29,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     // CONFIG header
     public ObservableCollection<string> ProfileNames { get; } = new();
+
+    // THEME picker
+    public ObservableCollection<string> ThemeNames { get; } = new()
+    {
+        "Dark",
+        "Neon",
+        "Industrial",
+        "Light"
+    };
+
+    [ObservableProperty] private string selectedTheme = "Dark";
 
     [ObservableProperty] private OutputDevice? selectedOutputDevice;
 
@@ -75,6 +87,11 @@ public sealed partial class MainViewModel : ObservableObject
         {
             SelectedProfileName = resolved;
             _cfg.SelectedProfile = resolved;
+
+            // Theme: load from config, validate against known themes
+            var t = string.IsNullOrWhiteSpace(_cfg.SelectedTheme) ? "Dark" : _cfg.SelectedTheme.Trim();
+            SelectedTheme = ThemeNames.FirstOrDefault(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase)) ?? "Dark";
+            _cfg.SelectedTheme = SelectedTheme;
         }
         finally
         {
@@ -83,6 +100,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Pads
         BuildPadsFromSelectedProfile(padCount: 8);
+
+        // Apply initial theme once
+        ThemeManager.Apply(SelectedTheme);
 
         PropertyChanged += OnMainChanged;
     }
@@ -120,6 +140,19 @@ public sealed partial class MainViewModel : ObservableObject
         {
             _suspendSave = false;
         }
+    }
+
+    partial void OnSelectedThemeChanged(string value)
+    {
+        if (_suspendSave) return;
+
+        var t = string.IsNullOrWhiteSpace(value) ? "Dark" : value.Trim();
+        var resolved = ThemeNames.FirstOrDefault(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase)) ?? "Dark";
+
+        _cfg.SelectedTheme = resolved;
+        ThemeManager.Apply(resolved);
+
+        _store.Save(_cfg);
     }
 
     private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
@@ -231,6 +264,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Keep SelectedProfileName + cfg in sync
         _cfg.SelectedProfile = string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName.Trim();
+
+        // Theme is already stored via OnSelectedThemeChanged, but keep consistent:
+        _cfg.SelectedTheme = string.IsNullOrWhiteSpace(SelectedTheme) ? "Dark" : SelectedTheme.Trim();
 
         _store.Save(_cfg);
     }

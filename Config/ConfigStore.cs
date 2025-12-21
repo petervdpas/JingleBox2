@@ -72,6 +72,8 @@ public sealed class ConfigStore
     private static void Normalize(AppConfig cfg, int padCount)
     {
         cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? "default" : cfg.SelectedProfile.Trim();
+        cfg.SelectedTheme = string.IsNullOrWhiteSpace(cfg.SelectedTheme) ? "Dark" : cfg.SelectedTheme.Trim();
+
         cfg.Profiles ??= new List<ConfigProfile>();
         cfg.Pads ??= new List<PadConfig>();
 

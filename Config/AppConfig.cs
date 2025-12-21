@@ -32,6 +32,9 @@ public sealed class AppConfig
     public string SelectedProfile { get; set; } = "default";
     public List<ConfigProfile> Profiles { get; set; } = new();
 
+    // NEW: theme (applies to whole app)
+    public string SelectedTheme { get; set; } = "Dark";
+
     // LEGACY: keep for backward compatibility (older config.json)
     // If present, will be migrated into Profiles["default"].
     public List<PadConfig> Pads { get; set; } = new();
