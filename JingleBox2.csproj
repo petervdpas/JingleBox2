@@ -23,17 +23,30 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="ManagedBass" Version="4.0.2" />
   </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\icon.ico" />
+  </ItemGroup>
+
   <!-- Native BASS binaries per RID -->
   <ItemGroup>
     <!-- Windows -->
-    <None Include="native\win-x64\bass.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == ''" />
+    <None Include="native\win-x64\bass.dll" CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest" Visible="false"
+      Condition="'$(RuntimeIdentifier)' == 'win-x64' OR '$(RuntimeIdentifier)' == ''" />
     <!-- Linux x64 -->
-    <None Include="native\linux-x64\libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
+    <None Include="native\linux-x64\libbass.so" CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest" Visible="false"
+      Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
     <!-- Linux ARM64 -->
-    <None Include="native\linux-arm64\libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
+    <None Include="native\linux-arm64\libbass.so" CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest" Visible="false"
+      Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
   </ItemGroup>
   <!-- Copy for local Debug runs (no -r) on Windows: ensure bass.dll is next to exe -->
   <Target Name="CopyBassToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == ''">
-    <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
   </Target>
+
 </Project>
