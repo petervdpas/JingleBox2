@@ -18,9 +18,11 @@ jobs:
           - name: windows-x64
             os: windows-latest
             rid: win-x64
+
           - name: linux-x64
             os: ubuntu-latest
             rid: linux-x64
+
           - name: linux-arm64
             os: ubuntu-latest
             rid: linux-arm64
@@ -30,6 +32,9 @@ jobs:
     env:
       APP_NAME: JingleBox2
       CONFIGURATION: Release
+      # Your logs show the csproj is at repo root:
+      # /home/runner/work/JingleBox2/JingleBox2/JingleBox2.csproj
+      PROJECT_PATH: ./JingleBox2.csproj
 
     steps:
       - uses: actions/checkout@v4
@@ -42,15 +47,34 @@ jobs:
       - name: Restore
         run: dotnet restore
 
-      - name: Publish
+      # --------------------
+      # Publish (Windows)
+      # --------------------
+      - name: Publish (Windows)
+        if: startsWith(matrix.rid, 'win')
+        shell: pwsh
+        run: |
+          dotnet publish $env:PROJECT_PATH `
+            -c $env:CONFIGURATION `
+            -r ${{ matrix.rid }} `
+            --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -o "out/${{ matrix.name }}"
+
+      # --------------------
+      # Publish (Linux)
+      # --------------------
+      - name: Publish (Linux)
+        if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
-          dotnet publish ./JingleBox2/JingleBox2.csproj \
-            -c $CONFIGURATION \
-            -r ${{ matrix.rid }} \
+          dotnet publish "$PROJECT_PATH" \
+            -c "$CONFIGURATION" \
+            -r "${{ matrix.rid }}" \
             --self-contained true \
-            /p:PublishSingleFile=true \
-            /p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
             -o "out/${{ matrix.name }}"
 
       # --------------------
@@ -69,21 +93,23 @@ jobs:
 
       # --------------------
       # Package Linux artifacts
-      # (Start with tar.gz; add AppImage/DEB/RPM as next step)
       # --------------------
       - name: Create tar.gz (Linux)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
-          cd out/${{ matrix.name }}
-          tar -czf ../../${{ env.APP_NAME }}-${{ matrix.name }}.tar.gz .
+          cd "out/${{ matrix.name }}"
+          tar -czf "../../${APP_NAME}-${{ matrix.name }}.tar.gz" .
           cd ../..
 
+      # --------------------
+      # Package Windows portable zip
+      # --------------------
       - name: Create zip (Windows portable)
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
         run: |
-          Compress-Archive -Path out/${{ matrix.name }}\* -DestinationPath $env:APP_NAME-${{ matrix.name }}.zip
+          Compress-Archive -Path "out/${{ matrix.name }}\*" -DestinationPath "$env:APP_NAME-${{ matrix.name }}.zip"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -109,7 +135,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f -maxdepth 5 -print -exec cp {} dist/ \;
+          find artifacts -type f -maxdepth 6 -print -exec cp {} dist/ \;
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
