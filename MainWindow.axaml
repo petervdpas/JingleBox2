@@ -5,7 +5,7 @@
         x:Class="JingleBox2.MainWindow"
         x:DataType="vm:MainViewModel"
         MinWidth="520" MinHeight="520"
-        Width="520" Height="800"
+        Width="520" Height="920"
         Title="Audio Control (Prototype)">
 
   <DockPanel Margin="16">

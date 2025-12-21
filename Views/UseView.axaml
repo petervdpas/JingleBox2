@@ -4,7 +4,6 @@
              x:Class="JingleBox2.Views.UseView"
              x:DataType="vm:MainViewModel">
 
-  <!-- Pad styles -->
   <UserControl.Styles>
     <Style Selector="ToggleButton.pad">
       <Setter Property="CornerRadius" Value="14"/>
@@ -20,31 +19,51 @@
     <Style Selector="ToggleButton.pad:checked">
       <Setter Property="Background" Value="#1E3A1E"/>
     </Style>
+
+    <Style Selector="Border.profileBar">
+      <Setter Property="Background" Value="#101010"/>
+      <Setter Property="BorderBrush" Value="#2A2A2A"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="10,8"/>
+    </Style>
   </UserControl.Styles>
 
-  <!-- OUTER padding around entire pad area -->
   <Border Padding="24">
+    <Grid RowDefinitions="Auto,*"
+          RowSpacing="14">
 
-    <ItemsControl ItemsSource="{Binding Pads}">
-      <ItemsControl.ItemsPanel>
-        <ItemsPanelTemplate>
-          <!-- 2 columns, 4 rows automatically -->
-          <UniformGrid Columns="2"/>
-        </ItemsPanelTemplate>
-      </ItemsControl.ItemsPanel>
+      <!-- Profile indicator (does NOT affect pad sizing logic) -->
+      <Border Grid.Row="0" Classes="profileBar">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Opacity="0.75" Text="Profile:"/>
+          <TextBlock FontWeight="SemiBold" Text="{Binding SelectedProfileName}"/>
+        </StackPanel>
+      </Border>
 
-      <ItemsControl.ItemTemplate>
-        <DataTemplate x:DataType="vm:PadViewModel">
-          <!-- space between pads -->
-          <Border Margin="10">
-            <ToggleButton Classes="pad"
-                          IsChecked="{Binding IsPlaying, Mode=OneWay}"
-                          Command="{Binding TogglePlayCommand}"
-                          Content="{Binding Title}" />
-          </Border>
-        </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
+      <!-- Pads -->
+      <ItemsControl Grid.Row="1"
+                    ItemsSource="{Binding Pads}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="2"/>
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
 
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PadViewModel">
+            <Border Margin="10">
+              <ToggleButton Classes="pad"
+                            IsChecked="{Binding IsPlaying, Mode=OneWay}"
+                            Command="{Binding TogglePlayCommand}"
+                            Content="{Binding Title}" />
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+    </Grid>
   </Border>
 </UserControl>
