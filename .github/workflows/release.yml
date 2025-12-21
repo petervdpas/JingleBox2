@@ -1,0 +1,118 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Package (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            rid: win-x64
+          - name: linux-x64
+            os: ubuntu-latest
+            rid: linux-x64
+          - name: linux-arm64
+            os: ubuntu-latest
+            rid: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      APP_NAME: JingleBox2
+      CONFIGURATION: Release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish
+        shell: bash
+        run: |
+          dotnet publish ./JingleBox2/JingleBox2.csproj \
+            -c $CONFIGURATION \
+            -r ${{ matrix.rid }} \
+            --self-contained true \
+            /p:PublishSingleFile=true \
+            /p:IncludeNativeLibrariesForSelfExtract=true \
+            -o "out/${{ matrix.name }}"
+
+      # --------------------
+      # Windows installer via Inno Setup
+      # --------------------
+      - name: Install Inno Setup (Windows only)
+        if: startsWith(matrix.os, 'windows')
+        run: choco install innosetup -y
+
+      - name: Build installer (Windows only)
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: |
+          # Expect an installer script at installer/windows/JingleBox2.iss
+          iscc installer/windows/JingleBox2.iss
+
+      # --------------------
+      # Package Linux artifacts
+      # (Start with tar.gz; add AppImage/DEB/RPM as next step)
+      # --------------------
+      - name: Create tar.gz (Linux)
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        run: |
+          cd out/${{ matrix.name }}
+          tar -czf ../../${{ env.APP_NAME }}-${{ matrix.name }}.tar.gz .
+          cd ../..
+
+      - name: Create zip (Windows portable)
+        if: startsWith(matrix.rid, 'win')
+        shell: pwsh
+        run: |
+          Compress-Archive -Path out/${{ matrix.name }}\* -DestinationPath $env:APP_NAME-${{ matrix.name }}.zip
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.name }}
+          path: |
+            *.zip
+            *.tar.gz
+            installer/windows/output/*.exe
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          find artifacts -type f -maxdepth 5 -print -exec cp {} dist/ \;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
