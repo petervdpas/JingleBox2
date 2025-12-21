@@ -175,13 +175,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          RPMTOP="$HOME/rpmbuild"
+          echo "whoami=$(whoami)"
+          echo "HOME=$HOME"
+          echo "PWD=$(pwd)"
+
+          # Force rpmbuild topdir to the SAME place rpmbuild uses in the logs
+          RPMTOP="/github/home/rpmbuild"
+          mkdir -p "$RPMTOP"
           rpmdev-setuptree
 
           VER="${GITHUB_REF_NAME#v}"
           PKGROOT="jinglebox2-${VER}"
-          TARBALL="${PKGROOT}.tar.gz"
+          TARBALL="jinglebox2-${VER}.tar.gz"
 
+          # Stage content
           STAGE="$(mktemp -d)"
           mkdir -p "$STAGE/$PKGROOT/payload"
           mkdir -p "$STAGE/$PKGROOT/packaging/fedora/icons"
@@ -193,21 +200,23 @@ jobs:
           cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
           cp -a LICENSE "$STAGE/$PKGROOT/" || true
 
-          # Create Source0 tarball exactly where rpmbuild expects it
+          # Create Source0 where rpmbuild expects it
           tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
 
-          echo "SOURCES dir:"
+          echo "== SOURCES =="
           ls -la "$RPMTOP/SOURCES"
           test -f "$RPMTOP/SOURCES/$TARBALL"
+          echo "OK: created $RPMTOP/SOURCES/$TARBALL"
 
       - name: Build RPM
         shell: bash
         run: |
           set -euo pipefail
 
-          RPMTOP="$HOME/rpmbuild"
+          RPMTOP="/github/home/rpmbuild"
           VER="${GITHUB_REF_NAME#v}"
 
+          echo "Building with _topdir=$RPMTOP version=$VER"
           rpmbuild -ba "$RPMTOP/SPECS/jinglebox2.spec" \
             --define "_topdir ${RPMTOP}" \
             --define "version ${VER}"
