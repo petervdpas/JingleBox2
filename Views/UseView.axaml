@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.UseView"
+             x:DataType="vm:MainViewModel">
+
+  <!-- Pad styles -->
+  <UserControl.Styles>
+    <Style Selector="ToggleButton.pad">
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="FontSize" Value="18"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleButton.pad:checked">
+      <Setter Property="Background" Value="#1E3A1E"/>
+    </Style>
+  </UserControl.Styles>
+
+  <!-- OUTER padding around entire pad area -->
+  <Border Padding="24">
+
+    <ItemsControl ItemsSource="{Binding Pads}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <!-- 2 columns, 4 rows automatically -->
+          <UniformGrid Columns="2"/>
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PadViewModel">
+          <!-- space between pads -->
+          <Border Margin="10">
+            <ToggleButton Classes="pad"
+                          IsChecked="{Binding IsPlaying, Mode=OneWay}"
+                          Command="{Binding TogglePlayCommand}"
+                          Content="{Binding Title}" />
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+  </Border>
+</UserControl>

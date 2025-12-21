@@ -1,0 +1,138 @@
+<!-- ===============================
+     Views/ConfigView.axaml
+     Make each pad config block visually distinct (card background + subtle border)
+     Drop-in full file (keeps your existing bindings/layout)
+     =============================== -->
+<UserControl xmlns="https://github.com/avaloniaui"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+  x:Class="JingleBox2.Views.ConfigView"
+  x:DataType="vm:MainViewModel">
+
+  <UserControl.Styles>
+    <!-- Card look for each pad config -->
+    <Style Selector="Border.padCard">
+      <!-- subtle dark card background -->
+      <Setter Property="Background" Value="#141414" />
+      <Setter Property="BorderBrush" Value="#2A2A2A" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="14" />
+      <Setter Property="Margin" Value="10" />
+    </Style>
+
+    <!-- Smaller section label -->
+    <Style Selector="TextBlock.sectionLabel">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
+    <!-- Optional: danger button look for Clear -->
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="#3A1E1E" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer Margin="0,16,0,0"
+    Padding="0,0,16,0"
+    VerticalScrollBarVisibility="Auto"
+    HorizontalScrollBarVisibility="Disabled">
+
+    <ItemsControl ItemsSource="{Binding Pads}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PadViewModel">
+
+          <!-- Card wrapper -->
+          <Border Classes="padCard">
+            <StackPanel Spacing="12">
+
+              <!-- header row -->
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <TextBox Grid.Column="0"
+                  Watermark="Pad name"
+                  Text="{Binding Name}" />
+
+                <!-- File/Web selector -->
+                <ComboBox Grid.Column="1"
+                  Width="140"
+                  ItemsSource="{x:Static vm:PadViewModel.SourceKinds}"
+                  SelectedItem="{Binding SourceKind}" />
+              </Grid>
+
+              <!-- FILE mode -->
+              <Grid ColumnDefinitions="*,Auto"
+                ColumnSpacing="10"
+                IsVisible="{Binding IsFile}">
+                <TextBox Grid.Column="0"
+                  Watermark="Choose an audio file…"
+                  Text="{Binding FilePath}" />
+                <Button Grid.Column="1"
+                  Content="Browse…"
+                  Command="{Binding AssignCommand}" />
+              </Grid>
+
+              <!-- WEB mode -->
+              <TextBox IsVisible="{Binding IsWeb}"
+                Watermark="Stream URL (https://...)"
+                Text="{Binding FilePath}" />
+
+              <!-- volume + test -->
+              <Grid ColumnDefinitions="*,Auto"
+                RowDefinitions="Auto,Auto"
+                ColumnSpacing="12"
+                RowSpacing="6">
+
+                <!-- Slider -->
+                <StackPanel Grid.Row="0"
+                  Grid.Column="0"
+                  Grid.ColumnSpan="2">
+                  <TextBlock Classes="sectionLabel"
+                    Text="Volume" />
+                  <Slider Minimum="0"
+                    Maximum="1"
+                    Value="{Binding Volume}"
+                    LargeChange="0.1"
+                    SmallChange="0.01" />
+                </StackPanel>
+
+                <!-- Value -->
+                <TextBlock Grid.Row="1"
+                  Grid.Column="0"
+                  VerticalAlignment="Center"
+                  Opacity="0.75"
+                  Text="{Binding Volume, StringFormat={}{0:0.00}}" />
+
+                <!-- Buttons -->
+                <StackPanel Grid.Row="1"
+                  Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  HorizontalAlignment="Right">
+                  <Button Content="Test"
+                    Command="{Binding PlayCommand}" />
+                  <Button Content="Stop"
+                    Command="{Binding StopCommand}" />
+                  <Button Content="Clear"
+                    Command="{Binding ClearCommand}"
+                    Classes="danger" />
+                </StackPanel>
+
+              </Grid>
+
+              <!-- Optional status line (if you want it visible) -->
+              <TextBlock Text="{Binding Status}"
+                Opacity="0.7"
+                FontSize="12"
+                IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            </StackPanel>
+          </Border>
+
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+  </ScrollViewer>
+</UserControl>

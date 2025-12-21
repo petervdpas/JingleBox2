@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.MainWindow"
+        x:DataType="vm:MainViewModel"
+        MinWidth="520" MinHeight="520"
+        Width="520" Height="800"
+        Title="Audio Control (Prototype)">
+
+  <DockPanel Margin="16">
+
+    <!-- Top bar: auto-scaling dropdown -->
+    <Grid DockPanel.Dock="Top"
+          ColumnDefinitions="Auto,*"
+          ColumnSpacing="12"
+          VerticalAlignment="Center">
+
+      <TextBlock Grid.Column="0"
+                 VerticalAlignment="Center"
+                 Text="Output device:"/>
+
+      <ComboBox Grid.Column="1"
+                HorizontalAlignment="Stretch"
+                MinWidth="260"
+                ItemsSource="{Binding OutputDevices}"
+                SelectedItem="{Binding SelectedOutputDevice}"
+                DisplayMemberBinding="{Binding Name}" />
+    </Grid>
+
+    <!-- Tabs -->
+    <TabControl Margin="0,12,0,0">
+      <TabItem Header="USE">
+        <views:UseView/>
+      </TabItem>
+
+      <TabItem Header="CONFIG">
+        <views:ConfigView/>
+      </TabItem>
+    </TabControl>
+
+  </DockPanel>
+</Window>

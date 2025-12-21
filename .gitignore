@@ -1,0 +1,15 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Avalonia
+*.cache
+*.log
+
+# OS / editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
