@@ -18,6 +18,9 @@ BuildArch:      x86_64
 # Requires:       fontconfig
 # Requires:       freetype
 
+# Self-contained app: no useful debuginfo/debugsource packages
+%global debug_package %{nil}
+
 %description
 JingleBox2 is a lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.
 
