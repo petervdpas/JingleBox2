@@ -85,12 +85,13 @@ jobs:
             EXTRA_PROPS="-p:PlatformTarget=AnyCPU"
           fi
 
+          # CONSISTENT Linux policy: multi-file for tar.gz (matches RPM/DEB)
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r "${{ matrix.rid }}" \
             --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:PublishSingleFile=false \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
             $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
@@ -186,14 +187,12 @@ jobs:
           mkdir -p "$RPMTOP"
           rpmdev-setuptree
 
-          # Copy spec into rpmbuild and PATCH its Version line to match the tag
           cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
           sed -i -E "s/^Version:[[:space:]]*.*/Version:        ${VER}/" "$RPMTOP/SPECS/jinglebox2.spec"
 
           echo "== Spec header after patch =="
           sed -n '1,25p' "$RPMTOP/SPECS/jinglebox2.spec"
 
-          # Parse Name from the spec (do not assume)
           NAME="$(awk '/^Name:[[:space:]]*/{print $2; exit}' "$RPMTOP/SPECS/jinglebox2.spec")"
           if [ -z "${NAME:-}" ]; then
             echo "ERROR: Could not parse Name: from spec"
@@ -203,7 +202,6 @@ jobs:
           PKGROOT="${NAME}-${VER}"
           TARBALL="${NAME}-${VER}.tar.gz"
 
-          # Stage files into a clean source tree that matches %autosetup -n NAME-VERSION
           STAGE="$(mktemp -d)"
           mkdir -p "$STAGE/$PKGROOT/payload"
           mkdir -p "$STAGE/$PKGROOT/packaging/fedora/icons"
@@ -214,7 +212,6 @@ jobs:
           cp -a packaging/fedora/icons/jinglebox2.png "$STAGE/$PKGROOT/packaging/fedora/icons/"
           cp -a LICENSE "$STAGE/$PKGROOT/" || true
 
-          # Create Source0 exactly: NAME-VERSION.tar.gz in rpmbuild/SOURCES
           tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
 
           echo "== SOURCES =="
@@ -243,9 +240,131 @@ jobs:
           name: artifacts-fedora-rpm-x64
           path: dist/*.rpm
 
+  deb_ubuntu:
+    name: Ubuntu/Debian .deb (${{ matrix.deb_arch }}, self-contained)
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            deb_arch: amd64
+          # - rid: linux-arm64
+          #   deb_arch: arm64
+
+    env:
+      APP_NAME: JingleBox2
+      CONFIGURATION: Release
+      PROJECT_PATH: ./JingleBox2.csproj
+      DEB_PKG_NAME: jinglebox2
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Install packaging tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg dpkg-dev fakeroot tar gzip
+
+      - name: Restore
+        shell: bash
+        run: dotnet restore
+
+      - name: Publish (self-contained, not single-file)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish "$PROJECT_PATH" \
+            -c "$CONFIGURATION" \
+            -r "${{ matrix.rid }}" \
+            --self-contained true \
+            -p:PublishSingleFile=false \
+            -p:IncludeNativeLibrariesForSelfExtract=false \
+            -o "out/${{ matrix.rid }}"
+
+      - name: Build .deb
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VER="${GITHUB_REF_NAME#v}"
+          ARCH="${{ matrix.deb_arch }}"
+          NAME="$DEB_PKG_NAME"
+
+          ROOT="$(mktemp -d)"
+          PKGDIR="$ROOT/${NAME}_${VER}_${ARCH}"
+          mkdir -p "$PKGDIR/DEBIAN"
+
+          mkdir -p "$PKGDIR/opt/${APP_NAME}"
+          mkdir -p "$PKGDIR/usr/bin"
+          mkdir -p "$PKGDIR/usr/share/applications"
+          mkdir -p "$PKGDIR/usr/share/icons/hicolor/256x256/apps"
+
+          cp -a "out/${{ matrix.rid }}/." "$PKGDIR/opt/${APP_NAME}/"
+          chmod 0755 "$PKGDIR/opt/${APP_NAME}/${APP_NAME}" || true
+
+          cat > "$PKGDIR/usr/bin/${NAME}" << EOF
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec /opt/${APP_NAME}/${APP_NAME} "\$@"
+          EOF
+          chmod 0755 "$PKGDIR/usr/bin/${NAME}"
+
+          cat > "$PKGDIR/usr/share/applications/${NAME}.desktop" << EOF
+          [Desktop Entry]
+          Type=Application
+          Name=JingleBox2
+          Comment=Audio pad launcher
+          Exec=/usr/bin/${NAME}
+          Icon=${NAME}
+          Terminal=false
+          Categories=Audio;AudioVideo;
+          EOF
+
+          if [ -f packaging/fedora/icons/jinglebox2.png ]; then
+            cp -a packaging/fedora/icons/jinglebox2.png \
+              "$PKGDIR/usr/share/icons/hicolor/256x256/apps/${NAME}.png"
+          else
+            echo "WARN: packaging/fedora/icons/jinglebox2.png not found; skipping icon"
+          fi
+
+          INSTALLED_SIZE="$(du -sk "$PKGDIR/opt/${APP_NAME}" | awk '{print $1}')"
+          cat > "$PKGDIR/DEBIAN/control" << EOF
+          Package: ${NAME}
+          Version: ${VER}
+          Section: sound
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: JingleBox2 CI <noreply@github.com>
+          Installed-Size: ${INSTALLED_SIZE}
+          Description: JingleBox2
+           Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.
+          EOF
+
+          OUT="dist"
+          mkdir -p "$OUT"
+          fakeroot dpkg-deb --build "$PKGDIR" "$OUT/${NAME}_${VER}_${ARCH}.deb"
+          ls -la "$OUT"
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-deb-${{ matrix.deb_arch }}
+          path: dist/*.deb
+
   release:
     name: Publish GitHub Release
-    needs: [build, rpm_fedora]
+    needs: [build, rpm_fedora, deb_ubuntu]
     runs-on: ubuntu-latest
 
     steps:
@@ -258,7 +377,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          find artifacts -type f -maxdepth 8 -exec cp "{}" dist/ \;
+          find artifacts -maxdepth 8 -type f -exec cp -v "{}" dist/ \;
           ls -la dist
 
       - name: Create Release
