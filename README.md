@@ -8,6 +8,8 @@
 
 It separates **live operation** from **configuration**, supports **multiple simultaneous pads**, and focuses on reliability and speed rather than visual clutter.
 
+[⬇️ Download the latest release](../../releases/latest)
+
 ---
 
 ## Features
