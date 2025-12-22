@@ -148,9 +148,11 @@ jobs:
 
     steps:
       - name: Install build tooling
+        shell: bash
         run: |
+          set -euo pipefail
           dnf -y update
-          dnf -y install git rpm-build rpmdevtools tar gzip findutils
+          dnf -y install git rpm-build rpmdevtools tar gzip findutils sed grep coreutils
           dnf -y install dotnet-sdk-9.0
 
       - uses: actions/checkout@v4
@@ -158,10 +160,13 @@ jobs:
           fetch-depth: 0
 
       - name: Restore
+        shell: bash
         run: dotnet restore
 
       - name: Publish (linux-x64 self-contained, NOT single-file)
+        shell: bash
         run: |
+          set -euo pipefail
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r linux-x64 \
@@ -170,25 +175,35 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -o out/linux-x64
 
-      - name: Prepare RPM sources
+      - name: Prepare RPM sources (patch spec Version + create matching Source0)
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "whoami=$(whoami)"
-          echo "HOME=$HOME"
-          echo "PWD=$(pwd)"
-
-          # Force rpmbuild topdir to the SAME place rpmbuild uses in the logs
+          VER="${GITHUB_REF_NAME#v}"
           RPMTOP="/github/home/rpmbuild"
+
           mkdir -p "$RPMTOP"
           rpmdev-setuptree
 
-          VER="${GITHUB_REF_NAME#v}"
-          PKGROOT="jinglebox2-${VER}"
-          TARBALL="jinglebox2-${VER}.tar.gz"
+          # Copy spec into rpmbuild and PATCH its Version line to match the tag
+          cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
+          sed -i -E "s/^Version:[[:space:]]*.*/Version:        ${VER}/" "$RPMTOP/SPECS/jinglebox2.spec"
 
-          # Stage content
+          echo "== Spec header after patch =="
+          sed -n '1,25p' "$RPMTOP/SPECS/jinglebox2.spec"
+
+          # Parse Name from the spec (do not assume)
+          NAME="$(awk '/^Name:[[:space:]]*/{print $2; exit}' "$RPMTOP/SPECS/jinglebox2.spec")"
+          if [ -z "${NAME:-}" ]; then
+            echo "ERROR: Could not parse Name: from spec"
+            exit 1
+          fi
+
+          PKGROOT="${NAME}-${VER}"
+          TARBALL="${NAME}-${VER}.tar.gz"
+
+          # Stage files into a clean source tree that matches %autosetup -n NAME-VERSION
           STAGE="$(mktemp -d)"
           mkdir -p "$STAGE/$PKGROOT/payload"
           mkdir -p "$STAGE/$PKGROOT/packaging/fedora/icons"
@@ -197,10 +212,9 @@ jobs:
           cp -a packaging/fedora/jinglebox2.sh "$STAGE/$PKGROOT/packaging/fedora/"
           cp -a packaging/fedora/jinglebox2.desktop "$STAGE/$PKGROOT/packaging/fedora/"
           cp -a packaging/fedora/icons/jinglebox2.png "$STAGE/$PKGROOT/packaging/fedora/icons/"
-          cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
           cp -a LICENSE "$STAGE/$PKGROOT/" || true
 
-          # Create Source0 where rpmbuild expects it
+          # Create Source0 exactly: NAME-VERSION.tar.gz in rpmbuild/SOURCES
           tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
 
           echo "== SOURCES =="
@@ -212,19 +226,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           RPMTOP="/github/home/rpmbuild"
-          VER="${GITHUB_REF_NAME#v}"
-
-          echo "Building with _topdir=$RPMTOP version=$VER"
-          rpmbuild -ba "$RPMTOP/SPECS/jinglebox2.spec" \
-            --define "_topdir ${RPMTOP}" \
-            --define "version ${VER}"
+          rpmbuild -ba "$RPMTOP/SPECS/jinglebox2.spec" --define "_topdir ${RPMTOP}"
 
       - name: Collect RPM
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist
-          find ~/rpmbuild/RPMS -name "*.rpm" -exec cp {} dist/ \;
+          find /github/home/rpmbuild/RPMS -name "*.rpm" -exec cp {} dist/ \;
           ls -la dist
 
       - name: Upload RPM artifact
