@@ -9,17 +9,8 @@ Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      x86_64
 
-# Self-contained: DO NOT require dotnet runtime.
-# You may still need basic GUI/audio libs at runtime depending on what Avalonia/Skia touches on Fedora.
-# If you want to declare them, uncomment and adjust as needed:
-# Requires:       alsa-lib
-# Requires:       mesa-libGL
-# Requires:       libX11
-# Requires:       fontconfig
-# Requires:       freetype
-
-# Self-contained app: no useful debuginfo/debugsource packages
 %global debug_package %{nil}
+%global appdir /opt/JingleBox2
 
 %description
 JingleBox2 is a lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.
@@ -33,25 +24,27 @@ JingleBox2 is a lightweight cross-platform audio pad launcher built with .NET an
 %install
 rm -rf %{buildroot}
 
-# Install app payload to /opt
-mkdir -p %{buildroot}/opt/JingleBox2
-cp -a payload/* %{buildroot}/opt/JingleBox2/
+# App payload
+mkdir -p %{buildroot}%{appdir}
+cp -a payload/* %{buildroot}%{appdir}/
 
-# Wrapper in /usr/bin
-install -Dpm 0755 packaging/fedora/jinglebox2.sh %{buildroot}/usr/bin/jinglebox2
+# Ensure main binary is executable (adjust name if different)
+chmod 0755 %{buildroot}%{appdir}/JingleBox2 || :
 
-# Desktop file
-install -Dpm 0644 packaging/fedora/jinglebox2.desktop %{buildroot}/usr/share/applications/jinglebox2.desktop
+# Wrapper
+install -Dpm 0755 packaging/fedora/jinglebox2.sh %{buildroot}%{_bindir}/jinglebox2
 
-# Icon (hicolor)
-install -Dpm 0644 packaging/fedora/icons/jinglebox2.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/jinglebox2.png
+# Desktop file + icon
+install -Dpm 0644 packaging/fedora/jinglebox2.desktop %{buildroot}%{_datadir}/applications/jinglebox2.desktop
+install -Dpm 0644 packaging/fedora/icons/jinglebox2.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/jinglebox2.png
 
 %files
 %license LICENSE
-/usr/bin/jinglebox2
-/usr/share/applications/jinglebox2.desktop
-/usr/share/icons/hicolor/256x256/apps/jinglebox2.png
-/opt/JingleBox2
+%{_bindir}/jinglebox2
+%{_datadir}/applications/jinglebox2.desktop
+%{_datadir}/icons/hicolor/256x256/apps/jinglebox2.png
+%dir %{appdir}
+%{appdir}/*
 
 %changelog
 * Sun Dec 21 2025 Peter van de Pas - 1.0.0-1
