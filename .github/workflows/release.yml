@@ -51,6 +51,7 @@ jobs:
         if: matrix.rid == 'linux-arm64'
         shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
 
@@ -102,15 +103,12 @@ jobs:
           set -euo pipefail
           OUT="out/${{ matrix.name }}"
 
-          # Put libbass.so next to the app binary (ManagedBass default search path)
           if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" ]; then
             cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" "$OUT/libbass.so"
           fi
 
-          # Remove tracepoint provider that links to liblttng-ust.so.0 (breaks on Fedora 43)
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
-          # Sanity
           test -f "$OUT/${APP_NAME}"
 
       - name: Install Inno Setup
@@ -204,15 +202,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Put libbass.so next to the app binary (ManagedBass default search path)
           if [ -f out/linux-x64/runtimes/linux-x64/native/libbass.so ]; then
             cp -a out/linux-x64/runtimes/linux-x64/native/libbass.so out/linux-x64/libbass.so
           fi
 
-          # Remove tracepoint provider that links to liblttng-ust.so.0
           rm -f out/linux-x64/libcoreclrtraceptprovider.so
 
-          # Sanity
           test -f out/linux-x64/JingleBox2
 
       - name: Prepare RPM sources (patch spec Version + create matching Source0)
@@ -228,9 +223,6 @@ jobs:
 
           cp -a packaging/fedora/jinglebox2.spec "$RPMTOP/SPECS/jinglebox2.spec"
           sed -i -E "s/^Version:[[:space:]]*.*/Version:        ${VER}/" "$RPMTOP/SPECS/jinglebox2.spec"
-
-          echo "== Spec header after patch =="
-          sed -n '1,25p' "$RPMTOP/SPECS/jinglebox2.spec"
 
           NAME="$(awk '/^Name:[[:space:]]*/{print $2; exit}' "$RPMTOP/SPECS/jinglebox2.spec")"
           if [ -z "${NAME:-}" ]; then
@@ -253,11 +245,6 @@ jobs:
 
           tar -C "$STAGE" -czf "$RPMTOP/SOURCES/$TARBALL" "$PKGROOT"
 
-          echo "== SOURCES =="
-          ls -la "$RPMTOP/SOURCES"
-          test -f "$RPMTOP/SOURCES/$TARBALL"
-          echo "OK: created $RPMTOP/SOURCES/$TARBALL"
-
       - name: Build RPM
         shell: bash
         run: |
@@ -269,12 +256,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "== lttng requires =="
-          for f in /github/home/rpmbuild/RPMS/*/*.rpm; do
-            echo "== $f =="
-            rpm -qp "$f"
-            rpm -qpR "$f" | grep -i lttng || true
-          done
 
           if [ "${{ matrix.fedora }}" = "43" ]; then
             if rpm -qpR /github/home/rpmbuild/RPMS/*/*.rpm | grep -q 'liblttng-ust\.so\.0'; then
@@ -307,8 +288,6 @@ jobs:
         include:
           - rid: linux-x64
             deb_arch: amd64
-          # - rid: linux-arm64
-          #   deb_arch: arm64
 
     env:
       APP_NAME: JingleBox2
@@ -374,8 +353,8 @@ jobs:
 
           ROOT="$(mktemp -d)"
           PKGDIR="$ROOT/${NAME}_${VER}_${ARCH}"
-          mkdir -p "$PKGDIR/DEBIAN"
 
+          mkdir -p "$PKGDIR/DEBIAN"
           mkdir -p "$PKGDIR/opt/${APP_NAME}"
           mkdir -p "$PKGDIR/usr/bin"
           mkdir -p "$PKGDIR/usr/share/applications"
@@ -384,48 +363,29 @@ jobs:
           cp -a "out/${{ matrix.rid }}/." "$PKGDIR/opt/${APP_NAME}/"
           chmod 0755 "$PKGDIR/opt/${APP_NAME}/${APP_NAME}" || true
 
-          cat > "$PKGDIR/usr/bin/${NAME}" << EOF
-          #!/usr/bin/env bash
-          set -euo pipefail
-          exec /opt/${APP_NAME}/${APP_NAME} "\$@"
-          EOF
-                    chmod 0755 "$PKGDIR/usr/bin/${NAME}"
+          printf '#!/usr/bin/env bash\nset -euo pipefail\nexec /opt/%s/%s "$@"\n' \
+            "$APP_NAME" "$APP_NAME" \
+            > "$PKGDIR/usr/bin/$NAME"
+          chmod 0755 "$PKGDIR/usr/bin/$NAME"
 
-                    cat > "$PKGDIR/usr/share/applications/${NAME}.desktop" << EOF
-          [Desktop Entry]
-          Type=Application
-          Name=JingleBox2
-          Comment=Audio pad launcher
-          Exec=/usr/bin/${NAME}
-          Icon=${NAME}
-          Terminal=false
-          Categories=Audio;AudioVideo;
-          EOF
+          printf '[Desktop Entry]\nType=Application\nName=JingleBox2\nComment=Audio pad launcher\nExec=/usr/bin/%s\nIcon=%s\nTerminal=false\nCategories=Audio;AudioVideo;\n' \
+            "$NAME" "$NAME" \
+            > "$PKGDIR/usr/share/applications/$NAME.desktop"
 
           if [ -f packaging/fedora/icons/jinglebox2.png ]; then
             cp -a packaging/fedora/icons/jinglebox2.png \
-              "$PKGDIR/usr/share/icons/hicolor/256x256/apps/${NAME}.png"
-          else
-            echo "WARN: packaging/fedora/icons/jinglebox2.png not found; skipping icon"
+              "$PKGDIR/usr/share/icons/hicolor/256x256/apps/$NAME.png"
           fi
 
           INSTALLED_SIZE="$(du -sk "$PKGDIR/opt/${APP_NAME}" | awk '{print $1}')"
-          cat > "$PKGDIR/DEBIAN/control" << EOF
-          Package: ${NAME}
-          Version: ${VER}
-          Section: sound
-          Priority: optional
-          Architecture: ${ARCH}
-          Maintainer: JingleBox2 CI <noreply@github.com>
-          Installed-Size: ${INSTALLED_SIZE}
-          Description: JingleBox2
-          Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.
-          EOF
 
-          OUTDIR="dist"
-          mkdir -p "$OUTDIR"
-          fakeroot dpkg-deb --build "$PKGDIR" "$OUTDIR/${NAME}_${VER}_${ARCH}.deb"
-          ls -la "$OUTDIR"
+          printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDescription: JingleBox2\n Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.\n' \
+            "$NAME" "$VER" "$ARCH" "$INSTALLED_SIZE" \
+            > "$PKGDIR/DEBIAN/control"
+
+          mkdir -p dist
+          fakeroot dpkg-deb --build "$PKGDIR" "dist/${NAME}_${VER}_${ARCH}.deb"
+          ls -la dist
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
