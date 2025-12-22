@@ -137,10 +137,14 @@ jobs:
             JingleBox2-${{ matrix.name }}.tar.gz
 
   rpm_fedora:
-    name: Fedora RPM (x64, self-contained)
+    name: Fedora RPM (x64, Fedora ${{ matrix.fedora }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora: [41, 43]
     container:
-      image: fedora:41
+      image: fedora:${{ matrix.fedora }}
 
     env:
       APP_NAME: JingleBox2
@@ -237,7 +241,7 @@ jobs:
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-fedora-rpm-x64
+          name: artifacts-fedora${{ matrix.fedora }}-rpm-x64
           path: dist/*.rpm
 
   deb_ubuntu:
