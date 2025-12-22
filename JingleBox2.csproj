@@ -59,24 +59,26 @@
   <ItemGroup>
     <!-- Windows -->
     <None Include="native\win-x64\bass.dll"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest"
-          Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+      Visible="false"
+      Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
 
     <!-- Linux x64 -->
-    <None Include="native\linux-x64\libbass.so"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest"
-          Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-x64'" />
+    <None Include="native/linux-x64/libbass.so"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+      Visible="false">
+      <TargetPath>runtimes/linux-x64/native/libbass.so</TargetPath>
+    </None>
 
     <!-- Linux ARM64 -->
-    <None Include="native\linux-arm64\libbass.so"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest"
-          Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'" />
+    <None Include="native/linux-arm64/libbass.so"
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="PreserveNewest"
+      Visible="false">
+      <TargetPath>runtimes/linux-arm64/native/libbass.so</TargetPath>
+    </None>
   </ItemGroup>
 
   <!-- =========================
@@ -85,22 +87,22 @@
 
   <!-- Local runs on Windows without -r sometimes miss the copy -->
   <Target Name="CopyBassToOutput"
-          AfterTargets="Build"
-          Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'">
+    AfterTargets="Build"
+    Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'">
     <Message Importance="high" Text="Copying native\win-x64\bass.dll -> $(OutDir)" />
     <Copy SourceFiles="native\win-x64\bass.dll"
-          DestinationFolder="$(OutDir)"
-          SkipUnchangedFiles="true" />
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
   </Target>
 
   <!-- Extra safety for publish output (win-x64) -->
   <Target Name="EnsureBassDllInPublish"
-          AfterTargets="Publish"
-          Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    AfterTargets="Publish"
+    Condition="'$(RuntimeIdentifier)' == 'win-x64'">
     <Message Importance="high" Text="Copying native\win-x64\bass.dll -> $(PublishDir)" />
     <Copy SourceFiles="native\win-x64\bass.dll"
-          DestinationFolder="$(PublishDir)"
-          SkipUnchangedFiles="true" />
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true" />
   </Target>
 
 </Project>
