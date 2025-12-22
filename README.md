@@ -8,7 +8,11 @@
 
 It separates **live operation** from **configuration**, supports **multiple simultaneous pads**, and focuses on reliability and speed rather than visual clutter.
 
-[⬇️ Download the latest release](../../releases/latest)
+<p align="center">
+  <a href="../../releases/latest">
+    <img alt="Download latest release" src="https://img.shields.io/badge/Download-Latest%20Release-brightgreen">
+  </a>
+</p>
 
 ---
 
