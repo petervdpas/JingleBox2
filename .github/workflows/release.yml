@@ -96,6 +96,23 @@ jobs:
             $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
+      - name: Extract DryWetMIDI native .so (Linux)
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="out/${{ matrix.name }}"
+          SO_PATH="$(find ~/.nuget/packages -type f -name 'Melanchall_DryWetMidi_Native64.so' | head -n 1 || true)"
+          if [ -z "$SO_PATH" ]; then
+            echo "ERROR: Melanchall_DryWetMidi_Native64.so not found in NuGet cache."
+            find ~/.nuget/packages -maxdepth 4 -type d -iname '*drywetmidi*' || true
+            exit 1
+          fi
+          echo "Using: $SO_PATH"
+          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
+          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
+          ls -la "$OUT" | grep -i drywetmidi || true
+
       - name: Fix Linux native libs (BASS + remove .NET lttng tracepoints)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
@@ -110,6 +127,7 @@ jobs:
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
           test -f "$OUT/${APP_NAME}"
+          test -f "$OUT/Melanchall_DryWetMidi_Native64.so"
 
       - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
@@ -197,6 +215,22 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -o out/linux-x64
 
+      - name: Extract DryWetMIDI native .so (Fedora container)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="out/linux-x64"
+          SO_PATH="$(find /github/home/.nuget/packages -type f -name 'Melanchall_DryWetMidi_Native64.so' | head -n 1 || true)"
+          if [ -z "$SO_PATH" ]; then
+            echo "ERROR: Melanchall_DryWetMidi_Native64.so not found in NuGet cache inside container."
+            find /github/home/.nuget/packages -maxdepth 4 -type d -iname '*drywetmidi*' || true
+            exit 1
+          fi
+          echo "Using: $SO_PATH"
+          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
+          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
+          ls -la "$OUT" | grep -i drywetmidi || true
+
       - name: Fix Fedora payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
@@ -209,6 +243,7 @@ jobs:
           rm -f out/linux-x64/libcoreclrtraceptprovider.so
 
           test -f out/linux-x64/JingleBox2
+          test -f out/linux-x64/Melanchall_DryWetMidi_Native64.so
 
       - name: Prepare RPM sources (patch spec Version + create matching Source0)
         shell: bash
@@ -328,6 +363,22 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -o "out/${{ matrix.rid }}"
 
+      - name: Extract DryWetMIDI native .so (DEB)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="out/${{ matrix.rid }}"
+          SO_PATH="$(find ~/.nuget/packages -type f -name 'Melanchall_DryWetMidi_Native64.so' | head -n 1 || true)"
+          if [ -z "$SO_PATH" ]; then
+            echo "ERROR: Melanchall_DryWetMidi_Native64.so not found in NuGet cache."
+            find ~/.nuget/packages -maxdepth 4 -type d -iname '*drywetmidi*' || true
+            exit 1
+          fi
+          echo "Using: $SO_PATH"
+          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
+          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
+          ls -la "$OUT" | grep -i drywetmidi || true
+
       - name: Fix DEB payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
@@ -341,6 +392,7 @@ jobs:
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
           test -f "$OUT/${APP_NAME}"
+          test -f "$OUT/Melanchall_DryWetMidi_Native64.so"
 
       - name: Build .deb
         shell: bash
