@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
+using JingleBox2.Midi;
 using JingleBox2.Models;
 using JingleBox2.UI;
 using System;
@@ -23,6 +24,8 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly Func<Task<string?>> _pickFileAsync;
 
     private bool _suspendSave;
+
+    public MidiViewModel Midi { get; }
 
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
@@ -51,12 +54,19 @@ public sealed partial class MainViewModel : ObservableObject
     public IRelayCommand AddProfileCommand { get; }
     public IRelayCommand DeleteProfileCommand { get; }
 
-    public MainViewModel(IAudioEngine audio, Func<Task<string?>> pickFileAsync, ConfigStore store, AppConfig cfg)
+    public MainViewModel(
+        IAudioEngine audio,
+        Func<Task<string?>> pickFileAsync,
+        ConfigStore store,
+        AppConfig cfg,
+        IMidiService midiService)
     {
         _audio = audio;
         _pickFileAsync = pickFileAsync;
         _store = store;
         _cfg = cfg;
+
+        Midi = new MidiViewModel(store, cfg, midiService);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

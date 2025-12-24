@@ -55,6 +55,11 @@
       <TabItem Header="CONFIG">
         <views:ConfigView />
       </TabItem>
+
+      <TabItem Header="MIDI">
+        <views:MidiView DataContext="{Binding Midi}" />
+      </TabItem>
+
     </TabControl>
 
   </DockPanel>

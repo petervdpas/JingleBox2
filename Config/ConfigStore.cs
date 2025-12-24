@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using JingleBox2.Midi;
 
 namespace JingleBox2.Config;
 
@@ -76,6 +77,30 @@ public sealed class ConfigStore
 
         cfg.Profiles ??= new List<ConfigProfile>();
         cfg.Pads ??= new List<PadConfig>();
+
+        // ✅ MIDI defaults / normalization (global, not per profile)
+        cfg.Midi ??= new MidiConfig();
+        cfg.Midi.Pads ??= new List<MidiMapping>();
+
+        // Ensure exactly padCount mappings
+        while (cfg.Midi.Pads.Count < padCount)
+        {
+            var i = cfg.Midi.Pads.Count;
+            cfg.Midi.Pads.Add(new MidiMapping
+            {
+                PadIndex = i,
+                Type = MidiMessageType.Note,
+                Channel = 1,
+                Value = 36 + i
+            });
+        }
+
+        while (cfg.Midi.Pads.Count > padCount)
+            cfg.Midi.Pads.RemoveAt(cfg.Midi.Pads.Count - 1);
+
+        // Ensure indices consistent
+        for (int i = 0; i < cfg.Midi.Pads.Count; i++)
+            cfg.Midi.Pads[i].PadIndex = i;
 
         // MIGRATION: if Profiles empty but legacy Pads exists, migrate to default profile
         if (cfg.Profiles.Count == 0 && cfg.Pads.Count > 0)
