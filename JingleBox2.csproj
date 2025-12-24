@@ -35,6 +35,7 @@
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="ManagedBass" Version="4.0.2" />
+    <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.3" />
   </ItemGroup>
   <!-- =========================
        Avalonia resources

@@ -4,7 +4,7 @@
   xmlns:views="clr-namespace:JingleBox2.Views"
   x:Class="JingleBox2.MainWindow"
   x:DataType="vm:MainViewModel"
-  Width="520" Height="720"
+  Width="520" Height="780"
   MinWidth="520" MinHeight="520"
   Title="JingleBox2"
   Icon="/Assets/icon.ico"
