@@ -1,9 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
-             x:Class="JingleBox2.Views.MidiView"
-             x:Name="Root"
-             x:DataType="vm:MidiViewModel">
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+  xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+  xmlns:conv="clr-namespace:JingleBox2.Converters"
+  x:Class="JingleBox2.Views.MidiView"
+  x:Name="Root"
+  x:DataType="vm:MidiViewModel">
+
+  <UserControl.Resources>
+    <conv:LearnButtonTextConverter x:Key="LearnText" />
+  </UserControl.Resources>
 
   <ScrollViewer>
     <StackPanel Spacing="12">
@@ -11,32 +16,32 @@
       <!-- Device -->
       <Border Classes="card" Padding="12">
         <StackPanel Spacing="8">
-          <TextBlock Text="MIDI input device" FontWeight="SemiBold"/>
+          <TextBlock Text="MIDI input device" FontWeight="SemiBold" />
 
           <ComboBox ItemsSource="{Binding Devices}"
-                    SelectedItem="{Binding SelectedDevice}"/>
+            SelectedItem="{Binding SelectedDevice}" />
 
           <Button Content="Refresh"
-                  Command="{Binding RefreshDevicesCommand}"/>
+            Command="{Binding RefreshDevicesCommand}" />
 
-          <TextBlock Text="{Binding Status}" Opacity="0.85"/>
+          <TextBlock Text="{Binding Status}" Opacity="0.85" />
         </StackPanel>
       </Border>
 
       <!-- Mapping (no DataGrid; avoids Avalonia DataGrid ctor crash) -->
       <Border Classes="card" Padding="12">
         <StackPanel Spacing="8">
-          <TextBlock Text="Pad mapping (global)" FontWeight="SemiBold"/>
+          <TextBlock Text="Pad mapping (global)" FontWeight="SemiBold" />
 
           <!-- Header row -->
           <Grid ColumnDefinitions="60,120,60,90,90"
-                ColumnSpacing="10"
-                Margin="0,0,0,6"
-                Opacity="0.85">
-            <TextBlock Grid.Column="0" Text="Pad" FontWeight="SemiBold"/>
-            <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold"/>
-            <TextBlock Grid.Column="2" Text="Ch" FontWeight="SemiBold"/>
-            <TextBlock Grid.Column="3" Text="Note/CC" FontWeight="SemiBold"/>
+            ColumnSpacing="10"
+            Margin="0,0,0,6"
+            Opacity="0.85">
+            <TextBlock Grid.Column="0" Text="Pad" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="2" Text="Ch" FontWeight="SemiBold" />
+            <TextBlock Grid.Column="3" Text="Note/CC" FontWeight="SemiBold" />
             <TextBlock Grid.Column="4" Text="" />
           </Grid>
 
@@ -45,30 +50,30 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Grid ColumnDefinitions="60,120,60,90,90"
-                      ColumnSpacing="10"
-                      Margin="0,4">
+                  ColumnSpacing="10"
+                  Margin="0,4">
 
                   <TextBlock Grid.Column="0"
-                             VerticalAlignment="Center"
-                             Text="{Binding PadIndex}"/>
+                    VerticalAlignment="Center"
+                    Text="{Binding PadIndex}" />
 
                   <!-- Keep as TextBlock for now (Type edits optional later) -->
                   <TextBlock Grid.Column="1"
-                             VerticalAlignment="Center"
-                             Text="{Binding Type}"/>
+                    VerticalAlignment="Center"
+                    Text="{Binding Type}" />
 
                   <TextBox Grid.Column="2"
-                           VerticalAlignment="Center"
-                           Text="{Binding Channel}"/>
+                    VerticalAlignment="Center"
+                    Text="{Binding Channel}" />
 
                   <TextBox Grid.Column="3"
-                           VerticalAlignment="Center"
-                           Text="{Binding Value}"/>
+                    VerticalAlignment="Center"
+                    Text="{Binding Value}" />
 
                   <Button Grid.Column="4"
-                          Content="Learn"
-                          Command="{Binding DataContext.LearnCommand, ElementName=Root}"
-                          CommandParameter="{Binding}"/>
+                    Content="{Binding IsLearning, Converter={StaticResource LearnText}}"
+                    Command="{Binding DataContext.LearnCommand, ElementName=Root}"
+                    CommandParameter="{Binding}" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -80,7 +85,7 @@
       <!-- Behavior -->
       <Border Classes="card" Padding="12">
         <CheckBox Content="Toggle mode (press again to stop)"
-                  IsChecked="{Binding ToggleMode}"/>
+          IsChecked="{Binding ToggleMode}" />
       </Border>
 
     </StackPanel>
