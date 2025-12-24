@@ -111,6 +111,14 @@ public sealed partial class MainViewModel : ObservableObject
         // Pads
         BuildPadsFromSelectedProfile(padCount: 8);
 
+        // MIDI routing: global, profile-independent mapping
+        var padTrigger = new JingleBox2.Midi.PadTriggerAdapter(Pads);
+        var router = new JingleBox2.Midi.MidiRouter(_cfg.Midi, padTrigger);
+
+        // NOTE: MidiViewModel already subscribes for learn/status.
+        // This subscription is for triggering pads.
+        midiService.MessageReceived += (_, msg) => router.Handle(msg);
+
         // Apply initial theme once
         ThemeManager.Apply(SelectedTheme);
 

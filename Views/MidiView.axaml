@@ -18,6 +18,8 @@
 
           <Button Content="Refresh"
                   Command="{Binding RefreshDevicesCommand}"/>
+
+          <TextBlock Text="{Binding Status}" Opacity="0.85"/>
         </StackPanel>
       </Border>
 
