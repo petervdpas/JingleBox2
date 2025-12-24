@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- =========================
-       Core project settings
-       ========================= -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
@@ -16,20 +13,11 @@
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
-  <!-- =========================
-       Windows-only settings
-       ========================= -->
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT' Or '$(RuntimeIdentifier)' == 'win-x64'">
-    <!-- Build x64 when building/publishing for Windows -->
     <PlatformTarget>x64</PlatformTarget>
-
-    <!-- Embed icon into the produced EXE (fixes Start Menu/shortcut icon) -->
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
 
-  <!-- =========================
-       NuGet packages
-       ========================= -->
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.10" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
@@ -46,10 +34,6 @@
     <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.3" />
   </ItemGroup>
 
-  <!-- =========================
-       Avalonia resources
-       (this is for runtime use inside the app)
-       ========================= -->
   <ItemGroup>
     <AvaloniaResource Include="Assets\icon.ico" />
   </ItemGroup>
@@ -70,7 +54,7 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+          Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass.so')">
       <TargetPath>runtimes/linux-x64/native/libbass.so</TargetPath>
     </None>
 
@@ -79,17 +63,16 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
+          Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbass.so')">
       <TargetPath>runtimes/linux-arm64/native/libbass.so</TargetPath>
     </None>
   </ItemGroup>
 
   <!-- =========================
        Native DryWetMIDI binaries (per RID)
-       YOU MUST PROVIDE THESE FILES IN YOUR REPO:
-         - native/linux-x64/Melanchall_DryWetMidi_Native64.so
-         - native/linux-arm64/Melanchall_DryWetMidi_Native64.so
-       (Windows .dll is intentionally NOT referenced, to avoid build failures.)
+       Notes:
+       - linux-x64 .so is REQUIRED for Fedora x64
+       - linux-arm64 .so is OPTIONAL until you provide it
        ========================= -->
   <ItemGroup>
     <!-- Linux x64 -->
@@ -97,17 +80,16 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
-      <!-- DryWetMIDI probes next to the app as well; keep it at app root -->
+          Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/Melanchall_DryWetMidi_Native64.so')">
       <TargetPath>Melanchall_DryWetMidi_Native64.so</TargetPath>
     </None>
 
-    <!-- Linux ARM64 -->
+    <!-- Linux ARM64 (only copied if present; prevents CI failure) -->
     <None Include="native/linux-arm64/Melanchall_DryWetMidi_Native64.so"
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           Visible="false"
-          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
+          Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/Melanchall_DryWetMidi_Native64.so')">
       <TargetPath>Melanchall_DryWetMidi_Native64.so</TargetPath>
     </None>
   </ItemGroup>
@@ -116,42 +98,36 @@
        Safety targets
        ========================= -->
 
-  <!-- Local runs on Windows without -r sometimes miss the copy -->
   <Target Name="CopyBassToOutput"
           AfterTargets="Build"
-          Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'">
-    <Message Importance="high" Text="Copying native\win-x64\bass.dll -&gt; $(OutDir)" />
+          Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll"
           DestinationFolder="$(OutDir)"
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Extra safety for publish output (win-x64) -->
   <Target Name="EnsureBassDllInPublish"
           AfterTargets="Publish"
-          Condition="'$(RuntimeIdentifier)' == 'win-x64'">
-    <Message Importance="high" Text="Copying native\win-x64\bass.dll -&gt; $(PublishDir)" />
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll"
           DestinationFolder="$(PublishDir)"
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Fail fast if linux-x64 publish is missing the DryWetMIDI .so -->
+  <!-- Fail fast for linux-x64 publish if DryWetMIDI .so is missing (because Fedora needs it) -->
   <Target Name="EnsureDryWetMidiSoInPublish_LinuxX64"
           AfterTargets="Publish"
           Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
-    <Message Importance="high" Text="Checking for Melanchall_DryWetMidi_Native64.so in publish output..." />
     <Error Condition="!Exists('$(PublishDir)Melanchall_DryWetMidi_Native64.so')"
-           Text="Missing Melanchall_DryWetMidi_Native64.so in publish output. Put it in native/linux-x64/ and rebuild." />
+           Text="Missing Melanchall_DryWetMidi_Native64.so for linux-x64 publish. Add it at native/linux-x64/ or adjust packaging." />
   </Target>
 
-  <!-- Fail fast if linux-arm64 publish is missing the DryWetMIDI .so -->
-  <Target Name="EnsureDryWetMidiSoInPublish_LinuxArm64"
+  <!-- For linux-arm64 we do NOT fail (until you actually supply the ARM64 .so) -->
+  <Target Name="WarnDryWetMidiSoMissing_LinuxArm64"
           AfterTargets="Publish"
-          Condition="'$(RuntimeIdentifier)' == 'linux-arm64'">
-    <Message Importance="high" Text="Checking for Melanchall_DryWetMidi_Native64.so in publish output..." />
-    <Error Condition="!Exists('$(PublishDir)Melanchall_DryWetMidi_Native64.so')"
-           Text="Missing Melanchall_DryWetMidi_Native64.so in publish output. Put it in native/linux-arm64/ and rebuild." />
+          Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And !Exists('$(PublishDir)Melanchall_DryWetMidi_Native64.so')">
+    <Message Importance="high"
+             Text="WARNING: DryWetMIDI native .so not present for linux-arm64. MIDI will not work on ARM64 until native/linux-arm64/Melanchall_DryWetMidi_Native64.so is provided." />
   </Target>
 
 </Project>
