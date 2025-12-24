@@ -96,57 +96,6 @@ jobs:
             $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
-      - name: Fetch DryWetMIDI native binaries (Linux)
-        if: startsWith(matrix.rid, 'linux')
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          OUT="out/${{ matrix.name }}"
-          RID="${{ matrix.rid }}"
-
-          DW_VER="$(grep -oP 'PackageReference\s+Include="Melanchall\.DryWetMidi"\s+Version="\K[^"]+' "$PROJECT_PATH" | head -n 1 || true)"
-          if [ -z "${DW_VER:-}" ]; then
-            echo "ERROR: Could not determine Melanchall.DryWetMidi version from $PROJECT_PATH"
-            exit 1
-          fi
-
-          ZIP="DryWetMIDI.${DW_VER}-bin-native.zip"
-          URL="https://github.com/melanchall/drywetmidi/releases/download/v${DW_VER}/${ZIP}"
-
-          echo "DryWetMIDI version: $DW_VER"
-          echo "Downloading: $URL"
-
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends curl unzip
-
-          TMP="$(mktemp -d)"
-          cd "$TMP"
-          curl -fL -o "$ZIP" "$URL"
-          unzip -q "$ZIP" -d extracted
-
-          if [ "$RID" = "linux-x64" ]; then
-            SO_PATH="$(find extracted -type f -name 'Melanchall_DryWetMidi_Native64.so' | grep -iE 'linux.*x64|linux-x64|x64.*linux' | head -n 1 || true)"
-          elif [ "$RID" = "linux-arm64" ]; then
-            SO_PATH="$(find extracted -type f -name 'Melanchall_DryWetMidi_Native64.so' | grep -iE 'linux.*arm64|linux-arm64|arm64.*linux|aarch64' | head -n 1 || true)"
-          else
-            SO_PATH=""
-          fi
-
-          if [ -z "${SO_PATH:-}" ]; then
-            echo "ERROR: Could not locate Melanchall_DryWetMidi_Native64.so in $ZIP for RID=$RID"
-            echo "Archive candidates:"
-            find extracted -type f -iname '*drywetmidi*' -o -iname '*.so' | sed 's#^#  - #' || true
-            exit 1
-          fi
-
-          echo "Using native lib: $SO_PATH"
-          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
-          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
-          ln -sf "Melanchall_DryWetMidi_Native64.so" "$OUT/libMelanchall_DryWetMidi_Native64.so"
-
-          ls -la "$OUT" | grep -i drywetmidi || true
-
       - name: Fix Linux native libs (BASS + remove .NET lttng tracepoints)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
@@ -161,7 +110,6 @@ jobs:
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
           test -f "$OUT/${APP_NAME}"
-          test -f "$OUT/Melanchall_DryWetMidi_Native64.so"
 
       - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
@@ -226,7 +174,7 @@ jobs:
         run: |
           set -euo pipefail
           dnf -y update
-          dnf -y install git rpm-build rpmdevtools tar gzip findutils sed grep coreutils curl unzip
+          dnf -y install git rpm-build rpmdevtools tar gzip findutils sed grep coreutils
           dnf -y install dotnet-sdk-9.0
 
       - uses: actions/checkout@v4
@@ -249,45 +197,6 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -o out/linux-x64
 
-      - name: Fetch DryWetMIDI native binaries (Fedora container)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          OUT="out/linux-x64"
-
-          DW_VER="$(grep -oP 'PackageReference\s+Include="Melanchall\.DryWetMidi"\s+Version="\K[^"]+' "$PROJECT_PATH" | head -n 1 || true)"
-          if [ -z "${DW_VER:-}" ]; then
-            echo "ERROR: Could not determine Melanchall.DryWetMidi version from $PROJECT_PATH"
-            exit 1
-          fi
-
-          ZIP="DryWetMIDI.${DW_VER}-bin-native.zip"
-          URL="https://github.com/melanchall/drywetmidi/releases/download/v${DW_VER}/${ZIP}"
-
-          echo "DryWetMIDI version: $DW_VER"
-          echo "Downloading: $URL"
-
-          TMP="$(mktemp -d)"
-          cd "$TMP"
-          curl -fL -o "$ZIP" "$URL"
-          unzip -q "$ZIP" -d extracted
-
-          SO_PATH="$(find extracted -type f -name 'Melanchall_DryWetMidi_Native64.so' | grep -iE 'linux.*x64|linux-x64|x64.*linux' | head -n 1 || true)"
-          if [ -z "${SO_PATH:-}" ]; then
-            echo "ERROR: Could not locate Melanchall_DryWetMidi_Native64.so in $ZIP for linux-x64"
-            echo "Archive candidates:"
-            find extracted -type f -iname '*drywetmidi*' -o -iname '*.so' | sed 's#^#  - #' || true
-            exit 1
-          fi
-
-          echo "Using native lib: $SO_PATH"
-          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
-          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
-          ln -sf "Melanchall_DryWetMidi_Native64.so" "$OUT/libMelanchall_DryWetMidi_Native64.so"
-
-          ls -la "$OUT" | grep -i drywetmidi || true
-
       - name: Fix Fedora payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
@@ -300,7 +209,6 @@ jobs:
           rm -f out/linux-x64/libcoreclrtraceptprovider.so
 
           test -f out/linux-x64/JingleBox2
-          test -f out/linux-x64/Melanchall_DryWetMidi_Native64.so
 
       - name: Prepare RPM sources (patch spec Version + create matching Source0)
         shell: bash
@@ -402,7 +310,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends dpkg dpkg-dev fakeroot tar gzip curl unzip
+          sudo apt-get install -y --no-install-recommends dpkg dpkg-dev fakeroot tar gzip
 
       - name: Restore
         shell: bash
@@ -420,45 +328,6 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=false \
             -o "out/${{ matrix.rid }}"
 
-      - name: Fetch DryWetMIDI native binaries (DEB)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          OUT="out/${{ matrix.rid }}"
-
-          DW_VER="$(grep -oP 'PackageReference\s+Include="Melanchall\.DryWetMidi"\s+Version="\K[^"]+' "$PROJECT_PATH" | head -n 1 || true)"
-          if [ -z "${DW_VER:-}" ]; then
-            echo "ERROR: Could not determine Melanchall.DryWetMidi version from $PROJECT_PATH"
-            exit 1
-          fi
-
-          ZIP="DryWetMIDI.${DW_VER}-bin-native.zip"
-          URL="https://github.com/melanchall/drywetmidi/releases/download/v${DW_VER}/${ZIP}"
-
-          echo "DryWetMIDI version: $DW_VER"
-          echo "Downloading: $URL"
-
-          TMP="$(mktemp -d)"
-          cd "$TMP"
-          curl -fL -o "$ZIP" "$URL"
-          unzip -q "$ZIP" -d extracted
-
-          SO_PATH="$(find extracted -type f -name 'Melanchall_DryWetMidi_Native64.so' | grep -iE 'linux.*x64|linux-x64|x64.*linux' | head -n 1 || true)"
-          if [ -z "${SO_PATH:-}" ]; then
-            echo "ERROR: Could not locate Melanchall_DryWetMidi_Native64.so in $ZIP for linux-x64"
-            echo "Archive candidates:"
-            find extracted -type f -iname '*drywetmidi*' -o -iname '*.so' | sed 's#^#  - #' || true
-            exit 1
-          fi
-
-          echo "Using native lib: $SO_PATH"
-          cp -v "$SO_PATH" "$OUT/Melanchall_DryWetMidi_Native64.so"
-          chmod 0755 "$OUT/Melanchall_DryWetMidi_Native64.so"
-          ln -sf "Melanchall_DryWetMidi_Native64.so" "$OUT/libMelanchall_DryWetMidi_Native64.so"
-
-          ls -la "$OUT" | grep -i drywetmidi || true
-
       - name: Fix DEB payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
@@ -472,7 +341,6 @@ jobs:
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
           test -f "$OUT/${APP_NAME}"
-          test -f "$OUT/Melanchall_DryWetMidi_Native64.so"
 
       - name: Build .deb
         shell: bash

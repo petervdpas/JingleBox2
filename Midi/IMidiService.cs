@@ -7,7 +7,7 @@ public interface IMidiService : IDisposable
 {
     IReadOnlyList<string> GetInputDevices();
 
-    void Open(string deviceName);
+    void Open(string deviceIdOrName);
     void Close();
 
     event EventHandler<MidiMessage>? MessageReceived;
