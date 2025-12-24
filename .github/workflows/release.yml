@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+env:
+  APP_NAME: JingleBox2
+  CONFIGURATION: Release
+  PROJECT_PATH: ./JingleBox2.csproj
+  DEB_PKG_NAME: jinglebox2
+
 jobs:
   build:
     name: Build & Package (${{ matrix.name }})
@@ -29,11 +35,6 @@ jobs:
 
     runs-on: ${{ matrix.os }}
 
-    env:
-      APP_NAME: JingleBox2
-      CONFIGURATION: Release
-      PROJECT_PATH: ./JingleBox2.csproj
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,14 +47,6 @@ jobs:
 
       - name: Restore
         run: dotnet restore
-
-      - name: Install ARM64 build deps (Linux arm64 only)
-        if: matrix.rid == 'linux-arm64'
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y clang zlib1g-dev
 
       - name: Publish (Windows)
         if: startsWith(matrix.rid, 'win')
@@ -82,21 +75,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          EXTRA_PROPS=""
-          if [ "${{ matrix.rid }}" = "linux-arm64" ]; then
-            EXTRA_PROPS="-p:PlatformTarget=AnyCPU"
-          fi
-
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r "${{ matrix.rid }}" \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
-            $EXTRA_PROPS \
             -o "out/${{ matrix.name }}"
 
-      - name: Fix Linux native libs (BASS + remove .NET lttng tracepoints)
+      - name: Fix Linux payload (BASS + remove .NET lttng tracepoints)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
@@ -163,18 +150,14 @@ jobs:
     container:
       image: fedora:${{ matrix.fedora }}
 
-    env:
-      APP_NAME: JingleBox2
-      CONFIGURATION: Release
-      PROJECT_PATH: ./JingleBox2.csproj
-
     steps:
       - name: Install build tooling
         shell: bash
         run: |
           set -euo pipefail
           dnf -y update
-          dnf -y install git rpm-build rpmdevtools tar gzip findutils sed grep coreutils
+          dnf -y install ca-certificates git rpm-build rpmdevtools tar gzip findutils sed grep coreutils
+          update-ca-trust || true
           dnf -y install dotnet-sdk-9.0
 
       - uses: actions/checkout@v4
@@ -279,21 +262,8 @@ jobs:
           path: dist/*.rpm
 
   deb_ubuntu:
-    name: Ubuntu/Debian .deb (${{ matrix.deb_arch }}, self-contained)
+    name: Ubuntu/Debian .deb (amd64, self-contained)
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rid: linux-x64
-            deb_arch: amd64
-
-    env:
-      APP_NAME: JingleBox2
-      CONFIGURATION: Release
-      PROJECT_PATH: ./JingleBox2.csproj
-      DEB_PKG_NAME: jinglebox2
 
     steps:
       - uses: actions/checkout@v4
@@ -316,26 +286,26 @@ jobs:
         shell: bash
         run: dotnet restore
 
-      - name: Publish (self-contained, not single-file)
+      - name: Publish (linux-x64 self-contained, not single-file)
         shell: bash
         run: |
           set -euo pipefail
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
-            -r "${{ matrix.rid }}" \
+            -r linux-x64 \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
-            -o "out/${{ matrix.rid }}"
+            -o "out/linux-x64"
 
       - name: Fix DEB payload (BASS + remove .NET lttng tracepoints)
         shell: bash
         run: |
           set -euo pipefail
-          OUT="out/${{ matrix.rid }}"
+          OUT="out/linux-x64"
 
-          if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" ]; then
-            cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" "$OUT/libbass.so"
+          if [ -f "$OUT/runtimes/linux-x64/native/libbass.so" ]; then
+            cp -a "$OUT/runtimes/linux-x64/native/libbass.so" "$OUT/libbass.so"
           fi
 
           rm -f "$OUT/libcoreclrtraceptprovider.so"
@@ -348,7 +318,7 @@ jobs:
           set -euo pipefail
 
           VER="${GITHUB_REF_NAME#v}"
-          ARCH="${{ matrix.deb_arch }}"
+          ARCH="amd64"
           NAME="$DEB_PKG_NAME"
 
           ROOT="$(mktemp -d)"
@@ -360,7 +330,7 @@ jobs:
           mkdir -p "$PKGDIR/usr/share/applications"
           mkdir -p "$PKGDIR/usr/share/icons/hicolor/256x256/apps"
 
-          cp -a "out/${{ matrix.rid }}/." "$PKGDIR/opt/${APP_NAME}/"
+          cp -a "out/linux-x64/." "$PKGDIR/opt/${APP_NAME}/"
           chmod 0755 "$PKGDIR/opt/${APP_NAME}/${APP_NAME}" || true
 
           printf '#!/usr/bin/env bash\nset -euo pipefail\nexec /opt/%s/%s "$@"\n' \
@@ -390,7 +360,7 @@ jobs:
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts-deb-${{ matrix.deb_arch }}
+          name: artifacts-deb-amd64
           path: dist/*.deb
 
   release:
