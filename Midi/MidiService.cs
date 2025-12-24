@@ -17,7 +17,6 @@ public sealed class MidiService : IMidiService
 
     public IReadOnlyList<string> GetInputDevices()
     {
-        // DryWetMIDI exposes currently available input devices by name.
         return InputDevice.GetAll()
             .Select(d => d.Name)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -32,12 +31,12 @@ public sealed class MidiService : IMidiService
         if (string.IsNullOrWhiteSpace(deviceName))
             return;
 
-        // Find exact match (case-insensitive)
         var dev = InputDevice.GetAll()
-            .FirstOrDefault(d => string.Equals(d.Name, deviceName, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(d =>
+                string.Equals(d.Name, deviceName, StringComparison.OrdinalIgnoreCase));
 
         if (dev is null)
-            throw new InvalidOperationException($"MIDI device not found: {deviceName}");
+            return; // ← critical fix: never crash on missing device
 
         _device = dev;
         _device.EventReceived += OnEventReceived;
@@ -66,48 +65,42 @@ public sealed class MidiService : IMidiService
     private void OnEventReceived(object? sender, MidiEventReceivedEventArgs e)
     {
         var msg = Convert(e.Event);
-        if (msg is null) return;
-
-        MessageReceived?.Invoke(this, msg);
+        if (msg != null)
+            MessageReceived?.Invoke(this, msg);
     }
 
     private static MidiMessage? Convert(MidiEvent ev)
     {
-        switch (ev)
+        return ev switch
         {
-            case NoteOnEvent noteOn:
-                // Treat velocity 0 as NoteOff
-                return new MidiMessage
-                {
-                    Type = MidiMessageType.Note,
-                    Channel = noteOn.Channel + 1, // DryWetMIDI channels are 0..15
-                    Value = noteOn.NoteNumber,
-                    Data = noteOn.Velocity,
-                    IsOn = noteOn.Velocity > 0
-                };
+            NoteOnEvent n => new MidiMessage
+            {
+                Type = MidiMessageType.Note,
+                Channel = n.Channel + 1,
+                Value = n.NoteNumber,
+                Data = n.Velocity,
+                IsOn = n.Velocity > 0
+            },
 
-            case NoteOffEvent noteOff:
-                return new MidiMessage
-                {
-                    Type = MidiMessageType.Note,
-                    Channel = noteOff.Channel + 1,
-                    Value = noteOff.NoteNumber,
-                    Data = noteOff.Velocity,
-                    IsOn = false
-                };
+            NoteOffEvent n => new MidiMessage
+            {
+                Type = MidiMessageType.Note,
+                Channel = n.Channel + 1,
+                Value = n.NoteNumber,
+                Data = n.Velocity,
+                IsOn = false
+            },
 
-            case ControlChangeEvent cc:
-                return new MidiMessage
-                {
-                    Type = MidiMessageType.ControlChange,
-                    Channel = cc.Channel + 1,
-                    Value = cc.ControlNumber,
-                    Data = cc.ControlValue,
-                    IsOn = cc.ControlValue > 0
-                };
+            ControlChangeEvent c => new MidiMessage
+            {
+                Type = MidiMessageType.ControlChange,
+                Channel = c.Channel + 1,
+                Value = c.ControlNumber,
+                Data = c.ControlValue,
+                IsOn = c.ControlValue > 0
+            },
 
-            default:
-                return null;
-        }
+            _ => null
+        };
     }
 }
