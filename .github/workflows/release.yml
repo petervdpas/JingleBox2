@@ -45,6 +45,15 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      # Ensure ALSA runtime is present on Linux runners (managed-midi needs libasound)
+      - name: Install ALSA runtime (Linux runners)
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2 libasound2-dev
+
       - name: Restore
         run: dotnet restore
 
@@ -157,6 +166,8 @@ jobs:
           set -euo pipefail
           dnf -y update
           dnf -y install ca-certificates git rpm-build rpmdevtools tar gzip findutils sed grep coreutils
+          # ALSA runtime + devel so managed-midi finds libasound.so during build-time tests
+          dnf -y install alsa-lib alsa-lib-devel
           update-ca-trust || true
           dnf -y install dotnet-sdk-9.0
 
@@ -275,12 +286,14 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
-      - name: Install packaging tools
+      - name: Install packaging tools (+ ALSA runtime)
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends dpkg dpkg-dev fakeroot tar gzip
+          sudo apt-get install -y --no-install-recommends \
+            dpkg dpkg-dev fakeroot tar gzip \
+            libasound2 libasound2-dev
 
       - name: Restore
         shell: bash
@@ -349,7 +362,8 @@ jobs:
 
           INSTALLED_SIZE="$(du -sk "$PKGDIR/opt/${APP_NAME}" | awk '{print $1}')"
 
-          printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDescription: JingleBox2\n Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.\n' \
+          # NOTE: add libasound2 as a runtime dependency for managed-midi/ALSA
+          printf 'Package: %s\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: %s\nMaintainer: JingleBox2 CI <noreply@github.com>\nInstalled-Size: %s\nDepends: libasound2\nDescription: JingleBox2\n Lightweight cross-platform audio pad launcher built with .NET and Avalonia UI.\n' \
             "$NAME" "$VER" "$ARCH" "$INSTALLED_SIZE" \
             > "$PKGDIR/DEBIAN/control"
 
