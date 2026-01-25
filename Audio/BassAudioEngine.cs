@@ -13,13 +13,15 @@ public sealed class BassAudioEngine : IAudioEngine
 {
     private int _currentDeviceId = -1;
 
-    private readonly int[] _padStreams;
-    private readonly PadSourceKind[] _padKinds;
-    private readonly string?[] _padSources;
-    private readonly float[] _padVolumes;
+    private int[] _padStreams;
+    private PadSourceKind[] _padKinds;
+    private string?[] _padSources;
+    private float[] _padVolumes;
 
     // ManagedBass sync must be kept alive
     private readonly SyncProcedure _endSync;
+
+    public int PadCount => _padStreams.Length;
 
     public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged;
 
@@ -252,6 +254,26 @@ public sealed class BassAudioEngine : IAudioEngine
     {
         for (int i = 0; i < _padStreams.Length; i++)
             FreeStream(i);
+    }
+
+    public void Resize(int newPadCount)
+    {
+        if (newPadCount == _padStreams.Length) return;
+
+        StopAllAndFreeStreams();
+
+        _padStreams = new int[newPadCount];
+        _padKinds = new PadSourceKind[newPadCount];
+        _padSources = new string?[newPadCount];
+        _padVolumes = new float[newPadCount];
+
+        for (int i = 0; i < newPadCount; i++)
+        {
+            _padKinds[i] = PadSourceKind.None;
+            _padSources[i] = null;
+            _padVolumes[i] = 1.0f;
+            _padStreams[i] = 0;
+        }
     }
 
     public void Dispose()

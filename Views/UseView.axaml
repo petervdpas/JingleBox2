@@ -67,7 +67,7 @@
                     VerticalAlignment="Stretch">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <UniformGrid Columns="2"/>
+            <UniformGrid Columns="{Binding Columns}"/>
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
 

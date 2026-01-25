@@ -134,4 +134,12 @@ public sealed partial class MidiViewModel : ObservableObject
         _cfg.Midi.Pads = Pads.Select(p => p.ToModel()).ToList();
         _store.Save(_cfg);
     }
+
+    public void UpdatePadCount(int newPadCount)
+    {
+        // ConfigStore.Normalize already updated _cfg.Midi.Pads, so just rebuild our VMs
+        Pads.Clear();
+        foreach (var m in _cfg.Midi.Pads)
+            Pads.Add(new PadMidiMappingViewModel(m));
+    }
 }

@@ -51,8 +51,23 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private string newProfileName = "";
 
+    // Matrix size (rows x columns)
+    [ObservableProperty] private int rows = 4;
+    [ObservableProperty] private int columns = 2;
+
+    public int PadCount => Rows * Columns;
+
+    // Validation message for matrix size
+    [ObservableProperty] private string matrixSizeError = "";
+
+    public bool IsMatrixSizeValid => string.IsNullOrEmpty(MatrixSizeError);
+
+    // Event to notify window to resize for square pads
+    public event Action<int, int>? MatrixSizeChanged;
+
     public IRelayCommand AddProfileCommand { get; }
     public IRelayCommand DeleteProfileCommand { get; }
+    public IRelayCommand ApplyMatrixSizeCommand { get; }
 
     public MainViewModel(
         IAudioEngine audio,
@@ -70,6 +85,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);
+        ApplyMatrixSizeCommand = new RelayCommand(ApplyMatrixSize, CanApplyMatrixSize);
 
         // Devices
         foreach (var d in _audio.GetOutputDevices())
@@ -82,8 +98,12 @@ public sealed partial class MainViewModel : ObservableObject
         if (SelectedOutputDevice != null)
             _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
+        // Load matrix size from config
+        Rows = _cfg.Rows;
+        Columns = _cfg.Columns;
+
         // Ensure profiles exist + list them
-        EnsureProfilesInitialized(padCount: 8);
+        EnsureProfilesInitialized(PadCount);
         RefreshProfilesList();
 
         // Pick initial selected profile (must match an item in ProfileNames)
@@ -109,7 +129,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         // Pads
-        BuildPadsFromSelectedProfile(padCount: 8);
+        BuildPadsFromSelectedProfile(PadCount);
 
         // MIDI routing: global, profile-independent mapping
         var padTrigger = new JingleBox2.Midi.PadTriggerAdapter(Pads);
@@ -125,6 +145,66 @@ public sealed partial class MainViewModel : ObservableObject
         PropertyChanged += OnMainChanged;
     }
 
+    partial void OnRowsChanged(int value)
+    {
+        ValidateMatrixSize();
+        (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    partial void OnColumnsChanged(int value)
+    {
+        ValidateMatrixSize();
+        (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private void ValidateMatrixSize()
+    {
+        int total = Rows * Columns;
+        if (Rows < 1 || Columns < 1)
+            MatrixSizeError = "Rows and columns must be at least 1";
+        else if (total < 4)
+            MatrixSizeError = $"Minimum 4 pads required (current: {total})";
+        else if (total > 16)
+            MatrixSizeError = $"Maximum 16 pads allowed (current: {total})";
+        else
+            MatrixSizeError = "";
+
+        OnPropertyChanged(nameof(PadCount));
+        OnPropertyChanged(nameof(IsMatrixSizeValid));
+    }
+
+    private bool CanApplyMatrixSize() => IsMatrixSizeValid && (Rows != _cfg.Rows || Columns != _cfg.Columns);
+
+    private void ApplyMatrixSize()
+    {
+        if (!IsMatrixSizeValid) return;
+
+        // Save current pads into profile
+        SavePadsIntoProfile(_cfg.SelectedProfile);
+
+        // Update config
+        _cfg.Rows = Rows;
+        _cfg.Columns = Columns;
+
+        // Resize audio engine
+        _audio.Resize(PadCount);
+
+        // Rebuild pads
+        EnsureProfilesInitialized(PadCount);
+        BuildPadsFromSelectedProfile(PadCount);
+
+        // Update MIDI router pad count
+        Midi.UpdatePadCount(PadCount);
+
+        // Save
+        _store.Save(_cfg);
+
+        // Notify window to resize for square pads
+        MatrixSizeChanged?.Invoke(Rows, Columns);
+
+        (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
+    }
+
     partial void OnSelectedProfileNameChanged(string value)
     {
         if (_suspendSave) return;
@@ -132,13 +212,13 @@ public sealed partial class MainViewModel : ObservableObject
         var name = (value ?? "").Trim();
         if (string.IsNullOrWhiteSpace(name)) return;
 
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(PadCount);
 
         // Persist edits of current pads into currently selected profile BEFORE switching
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
         // Switch selection to the requested name (must exist)
-        _cfg.SelectedProfile = EnsureProfileExistsAndReturnResolved(name, padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        _cfg.SelectedProfile = EnsureProfileExistsAndReturnResolved(name, padCount: PadCount);
 
         _store.Save(_cfg);
 
@@ -200,7 +280,7 @@ public sealed partial class MainViewModel : ObservableObject
         var name = NormalizeProfileName(raw);
         if (string.IsNullOrWhiteSpace(name)) return;
 
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         if (_cfg.Profiles.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
             return;
@@ -209,7 +289,7 @@ public sealed partial class MainViewModel : ObservableObject
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
         // IMPORTANT: new profile must be a CLEAN SLATE
-        var padCount = Pads.Count == 0 ? 8 : Pads.Count;
+        var padCount = PadCount;
         var newProfile = new ConfigProfile
         {
             Name = name,
@@ -242,7 +322,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(cur)) return;
         if (string.Equals(cur, "default", StringComparison.OrdinalIgnoreCase)) return;
 
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         // Persist current edits into current selected profile before deleting (optional but safe)
         SavePadsIntoProfile(cur);
@@ -273,7 +353,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void SaveNow()
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         _cfg.SelectedOutputDeviceId = SelectedOutputDevice?.Id ?? -1;
 
@@ -315,7 +395,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void ApplySelectedProfileToPads()
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         var profile = GetProfileByName(_cfg.SelectedProfile);
 
@@ -343,7 +423,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void SavePadsIntoProfile(string? profileName)
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         var name = string.IsNullOrWhiteSpace(profileName) ? "default" : profileName.Trim();
         var profile = GetProfileByName(name);
@@ -362,7 +442,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void RefreshProfilesList()
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         ProfileNames.Clear();
 
@@ -449,7 +529,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private ConfigProfile GetProfileByName(string? name)
     {
-        EnsureProfilesInitialized(padCount: Pads.Count == 0 ? 8 : Pads.Count);
+        EnsureProfilesInitialized(padCount: PadCount);
 
         var n = string.IsNullOrWhiteSpace(name) ? "default" : name.Trim();
 

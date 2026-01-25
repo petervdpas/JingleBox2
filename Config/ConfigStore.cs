@@ -28,7 +28,7 @@ public sealed class ConfigStore
         ConfigPath = Path.Combine(dir, "config.json");
     }
 
-    public AppConfig LoadOrCreateDefault(int padCount = 8)
+    public AppConfig LoadOrCreateDefault()
     {
         try
         {
@@ -36,7 +36,7 @@ public sealed class ConfigStore
             {
                 var json = File.ReadAllText(ConfigPath);
                 var cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? new AppConfig();
-                Normalize(cfg, padCount);
+                Normalize(cfg);
                 return cfg;
             }
         }
@@ -46,39 +46,48 @@ public sealed class ConfigStore
         }
 
         var fresh = new AppConfig();
-        Normalize(fresh, padCount);
+        Normalize(fresh);
         Save(fresh);
         return fresh;
     }
 
     public void Save(AppConfig cfg)
     {
-        Normalize(cfg, padCount: GuessPadCount(cfg));
+        Normalize(cfg);
         var json = JsonSerializer.Serialize(cfg, JsonOptions);
         File.WriteAllText(ConfigPath, json);
     }
 
-    private static int GuessPadCount(AppConfig cfg)
-    {
-        if (cfg.Profiles != null && cfg.Profiles.Count > 0)
-        {
-            var p = GetSelectedProfile(cfg) ?? cfg.Profiles[0];
-            if (p.Pads != null && p.Pads.Count > 0) return p.Pads.Count;
-        }
-
-        if (cfg.Pads != null && cfg.Pads.Count > 0) return cfg.Pads.Count;
-        return 8;
-    }
-
-    private static void Normalize(AppConfig cfg, int padCount)
+    private static void Normalize(AppConfig cfg)
     {
         cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? "default" : cfg.SelectedProfile.Trim();
         cfg.SelectedTheme = string.IsNullOrWhiteSpace(cfg.SelectedTheme) ? "Dark" : cfg.SelectedTheme.Trim();
 
+        // Validate and clamp matrix dimensions
+        // Min per dimension: 1, Min total: 4, Max total: 16
+        cfg.Rows = Math.Clamp(cfg.Rows, 1, 16);
+        cfg.Columns = Math.Clamp(cfg.Columns, 1, 16);
+
+        // Ensure minimum 4 pads total
+        if (cfg.Rows * cfg.Columns < 4)
+        {
+            cfg.Rows = 2;
+            cfg.Columns = 2;
+        }
+
+        // Ensure maximum 16 pads total
+        if (cfg.Rows * cfg.Columns > 16)
+        {
+            cfg.Rows = 4;
+            cfg.Columns = 4;
+        }
+
+        int padCount = cfg.Rows * cfg.Columns;
+
         cfg.Profiles ??= new List<ConfigProfile>();
         cfg.Pads ??= new List<PadConfig>();
 
-        // ✅ MIDI defaults / normalization (global, not per profile)
+        // MIDI defaults / normalization (global, not per profile)
         cfg.Midi ??= new MidiConfig();
         cfg.Midi.Pads ??= new List<MidiMapping>();
 

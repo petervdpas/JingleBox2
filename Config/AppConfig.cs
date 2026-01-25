@@ -26,6 +26,8 @@ public sealed class AppConfig
     public string SelectedProfile { get; set; } = "default";
     public List<ConfigProfile> Profiles { get; set; } = new();
     public string SelectedTheme { get; set; } = "Dark";
+    public int Rows { get; set; } = 4;
+    public int Columns { get; set; } = 2;
     public MidiConfig Midi { get; set; } = new();
     public List<PadConfig> Pads { get; set; } = new();
 }

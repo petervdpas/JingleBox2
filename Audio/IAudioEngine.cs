@@ -23,6 +23,8 @@ public sealed record PadPlaybackChanged(
 
 public interface IAudioEngine : IDisposable
 {
+    int PadCount { get; }
+
     IEnumerable<OutputDevice> GetOutputDevices();
     void SetOutputDevice(int deviceId);
 
@@ -37,4 +39,6 @@ public interface IAudioEngine : IDisposable
 
     void SetPadSource(int padIndex, PadSourceKind kind, string? source);
     void SetPadVolume(int padIndex, float volume);
+
+    void Resize(int newPadCount);
 }
