@@ -77,6 +77,14 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <Target Name="CopyBassToLinuxOutput"
+          AfterTargets="Build"
+          Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
+    <Copy SourceFiles="native/linux-x64/libbass.so"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="EnsureBassDllInPublish"
           AfterTargets="Publish"
           Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
