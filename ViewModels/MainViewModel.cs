@@ -385,7 +385,8 @@ public sealed partial class MainViewModel : ObservableObject
                 Name = padCfg.Name,
                 FilePath = padCfg.Source,
                 Volume = (float)padCfg.Volume,
-                SourceKind = padCfg.Kind
+                SourceKind = padCfg.Kind,
+                Loop = padCfg.Loop
             };
 
             pad.PropertyChanged += OnPadChanged;
@@ -413,6 +414,7 @@ public sealed partial class MainViewModel : ObservableObject
                 vm.FilePath = pc.Source;
                 vm.Volume = (float)pc.Volume;
                 vm.SourceKind = pc.Kind;
+                vm.Loop = pc.Loop;
             }
         }
         finally
@@ -437,6 +439,7 @@ public sealed partial class MainViewModel : ObservableObject
             pc.Source = vm.FilePath ?? "";
             pc.Volume = vm.Volume;
             pc.Kind = vm.SourceKind;
+            pc.Loop = vm.Loop;
         }
     }
 
@@ -561,7 +564,8 @@ public sealed partial class MainViewModel : ObservableObject
         Name = p.Name,
         Kind = p.Kind,
         Source = p.Source,
-        Volume = p.Volume
+        Volume = p.Volume,
+        Loop = p.Loop
     };
 
     private static string NormalizeProfileName(string name)

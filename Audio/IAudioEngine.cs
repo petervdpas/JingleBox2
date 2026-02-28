@@ -39,6 +39,7 @@ public interface IAudioEngine : IDisposable
 
     void SetPadSource(int padIndex, PadSourceKind kind, string? source);
     void SetPadVolume(int padIndex, float volume);
+    void SetPadLoop(int padIndex, bool loop);
 
     void Resize(int newPadCount);
 }

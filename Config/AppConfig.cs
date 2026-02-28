@@ -12,6 +12,8 @@ public sealed class PadConfig
     public PadSourceKind Kind { get; set; } = PadSourceKind.None;
     public string Source { get; set; } = "";
     public double Volume { get; set; } = 1.0;
+
+    public bool Loop { get; set; } = false;
 }
 
 public sealed class ConfigProfile

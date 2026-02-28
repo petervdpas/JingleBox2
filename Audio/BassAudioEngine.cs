@@ -17,6 +17,7 @@ public sealed class BassAudioEngine : IAudioEngine
     private PadSourceKind[] _padKinds;
     private string?[] _padSources;
     private float[] _padVolumes;
+    private bool[] _padLoops;
 
     // ManagedBass sync must be kept alive
     private readonly SyncProcedure _endSync;
@@ -31,6 +32,7 @@ public sealed class BassAudioEngine : IAudioEngine
         _padKinds = new PadSourceKind[padCount];
         _padSources = new string?[padCount];
         _padVolumes = new float[padCount];
+        _padLoops = new bool[padCount];
 
         _endSync = OnChannelEnd;
 
@@ -40,6 +42,7 @@ public sealed class BassAudioEngine : IAudioEngine
             _padSources[i] = null;
             _padVolumes[i] = 1.0f;
             _padStreams[i] = 0;
+            _padLoops[i] = false;
         }
     }
 
@@ -107,6 +110,16 @@ public sealed class BassAudioEngine : IAudioEngine
             Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, volume);
     }
 
+    public void SetPadLoop(int padIndex, bool loop)
+    {
+        if (!InRange(padIndex)) return;
+
+        _padLoops[padIndex] = loop;
+
+        // Free the existing stream so it's recreated with the correct loop flag on next play
+        FreeStream(padIndex);
+    }
+
     public void PlaySample(int padIndex, string filePath, float volume)
     {
         if (!InRange(padIndex)) return;
@@ -127,14 +140,16 @@ public sealed class BassAudioEngine : IAudioEngine
         var handle = _padStreams[padIndex];
         if (handle == 0)
         {
-            handle = Bass.CreateStream(filePath, Flags: BassFlags.Prescan);
+            var flags = BassFlags.Prescan | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default);
+            handle = Bass.CreateStream(filePath, Flags: flags);
             if (handle == 0)
                 throw new InvalidOperationException($"CreateStream(file) failed: {Bass.LastError}");
 
             _padStreams[padIndex] = handle;
 
-            // Notify when playback ends (file completes)
-            Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
+            // Only register end-sync for non-looping streams; looping streams never end
+            if (!_padLoops[padIndex])
+                Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
         }
 
         Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
@@ -266,6 +281,7 @@ public sealed class BassAudioEngine : IAudioEngine
         _padKinds = new PadSourceKind[newPadCount];
         _padSources = new string?[newPadCount];
         _padVolumes = new float[newPadCount];
+        _padLoops = new bool[newPadCount];
 
         for (int i = 0; i < newPadCount; i++)
         {
@@ -273,6 +289,7 @@ public sealed class BassAudioEngine : IAudioEngine
             _padSources[i] = null;
             _padVolumes[i] = 1.0f;
             _padStreams[i] = 0;
+            _padLoops[i] = false;
         }
     }
 

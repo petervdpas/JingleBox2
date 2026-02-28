@@ -25,6 +25,7 @@ public sealed partial class PadViewModel : ObservableObject
     [ObservableProperty] private string? filePath;
     [ObservableProperty] private float volume = 1.0f;
     [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.File;
+    [ObservableProperty] private bool loop = false;
     [ObservableProperty] private string status = "";
     [ObservableProperty] private bool isPlaying;
 
@@ -101,6 +102,7 @@ public sealed partial class PadViewModel : ObservableObject
                 FilePath = null;
                 SourceKind = PadSourceKind.File;
                 Volume = 1.0f;
+                Loop = false;
             }
             catch (Exception ex)
             {
@@ -159,6 +161,8 @@ public sealed partial class PadViewModel : ObservableObject
         OnPropertyChanged(nameof(IsWeb));
         _audio.SetPadSource(Index, SourceKind, FilePath);
     }
+
+    partial void OnLoopChanged(bool value) => _audio.SetPadLoop(Index, value);
 
     public void SetSourceFromConfig(PadSourceKind kind, string source)
     {

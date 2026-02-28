@@ -98,6 +98,10 @@
                            Watermark="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
 
+                  <ToggleSwitch IsChecked="{Binding Loop}"
+                               OnContent="Loop"
+                               OffContent="Loop" />
+
                   <Grid ColumnDefinitions="*,Auto"
                         RowDefinitions="Auto,Auto"
                         ColumnSpacing="12"
