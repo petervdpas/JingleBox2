@@ -115,7 +115,8 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         shell: pwsh
         run: |
-          iscc installer/windows/JingleBox2.iss
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          iscc /DAppVersion=$version installer/windows/JingleBox2.iss
 
       - name: Create tar.gz (Linux)
         if: startsWith(matrix.rid, 'linux')

@@ -1,5 +1,8 @@
 #define AppName "JingleBox2"
-#define AppVersion "1.0.0"
+; AppVersion is injected at build time via: iscc /DAppVersion=x.y.z
+#ifndef AppVersion
+  #define AppVersion "0.0.0-local"
+#endif
 #define AppPublisher "Peter van de Pas"
 #define AppExeName "JingleBox2.exe"
 #define SetupIco "assets\app.ico"
