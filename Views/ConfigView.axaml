@@ -31,6 +31,18 @@
     <Style Selector="TextBlock.muted">
       <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
     </Style>
+
+    <Style Selector="Button.colorSwatch">
+      <Setter Property="Width" Value="22"/>
+      <Setter Property="Height" Value="22"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="50"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="BorderBrush" Value="White"/>
+    </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource BgBrush}">
@@ -98,9 +110,76 @@
                            Watermark="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
 
-                  <ToggleSwitch IsChecked="{Binding Loop}"
-                               OnContent="Loop"
-                               OffContent="Loop" />
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <!-- Left: loop toggle -->
+                    <ToggleSwitch Grid.Column="0"
+                                  IsChecked="{Binding Loop}"
+                                  OnContent="Loop"
+                                  OffContent="Loop" />
+
+                    <!-- Right: colour palette + preview + clear -->
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right">
+
+                      <Button Classes="colorSwatch" Background="#E53935"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#E53935'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#E53935" />
+                      <Button Classes="colorSwatch" Background="#FB8C00"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FB8C00'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#FB8C00" />
+                      <Button Classes="colorSwatch" Background="#FDD835"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FDD835'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#FDD835" />
+                      <Button Classes="colorSwatch" Background="#43A047"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#43A047'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#43A047" />
+                      <Button Classes="colorSwatch" Background="#00ACC1"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#00ACC1'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#00ACC1" />
+                      <Button Classes="colorSwatch" Background="#1E88E5"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#1E88E5'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#1E88E5" />
+                      <Button Classes="colorSwatch" Background="#8E24AA"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#8E24AA'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#8E24AA" />
+                      <Button Classes="colorSwatch" Background="#F06292"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#F06292'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#F06292" />
+
+                      <!-- Clear: styled as a fixed-size "no colour" swatch with centred ✕ -->
+                      <Button Classes="colorSwatch"
+                              Width="22" Height="22"
+                              Background="{DynamicResource SurfaceBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}"
+                              BorderThickness="2"
+                              Content="✕"
+                              FontSize="11"
+                              Foreground="{DynamicResource TextMutedBrush}"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              ToolTip.Tip="Clear custom colour"
+                              Command="{Binding ClearColorCommand}" />
+                    </StackPanel>
+                  </Grid>
 
                   <Grid ColumnDefinitions="*,Auto"
                         RowDefinitions="Auto,Auto"

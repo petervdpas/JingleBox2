@@ -3,6 +3,7 @@
 // ===============================
 using System;
 using System.Threading.Tasks;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
@@ -21,11 +22,24 @@ public sealed partial class PadViewModel : ObservableObject
     public static PadSourceKind[] SourceKinds { get; } =
         new[] { PadSourceKind.File, PadSourceKind.StreamUrl };
 
+    public static readonly string[] PaletteColors =
+    {
+        "#E53935", // red
+        "#FB8C00", // orange
+        "#FDD835", // yellow
+        "#43A047", // green
+        "#00ACC1", // cyan
+        "#1E88E5", // blue
+        "#8E24AA", // purple
+        "#F06292", // pink
+    };
+
     [ObservableProperty] private string name = "";
     [ObservableProperty] private string? filePath;
     [ObservableProperty] private float volume = 1.0f;
     [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.File;
     [ObservableProperty] private bool loop = false;
+    [ObservableProperty] private string padColor = "";
     [ObservableProperty] private string status = "";
     [ObservableProperty] private bool isPlaying;
 
@@ -34,11 +48,46 @@ public sealed partial class PadViewModel : ObservableObject
 
     public string Title => string.IsNullOrWhiteSpace(Name) ? $"Pad {Index + 1}" : Name;
 
+    /// <summary>
+    /// Returns a brush for the custom pad color, or null when no color is set / pad is playing
+    /// (null causes the NullToUnset converter to restore the theme style).
+    /// </summary>
+    public SolidColorBrush? PadBackground
+    {
+        get
+        {
+            // While playing, let the :checked style handle the background
+            if (IsPlaying || string.IsNullOrWhiteSpace(PadColor))
+                return null;
+
+            try { return new SolidColorBrush(Color.Parse(PadColor)); }
+            catch { return null; }
+        }
+    }
+
+    /// <summary>
+    /// Always returns a brush — grey when no color is configured, custom color otherwise.
+    /// Used for the small preview dot in ConfigView.
+    /// </summary>
+    public SolidColorBrush PadPreviewBrush
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(PadColor))
+                try { return new SolidColorBrush(Color.Parse(PadColor)); }
+                catch { /* fall through */ }
+
+            return new SolidColorBrush(Color.FromRgb(80, 80, 80));
+        }
+    }
+
     public IRelayCommand PlayCommand { get; }
     public IRelayCommand StopCommand { get; }
     public IAsyncRelayCommand AssignCommand { get; }
     public IRelayCommand TogglePlayCommand { get; }
     public IRelayCommand ClearCommand { get; }
+    public IRelayCommand ClearColorCommand { get; }
+    public IRelayCommand<string?> SetColorCommand { get; }
 
     public PadViewModel(int index, IAudioEngine audio, Func<Task<string?>> pickFileAsync)
     {
@@ -103,12 +152,16 @@ public sealed partial class PadViewModel : ObservableObject
                 SourceKind = PadSourceKind.File;
                 Volume = 1.0f;
                 Loop = false;
+                PadColor = "";
             }
             catch (Exception ex)
             {
                 Status = ex.Message;
             }
         });
+
+        ClearColorCommand = new RelayCommand(() => PadColor = "");
+        SetColorCommand   = new RelayCommand<string?>(color => PadColor = color ?? "");
     }
 
     private void TryStart()
@@ -163,6 +216,14 @@ public sealed partial class PadViewModel : ObservableObject
     }
 
     partial void OnLoopChanged(bool value) => _audio.SetPadLoop(Index, value);
+
+    partial void OnPadColorChanged(string value)
+    {
+        OnPropertyChanged(nameof(PadBackground));
+        OnPropertyChanged(nameof(PadPreviewBrush));
+    }
+
+    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PadBackground));
 
     public void SetSourceFromConfig(PadSourceKind kind, string source)
     {

@@ -14,6 +14,7 @@ public sealed class PadConfig
     public double Volume { get; set; } = 1.0;
 
     public bool Loop { get; set; } = false;
+    public string Color { get; set; } = "";
 }
 
 public sealed class ConfigProfile
