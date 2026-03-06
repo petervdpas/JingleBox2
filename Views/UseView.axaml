@@ -99,13 +99,22 @@
                                       Level="{Binding CurrentVolume}" />
                   </Grid>
 
-                  <!-- Playback circle: top-right -->
+                  <!-- Playback circle: top-right (files only) -->
                   <ctrl:CircleCountdown Width="16" Height="16"
                                         Progress="{Binding PlaybackProgress}"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
                                         Margin="0,4,6,0"
-                                        IsVisible="{Binding HasSource}" />
+                                        IsVisible="{Binding IsFile}" />
+
+                  <!-- Stream indicator: top-right (streams only) -->
+                  <TextBlock Text="📡"
+                             FontSize="14"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Top"
+                             Margin="0,4,6,0"
+                             Opacity="0.8"
+                             IsVisible="{Binding IsWeb}" />
                 </Grid>
               </ToggleButton>
             </Border>

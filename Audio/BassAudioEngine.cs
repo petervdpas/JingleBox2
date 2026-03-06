@@ -3,6 +3,7 @@
 // ===============================
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using JingleBox2.Config;
 using JingleBox2.Models;
@@ -67,6 +68,7 @@ public sealed class BassAudioEngine : IAudioEngine
     public double GetPadProgress(int padIndex)
     {
         if (!InRange(padIndex)) return 0;
+        if (_padKinds[padIndex] == PadSourceKind.StreamUrl) return 0;
         var handle = _padStreams[padIndex];
         if (handle == 0) return 0;
         var len = Bass.ChannelGetLength(handle);
@@ -80,12 +82,13 @@ public sealed class BassAudioEngine : IAudioEngine
         if (!InRange(padIndex)) return 0;
         var handle = _padStreams[padIndex];
         if (handle == 0) return 0;
-        if (Bass.ChannelIsActive(handle) != PlaybackState.Playing) return 0;
+
+        var state = Bass.ChannelIsActive(handle);
+        if (state != PlaybackState.Playing && state != PlaybackState.Stalled) return 0;
 
         int raw = Bass.ChannelGetLevel(handle);
         if (raw == -1) return 0;
 
-        // ChannelGetLevel returns left in high word, right in low word (0-32768 each)
         int left = (raw >> 16) & 0xFFFF;
         int right = raw & 0xFFFF;
         float peak = Math.Max(left, right) / 32768f;
@@ -120,6 +123,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
         if (!Bass.Init(deviceId, 44100))
             throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+
+        LoadPlugins();
     }
 
     public void SetPadSource(int padIndex, PadSourceKind kind, string? source)
@@ -291,39 +296,56 @@ public sealed class BassAudioEngine : IAudioEngine
         var handle = _padStreams[padIndex];
         if (handle == 0) return;
 
+        var isStream = _padKinds[padIndex] == PadSourceKind.StreamUrl;
+
         var fadeOut = _padFadeOut[padIndex];
         if (fadeOut > 0 && Bass.ChannelIsActive(handle) == PlaybackState.Playing)
         {
             Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, 0f, (int)(fadeOut * 1000));
 
-            // Stop the channel after the fade completes
-            var capturedHandle = handle;
             var capturedIndex = padIndex;
-            var capturedKind = _padKinds[padIndex];
+            var capturedIsStream = isStream;
             Timer? timer = null;
             timer = new Timer(_ =>
             {
-                Bass.ChannelStop(capturedHandle);
-                if (capturedKind == PadSourceKind.File)
-                    Bass.ChannelSetPosition(capturedHandle, 0);
-                Raise(capturedIndex, PadPlaybackState.Stopped);
+                if (capturedIsStream)
+                    FreeStream(capturedIndex);
+                else
+                {
+                    var h = _padStreams[capturedIndex];
+                    if (h != 0)
+                    {
+                        Bass.ChannelStop(h);
+                        Bass.ChannelSetPosition(h, 0);
+                    }
+                    Raise(capturedIndex, PadPlaybackState.Stopped);
+                }
                 timer?.Dispose();
             }, null, (int)(fadeOut * 1000), Timeout.Infinite);
             return;
         }
 
+        // For streams: free completely so a fresh connection is made on next play
+        if (isStream)
+        {
+            FreeStream(padIndex);
+            return;
+        }
+
         Bass.ChannelStop(handle);
-
-        if (_padKinds[padIndex] == PadSourceKind.File)
-            Bass.ChannelSetPosition(handle, 0);
-
+        Bass.ChannelSetPosition(handle, 0);
         Raise(padIndex, PadPlaybackState.Stopped);
     }
 
     private void OnChannelEnd(int handle, int channel, int data, IntPtr user)
     {
-        // user contains padIndex
         var padIndex = user.ToInt32();
+
+        // For AutoFree streams, BASS frees the handle after this callback.
+        // Clear our reference so we don't try to reuse a dead handle.
+        if (InRange(padIndex) && _padStreams[padIndex] == handle)
+            _padStreams[padIndex] = 0;
+
         Raise(padIndex, PadPlaybackState.Stopped);
     }
 
@@ -335,6 +357,18 @@ public sealed class BassAudioEngine : IAudioEngine
     private bool InRange(int padIndex) =>
         padIndex >= 0 && padIndex < _padStreams.Length;
 
+    private void LoadPlugins()
+    {
+        // Load AAC plugin if available
+        var dir = AppContext.BaseDirectory;
+        var aacLib = OperatingSystem.IsWindows()
+            ? Path.Combine(dir, "bass_aac.dll")
+            : Path.Combine(dir, "libbass_aac.so");
+
+        if (File.Exists(aacLib))
+            Bass.PluginLoad(aacLib);
+    }
+
     private void EnsureInit()
     {
         if (_currentDeviceId >= 0) return;
@@ -342,6 +376,8 @@ public sealed class BassAudioEngine : IAudioEngine
         if (!Bass.Init(0, 44100))
             throw new InvalidOperationException($"Bass.Init default device failed: {Bass.LastError}");
         _currentDeviceId = 0;
+
+        LoadPlugins();
     }
 
     private void FreeStream(int padIndex)
@@ -349,9 +385,13 @@ public sealed class BassAudioEngine : IAudioEngine
         var handle = _padStreams[padIndex];
         if (handle == 0) return;
 
-        Bass.ChannelStop(handle);
-        Bass.StreamFree(handle);
         _padStreams[padIndex] = 0;
+
+        // Check if BASS still knows about this handle (may be auto-freed already)
+        var state = Bass.ChannelIsActive(handle);
+        if (state != PlaybackState.Stopped)
+            Bass.ChannelStop(handle);
+        Bass.StreamFree(handle);
 
         Raise(padIndex, PadPlaybackState.Stopped);
     }
