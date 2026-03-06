@@ -78,6 +78,9 @@ jobs:
           $p = "out\${{ matrix.name }}\bass.dll"
           if (!(Test-Path $p)) { throw "bass.dll missing at $p" }
           Write-Host "OK: bass.dll present"
+          $p2 = "out\${{ matrix.name }}\bass_aac.dll"
+          if (!(Test-Path $p2)) { Write-Host "WARNING: bass_aac.dll missing (AAC streams won't work)" }
+          else { Write-Host "OK: bass_aac.dll present" }
 
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')
@@ -101,6 +104,9 @@ jobs:
 
           if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" ]; then
             cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass.so" "$OUT/libbass.so"
+          fi
+          if [ -f "$OUT/runtimes/${{ matrix.rid }}/native/libbass_aac.so" ]; then
+            cp -a "$OUT/runtimes/${{ matrix.rid }}/native/libbass_aac.so" "$OUT/libbass_aac.so"
           fi
 
           rm -f "$OUT/libcoreclrtraceptprovider.so"
@@ -199,6 +205,9 @@ jobs:
 
           if [ -f out/linux-x64/runtimes/linux-x64/native/libbass.so ]; then
             cp -a out/linux-x64/runtimes/linux-x64/native/libbass.so out/linux-x64/libbass.so
+          fi
+          if [ -f out/linux-x64/runtimes/linux-x64/native/libbass_aac.so ]; then
+            cp -a out/linux-x64/runtimes/linux-x64/native/libbass_aac.so out/linux-x64/libbass_aac.so
           fi
 
           rm -f out/linux-x64/libcoreclrtraceptprovider.so
@@ -320,6 +329,9 @@ jobs:
 
           if [ -f "$OUT/runtimes/linux-x64/native/libbass.so" ]; then
             cp -a "$OUT/runtimes/linux-x64/native/libbass.so" "$OUT/libbass.so"
+          fi
+          if [ -f "$OUT/runtimes/linux-x64/native/libbass_aac.so" ]; then
+            cp -a "$OUT/runtimes/linux-x64/native/libbass_aac.so" "$OUT/libbass_aac.so"
           fi
 
           rm -f "$OUT/libcoreclrtraceptprovider.so"
