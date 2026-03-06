@@ -4,6 +4,7 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia.Media;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
@@ -39,12 +40,18 @@ public sealed partial class PadViewModel : ObservableObject
     [ObservableProperty] private float volume = 1.0f;
     [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.File;
     [ObservableProperty] private bool loop = false;
+    [ObservableProperty] private double fadeIn = 0;
+    [ObservableProperty] private double fadeOut = 0;
     [ObservableProperty] private string padColor = "";
     [ObservableProperty] private string status = "";
     [ObservableProperty] private bool isPlaying;
+    [ObservableProperty] private double playbackProgress;
 
     public bool IsFile => SourceKind == PadSourceKind.File;
     public bool IsWeb => SourceKind == PadSourceKind.StreamUrl;
+    public bool HasFadeIn => FadeIn > 0;
+    public bool HasFadeOut => FadeOut > 0;
+    public bool HasSource => !string.IsNullOrWhiteSpace(FilePath);
 
     public string Title => string.IsNullOrWhiteSpace(Name) ? $"Pad {Index + 1}" : Name;
 
@@ -152,6 +159,8 @@ public sealed partial class PadViewModel : ObservableObject
                 SourceKind = PadSourceKind.File;
                 Volume = 1.0f;
                 Loop = false;
+                FadeIn = 0;
+                FadeOut = 0;
                 PadColor = "";
             }
             catch (Exception ex)
@@ -162,6 +171,16 @@ public sealed partial class PadViewModel : ObservableObject
 
         ClearColorCommand = new RelayCommand(() => PadColor = "");
         SetColorCommand   = new RelayCommand<string?>(color => PadColor = color ?? "");
+
+        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        progressTimer.Tick += (_, _) =>
+        {
+            if (IsPlaying)
+                PlaybackProgress = _audio.GetPadProgress(Index);
+            else
+                PlaybackProgress = 0;
+        };
+        progressTimer.Start();
     }
 
     private void TryStart()
@@ -199,8 +218,11 @@ public sealed partial class PadViewModel : ObservableObject
 
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(Title));
 
-    partial void OnFilePathChanged(string? value) =>
+    partial void OnFilePathChanged(string? value)
+    {
         _audio.SetPadSource(Index, SourceKind, value);
+        OnPropertyChanged(nameof(HasSource));
+    }
 
     partial void OnVolumeChanged(float value)
     {
@@ -216,6 +238,20 @@ public sealed partial class PadViewModel : ObservableObject
     }
 
     partial void OnLoopChanged(bool value) => _audio.SetPadLoop(Index, value);
+
+    partial void OnFadeInChanged(double value)
+    {
+        FadeIn = Math.Clamp(value, 0, 4.9);
+        _audio.SetPadFadeIn(Index, FadeIn);
+        OnPropertyChanged(nameof(HasFadeIn));
+    }
+
+    partial void OnFadeOutChanged(double value)
+    {
+        FadeOut = Math.Clamp(value, 0, 4.9);
+        _audio.SetPadFadeOut(Index, FadeOut);
+        OnPropertyChanged(nameof(HasFadeOut));
+    }
 
     partial void OnPadColorChanged(string value)
     {

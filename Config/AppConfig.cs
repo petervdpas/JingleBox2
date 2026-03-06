@@ -14,6 +14,8 @@ public sealed class PadConfig
     public double Volume { get; set; } = 1.0;
 
     public bool Loop { get; set; } = false;
+    public double FadeIn { get; set; } = 0;
+    public double FadeOut { get; set; } = 0;
     public string Color { get; set; } = "";
 }
 

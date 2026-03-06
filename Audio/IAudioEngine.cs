@@ -31,6 +31,7 @@ public interface IAudioEngine : IDisposable
     event EventHandler<PadPlaybackChanged>? PadPlaybackChanged;
 
     bool IsPadPlaying(int padIndex);
+    double GetPadProgress(int padIndex);
 
     void PlaySample(int padIndex, string filePath, float volume);
     void PlayStream(int padIndex, string url, float volume);
@@ -40,6 +41,8 @@ public interface IAudioEngine : IDisposable
     void SetPadSource(int padIndex, PadSourceKind kind, string? source);
     void SetPadVolume(int padIndex, float volume);
     void SetPadLoop(int padIndex, bool loop);
+    void SetPadFadeIn(int padIndex, double seconds);
+    void SetPadFadeOut(int padIndex, double seconds);
 
     void Resize(int newPadCount);
 }

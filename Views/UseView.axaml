@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:ctrl="clr-namespace:JingleBox2.Controls"
              x:Class="JingleBox2.Views.UseView"
              x:DataType="vm:MainViewModel">
 
@@ -17,8 +18,8 @@
 
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="VerticalAlignment" Value="Stretch"/>
-      <Setter Property="HorizontalContentAlignment" Value="Center"/>
-      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="VerticalContentAlignment" Value="Stretch"/>
     </Style>
 
     <Style Selector="ToggleButton.pad:pointerover">
@@ -77,9 +78,32 @@
               <ToggleButton Classes="pad"
                             IsChecked="{Binding IsPlaying, Mode=OneWay}"
                             Command="{Binding TogglePlayCommand}"
-                            Content="{Binding Title}"
                             Background="{Binding PadBackground,
-                                         Converter={StaticResource NullToUnset}}" />
+                                         Converter={StaticResource NullToUnset}}">
+                <Grid>
+                  <!-- Pad title centred -->
+                  <TextBlock Text="{Binding Title}"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             TextAlignment="Center"
+                             TextWrapping="Wrap" />
+
+                  <!-- Indicators: top-right corner -->
+                  <StackPanel Orientation="Horizontal"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              Spacing="3"
+                              Margin="0,4,6,0">
+                    <TextBlock Text="▲" FontSize="10" Opacity="0.7"
+                               IsVisible="{Binding HasFadeIn}" />
+                    <TextBlock Text="▼" FontSize="10" Opacity="0.7"
+                               IsVisible="{Binding HasFadeOut}" />
+                    <ctrl:CircleCountdown Width="16" Height="16"
+                                          Progress="{Binding PlaybackProgress}"
+                                          IsVisible="{Binding HasSource}" />
+                  </StackPanel>
+                </Grid>
+              </ToggleButton>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>

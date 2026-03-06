@@ -37,6 +37,7 @@
       <Setter Property="Height" Value="22"/>
       <Setter Property="MinWidth" Value="0"/>
       <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="3"/>
       <Setter Property="CornerRadius" Value="50"/>
       <Setter Property="VerticalAlignment" Value="Center"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -75,9 +76,9 @@
       </Border>
 
       <ScrollViewer VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled"
-                    Padding="0,0,28,0">
+                    HorizontalScrollBarVisibility="Disabled">
 
+        <Border Margin="0,0,18,0">
         <ItemsControl ItemsSource="{Binding Pads}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PadViewModel">
@@ -90,7 +91,7 @@
                              Text="{Binding Name}" />
 
                     <ComboBox Grid.Column="1"
-                              Width="140"
+                              Width="100"
                               ItemsSource="{x:Static vm:PadViewModel.SourceKinds}"
                               SelectedItem="{Binding SourceKind}" />
                   </Grid>
@@ -110,7 +111,7 @@
                            Watermark="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
 
-                  <Grid ColumnDefinitions="Auto,*,Auto">
+                  <Grid ColumnDefinitions="Auto,*">
                     <!-- Left: loop toggle -->
                     <ToggleSwitch Grid.Column="0"
                                   IsChecked="{Binding Loop}"
@@ -118,9 +119,8 @@
                                   OffContent="Loop" />
 
                     <!-- Right: colour palette + preview + clear -->
-                    <StackPanel Grid.Column="2"
+                    <WrapPanel Grid.Column="1"
                                 Orientation="Horizontal"
-                                Spacing="6"
                                 VerticalAlignment="Center"
                                 HorizontalAlignment="Right">
 
@@ -178,8 +178,23 @@
                               VerticalContentAlignment="Center"
                               ToolTip.Tip="Clear custom colour"
                               Command="{Binding ClearColorCommand}" />
-                    </StackPanel>
+                    </WrapPanel>
                   </Grid>
+
+                  <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,4">
+                      <TextBlock Text="Fade In" VerticalAlignment="Center" />
+                      <NumericUpDown Value="{Binding FadeIn}" Minimum="0" Maximum="4.9"
+                                     Increment="0.1" FormatString="0.0" Width="120"
+                                     VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+                      <TextBlock Text="Fade Out" VerticalAlignment="Center" />
+                      <NumericUpDown Value="{Binding FadeOut}" Minimum="0" Maximum="4.9"
+                                     Increment="0.1" FormatString="0.0" Width="120"
+                                     VerticalAlignment="Center" />
+                    </StackPanel>
+                  </WrapPanel>
 
                   <Grid ColumnDefinitions="*,Auto"
                         RowDefinitions="Auto,Auto"
@@ -225,6 +240,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </Border>
 
       </ScrollViewer>
     </DockPanel>

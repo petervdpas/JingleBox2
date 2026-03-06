@@ -387,6 +387,8 @@ public sealed partial class MainViewModel : ObservableObject
                 Volume = (float)padCfg.Volume,
                 SourceKind = padCfg.Kind,
                 Loop = padCfg.Loop,
+                FadeIn = padCfg.FadeIn,
+                FadeOut = padCfg.FadeOut,
                 PadColor = padCfg.Color
             };
 
@@ -416,6 +418,8 @@ public sealed partial class MainViewModel : ObservableObject
                 vm.Volume = (float)pc.Volume;
                 vm.SourceKind = pc.Kind;
                 vm.Loop = pc.Loop;
+                vm.FadeIn = pc.FadeIn;
+                vm.FadeOut = pc.FadeOut;
                 vm.PadColor = pc.Color;
             }
         }
@@ -442,6 +446,8 @@ public sealed partial class MainViewModel : ObservableObject
             pc.Volume = vm.Volume;
             pc.Kind = vm.SourceKind;
             pc.Loop = vm.Loop;
+            pc.FadeIn = vm.FadeIn;
+            pc.FadeOut = vm.FadeOut;
             pc.Color = vm.PadColor;
         }
     }
@@ -569,6 +575,8 @@ public sealed partial class MainViewModel : ObservableObject
         Source = p.Source,
         Volume = p.Volume,
         Loop = p.Loop,
+        FadeIn = p.FadeIn,
+        FadeOut = p.FadeOut,
         Color = p.Color
     };
 

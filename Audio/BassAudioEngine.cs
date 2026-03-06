@@ -3,6 +3,7 @@
 // ===============================
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using JingleBox2.Config;
 using JingleBox2.Models;
 using ManagedBass;
@@ -18,6 +19,8 @@ public sealed class BassAudioEngine : IAudioEngine
     private string?[] _padSources;
     private float[] _padVolumes;
     private bool[] _padLoops;
+    private double[] _padFadeIn;
+    private double[] _padFadeOut;
 
     // ManagedBass sync must be kept alive
     private readonly SyncProcedure _endSync;
@@ -33,6 +36,8 @@ public sealed class BassAudioEngine : IAudioEngine
         _padSources = new string?[padCount];
         _padVolumes = new float[padCount];
         _padLoops = new bool[padCount];
+        _padFadeIn = new double[padCount];
+        _padFadeOut = new double[padCount];
 
         _endSync = OnChannelEnd;
 
@@ -43,6 +48,8 @@ public sealed class BassAudioEngine : IAudioEngine
             _padVolumes[i] = 1.0f;
             _padStreams[i] = 0;
             _padLoops[i] = false;
+            _padFadeIn[i] = 0;
+            _padFadeOut[i] = 0;
         }
     }
 
@@ -55,6 +62,17 @@ public sealed class BassAudioEngine : IAudioEngine
 
         var state = Bass.ChannelIsActive(handle);
         return state == PlaybackState.Playing || state == PlaybackState.Stalled;
+    }
+
+    public double GetPadProgress(int padIndex)
+    {
+        if (!InRange(padIndex)) return 0;
+        var handle = _padStreams[padIndex];
+        if (handle == 0) return 0;
+        var len = Bass.ChannelGetLength(handle);
+        if (len <= 0) return 0;
+        var pos = Bass.ChannelGetPosition(handle);
+        return Math.Clamp((double)pos / len, 0, 1);
     }
 
     public IReadOnlyList<OutputDevice> GetOutputDevices()
@@ -120,6 +138,18 @@ public sealed class BassAudioEngine : IAudioEngine
         FreeStream(padIndex);
     }
 
+    public void SetPadFadeIn(int padIndex, double seconds)
+    {
+        if (!InRange(padIndex)) return;
+        _padFadeIn[padIndex] = Math.Max(0, seconds);
+    }
+
+    public void SetPadFadeOut(int padIndex, double seconds)
+    {
+        if (!InRange(padIndex)) return;
+        _padFadeOut[padIndex] = Math.Max(0, seconds);
+    }
+
     public void PlaySample(int padIndex, string filePath, float volume)
     {
         if (!InRange(padIndex)) return;
@@ -152,10 +182,22 @@ public sealed class BassAudioEngine : IAudioEngine
                 Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
         }
 
-        Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
-        Bass.ChannelSetPosition(handle, 0);
-        if (!Bass.ChannelPlay(handle))
-            throw new InvalidOperationException($"ChannelPlay(file) failed: {Bass.LastError}");
+        var fadeIn = _padFadeIn[padIndex];
+        if (fadeIn > 0)
+        {
+            Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
+            Bass.ChannelSetPosition(handle, 0);
+            if (!Bass.ChannelPlay(handle))
+                throw new InvalidOperationException($"ChannelPlay(file) failed: {Bass.LastError}");
+            Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
+        }
+        else
+        {
+            Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
+            Bass.ChannelSetPosition(handle, 0);
+            if (!Bass.ChannelPlay(handle))
+                throw new InvalidOperationException($"ChannelPlay(file) failed: {Bass.LastError}");
+        }
 
         Raise(padIndex, PadPlaybackState.Playing);
     }
@@ -207,9 +249,20 @@ public sealed class BassAudioEngine : IAudioEngine
             Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
         }
 
-        Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
-        if (!Bass.ChannelPlay(handle))
-            throw new InvalidOperationException($"ChannelPlay(url) failed: {Bass.LastError}");
+        var fadeIn = _padFadeIn[padIndex];
+        if (fadeIn > 0)
+        {
+            Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
+            if (!Bass.ChannelPlay(handle))
+                throw new InvalidOperationException($"ChannelPlay(url) failed: {Bass.LastError}");
+            Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
+        }
+        else
+        {
+            Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
+            if (!Bass.ChannelPlay(handle))
+                throw new InvalidOperationException($"ChannelPlay(url) failed: {Bass.LastError}");
+        }
 
         Raise(padIndex, PadPlaybackState.Playing);
     }
@@ -220,6 +273,27 @@ public sealed class BassAudioEngine : IAudioEngine
 
         var handle = _padStreams[padIndex];
         if (handle == 0) return;
+
+        var fadeOut = _padFadeOut[padIndex];
+        if (fadeOut > 0 && Bass.ChannelIsActive(handle) == PlaybackState.Playing)
+        {
+            Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, 0f, (int)(fadeOut * 1000));
+
+            // Stop the channel after the fade completes
+            var capturedHandle = handle;
+            var capturedIndex = padIndex;
+            var capturedKind = _padKinds[padIndex];
+            Timer? timer = null;
+            timer = new Timer(_ =>
+            {
+                Bass.ChannelStop(capturedHandle);
+                if (capturedKind == PadSourceKind.File)
+                    Bass.ChannelSetPosition(capturedHandle, 0);
+                Raise(capturedIndex, PadPlaybackState.Stopped);
+                timer?.Dispose();
+            }, null, (int)(fadeOut * 1000), Timeout.Infinite);
+            return;
+        }
 
         Bass.ChannelStop(handle);
 
@@ -282,6 +356,8 @@ public sealed class BassAudioEngine : IAudioEngine
         _padSources = new string?[newPadCount];
         _padVolumes = new float[newPadCount];
         _padLoops = new bool[newPadCount];
+        _padFadeIn = new double[newPadCount];
+        _padFadeOut = new double[newPadCount];
 
         for (int i = 0; i < newPadCount; i++)
         {
@@ -290,6 +366,8 @@ public sealed class BassAudioEngine : IAudioEngine
             _padVolumes[i] = 1.0f;
             _padStreams[i] = 0;
             _padLoops[i] = false;
+            _padFadeIn[i] = 0;
+            _padFadeOut[i] = 0;
         }
     }
 
