@@ -32,6 +32,7 @@ public interface IAudioEngine : IDisposable
 
     bool IsPadPlaying(int padIndex);
     double GetPadProgress(int padIndex);
+    float GetPadLevel(int padIndex);
 
     void PlaySample(int padIndex, string filePath, float volume);
     void PlayStream(int padIndex, string url, float volume);

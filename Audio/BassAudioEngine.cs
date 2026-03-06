@@ -75,6 +75,23 @@ public sealed class BassAudioEngine : IAudioEngine
         return Math.Clamp((double)pos / len, 0, 1);
     }
 
+    public float GetPadLevel(int padIndex)
+    {
+        if (!InRange(padIndex)) return 0;
+        var handle = _padStreams[padIndex];
+        if (handle == 0) return 0;
+        if (Bass.ChannelIsActive(handle) != PlaybackState.Playing) return 0;
+
+        int raw = Bass.ChannelGetLevel(handle);
+        if (raw == -1) return 0;
+
+        // ChannelGetLevel returns left in high word, right in low word (0-32768 each)
+        int left = (raw >> 16) & 0xFFFF;
+        int right = raw & 0xFFFF;
+        float peak = Math.Max(left, right) / 32768f;
+        return Math.Clamp(peak, 0f, 1f);
+    }
+
     public IReadOnlyList<OutputDevice> GetOutputDevices()
     {
         var list = new List<OutputDevice>();

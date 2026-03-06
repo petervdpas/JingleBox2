@@ -88,20 +88,24 @@
                              TextAlignment="Center"
                              TextWrapping="Wrap" />
 
-                  <!-- Indicators: top-right corner -->
-                  <StackPanel Orientation="Horizontal"
-                              HorizontalAlignment="Right"
-                              VerticalAlignment="Top"
-                              Spacing="3"
-                              Margin="0,4,6,0">
-                    <TextBlock Text="▲" FontSize="10" Opacity="0.7"
-                               IsVisible="{Binding HasFadeIn}" />
-                    <TextBlock Text="▼" FontSize="10" Opacity="0.7"
-                               IsVisible="{Binding HasFadeOut}" />
-                    <ctrl:CircleCountdown Width="16" Height="16"
-                                          Progress="{Binding PlaybackProgress}"
-                                          IsVisible="{Binding HasSource}" />
-                  </StackPanel>
+                  <!-- Volume meter: bottom-left, 1/3 of pad height -->
+                  <Grid RowDefinitions="2*,*"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Stretch"
+                        Width="10"
+                        Margin="6,6,0,6"
+                        IsVisible="{Binding HasSource}">
+                    <ctrl:VolumeMeter Grid.Row="1"
+                                      Level="{Binding CurrentVolume}" />
+                  </Grid>
+
+                  <!-- Playback circle: top-right -->
+                  <ctrl:CircleCountdown Width="16" Height="16"
+                                        Progress="{Binding PlaybackProgress}"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="0,4,6,0"
+                                        IsVisible="{Binding HasSource}" />
                 </Grid>
               </ToggleButton>
             </Border>
