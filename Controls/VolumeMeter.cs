@@ -23,31 +23,40 @@ public class VolumeMeter : Control
 
     private static readonly IBrush TrackBrush = new SolidColorBrush(Colors.White, 0.1);
 
+    private const double DbMin = -60.0;
+    private const double DbMax = 0.0;
+
     static VolumeMeter()
     {
         AffectsRender<VolumeMeter>(LevelProperty);
     }
 
-    private static Color LerpColor(Color a, Color b, double t)
+    private static double LinearToDb(float linear)
     {
-        t = Math.Clamp(t, 0, 1);
-        return Color.FromArgb(
-            (byte)(a.A + (b.A - a.A) * t),
-            (byte)(a.R + (b.R - a.R) * t),
-            (byte)(a.G + (b.G - a.G) * t),
-            (byte)(a.B + (b.B - a.B) * t));
+        if (linear <= 0.0001f) return DbMin;
+        return 20.0 * Math.Log10(linear);
     }
 
-    private static Color GetMeterColor(double fraction)
+    private static double DbToFraction(double db)
     {
-        // fraction 0=bottom, 1=top
-        // 0.0-0.5 green, 0.5-0.75 yellow, 0.75-0.9 orange, 0.9-1.0 red
-        if (fraction < 0.5)
-            return LerpColor(Green, Green, 0);
-        if (fraction < 0.75)
-            return LerpColor(Yellow, Yellow, 0);
-        if (fraction < 0.9)
-            return LerpColor(Orange, Orange, 0);
+        // Map dB range to 0-1 for meter display
+        return Math.Clamp((db - DbMin) / (DbMax - DbMin), 0, 1);
+    }
+
+    private static Color GetMeterColor(double dbFraction)
+    {
+        // dbFraction 0=bottom(-60dB), 1=top(0dB)
+        // Map to standard meter ranges:
+        // Green:  -60dB to -12dB  => fraction 0.0  to 0.8
+        // Yellow: -12dB to -6dB   => fraction 0.8  to 0.9
+        // Orange:  -6dB to -3dB   => fraction 0.9  to 0.95
+        // Red:     -3dB to  0dB   => fraction 0.95 to 1.0
+        if (dbFraction < 0.8)
+            return Green;
+        if (dbFraction < 0.9)
+            return Yellow;
+        if (dbFraction < 0.95)
+            return Orange;
         return Red;
     }
 
@@ -59,20 +68,26 @@ public class VolumeMeter : Control
         // Track background
         context.DrawRectangle(TrackBrush, null, new Rect(0, 0, w, h), 2, 2);
 
-        var level = Math.Clamp(Level, 0f, 1f);
-        if (level < 0.005) return;
+        var linear = Math.Clamp(Level, 0f, 1f);
+        if (linear < 0.0001f) return;
 
-        var fillH = h * level;
-        var segmentCount = Math.Max(1, (int)(fillH / 2));
-        var segH = fillH / segmentCount;
+        var db = LinearToDb(linear);
+        var meterFraction = DbToFraction(db);
+        var fillH = h * meterFraction;
 
-        for (int i = 0; i < segmentCount; i++)
+        if (fillH < 1) return;
+
+        // Draw in 2px segments for the banded look
+        var segH = 2.0;
+        var segments = (int)(fillH / segH);
+
+        for (int i = 0; i < segments; i++)
         {
-            var y = h - (i + 1) * segH;
-            var fraction = (double)(i + 1) / (h / segH); // position 0-1 from bottom
-            var color = GetMeterColor(Math.Clamp(fraction, 0, 1));
+            var segBottom = h - (i + 1) * segH;
+            var segFraction = ((i + 1) * segH) / h;
+            var color = GetMeterColor(segFraction);
             var brush = new SolidColorBrush(color);
-            context.DrawRectangle(brush, null, new Rect(0, y, w, segH));
+            context.DrawRectangle(brush, null, new Rect(0, segBottom, w, segH - 0.5));
         }
     }
 }
