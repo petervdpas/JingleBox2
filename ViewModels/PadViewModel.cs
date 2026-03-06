@@ -47,6 +47,7 @@ public sealed partial class PadViewModel : ObservableObject
     [ObservableProperty] private bool isPlaying;
     [ObservableProperty] private double playbackProgress;
     [ObservableProperty] private float currentVolume;
+    [ObservableProperty] private float channelVolume;
 
     public bool IsFile => SourceKind == PadSourceKind.File;
     public bool IsWeb => SourceKind == PadSourceKind.StreamUrl;
@@ -180,11 +181,13 @@ public sealed partial class PadViewModel : ObservableObject
             {
                 PlaybackProgress = _audio.GetPadProgress(Index);
                 CurrentVolume = _audio.GetPadLevel(Index);
+                ChannelVolume = _audio.GetPadChannelVolume(Index);
             }
             else
             {
                 PlaybackProgress = 0;
                 CurrentVolume = 0;
+                ChannelVolume = 0;
             }
         };
         progressTimer.Start();

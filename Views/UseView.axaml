@@ -88,15 +88,24 @@
                              TextAlignment="Center"
                              TextWrapping="Wrap" />
 
-                  <!-- Volume meter: bottom-left, 1/3 of pad height -->
+                  <!-- Volume + VU meter: bottom-left, 1/3 of pad height -->
                   <Grid RowDefinitions="2*,*"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Stretch"
-                        Width="10"
                         Margin="6,6,0,6"
                         IsVisible="{Binding HasSource}">
-                    <ctrl:VolumeMeter Grid.Row="1"
-                                      Level="{Binding CurrentVolume}" />
+                    <Border Grid.Row="1"
+                            Background="#CC000000"
+                            CornerRadius="3"
+                            Padding="3">
+                      <StackPanel Orientation="Horizontal" Spacing="3">
+                        <!-- Volume bar (shows fade in/out) -->
+                        <ctrl:VolumeMeter Width="8" Level="{Binding ChannelVolume}"
+                                          FillBrush="#881E88E5" />
+                        <!-- VU meter (real audio peaks) -->
+                        <ctrl:VolumeMeter Width="8" Level="{Binding CurrentVolume}" />
+                      </StackPanel>
+                    </Border>
                   </Grid>
 
                   <!-- Playback circle: top-right (files only) -->

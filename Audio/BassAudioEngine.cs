@@ -95,6 +95,16 @@ public sealed class BassAudioEngine : IAudioEngine
         return Math.Clamp(peak, 0f, 1f);
     }
 
+    public float GetPadChannelVolume(int padIndex)
+    {
+        if (!InRange(padIndex)) return _padVolumes[padIndex];
+        var handle = _padStreams[padIndex];
+        if (handle == 0) return _padVolumes[padIndex];
+        if (Bass.ChannelGetAttribute(handle, ChannelAttribute.Volume, out float vol))
+            return vol;
+        return _padVolumes[padIndex];
+    }
+
     public IReadOnlyList<OutputDevice> GetOutputDevices()
     {
         var list = new List<OutputDevice>();

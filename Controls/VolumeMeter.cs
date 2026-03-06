@@ -10,10 +10,28 @@ public class VolumeMeter : Control
     public static readonly StyledProperty<float> LevelProperty =
         AvaloniaProperty.Register<VolumeMeter, float>(nameof(Level));
 
+    public static readonly StyledProperty<bool> UseDbScaleProperty =
+        AvaloniaProperty.Register<VolumeMeter, bool>(nameof(UseDbScale), true);
+
+    public static readonly StyledProperty<IBrush?> FillBrushProperty =
+        AvaloniaProperty.Register<VolumeMeter, IBrush?>(nameof(FillBrush));
+
     public float Level
     {
         get => GetValue(LevelProperty);
         set => SetValue(LevelProperty, value);
+    }
+
+    public bool UseDbScale
+    {
+        get => GetValue(UseDbScaleProperty);
+        set => SetValue(UseDbScaleProperty, value);
+    }
+
+    public IBrush? FillBrush
+    {
+        get => GetValue(FillBrushProperty);
+        set => SetValue(FillBrushProperty, value);
     }
 
     private static readonly Color Green = Color.Parse("#43A047");
@@ -28,7 +46,7 @@ public class VolumeMeter : Control
 
     static VolumeMeter()
     {
-        AffectsRender<VolumeMeter>(LevelProperty);
+        AffectsRender<VolumeMeter>(LevelProperty, UseDbScaleProperty, FillBrushProperty);
     }
 
     private static double LinearToDb(float linear)
@@ -39,24 +57,14 @@ public class VolumeMeter : Control
 
     private static double DbToFraction(double db)
     {
-        // Map dB range to 0-1 for meter display
         return Math.Clamp((db - DbMin) / (DbMax - DbMin), 0, 1);
     }
 
-    private static Color GetMeterColor(double dbFraction)
+    private static Color GetMeterColor(double fraction)
     {
-        // dbFraction 0=bottom(-60dB), 1=top(0dB)
-        // Map to standard meter ranges:
-        // Green:  -60dB to -12dB  => fraction 0.0  to 0.8
-        // Yellow: -12dB to -6dB   => fraction 0.8  to 0.9
-        // Orange:  -6dB to -3dB   => fraction 0.9  to 0.95
-        // Red:     -3dB to  0dB   => fraction 0.95 to 1.0
-        if (dbFraction < 0.8)
-            return Green;
-        if (dbFraction < 0.9)
-            return Yellow;
-        if (dbFraction < 0.95)
-            return Orange;
+        if (fraction < 0.8) return Green;
+        if (fraction < 0.9) return Yellow;
+        if (fraction < 0.95) return Orange;
         return Red;
     }
 
@@ -65,21 +73,36 @@ public class VolumeMeter : Control
         var w = Bounds.Width;
         var h = Bounds.Height;
 
-        // Track background
         context.DrawRectangle(TrackBrush, null, new Rect(0, 0, w, h), 2, 2);
 
         var linear = Math.Clamp(Level, 0f, 1f);
-        if (linear < 0.0001f) return;
+        if (linear < 0.005f) return;
 
-        var db = LinearToDb(linear);
-        var meterFraction = DbToFraction(db);
-        var fillH = h * meterFraction;
+        // Solid fill mode (volume bar)
+        if (FillBrush != null)
+        {
+            var fillH = h * linear;
+            context.DrawRectangle(FillBrush, null, new Rect(0, h - fillH, w, fillH), 2, 2);
+            return;
+        }
 
-        if (fillH < 1) return;
+        // VU meter mode (dB scale, segmented, colored)
+        double meterFraction;
+        if (UseDbScale)
+        {
+            var db = LinearToDb(linear);
+            meterFraction = DbToFraction(db);
+        }
+        else
+        {
+            meterFraction = linear;
+        }
 
-        // Draw in 2px segments for the banded look
+        var fillHeight = h * meterFraction;
+        if (fillHeight < 1) return;
+
         var segH = 2.0;
-        var segments = (int)(fillH / segH);
+        var segments = (int)(fillHeight / segH);
 
         for (int i = 0; i < segments; i++)
         {
