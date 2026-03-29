@@ -13,10 +13,12 @@ using JingleBox2.Models;
 
 namespace JingleBox2.ViewModels;
 
-public sealed partial class PadViewModel : ObservableObject
+public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
     private readonly IAudioEngine _audio;
     private readonly Func<Task<string?>> _pickFileAsync;
+    private readonly DispatcherTimer _progressTimer;
+    private readonly EventHandler<PadPlaybackChanged> _playbackHandler;
 
     public int Index { get; }
 
@@ -106,7 +108,7 @@ public sealed partial class PadViewModel : ObservableObject
 
         IsPlaying = _audio.IsPadPlaying(Index);
 
-        _audio.PadPlaybackChanged += (s, e) =>
+        _playbackHandler = (s, e) =>
         {
             if (e.PadIndex != Index) return;
 
@@ -115,6 +117,7 @@ public sealed partial class PadViewModel : ObservableObject
             if (e.State == PadPlaybackState.Error && !string.IsNullOrWhiteSpace(e.Message))
                 Status = e.Message;
         };
+        _audio.PadPlaybackChanged += _playbackHandler;
 
         PlayCommand = new RelayCommand(() =>
         {
@@ -174,8 +177,8 @@ public sealed partial class PadViewModel : ObservableObject
         ClearColorCommand = new RelayCommand(() => PadColor = "");
         SetColorCommand   = new RelayCommand<string?>(color => PadColor = color ?? "");
 
-        var progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-        progressTimer.Tick += (_, _) =>
+        _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _progressTimer.Tick += (_, _) =>
         {
             if (IsPlaying)
             {
@@ -190,7 +193,7 @@ public sealed partial class PadViewModel : ObservableObject
                 ChannelVolume = 0;
             }
         };
-        progressTimer.Start();
+        _progressTimer.Start();
     }
 
     private void TryStart()
@@ -275,5 +278,11 @@ public sealed partial class PadViewModel : ObservableObject
     {
         SourceKind = kind;
         FilePath = string.IsNullOrWhiteSpace(source) ? null : source;
+    }
+
+    public void Dispose()
+    {
+        _progressTimer.Stop();
+        _audio.PadPlaybackChanged -= _playbackHandler;
     }
 }

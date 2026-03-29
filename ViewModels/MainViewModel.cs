@@ -375,6 +375,8 @@ public sealed partial class MainViewModel : ObservableObject
 
         var profile = GetProfileByName(_cfg.SelectedProfile);
 
+        foreach (var old in Pads)
+            old.Dispose();
         Pads.Clear();
         for (int i = 0; i < profile.Pads.Count; i++)
         {
