@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Version from git tag (CI sets this via /p:Version=...; local fallback below) -->
+    <Version>0.0.0-local</Version>
     <!-- Publish targets -->
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
@@ -51,6 +53,15 @@
       <TargetPath>runtimes/linux-arm64/native/libbass_aac.so</TargetPath>
     </None>
   </ItemGroup>
+  <!-- Derive version from git tag (e.g. v1.0.12 → 1.0.12) -->
+  <Target Name="SetVersionFromGit" BeforeTargets="GetAssemblyVersion;GenerateNuspec;BeforeCompile" Condition="'$(Version)' == '0.0.0-local'">
+    <Exec Command="git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0" ConsoleToMsBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitTag" />
+    </Exec>
+    <PropertyGroup>
+      <Version>$(_GitTag.TrimStart('v'))</Version>
+    </PropertyGroup>
+  </Target>
   <!-- Safety targets -->
   <Target Name="CopyBassToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />

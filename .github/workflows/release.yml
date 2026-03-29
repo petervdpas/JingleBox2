@@ -61,12 +61,14 @@ jobs:
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
         run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
           dotnet publish $env:PROJECT_PATH `
             -c $env:CONFIGURATION `
             -r ${{ matrix.rid }} `
             --self-contained true `
             -p:PublishSingleFile=false `
             -p:IncludeNativeLibrariesForSelfExtract=false `
+            -p:Version=$ver `
             -o "out/${{ matrix.name }}"
 
       - name: Verify bass.dll exists (Windows)
@@ -87,12 +89,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r "${{ matrix.rid }}" \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:Version="$VER" \
             -o "out/${{ matrix.name }}"
 
       - name: Fix Linux payload (BASS + remove .NET lttng tracepoints)
@@ -190,12 +194,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r linux-x64 \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:Version="$VER" \
             -o out/linux-x64
 
       - name: Fix Fedora payload (BASS + remove .NET lttng tracepoints)
@@ -313,12 +319,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
           dotnet publish "$PROJECT_PATH" \
             -c "$CONFIGURATION" \
             -r linux-x64 \
             --self-contained true \
             -p:PublishSingleFile=false \
             -p:IncludeNativeLibrariesForSelfExtract=false \
+            -p:Version="$VER" \
             -o "out/linux-x64"
 
       - name: Fix DEB payload (BASS + remove .NET lttng tracepoints)

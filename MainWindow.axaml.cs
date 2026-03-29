@@ -5,6 +5,7 @@ using JingleBox2.Config;
 using JingleBox2.Midi;
 using JingleBox2.ViewModels;
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace JingleBox2;
@@ -47,6 +48,16 @@ public partial class MainWindow : Window
 
         var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi);
         DataContext = vm;
+
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrEmpty(version))
+        {
+            // Strip git hash suffix if present (e.g. "1.0.12+abc123def")
+            var plus = version.IndexOf('+');
+            if (plus > 0) version = version[..plus];
+            Title = $"JingleBox2 v{version}";
+        }
 
         // Subscribe to matrix size changes to resize window
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
