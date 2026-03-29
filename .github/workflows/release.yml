@@ -43,7 +43,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       # Ensure ALSA runtime is present on Ubuntu runners (24.04 uses libasound2t64)
       - name: Install ALSA runtime (Linux runners)
@@ -176,7 +176,7 @@ jobs:
           # ALSA runtime + devel so managed-midi finds libasound.so
           dnf -y install alsa-lib alsa-lib-devel
           update-ca-trust || true
-          dnf -y install dotnet-sdk-9.0
+          dnf -y install dotnet-sdk-10.0
 
       - uses: actions/checkout@v4
         with:
@@ -294,7 +294,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "9.0.x"
+          dotnet-version: "10.0.x"
 
       - name: Install packaging tools (+ ALSA runtime)
         shell: bash
