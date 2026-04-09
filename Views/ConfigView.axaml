@@ -66,7 +66,7 @@
                   Command="{Binding DeleteProfileCommand}" />
 
           <TextBox Grid.Row="1" Grid.Column="0"
-                   Watermark="New profile name"
+                   PlaceholderText="New profile name"
                    Text="{Binding NewProfileName}" />
 
           <Button Grid.Row="1" Grid.Column="1"
@@ -87,7 +87,7 @@
 
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <TextBox Grid.Column="0"
-                             Watermark="Pad name"
+                             PlaceholderText="Pad name"
                              Text="{Binding Name}" />
 
                     <ComboBox Grid.Column="1"
@@ -100,7 +100,7 @@
                         ColumnSpacing="10"
                         IsVisible="{Binding IsFile}">
                     <TextBox Grid.Column="0"
-                             Watermark="Choose an audio file…"
+                             PlaceholderText="Choose an audio file…"
                              Text="{Binding FilePath}" />
                     <Button Grid.Column="1"
                             Content="Browse…"
@@ -108,7 +108,7 @@
                   </Grid>
 
                   <TextBox IsVisible="{Binding IsWeb}"
-                           Watermark="Stream URL (https://...)"
+                           PlaceholderText="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
 
                   <Grid ColumnDefinitions="Auto,*">
