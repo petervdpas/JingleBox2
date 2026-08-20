@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Midi;
@@ -17,6 +18,12 @@ public partial class MainWindow : Window
     private readonly IMidiService _midi = new MidiService();
     private readonly IRecordingService _recording = new RecordingService();
     private readonly IWaveformService _waveform = new WaveformService();
+
+    private AppConfig? _cfg;
+    private DispatcherTimer? _saveWindowTimer;
+
+    /// <summary>Set once the startup size has been applied, so layout does not trigger saves.</summary>
+    private bool _windowRestored;
 
     // Constants for window sizing
     private const double HeaderHeight = 140; // Theme, device, tabs
@@ -69,8 +76,8 @@ public partial class MainWindow : Window
         // Subscribe to matrix size changes to resize window
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
-        // Set initial window size based on config
-        AdjustWindowSize(cfg.Rows, cfg.Columns);
+        _cfg = cfg;
+        RestoreWindowSize(cfg);
 
         Closed += (_, __) =>
         {
@@ -80,23 +87,87 @@ public partial class MainWindow : Window
         };
     }
 
-    private void OnMatrixSizeChanged(int rows, int columns)
+    /// <summary>
+    /// Uses the size the window was last left at, falling back to the pad matrix on first run.
+    /// </summary>
+    private void RestoreWindowSize(AppConfig cfg)
     {
-        AdjustWindowSize(rows, columns);
+        if (cfg.WindowWidth > 0 && cfg.WindowHeight > 0)
+        {
+            Width = cfg.WindowWidth;
+            Height = cfg.WindowHeight;
+        }
+        else
+        {
+            var (width, height) = MatrixSize(cfg.Rows, cfg.Columns);
+            Width = width;
+            Height = height;
+        }
+
+        if (cfg.WindowMaximized)
+            WindowState = WindowState.Maximized;
+
+        _windowRestored = true;
+
+        // Resizing fires continuously during a drag, so coalesce into one write at the end.
+        _saveWindowTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _saveWindowTimer.Tick += (_, _) =>
+        {
+            _saveWindowTimer.Stop();
+            SaveWindowSize();
+        };
+
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == ClientSizeProperty || e.Property == WindowStateProperty)
+                ScheduleWindowSave();
+        };
     }
 
-    private void AdjustWindowSize(int rows, int columns)
+    private void ScheduleWindowSave()
     {
-        // Calculate window size to keep pads approximately square
+        if (!_windowRestored || _saveWindowTimer == null) return;
+
+        _saveWindowTimer.Stop();
+        _saveWindowTimer.Start();
+    }
+
+    private void SaveWindowSize()
+    {
+        if (_cfg == null) return;
+
+        _cfg.WindowMaximized = WindowState == WindowState.Maximized;
+
+        // Only record a normal-state size; storing the maximized dimensions would make them
+        // the size the window restores down to.
+        if (WindowState == WindowState.Normal && Width > 0 && Height > 0)
+        {
+            _cfg.WindowWidth = Width;
+            _cfg.WindowHeight = Height;
+        }
+
+        _store.Save(_cfg);
+    }
+
+    private void OnMatrixSizeChanged(int rows, int columns)
+    {
+        var (width, height) = MatrixSize(rows, columns);
+
+        // Only grow. A deliberate resize should survive a change of matrix, but the pads
+        // must never end up clipped.
+        if (Width < width) Width = width;
+        if (Height < height) Height = height;
+
+        ScheduleWindowSave();
+    }
+
+    /// <summary>Size that keeps the pads roughly square, never below the first-run default.</summary>
+    private static (double Width, double Height) MatrixSize(int rows, int columns)
+    {
         double padTotalSize = PadSize + PadMargin;
         double width = columns * padTotalSize + 48;  // 48 for window padding
         double height = rows * padTotalSize + HeaderHeight + 48;
 
-        // Never open smaller than the default, however few pads there are.
-        width = Math.Max(width, DefaultWidth);
-        height = Math.Max(height, DefaultHeight);
-
-        Width = width;
-        Height = height;
+        return (Math.Max(width, DefaultWidth), Math.Max(height, DefaultHeight));
     }
 }

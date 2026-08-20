@@ -35,5 +35,10 @@ public sealed class AppConfig
     public int Columns { get; set; } = 2;
     public MidiConfig Midi { get; set; } = new();
     public double RecordGainDb { get; set; } = 0;
+
+    // 0 means never resized, so fall back to sizing from the pad matrix.
+    public double WindowWidth { get; set; }
+    public double WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
     public List<PadConfig> Pads { get; set; } = new();
 }
