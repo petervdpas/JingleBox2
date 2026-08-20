@@ -60,6 +60,10 @@
         <views:RecordView DataContext="{Binding Record}" />
       </TabItem>
 
+      <TabItem Header="TRACKER">
+        <views:TrackerView DataContext="{Binding Tracker}" />
+      </TabItem>
+
       <TabItem Header="MIDI">
         <views:MidiView DataContext="{Binding Midi}" />
       </TabItem>

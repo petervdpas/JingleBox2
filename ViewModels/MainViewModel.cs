@@ -27,6 +27,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MidiViewModel Midi { get; }
     public RecordViewModel Record { get; }
+    public TrackerViewModel Tracker { get; }
 
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
@@ -86,6 +87,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         Midi = new MidiViewModel(store, cfg, midiService);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg);
+
+        // The tracker turns those same recordings into instruments, so it shares the list.
+        Tracker = new TrackerViewModel(audio, Record.Recordings);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

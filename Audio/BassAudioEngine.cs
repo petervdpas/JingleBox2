@@ -439,6 +439,15 @@ public sealed class BassAudioEngine : IAudioEngine
             Bass.PluginLoad(aacLib);
     }
 
+    /// <summary>
+    /// Brings BASS up if nothing has yet. The tracker plays through the same device as the
+    /// pads, so it calls this rather than running an init of its own.
+    /// </summary>
+    public void EnsureInitialized()
+    {
+        lock (_lock) EnsureInitLocked();
+    }
+
     private void EnsureInitLocked()
     {
         if (_currentDeviceId >= 0) return;

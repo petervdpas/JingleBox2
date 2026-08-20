@@ -28,6 +28,9 @@ public interface IAudioEngine : IDisposable
     IEnumerable<OutputDevice> GetOutputDevices();
     void SetOutputDevice(int deviceId);
 
+    /// <summary>Brings BASS up on the current device. Other players share this one init.</summary>
+    void EnsureInitialized();
+
     event EventHandler<PadPlaybackChanged>? PadPlaybackChanged;
 
     bool IsPadPlaying(int padIndex);
