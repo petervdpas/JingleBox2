@@ -36,41 +36,46 @@ public sealed class WaveformService : IWaveformService
         using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
         using var reader = new BinaryReader(fs);
 
+        // Read RIFF header
         if (new string(reader.ReadChars(4)) != "RIFF")
             throw new InvalidOperationException("Invalid WAV file");
 
-        reader.ReadInt32();
+        int riffSize = reader.ReadInt32();
 
         if (new string(reader.ReadChars(4)) != "WAVE")
             throw new InvalidOperationException("Invalid WAV file");
 
-        if (new string(reader.ReadChars(4)) != "fmt ")
-            throw new InvalidOperationException("Invalid WAV file: missing fmt chunk");
+        // Find fmt chunk
+        int sampleRate = 0;
+        int channels = 0;
 
-        int fmtSize = reader.ReadInt32();
-        ushort audioFormat = reader.ReadUInt16();
-        ushort channels = reader.ReadUInt16();
-        int sampleRate = reader.ReadInt32();
-        reader.ReadInt32();
-        reader.ReadUInt16();
-        ushort bitsPerSample = reader.ReadUInt16();
-
-        fs.Seek(8 + 4 + fmtSize, SeekOrigin.Current);
-
-        string dataChunkId;
-        while ((dataChunkId = new string(reader.ReadChars(4))) != "data")
+        while (fs.Position < fs.Length)
         {
+            string chunkId = new string(reader.ReadChars(4));
             int chunkSize = reader.ReadInt32();
-            fs.Seek(chunkSize, SeekOrigin.Current);
+            long chunkStart = fs.Position;
+
+            if (chunkId == "fmt ")
+            {
+                reader.ReadUInt16(); // audio format (should be 1 for PCM)
+                channels = reader.ReadUInt16();
+                sampleRate = reader.ReadInt32();
+                reader.ReadInt32(); // byte rate
+                reader.ReadUInt16(); // block align
+                ushort bitsPerSample = reader.ReadUInt16();
+            }
+            else if (chunkId == "data")
+            {
+                byte[] rawData = reader.ReadBytes(chunkSize);
+                short[] pcmData = new short[chunkSize / 2];
+                Buffer.BlockCopy(rawData, 0, pcmData, 0, chunkSize);
+                return (pcmData, sampleRate, channels);
+            }
+
+            fs.Seek(chunkStart + chunkSize, SeekOrigin.Begin);
         }
 
-        int dataSize = reader.ReadInt32();
-        byte[] rawData = reader.ReadBytes(dataSize);
-
-        short[] pcmData = new short[dataSize / 2];
-        Buffer.BlockCopy(rawData, 0, pcmData, 0, dataSize);
-
-        return (pcmData, sampleRate, (int)channels);
+        throw new InvalidOperationException("Invalid WAV file: missing data chunk");
     }
 
     private float[] ExtractPeaks(short[] pcmData, int channels, int pixelWidth)
