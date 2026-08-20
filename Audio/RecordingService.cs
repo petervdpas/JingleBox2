@@ -212,7 +212,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             try
             {
-                WriteWavFile(filePath, pcmData);
+                WavFile.Write(filePath, pcmData, _sampleRate, _channels);
                 return filePath;
             }
             catch (Exception ex)
@@ -234,30 +234,6 @@ public sealed class RecordingService : IRecordingService, IDisposable
             }
         }
         return true;
-    }
-
-    private void WriteWavFile(string filePath, byte[] pcmData)
-    {
-        using var fs = new FileStream(filePath, FileMode.Create);
-        using var writer = new BinaryWriter(fs);
-
-        int byteRate = _sampleRate * _channels * 2;
-        int blockAlign = _channels * 2;
-
-        writer.Write("RIFF".ToCharArray());
-        writer.Write(36 + pcmData.Length);
-        writer.Write("WAVE".ToCharArray());
-        writer.Write("fmt ".ToCharArray());
-        writer.Write(16);
-        writer.Write((ushort)1);
-        writer.Write((ushort)_channels);
-        writer.Write(_sampleRate);
-        writer.Write(byteRate);
-        writer.Write((ushort)blockAlign);
-        writer.Write((ushort)16);
-        writer.Write("data".ToCharArray());
-        writer.Write(pcmData.Length);
-        writer.Write(pcmData);
     }
 
     private int GetDeviceIndex(string? deviceName)

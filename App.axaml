@@ -17,6 +17,11 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
         </Style>
+        <Style Selector="Button.danger">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+            </Setter>
+        </Style>
     </Application.Styles>
 
     <Application.Resources>

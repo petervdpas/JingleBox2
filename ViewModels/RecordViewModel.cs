@@ -52,6 +52,7 @@ public sealed partial class RecordViewModel : ObservableObject
     public IAsyncRelayCommand StopRecordingCommand => new AsyncRelayCommand(StopRecording);
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
     public IRelayCommand<Recording> EditRecordingCommand => new RelayCommand<Recording>(EditRecording);
+    public IAsyncRelayCommand<Recording> DeleteRecordingCommand => new AsyncRelayCommand<Recording>(DeleteRecording);
 
     private void RefreshDevices()
     {
@@ -79,7 +80,7 @@ public sealed partial class RecordViewModel : ObservableObject
                     Id = Guid.NewGuid().ToString(),
                     Name = Path.GetFileNameWithoutExtension(file),
                     FilePath = file,
-                    DurationMs = 0, // Will be calculated when needed
+                    DurationMs = ReadDurationMs(file),
                     CreatedAt = info.CreationTime
                 };
                 Recordings.Add(recording);
@@ -121,6 +122,80 @@ public sealed partial class RecordViewModel : ObservableObject
         catch (Exception ex)
         {
             Status = $"Failed to load recording: {ex.Message}";
+        }
+    }
+
+    /// <summary>Duration in ms, or 0 for a file we cannot read.</summary>
+    private long ReadDurationMs(string filePath)
+    {
+        try { return (long)_waveformService.GetDuration(filePath).TotalMilliseconds; }
+        catch { return 0; }
+    }
+
+    /// <summary>
+    /// Cuts the recording down to the selected region. Start and end are fractions of the
+    /// whole file, matching the trim handles in the editor.
+    /// </summary>
+    public async Task ApplyTrimAsync(double startFraction, double endFraction)
+    {
+        var recording = SelectedRecordingForEdit;
+        var waveform = CurrentWaveform;
+        if (recording == null || waveform == null) return;
+
+        try
+        {
+            long totalFrames = waveform.TotalSamples;
+            long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
+            long endFrame = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames);
+
+            Status = "Trimming...";
+            await Task.Run(() => _waveformService.TrimFile(recording.FilePath, startFrame, endFrame));
+
+            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
+            recording.DurationMs = ReadDurationMs(recording.FilePath);
+
+            Status = $"Trimmed '{recording.Name}' to {TimeSpan.FromMilliseconds(recording.DurationMs):mm\\:ss\\.fff}";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Trim failed: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteRecording(Recording? recording)
+    {
+        if (recording == null) return;
+
+        if (App.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is null)
+            return;
+
+        bool confirmed = await ConfirmDialog.ShowAsync(
+            desktop.MainWindow,
+            "Delete recording",
+            $"Delete '{recording.Name}' permanently? This cannot be undone.",
+            "Delete");
+
+        if (!confirmed) return;
+
+        try
+        {
+            if (File.Exists(recording.FilePath))
+                File.Delete(recording.FilePath);
+
+            Recordings.Remove(recording);
+
+            if (ReferenceEquals(SelectedRecordingForEdit, recording))
+            {
+                SelectedRecordingForEdit = null;
+                CurrentWaveform = null;
+            }
+
+            Status = $"Deleted '{recording.Name}'";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Delete failed: {ex.Message}";
         }
     }
 
@@ -186,7 +261,7 @@ public sealed partial class RecordViewModel : ObservableObject
                 Id = Guid.NewGuid().ToString(),
                 Name = RecordingName,
                 FilePath = filePath,
-                DurationMs = (long)_recordingTimer.Elapsed.TotalMilliseconds,
+                DurationMs = ReadDurationMs(filePath),
                 CreatedAt = DateTime.Now
             };
 

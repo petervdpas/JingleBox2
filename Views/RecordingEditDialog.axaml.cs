@@ -134,13 +134,9 @@ public partial class RecordingEditDialog : Window
         };
         _editWaveformCanvas.Children.Add(waveformPath);
 
-        // Calculate trim handle positions accounting for zoom
-        double leftX = _leftTrimPos * canvasWidth * _zoomLevel;
-        double rightX = _rightTrimPos * canvasWidth * _zoomLevel;
-
-        // Clamp to canvas bounds when zoomed
-        leftX = Math.Clamp(leftX, 0, canvasWidth);
-        rightX = Math.Clamp(rightX, 0, canvasWidth);
+        // Trim handle positions, in the same coordinate space the pointer handlers use
+        double leftX = FractionToX(_leftTrimPos, canvasWidth);
+        double rightX = FractionToX(_rightTrimPos, canvasWidth);
 
         // Draw selection overlay
         double selectionWidth = Math.Max(0, rightX - leftX - _trimHandleWidth);
@@ -182,14 +178,26 @@ public partial class RecordingEditDialog : Window
         _editWaveformCanvas.Children.Add(rightHandle);
     }
 
+    // Zoomed in, the canvas shows the leading 1/_zoomLevel of the file stretched across its
+    // full width. Drawing, hit-testing and dragging all go through this one mapping so a
+    // handle always responds where it is painted.
+
+    /// <summary>Fraction of the whole recording (0..1) to an x offset on the canvas.</summary>
+    private double FractionToX(double fraction, double canvasWidth)
+        => Math.Clamp(fraction * canvasWidth * _zoomLevel, 0, canvasWidth);
+
+    /// <summary>An x offset on the canvas back to a fraction of the whole recording.</summary>
+    private double XToFraction(double x, double canvasWidth)
+        => canvasWidth > 0 ? x / (canvasWidth * _zoomLevel) : 0;
+
     private void EditCanvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (_editWaveformCanvas == null) return;
 
         var point = e.GetPosition(_editWaveformCanvas);
         double canvasWidth = _editWaveformCanvas.Width;
-        double leftX = _leftTrimPos * canvasWidth;
-        double rightX = _rightTrimPos * canvasWidth;
+        double leftX = FractionToX(_leftTrimPos, canvasWidth);
+        double rightX = FractionToX(_rightTrimPos, canvasWidth);
 
         if (point.X >= leftX && point.X <= leftX + _trimHandleWidth)
             _draggingLeft = true;
@@ -206,7 +214,7 @@ public partial class RecordingEditDialog : Window
 
         var point = e.GetPosition(_editWaveformCanvas);
         double canvasWidth = _editWaveformCanvas.Width;
-        double newPos = Math.Clamp(point.X / canvasWidth, 0, 1);
+        double newPos = Math.Clamp(XToFraction(point.X, canvasWidth), 0, 1);
 
         if (_draggingLeft && newPos < _rightTrimPos - 0.05)
             _leftTrimPos = newPos;
@@ -230,9 +238,13 @@ public partial class RecordingEditDialog : Window
         this.Close();
     }
 
-    private void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // TODO: Implement actual trimming
+        StopPlayback();
+
+        if (this.DataContext is RecordViewModel vm)
+            await vm.ApplyTrimAsync(_leftTrimPos, _rightTrimPos);
+
         this.Close();
     }
 

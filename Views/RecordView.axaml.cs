@@ -54,9 +54,11 @@ public partial class RecordView : UserControl
 
     private void DrawWaveform(WaveformData? waveform)
     {
-        if (waveform == null || _recordWaveformCanvas == null) return;
+        if (_recordWaveformCanvas == null) return;
 
         _recordWaveformCanvas.Children.Clear();
+
+        if (waveform == null) return; // cleared, e.g. after the recording was deleted
 
         // Control.Width/Height are the *requested* sizes and are NaN unless set in XAML.
         // The rendered size lives in Bounds, so use that.
