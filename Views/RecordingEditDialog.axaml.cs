@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
+using ManagedBass;
 using System;
 using System.ComponentModel;
 
@@ -19,7 +20,9 @@ public partial class RecordingEditDialog : Window
     private bool _draggingLeft = false;
     private bool _draggingRight = false;
     private double _zoomLevel = 1.0;
-    private double _scrollPos = 0;
+    private int _playbackChannel = 0;
+    private bool _isPlaying = false;
+    private Button? _playButton;
 
     public RecordingEditDialog()
     {
@@ -39,6 +42,12 @@ public partial class RecordingEditDialog : Window
                     DrawWaveform(vm.CurrentWaveform);
                 }
             }
+        };
+
+        this.Closing += (s, e) =>
+        {
+            // Stop playback when dialog closes
+            StopPlayback();
         };
 
         this.DataContextChanged += (s, e) =>
@@ -237,29 +246,87 @@ public partial class RecordingEditDialog : Window
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         _zoomLevel = Math.Max(_zoomLevel / 1.5, 1);
-        _scrollPos = 0;
         if (this.DataContext is RecordViewModel vm)
             DrawWaveform(vm.CurrentWaveform);
     }
 
     private void Play_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        _playButton = sender as Button;
+
+        if (_isPlaying)
+        {
+            StopPlayback();
+            return;
+        }
+
         if (this.DataContext is not RecordViewModel vm || vm.SelectedRecordingForEdit == null)
             return;
 
         try
         {
-            // Play the trimmed region
-            long trimStartSample = (long)(_leftTrimPos * vm.CurrentWaveform?.TotalSamples ?? 0);
-            long trimEndSample = (long)(_rightTrimPos * vm.CurrentWaveform?.TotalSamples ?? 0);
+            long trimStartSample = (long)(_leftTrimPos * (vm.CurrentWaveform?.TotalSamples ?? 0));
+            long trimEndSample = (long)(_rightTrimPos * (vm.CurrentWaveform?.TotalSamples ?? 0));
 
-            // TODO: Implement playback of trimmed region using BASS
-            // For now, just show a message
-            System.Diagnostics.Debug.WriteLine($"Playing from sample {trimStartSample} to {trimEndSample}");
+            StartPlayback(vm.SelectedRecordingForEdit.FilePath, trimStartSample, trimEndSample);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Playback error: {ex.Message}");
         }
+    }
+
+    private void StartPlayback(string filePath, long startSample, long endSample)
+    {
+        try
+        {
+            // Load the file
+            _playbackChannel = Bass.CreateStream(filePath, 0, 0, BassFlags.Default);
+            if (_playbackChannel == 0)
+                return;
+
+            // Set start position (BASS uses bytes, need to calculate from samples)
+            var info = Bass.ChannelGetInfo(_playbackChannel);
+            long startBytes = (startSample * info.Channels * 2); // 2 bytes per sample (16-bit)
+            Bass.ChannelSetPosition(_playbackChannel, startBytes);
+
+            // Play
+            Bass.ChannelPlay(_playbackChannel);
+            _isPlaying = true;
+            if (_playButton != null)
+                _playButton.Content = "⏹ Stop";
+
+            // Monitor playback (stop when we reach end position)
+            var timer = new System.Timers.Timer(100);
+            long endBytes = (endSample * info.Channels * 2);
+            timer.Elapsed += (s, e) =>
+            {
+                long currentPos = Bass.ChannelGetPosition(_playbackChannel);
+                if (currentPos >= endBytes || !Bass.ChannelIsActive(_playbackChannel).HasFlag(PlaybackState.Playing))
+                {
+                    timer.Stop();
+                    StopPlayback();
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Playback error: {ex.Message}");
+            _isPlaying = false;
+        }
+    }
+
+    private void StopPlayback()
+    {
+        if (_playbackChannel != 0)
+        {
+            Bass.ChannelStop(_playbackChannel);
+            Bass.StreamFree(_playbackChannel);
+            _playbackChannel = 0;
+        }
+        _isPlaying = false;
+        if (_playButton != null)
+            _playButton.Content = "▶ Play";
     }
 }
