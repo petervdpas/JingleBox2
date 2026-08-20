@@ -15,6 +15,8 @@ public partial class MainWindow : Window
     private readonly ConfigStore _store = new("JingleBox2");
     private readonly BassAudioEngine _audio;
     private readonly IMidiService _midi = new MidiService();
+    private readonly IRecordingService _recording = new RecordingService();
+    private readonly IWaveformService _waveform = new WaveformService();
 
     // Constants for window sizing
     private const double HeaderHeight = 140; // Theme, device, tabs
@@ -46,7 +48,7 @@ public partial class MainWindow : Window
             return files.Count == 1 ? files[0].Path.LocalPath : null;
         }
 
-        var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi);
+        var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi, _recording, _waveform);
         DataContext = vm;
 
         var version = Assembly.GetExecutingAssembly()

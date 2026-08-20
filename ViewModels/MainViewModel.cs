@@ -26,6 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _suspendSave;
 
     public MidiViewModel Midi { get; }
+    public RecordViewModel Record { get; }
 
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
@@ -74,7 +75,9 @@ public sealed partial class MainViewModel : ObservableObject
         Func<Task<string?>> pickFileAsync,
         ConfigStore store,
         AppConfig cfg,
-        IMidiService midiService)
+        IMidiService midiService,
+        IRecordingService recordingService,
+        IWaveformService waveformService)
     {
         _audio = audio;
         _pickFileAsync = pickFileAsync;
@@ -82,6 +85,7 @@ public sealed partial class MainViewModel : ObservableObject
         _cfg = cfg;
 
         Midi = new MidiViewModel(store, cfg, midiService);
+        Record = new RecordViewModel(recordingService, waveformService, store);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

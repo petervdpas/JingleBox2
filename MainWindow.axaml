@@ -55,6 +55,10 @@
         <views:ConfigView />
       </TabItem>
 
+      <TabItem Header="RECORD">
+        <views:RecordView DataContext="{Binding Record}" />
+      </TabItem>
+
       <TabItem Header="MIDI">
         <views:MidiView DataContext="{Binding Midi}" />
       </TabItem>

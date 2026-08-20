@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.RecordView"
+             x:DataType="vm:RecordViewModel">
+
+  <ScrollViewer>
+    <StackPanel Spacing="16" Margin="16">
+
+      <!-- Recording Input -->
+      <Border Classes="card" Padding="12">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Recording Input" FontWeight="SemiBold" />
+
+          <StackPanel Spacing="4">
+            <TextBlock Text="Input Device" Opacity="0.8" />
+            <ComboBox ItemsSource="{Binding InputDevices}"
+                      SelectedItem="{Binding SelectedDevice}" />
+          </StackPanel>
+
+          <Button Content="Refresh Devices"
+                  Command="{Binding RefreshDevicesCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Recording Controls -->
+      <Border Classes="card" Padding="12">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Record" FontWeight="SemiBold" />
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Recording Name" Opacity="0.8" />
+            <TextBox Text="{Binding RecordingName}" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Content="🔴 Record"
+                    Command="{Binding StartRecordingCommand}"
+                    IsEnabled="{Binding !IsRecording}" />
+            <Button Grid.Column="1"
+                    Content="⏹ Stop"
+                    Command="{Binding StopRecordingCommand}"
+                    IsEnabled="{Binding IsRecording}" />
+          </Grid>
+
+          <TextBlock Text="{Binding RecordingTime}"
+                     FontSize="24"
+                     Foreground="#FF6B7280"
+                     HorizontalAlignment="Center" />
+
+          <!-- Level Meter -->
+          <StackPanel Spacing="4">
+            <TextBlock Text="Level" Opacity="0.8" FontSize="12" />
+            <ProgressBar Value="{Binding Level}" Minimum="0" Maximum="1" Height="6" />
+          </StackPanel>
+
+          <TextBlock Text="{Binding Status}"
+                     Opacity="0.7"
+                     FontSize="12" />
+        </StackPanel>
+      </Border>
+
+      <!-- Waveform Display -->
+      <Border Classes="card" Padding="12" IsVisible="{Binding CurrentWaveform, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Waveform" FontWeight="SemiBold" />
+          <Canvas Height="120" Background="#1F2937">
+            <!-- Waveform will be drawn here in Phase 2 -->
+            <TextBlock Canvas.Left="10" Canvas.Top="50" Text="Waveform rendering coming in Phase 2..." Foreground="#6B7280" />
+          </Canvas>
+          <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
+        </StackPanel>
+      </Border>
+
+      <!-- Recordings Library -->
+      <Border Classes="card" Padding="12" IsVisible="{Binding Recordings.Count}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Recordings" FontWeight="SemiBold" />
+
+          <ItemsControl ItemsSource="{Binding Recordings}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border BorderThickness="1" BorderBrush="#374151" Padding="8" CornerRadius="4" Margin="0,4">
+                  <Grid ColumnDefinitions="*,80,80" ColumnSpacing="8">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" Opacity="0.7" FontSize="12" />
+                      <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" Opacity="0.7" FontSize="12" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Play" />
+                    <Button Grid.Column="2" Content="Delete" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>
