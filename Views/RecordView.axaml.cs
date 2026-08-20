@@ -4,6 +4,7 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Media;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
+using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
 
@@ -11,6 +12,9 @@ namespace JingleBox2.Views;
 
 public partial class RecordView : UserControl
 {
+    private static readonly WaveformViewport FullView = new();
+    private static readonly IBrush WaveformBrush = new SolidColorBrush(Color.Parse("#3B82F6"));
+
     private Canvas? _recordWaveformCanvas;
 
     public RecordView()
@@ -68,39 +72,11 @@ public partial class RecordView : UserControl
 
         if (peakData.Length == 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
 
-        // Draw waveform as filled area (mirrored top/bottom)
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            double pixelWidth = canvasWidth / peakData.Length;
-            double centerY = canvasHeight / 2;
-
-            // Top half
-            ctx.BeginFigure(new Point(0, centerY), true);
-            for (int i = 0; i < peakData.Length; i++)
-            {
-                double x = i * pixelWidth + pixelWidth / 2;
-                double peakHeight = peakData[i] * centerY;
-                double y = centerY - peakHeight;
-                ctx.LineTo(new Point(x, y));
-            }
-
-            // Bottom half (mirror)
-            for (int i = peakData.Length - 1; i >= 0; i--)
-            {
-                double x = i * pixelWidth + pixelWidth / 2;
-                double peakHeight = peakData[i] * centerY;
-                double y = centerY + peakHeight;
-                ctx.LineTo(new Point(x, y));
-            }
-
-            ctx.EndFigure(true);
-        }
-
+        // Same outline builder the editor uses, at the default viewport: no zoom, no scroll.
         var waveformPath = new Path
         {
-            Data = geometry,
-            Fill = new SolidColorBrush(Color.Parse("#3B82F6")),
+            Data = WaveformGeometry.Build(peakData, FullView, canvasWidth, canvasHeight),
+            Fill = WaveformBrush,
             Opacity = 0.6
         };
         _recordWaveformCanvas.Children.Add(waveformPath);

@@ -28,7 +28,7 @@
     <!-- Controls -->
     <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
       <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" />
-      <Button Grid.Column="1" Content="Apply Trim" Click="ApplyTrim_Click" />
+      <Button Grid.Column="1" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" />
     </Grid>
   </StackPanel>
 

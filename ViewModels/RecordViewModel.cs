@@ -168,11 +168,12 @@ public sealed partial class RecordViewModel : ObservableObject
     /// Cuts the recording down to the selected region. Start and end are fractions of the
     /// whole file, matching the trim handles in the editor.
     /// </summary>
-    public async Task ApplyTrimAsync(double startFraction, double endFraction)
+    /// <summary>Returns true when the file was rewritten, so callers can reset their view.</summary>
+    public async Task<bool> ApplyTrimAsync(double startFraction, double endFraction)
     {
         var recording = SelectedRecordingForEdit;
         var waveform = CurrentWaveform;
-        if (recording == null || waveform == null) return;
+        if (recording == null || waveform == null) return false;
 
         try
         {
@@ -187,10 +188,12 @@ public sealed partial class RecordViewModel : ObservableObject
             recording.DurationMs = ReadDurationMs(recording.FilePath);
 
             Status = $"Trimmed '{recording.Name}' to {TimeSpan.FromMilliseconds(recording.DurationMs):mm\\:ss\\.fff}";
+            return true;
         }
         catch (Exception ex)
         {
             Status = $"Trim failed: {ex.Message}";
+            return false;
         }
     }
 

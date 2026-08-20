@@ -3,374 +3,387 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Threading;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
-using ManagedBass;
+using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
 
 namespace JingleBox2.Views;
 
+/// <summary>
+/// Wiring only: pointer and button events in, redraws out. The viewport maths, the trim
+/// rules, the outline building and the playback lifecycle all live in JingleBox2.Waveform.
+/// </summary>
 public partial class RecordingEditDialog : Window
 {
-    private Canvas? _editWaveformCanvas;
-    private double _trimHandleWidth = 3;
-
-    /// <summary>How far from a handle a click still counts as grabbing it.</summary>
+    private const double TrimHandleWidth = 3;
     private const double TrimGrabTolerance = 10;
-    private double _leftTrimPos = 0;
-    private double _rightTrimPos = 1;
-    private bool _draggingLeft = false;
-    private bool _draggingRight = false;
-    private double _zoomLevel = 1.0;
-    private int _playbackChannel = 0;
-    private bool _isPlaying = false;
+    private const double ClickSlop = 4; // a press moving less than this is a click, not a drag
+
+    private static readonly IBrush WaveformBrush = new SolidColorBrush(Color.Parse("#3B82F6"));
+    private static readonly IBrush CentreLineBrush = new SolidColorBrush(Color.Parse("#94A3B8"));
+    private static readonly IBrush TrimHandleBrush = new SolidColorBrush(Color.Parse("#EF4444"));
+    private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#F1F5F9"));
+    private static readonly Cursor PanCursor = new(StandardCursorType.Hand);
+    private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
+
+    private readonly WaveformViewport _viewport = new();
+    private readonly TrimSelection _trim = new();
+    private readonly WaveformPlayer _player = new();
+
+    private Canvas? _canvas;
     private Button? _playButton;
-    private DispatcherTimer? _playbackTimer;
-    private long _playbackEndBytes;
+    private Rectangle? _playheadMarker;
+    private RecordViewModel? _vm;
+
+    private TrimHandle _dragging = TrimHandle.None;
+    private bool _panning;
+    private double _pressX;
+    private double _panStartScroll;
+
+    /// <summary>Where playback starts, as a fraction of the file. Null means the trim start.</summary>
+    private double? _playStart;
+
+    /// <summary>Live position while playing. Null when stopped.</summary>
+    private double? _playhead;
+
+    /// <summary>Guards against a second Apply landing while the file is being rewritten.</summary>
+    private bool _applying;
+
+    private double CanvasWidth => _canvas?.Width ?? 0;
 
     public RecordingEditDialog()
     {
         InitializeComponent();
-        this.Loaded += (s, e) =>
+
+        _player.PositionChanged += position =>
+        {
+            _playhead = position;
+            UpdatePlayhead();
+        };
+
+        _player.Stopped += () =>
+        {
+            _playhead = null; // fall back to showing the play cursor
+            UpdatePlayhead();
+            SetPlayButtonContent("▶ Play");
+        };
+
+        Loaded += (_, _) =>
         {
             _playButton = this.FindControl<Button>("PlayButton");
-            _editWaveformCanvas = this.FindControl<Canvas>("EditWaveformCanvas");
-            if (_editWaveformCanvas != null)
-            {
-                _editWaveformCanvas.PointerPressed += EditCanvas_PointerPressed;
-                _editWaveformCanvas.PointerMoved += EditCanvas_PointerMoved;
-                _editWaveformCanvas.PointerReleased += EditCanvas_PointerReleased;
+            _canvas = this.FindControl<Canvas>("EditWaveformCanvas");
 
-                // Force draw if data context already has waveform
-                if (this.DataContext is RecordViewModel vm && vm.CurrentWaveform != null)
-                {
-                    DrawWaveform(vm.CurrentWaveform);
-                }
-            }
+            if (_canvas == null) return;
+
+            _canvas.PointerPressed += Canvas_PointerPressed;
+            _canvas.PointerMoved += Canvas_PointerMoved;
+            _canvas.PointerReleased += Canvas_PointerReleased;
+            _canvas.PointerWheelChanged += Canvas_PointerWheelChanged;
+
+            Redraw();
         };
 
-        this.Closing += (s, e) =>
+        DataContextChanged += (_, _) =>
         {
-            // Stop playback when dialog closes
-            StopPlayback();
+            // Unsubscribe first: this fires again on every reassignment and would otherwise leak.
+            if (_vm != null) _vm.PropertyChanged -= ViewModelPropertyChanged;
+
+            _vm = DataContext as RecordViewModel;
+
+            if (_vm != null) _vm.PropertyChanged += ViewModelPropertyChanged;
+            Redraw();
         };
 
-        this.DataContextChanged += (s, e) =>
+        Closing += (_, _) =>
         {
-            if (this.DataContext is RecordViewModel vm)
-            {
-                vm.PropertyChanged += (sender, args) =>
-                {
-                    if (args.PropertyName == nameof(vm.CurrentWaveform))
-                        DrawWaveform(vm.CurrentWaveform);
-                };
-
-                // Also draw immediately if waveform is already loaded
-                if (vm.CurrentWaveform != null)
-                    DrawWaveform(vm.CurrentWaveform);
-            }
+            _player.Dispose();
+            if (_vm != null) _vm.PropertyChanged -= ViewModelPropertyChanged;
         };
     }
 
-    private void DrawWaveform(WaveformData? waveform)
+    private void ViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (waveform == null || _editWaveformCanvas == null) return;
+        if (e.PropertyName == nameof(RecordViewModel.CurrentWaveform))
+            Redraw();
+    }
 
-        _editWaveformCanvas.Children.Clear();
+    // ---- drawing ----------------------------------------------------------------
 
-        double canvasWidth = _editWaveformCanvas.Width;
-        double canvasHeight = _editWaveformCanvas.Height;
-        float[] peakData = waveform.PeakData;
+    private void Redraw()
+    {
+        if (_canvas == null) return;
 
-        if (peakData.Length == 0) return;
+        _canvas.Children.Clear();
+        _playheadMarker = null;
 
-        // Calculate pixel width based on zoom level
-        double basePixelWidth = canvasWidth / peakData.Length;
-        double pixelWidth = basePixelWidth * _zoomLevel;
+        var waveform = _vm?.CurrentWaveform;
+        double width = CanvasWidth;
+        double height = _canvas.Height;
 
-        // Calculate visible range based on zoom
-        int startSample = 0;
-        int endSample = peakData.Length;
+        if (waveform == null || waveform.PeakData.Length == 0 || width <= 0 || height <= 0) return;
 
-        if (_zoomLevel > 1)
+        _canvas.Cursor = _viewport.CanPan ? PanCursor : Cursor.Default;
+
+        _canvas.Children.Add(new Path
         {
-            // When zoomed in, show only a portion
-            int visibleSamples = (int)(peakData.Length / _zoomLevel);
-            endSample = Math.Min(startSample + visibleSamples, peakData.Length);
-        }
-
-        // Draw waveform as filled area
-        var geometry = new StreamGeometry();
-        using (var ctx = geometry.Open())
-        {
-            double centerY = canvasHeight / 2;
-
-            // Top half
-            ctx.BeginFigure(new Point(0, centerY), true);
-            for (int i = startSample; i < endSample; i++)
-            {
-                double x = (i - startSample) * pixelWidth + pixelWidth / 2;
-                if (x > canvasWidth) break;
-
-                double peakHeight = peakData[i] * centerY;
-                double y = centerY - peakHeight;
-                ctx.LineTo(new Point(x, y));
-            }
-
-            // Bottom half (mirror)
-            for (int i = endSample - 1; i >= startSample; i--)
-            {
-                double x = (i - startSample) * pixelWidth + pixelWidth / 2;
-                if (x > canvasWidth) continue;
-
-                double peakHeight = peakData[i] * centerY;
-                double y = centerY + peakHeight;
-                ctx.LineTo(new Point(x, y));
-            }
-
-            ctx.EndFigure(true);
-        }
-
-        var waveformPath = new Path
-        {
-            Data = geometry,
-            Fill = new SolidColorBrush(Color.Parse("#3B82F6")),
+            Data = WaveformGeometry.Build(waveform.PeakData, _viewport, width, height),
+            Fill = WaveformBrush,
             Opacity = 0.6
+        });
+
+        // On top of the fill: the outline is mirrored around this exact row, so behind it
+        // the line would be hidden everywhere except in true silence.
+        _canvas.Children.Add(new Line
+        {
+            StartPoint = new Point(0, height / 2),
+            EndPoint = new Point(width, height / 2),
+            Stroke = CentreLineBrush,
+            StrokeThickness = 1,
+            Opacity = 0.5
+        });
+
+        AddSelectionOverlay(width, height);
+
+        double startX = _viewport.FractionToX(_trim.Start, width);
+        double endX = _viewport.FractionToX(_trim.End, width);
+        AddTrimHandle(startX, width, height);
+        AddTrimHandle(endX - TrimHandleWidth, width, height);
+
+        // Kept as a field so playback can move it without rebuilding the outline.
+        _playheadMarker = new Rectangle
+        {
+            Fill = PlayheadBrush,
+            Width = 1.5,
+            Height = height,
+            Opacity = 0.9,
+            IsHitTestVisible = false
         };
-        _editWaveformCanvas.Children.Add(waveformPath);
+        Canvas.SetTop(_playheadMarker, 0);
+        _canvas.Children.Add(_playheadMarker);
 
-        // Trim handle positions, in the same coordinate space the pointer handlers use
-        double leftX = FractionToX(_leftTrimPos, canvasWidth);
-        double rightX = FractionToX(_rightTrimPos, canvasWidth);
+        UpdatePlayhead();
+    }
 
-        // Draw selection overlay
-        double selectionWidth = Math.Max(0, rightX - leftX - _trimHandleWidth);
+    private void AddSelectionOverlay(double width, double height)
+    {
+        double left = Math.Max(0, _viewport.FractionToX(_trim.Start, width));
+        double right = Math.Min(width, _viewport.FractionToX(_trim.End, width));
+
+        if (right <= left) return;
+
         var selection = new Rectangle
         {
-            Fill = new SolidColorBrush(Color.Parse("#3B82F6")),
-            Width = selectionWidth,
-            Height = canvasHeight,
+            Fill = WaveformBrush,
+            Width = right - left,
+            Height = height,
             Opacity = 0.2
         };
-        Canvas.SetLeft(selection, Math.Max(0, leftX + _trimHandleWidth));
+        Canvas.SetLeft(selection, left);
         Canvas.SetTop(selection, 0);
-        _editWaveformCanvas.Children.Add(selection);
-
-        // Draw left trim handle
-        var leftHandle = new Rectangle
-        {
-            Fill = new SolidColorBrush(Color.Parse("#EF4444")),
-            Width = _trimHandleWidth,
-            Height = canvasHeight,
-            Opacity = 0.9,
-            Cursor = new Cursor(StandardCursorType.SizeWestEast)
-        };
-        Canvas.SetLeft(leftHandle, leftX);
-        Canvas.SetTop(leftHandle, 0);
-        _editWaveformCanvas.Children.Add(leftHandle);
-
-        // Draw right trim handle
-        var rightHandle = new Rectangle
-        {
-            Fill = new SolidColorBrush(Color.Parse("#EF4444")),
-            Width = _trimHandleWidth,
-            Height = canvasHeight,
-            Opacity = 0.9,
-            Cursor = new Cursor(StandardCursorType.SizeWestEast)
-        };
-        Canvas.SetLeft(rightHandle, rightX - _trimHandleWidth);
-        Canvas.SetTop(rightHandle, 0);
-        _editWaveformCanvas.Children.Add(rightHandle);
+        _canvas!.Children.Add(selection);
     }
 
-    // Zoomed in, the canvas shows the leading 1/_zoomLevel of the file stretched across its
-    // full width. Drawing, hit-testing and dragging all go through this one mapping so a
-    // handle always responds where it is painted.
-
-    /// <summary>Fraction of the whole recording (0..1) to an x offset on the canvas.</summary>
-    private double FractionToX(double fraction, double canvasWidth)
-        => Math.Clamp(fraction * canvasWidth * _zoomLevel, 0, canvasWidth);
-
-    /// <summary>An x offset on the canvas back to a fraction of the whole recording.</summary>
-    private double XToFraction(double x, double canvasWidth)
-        => canvasWidth > 0 ? x / (canvasWidth * _zoomLevel) : 0;
-
-    private void EditCanvas_PointerPressed(object? sender, PointerPressedEventArgs e)
+    /// <summary>
+    /// Paints a handle only when its true position is on screen. One scrolled out of view
+    /// stays where it belongs in the file rather than being pinned to the canvas edge, where
+    /// it would look grabbable but point at the wrong sample.
+    /// </summary>
+    private void AddTrimHandle(double x, double width, double height)
     {
-        if (_editWaveformCanvas == null) return;
+        if (x + TrimHandleWidth < 0 || x > width) return;
 
-        var point = e.GetPosition(_editWaveformCanvas);
-        double canvasWidth = _editWaveformCanvas.Width;
-        double leftX = FractionToX(_leftTrimPos, canvasWidth);
-        double rightX = FractionToX(_rightTrimPos, canvasWidth);
-
-        // The handles are drawn thin, so grab by proximity rather than by the painted
-        // rectangle, and give the nearer one priority when they are close together.
-        double distanceToLeft = Math.Abs(point.X - leftX);
-        double distanceToRight = Math.Abs(point.X - rightX);
-
-        if (distanceToLeft <= TrimGrabTolerance || distanceToRight <= TrimGrabTolerance)
+        var handle = new Rectangle
         {
-            if (distanceToLeft <= distanceToRight)
-                _draggingLeft = true;
-            else
-                _draggingRight = true;
+            Fill = TrimHandleBrush,
+            Width = TrimHandleWidth,
+            Height = height,
+            Opacity = 0.9,
+            Cursor = ResizeCursor
+        };
+        Canvas.SetLeft(handle, x);
+        Canvas.SetTop(handle, 0);
+        _canvas!.Children.Add(handle);
+    }
 
-            e.Pointer.Capture(_editWaveformCanvas);
+    /// <summary>
+    /// Moves the playhead without rebuilding the outline, which can carry thousands of points
+    /// and would otherwise be regenerated ten times a second during playback.
+    /// </summary>
+    private void UpdatePlayhead()
+    {
+        if (_playheadMarker == null) return;
+
+        double? fraction = _playhead ?? _playStart;
+        if (fraction is null)
+        {
+            _playheadMarker.IsVisible = false;
+            return;
         }
+
+        double x = _viewport.FractionToX(fraction.Value, CanvasWidth);
+        _playheadMarker.IsVisible = _viewport.IsOnScreen(x, CanvasWidth);
+        Canvas.SetLeft(_playheadMarker, x);
     }
 
-    private void EditCanvas_PointerMoved(object? sender, PointerEventArgs e)
+    // ---- pointer ----------------------------------------------------------------
+
+    private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!_draggingLeft && !_draggingRight || _editWaveformCanvas == null) return;
+        if (_canvas == null) return;
 
-        var point = e.GetPosition(_editWaveformCanvas);
-        double canvasWidth = _editWaveformCanvas.Width;
-        double newPos = Math.Clamp(XToFraction(point.X, canvasWidth), 0, 1);
+        var point = e.GetPosition(_canvas);
+        _pressX = point.X;
 
-        if (_draggingLeft && newPos < _rightTrimPos - 0.05)
-            _leftTrimPos = newPos;
-        else if (_draggingRight && newPos > _leftTrimPos + 0.05)
-            _rightTrimPos = newPos;
+        _dragging = _trim.HitTest(point.X, _viewport, CanvasWidth, TrimGrabTolerance);
 
-        if (this.DataContext is RecordViewModel vm)
-            DrawWaveform(vm.CurrentWaveform);
+        if (_dragging == TrimHandle.None && _viewport.CanPan)
+        {
+            _panning = true;
+            _panStartScroll = _viewport.Scroll;
+        }
+
+        if (_dragging != TrimHandle.None || _panning)
+            e.Pointer.Capture(_canvas);
     }
 
-    private void EditCanvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
+    private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
     {
-        _draggingLeft = false;
-        _draggingRight = false;
-        if (_editWaveformCanvas != null)
-            e.Pointer.Capture(null);
+        if (_canvas == null) return;
+        if (_dragging == TrimHandle.None && !_panning) return;
+
+        var point = e.GetPosition(_canvas);
+
+        if (_panning)
+        {
+            // Drag right to move the window earlier, so the audio tracks the cursor.
+            _viewport.ScrollTo(_panStartScroll - _viewport.PanDistance(point.X - _pressX, CanvasWidth));
+        }
+        else
+        {
+            _trim.Move(_dragging, _viewport.XToFraction(point.X, CanvasWidth), TrimSelection.MinGapFor(_viewport));
+        }
+
+        Redraw();
     }
 
-    private void Cancel_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        this.Close();
+        if (_canvas != null && _dragging == TrimHandle.None)
+        {
+            var point = e.GetPosition(_canvas);
+            if (Math.Abs(point.X - _pressX) <= ClickSlop)
+                SetPlayStart(_viewport.XToFraction(point.X, CanvasWidth));
+        }
+
+        _dragging = TrimHandle.None;
+        _panning = false;
+        e.Pointer.Capture(null);
     }
 
-    private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void Canvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
     {
-        StopPlayback();
+        if (_canvas == null || CanvasWidth <= 0) return;
 
-        if (this.DataContext is RecordViewModel vm)
-            await vm.ApplyTrimAsync(_leftTrimPos, _rightTrimPos);
+        var point = e.GetPosition(_canvas);
+        double factor = e.Delta.Y > 0 ? 1.25 : 1 / 1.25;
 
-        this.Close();
+        if (_viewport.ZoomAt(_viewport.Zoom * factor, point.X, CanvasWidth))
+            Redraw();
+
+        e.Handled = true;
     }
+
+    /// <summary>
+    /// Drops the play cursor, clamped into the trim region so Play always previews audio that
+    /// will survive the cut. Seeks straight away if something is already playing.
+    /// </summary>
+    private void SetPlayStart(double fraction)
+    {
+        _playStart = _trim.Clamp(fraction);
+
+        if (_player.IsPlaying)
+            _player.SeekTo(_playStart.Value);
+        else
+            _playhead = null;
+
+        UpdatePlayhead();
+    }
+
+    // ---- buttons ----------------------------------------------------------------
 
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _zoomLevel = Math.Min(_zoomLevel * 1.5, 10);
-        if (this.DataContext is RecordViewModel vm)
-            DrawWaveform(vm.CurrentWaveform);
+        _viewport.ZoomTo(_viewport.Zoom * 1.5);
+        Redraw();
     }
 
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _zoomLevel = Math.Max(_zoomLevel / 1.5, 1);
-        if (this.DataContext is RecordViewModel vm)
-            DrawWaveform(vm.CurrentWaveform);
+        _viewport.ZoomTo(_viewport.Zoom / 1.5);
+        Redraw();
     }
 
     private void Play_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _playButton = sender as Button;
-
-        if (_isPlaying)
+        if (_player.IsPlaying)
         {
-            StopPlayback();
+            _player.Stop();
             return;
         }
 
-        if (this.DataContext is not RecordViewModel vm || vm.SelectedRecordingForEdit == null)
-            return;
+        if (_vm?.SelectedRecordingForEdit == null || _vm.CurrentWaveform == null) return;
 
-        try
-        {
-            long trimStartSample = (long)(_leftTrimPos * (vm.CurrentWaveform?.TotalSamples ?? 0));
-            long trimEndSample = (long)(_rightTrimPos * (vm.CurrentWaveform?.TotalSamples ?? 0));
+        _player.Play(
+            _vm.SelectedRecordingForEdit.FilePath,
+            _trim.Clamp(_playStart ?? _trim.Start),
+            _trim.End,
+            _vm.CurrentWaveform.TotalSamples);
 
-            StartPlayback(vm.SelectedRecordingForEdit.FilePath, trimStartSample, trimEndSample);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Playback error: {ex.Message}");
-        }
-    }
-
-    private void StartPlayback(string filePath, long startSample, long endSample)
-    {
-        try
-        {
-            StopPlayback(); // never leave a previous channel or timer running
-
-            _playbackChannel = Bass.CreateStream(filePath, 0, 0, BassFlags.Default);
-            if (_playbackChannel == 0)
-                return;
-
-            // BASS positions are in bytes; the file is 16-bit, so 2 bytes per sample.
-            var info = Bass.ChannelGetInfo(_playbackChannel);
-            long bytesPerFrame = info.Channels * 2;
-            Bass.ChannelSetPosition(_playbackChannel, startSample * bytesPerFrame);
-            _playbackEndBytes = endSample * bytesPerFrame;
-
-            Bass.ChannelPlay(_playbackChannel);
-            _isPlaying = true;
+        if (_player.IsPlaying)
             SetPlayButtonContent("⏹ Stop");
-
-            // DispatcherTimer ticks on the UI thread, so the handler may touch the button.
-            // A System.Timers.Timer ticks on a pool thread: the button update threw a
-            // cross-thread exception that the timer swallowed, so the label stayed on
-            // "Stop" after playback had already ended, and the next click restarted it.
-            _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-            _playbackTimer.Tick += (_, _) =>
-            {
-                if (_playbackChannel == 0)
-                {
-                    StopPlayback();
-                    return;
-                }
-
-                bool reachedEnd = _playbackEndBytes > 0
-                    && Bass.ChannelGetPosition(_playbackChannel) >= _playbackEndBytes;
-                bool stopped = Bass.ChannelIsActive(_playbackChannel) == PlaybackState.Stopped;
-
-                if (reachedEnd || stopped)
-                    StopPlayback();
-            };
-            _playbackTimer.Start();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Playback error: {ex.Message}");
-            StopPlayback();
-        }
-    }
-
-    private void StopPlayback()
-    {
-        _playbackTimer?.Stop();
-        _playbackTimer = null;
-
-        if (_playbackChannel != 0)
-        {
-            Bass.ChannelStop(_playbackChannel);
-            Bass.StreamFree(_playbackChannel);
-            _playbackChannel = 0;
-        }
-
-        _playbackEndBytes = 0;
-        _isPlaying = false;
-        SetPlayButtonContent("▶ Play");
     }
 
     private void SetPlayButtonContent(string text)
     {
-        if (_playButton != null)
-            _playButton.Content = text;
+        if (_playButton != null) _playButton.Content = text;
+    }
+
+    private void Cancel_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm == null || _applying) return;
+
+        _player.Stop();
+
+        _applying = true;
+        SetApplyEnabled(false);
+
+        try
+        {
+            if (!await _vm.ApplyTrimAsync(_trim.Start, _trim.End)) return;
+
+            // The file has been rewritten, so every stored position now points at audio that
+            // no longer exists. What survived the cut is the whole file from here on.
+            _trim.Reset();
+            _playStart = null;
+            _playhead = null;
+            _viewport.ZoomTo(WaveformViewport.MinZoom);
+
+            Redraw();
+        }
+        finally
+        {
+            _applying = false;
+            SetApplyEnabled(true);
+        }
+    }
+
+    private void SetApplyEnabled(bool enabled)
+    {
+        var button = this.FindControl<Button>("ApplyTrimButton");
+        if (button != null) button.IsEnabled = enabled;
     }
 }
