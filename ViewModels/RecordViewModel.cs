@@ -22,8 +22,11 @@ public sealed partial class RecordViewModel : ObservableObject
     private readonly ILevelMeterService _levelMeter;
     private readonly IWaveformService _waveformService;
     private readonly ConfigStore _configStore;
+    private readonly AppConfig _cfg;
     private Stopwatch _recordingTimer = new();
     private System.Timers.Timer? _levelUpdateTimer;
+    private readonly DispatcherTimer _gainSaveTimer;
+    private bool _gainLoaded;
 
     public ObservableCollection<string> InputDevices { get; } = new();
     public ObservableCollection<Recording> Recordings { get; } = new();
@@ -36,13 +39,32 @@ public sealed partial class RecordViewModel : ObservableObject
     [ObservableProperty] private string recordingName = "Recording";
     [ObservableProperty] private string status = "Ready";
     [ObservableProperty] private Recording? selectedRecordingForEdit;
+    [ObservableProperty] private double recordGainDb;
+    [ObservableProperty] private bool isClipping;
 
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore)
+    public double MinGainDb => Audio.RecordingService.MinGainDb;
+    public double MaxGainDb => Audio.RecordingService.MaxGainDb;
+
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg)
     {
+        _cfg = cfg;
         _recordingService = recordingService;
         _levelMeter = levelMeter;
         _waveformService = waveformService;
         _configStore = configStore;
+
+        // Dragging the slider fires on every pixel, so coalesce the writes to config.json.
+        _gainSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _gainSaveTimer.Tick += (_, _) =>
+        {
+            _gainSaveTimer.Stop();
+            _cfg.RecordGainDb = _recordingService.GainDb;
+            _configStore.Save(_cfg);
+        };
+
+        RecordGainDb = cfg.RecordGainDb; // also pushes it into the service via the partial hook
+        _recordingService.GainDb = cfg.RecordGainDb; // covers the case where the value was already 0
+        _gainLoaded = true;
 
         RefreshDevices();
         LoadRecordings();
@@ -90,6 +112,16 @@ public sealed partial class RecordViewModel : ObservableObject
         {
             Status = $"Failed to load recordings: {ex.Message}";
         }
+    }
+
+    partial void OnRecordGainDbChanged(double value)
+    {
+        _recordingService.GainDb = value;
+
+        if (!_gainLoaded) return; // do not rewrite the file just for loading it
+
+        _gainSaveTimer.Stop();
+        _gainSaveTimer.Start();
     }
 
     partial void OnSelectedDeviceChanged(string? value)
@@ -214,9 +246,12 @@ public sealed partial class RecordViewModel : ObservableObject
                 var recentData = _recordingService.GetRecentRecordingData(4410);
                 float level = _levelMeter.GetLevelFromBytes(recentData);
 
+                bool clipping = _recordingService.IsClipping;
+
                 Dispatcher.UIThread.Invoke(() =>
                 {
                     Level = level;
+                    IsClipping = clipping;
                     RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
                 });
             };
@@ -240,6 +275,9 @@ public sealed partial class RecordViewModel : ObservableObject
 
             _recordingService.StopRecording();
             IsRecording = false;
+            IsClipping = false;
+
+            bool clipped = _recordingService.ClippedDuringTake;
 
             string filePath = await _recordingService.SaveRecordingAsync(RecordingName);
             Status = "Saved recording";
@@ -266,6 +304,10 @@ public sealed partial class RecordViewModel : ObservableObject
             };
 
             Recordings.Add(recording);
+
+            if (clipped)
+                Status = "Saved, but the input clipped. Lower the input gain or the source level.";
+
             Level = 0;
             RecordingTime = "00:00:00";
             RecordingName = "Recording";

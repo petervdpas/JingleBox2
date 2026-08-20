@@ -21,6 +21,15 @@ public interface IRecordingService
     /// </summary>
     string? LastStartWarning { get; }
 
+    /// <summary>Gain applied to incoming audio, in dB. 0 is unity.</summary>
+    double GainDb { get; set; }
+
+    /// <summary>True while clipping was seen in the last moment or so. Decays on its own.</summary>
+    bool IsClipping { get; }
+
+    /// <summary>True if anything clipped at any point during the current or last take.</summary>
+    bool ClippedDuringTake { get; }
+
     byte[] GetRecentRecordingData(int maxBytes);
     Task<string> SaveRecordingAsync(string fileName);
 }
@@ -48,6 +57,31 @@ public sealed class RecordingService : IRecordingService, IDisposable
     public string? LastStartWarning { get; private set; }
 
     private int BytesPerFrame => _channels * 2;
+
+    public const double MinGainDb = -24;
+    public const double MaxGainDb = 12;
+
+    /// <summary>How long the clip light stays lit after the last clipped sample.</summary>
+    private const long ClipHoldMs = 1500;
+
+    private double _gainDb;
+    private volatile float _gainFactor = 1f;
+    private long _lastClipTick = long.MinValue / 2;
+    private volatile bool _clippedDuringTake;
+
+    public double GainDb
+    {
+        get => _gainDb;
+        set
+        {
+            _gainDb = Math.Clamp(value, MinGainDb, MaxGainDb);
+            _gainFactor = (float)Math.Pow(10, _gainDb / 20.0);
+        }
+    }
+
+    public bool IsClipping => Environment.TickCount64 - _lastClipTick < ClipHoldMs;
+
+    public bool ClippedDuringTake => _clippedDuringTake;
 
     public RecordingService()
     {
@@ -101,6 +135,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
         if (_isRecording) return;
 
         LastStartWarning = null;
+        _clippedDuringTake = false;
+        _lastClipTick = long.MinValue / 2;
         lock (_recordingBuffer)
         {
             _recordingBuffer.Clear();
@@ -228,12 +264,51 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             byte[] data = new byte[length];
             System.Runtime.InteropServices.Marshal.Copy(buffer, data, 0, length);
+
+            if (ApplyGainAndDetectClipping(data))
+            {
+                _lastClipTick = Environment.TickCount64;
+                _clippedDuringTake = true;
+            }
+
             lock (_recordingBuffer)
             {
                 _recordingBuffer.AddRange(data);
             }
         }
         return true;
+    }
+
+    /// <summary>
+    /// Scales the buffer in place and reports whether anything clipped, either because the
+    /// input arrived at full scale or because the gain pushed it there.
+    /// </summary>
+    private bool ApplyGainAndDetectClipping(byte[] data)
+    {
+        float gain = _gainFactor;
+        bool unity = gain == 1f;
+        bool clipped = false;
+
+        for (int i = 0; i + 1 < data.Length; i += 2)
+        {
+            short sample = (short)(data[i] | (data[i + 1] << 8));
+
+            // Full-scale input means the signal was already squared off before we saw it.
+            if (sample >= short.MaxValue || sample <= short.MinValue)
+                clipped = true;
+
+            if (unity) continue;
+
+            float scaled = sample * gain;
+            if (scaled > short.MaxValue) { scaled = short.MaxValue; clipped = true; }
+            else if (scaled < short.MinValue) { scaled = short.MinValue; clipped = true; }
+
+            sample = (short)scaled;
+            data[i] = (byte)(sample & 0xFF);
+            data[i + 1] = (byte)((sample >> 8) & 0xFF);
+        }
+
+        return clipped;
     }
 
     private int GetDeviceIndex(string? deviceName)

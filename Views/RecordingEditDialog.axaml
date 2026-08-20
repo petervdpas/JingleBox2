@@ -18,7 +18,7 @@
           <TextBlock Grid.Column="0" Text="Trim Region" FontWeight="SemiBold" VerticalAlignment="Center" />
           <Button Grid.Column="1" Content="🔍-" Click="ZoomOut_Click" Width="40" />
           <Button Grid.Column="2" Content="🔍+" Click="ZoomIn_Click" Width="40" />
-          <Button Grid.Column="3" Content="▶ Play" Click="Play_Click" />
+          <Button Grid.Column="3" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
         </Grid>
         <Canvas Height="200" Width="760" Background="#1F2937" Name="EditWaveformCanvas" />
         <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />

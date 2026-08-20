@@ -34,5 +34,6 @@ public sealed class AppConfig
     public int Rows { get; set; } = 4;
     public int Columns { get; set; } = 2;
     public MidiConfig Midi { get; set; } = new();
+    public double RecordGainDb { get; set; } = 0;
     public List<PadConfig> Pads { get; set; } = new();
 }

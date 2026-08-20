@@ -50,9 +50,27 @@
                      Foreground="#FF6B7280"
                      HorizontalAlignment="Center" />
 
+          <!-- Input Gain -->
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <TextBlock Grid.Column="0" Text="Input Gain" Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding RecordGainDb, StringFormat='{}{0:0.0} dB'}"
+                         Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
+            </Grid>
+            <Slider Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}"
+                    Value="{Binding RecordGainDb}" TickFrequency="6" />
+          </StackPanel>
+
           <!-- Level Meter -->
           <StackPanel Spacing="4">
-            <TextBlock Text="Level" Opacity="0.8" FontSize="12" />
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+              <TextBlock Grid.Column="0" Text="Level" Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="CLIP" FontSize="10" FontWeight="SemiBold"
+                         Margin="0,0,6,0" VerticalAlignment="Center"
+                         Classes="cliptext" Classes.clipping="{Binding IsClipping}" />
+              <Border Grid.Column="3" Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
+                      Classes="cliplight" Classes.clipping="{Binding IsClipping}" />
+            </Grid>
             <ProgressBar Value="{Binding Level}" Minimum="0" Maximum="1" Height="6" />
           </StackPanel>
 

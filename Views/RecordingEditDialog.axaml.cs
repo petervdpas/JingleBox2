@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
 using ManagedBass;
@@ -14,7 +15,10 @@ namespace JingleBox2.Views;
 public partial class RecordingEditDialog : Window
 {
     private Canvas? _editWaveformCanvas;
-    private double _trimHandleWidth = 8;
+    private double _trimHandleWidth = 3;
+
+    /// <summary>How far from a handle a click still counts as grabbing it.</summary>
+    private const double TrimGrabTolerance = 10;
     private double _leftTrimPos = 0;
     private double _rightTrimPos = 1;
     private bool _draggingLeft = false;
@@ -23,12 +27,15 @@ public partial class RecordingEditDialog : Window
     private int _playbackChannel = 0;
     private bool _isPlaying = false;
     private Button? _playButton;
+    private DispatcherTimer? _playbackTimer;
+    private long _playbackEndBytes;
 
     public RecordingEditDialog()
     {
         InitializeComponent();
         this.Loaded += (s, e) =>
         {
+            _playButton = this.FindControl<Button>("PlayButton");
             _editWaveformCanvas = this.FindControl<Canvas>("EditWaveformCanvas");
             if (_editWaveformCanvas != null)
             {
@@ -199,13 +206,20 @@ public partial class RecordingEditDialog : Window
         double leftX = FractionToX(_leftTrimPos, canvasWidth);
         double rightX = FractionToX(_rightTrimPos, canvasWidth);
 
-        if (point.X >= leftX && point.X <= leftX + _trimHandleWidth)
-            _draggingLeft = true;
-        else if (point.X >= rightX - _trimHandleWidth && point.X <= rightX)
-            _draggingRight = true;
+        // The handles are drawn thin, so grab by proximity rather than by the painted
+        // rectangle, and give the nearer one priority when they are close together.
+        double distanceToLeft = Math.Abs(point.X - leftX);
+        double distanceToRight = Math.Abs(point.X - rightX);
 
-        if (_draggingLeft || _draggingRight)
+        if (distanceToLeft <= TrimGrabTolerance || distanceToRight <= TrimGrabTolerance)
+        {
+            if (distanceToLeft <= distanceToRight)
+                _draggingLeft = true;
+            else
+                _draggingRight = true;
+
             e.Pointer.Capture(_editWaveformCanvas);
+        }
     }
 
     private void EditCanvas_PointerMoved(object? sender, PointerEventArgs e)
@@ -292,53 +306,71 @@ public partial class RecordingEditDialog : Window
     {
         try
         {
-            // Load the file
+            StopPlayback(); // never leave a previous channel or timer running
+
             _playbackChannel = Bass.CreateStream(filePath, 0, 0, BassFlags.Default);
             if (_playbackChannel == 0)
                 return;
 
-            // Set start position (BASS uses bytes, need to calculate from samples)
+            // BASS positions are in bytes; the file is 16-bit, so 2 bytes per sample.
             var info = Bass.ChannelGetInfo(_playbackChannel);
-            long startBytes = (startSample * info.Channels * 2); // 2 bytes per sample (16-bit)
-            Bass.ChannelSetPosition(_playbackChannel, startBytes);
+            long bytesPerFrame = info.Channels * 2;
+            Bass.ChannelSetPosition(_playbackChannel, startSample * bytesPerFrame);
+            _playbackEndBytes = endSample * bytesPerFrame;
 
-            // Play
             Bass.ChannelPlay(_playbackChannel);
             _isPlaying = true;
-            if (_playButton != null)
-                _playButton.Content = "⏹ Stop";
+            SetPlayButtonContent("⏹ Stop");
 
-            // Monitor playback (stop when we reach end position)
-            var timer = new System.Timers.Timer(100);
-            long endBytes = (endSample * info.Channels * 2);
-            timer.Elapsed += (s, e) =>
+            // DispatcherTimer ticks on the UI thread, so the handler may touch the button.
+            // A System.Timers.Timer ticks on a pool thread: the button update threw a
+            // cross-thread exception that the timer swallowed, so the label stayed on
+            // "Stop" after playback had already ended, and the next click restarted it.
+            _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _playbackTimer.Tick += (_, _) =>
             {
-                long currentPos = Bass.ChannelGetPosition(_playbackChannel);
-                if (currentPos >= endBytes || !Bass.ChannelIsActive(_playbackChannel).HasFlag(PlaybackState.Playing))
+                if (_playbackChannel == 0)
                 {
-                    timer.Stop();
                     StopPlayback();
+                    return;
                 }
+
+                bool reachedEnd = _playbackEndBytes > 0
+                    && Bass.ChannelGetPosition(_playbackChannel) >= _playbackEndBytes;
+                bool stopped = Bass.ChannelIsActive(_playbackChannel) == PlaybackState.Stopped;
+
+                if (reachedEnd || stopped)
+                    StopPlayback();
             };
-            timer.Start();
+            _playbackTimer.Start();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Playback error: {ex.Message}");
-            _isPlaying = false;
+            StopPlayback();
         }
     }
 
     private void StopPlayback()
     {
+        _playbackTimer?.Stop();
+        _playbackTimer = null;
+
         if (_playbackChannel != 0)
         {
             Bass.ChannelStop(_playbackChannel);
             Bass.StreamFree(_playbackChannel);
             _playbackChannel = 0;
         }
+
+        _playbackEndBytes = 0;
         _isPlaying = false;
+        SetPlayButtonContent("▶ Play");
+    }
+
+    private void SetPlayButtonContent(string text)
+    {
         if (_playButton != null)
-            _playButton.Content = "▶ Play";
+            _playButton.Content = text;
     }
 }
