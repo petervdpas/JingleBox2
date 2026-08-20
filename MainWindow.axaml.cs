@@ -23,6 +23,11 @@ public partial class MainWindow : Window
     private const double PadSize = 120;      // Target pad size in pixels
     private const double PadMargin = 20;     // Margin around each pad
 
+    // The matrix alone gives a cramped window for small grids, so treat this as the floor
+    // the window opens at. Larger matrices still grow past it.
+    private const double DefaultWidth = 800;
+    private const double DefaultHeight = 800;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -87,9 +92,9 @@ public partial class MainWindow : Window
         double width = columns * padTotalSize + 48;  // 48 for window padding
         double height = rows * padTotalSize + HeaderHeight + 48;
 
-        // Apply minimum constraints
-        width = Math.Max(width, 400);
-        height = Math.Max(height, 400);
+        // Never open smaller than the default, however few pads there are.
+        width = Math.Max(width, DefaultWidth);
+        height = Math.Max(height, DefaultHeight);
 
         Width = width;
         Height = height;
