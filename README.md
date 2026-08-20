@@ -48,7 +48,7 @@ It separates **live operation** from **configuration**, supports **multiple simu
 ```bash
 JingleBox2/
 ├─ Audio/              # Audio engine (BassAudioEngine, IAudioEngine)
-├─ Views/              # Avalonia views (UseView, ConfigView)
+├─ Views/              # Avalonia views (UseView, PadsView)
 ├─ ViewModels/         # MVVM view models
 ├─ Config/             # App and pad configuration models
 ├─ Models/             # Shared domain models

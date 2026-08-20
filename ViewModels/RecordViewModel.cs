@@ -27,16 +27,27 @@ public sealed partial class RecordViewModel : ObservableObject
     private System.Timers.Timer? _levelUpdateTimer;
     private readonly DispatcherTimer _gainSaveTimer;
     private bool _gainLoaded;
+    private bool _deviceLoaded;
 
     public ObservableCollection<string> InputDevices { get; } = new();
     public ObservableCollection<Recording> Recordings { get; } = new();
 
     [ObservableProperty] private string? selectedDevice;
-    [ObservableProperty] private bool isRecording;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRecord))]
+    private bool isRecording;
     [ObservableProperty] private string recordingTime = "00:00:00";
     [ObservableProperty] private float level;
     [ObservableProperty] private WaveformData? currentWaveform;
-    [ObservableProperty] private string recordingName = "Recording";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRecord))]
+    private string recordingName = RecordingNameValidator.DefaultBaseName;
+
+    /// <summary>Null when the name is usable, otherwise why it is not.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanRecord))]
+    [NotifyPropertyChangedFor(nameof(HasNameError))]
+    private string? nameError;
     [ObservableProperty] private string status = "Ready";
     [ObservableProperty] private Recording? selectedRecordingForEdit;
     [ObservableProperty] private double recordGainDb;
@@ -44,6 +55,9 @@ public sealed partial class RecordViewModel : ObservableObject
 
     public double MinGainDb => Audio.RecordingService.MinGainDb;
     public double MaxGainDb => Audio.RecordingService.MaxGainDb;
+
+    public bool HasNameError => NameError != null;
+    public bool CanRecord => !IsRecording && NameError == null;
 
     public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg)
     {
@@ -67,7 +81,15 @@ public sealed partial class RecordViewModel : ObservableObject
         _gainLoaded = true;
 
         RefreshDevices();
+        _deviceLoaded = true;
+
         LoadRecordings();
+
+        // Deleting a recording frees its name again, so the check has to follow the list.
+        Recordings.CollectionChanged += (_, _) => ValidateName();
+
+        RecordingName = NextRecordingName(RecordingNameValidator.DefaultBaseName);
+        ValidateName();
     }
 
     public IAsyncRelayCommand StartRecordingCommand => new AsyncRelayCommand(StartRecording);
@@ -78,11 +100,14 @@ public sealed partial class RecordViewModel : ObservableObject
 
     private void RefreshDevices()
     {
+        string? previous = SelectedDevice ?? _cfg.RecordInputDevice;
+
         InputDevices.Clear();
         foreach (var device in _recordingService.GetInputDevices())
             InputDevices.Add(device);
 
-        SelectedDevice = InputDevices.FirstOrDefault() ?? "Default";
+        // Keep the current pick if it is still plugged in, otherwise fall back to the first one.
+        SelectedDevice = InputDeviceSelector.Pick(InputDevices, previous);
     }
 
     private void LoadRecordings()
@@ -114,6 +139,15 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    partial void OnRecordingNameChanged(string value) => ValidateName();
+
+    private void ValidateName() =>
+        NameError = RecordingNameValidator.Validate(RecordingName, Recordings.Select(r => r.Name));
+
+    /// <summary>Next free name in the same series as <paramref name="basedOn"/>.</summary>
+    private string NextRecordingName(string basedOn) =>
+        RecordingNameValidator.NextName(basedOn, Recordings.Select(r => r.Name));
+
     partial void OnRecordGainDbChanged(double value)
     {
         _recordingService.GainDb = value;
@@ -126,8 +160,15 @@ public sealed partial class RecordViewModel : ObservableObject
 
     partial void OnSelectedDeviceChanged(string? value)
     {
-        if (!string.IsNullOrEmpty(value))
-            _recordingService.SelectedDevice = value;
+        if (string.IsNullOrEmpty(value)) return;
+
+        _recordingService.SelectedDevice = value;
+
+        if (!_deviceLoaded) return; // do not rewrite the file just for loading it
+        if (_cfg.RecordInputDevice == value) return;
+
+        _cfg.RecordInputDevice = value;
+        _configStore.Save(_cfg);
     }
 
     private void EditRecording(Recording? recording)
@@ -236,6 +277,13 @@ public sealed partial class RecordViewModel : ObservableObject
 
     private async Task StartRecording()
     {
+        ValidateName();
+        if (NameError != null)
+        {
+            Status = NameError;
+            return;
+        }
+
         try
         {
             _recordingService.StartRecording();
@@ -282,7 +330,9 @@ public sealed partial class RecordViewModel : ObservableObject
 
             bool clipped = _recordingService.ClippedDuringTake;
 
-            string filePath = await _recordingService.SaveRecordingAsync(RecordingName);
+            // The name check trims, so save under the trimmed name too or the two disagree.
+            string savedName = RecordingName.Trim();
+            string filePath = await _recordingService.SaveRecordingAsync(savedName);
             Status = "Saved recording";
 
             try
@@ -300,7 +350,7 @@ public sealed partial class RecordViewModel : ObservableObject
             var recording = new Recording
             {
                 Id = Guid.NewGuid().ToString(),
-                Name = RecordingName,
+                Name = savedName,
                 FilePath = filePath,
                 DurationMs = ReadDurationMs(filePath),
                 CreatedAt = DateTime.Now
@@ -313,7 +363,7 @@ public sealed partial class RecordViewModel : ObservableObject
 
             Level = 0;
             RecordingTime = "00:00:00";
-            RecordingName = "Recording";
+            RecordingName = NextRecordingName(savedName);
         }
         catch (Exception ex)
         {

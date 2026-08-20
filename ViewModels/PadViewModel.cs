@@ -78,7 +78,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Always returns a brush: grey when no color is configured, custom color otherwise.
-    /// Used for the small preview dot in ConfigView.
+    /// Used for the small preview dot in PadsView.
     /// </summary>
     public SolidColorBrush PadPreviewBrush
     {

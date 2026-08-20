@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
-             x:Class="JingleBox2.Views.ConfigView"
+             x:Class="JingleBox2.Views.PadsView"
              x:DataType="vm:MainViewModel">
 
   <UserControl.Styles>

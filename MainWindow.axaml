@@ -52,8 +52,8 @@
         <views:UseView />
       </TabItem>
 
-      <TabItem Header="CONFIG">
-        <views:ConfigView />
+      <TabItem Header="PADS">
+        <views:PadsView />
       </TabItem>
 
       <TabItem Header="RECORD">

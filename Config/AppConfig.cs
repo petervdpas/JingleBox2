@@ -36,6 +36,9 @@ public sealed class AppConfig
     public MidiConfig Midi { get; set; } = new();
     public double RecordGainDb { get; set; } = 0;
 
+    // Stored by name, not index: device indexes shift when hardware is plugged in or out.
+    public string RecordInputDevice { get; set; } = "";
+
     // 0 means never resized, so fall back to sizing from the pad matrix.
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

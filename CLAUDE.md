@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-JingleBox2 is a cross-platform audio pad launcher built with .NET 9 and Avalonia UI for radio, streaming, and live audio workflows. It features a USE tab for performance (triggering audio pads) and a CONFIG tab for setup, with MIDI controller support.
+JingleBox2 is a cross-platform audio pad launcher built with .NET 9 and Avalonia UI for radio, streaming, and live audio workflows. It features a USE tab for performance (triggering audio pads) and a PADS tab for setup, with MIDI controller support.
 
 ## Build Commands
 
@@ -30,7 +30,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Midi/` - MIDI input handling and routing to pads
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
-- `Views/` - Avalonia user controls (UseView, ConfigView, MidiView, SettingsView)
+- `Views/` - Avalonia user controls (UseView, PadsView, MidiView, SettingsView)
 - `Themes/` - XAML resource dictionaries (Dark, Light, Neon, Industrial)
 - `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64
 

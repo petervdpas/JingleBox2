@@ -36,6 +36,11 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <Style Selector="TextBox.invalid">
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+            </Setter>
+        </Style>
         <Style Selector="Button.danger">
             <Setter Property="Foreground">
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />

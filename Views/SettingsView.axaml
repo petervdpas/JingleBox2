@@ -49,6 +49,32 @@
 
         <Border Classes="settingsCard">
           <StackPanel Spacing="16">
+            <TextBlock Classes="header" Text="Recording Input" />
+
+            <TextBlock Classes="muted"
+                       TextWrapping="Wrap"
+                       Text="Pick the device the RECORD tab captures from. The choice is remembered between sessions." />
+
+            <Grid ColumnDefinitions="Auto,*"
+                  RowDefinitions="Auto"
+                  ColumnSpacing="16">
+              <TextBlock Grid.Row="0" Grid.Column="0"
+                         Classes="label"
+                         Text="Input device:" />
+              <ComboBox Grid.Row="0" Grid.Column="1"
+                        ItemsSource="{Binding Record.InputDevices}"
+                        SelectedItem="{Binding Record.SelectedDevice}"
+                        HorizontalAlignment="Stretch" />
+            </Grid>
+
+            <Button Content="Refresh Devices"
+                    HorizontalAlignment="Left"
+                    Command="{Binding Record.RefreshDevicesCommand}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="settingsCard">
+          <StackPanel Spacing="16">
             <TextBlock Classes="header" Text="Pad Matrix Size" />
 
             <TextBlock Classes="muted"

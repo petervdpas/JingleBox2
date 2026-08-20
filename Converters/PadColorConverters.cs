@@ -8,7 +8,7 @@ namespace JingleBox2.Converters;
 
 /// <summary>
 /// Converts a hex color string (e.g. "#E53935") to an Avalonia Color and back.
-/// Used by the ColorPicker in ConfigView.
+/// Used by the ColorPicker in PadsView.
 /// Empty/null string produces a neutral grey so the picker always shows a valid color.
 /// </summary>
 public sealed class HexColorToColorConverter : IValueConverter

@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace JingleBox2.Views;
 
-public partial class ConfigView : UserControl
+public partial class PadsView : UserControl
 {
-    public ConfigView()
+    public PadsView()
     {
         InitializeComponent();
     }

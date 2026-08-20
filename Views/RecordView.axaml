@@ -7,38 +7,25 @@
   <ScrollViewer>
     <StackPanel Spacing="16" Margin="16">
 
-
-      <!-- Recording Input -->
-      <Border Classes="card" Padding="12">
-        <StackPanel Spacing="8">
-          <TextBlock Text="Recording Input" FontWeight="SemiBold" />
-
-          <StackPanel Spacing="4">
-            <TextBlock Text="Input Device" Opacity="0.8" />
-            <ComboBox ItemsSource="{Binding InputDevices}"
-                      SelectedItem="{Binding SelectedDevice}" />
-          </StackPanel>
-
-          <Button Content="Refresh Devices"
-                  Command="{Binding RefreshDevicesCommand}" />
-        </StackPanel>
-      </Border>
-
       <!-- Recording Controls -->
       <Border Classes="card" Padding="12">
         <StackPanel Spacing="12">
-          <TextBlock Text="Record" FontWeight="SemiBold" />
-
-          <StackPanel Spacing="8">
+          <StackPanel Spacing="4">
             <TextBlock Text="Recording Name" Opacity="0.8" />
-            <TextBox Text="{Binding RecordingName}" />
+            <TextBox Text="{Binding RecordingName}"
+                     Classes.invalid="{Binding HasNameError}" />
+            <TextBlock Text="{Binding NameError}"
+                       IsVisible="{Binding HasNameError}"
+                       Foreground="{DynamicResource DangerBrush}"
+                       FontSize="12"
+                       TextWrapping="Wrap" />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="4">
             <Button Content="🔴 Record"
                     MinWidth="96" Padding="10,5"
                     Command="{Binding StartRecordingCommand}"
-                    IsEnabled="{Binding !IsRecording}" />
+                    IsEnabled="{Binding CanRecord}" />
             <Button Content="⏹ Stop"
                     MinWidth="96" Padding="10,5"
                     Command="{Binding StopRecordingCommand}"

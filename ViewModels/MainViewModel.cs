@@ -31,7 +31,7 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
 
-    // CONFIG header
+    // PADS header
     public ObservableCollection<string> ProfileNames { get; } = new();
 
     // THEME picker
