@@ -23,6 +23,8 @@
         <conv:NullToUnsetConverter x:Key="NullToUnset" />
         <conv:IsSelectedColorConverter x:Key="IsSelectedColor" />
         <conv:SelectedSwatchSizeConverter x:Key="SelectedSwatchSize" />
+        <conv:StringEqualsConverter x:Key="StringEqualsConverter" />
+        <conv:ModeToColorConverter x:Key="ModeToColorConverter" />
     </Application.Resources>
 
 </Application>

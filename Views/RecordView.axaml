@@ -7,6 +7,7 @@
   <ScrollViewer>
     <StackPanel Spacing="16" Margin="16">
 
+
       <!-- Recording Input -->
       <Border Classes="card" Padding="12">
         <StackPanel Spacing="8">
@@ -65,9 +66,7 @@
       <Border Classes="card" Padding="12" IsVisible="{Binding CurrentWaveform, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Spacing="8">
           <TextBlock Text="Waveform" FontWeight="SemiBold" />
-          <Canvas Height="120" Background="#1F2937">
-            <!-- Waveform will be drawn here in Phase 2 -->
-            <TextBlock Canvas.Left="10" Canvas.Top="50" Text="Waveform rendering coming in Phase 2..." Foreground="#6B7280" />
+          <Canvas Height="120" Background="#1F2937" Name="RecordWaveformCanvas">
           </Canvas>
           <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
         </StackPanel>
@@ -88,7 +87,7 @@
                       <TextBlock Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" Opacity="0.7" FontSize="12" />
                       <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" Opacity="0.7" FontSize="12" />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="Play" />
+                    <Button Grid.Column="1" Content="Edit" Command="{Binding $parent[UserControl].DataContext.EditRecordingCommand}" CommandParameter="{Binding .}" />
                     <Button Grid.Column="2" Content="Delete" />
                   </Grid>
                 </Border>
