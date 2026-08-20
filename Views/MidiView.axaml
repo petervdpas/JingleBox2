@@ -72,7 +72,7 @@
 
                   <Button Grid.Column="4"
                     Content="{Binding IsLearning, Converter={StaticResource LearnText}}"
-                    Command="{Binding DataContext.LearnCommand, ElementName=Root}"
+                    Command="{Binding ((vm:MidiViewModel)DataContext).LearnCommand, ElementName=Root}"
                     CommandParameter="{Binding}" />
                 </Grid>
               </DataTemplate>
