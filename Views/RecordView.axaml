@@ -5,10 +5,10 @@
              x:DataType="vm:RecordViewModel">
 
   <ScrollViewer>
-    <StackPanel Spacing="16" Margin="16">
+    <StackPanel Classes="tabRoot">
 
       <!-- Recording Controls -->
-      <Border Classes="card" Padding="12">
+      <Border Classes="card">
         <StackPanel Spacing="12">
           <StackPanel Spacing="4">
             <TextBlock Text="Recording Name" Opacity="0.8" />
@@ -68,8 +68,8 @@
       </Border>
 
       <!-- Waveform Display -->
-      <Border Classes="card" Padding="12" IsVisible="{Binding CurrentWaveform, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <StackPanel Spacing="8">
+      <Border Classes="card" IsVisible="{Binding CurrentWaveform, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Classes="cardBody">
           <TextBlock Text="Waveform" FontWeight="SemiBold" />
           <Canvas Height="120" Background="#1F2937" Name="RecordWaveformCanvas">
           </Canvas>
@@ -78,9 +78,9 @@
       </Border>
 
       <!-- Recordings Library -->
-      <Border Classes="card" Padding="12" IsVisible="{Binding Recordings.Count}">
-        <StackPanel Spacing="8">
-          <TextBlock Text="Recordings" FontWeight="SemiBold" />
+      <Border Classes="card" IsVisible="{Binding Recordings.Count}">
+        <StackPanel Classes="cardBody">
+          <TextBlock Classes="cardTitle" Text="Recordings" />
 
           <ItemsControl ItemsSource="{Binding Recordings}">
             <ItemsControl.ItemTemplate>

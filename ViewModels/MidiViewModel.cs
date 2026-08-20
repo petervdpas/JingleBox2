@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Midi;
 using System.Collections.ObjectModel;
@@ -38,8 +39,9 @@ public sealed partial class MidiViewModel : ObservableObject
             _cfg.Midi.Pads.Select(m => new PadMidiMappingViewModel(m)));
 
         ToggleMode = _cfg.Midi.ToggleMode;
-        SelectedDevice = _cfg.Midi.InputDevice;
 
+        // Build the list first: assigning SelectedDevice before the list exists leaves the
+        // combo blank and the saved device unopened.
         RefreshDevices();
 
         _midi.MessageReceived += OnMidi;
@@ -52,17 +54,29 @@ public sealed partial class MidiViewModel : ObservableObject
 
     private void RefreshDevices()
     {
+        string? previous = SelectedDevice ?? _cfg.Midi.InputDevice;
+
         Devices.Clear();
         foreach (var d in _midi.GetInputDevices())
             Devices.Add(d);
 
-        Status = Devices.Count == 0 ? "No MIDI devices found." : "";
+        SelectedDevice = InputDeviceSelector.Preserve(Devices, previous);
+
+        if (Devices.Count == 0)
+            Status = "No MIDI devices found.";
+        else if (SelectedDevice == null && !string.IsNullOrEmpty(previous))
+            Status = $"'{previous}' is not connected.";
     }
 
     partial void OnSelectedDeviceChanged(string? value)
     {
-        _cfg.Midi.InputDevice = value;
-        SaveMidi();
+        // An unplugged device drops out of the list and lands here as null. Keep the saved
+        // name in that case so it reconnects on its own once the hardware is back.
+        if (value != null)
+        {
+            _cfg.Midi.InputDevice = value;
+            SaveMidi();
+        }
 
         _midi.Close();
 

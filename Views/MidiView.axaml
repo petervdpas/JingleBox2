@@ -11,27 +11,15 @@
   </UserControl.Resources>
 
   <ScrollViewer>
-    <StackPanel Spacing="12">
-
-      <!-- Device -->
-      <Border Classes="card" Padding="12">
-        <StackPanel Spacing="8">
-          <TextBlock Text="MIDI input device" FontWeight="SemiBold" />
-
-          <ComboBox ItemsSource="{Binding Devices}"
-            SelectedItem="{Binding SelectedDevice}" />
-
-          <Button Content="Refresh"
-            Command="{Binding RefreshDevicesCommand}" />
-
-          <TextBlock Text="{Binding Status}" Opacity="0.85" />
-        </StackPanel>
-      </Border>
+    <StackPanel Classes="tabRoot">
 
       <!-- Mapping (no DataGrid; avoids Avalonia DataGrid ctor crash) -->
-      <Border Classes="card" Padding="12">
-        <StackPanel Spacing="8">
-          <TextBlock Text="Pad mapping (global)" FontWeight="SemiBold" />
+      <Border Classes="card">
+        <StackPanel Classes="cardBody">
+          <TextBlock Classes="cardTitle" Text="Pad mapping (global)" />
+
+          <TextBlock Text="{Binding Status}" Opacity="0.85"
+            IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
           <!-- Header row -->
           <Grid ColumnDefinitions="60,120,60,90,90"
@@ -83,7 +71,7 @@
       </Border>
 
       <!-- Behavior -->
-      <Border Classes="card" Padding="12">
+      <Border Classes="card">
         <CheckBox Content="Toggle mode (press again to stop)"
           IsChecked="{Binding ToggleMode}" />
       </Border>

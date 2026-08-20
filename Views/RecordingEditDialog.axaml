@@ -12,7 +12,7 @@
     <TextBlock Text="{Binding SelectedRecordingForEdit.Name, StringFormat='Editing: {0}'}" FontWeight="Bold" FontSize="16" />
 
     <!-- Waveform Editor -->
-    <Border Classes="card" Padding="12">
+    <Border Classes="card">
       <StackPanel Spacing="8">
         <Grid ColumnDefinitions="*,auto,auto,auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Text="Trim Region" FontWeight="SemiBold" VerticalAlignment="Center" />
