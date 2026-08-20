@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace JingleBox2.Audio;
@@ -15,13 +14,13 @@ public interface IRecordingService
     void StartRecording();
     void StopRecording();
     bool IsRecording { get; }
-    float GetLevel();
+    byte[] GetRecentRecordingData(int maxBytes);
     Task<string> SaveRecordingAsync(string fileName);
 }
 
 public sealed class RecordingService : IRecordingService
 {
-    private int _recordHandle = -1;
+    private int _recordHandle = 0;
     private readonly string _recordingsDir;
     private List<byte> _recordingBuffer = new();
     private bool _isRecording;
@@ -45,14 +44,11 @@ public sealed class RecordingService : IRecordingService
     public IReadOnlyList<string> GetInputDevices()
     {
         var devices = new List<string>();
-        int count = Bass.RecordingDeviceCount;
-
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < Bass.RecordingDeviceCount; i++)
         {
             if (Bass.RecordGetDeviceInfo(i, out var info))
                 devices.Add(info.Name);
         }
-
         return devices;
     }
 
@@ -67,7 +63,7 @@ public sealed class RecordingService : IRecordingService
         {
             _currentDeviceId = deviceIndex;
             if (!Bass.RecordInit(deviceIndex))
-                throw new InvalidOperationException($"Bass.RecordInit failed for device {deviceIndex}: {Bass.LastError}");
+                throw new InvalidOperationException($"Bass.RecordInit failed: {Bass.LastError}");
         }
 
         _recordCallback = OnRecordData;
@@ -83,17 +79,6 @@ public sealed class RecordingService : IRecordingService
         }
     }
 
-    private bool OnRecordData(int handle, IntPtr buffer, int length, IntPtr user)
-    {
-        if (buffer != IntPtr.Zero && length > 0)
-        {
-            byte[] data = new byte[length];
-            System.Runtime.InteropServices.Marshal.Copy(buffer, data, 0, length);
-            _recordingBuffer.AddRange(data);
-        }
-        return true;
-    }
-
     public void StopRecording()
     {
         if (!_isRecording) return;
@@ -101,38 +86,53 @@ public sealed class RecordingService : IRecordingService
         Bass.ChannelStop(_recordHandle);
         _isRecording = false;
         _recordCallback = null;
-
         Bass.StreamFree(_recordHandle);
-        _recordHandle = -1;
+        _recordHandle = 0;
     }
 
-    public float GetLevel()
+    public byte[] GetRecentRecordingData(int maxBytes)
     {
-        if (!_isRecording || _recordHandle < 0) return 0;
-
-        int level = Bass.ChannelGetLevel(_recordHandle);
-        float left = (level & 0xFFFF) / 32768f;
-        float right = ((level >> 16) & 0xFFFF) / 32768f;
-        return Math.Max(left, right);
+        lock (_recordingBuffer)
+        {
+            if (_recordingBuffer.Count == 0) return Array.Empty<byte>();
+            int count = Math.Min(maxBytes, _recordingBuffer.Count);
+            int start = _recordingBuffer.Count - count;
+            return _recordingBuffer.GetRange(start, count).ToArray();
+        }
     }
 
     public async Task<string> SaveRecordingAsync(string fileName)
     {
-        if (_recordingBuffer.Count == 0)
-            throw new InvalidOperationException("No recording data to save");
-
-        string filePath = Path.Combine(_recordingsDir, $"{fileName}.wav");
-
-        try
+        lock (_recordingBuffer)
         {
-            await Task.Run(() => WriteWavFile(filePath, _recordingBuffer.ToArray()));
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException($"Failed to save recording: {ex.Message}", ex);
-        }
+            if (_recordingBuffer.Count == 0)
+                throw new InvalidOperationException("No recording data to save");
 
-        return filePath;
+            string filePath = Path.Combine(_recordingsDir, $"{fileName}.wav");
+            try
+            {
+                WriteWavFile(filePath, _recordingBuffer.ToArray());
+                return filePath;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to save recording: {ex.Message}", ex);
+            }
+        }
+    }
+
+    private bool OnRecordData(int handle, IntPtr buffer, int length, IntPtr user)
+    {
+        if (buffer != IntPtr.Zero && length > 0)
+        {
+            byte[] data = new byte[length];
+            System.Runtime.InteropServices.Marshal.Copy(buffer, data, 0, length);
+            lock (_recordingBuffer)
+            {
+                _recordingBuffer.AddRange(data);
+            }
+        }
+        return true;
     }
 
     private void WriteWavFile(string filePath, byte[] pcmData)
@@ -146,7 +146,6 @@ public sealed class RecordingService : IRecordingService
         writer.Write("RIFF".ToCharArray());
         writer.Write(36 + pcmData.Length);
         writer.Write("WAVE".ToCharArray());
-
         writer.Write("fmt ".ToCharArray());
         writer.Write(16);
         writer.Write((ushort)1);
@@ -155,7 +154,6 @@ public sealed class RecordingService : IRecordingService
         writer.Write(byteRate);
         writer.Write((ushort)blockAlign);
         writer.Write((ushort)16);
-
         writer.Write("data".ToCharArray());
         writer.Write(pcmData.Length);
         writer.Write(pcmData);
@@ -164,13 +162,11 @@ public sealed class RecordingService : IRecordingService
     private int GetDeviceIndex(string? deviceName)
     {
         if (string.IsNullOrEmpty(deviceName)) return -1;
-
         for (int i = 0; i < Bass.RecordingDeviceCount; i++)
         {
             if (Bass.RecordGetDeviceInfo(i, out var info) && info.Name == deviceName)
                 return i;
         }
-
         return -1;
     }
 }

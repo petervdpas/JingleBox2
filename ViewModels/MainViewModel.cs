@@ -85,7 +85,7 @@ public sealed partial class MainViewModel : ObservableObject
         _cfg = cfg;
 
         Midi = new MidiViewModel(store, cfg, midiService);
-        Record = new RecordViewModel(recordingService, waveformService, store);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

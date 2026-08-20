@@ -9,12 +9,10 @@
     <Version>0.0.0-local</Version>
     <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64</RuntimeIdentifiers>
   </PropertyGroup>
-
   <PropertyGroup Condition="'$(OS)' == 'Windows_NT' Or '$(RuntimeIdentifier)' == 'win-x64'">
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
@@ -30,22 +28,18 @@
     <PackageReference Include="managed-midi" Version="1.10.1" />
     <PackageReference Include="ManagedBass.Aac" Version="4.0.2" />
   </ItemGroup>
-
   <ItemGroup>
     <AvaloniaResource Include="Assets\icon.ico" />
   </ItemGroup>
-
   <ItemGroup>
     <None Include="native\win-x64\bass.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
     <None Include="native\win-x64\bass_aac.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
-
     <None Include="native/linux-x64/libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass.so')">
       <TargetPath>runtimes/linux-x64/native/libbass.so</TargetPath>
     </None>
     <None Include="native/linux-x64/libbass_aac.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass_aac.so')">
       <TargetPath>runtimes/linux-x64/native/libbass_aac.so</TargetPath>
     </None>
-
     <None Include="native/linux-arm64/libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbass.so')">
       <TargetPath>runtimes/linux-arm64/native/libbass.so</TargetPath>
     </None>
@@ -53,29 +47,24 @@
       <TargetPath>runtimes/linux-arm64/native/libbass_aac.so</TargetPath>
     </None>
   </ItemGroup>
-
   <Target Name="SetVersionFromGit" BeforeTargets="GetAssemblyVersion;GenerateNuspec;BeforeCompile" Condition="'$(Version)' == '0.0.0-local'">
     <Exec Command="git describe --tags --abbrev=0" ConsoleToMsBuild="true" StandardOutputImportance="low" IgnoreExitCode="true">
       <Output TaskParameter="ConsoleOutput" PropertyName="_GitTagRaw" />
     </Exec>
-
     <PropertyGroup>
       <_GitTag>$([System.String]::Copy('$(_GitTagRaw)').Trim())</_GitTag>
       <Version Condition="'$(_GitTag)' != '' and $([System.Text.RegularExpressions.Regex]::IsMatch('$(_GitTag)', '^v?\d+\.\d+\.\d+([-.][0-9A-Za-z]+)*$'))">$(_GitTag.TrimStart('v'))</Version>
       <Version Condition="'$(Version)' == '0.0.0-local'">0.0.0-local</Version>
     </PropertyGroup>
   </Target>
-
   <Target Name="CopyBassToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
   </Target>
-
   <Target Name="CopyBassToLinuxOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
     <Copy SourceFiles="native/linux-x64/libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native/linux-x64/libbass_aac.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libbass_aac.so')" />
   </Target>
-
   <Target Name="EnsureBassDllInPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />

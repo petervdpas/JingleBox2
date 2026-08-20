@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
@@ -14,6 +15,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class RecordViewModel : ObservableObject
 {
     private readonly IRecordingService _recordingService;
+    private readonly ILevelMeterService _levelMeter;
     private readonly IWaveformService _waveformService;
     private readonly ConfigStore _configStore;
     private Stopwatch _recordingTimer = new();
@@ -30,9 +32,10 @@ public sealed partial class RecordViewModel : ObservableObject
     [ObservableProperty] private string recordingName = "Recording";
     [ObservableProperty] private string status = "Ready";
 
-    public RecordViewModel(IRecordingService recordingService, IWaveformService waveformService, ConfigStore configStore)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore)
     {
         _recordingService = recordingService;
+        _levelMeter = levelMeter;
         _waveformService = waveformService;
         _configStore = configStore;
 
@@ -67,11 +70,17 @@ public sealed partial class RecordViewModel : ObservableObject
             Status = "Recording...";
 
             _recordingTimer.Restart();
-            _levelUpdateTimer = new System.Timers.Timer(100);
+            _levelUpdateTimer = new System.Timers.Timer(50);
             _levelUpdateTimer.Elapsed += (s, e) =>
             {
-                Level = _recordingService.GetLevel();
-                RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
+                var recentData = _recordingService.GetRecentRecordingData(4410);
+                float level = _levelMeter.GetLevelFromBytes(recentData);
+
+                Dispatcher.UIThread.Invoke(() =>
+                {
+                    Level = level;
+                    RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
+                });
             };
             _levelUpdateTimer.Start();
         }
@@ -100,7 +109,9 @@ public sealed partial class RecordViewModel : ObservableObject
             try
             {
                 Status = "Processing waveform...";
-                CurrentWaveform = _waveformService.AnalyzeFile(filePath);
+                var waveform = await Task.Run(() => _waveformService.AnalyzeFile(filePath));
+                CurrentWaveform = waveform;
+                Status = "Ready";
             }
             catch (Exception wfEx)
             {
@@ -117,7 +128,6 @@ public sealed partial class RecordViewModel : ObservableObject
             };
 
             Recordings.Add(recording);
-            Status = "Ready";
             Level = 0;
             RecordingTime = "00:00:00";
             RecordingName = "Recording";
