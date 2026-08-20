@@ -1,4 +1,4 @@
-using ManagedBass;
+﻿using ManagedBass;
 using System;
 
 namespace JingleBox2.Audio;
@@ -21,7 +21,8 @@ public sealed class LevelMeterService : ILevelMeterService
             if (i + 1 < data.Length)
             {
                 short sample = (short)((data[i + 1] << 8) | data[i]);
-                float normalized = Math.Abs(sample) / 32768f;
+                // Widen before Abs: Math.Abs(short.MinValue) throws OverflowException.
+                float normalized = Math.Abs((int)sample) / 32768f;
                 if (normalized > maxLevel) maxLevel = normalized;
             }
         }

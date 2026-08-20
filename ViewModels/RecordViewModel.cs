@@ -130,7 +130,7 @@ public sealed partial class RecordViewModel : ObservableObject
         {
             _recordingService.StartRecording();
             IsRecording = true;
-            Status = "Recording...";
+            Status = _recordingService.LastStartWarning ?? "Recording...";
 
             _recordingTimer.Restart();
             _levelUpdateTimer = new System.Timers.Timer(50);

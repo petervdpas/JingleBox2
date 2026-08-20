@@ -1,4 +1,4 @@
-using JingleBox2.Models;
+﻿using JingleBox2.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -93,7 +93,7 @@ public sealed class WaveformService : IWaveformService
             float maxPeak = 0;
             for (int i = startSample; i < endSample; i++)
             {
-                float normalized = Math.Abs(pcmData[i]) / 32768f;
+                float normalized = Math.Abs((int)pcmData[i]) / 32768f;
                 if (normalized > maxPeak)
                     maxPeak = normalized;
             }
