@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.SettingsView"
              x:DataType="vm:MainViewModel">
 
@@ -83,20 +84,18 @@
                 RowSpacing="6">
 
             <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Rows:" />
-            <NumericUpDown Grid.Row="0" Grid.Column="1"
-                           Minimum="1" Maximum="16"
-                           Value="{Binding Rows}"
-                           FormatString="0"
-                           HorizontalAlignment="Left"
-                           Width="120" />
+            <views:NumberField Grid.Row="0" Grid.Column="1"
+                               Minimum="1" Maximum="16"
+                               Value="{Binding Rows}"
+                               HorizontalAlignment="Left"
+                               Width="62" />
 
             <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Columns:" />
-            <NumericUpDown Grid.Row="1" Grid.Column="1"
-                           Minimum="1" Maximum="16"
-                           Value="{Binding Columns}"
-                           FormatString="0"
-                           HorizontalAlignment="Left"
-                           Width="120" />
+            <views:NumberField Grid.Row="1" Grid.Column="1"
+                               Minimum="1" Maximum="16"
+                               Value="{Binding Columns}"
+                               HorizontalAlignment="Left"
+                               Width="62" />
 
             <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Total:" />
             <StackPanel Grid.Row="2" Grid.Column="1"
