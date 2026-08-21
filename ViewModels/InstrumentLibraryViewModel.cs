@@ -34,6 +34,9 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
 
     /// <summary>Reads a sample down to peaks, so a sample instrument can show its shape.</summary>
     private readonly IWaveformService? _waveforms;
+
+    /// <summary>The plugins this machine has, for building an instrument out of one.</summary>
+    private readonly PluginLibraryViewModel? _plugins;
     private readonly DispatcherTimer _saveTimer;
 
     private TrackerInstrument? _pendingSave;
@@ -42,12 +45,25 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         InstrumentLibrary library,
         IInstrumentAudition audition,
         ObservableCollection<Recording> recordings,
-        IWaveformService? waveforms = null)
+        IWaveformService? waveforms = null,
+        PluginLibraryViewModel? plugins = null)
     {
         _library = library;
         _audition = audition;
         _recordings = recordings;
         _waveforms = waveforms;
+        _plugins = plugins;
+
+        // A scan in SETTINGS can happen while this page is open, and a plugin installed since
+        // startup should be offerable without restarting.
+        if (plugins != null)
+        {
+            plugins.Plugins.CollectionChanged += (_, _) =>
+            {
+                OnPropertyChanged(nameof(AvailablePlugins));
+                OnPropertyChanged(nameof(HasAvailablePlugins));
+            };
+        }
 
         _saveTimer = new DispatcherTimer { Interval = SaveDelay };
         _saveTimer.Tick += (_, _) => Flush();
@@ -159,6 +175,11 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         _pendingSave = null;
         if (instrument == null) return;
 
+        // A plugin instrument's sound lives inside the plugin, so it is read back out of the
+        // running one before anything is written. Done here rather than per knob move: it
+        // means serialising the whole patch, which is not free.
+        Editor?.SyncPluginState();
+
         try
         {
             _library.Save(instrument);
@@ -175,9 +196,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         // Switching away is a good moment to write: never leave an edit only in memory.
         Flush();
 
+        // The instrument being left may have had a plugin drawing its own interface. That
+        // window goes with it rather than being left behind on a page showing somebody else.
+        Editor?.ClosePlugin();
+
         Editor = value == null
             ? null
-            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms);
+            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition);
 
         if (value?.Instrument.IsSynth == true) PresetName = value.Name;
     }
@@ -210,6 +235,38 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         string baseName = SelectedPreset?.Name ?? "synth";
 
         Add(TrackerInstrument.CreateSynth(UniqueName(baseName), patch));
+    }
+
+    /// <summary>
+    /// The plugins that can be an instrument here: the ones that take notes, in a format this
+    /// host knows how to play. An effect is not offered, and neither is an instrument in a
+    /// format that would load and then be silent.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<Audio.Plugins.PluginInfo> AvailablePlugins =>
+        _plugins == null
+            ? System.Array.Empty<Audio.Plugins.PluginInfo>()
+            : _plugins.Plugins.Where(Audio.Plugins.PluginHost.CanPlay).ToList();
+
+    public bool HasAvailablePlugins => AvailablePlugins.Count > 0;
+
+    public IRelayCommand<Audio.Plugins.PluginInfo> NewFromPluginCommand =>
+        new RelayCommand<Audio.Plugins.PluginInfo>(NewFromPlugin);
+
+    private void NewFromPlugin(Audio.Plugins.PluginInfo? plugin)
+    {
+        if (plugin == null)
+        {
+            Status = "Pick a plugin first.";
+            return;
+        }
+
+        if (!Audio.Plugins.PluginHost.CanPlay(plugin))
+        {
+            Status = $"'{plugin.Name}' cannot be played as an instrument here.";
+            return;
+        }
+
+        Add(TrackerInstrument.CreatePlugin(UniqueName(plugin.Name), plugin));
     }
 
     private void NewFromRecording(Recording? recording)

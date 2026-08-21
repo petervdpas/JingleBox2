@@ -149,7 +149,7 @@ public sealed partial class MainViewModel : ObservableObject
         var library = new InstrumentLibrary();
 
         Tracker = new TrackerViewModel(audio, library, Record.Recordings, store, cfg, Plugins);
-        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService);
+        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService, Plugins);
 
         Instruments.InstrumentChanged += (_, instrument) =>
         {

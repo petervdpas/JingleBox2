@@ -141,6 +141,10 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         Target.Chain.Remove(device.Device);
         Devices.Remove(device);
+
+        // Its own interface goes before the plugin does: a plugin drawing into a window that
+        // has been taken apart is a crash inside its own toolkit.
+        device.Panel.Close();
         device.Effect.Dispose();
 
         if (Devices.Count == 0) _poll.Stop();

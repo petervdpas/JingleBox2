@@ -84,6 +84,47 @@ public partial class InstrumentsView : UserControl
     }
 
     /// <summary>
+    /// Opens the plugin's own interface for the instrument being edited, in a window of its
+    /// own. It closes itself when the instrument is left.
+    /// </summary>
+    private void OpenPluginWindow_Click(object? sender, RoutedEventArgs e)
+    {
+        var editor = ViewModel?.Editor;
+        if (editor?.PluginPanel == null) return;
+
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+
+        // Held in a field so the same handler can be taken off again. A local function makes
+        // a new delegate each time and would pile up instead.
+        if (_openEditor != null) _openEditor.Closing -= CloseOpenEditor;
+
+        _openEditor = editor;
+        editor.Closing += CloseOpenEditor;
+
+        PluginWindow.Show(editor, editor.PluginPanel, editor.PluginText, owner);
+    }
+
+    /// <summary>The instrument whose plugin window this page opened, if any.</summary>
+    private InstrumentEditorViewModel? _openEditor;
+
+    private void CloseOpenEditor()
+    {
+        var editor = _openEditor;
+        if (editor == null) return;
+
+        editor.Closing -= CloseOpenEditor;
+        _openEditor = null;
+
+        PluginWindow.Close(editor);
+    }
+
+    private void NewFromPlugin_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel != null && PluginPicker.SelectedItem is JingleBox2.Audio.Plugins.PluginInfo plugin)
+            ViewModel.NewFromPluginCommand.Execute(plugin);
+    }
+
+    /// <summary>
     /// The tracker's piano layout, auditioning rather than writing: a knob is easier to judge
     /// while you are playing than one Test button at a time.
     /// </summary>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace JingleBox2.Audio.Plugins;
@@ -70,19 +71,16 @@ public sealed record PluginParameter(
 }
 
 /// <summary>
-/// A loaded plugin with audio running through it, whatever standard it speaks.
+/// The knobs of a loaded plugin, whatever the plugin is doing with them.
 /// </summary>
 /// <remarks>
-/// Process runs on the audio thread; everything else is called from the UI. A parameter move
-/// is queued rather than written, because both standards expect values to arrive at the start
-/// of a block rather than whenever a knob is dragged.
+/// An effect and an instrument have nothing in common in the audio path and everything in
+/// common here, so this is what the knob controls are written against. It is also what makes
+/// one parameter panel serve both.
 /// </remarks>
-public interface IPluginEffect : IAudioInsert, System.IDisposable
+public interface IPluginParameters
 {
     PluginInfo Info { get; }
-
-    /// <summary>True once the plugin has been switched on and can be given audio.</summary>
-    bool IsActive { get; }
 
     /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
     IReadOnlyList<PluginParameter> Parameters();
@@ -95,10 +93,64 @@ public interface IPluginEffect : IAudioInsert, System.IDisposable
 
     /// <summary>Moves a parameter.</summary>
     void SetValue(uint id, double value);
+}
+
+/// <summary>
+/// A loaded plugin with audio running through it, whatever standard it speaks.
+/// </summary>
+/// <remarks>
+/// Process runs on the audio thread; everything else is called from the UI. A parameter move
+/// is queued rather than written, because both standards expect values to arrive at the start
+/// of a block rather than whenever a knob is dragged.
+/// </remarks>
+public interface IPluginEffect : IAudioInsert, IPluginParameters, System.IDisposable
+{
+    /// <summary>True once the plugin has been switched on and can be given audio.</summary>
+    bool IsActive { get; }
 
     /// <summary>
     /// Hands over anything queued now rather than on the next block, for a plugin nothing is
     /// being played through.
     /// </summary>
     void FlushParameters();
+}
+
+
+/// <summary>
+/// A plugin that makes sound from notes rather than from audio.
+/// </summary>
+/// <remarks>
+/// An instrument is not a voice. The tracker's own instruments make one voice per sounding
+/// note; a plugin is polyphonic inside itself and wants to be told about every note on a track,
+/// so there is one of these per track rather than one per note.
+///
+/// Notes are queued and handed over at the start of a block, for the same reason parameter
+/// moves are: that is when a plugin is willing to hear about them.
+/// </remarks>
+public interface IPluginInstrument : IPluginParameters, IDisposable
+{
+    /// <summary>Starts a note. Velocity runs nought to one.</summary>
+    void NoteOn(int semitone, float velocity);
+
+    /// <summary>Ends a note that was started. Unknown notes are ignored rather than guessed at.</summary>
+    void NoteOff(int semitone);
+
+    /// <summary>Ends everything sounding, for a stop button or a track being emptied.</summary>
+    void AllNotesOff();
+
+    /// <summary>
+    /// Fills a block with what the plugin is playing, replacing whatever was in it. Runs on
+    /// the audio thread.
+    /// </summary>
+    void Render(float[] buffer, int frames);
+
+    /// <summary>
+    /// Everything inside the plugin, as a lump to keep. Not the same as its parameters: a
+    /// Serum patch is wavetables and samples as much as it is knob positions, and none of
+    /// that is a parameter.
+    /// </summary>
+    byte[] SaveState();
+
+    /// <summary>Puts a saved lump back. Anything unreadable is ignored.</summary>
+    void LoadState(byte[]? state);
 }

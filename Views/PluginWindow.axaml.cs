@@ -10,14 +10,13 @@ namespace JingleBox2.Views;
 /// used. Several can be open at once, one per device.
 /// </summary>
 /// <remarks>
-/// These are our own controls, not the plugin's interface. A plugin's own window is a
-/// different thing entirely: it means handing the plugin a native child window and running
-/// its event loop, which is a job of its own.
+/// What is inside is the plugin's own interface where it has one, and the host's knobs where
+/// it has not. Either way the window itself, its title and its bypass button are the host's.
 /// </remarks>
 public partial class PluginWindow : Window
 {
-    /// <summary>What is already open, so a device shows the window it has rather than another.</summary>
-    private static readonly Dictionary<PluginDeviceViewModel, PluginWindow> Open = new();
+    /// <summary>What is already open, so a thing shows the window it has rather than another.</summary>
+    private static readonly Dictionary<object, PluginWindow> Open = new();
 
     public PluginWindow()
     {
@@ -29,41 +28,82 @@ public partial class PluginWindow : Window
     {
         if (device == null) return;
 
-        if (Open.TryGetValue(device, out var existing))
+        device.IsOpen = true;
+
+        Show(device, device.Panel, device.Name, owner, device, () => device.IsOpen = false);
+    }
+
+    /// <summary>
+    /// Opens a plugin that is not in a chain, an instrument for instance, in the same kind of
+    /// window. The key is whatever owns it, so asking twice brings the same window forward.
+    /// </summary>
+    public static void Show(object key, PluginControlsViewModel panel, string title, Window owner)
+    {
+        Show(key, panel, title, owner, null, null);
+    }
+
+    private static void Show(
+        object key,
+        PluginControlsViewModel panel,
+        string title,
+        Window owner,
+        PluginDeviceViewModel? device,
+        Action? closed)
+    {
+        if (key == null || panel == null) return;
+
+        if (Open.TryGetValue(key, out var existing))
         {
             existing.Activate();
             return;
         }
 
+        // The plugin's interface is opened before the window is built, so the window can size
+        // itself to whatever the plugin turns out to be.
+        panel.Prepare();
+
         var window = new PluginWindow
         {
-            DataContext = device,
-            Title = device.Name
+            DataContext = new PluginWindowViewModel(panel, title, device),
+            Title = title
         };
 
-        // Wide plugins wrap rather than running off the edge; the window sizes itself to what
-        // is in it, up to the caps set in the XAML.
-        window.MaxWidth = Math.Min(900, owner.Bounds.Width > 0 ? owner.Bounds.Width : 900);
+        // A plugin drawing its own interface is a picture at a size it chose, so it is let out
+        // of the caps that keep a wall of knobs from filling the screen.
+        if (panel.HasOwnWindow)
+        {
+            window.MaxWidth = double.PositiveInfinity;
+            window.MaxHeight = double.PositiveInfinity;
+        }
+        else
+        {
+            window.MaxWidth = Math.Min(900, owner.Bounds.Width > 0 ? owner.Bounds.Width : 900);
+        }
 
-        Open[device] = window;
-        device.IsOpen = true;
+        Open[key] = window;
 
         window.Closed += (_, _) =>
         {
-            Open.Remove(device);
-            device.IsOpen = false;
+            Open.Remove(key);
+            closed?.Invoke();
+
+            // The plugin's interface goes with the window. The plugin itself carries on
+            // playing; only its picture is put away.
+            panel.Close();
         };
 
         window.Show(owner);
     }
 
-    /// <summary>Closes a device's window, for a device being taken out of a chain.</summary>
-    public static void Close(PluginDeviceViewModel device)
+    /// <summary>Closes a window, for whatever owned it going away.</summary>
+    public static void Close(object key)
     {
-        if (device == null || !Open.TryGetValue(device, out var window)) return;
+        if (key == null || !Open.TryGetValue(key, out var window)) return;
 
-        Open.Remove(device);
-        device.IsOpen = false;
+        Open.Remove(key);
+
+        if (key is PluginDeviceViewModel device) device.IsOpen = false;
+
         window.Close();
     }
 }

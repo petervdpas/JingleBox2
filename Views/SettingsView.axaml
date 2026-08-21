@@ -151,6 +151,32 @@
             </ScrollViewer>
           </Border>
 
+          <!-- Plugins that crashed the application while opening their own window. Kept out
+               of the way until there is one, because most of the time there is not. -->
+          <Border Classes="inset" IsVisible="{Binding Plugins.HasBlockedPlugins}">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="section" Text="Not opening their own windows" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="These brought the application down while opening their own interface, so they are shown with the host's knobs instead. They still play and still save." />
+
+              <ItemsControl ItemsSource="{Binding Plugins.BlockedPlugins}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Classes="cardHint" Margin="0,2"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Name}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Button Content="Let them try again"
+                      HorizontalAlignment="Left"
+                      Command="{Binding Plugins.AllowBlockedCommand}"
+                      ToolTip.Tip="Any that go down again go straight back on this list." />
+            </StackPanel>
+          </Border>
+
           <TextBlock Classes="cardHint" Text="Looked for in:" />
           <TextBlock Classes="cardHint" Text="{Binding Plugins.SearchPaths}" />
 

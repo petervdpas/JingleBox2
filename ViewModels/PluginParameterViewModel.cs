@@ -16,7 +16,7 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class PluginParameterViewModel : ObservableObject
 {
-    private readonly IPluginEffect _effect;
+    private readonly IPluginParameters _effect;
     private readonly PluginParameter _parameter;
 
     /// <summary>Told when this moves, so whatever owns the chain knows it has something to save.</summary>
@@ -27,7 +27,7 @@ public sealed class PluginParameterViewModel : ObservableObject
     /// <summary>When this was last moved here, so a poll does not fight a hand on the knob.</summary>
     private long _movedAt;
 
-    public PluginParameterViewModel(IPluginEffect effect, PluginParameter parameter, Action? changed = null)
+    public PluginParameterViewModel(IPluginParameters effect, PluginParameter parameter, Action? changed = null)
     {
         _effect = effect;
         _parameter = parameter;

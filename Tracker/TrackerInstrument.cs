@@ -10,7 +10,10 @@ public enum TrackerInstrumentKind
     Sample = 0,
 
     /// <summary>Generated on the fly from a patch, so it needs no file at all.</summary>
-    Synth = 1
+    Synth = 1,
+
+    /// <summary>A plugin doing the playing: Serum, Vital, anything that takes notes.</summary>
+    Plugin = 2
 }
 
 /// <summary>
@@ -58,8 +61,75 @@ public sealed class TrackerInstrument
     /// </summary>
     public SampleShape? Shape { get; set; }
 
+    /// <summary>The plugin this instrument is, when it is one. Found again by id first.</summary>
+    public string PluginPath { get; set; } = "";
+
+    public string PluginId { get; set; } = "";
+
+    public Audio.Plugins.PluginFormat PluginFormat { get; set; } = Audio.Plugins.PluginFormat.Clap;
+
+    /// <summary>Kept so a plugin that is no longer installed can be named rather than blank.</summary>
+    public string PluginName { get; set; } = "";
+
+    /// <summary>
+    /// The plugin's own state, as text so it can live in a JSON file.
+    /// </summary>
+    /// <remarks>
+    /// This is the patch, and it is not the same as the parameters. A Serum sound is its
+    /// wavetables, its samples and its modulation as much as it is knob positions, and none of
+    /// those is a parameter the host can see. Saving the parameters and not this would reopen
+    /// a song with the right knobs on the wrong sound.
+    /// </remarks>
+    public string PluginState { get; set; } = "";
+
     [JsonIgnore]
     public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
+
+    [JsonIgnore]
+    public bool IsPlugin => Kind == TrackerInstrumentKind.Plugin;
+
+    /// <summary>What the plugin is, in the shape the host loads from.</summary>
+    [JsonIgnore]
+    public Audio.Plugins.PluginInfo? Plugin =>
+        string.IsNullOrWhiteSpace(PluginPath)
+            ? null
+            : new Audio.Plugins.PluginInfo(PluginId, PluginName, "", "", PluginPath, PluginFormat, IsInstrument: true);
+
+    /// <summary>The state as bytes, or nothing when there is none or it will not read.</summary>
+    [JsonIgnore]
+    public byte[] StateBytes
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(PluginState)) return Array.Empty<byte>();
+
+            try
+            {
+                return Convert.FromBase64String(PluginState);
+            }
+            catch (FormatException)
+            {
+                // A state written by something else, or damaged. The instrument still loads;
+                // it opens at the plugin's defaults rather than not at all.
+                return Array.Empty<byte>();
+            }
+        }
+        set => PluginState = value == null || value.Length == 0 ? "" : Convert.ToBase64String(value);
+    }
+
+    /// <summary>An instrument that is a plugin, at whatever the plugin opens with.</summary>
+    public static TrackerInstrument CreatePlugin(string name, Audio.Plugins.PluginInfo plugin)
+    {
+        return new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Plugin,
+            PluginPath = plugin.Path,
+            PluginId = plugin.Id,
+            PluginFormat = plugin.Format,
+            PluginName = plugin.Name
+        };
+    }
 
     [JsonIgnore]
     public Note BaseNote

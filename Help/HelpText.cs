@@ -87,11 +87,17 @@ public static class HelpText
             ships, Serum included, and it lives in ~/.vst3 and /usr/lib/vst3.
 
             Effects from either format go in the same chain, side by side, on a pad or a tracker
-            track. Instruments are listed but cannot be played yet: an instrument takes notes
-            rather than audio, and that is a different job from an insert.
+            track. Instruments are a different thing: they take notes rather than audio, so they
+            are kept out of effect chains and turned into tracker instruments instead, on the
+            INSTRUMENTS page. Only VST3 instruments can be played so far.
 
             Windows plugins are not Linux plugins. A Windows VST3 holds a .dll and needs wine
             and yabridge to run at all; what is listed here is what runs natively.
+
+            A plugin draws its own interface where it has one, in a window of its own that you
+            can leave open while you work. The host's knobs are the fallback for a plugin that
+            draws nothing, and are what a plugin gets on a platform where its window will not
+            open. Plugin windows are X11 only so far.
 
             Scanning opens each plugin to ask what is inside it. They stay loaded until the app
             closes, on purpose: unloading plugin libraries after they have been used is what

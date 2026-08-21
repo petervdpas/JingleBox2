@@ -18,43 +18,11 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
         Effect = effect;
         Device = device;
 
-        foreach (var parameter in effect.Parameters())
-        {
-            // A hidden parameter is one the plugin does not want shown, and its own bypass is
-            // something the host offers in its own way.
-            if (parameter.IsHidden || parameter.IsBypass) continue;
-
-            Total++;
-
-            // A big synth declares thousands. Serum has 2622, and a window with 2622 knobs in
-            // it is not a window anybody can use, so what is shown stops here and says so.
-            // Everything is still loaded, still played and still saved; only the drawing stops.
-            if (Parameters.Count >= MaxShown) continue;
-
-            var row = new PluginParameterViewModel(effect, parameter, chain.NotifyChanged);
-
-            Parameters.Add(row);
-
-            if (parameter.IsReadOnly) Readouts.Add(row);
-            else if (row.IsSwitch) Switches.Add(row);
-            else Controls.Add(row);
-        }
+        Panel = new PluginControlsViewModel(effect, chain.NotifyChanged);
     }
 
-    /// <summary>How many knobs one window will draw before it stops.</summary>
-    public const int MaxShown = 256;
-
-    /// <summary>How many the plugin actually has, shown or not.</summary>
-    public int Total { get; private set; }
-
-    /// <summary>True when the plugin has more than a window can usefully hold.</summary>
-    public bool IsTruncated => Total > Parameters.Count;
-
-    /// <summary>Said out loud rather than left as a list that quietly stops.</summary>
-    public string TruncationNote =>
-        IsTruncated
-            ? $"Showing the first {Parameters.Count} of {Total} parameters. The rest are loaded and saved, just not drawn."
-            : "";
+    /// <summary>This plugin's knobs. The panel is shared with the instrument editor.</summary>
+    public PluginControlsViewModel Panel { get; }
 
     public IPluginEffect Effect { get; }
 
@@ -62,23 +30,10 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
 
     public string Name => Effect.Info.Name;
 
-    /// <summary>Everything shown, controls and readings alike, for polling.</summary>
-    public ObservableCollection<PluginParameterViewModel> Parameters { get; } = new();
+    /// <summary>The readings, which is all a poll needs to touch.</summary>
+    public ObservableCollection<PluginParameterViewModel> Readouts => Panel.Readouts;
 
-    /// <summary>The knobs: what you set.</summary>
-    public ObservableCollection<PluginParameterViewModel> Controls { get; } = new();
-
-    /// <summary>The two-position ones, which are tick boxes rather than dials.</summary>
-    public ObservableCollection<PluginParameterViewModel> Switches { get; } = new();
-
-    /// <summary>The readings: what the plugin reports back, such as gain reduction.</summary>
-    public ObservableCollection<PluginParameterViewModel> Readouts { get; } = new();
-
-    public bool HasSwitches => Switches.Count > 0;
-
-    public bool HasParameters => Parameters.Count > 0;
-
-    public bool HasReadouts => Readouts.Count > 0;
+    public bool HasParameters => Panel.HasParameters;
 
     /// <summary>True while this one's window is open, so the box in the strip says so.</summary>
     [ObservableProperty] private bool isOpen;

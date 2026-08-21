@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.PluginParameters"
-             x:DataType="vm:PluginDeviceViewModel">
+             x:DataType="vm:PluginControlsViewModel">
 
   <UserControl.Styles>
     <!-- A reading is not a control: no dial, no hover, nothing to grab. -->
@@ -33,6 +33,32 @@
   <!-- One device's controls. Shared by the window a device opens in and by anywhere else that
        shows a plugin, so it looks the same wherever it is worked on. -->
   <StackPanel Spacing="10">
+
+    <!-- The plugin's own interface, where it has one. Everything inside it is the plugin's
+         doing; the host only lends it the window. -->
+    <views:PluginEditorHost IsVisible="{Binding HasOwnWindow}"
+                            Editor="{Binding Editor}"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top" />
+
+    <!-- Knobs are the fallback, for a plugin that draws nothing of its own. -->
+    <StackPanel Spacing="10" IsVisible="{Binding !HasOwnWindow}">
+
+    <!-- A plugin that took the application down while opening its window does not get another
+         go at it without being asked for by name. -->
+    <Border Classes="inset" IsVisible="{Binding IsBlocked}">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding BlockedNote}" />
+        <Button Content="Let it try its window again"
+                HorizontalAlignment="Left"
+                Command="{Binding AllowCommand}"
+                ToolTip.Tip="Close this and open it again to find out. If it goes down again it goes straight back on the list." />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Classes="cardHint" TextWrapping="Wrap"
+               IsVisible="{Binding WasAllowed}"
+               Text="Allowed. Close this window and open it again to try the plugin's own interface." />
 
     <!-- A plugin with thousands of parameters has a list that stops somewhere. Where it stops
          is said out loud rather than left to look like the plugin is missing controls. -->
@@ -101,6 +127,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+    </StackPanel>
     </StackPanel>
   </StackPanel>
 </UserControl>

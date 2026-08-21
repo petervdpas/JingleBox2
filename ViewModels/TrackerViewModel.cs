@@ -618,6 +618,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public void Audition(TrackerInstrument instrument, Note note, int volume) =>
         _player.Preview(instrument, note, GainFor(volume));
 
+    /// <summary>
+    /// The running plugin behind a plugin instrument, for the editor to show and to read a
+    /// patch out of. Loading it here also means the first note played is not the one that
+    /// waits for the plugin to open.
+    /// </summary>
+    public Audio.Plugins.IPluginInstrument? PluginFor(TrackerInstrument instrument)
+    {
+        if (instrument == null || !instrument.IsPlugin) return null;
+
+        _player.EnsureEngine();
+        return _player.PreviewPlayerFor(instrument);
+    }
+
     private static float GainFor(int volume) =>
         volume == TrackerCell.NoVolume
             ? 1f
@@ -1069,6 +1082,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         SyncInstruments();
         RefreshStrips();
+
+        // The plugins the last song had on its tracks belong to that song, not this one.
+        // Left in place they would keep playing under the new song's notes.
+        _player.ClearPlayers();
 
         // The effects come back with the song. A plugin that is not on this machine is
         // reported rather than passed over in silence.

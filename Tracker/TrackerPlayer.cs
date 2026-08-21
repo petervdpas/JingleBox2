@@ -179,6 +179,10 @@ public sealed class TrackerPlayer : IDisposable
         if (clock != null && clock != Thread.CurrentThread)
             clock.Join(TimeSpan.FromSeconds(1));
 
+        // A plugin holds its own notes, and nothing else will let go of them: stopping the
+        // clock has to stop the sound too, or a chord hangs on until the app closes.
+        if (_synth.HasMixer) _synth.Mixer.AllPluginNotesOff();
+
         cancel?.Dispose();
         StopAllVoices();
     }
@@ -200,6 +204,15 @@ public sealed class TrackerPlayer : IDisposable
         _synth.EnsureStarted(_audio);
 
         float level = gain * (float)instrument.Volume;
+
+        if (instrument.IsPlugin)
+        {
+            var player = PreviewPlayerFor(instrument);
+            if (player == null) return;
+
+            _synth.Mixer.PreviewPlugin(note, level, PreviewHoldSeconds);
+            return;
+        }
 
         if (instrument.IsSynth)
         {
@@ -295,6 +308,150 @@ public sealed class TrackerPlayer : IDisposable
         return missing;
     }
 
+    /// <summary>
+    /// The plugin playing each track, and which instrument it is. A track holds on to its
+    /// plugin between notes because a plugin has a release to finish.
+    /// </summary>
+    private readonly Dictionary<int, (string Instrument, IPluginInstrument Plugin)> _players = new();
+
+    private readonly object _playerLock = new();
+
+    /// <summary>
+    /// Opens the audio engine if it is not already open. A plugin has to be built for the rate
+    /// the engine settled on, and until the device is open there is no rate to build for.
+    /// </summary>
+    public void EnsureEngine()
+    {
+        _audio.EnsureInitialized();
+        _synth.EnsureStarted(_audio);
+    }
+
+    /// <summary>
+    /// The plugin for a track, loading it if that track is not already playing this
+    /// instrument. Null when the plugin is missing or this host cannot play its kind.
+    /// </summary>
+    /// <remarks>
+    /// Loading happens here, on the thread that triggered the note, which is the clock. That
+    /// is a stall on the very first note of a plugin and nothing after: an instrument that has
+    /// been opened in the editor is already in memory, and a plugin put down is parked rather
+    /// than taken apart, so picking it up again costs almost nothing.
+    /// </remarks>
+    private IPluginInstrument? PlayerFor(int track, TrackerInstrument instrument)
+    {
+        if (track < 0 || instrument == null || !instrument.IsPlugin) return null;
+
+        lock (_playerLock)
+        {
+            if (_players.TryGetValue(track, out var existing))
+            {
+                if (string.Equals(existing.Instrument, instrument.Id, StringComparison.Ordinal)) return existing.Plugin;
+
+                // A different instrument on this track. The old one comes off the mix before
+                // it is put down, or it plays into a bus that is about to be somebody else's.
+                _synth.Mixer.SetInstrument(track, null);
+                existing.Plugin.Dispose();
+                _players.Remove(track);
+            }
+
+            var description = instrument.Plugin;
+            if (description == null) return null;
+
+            var player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
+            if (player == null) return null;
+
+            // The patch goes in before the first note, or the first note is the wrong sound.
+            player.LoadState(instrument.StateBytes);
+
+            _players[track] = (instrument.Id, player);
+            _synth.Mixer.SetInstrument(track, player);
+
+            return player;
+        }
+    }
+
+    /// <summary>
+    /// The plugin a track is playing, without loading one. What the editor asks when it wants
+    /// to save a patch back.
+    /// </summary>
+    public IPluginInstrument? PlayerOn(int track)
+    {
+        lock (_playerLock) return _players.TryGetValue(track, out var found) ? found.Plugin : null;
+    }
+
+    /// <summary>
+    /// The plugin used for auditioning, which belongs to no track. One at a time: opening a
+    /// second instrument in the editor puts the first one down.
+    /// </summary>
+    private (string Instrument, IPluginInstrument Plugin)? _auditioned;
+
+    /// <summary>
+    /// The plugin behind an audition, loaded if it is not already the one being auditioned.
+    /// Also what the editor calls to get a live plugin to work on.
+    /// </summary>
+    public IPluginInstrument? PreviewPlayerFor(TrackerInstrument instrument)
+    {
+        if (instrument == null || !instrument.IsPlugin) return null;
+
+        lock (_playerLock)
+        {
+            if (_auditioned is { } current)
+            {
+                if (string.Equals(current.Instrument, instrument.Id, StringComparison.Ordinal)) return current.Plugin;
+
+                _synth.Mixer.SetPreviewInstrument(null);
+                current.Plugin.Dispose();
+                _auditioned = null;
+            }
+
+            var description = instrument.Plugin;
+            if (description == null) return null;
+
+            var player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
+            if (player == null) return null;
+
+            player.LoadState(instrument.StateBytes);
+
+            _auditioned = (instrument.Id, player);
+            _synth.Mixer.SetPreviewInstrument(player);
+
+            return player;
+        }
+    }
+
+    /// <summary>Puts the auditioned plugin down, for a page that is being left.</summary>
+    public void ClearPreviewPlayer()
+    {
+        IPluginInstrument? leaving;
+
+        lock (_playerLock)
+        {
+            leaving = _auditioned?.Plugin;
+            _auditioned = null;
+        }
+
+        if (leaving == null) return;
+
+        _synth.Mixer.SetPreviewInstrument(null);
+        leaving.Dispose();
+    }
+
+    /// <summary>Takes every plugin off the tracks and puts it down. For closing a song.</summary>
+    public void ClearPlayers()
+    {
+        (string Instrument, IPluginInstrument Plugin)[] leaving;
+
+        lock (_playerLock)
+        {
+            leaving = _players.Values.ToArray();
+
+            foreach (var track in _players.Keys) _synth.Mixer.SetInstrument(track, null);
+
+            _players.Clear();
+        }
+
+        foreach (var (_, plugin) in leaving) plugin.Dispose();
+    }
+
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>
     public void ReloadInstrument(string filePath) => _samples.Invalidate(filePath);
 
@@ -383,6 +540,7 @@ public sealed class TrackerPlayer : IDisposable
             {
                 case TrackerEventKind.Stop:
                     _synth.Mixer.NoteOff(e.Track);
+                    _synth.Mixer.PluginNoteOff(e.Track);
                     break;
 
                 case TrackerEventKind.Trigger:
@@ -410,6 +568,20 @@ public sealed class TrackerPlayer : IDisposable
 
         // One voice per track, as a tracker has always worked: the mixer cuts whatever that
         // track was sounding, whichever kind of instrument it was.
+        if (instrument.IsPlugin)
+        {
+            // The plugin holds its own notes, so the track's voices are let go rather than
+            // left ringing underneath it.
+            _synth.Mixer.NoteOff(e.Track);
+
+            if (PlayerFor(e.Track, instrument) != null)
+            {
+                _synth.Mixer.PluginNoteOn(e.Track, e.Note, mixed, placed ?? 0f);
+            }
+
+            return;
+        }
+
         if (instrument.IsSynth)
         {
             _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f);
@@ -437,6 +609,7 @@ public sealed class TrackerPlayer : IDisposable
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
 
         _synth.Mixer.SetLevels(e.Track, mixed, placed);
+        _synth.Mixer.SetPluginLevels(e.Track, mixed, placed);
     }
 
     /// <summary>

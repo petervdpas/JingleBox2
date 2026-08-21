@@ -27,11 +27,18 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         int index,
         TrackerInstrument instrument,
         Action changed,
-        IWaveformService? waveforms = null)
+        IWaveformService? waveforms = null,
+        IInstrumentAudition? audition = null)
     {
         Index = index;
         _instrument = instrument;
         _changed = changed;
+
+        if (instrument.IsPlugin)
+        {
+            OpenPlugin(audition);
+            return;
+        }
 
         // Both kinds run through the same voice now, so both have a patch to edit: a sample
         // has an envelope, a filter and modulation exactly as a generated wave does. Only the
@@ -53,13 +60,110 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     public bool IsSynth => _instrument.IsSynth;
 
-    public bool IsSample => !IsSynth;
+    public bool IsPlugin => _instrument.IsPlugin;
+
+    public bool IsSample => !IsSynth && !IsPlugin;
+
+    /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
+    public PluginControlsViewModel? PluginPanel { get; private set; }
+
+    public bool HasPluginPanel => PluginPanel != null;
+
+    /// <summary>Said plainly when the plugin named by the instrument is not here to open.</summary>
+    public string PluginProblem { get; private set; } = "";
+
+    public bool HasPluginProblem => !string.IsNullOrWhiteSpace(PluginProblem);
+
+    /// <summary>What plugin this instrument is, for the page to name.</summary>
+    public string PluginText =>
+        string.IsNullOrWhiteSpace(_instrument.PluginName) ? _instrument.PluginPath : _instrument.PluginName;
+
+    /// <summary>
+    /// Opens the plugin behind this instrument and builds its knobs.
+    /// </summary>
+    /// <remarks>
+    /// A knob moved here changes the running plugin, and the patch is read back out of it
+    /// afterwards. That is the only way round: a Serum sound is wavetables and samples as much
+    /// as knob positions, and only the plugin can hand those over.
+    /// </remarks>
+    private void OpenPlugin(IInstrumentAudition? audition)
+    {
+        if (audition == null)
+        {
+            PluginProblem = "No audio engine to open this plugin in.";
+            return;
+        }
+
+        var plugin = audition.PluginFor(_instrument);
+
+        if (plugin == null)
+        {
+            PluginProblem = string.IsNullOrWhiteSpace(PluginText)
+                ? "This instrument has no plugin set."
+                : $"'{PluginText}' would not open. It may not be installed on this machine.";
+            return;
+        }
+
+        _plugin = plugin;
+
+        // Not prepared here. The plugin's interface is opened when its window is, because
+        // Serum wants 1190 by 740 and Vital 1400 by 820, and neither belongs inside a page.
+        PluginPanel = new PluginControlsViewModel(plugin, KeepPatch);
+    }
+
+    /// <summary>The plugin this editor is showing, when it is showing one.</summary>
+    private Audio.Plugins.IPluginInstrument? _plugin;
+
+    /// <summary>Set when a knob has moved and the patch has not been read back yet.</summary>
+    private bool _patchStale;
+
+    /// <summary>
+    /// A knob moved. The patch is not read out here: asking a plugin for its state means
+    /// asking it to serialise everything it holds, which for Vital is a couple of hundred
+    /// kilobytes, and doing that on every degree of a knob turn would make the knob stutter.
+    /// It is read once the turning stops, in <see cref="SyncPluginState"/>.
+    /// </summary>
+    private void KeepPatch()
+    {
+        _patchStale = true;
+        _changed();
+    }
+
+    /// <summary>
+    /// Puts the plugin's interface away, for an instrument being left. The plugin itself
+    /// carries on: it is still what the tracker plays.
+    /// </summary>
+    public void ClosePlugin()
+    {
+        SyncPluginState();
+
+        Closing?.Invoke();
+        PluginPanel?.Close();
+    }
+
+    /// <summary>
+    /// Raised when this instrument is being left, so anything showing its plugin can put
+    /// itself away. A view model reaching into a window would be worse than one event.
+    /// </summary>
+    public event Action? Closing;
+
+    /// <summary>
+    /// Takes the sound back out of the plugin and onto the instrument, so it is what gets
+    /// written to the library file. Called before a save rather than on every move.
+    /// </summary>
+    public void SyncPluginState()
+    {
+        if (!_patchStale || _plugin == null) return;
+
+        _patchStale = false;
+        _instrument.StateBytes = _plugin.SaveState();
+    }
 
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
 
-    public string KindText => IsSynth ? "Synth" : "Sample";
+    public string KindText => IsSynth ? "Synth" : IsPlugin ? "Plugin" : "Sample";
 
-    public string SourceText => IsSynth ? "Generated, no file." : _instrument.FilePath;
+    public string SourceText => IsSynth ? "Generated, no file." : IsPlugin ? PluginText : _instrument.FilePath;
 
     /// <summary>
     /// The sample's shape, one value per pixel column, or null while it is being read. A synth
@@ -80,7 +184,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     {
         get
         {
-            if (IsSynth) return "";
+            if (IsSynth || IsPlugin) return "";
             if (_waveform == null) return _sampleProblem ?? "Reading the file...";
 
             double seconds = _waveform.SampleRate > 0

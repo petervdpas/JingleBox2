@@ -3,7 +3,7 @@
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
         xmlns:views="clr-namespace:JingleBox2.Views"
         x:Class="JingleBox2.Views.PluginWindow"
-        x:DataType="vm:PluginDeviceViewModel"
+        x:DataType="vm:PluginWindowViewModel"
         Title="{Binding Name}"
         SizeToContent="WidthAndHeight"
         MinWidth="320"
@@ -20,13 +20,14 @@
 
         <ToggleButton Content="Bypass"
                       MinWidth="0" Padding="10,2" FontSize="12"
+                      IsVisible="{Binding HasBypass}"
                       IsChecked="{Binding IsBypassed}"
                       ToolTip.Tip="Switch it off without taking it out of the chain" />
       </StackPanel>
     </Border>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-      <views:PluginParameters />
+      <views:PluginParameters DataContext="{Binding Panel}" />
     </ScrollViewer>
   </DockPanel>
 </Window>

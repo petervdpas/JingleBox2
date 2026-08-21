@@ -20,7 +20,7 @@ public static class PluginHost
     {
         return format switch
         {
-            PluginFormat.Vst3 => Vst3Effect.Load(path, id, sampleRate, maxFrames),
+            PluginFormat.Vst3 => Vst3Plugin.Load(path, id, sampleRate, maxFrames),
             _ => ClapEffect.Load(path, id, sampleRate, maxFrames)
         };
     }
@@ -29,6 +29,26 @@ public static class PluginHost
     {
         return plugin == null ? null : Load(plugin.Path, plugin.Id, plugin.Format, sampleRate, maxFrames);
     }
+
+    /// <summary>
+    /// Opens a plugin as an instrument: something that takes notes and gives audio back.
+    /// </summary>
+    /// <remarks>
+    /// Only VST3 for now. CLAP carries notes just as well and the plumbing here is the same
+    /// shape, but nothing has been written for it yet, so a CLAP instrument is refused rather
+    /// than loaded and then found to be silent. <see cref="CanPlay"/> is what a picker should
+    /// ask so nobody is offered one.
+    /// </remarks>
+    public static IPluginInstrument? LoadInstrument(PluginInfo plugin, int sampleRate, int maxFrames)
+    {
+        if (plugin == null || plugin.Format != PluginFormat.Vst3) return null;
+
+        return Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+    }
+
+    /// <summary>True when this host can play notes into a plugin of this kind.</summary>
+    public static bool CanPlay(PluginInfo plugin) =>
+        plugin != null && plugin.IsInstrument && plugin.Format == PluginFormat.Vst3;
 
     /// <summary>Every directory either standard keeps plugins in, plus the user's own.</summary>
     public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)

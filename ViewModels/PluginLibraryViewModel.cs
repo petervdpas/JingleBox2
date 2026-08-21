@@ -130,6 +130,27 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         _store.Save(_config);
     }
 
+    /// <summary>
+    /// Plugins that took the application down while opening their own window. Shown here so
+    /// somebody who never opens that plugin's panel can still find out why, and undo it.
+    /// </summary>
+    public System.Collections.Generic.IReadOnlyList<Audio.Plugins.PluginCrash> BlockedPlugins =>
+        Audio.Plugins.PluginCrashGuard.Blocked;
+
+    public bool HasBlockedPlugins => BlockedPlugins.Count > 0;
+
+    public IRelayCommand AllowBlockedCommand => new RelayCommand(AllowBlocked);
+
+    private void AllowBlocked()
+    {
+        Audio.Plugins.PluginCrashGuard.AllowEverything();
+
+        OnPropertyChanged(nameof(BlockedPlugins));
+        OnPropertyChanged(nameof(HasBlockedPlugins));
+
+        Status = "Those plugins may open their own windows again.";
+    }
+
     public ObservableCollection<PluginInfo> Plugins { get; } = new();
 
     /// <summary>

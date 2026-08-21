@@ -22,13 +22,19 @@ namespace JingleBox2.Audio.Plugins;
 /// sound on the first block it plays, which is soon enough to be inaudible and late enough to
 /// be safe.
 /// </remarks>
-public sealed unsafe class Vst3Effect : IPluginEffect
+public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPluginWindowSource
 {
     /// <summary>Stereo in, stereo out. Wider plugins are fed and read on their first two.</summary>
     public const int Channels = 2;
 
     /// <summary>How many knob moves one block can carry. A hand moves one at a time.</summary>
     private const int MaxChangesPerBlock = 64;
+
+    /// <summary>
+    /// How many notes one block can carry. A block is a few milliseconds, so this is a chord
+    /// several times over.
+    /// </summary>
+    private const int MaxNotesPerBlock = 64;
 
     private readonly Vst3Module _module;
     private readonly IComponent* _component;
@@ -44,6 +50,16 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
     private Vst3ParameterChanges? _changes;
     private Vst3ParameterChanges? _outgoing;
+    private Vst3EventList? _notes;
+    private Vst3EventList? _played;
+
+    /// <summary>What is sounding, by pitch, so a note off can name the note that started.</summary>
+    private readonly Dictionary<int, int> _sounding = new();
+
+    /// <summary>Notes waiting for the next block, in the order they were played.</summary>
+    private readonly List<(bool On, int Pitch, float Velocity, int Id)> _queued = new();
+
+    private int _nextNoteId = 1;
 
     private int[] _inputBusChannels = Array.Empty<int>();
     private int[] _outputBusChannels = Array.Empty<int>();
@@ -63,7 +79,7 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
     private string _key = "";
 
-    private Vst3Effect(
+    private Vst3Plugin(
         Vst3Module module,
         IComponent* component,
         IAudioProcessor* processor,
@@ -100,7 +116,7 @@ public sealed unsafe class Vst3Effect : IPluginEffect
     /// Opens one class out of a bundle and gets it ready to play. Null when the bundle will
     /// not load, does not hold that class, or refuses to start.
     /// </summary>
-    public static Vst3Effect? Load(string bundlePath, string classId, int sampleRate, int maxFrames)
+    public static Vst3Plugin? Load(string bundlePath, string classId, int sampleRate, int maxFrames)
     {
         string key = Key(bundlePath, classId, sampleRate, maxFrames);
 
@@ -152,7 +168,7 @@ public sealed unsafe class Vst3Effect : IPluginEffect
             CopyState(component, controller);
         }
 
-        var effect = new Vst3Effect(module, component, processor, controller, handler, shared, info) { _key = key };
+        var effect = new Vst3Plugin(module, component, processor, controller, handler, shared, info) { _key = key };
 
         if (effect.Activate(sampleRate, maxFrames)) return effect;
 
@@ -322,6 +338,12 @@ public sealed unsafe class Vst3Effect : IPluginEffect
         // a plugin one is live when nothing is feeding it invites it to duck against silence.
         SwitchOnMainBusses(inputs, Vst3Abi.DirectionInput);
         SwitchOnMainBusses(outputs, Vst3Abi.DirectionOutput);
+
+        // Notes arrive on an event bus, and a bus nobody switched on is a bus the plugin
+        // ignores. This is the difference between an instrument that plays and one that sits
+        // there taking every note without a sound.
+        SwitchOnEventBusses(Vst3Abi.DirectionInput);
+        SwitchOnEventBusses(Vst3Abi.DirectionOutput);
     }
 
     private int[] Read(int count, int direction)
@@ -361,6 +383,16 @@ public sealed unsafe class Vst3Effect : IPluginEffect
         }
     }
 
+    private void SwitchOnEventBusses(int direction)
+    {
+        int count = _component->Vtbl->GetBusCount(_component, Vst3Abi.MediaEvent, direction);
+
+        for (int bus = 0; bus < count; bus++)
+        {
+            _component->Vtbl->ActivateBus(_component, Vst3Abi.MediaEvent, direction, bus, 1);
+        }
+    }
+
     /// <summary>Everything the audio thread needs, taken once so it never allocates.</summary>
     private void Allocate(int frames)
     {
@@ -369,6 +401,9 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
         _changes = new Vst3ParameterChanges(MaxChangesPerBlock);
         _outgoing = new Vst3ParameterChanges(MaxChangesPerBlock);
+
+        _notes = new Vst3EventList(MaxNotesPerBlock);
+        _played = new Vst3EventList(MaxNotesPerBlock);
 
         _process = Alloc<ProcessData>(1);
         _process->ProcessMode = Vst3Abi.RealtimeMode;
@@ -379,8 +414,8 @@ public sealed unsafe class Vst3Effect : IPluginEffect
         _process->Outputs = _outputBusses;
         _process->InputParameterChanges = _changes.Pointer;
         _process->OutputParameterChanges = _outgoing.Pointer;
-        _process->InputEvents = null;
-        _process->OutputEvents = null;
+        _process->InputEvents = _notes.Pointer;
+        _process->OutputEvents = _played.Pointer;
         _process->ProcessContext = null;
     }
 
@@ -481,6 +516,7 @@ public sealed unsafe class Vst3Effect : IPluginEffect
         Silence(_inputBusses, _inputBusChannels, fed);
 
         TakePending();
+        TakeNotes();
 
         _process->NumSamples = frames;
 
@@ -488,6 +524,8 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
         _changes?.Clear();
         _outgoing?.Clear();
+        _notes?.Clear();
+        _played?.Clear();
 
         int given = OutputChannels;
 
@@ -629,6 +667,146 @@ public sealed unsafe class Vst3Effect : IPluginEffect
     {
     }
 
+    /// <summary>
+    /// Starts a note. Queued rather than played: a plugin hears about notes at the start of a
+    /// block, on the audio thread, not when a key goes down.
+    /// </summary>
+    public void NoteOn(int semitone, float velocity)
+    {
+        if (_disposed) return;
+
+        int pitch = Math.Clamp(semitone, 0, 127);
+
+        lock (_lock)
+        {
+            // The same pitch twice over is the tracker retriggering a note. The one that was
+            // sounding is ended first, or the plugin is left holding a note nothing will
+            // ever release.
+            if (_sounding.TryGetValue(pitch, out int held))
+            {
+                _queued.Add((false, pitch, 0, held));
+                _sounding.Remove(pitch);
+            }
+
+            int id = _nextNoteId++;
+
+            _sounding[pitch] = id;
+            _queued.Add((true, pitch, Math.Clamp(velocity, 0, 1), id));
+        }
+    }
+
+    public void NoteOff(int semitone)
+    {
+        if (_disposed) return;
+
+        int pitch = Math.Clamp(semitone, 0, 127);
+
+        lock (_lock)
+        {
+            // A note off for something that never started is a note off from somewhere that
+            // lost track, and passing it on would end a note the plugin is holding for
+            // somebody else.
+            if (!_sounding.TryGetValue(pitch, out int held)) return;
+
+            _sounding.Remove(pitch);
+            _queued.Add((false, pitch, 0, held));
+        }
+    }
+
+    public void AllNotesOff()
+    {
+        if (_disposed) return;
+
+        lock (_lock)
+        {
+            foreach (var (pitch, held) in _sounding) _queued.Add((false, pitch, 0, held));
+
+            _sounding.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Fills a block with what the plugin is playing. An instrument has no audio input, so
+    /// what was in the buffer is replaced rather than added to.
+    /// </summary>
+    public void Render(float[] buffer, int frames)
+    {
+        if (buffer == null || frames <= 0) return;
+
+        Process(buffer, frames);
+    }
+
+    /// <summary>Hands the waiting notes to this block.</summary>
+    private void TakeNotes()
+    {
+        if (_notes == null) return;
+
+        lock (_lock)
+        {
+            if (_queued.Count == 0) return;
+
+            foreach (var (on, pitch, velocity, id) in _queued)
+            {
+                bool room = on
+                    ? _notes.NoteOn(pitch, velocity, id)
+                    : _notes.NoteOff(pitch, 0, id);
+
+                if (!room) break;
+            }
+
+            _queued.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Everything inside the plugin, as a lump to keep. This is where a patch really lives:
+    /// the parameters are knob positions, and a wavetable is not a knob position.
+    /// </summary>
+    public byte[] SaveState()
+    {
+        if (_disposed || _component == null) return Array.Empty<byte>();
+
+        using var state = new Vst3Stream();
+
+        if (_component->Vtbl->GetState(_component, state.Pointer) != Vst3Abi.ResultOk) return Array.Empty<byte>();
+        if (state.LooksEmpty) return Array.Empty<byte>();
+
+        return state.ToArray();
+    }
+
+    /// <summary>
+    /// Puts a saved lump back, into both halves: the audio half so it sounds right, and the
+    /// settings half so the knobs agree with it.
+    /// </summary>
+    public void LoadState(byte[]? state)
+    {
+        if (_disposed || _component == null || state == null || state.Length == 0) return;
+
+        using var stream = new Vst3Stream();
+        stream.Fill(state);
+
+        if (_component->Vtbl->SetState(_component, stream.Pointer) != Vst3Abi.ResultOk) return;
+
+        if (_controller == null) return;
+
+        stream.Rewind();
+        _controller->Vtbl->SetComponentState(_controller, stream.Pointer);
+    }
+
+    /// <summary>
+    /// Opens the plugin's own interface, or null when it has none or will not draw here.
+    /// </summary>
+    /// <remarks>
+    /// The view belongs to the settings half, which is the half that knows what the plugin
+    /// looks like. A plugin with no settings half has no window either.
+    /// </remarks>
+    public IPluginEditor? OpenEditor()
+    {
+        if (_disposed || _controller == null) return null;
+
+        return Vst3Editor.Open(_controller);
+    }
+
     /// <summary>Reads a String128, which is 128 UTF-16 characters with a nought at the end.</summary>
     private static string ReadWide(byte* text)
     {
@@ -651,16 +829,16 @@ public sealed unsafe class Vst3Effect : IPluginEffect
     /// path least likely to have been exercised by its author, and a fault in there takes the
     /// whole application with it rather than one effect slot.
     /// </remarks>
-    private static readonly Dictionary<string, Stack<Vst3Effect>> Parked = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, Stack<Vst3Plugin>> Parked = new(StringComparer.Ordinal);
 
     private static readonly object ParkLock = new();
 
     private static string Key(string path, string id, int sampleRate, int maxFrames) =>
         path + "|" + id + "|" + sampleRate + "|" + maxFrames;
 
-    private static Vst3Effect? TakeParked(string key)
+    private static Vst3Plugin? TakeParked(string key)
     {
-        Vst3Effect? effect = null;
+        Vst3Plugin? effect = null;
 
         lock (ParkLock)
         {
@@ -671,7 +849,15 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
         effect._disposed = false;
 
-        lock (effect._lock) effect._pending.Clear();
+        lock (effect._lock)
+        {
+            effect._pending.Clear();
+
+            // Whatever it was holding when it was put down was turned into note offs then,
+            // and those are still waiting. They go out on the first block so the plugin does
+            // not come back sounding a chord from its last life.
+            effect._sounding.Clear();
+        }
 
         if (!effect._processing)
         {
@@ -697,13 +883,19 @@ public sealed unsafe class Vst3Effect : IPluginEffect
             _processing = false;
         }
 
+        // Anything still sounding is ended before this is put down. The note offs stay in the
+        // queue rather than being played here: this runs on the UI thread, the audio thread
+        // may be in the middle of a block, and the queue is delivered on the first block after
+        // this plugin is picked up again.
+        AllNotesOff();
+
         lock (_lock) _pending.Clear();
 
         lock (ParkLock)
         {
             if (!Parked.TryGetValue(_key, out var waiting))
             {
-                waiting = new Stack<Vst3Effect>();
+                waiting = new Stack<Vst3Plugin>();
                 Parked[_key] = waiting;
             }
 
@@ -750,6 +942,12 @@ public sealed unsafe class Vst3Effect : IPluginEffect
 
         _outgoing?.Dispose();
         _outgoing = null;
+
+        _notes?.Dispose();
+        _notes = null;
+
+        _played?.Dispose();
+        _played = null;
 
         Free(_inputData);
         Free(_outputData);

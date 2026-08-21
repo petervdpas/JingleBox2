@@ -45,6 +45,35 @@ public sealed class SynthMixer
     /// <summary>What each track's audio passes through before the mix, if anything.</summary>
     private readonly IAudioInsert?[] _inserts = new IAudioInsert[MaxTracks];
 
+    /// <summary>
+    /// A plugin playing a track, when that track's instrument is one.
+    /// </summary>
+    /// <remarks>
+    /// Not a voice. A plugin is polyphonic inside itself and holds its own notes, so it fills
+    /// a track's bus rather than adding one note to it, and it stays on the track between
+    /// notes because it has a release to finish.
+    /// </remarks>
+    private readonly IPluginInstrument?[] _instruments = new IPluginInstrument[MaxTracks];
+
+    /// <summary>The volume and pan columns, applied to a plugin's bus after it has played.</summary>
+    private readonly float[] _instrumentGain = new float[MaxTracks];
+    private readonly float[] _instrumentPan = new float[MaxTracks];
+
+    /// <summary>How many tracks have a plugin on them, so the quiet path can stay quick.</summary>
+    private int _instrumentCount;
+
+    /// <summary>
+    /// A plugin being auditioned, which belongs to no track. Rendered into the loose bus with
+    /// the other auditions rather than over one of them.
+    /// </summary>
+    private IPluginInstrument? _preview;
+
+    private float[] _previewScratch = Array.Empty<float>();
+    private float _previewGain = 1f;
+
+    /// <summary>When the audition lets go of its note. Zero while nothing is being auditioned.</summary>
+    private long _previewUntil;
+
     private int _bufferFrames;
 
     /// <summary>What one strip's side chain is set to.</summary>
@@ -62,6 +91,7 @@ public sealed class SynthMixer
         {
             _ducking[track] = new DuckSetting(0, TrackMix.NoKey, TrackMix.DefaultDuckReleaseMs);
             _duckGain[track] = 1f;
+            _instrumentGain[track] = 1f;
         }
     }
 
@@ -89,6 +119,127 @@ public sealed class SynthMixer
 
     public IAudioInsert? InsertOn(int track) =>
         track >= 0 && track < MaxTracks ? _inserts[track] : null;
+
+    /// <summary>
+    /// Puts a plugin on a track, or takes one off with null. Whatever was there is told to
+    /// stop first, or it carries on playing into a bus nobody renders.
+    /// </summary>
+    public void SetInstrument(int track, IPluginInstrument? instrument)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        IPluginInstrument? leaving;
+
+        lock (_lock)
+        {
+            leaving = _instruments[track];
+            if (ReferenceEquals(leaving, instrument)) return;
+
+            _instruments[track] = instrument;
+
+            int count = 0;
+            for (int index = 0; index < MaxTracks; index++)
+            {
+                if (_instruments[index] != null) count++;
+            }
+
+            _instrumentCount = count;
+        }
+
+        leaving?.AllNotesOff();
+    }
+
+    /// <summary>Puts a plugin in the audition slot, or takes one out with null.</summary>
+    public void SetPreviewInstrument(IPluginInstrument? instrument)
+    {
+        IPluginInstrument? leaving;
+
+        lock (_lock)
+        {
+            leaving = _preview;
+            if (ReferenceEquals(leaving, instrument)) return;
+
+            _preview = instrument;
+            _previewUntil = 0;
+        }
+
+        leaving?.AllNotesOff();
+    }
+
+    public IPluginInstrument? PreviewInstrument
+    {
+        get { lock (_lock) return _preview; }
+    }
+
+    /// <summary>
+    /// Plays a note on the audition plugin, letting go of it after a while. There is no key to
+    /// release when a note is played by clicking on it, so it releases itself.
+    /// </summary>
+    public void PreviewPlugin(Note note, float gain, double holdSeconds)
+    {
+        if (!note.IsPlayable) return;
+
+        IPluginInstrument? instrument;
+
+        lock (_lock)
+        {
+            instrument = _preview;
+            _previewGain = gain;
+            _previewUntil = Environment.TickCount64 + (long)(Math.Max(0.05, holdSeconds) * 1000);
+        }
+
+        if (instrument == null) return;
+
+        instrument.AllNotesOff();
+        instrument.NoteOn(note.Semitone, 1f);
+    }
+
+    public IPluginInstrument? InstrumentOn(int track) =>
+        track >= 0 && track < MaxTracks ? _instruments[track] : null;
+
+    /// <summary>Starts a note on a track's plugin. The volume column rides its bus after.</summary>
+    public void PluginNoteOn(int track, Note note, float gain, float pan)
+    {
+        if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
+
+        IPluginInstrument? instrument;
+        lock (_lock)
+        {
+            instrument = _instruments[track];
+            _instrumentGain[track] = gain;
+            _instrumentPan[track] = Math.Clamp(pan, -1f, 1f);
+        }
+
+        if (instrument == null) return;
+
+        // One note a track, as a tracker has always worked. The note that was there is let go
+        // rather than cut off, so a plugin plays its own release instead of clicking.
+        instrument.AllNotesOff();
+        instrument.NoteOn(note.Semitone, 1f);
+    }
+
+    /// <summary>Lets go of whatever a track's plugin is holding.</summary>
+    public void PluginNoteOff(int track)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        IPluginInstrument? instrument;
+        lock (_lock) instrument = _instruments[track];
+
+        instrument?.AllNotesOff();
+    }
+
+    /// <summary>Follows the volume and pan columns while a plugin note holds.</summary>
+    public void SetPluginLevels(int track, float gain, float? pan)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        lock (_lock)
+        {
+            _instrumentGain[track] = gain;
+            if (pan.HasValue) _instrumentPan[track] = Math.Clamp(pan.Value, -1f, 1f);
+        }
+    }
 
     /// <summary>How far a track is being pushed down right now, 1 being not at all.</summary>
     public float DuckGainFor(int track) =>
@@ -227,10 +378,14 @@ public sealed class SynthMixer
 
         IVoice[] playing;
         DuckSetting[] ducking;
+        IPluginInstrument?[] instruments;
+        IPluginInstrument? preview;
+        IPluginInstrument? releasing = null;
+        float previewGain;
 
         lock (_lock)
         {
-            if (_voices.Count == 0)
+            if (_voices.Count == 0 && _instrumentCount == 0 && _preview == null)
             {
                 Rest();
                 return;
@@ -243,13 +398,26 @@ public sealed class SynthMixer
             }
 
             playing = _snapshot;
+            instruments = (IPluginInstrument?[])_instruments.Clone();
+
+            preview = _preview;
+            previewGain = _previewGain;
+
+            // An audition has no key to let go of, so it lets go of itself.
+            if (_previewUntil != 0 && Environment.TickCount64 >= _previewUntil)
+            {
+                _previewUntil = 0;
+                releasing = preview;
+            }
             ducking = (DuckSetting[])_ducking.Clone();
         }
 
         // Each track is rendered on its own before anything is summed. Ducking needs one
         // track to be measurable while another is being moved by it, and once everything is
         // added together there is nothing left to measure.
-        RenderBusses(playing, frames, samples);
+        releasing?.AllNotesOff();
+
+        RenderBusses(playing, instruments, preview, previewGain, frames, samples);
 
         // Inserts run on the bus, before the side chains: what keys a duck is the track as it
         // sounds, effects included, which is what anyone listening would call the track.
@@ -267,6 +435,24 @@ public sealed class SynthMixer
         Reap();
     }
 
+    /// <summary>Lets go of every note on every plugin, for a stop.</summary>
+    public void AllPluginNotesOff()
+    {
+        IPluginInstrument?[] instruments;
+        IPluginInstrument? preview;
+
+        lock (_lock)
+        {
+            instruments = (IPluginInstrument?[])_instruments.Clone();
+            preview = _preview;
+            _previewUntil = 0;
+        }
+
+        foreach (var instrument in instruments) instrument?.AllNotesOff();
+
+        preview?.AllNotesOff();
+    }
+
     /// <summary>Nothing is playing: the side chains fall back open rather than staying shut.</summary>
     private void Rest()
     {
@@ -278,7 +464,7 @@ public sealed class SynthMixer
     }
 
     /// <summary>Puts every voice on its own track's bus, auditions aside.</summary>
-    private void RenderBusses(IVoice[] playing, int frames, int samples)
+    private void RenderBusses(IVoice[] playing, IPluginInstrument?[] instruments, IPluginInstrument? preview, float previewGain, int frames, int samples)
     {
         EnsureBusses(frames);
 
@@ -290,7 +476,33 @@ public sealed class SynthMixer
             if (track >= 0 && track < MaxTracks) _sounding[track] = true;
         }
 
+        // A track with a plugin on it always sounds. The plugin holds its own notes and its
+        // own release, and there is no voice here to say whether it is still ringing.
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            if (instruments[track] != null) _sounding[track] = true;
+        }
+
         Array.Clear(_loose, 0, samples);
+
+        // An audition is added to the loose bus rather than written over it: a plugin fills a
+        // buffer, and the loose bus may already have another audition in it.
+        if (preview != null)
+        {
+            if (_previewScratch.Length < samples) _previewScratch = new float[samples];
+            Array.Clear(_previewScratch, 0, samples);
+
+            try
+            {
+                preview.Render(_previewScratch, frames);
+            }
+            catch (Exception)
+            {
+                Array.Clear(_previewScratch, 0, samples);
+            }
+
+            for (int index = 0; index < samples; index++) _loose[index] += _previewScratch[index] * previewGain;
+        }
 
         for (int track = 0; track < MaxTracks; track++)
         {
@@ -300,12 +512,53 @@ public sealed class SynthMixer
             Array.Clear(_busses[track]!, 0, samples);
         }
 
+        // Plugins first: one fills its track's bus, and anything else on that track adds on
+        // top of what it played.
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            var instrument = instruments[track];
+            if (instrument == null) continue;
+
+            var bus = _busses[track];
+            if (bus == null) continue;
+
+            try
+            {
+                instrument.Render(bus, frames);
+            }
+            catch (Exception)
+            {
+                // A managed fault in a plugin costs that block, not the audio thread.
+                Array.Clear(bus, 0, samples);
+            }
+
+            Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
+        }
+
         foreach (var voice in playing)
         {
             int track = voice.Track;
 
             var target = track >= 0 && track < MaxTracks ? _busses[track] : _loose;
             if (target != null) voice.Render(target, frames);
+        }
+    }
+
+    /// <summary>
+    /// The volume and pan columns applied to a plugin's bus. A plugin plays at its own level
+    /// and knows nothing about the tracker's columns, so they are applied to what came out.
+    /// </summary>
+    private static void Place(float[] bus, int samples, float gain, float pan)
+    {
+        float left = gain * Math.Min(1f, 1f - pan);
+        float right = gain * Math.Min(1f, 1f + pan);
+
+        if (Math.Abs(left - 1f) < 0.0001f && Math.Abs(right - 1f) < 0.0001f) return;
+
+        for (int index = 0; index + 1 < samples; index += 2)
+        {
+            bus[index] *= left;
+            bus[index + 1] *= right;
         }
     }
 

@@ -201,6 +201,29 @@ internal sealed unsafe class Vst3Stream : IDisposable
     /// <summary>The pointer a plugin is handed.</summary>
     public void* Pointer => _body;
 
+    /// <summary>Everything written so far, copied out.</summary>
+    public byte[] ToArray()
+    {
+        if (_body == null || _body->Length <= 0) return Array.Empty<byte>();
+
+        var copy = new byte[_body->Length];
+        Marshal.Copy((nint)_body->Data, copy, 0, copy.Length);
+
+        return copy;
+    }
+
+    /// <summary>Fills the stream from a saved lump, ready to be read from the start.</summary>
+    public void Fill(byte[] bytes)
+    {
+        if (_body == null || bytes == null || bytes.Length == 0) return;
+
+        Reserve(_body, bytes.Length);
+        Marshal.Copy(bytes, 0, (nint)_body->Data, bytes.Length);
+
+        _body->Length = bytes.Length;
+        _body->Position = 0;
+    }
+
     /// <summary>Rewinds, which is what has to happen between the write and the read.</summary>
     public void Rewind()
     {

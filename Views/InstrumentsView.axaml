@@ -55,6 +55,17 @@
               <Button Grid.Column="1" Content="+ New" Command="{Binding NewFromPresetCommand}" />
             </Grid>
 
+            <TextBlock Classes="cardHint" Text="Or from a plugin:" Margin="0,6,0,0"
+                       IsVisible="{Binding HasAvailablePlugins}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasAvailablePlugins}">
+              <ComboBox Grid.Column="0" x:Name="PluginPicker"
+                        ItemsSource="{Binding AvailablePlugins}"
+                        DisplayMemberBinding="{Binding Name}"
+                        HorizontalAlignment="Stretch"
+                        PlaceholderText="Pick a plugin..." />
+              <Button Grid.Column="1" Content="+ New" Click="NewFromPlugin_Click" />
+            </Grid>
+
             <TextBlock Classes="cardHint" Text="Or from one of your recordings:" Margin="0,6,0,0" />
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
               <ComboBox Grid.Column="0" x:Name="RecordingPicker"
@@ -140,6 +151,39 @@
               </StackPanel>
             </Border>
 
+            <!-- Plugin instruments. The plugin does the playing, so there is no wave to draw
+                 and no envelope of ours to set: what is here is the plugin's own. -->
+            <StackPanel Spacing="8" IsVisible="{Binding Editor.IsPlugin}">
+              <TextBlock Classes="cardHint"
+                         IsVisible="{Binding Editor.HasPluginProblem}"
+                         TextWrapping="Wrap"
+                         Text="{Binding Editor.PluginProblem}" />
+
+              <Border Classes="inset" IsVisible="{Binding Editor.HasPluginPanel}" HorizontalAlignment="Left">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="section" Text="{Binding Editor.PluginText}" />
+
+                  <!-- The plugin's own interface opens in a window of its own. Serum draws
+                       itself at 1190 by 740 and Vital at 1400 by 820, which is a window, not
+                       a panel on a page. -->
+                  <Button Content="Open the plugin"
+                          HorizontalAlignment="Left"
+                          Click="OpenPluginWindow_Click"
+                          ToolTip.Tip="The plugin's own interface, in a window you can leave open while you work." />
+
+                  <!-- The instrument's own level, on top of whatever the plugin plays at. The
+                       volume column in a pattern rides this the same as for any instrument. -->
+                  <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                               Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
+                               TrackLength="96"
+                               Ticks="6,0,-12,-40"
+                               HorizontalAlignment="Left"
+                               ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
+                               Value="{Binding Editor.VolumeDecibels}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
             <!-- Sample instruments. Everything below this section applies to a recording as
                  much as to a generated wave: the two are the same voice with a different
                  source, so only what is actually about the file lives here. -->
@@ -181,8 +225,9 @@
             </WrapPanel>
 
             <!-- The voice: the same chain whether the source is a recording or a wave, so
-                 this row is shown for both. Only the oscillator itself is synth only. -->
-            <WrapPanel Orientation="Horizontal">
+                 this row is shown for both. A plugin instrument has none of it, because the
+                 plugin does its own envelope, its own filter and its own everything else. -->
+            <WrapPanel Orientation="Horizontal" IsVisible="{Binding !Editor.IsPlugin}">
 
               <StackPanel Classes="group" IsVisible="{Binding Editor.IsSynth}">
                 <TextBlock Classes="section" Text="Shape" />

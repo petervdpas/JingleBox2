@@ -59,6 +59,23 @@ internal static class Vst3Abi
     // SymbolicSampleSizes
     public const int Sample32 = 0;
 
+    // Event::EventTypes
+    public const ushort NoteOnEvent = 0;
+    public const ushort NoteOffEvent = 1;
+
+    /// <summary>Event::kIsLive: played by hand rather than read off a timeline.</summary>
+    public const ushort LiveEvent = 1 << 0;
+
+    /// <summary>No note identity of its own, which is how a plain keyboard plays.</summary>
+    public const int NoNoteId = -1;
+
+    /// <summary>What a plugin's window is called on each platform.</summary>
+    public static string PlatformWindowType =>
+        OperatingSystem.IsWindows() ? "HWND" : OperatingSystem.IsMacOS() ? "NSView" : "X11EmbedWindowID";
+
+    /// <summary>The name of the one view every plugin with an interface offers.</summary>
+    public const string EditorView = "editor";
+
     // ProcessModes
     public const int RealtimeMode = 0;
 
@@ -149,6 +166,11 @@ internal static class Vst3Abi
     public static readonly byte[] BStreamId = Uid(0xC3BF6EA2, 0x30994752, 0x9B6BF990, 0x1EE33E9B);
 
     // Steinberg::Linux. X11 has no run loop of its own, so the host has to be one.
+    public static readonly byte[] PlugViewId = Uid(0x5BC32507, 0xD06049EA, 0xA6151B52, 0x2B755B29);
+    public static readonly byte[] PlugFrameId = Uid(0x367FAF01, 0xAFA94693, 0x8D4DA2A0, 0xED0882A3);
+
+    public static readonly byte[] EventListId = Uid(0x3A2C4214, 0x346349FE, 0xB2C4F397, 0xB9695A44);
+
     public static readonly byte[] RunLoopId = Uid(0x18C35366, 0x97764F1A, 0x9C5B8385, 0x7A871389);
     public static readonly byte[] TimerHandlerId = Uid(0x10BDD94F, 0x41424774, 0x821FAD8F, 0xECA72CA9);
     public static readonly byte[] EventHandlerId = Uid(0x561E65C9, 0x13A0496F, 0x813A2C35, 0x654D7983);
@@ -433,4 +455,80 @@ internal unsafe struct IConnectionPointVtbl
 internal unsafe struct IConnectionPoint
 {
     public IConnectionPointVtbl* Vtbl;
+}
+
+
+/// <summary>
+/// One thing that happens at a point in a block: a note starting, a note ending.
+/// </summary>
+/// <remarks>
+/// The layout is a C union, so the note-on and note-off fields sit on top of each other and
+/// which set means anything is decided by <see cref="Type"/>. Written out with the offsets
+/// spelled rather than left to the compiler, because the union has to land at 24 whatever is
+/// in it, and a byte out here is a note at the wrong pitch or a plugin reading rubbish.
+/// </remarks>
+[StructLayout(LayoutKind.Explicit, Size = 48)]
+internal struct Vst3Event
+{
+    [FieldOffset(0)] public int BusIndex;
+    [FieldOffset(4)] public int SampleOffset;
+    [FieldOffset(8)] public double PpqPosition;
+    [FieldOffset(16)] public ushort Flags;
+    [FieldOffset(18)] public ushort Type;
+
+    // NoteOnEvent
+    [FieldOffset(24)] public short OnChannel;
+    [FieldOffset(26)] public short OnPitch;
+    [FieldOffset(28)] public float OnTuning;
+    [FieldOffset(32)] public float OnVelocity;
+    [FieldOffset(36)] public int OnLength;
+    [FieldOffset(40)] public int OnNoteId;
+
+    // NoteOffEvent, on the same ground
+    [FieldOffset(24)] public short OffChannel;
+    [FieldOffset(26)] public short OffPitch;
+    [FieldOffset(28)] public float OffVelocity;
+    [FieldOffset(32)] public int OffNoteId;
+    [FieldOffset(36)] public float OffTuning;
+}
+
+
+/// <summary>Where a plugin's window is and how big it is, in pixels on X11 and Windows.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct ViewRect
+{
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+
+    public int Width => Right - Left;
+
+    public int Height => Bottom - Top;
+}
+
+/// <summary>A plugin's own interface: a window it draws itself, inside one the host lends it.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IPlugViewVtbl
+{
+    public FUnknownVtbl Base;
+
+    public delegate* unmanaged[Cdecl]<void*, byte*, int> IsPlatformTypeSupported;
+    public delegate* unmanaged[Cdecl]<void*, void*, byte*, int> Attached;
+    public delegate* unmanaged[Cdecl]<void*, int> Removed;
+    public delegate* unmanaged[Cdecl]<void*, float, int> OnWheel;
+    public delegate* unmanaged[Cdecl]<void*, char, short, short, int> OnKeyDown;
+    public delegate* unmanaged[Cdecl]<void*, char, short, short, int> OnKeyUp;
+    public delegate* unmanaged[Cdecl]<void*, ViewRect*, int> GetSize;
+    public delegate* unmanaged[Cdecl]<void*, ViewRect*, int> OnSize;
+    public delegate* unmanaged[Cdecl]<void*, byte, int> OnFocus;
+    public delegate* unmanaged[Cdecl]<void*, void*, int> SetFrame;
+    public delegate* unmanaged[Cdecl]<void*, int> CanResize;
+    public delegate* unmanaged[Cdecl]<void*, ViewRect*, int> CheckSizeConstraint;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IPlugView
+{
+    public IPlugViewVtbl* Vtbl;
 }

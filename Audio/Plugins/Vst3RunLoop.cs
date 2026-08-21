@@ -19,10 +19,10 @@ namespace JingleBox2.Audio.Plugins;
 /// as many words that it cannot function without it, editor or no editor, which is what a host
 /// that skips this gets wrong.
 ///
-/// The pump runs on a thread of its own. That is honest for what is hosted today, which is
-/// effects with no window of their own. The day a plugin draws its own interface this has to
-/// move onto the UI thread, because that is where a toolkit expects to be called, and
-/// <see cref="DriveWith"/> is the seam for it.
+/// The pump runs on a thread of its own until somebody takes it over with
+/// <see cref="DriveWith"/>. Once a plugin has a window, that somebody is the UI thread: a
+/// toolkit drawing into an X11 window expects to be called where the window lives, and calling
+/// it from anywhere else is a crash inside somebody else's code rather than a bug report.
 /// </remarks>
 internal static unsafe class Vst3RunLoop
 {
@@ -49,6 +49,12 @@ internal static unsafe class Vst3RunLoop
     private static void* _instance;
     private static Thread? _pump;
     private static Action<Action>? _post;
+
+    /// <summary>
+    /// Set while a round is on its way to somebody else's thread. Without it a busy UI thread
+    /// would collect a queue of rounds and then run them all at once.
+    /// </summary>
+    private static volatile bool _inFlight;
 
     /// <summary>
     /// Hands the pumping to somebody else, a UI dispatcher for instance. Each call is one
@@ -106,15 +112,50 @@ internal static unsafe class Vst3RunLoop
             Thread.Sleep(TickMilliseconds);
 
             Action<Action>? post;
-            lock (Gate) post = _post;
+            bool idle;
 
-            if (post == null) Pump();
-            else post(Pump);
+            lock (Gate)
+            {
+                post = _post;
+                idle = Timers.Count == 0 && Watches.Count == 0;
+            }
+
+            // Nothing registered means nothing to do, and there is no reason to wake the UI
+            // thread sixty times a second to find that out.
+            if (idle) continue;
+
+            if (post == null)
+            {
+                Pump();
+                continue;
+            }
+
+            if (_inFlight) continue;
+
+            _inFlight = true;
+
+            post(() =>
+            {
+                try
+                {
+                    Pump();
+                }
+                finally
+                {
+                    _inFlight = false;
+                }
+            });
         }
     }
 
     /// <summary>One round: whatever is due, and whatever has something to read.</summary>
     private static void Pump()
+    {
+        Ring();
+        Deliver();
+    }
+
+    private static void Ring()
     {
         long now = Environment.TickCount64;
 
@@ -158,6 +199,127 @@ internal static unsafe class Vst3RunLoop
             }
         }
     }
+
+    /// <summary>
+    /// Tells any plugin whose file has something waiting on it. This is how a plugin's own
+    /// window hears about a mouse or a keystroke: its toolkit is sitting on an X11 connection
+    /// and the host is the only thing that will ever look at it.
+    /// </summary>
+    private static void Deliver()
+    {
+        Watch[] watching;
+
+        lock (Gate)
+        {
+            if (Watches.Count == 0) return;
+
+            watching = Watches.ToArray();
+        }
+
+        var files = new int[watching.Length];
+        var ready = new bool[watching.Length];
+
+        for (int index = 0; index < watching.Length; index++) files[index] = watching[index].File;
+
+        if (Waiting(files, ready) <= 0) return;
+
+        for (int index = 0; index < watching.Length; index++)
+        {
+            if (!ready[index]) continue;
+
+            try
+            {
+                Ready(watching[index].Handler, watching[index].File);
+            }
+            catch (Exception)
+            {
+                // One plugin's event handling is that plugin's problem for this round.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Which of these files have something waiting. Asked and answered at once: this runs on
+    /// the thread that draws, so it may not wait for anything.
+    /// </summary>
+    /// <remarks>
+    /// The array is pinned rather than handed over as a managed array, and that is the whole
+    /// point of this method existing on its own. poll writes its answer back into the same
+    /// memory it was given; an array marshalled by copy goes in and comes back untouched, so
+    /// every file reads as quiet and no plugin is ever told anything. What that looks like is
+    /// a plugin window that opens at the right size and stays black forever, which is why it
+    /// is worth a check of its own.
+    /// </remarks>
+    internal static unsafe int Waiting(int[] files, bool[] ready)
+    {
+        if (files == null || ready == null || files.Length == 0) return 0;
+
+        var polled = new PollFile[files.Length];
+
+        for (int index = 0; index < files.Length; index++)
+        {
+            polled[index].File = files[index];
+            polled[index].Events = PollIn;
+            polled[index].Returned = 0;
+        }
+
+        int answer;
+
+        try
+        {
+            fixed (PollFile* first = polled)
+            {
+                answer = Poll(first, (nuint)polled.Length, 0);
+            }
+        }
+        catch (Exception)
+        {
+            // No poll to call means no windows getting events, which is a plugin that does
+            // not respond rather than an application that stops.
+            return 0;
+        }
+
+        for (int index = 0; index < files.Length && index < ready.Length; index++)
+        {
+            // A file that has gone wrong counts as something to hear about: a plugin told its
+            // connection has hung up can tidy up, and one told nothing waits forever.
+            ready[index] = (polled[index].Returned & (PollIn | PollBroken)) != 0;
+        }
+
+        return answer;
+    }
+
+    /// <summary>There is something to read on this file. The third entry after the usual three.</summary>
+    private static void Ready(nint handler, int file)
+    {
+        if (handler == 0) return;
+
+        var table = *(nint**)handler;
+        if (table == null) return;
+
+        var onReady = (delegate* unmanaged[Cdecl]<void*, int, void>)table[3];
+        if (onReady == null) return;
+
+        onReady((void*)handler, file);
+    }
+
+    /// <summary>One file being waited on, in the shape poll expects.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PollFile
+    {
+        public int File;
+        public short Events;
+        public short Returned;
+    }
+
+    /// <summary>There is something to read.</summary>
+    private const short PollIn = 0x001;
+
+    /// <summary>The file has gone wrong or the other end has gone away.</summary>
+    private const short PollBroken = 0x008 | 0x010 | 0x020;
+
+    [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
+    private static extern int Poll(PollFile* files, nuint count, int timeoutMilliseconds);
 
     /// <summary>Rings one timer, through the fourth entry of its table.</summary>
     private static void Call(nint handler)
@@ -236,9 +398,8 @@ internal static unsafe class Vst3RunLoop
     }
 
     /// <summary>
-    /// Remembers a file a plugin wants watching. Nothing watches it yet: this is how a plugin
-    /// hears about X11 events, and there are no plugin windows to have events. Taken rather
-    /// than refused, because a plugin told no is a plugin that may decide the host is broken.
+    /// Takes a file a plugin wants watching. Its X11 connection, in practice: this is how a
+    /// plugin's window hears about a click.
     /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int RegisterEventHandler(void* self, void* handler, int file)
