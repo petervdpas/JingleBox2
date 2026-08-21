@@ -97,7 +97,7 @@ public sealed partial class MainViewModel : ObservableObject
         var library = new InstrumentLibrary();
 
         Tracker = new TrackerViewModel(audio, library, Record.Recordings);
-        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings);
+        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService);
 
         Instruments.InstrumentChanged += (_, instrument) =>
         {
@@ -124,6 +124,10 @@ public sealed partial class MainViewModel : ObservableObject
         // A recording that an instrument is built on cannot be thrown away, so the RECORD page
         // asks the library before it deletes anything.
         Record.SampleUsage = library;
+
+        // Trimming a recording changes what its instruments sound like, and the player is
+        // holding the old audio.
+        Record.RecordingChanged += (_, path) => Tracker.ReloadSample(path);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

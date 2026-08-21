@@ -140,34 +140,51 @@
               </StackPanel>
             </Border>
 
-            <!-- Sample instruments -->
+            <!-- Sample instruments. Everything below this section applies to a recording as
+                 much as to a generated wave: the two are the same voice with a different
+                 source, so only what is actually about the file lives here. -->
             <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.IsSample}">
               <StackPanel Classes="group">
                 <TextBlock Classes="section" Text="Sample" />
+
+                <views:WaveformView Width="340" Height="90"
+                                    Peaks="{Binding Editor.Peaks}"
+                                    Placeholder="{Binding Editor.SampleText}"
+                                    ShowMarkers="True"
+                                    ShowLoop="{Binding Editor.IsLooping}"
+                                    Start="{Binding Editor.SampleStart}"
+                                    End="{Binding Editor.SampleEnd}"
+                                    LoopStart="{Binding Editor.LoopStart}"
+                                    LoopEnd="{Binding Editor.LoopEnd}"
+                                    ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
+
+                <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
+
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock Classes="field" Text="Base note" />
                   <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
-                                     Minimum="0" Maximum="119" Width="70" />
+                                     Minimum="0" Maximum="119" Width="70"
+                                     ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
                   <TextBlock Classes="field" Text="{Binding Editor.BaseNoteText}" />
-                  <CheckBox Content="Loop" Margin="8,0,0,0" IsChecked="{Binding Editor.Loop}" />
-                </StackPanel>
-              </StackPanel>
 
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Output" />
-                <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
-                             Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
-                             TrackLength="90"
-                             Ticks="6,0,-12,-40"
-                             ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
-                             Value="{Binding Editor.VolumeDecibels}" />
+                  <TextBlock Classes="field" Text="Loop" Margin="10,0,0,0" />
+                  <ComboBox Width="110"
+                            ItemsSource="{Binding Editor.LoopModes}"
+                            SelectedItem="{Binding Editor.LoopMode}"
+                            ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
+
+                  <CheckBox Content="Reverse" Margin="6,0,0,0"
+                            IsChecked="{Binding Editor.Reverse}"
+                            ToolTip.Tip="Plays the window from its end towards its start." />
+                </StackPanel>
               </StackPanel>
             </WrapPanel>
 
-            <!-- Synth instruments: the whole voice on one row, wrapping when it has to -->
-            <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.IsSynth}">
+            <!-- The voice: the same chain whether the source is a recording or a wave, so
+                 this row is shown for both. Only the oscillator itself is synth only. -->
+            <WrapPanel Orientation="Horizontal">
 
-              <StackPanel Classes="group">
+              <StackPanel Classes="group" IsVisible="{Binding Editor.IsSynth}">
                 <TextBlock Classes="section" Text="Shape" />
 
                 <views:WaveScope Width="150" Height="58"
@@ -183,17 +200,19 @@
                             ToolTip.Tip="How much of the wave the view shows. A view setting: it is not part of the sound."
                             Value="{Binding ScopeCycles}" />
 
-                <views:EnvelopeScope Width="150" Height="58"
-                                     Patch="{Binding Editor.Patch.Patch}"
-                                     Revision="{Binding Editor.Patch.Revision}"
-                                     HoldSeconds="{Binding HoldSeconds}"
-                                     Trigger="{Binding NoteTrigger}"
-                                     ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
               </StackPanel>
 
               <StackPanel Classes="group">
                 <TextBlock Classes="section" Text="Envelope" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
+                  <views:EnvelopeScope Width="150" Height="58"
+                                       VerticalAlignment="Top"
+                                       Patch="{Binding Editor.Patch.Patch}"
+                                       Revision="{Binding Editor.Patch.Revision}"
+                                       HoldSeconds="{Binding HoldSeconds}"
+                                       Trigger="{Binding NoteTrigger}"
+                                       ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
+
                   <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
                                Minimum="0" Maximum="2000" SmallStep="1" LargeStep="25"
                                TrackLength="96"
@@ -260,6 +279,22 @@
                               Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
                               Value="{Binding Editor.Patch.TremoloDepth}" />
                 </UniformGrid>
+              </StackPanel>
+
+              <StackPanel Classes="group">
+                <TextBlock Classes="section" Text="Filter" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <views:Knob Label="Cutoff" Format="0.00" DefaultValue="1"
+                              Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.08"
+                              Display="{Binding Editor.Patch.FilterCutoffText}"
+                              ToolTip.Tip="A low pass. Wide open at the top, where it does nothing at all."
+                              Value="{Binding Editor.Patch.FilterCutoff}" />
+
+                  <views:Knob Label="Resonance" Format="0.00" DefaultValue="0"
+                              Minimum="0" Maximum="0.98" SmallStep="0.01" LargeStep="0.1"
+                              ToolTip.Tip="How much the filter rings at its cutoff."
+                              Value="{Binding Editor.Patch.FilterResonance}" />
+                </StackPanel>
               </StackPanel>
 
               <StackPanel Classes="group">

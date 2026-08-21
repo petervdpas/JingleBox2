@@ -24,10 +24,10 @@ public sealed class SynthMixer
     /// </summary>
     public const float MasterGain = 0.9f;
 
-    private readonly List<SynthVoice> _voices = new();
+    private readonly List<IVoice> _voices = new();
     private readonly object _lock = new();
 
-    private SynthVoice[] _snapshot = Array.Empty<SynthVoice>();
+    private IVoice[] _snapshot = Array.Empty<IVoice>();
     private bool _snapshotStale = true;
     private int _noiseSeed;
 
@@ -66,6 +66,46 @@ public sealed class SynthMixer
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new SynthVoice(patch, note, SynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed());
+        voice.HoldFor(holdSeconds);
+
+        lock (_lock) Add(voice);
+    }
+
+    /// <summary>
+    /// Sounds a recording on a track, under the same rules: the track's last note is cut, and
+    /// the voice takes its place. The caller brings the audio, so the mixer never reads a file.
+    /// </summary>
+    public void NoteOn(int track, TrackerInstrument instrument, SampleData sample, Note note, float gain, float pan)
+    {
+        if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
+            track, gain, pan, SampleRate);
+
+        lock (_lock)
+        {
+            if (track >= 0)
+            {
+                foreach (var playing in _voices)
+                {
+                    if (playing.Track == track) playing.Cut();
+                }
+            }
+
+            Add(voice);
+        }
+    }
+
+    /// <summary>A recording sounded once, for auditioning while editing.</summary>
+    public void Preview(TrackerInstrument instrument, SampleData sample, Note note, float gain, double holdSeconds)
+    {
+        if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
+            SynthVoice.NoTrack, gain, 0f, SampleRate);
+
         voice.HoldFor(holdSeconds);
 
         lock (_lock) Add(voice);
@@ -122,7 +162,7 @@ public sealed class SynthMixer
         int samples = frames * 2;
         Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
 
-        SynthVoice[] playing;
+        IVoice[] playing;
         lock (_lock)
         {
             if (_voices.Count == 0) return;
@@ -145,11 +185,29 @@ public sealed class SynthMixer
         Reap();
     }
 
+    /// <summary>Below this the bus is a wire; above it, it bends. Roughly -3 dB.</summary>
+    public const float Knee = 0.7f;
+
     /// <summary>
     /// Saturates rather than clipping. A chord of voices can sum past full scale, and a hard
-    /// clip on that sounds like a fault; this bends instead, and leaves quiet signals alone.
+    /// clip on that sounds like a fault; this bends instead.
     /// </summary>
-    private static float SoftClip(float value) => MathF.Tanh(value);
+    /// <remarks>
+    /// Bending starts at the knee rather than at zero. Recordings come through here too now,
+    /// and a curve applied from the bottom up would quietly reshape every sample in the song
+    /// on its way out, which is not the bus's business. Only what is loud enough to be a
+    /// problem is touched.
+    /// </remarks>
+    public static float SoftClip(float value)
+    {
+        float magnitude = MathF.Abs(value);
+        if (magnitude <= Knee) return value;
+
+        float over = (magnitude - Knee) / (1 - Knee);
+        float shaped = Knee + (1 - Knee) * MathF.Tanh(over);
+
+        return value < 0 ? -shaped : shaped;
+    }
 
     /// <summary>
     /// How loud a track is sounding, for a meter. Taken from the voices rather than from the
@@ -189,7 +247,7 @@ public sealed class SynthMixer
         }
     }
 
-    private void Add(SynthVoice voice)
+    private void Add(IVoice voice)
     {
         // Oldest first, so voice stealing takes the one that has been ringing longest.
         while (_voices.Count >= MaxVoices)

@@ -6,7 +6,7 @@ namespace JingleBox2.Tracker.Synth;
 /// One sounding note. Owns its own copy of the patch, so editing an instrument while it plays
 /// changes the next note rather than the one in the air.
 /// </summary>
-public sealed class SynthVoice
+public sealed class SynthVoice : IVoice
 {
     /// <summary>Voices not tied to a track, such as an audition, use this.</summary>
     public const int NoTrack = -1;
@@ -21,6 +21,7 @@ public sealed class SynthVoice
     private readonly double _pitchEnvSeconds;
     private readonly double _drive;
     private readonly double _driveMakeup;
+    private readonly ToneFilter _filter;
     private readonly Random _noise;
 
     private double _phase;
@@ -43,6 +44,7 @@ public sealed class SynthVoice
         // than the loudness. That is what the level fader is for.
         _drive = _patch.Drive;
         _driveMakeup = Saturation.Makeup(_drive);
+        _filter = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _noise = new Random(noiseSeed);
 
         Track = track;
@@ -65,6 +67,7 @@ public sealed class SynthVoice
 
     public bool IsFinished => _envelope.IsFinished;
 
+    /// <summary>Letting go of the note has started its release, but it is still sounding.</summary>
     public bool IsReleasing => _envelope.Stage == EnvelopeStage.Release;
 
     /// <summary>
@@ -131,7 +134,7 @@ public sealed class SynthVoice
             _phase = Oscillator.Wrap(_phase + frequency * step);
 
             double sample = Oscillator.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
-            double value = Drive(sample) * level * TremoloAt(_time) * Gain;
+            double value = _filter.Process(Drive(sample)) * level * TremoloAt(_time) * Gain;
 
             int index = frame * 2;
             buffer[index] += (float)(value * left);

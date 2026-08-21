@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker.Synth;
+using JingleBox2.UI;
 using System;
 
 namespace JingleBox2.ViewModels;
@@ -144,6 +145,33 @@ public sealed class SynthPatchViewModel : ObservableObject
         get => _patch.PitchEnvMs;
         set => Set(v => _patch.PitchEnvMs = v, _patch.PitchEnvMs, value,
             SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, nameof(PitchEnvMs));
+    }
+
+    public double FilterCutoffHz
+    {
+        get => _patch.FilterCutoffHz;
+        set => Set(v => _patch.FilterCutoffHz = v, _patch.FilterCutoffHz, value,
+            SynthPatch.MinCutoffHz, SynthPatch.MaxCutoffHz,
+            nameof(FilterCutoffHz), nameof(FilterCutoff), nameof(FilterCutoffText));
+    }
+
+    /// <summary>
+    /// The cutoff as a knob position rather than a frequency, so the dial spends its travel
+    /// where the ear does: octaves, not hertz.
+    /// </summary>
+    public double FilterCutoff
+    {
+        get => FrequencyScale.ToPosition(_patch.FilterCutoffHz);
+        set => FilterCutoffHz = FrequencyScale.ToHz(value);
+    }
+
+    public string FilterCutoffText => FrequencyScale.Text(_patch.FilterCutoffHz);
+
+    public double FilterResonance
+    {
+        get => _patch.FilterResonance;
+        set => Set(v => _patch.FilterResonance = v, _patch.FilterResonance, value,
+            SynthPatch.MinResonance, SynthPatch.MaxResonance, nameof(FilterResonance));
     }
 
     /// <summary>Called after a preset lands on top of the patch: every value may have moved.</summary>

@@ -42,6 +42,14 @@ public sealed class SynthPatch
     public const double MinFineCents = -100;
     public const double MaxFineCents = 100;
 
+    public const double MinCutoffHz = ToneFilter.MinHz;
+
+    /// <summary>Wide open. A patch at the top of the range is not filtered at all.</summary>
+    public const double MaxCutoffHz = ToneFilter.OpenHz;
+
+    public const double MinResonance = ToneFilter.MinResonance;
+    public const double MaxResonance = ToneFilter.MaxResonance;
+
     public SynthWave Wave { get; set; } = SynthWave.Square;
 
     /// <summary>How much of the pulse wave's cycle is high. Ignored by the other waves.</summary>
@@ -76,6 +84,12 @@ public sealed class SynthPatch
     /// <summary>How long that pitch offset takes to reach the note.</summary>
     public double PitchEnvMs { get; set; } = 60;
 
+    /// <summary>Where the low pass starts taking the top off. Wide open by default.</summary>
+    public double FilterCutoffHz { get; set; } = MaxCutoffHz;
+
+    /// <summary>How much the filter rings at its cutoff. Zero is a plain roll off.</summary>
+    public double FilterResonance { get; set; }
+
     public SynthPatch Clone() => new()
     {
         Wave = Wave,
@@ -92,7 +106,9 @@ public sealed class SynthPatch
         TremoloRateHz = TremoloRateHz,
         TremoloDepth = TremoloDepth,
         PitchEnvSemitones = PitchEnvSemitones,
-        PitchEnvMs = PitchEnvMs
+        PitchEnvMs = PitchEnvMs,
+        FilterCutoffHz = FilterCutoffHz,
+        FilterResonance = FilterResonance
     };
 
     /// <summary>Pulls every value back into range, for anything read off disk.</summary>
@@ -117,6 +133,11 @@ public sealed class SynthPatch
 
         PitchEnvSemitones = Clamp(PitchEnvSemitones, MinPitchEnvSemitones, MaxPitchEnvSemitones);
         PitchEnvMs = Clamp(PitchEnvMs, MinTimeMs, MaxPitchEnvMs);
+
+        // A patch written before the filter existed has no cutoff at all, which reads as zero
+        // and would silence it. Nothing is a filter that is not there, so it opens up.
+        FilterCutoffHz = FilterCutoffHz <= MinCutoffHz ? MaxCutoffHz : Clamp(FilterCutoffHz, MinCutoffHz, MaxCutoffHz);
+        FilterResonance = Clamp(FilterResonance, MinResonance, MaxResonance);
     }
 
     /// <summary>A value that is not a number at all reads as the low end rather than poisoning the voice.</summary>

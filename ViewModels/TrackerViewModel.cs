@@ -272,6 +272,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     partial void OnSongNameChanged(string value) => MarkDirty();
 
+    /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
+    public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
+
     /// <summary>Something about the song changed and the file on disk no longer matches.</summary>
     private void MarkDirty() => IsDirty = true;
 

@@ -54,6 +54,13 @@ public class Knob : ThemedControl
     public static readonly StyledProperty<string> FormatProperty =
         AvaloniaProperty.Register<Knob, string>(nameof(Format), "0.00");
 
+    /// <summary>
+    /// Shown instead of the number, for a knob whose position is not what it means: a filter
+    /// cutoff moves in octaves, so the dial holds 0 to 1 and this says what that is in hertz.
+    /// </summary>
+    public static readonly StyledProperty<string> DisplayProperty =
+        AvaloniaProperty.Register<Knob, string>(nameof(Display), "");
+
     public static readonly StyledProperty<double> DialSizeProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(DialSize), 34.0);
 
@@ -73,9 +80,9 @@ public class Knob : ThemedControl
     {
         AffectsRender<Knob>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
-            UnitProperty, FormatProperty, DialSizeProperty);
+            UnitProperty, FormatProperty, DisplayProperty, DialSizeProperty);
 
-        AffectsMeasure<Knob>(LabelProperty, UnitProperty, FormatProperty, DialSizeProperty);
+        AffectsMeasure<Knob>(LabelProperty, UnitProperty, FormatProperty, DisplayProperty, DialSizeProperty);
     }
 
     public Knob()
@@ -132,6 +139,12 @@ public class Knob : ThemedControl
         set => SetValue(FormatProperty, value);
     }
 
+    public string Display
+    {
+        get => GetValue(DisplayProperty);
+        set => SetValue(DisplayProperty, value);
+    }
+
     public double DialSize
     {
         get => GetValue(DialSizeProperty);
@@ -144,7 +157,8 @@ public class Knob : ThemedControl
         set => SetValue(DefaultValueProperty, value);
     }
 
-    public string ValueText => NumericInput.Format(Value, Format) + Unit;
+    public string ValueText =>
+        string.IsNullOrEmpty(Display) ? NumericInput.Format(Value, Format) + Unit : Display;
 
     protected override Size MeasureOverride(Size availableSize)
     {

@@ -119,6 +119,7 @@ public sealed class InstrumentLibrary : ISampleUsage
             instrument.EnsureId();
             instrument.Patch ??= new Synth.SynthPatch();
             instrument.Patch.Clamp();
+            instrument.EnsureShape();
 
             return instrument;
         }

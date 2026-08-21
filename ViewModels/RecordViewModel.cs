@@ -136,6 +136,12 @@ public sealed partial class RecordViewModel : ObservableObject
     public IRelayCommand<Recording> EditRecordingCommand => new RelayCommand<Recording>(EditRecording);
     public IAsyncRelayCommand<Recording> DeleteRecordingCommand => new AsyncRelayCommand<Recording>(DeleteRecording);
 
+    /// <summary>
+    /// Raised with the path of a recording whose audio has changed, so anything playing it
+    /// from memory can read it again.
+    /// </summary>
+    public event EventHandler<string>? RecordingChanged;
+
     private void RefreshDevices()
     {
         string? previous = SelectedDevice ?? _cfg.RecordInputDevice;
@@ -265,6 +271,9 @@ public sealed partial class RecordViewModel : ObservableObject
 
             CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
             recording.DurationMs = ReadDurationMs(recording.FilePath);
+
+            // An instrument built on this file is holding the old audio in memory, so say so.
+            RecordingChanged?.Invoke(this, recording.FilePath);
 
             Status = $"Trimmed '{recording.Name}' to {TimeSpan.FromMilliseconds(recording.DurationMs):mm\\:ss\\.fff}";
             return true;

@@ -45,7 +45,18 @@ public sealed class TrackerInstrument
     /// <summary>0-1 gain applied on top of the cell's volume column.</summary>
     public double Volume { get; set; } = 1.0;
 
+    /// <summary>
+    /// Kept for files written before the shape existed, and kept in step with it since: an
+    /// older build reads this and still loops.
+    /// </summary>
     public bool Loop { get; set; }
+
+    /// <summary>
+    /// Which part of the recording plays, and how it repeats. Null on an instrument written
+    /// before samples had a shape at all, which is the one reliable sign that its envelope
+    /// was never heard: see <see cref="EnsureShape"/>.
+    /// </summary>
+    public SampleShape? Shape { get; set; }
 
     [JsonIgnore]
     public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
@@ -55,6 +66,23 @@ public sealed class TrackerInstrument
     {
         get => new(BaseNoteSemitone);
         set => BaseNoteSemitone = value.Semitone;
+    }
+
+    /// <summary>An instrument that plays a recording, with the envelope out of the way.</summary>
+    public static TrackerInstrument CreateSample(string name, string filePath, Note baseNote)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Sample,
+            FilePath = filePath,
+            BaseNote = baseNote
+        };
+
+        instrument.EnsureId();
+        instrument.EnsureShape();
+
+        return instrument;
     }
 
     /// <summary>A synth instrument with the starting patch, ready to be edited.</summary>
@@ -81,6 +109,44 @@ public sealed class TrackerInstrument
     }
 
     /// <summary>
+    /// Straightens the sample settings, for anything read off disk. An instrument saved before
+    /// there was a shape carries its loop as a flag, so that is what the shape starts from;
+    /// after that the two are kept saying the same thing.
+    /// </summary>
+    public void EnsureShape()
+    {
+        if (Shape == null)
+        {
+            Shape = new SampleShape();
+
+            // A sample used to be handed to the audio library whole, so whatever its patch
+            // says was never heard. Playing it through the voice now would put a decay on
+            // every recording that has one, so the envelope opens flat instead.
+            if (!IsSynth) FlattenEnvelope();
+        }
+
+        Shape.Clamp();
+
+        if (Loop && Shape.LoopMode == SampleLoopMode.None) Shape.LoopMode = SampleLoopMode.Forward;
+
+        Loop = Shape.IsLooping;
+    }
+
+    /// <summary>
+    /// The envelope a recording starts with: none. It plays as it was recorded until the note
+    /// ends, and the short release is only there so a note off does not click.
+    /// </summary>
+    public void FlattenEnvelope()
+    {
+        Patch ??= new SynthPatch();
+
+        Patch.AttackMs = 0;
+        Patch.DecayMs = 0;
+        Patch.Sustain = 1;
+        Patch.ReleaseMs = 20;
+    }
+
+    /// <summary>
     /// Takes on another instrument's sound and name, keeping this object. A song's copy is
     /// refreshed this way, so everything already pointing at it stays pointing at it.
     /// </summary>
@@ -96,6 +162,7 @@ public sealed class TrackerInstrument
         BaseNoteSemitone = other.BaseNoteSemitone;
         Volume = other.Volume;
         Loop = other.Loop;
+        Shape = other.Shape?.Clone();
     }
 
     public TrackerInstrument Clone() => new()
@@ -107,6 +174,7 @@ public sealed class TrackerInstrument
         FilePath = FilePath,
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,
-        Loop = Loop
+        Loop = Loop,
+        Shape = Shape?.Clone()
     };
 }

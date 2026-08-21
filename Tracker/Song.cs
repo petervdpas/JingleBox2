@@ -218,6 +218,7 @@ public sealed class Song
         {
             instrument.Patch ??= new Synth.SynthPatch();
             instrument.Patch.Clamp();
+            instrument.EnsureShape();
         }
 
         EnsureTrackInstruments();

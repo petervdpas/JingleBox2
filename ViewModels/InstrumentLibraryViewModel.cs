@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
@@ -30,6 +31,9 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
     private readonly SynthPresetStore _presets = new();
     private readonly IInstrumentAudition _audition;
     private readonly ObservableCollection<Recording> _recordings;
+
+    /// <summary>Reads a sample down to peaks, so a sample instrument can show its shape.</summary>
+    private readonly IWaveformService? _waveforms;
     private readonly DispatcherTimer _saveTimer;
 
     private TrackerInstrument? _pendingSave;
@@ -37,11 +41,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
     public InstrumentLibraryViewModel(
         InstrumentLibrary library,
         IInstrumentAudition audition,
-        ObservableCollection<Recording> recordings)
+        ObservableCollection<Recording> recordings,
+        IWaveformService? waveforms = null)
     {
         _library = library;
         _audition = audition;
         _recordings = recordings;
+        _waveforms = waveforms;
 
         _saveTimer = new DispatcherTimer { Interval = SaveDelay };
         _saveTimer.Tick += (_, _) => Flush();
@@ -171,7 +177,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
 
         Editor = value == null
             ? null
-            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited);
+            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms);
 
         if (value?.Instrument.IsSynth == true) PresetName = value.Name;
     }
@@ -214,15 +220,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
             return;
         }
 
-        var instrument = new TrackerInstrument
-        {
-            Name = UniqueName(recording.Name),
-            FilePath = recording.FilePath,
-            BaseNote = Note.C4
-        };
-
-        instrument.EnsureId();
-        Add(instrument);
+        Add(TrackerInstrument.CreateSample(UniqueName(recording.Name), recording.FilePath, Note.C4));
     }
 
     private void Duplicate()
