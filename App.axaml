@@ -63,6 +63,12 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <Style Selector="Button.armed">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+            </Setter>
+            <Setter Property="Foreground" Value="White" />
+        </Style>
         <Style Selector="Button.danger">
             <Setter Property="Foreground">
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />

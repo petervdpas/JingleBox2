@@ -26,7 +26,18 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private PatternCursor cursor = PatternCursor.Start;
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
-    [ObservableProperty] private bool isPlaying;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPlaying))]
+    [NotifyPropertyChangedFor(nameof(IsPaused))]
+    [NotifyPropertyChangedFor(nameof(IsStopped))]
+    [NotifyPropertyChangedFor(nameof(CanPause))]
+    private TrackerTransportState transport = TrackerTransportState.Stopped;
+
+    /// <summary>Typed notes are written into the pattern only while this is on.</summary>
+    [ObservableProperty] private bool isRecording;
+
+    [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Song;
     [ObservableProperty] private int octave = 4;
     [ObservableProperty] private int selectedInstrument;
     [ObservableProperty] private int editStep = 1;
@@ -35,6 +46,9 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public ObservableCollection<TrackerInstrument> Instruments { get; } = new();
     public ObservableCollection<string> OrderEntries { get; } = new();
+    public ObservableCollection<SongFile> SavedSongs { get; } = new();
+
+    [ObservableProperty] private SongFile? selectedSongFile;
 
     public TrackerViewModel(IAudioEngine audio, ObservableCollection<Recording> recordings)
     {
@@ -46,9 +60,11 @@ public sealed partial class TrackerViewModel : ObservableObject
         currentPattern = song.Patterns[0];
 
         _player.PositionChanged += OnPositionChanged;
+        _player.StateChanged += OnPlayerStateChanged;
         _player.Stopped += OnPlayerStopped;
 
         RefreshOrder();
+        RefreshSavedSongs();
     }
 
     public double Bpm
@@ -75,14 +91,28 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public int TrackCount => Song.TrackCount;
 
-    public IRelayCommand PlaySongCommand => new RelayCommand(() => Play(TrackerPlayMode.Song));
-    public IRelayCommand PlayPatternCommand => new RelayCommand(() => Play(TrackerPlayMode.Pattern));
+    public bool IsPlaying => Transport == TrackerTransportState.Playing;
+    public bool IsPaused => Transport == TrackerTransportState.Paused;
+    public bool IsStopped => Transport == TrackerTransportState.Stopped;
+
+    /// <summary>Pause only means anything while something is running.</summary>
+    public bool CanPause => Transport == TrackerTransportState.Playing;
+
+    /// <summary>The two things the play button can walk through.</summary>
+    public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Song, TrackerPlayMode.Pattern };
+
+    public IRelayCommand PlayCommand => new RelayCommand(Play);
+    public IRelayCommand PauseCommand => new RelayCommand(Pause);
     public IRelayCommand StopCommand => new RelayCommand(Stop);
+    public IRelayCommand ToggleRecordCommand => new RelayCommand(() => IsRecording = !IsRecording);
     public IRelayCommand AddPatternCommand => new RelayCommand(AddPattern);
     public IRelayCommand RemoveOrderEntryCommand => new RelayCommand(RemoveOrderEntry);
     public IRelayCommand AddTrackCommand => new RelayCommand(() => SetTrackCount(Song.TrackCount + 1));
     public IRelayCommand RemoveTrackCommand => new RelayCommand(() => SetTrackCount(Song.TrackCount - 1));
     public IRelayCommand SaveCommand => new RelayCommand(Save);
+    public IRelayCommand LoadCommand => new RelayCommand(Load);
+    public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
+    public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
     public IRelayCommand<Recording> AddInstrumentCommand => new RelayCommand<Recording>(AddInstrument);
     public IRelayCommand<TrackerInstrument> RemoveInstrumentCommand =>
         new RelayCommand<TrackerInstrument>(RemoveInstrument);
@@ -90,14 +120,20 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
     public ObservableCollection<Recording> AvailableRecordings => _recordings;
 
-    private void Play(TrackerPlayMode mode)
+    private void Play()
     {
         try
         {
+            if (Transport == TrackerTransportState.Paused)
+            {
+                _player.Resume();
+                Status = "Resumed";
+                return;
+            }
+
             Song.Normalize();
-            _player.Play(Song, new TrackerPosition(OrderIndex, 0), mode);
-            IsPlaying = true;
-            Status = mode == TrackerPlayMode.Pattern ? "Playing pattern" : "Playing song";
+            _player.Play(Song, new TrackerPosition(OrderIndex, 0), PlayMode);
+            Status = PlayMode == TrackerPlayMode.Pattern ? "Playing pattern" : "Playing song";
         }
         catch (Exception ex)
         {
@@ -105,10 +141,15 @@ public sealed partial class TrackerViewModel : ObservableObject
         }
     }
 
+    private void Pause()
+    {
+        _player.Pause();
+        Status = "Paused";
+    }
+
     private void Stop()
     {
         _player.Stop();
-        IsPlaying = false;
         PlayingLine = -1;
         Status = "Stopped";
     }
@@ -124,19 +165,29 @@ public sealed partial class TrackerViewModel : ObservableObject
             }
         });
 
+    /// <summary>
+    /// The player owns the transport state; the view model only mirrors it. Deriving it here
+    /// instead is what let a teardown from one run switch the buttons off during the next.
+    /// </summary>
+    private void OnPlayerStateChanged(object? sender, TrackerTransportState state) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            Transport = state;
+            if (state == TrackerTransportState.Stopped) PlayingLine = -1;
+        });
+
     private void OnPlayerStopped(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(() =>
         {
-            IsPlaying = false;
-            PlayingLine = -1;
-
             var failed = _player.FailedInstruments;
-            Status = failed.Count > 0
-                ? $"Stopped. {failed.Count} instrument file(s) could not be loaded."
-                : "Stopped";
+            if (failed.Count > 0)
+                Status = $"Stopped. {failed.Count} instrument file(s) could not be loaded.";
         });
 
     partial void OnOrderIndexChanged(int value) => CurrentPattern = Song.PatternAt(value);
+
+    partial void OnIsRecordingChanged(bool value) =>
+        Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";
 
     /// <summary>Auditions the note under the cursor's instrument, for note entry feedback.</summary>
     public void PreviewNote(Note note)
@@ -147,16 +198,20 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public void EnterNote(Note note)
     {
-        if (CurrentPattern == null) return;
-
-        PatternEdit.EnterNote(CurrentPattern, Cursor, note, SelectedInstrument);
         PreviewNote(note);
-        StepDown();
+
+        if (CurrentPattern == null || !IsRecording) return;
+
+        // While playing, notes land on the line you can hear, not the line you left the cursor on.
+        var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
+
+        PatternEdit.EnterNote(CurrentPattern, target, note, SelectedInstrument);
+        if (!IsPlaying) StepDown();
     }
 
     public void EnterNoteOff()
     {
-        if (CurrentPattern == null) return;
+        if (CurrentPattern == null || !IsRecording) return;
 
         PatternEdit.EnterNoteOff(CurrentPattern, Cursor);
         StepDown();
@@ -164,19 +219,19 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public void EnterHexDigit(char digit)
     {
-        if (CurrentPattern == null) return;
+        if (CurrentPattern == null || !IsRecording) return;
         if (PatternEdit.EnterHexDigit(CurrentPattern, Cursor, digit)) StepDown();
     }
 
     public void EnterEffectCommand(char command)
     {
-        if (CurrentPattern == null) return;
+        if (CurrentPattern == null || !IsRecording) return;
         PatternEdit.EnterEffectCommand(CurrentPattern, Cursor, command);
     }
 
     public void ClearAtCursor()
     {
-        if (CurrentPattern == null) return;
+        if (CurrentPattern == null || !IsRecording) return;
 
         PatternEdit.ClearAtCursor(CurrentPattern, Cursor);
         StepDown();
@@ -184,12 +239,12 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public void InsertLine()
     {
-        if (CurrentPattern != null) PatternEdit.InsertLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null && IsRecording) PatternEdit.InsertLine(CurrentPattern, Cursor);
     }
 
     public void DeleteLine()
     {
-        if (CurrentPattern != null) PatternEdit.DeleteLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null && IsRecording) PatternEdit.DeleteLine(CurrentPattern, Cursor);
     }
 
     public void MoveCursor(int lineDelta, int trackDelta, int columnDelta)
@@ -281,17 +336,111 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     private void Save()
     {
+        string name = SongName.Trim();
+        if (name.Length == 0)
+        {
+            Status = "Give the song a name before saving.";
+            return;
+        }
+
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            Status = "That name cannot be used as a file name.";
+            return;
+        }
+
         try
         {
-            Song.Name = SongName;
-            string path = _store.PathFor(SongName);
+            SongName = name;
+            Song.Name = name;
+
+            string path = _store.PathFor(name);
             _store.Save(Song, path);
-            Status = $"Saved to {Path.GetFileName(path)}";
+
+            RefreshSavedSongs();
+            SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == path);
+            Status = $"Saved '{name}'";
         }
         catch (Exception ex)
         {
             Status = $"Save failed: {ex.Message}";
         }
+    }
+
+    private void Load()
+    {
+        var file = SelectedSongFile;
+        if (file == null)
+        {
+            Status = "Pick a song to open.";
+            return;
+        }
+
+        var loaded = _store.Load(file.Path);
+        if (loaded == null)
+        {
+            Status = $"'{file.Name}' could not be read.";
+            return;
+        }
+
+        Adopt(loaded, file.Name);
+        Status = $"Opened '{file.Name}'";
+    }
+
+    private void NewSong()
+    {
+        Adopt(Song.CreateDefault(), "untitled");
+        SelectedSongFile = null;
+        Status = "New song";
+    }
+
+    /// <summary>
+    /// Swaps in a different song and brings every view-facing collection with it. Loading
+    /// touches the pattern, the order, the instruments, and the cursor, so it all happens here
+    /// rather than being spread across the callers.
+    /// </summary>
+    private void Adopt(Song replacement, string name)
+    {
+        _player.Stop();
+
+        replacement.Normalize();
+
+        Song = replacement;
+        SongName = name;
+        Song.Name = name;
+
+        OrderIndex = 0;
+        CurrentPattern = Song.PatternAt(0);
+        Cursor = PatternCursor.Start.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
+        PlayingLine = -1;
+
+        SyncInstruments();
+        RefreshOrder();
+
+        // The tempo and track count live on the song, so the whole transport bar is stale.
+        OnPropertyChanged(nameof(Bpm));
+        OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(TrackCount));
+    }
+
+    private void SyncInstruments()
+    {
+        Instruments.Clear();
+        foreach (var instrument in Song.Instruments)
+            Instruments.Add(instrument);
+
+        SelectedInstrument = Song.Instruments.Count > 0 ? 0 : 0;
+    }
+
+    private void RefreshSavedSongs()
+    {
+        string? keep = SelectedSongFile?.Path;
+
+        SavedSongs.Clear();
+        foreach (var file in _store.ListSongs())
+            SavedSongs.Add(file);
+
+        SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == keep);
     }
 
     public void Dispose() => _player.Dispose();

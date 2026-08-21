@@ -39,6 +39,17 @@ public sealed class SongStore
             ? Directory.GetFiles(SongsDirectory, "*" + Extension).OrderBy(p => p).ToArray()
             : Array.Empty<string>();
 
+    /// <summary>Saved songs as name and path, ready for a picker.</summary>
+    public IReadOnlyList<SongFile> ListSongs() =>
+        List().Select(path => new SongFile(Path.GetFileNameWithoutExtension(path), path)).ToArray();
+
+    public bool Exists(string songName) => File.Exists(PathFor(songName));
+
+    public void Delete(string filePath)
+    {
+        if (File.Exists(filePath)) File.Delete(filePath);
+    }
+
     public void Save(Song song, string filePath)
     {
         song.Normalize();

@@ -18,10 +18,20 @@
 
     <!-- Transport -->
     <Border DockPanel.Dock="Top" Classes="card stacked">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <Button Content="▶ Song" Command="{Binding PlaySongCommand}" />
-        <Button Content="▶ Pattern" Command="{Binding PlayPatternCommand}" />
-        <Button Content="⏹ Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsPlaying}" />
+      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+        <Button Content="⏺" ToolTip.Tip="Record: typing writes into the pattern"
+                MinWidth="40"
+                Classes.armed="{Binding IsRecording}"
+                Command="{Binding ToggleRecordCommand}" />
+        <Button Content="▶" ToolTip.Tip="Play" MinWidth="40" Command="{Binding PlayCommand}" />
+        <Button Content="⏸" ToolTip.Tip="Pause" MinWidth="40"
+                Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}" />
+        <Button Content="⏹" ToolTip.Tip="Stop" MinWidth="40" Command="{Binding StopCommand}" />
+
+        <ComboBox ItemsSource="{Binding PlayModes}"
+                  SelectedItem="{Binding PlayMode}"
+                  MinWidth="104"
+                  Margin="6,0,0,0" />
 
         <TextBlock Classes="field" Text="BPM" Margin="12,0,0,0" />
         <NumericUpDown Value="{Binding Bpm}" Minimum="20" Maximum="400" FormatString="0" Width="104" />
@@ -44,13 +54,27 @@
 
     <!-- Status -->
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-        <TextBlock Grid.Column="0" Classes="field" Text="Song:" />
-        <TextBox Grid.Column="1" Text="{Binding SongName}" />
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <Button Content="Save" Command="{Binding SaveCommand}" />
-        </StackPanel>
-      </Grid>
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="field" Text="Open:" />
+          <ComboBox Grid.Column="1"
+                    ItemsSource="{Binding SavedSongs}"
+                    SelectedItem="{Binding SelectedSongFile}"
+                    HorizontalAlignment="Stretch"
+                    PlaceholderText="No saved songs" />
+          <Button Grid.Column="2" Content="Open" Command="{Binding LoadCommand}" />
+          <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshSongsCommand}" />
+          <Button Grid.Column="4" Content="New" Command="{Binding NewSongCommand}" />
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="field" Text="Save as:" />
+          <TextBox Grid.Column="1" Text="{Binding SongName}" />
+          <Button Grid.Column="2" Content="Save" Command="{Binding SaveCommand}" />
+        </Grid>
+
+        <TextBlock Classes="cardHint" Text="{Binding Status}" />
+      </StackPanel>
     </Border>
 
     <Grid ColumnDefinitions="180,*,220" ColumnSpacing="12">

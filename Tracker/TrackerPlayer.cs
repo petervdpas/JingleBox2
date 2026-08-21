@@ -36,6 +36,12 @@ public sealed class TrackerPlayer : IDisposable
     private Thread? _clock;
     private CancellationTokenSource? _cancel;
 
+    /// <summary>
+    /// Bumped every time playback is torn down. A clock thread that is on its way out can
+    /// still be mid-callback, and its events must not overwrite the state of a newer run.
+    /// </summary>
+    private int _generation;
+
     private Song? _song;
     private TrackerSequencer? _sequencer;
     private int[] _voices = Array.Empty<int>();
@@ -45,9 +51,16 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>Raised from the clock thread. Marshal before touching UI.</summary>
     public event EventHandler<TrackerPosition>? PositionChanged;
 
+    /// <summary>Raised on every transport change, from whichever thread caused it.</summary>
+    public event EventHandler<TrackerTransportState>? StateChanged;
+
     public event EventHandler? Stopped;
 
-    public bool IsPlaying { get; private set; }
+    public TrackerTransportState State { get; private set; } = TrackerTransportState.Stopped;
+
+    public bool IsPlaying => State == TrackerTransportState.Playing;
+
+    public bool IsPaused => State == TrackerTransportState.Paused;
 
     public TrackerPosition Position { get; private set; } = TrackerPosition.Start;
 
@@ -62,8 +75,8 @@ public sealed class TrackerPlayer : IDisposable
     public void Play(Song song, TrackerPosition from, TrackerPlayMode mode = TrackerPlayMode.Song)
     {
         ArgumentNullException.ThrowIfNull(song);
-        Stop();
 
+        Teardown();
         _audio.EnsureInitialized();
 
         lock (_lock)
@@ -76,12 +89,51 @@ public sealed class TrackerPlayer : IDisposable
         }
 
         _bank.Preload(song.Instruments);
+        StartClock();
+    }
 
+    /// <summary>Continues from where a pause left off. Does nothing when not paused.</summary>
+    public void Resume()
+    {
+        if (State != TrackerTransportState.Paused) return;
+
+        Song? song;
+        lock (_lock) song = _song;
+        if (song == null) return;
+
+        _audio.EnsureInitialized();
+        StartClock();
+    }
+
+    /// <summary>Freezes at the current step. The voices are cut, the position is kept.</summary>
+    public void Pause()
+    {
+        if (State != TrackerTransportState.Playing) return;
+
+        Teardown();
+        SetState(TrackerTransportState.Paused);
+    }
+
+    public void Stop()
+    {
+        Teardown();
+
+        bool wasRunning = State != TrackerTransportState.Stopped;
+        Position = TrackerPosition.Start;
+
+        SetState(TrackerTransportState.Stopped);
+        if (wasRunning) Stopped?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void StartClock()
+    {
         _cancel = new CancellationTokenSource();
         var token = _cancel.Token;
+        int generation = Interlocked.Increment(ref _generation);
 
-        IsPlaying = true;
-        _clock = new Thread(() => RunClock(token))
+        SetState(TrackerTransportState.Playing);
+
+        _clock = new Thread(() => RunClock(token, generation))
         {
             IsBackground = true,
             Name = "JingleBox2 tracker clock",
@@ -91,8 +143,11 @@ public sealed class TrackerPlayer : IDisposable
         _clock.Start();
     }
 
-    public void Stop()
+    /// <summary>Stops the clock and silences the voices without deciding what state follows.</summary>
+    private void Teardown()
     {
+        Interlocked.Increment(ref _generation);
+
         var cancel = _cancel;
         var clock = _clock;
 
@@ -104,14 +159,15 @@ public sealed class TrackerPlayer : IDisposable
             clock.Join(TimeSpan.FromSeconds(1));
 
         cancel?.Dispose();
-
         StopAllVoices();
+    }
 
-        if (IsPlaying)
-        {
-            IsPlaying = false;
-            Stopped?.Invoke(this, EventArgs.Empty);
-        }
+    private void SetState(TrackerTransportState state)
+    {
+        if (State == state) return;
+
+        State = state;
+        StateChanged?.Invoke(this, state);
     }
 
     /// <summary>Sounds a single note, for auditioning while editing. Independent of playback.</summary>
@@ -131,7 +187,7 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>
     public void ReloadInstrument(string filePath) => _bank.Invalidate(filePath);
 
-    private void RunClock(CancellationToken token)
+    private void RunClock(CancellationToken token, int generation)
     {
         Song song;
         TrackerSequencer sequencer;
@@ -151,6 +207,8 @@ public sealed class TrackerPlayer : IDisposable
 
         while (!token.IsCancellationRequested)
         {
+            if (generation != Volatile.Read(ref _generation)) return;
+
             ApplyEvents(sequencer.EventsFor(song, position), song);
             Position = position;
             PositionChanged?.Invoke(this, position);
@@ -166,11 +224,13 @@ public sealed class TrackerPlayer : IDisposable
             if (!WaitUntil(clock, nextLine, token)) return;
         }
 
-        if (!token.IsCancellationRequested)
+        // Ran off the end on its own rather than being stopped. A newer run may already have
+        // started, in which case this thread has no business touching the transport.
+        if (!token.IsCancellationRequested && generation == Volatile.Read(ref _generation))
         {
-            // Ran off the end on its own rather than being stopped.
             StopAllVoices();
-            IsPlaying = false;
+            Position = TrackerPosition.Start;
+            SetState(TrackerTransportState.Stopped);
             Stopped?.Invoke(this, EventArgs.Empty);
         }
     }
