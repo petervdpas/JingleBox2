@@ -111,6 +111,12 @@ public sealed partial class PluginChainViewModel : ObservableObject
             return;
         }
 
+        if (PluginCrashGuard.IsLoadBlocked(plugin))
+        {
+            Status = PluginCrashGuard.Reason(plugin);
+            return;
+        }
+
         var effect = PluginHost.Load(plugin, Target.SampleRate, MaxFrames);
         if (effect == null)
         {

@@ -21,11 +21,11 @@ public partial class PluginStrip : UserControl
         // from: the strip's menu, a song being opened, or a pad profile changing.
         DataContextChanged += (_, _) =>
         {
-            if (_chain != null) _chain.DeviceClosing -= PluginWindow.Close;
+            if (_chain != null) _chain.DeviceClosing -= PluginWindow.CloseFor;
 
             _chain = DataContext as PluginChainViewModel;
 
-            if (_chain != null) _chain.DeviceClosing += PluginWindow.Close;
+            if (_chain != null) _chain.DeviceClosing += PluginWindow.CloseFor;
         };
     }
 

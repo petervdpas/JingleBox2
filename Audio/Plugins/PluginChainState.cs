@@ -122,7 +122,10 @@ public static class PluginChainState
 
         foreach (var saved in config.Devices)
         {
-            var effect = PluginHost.Load(saved.Path, saved.Id, saved.Format, sampleRate, maxFrames);
+            // Built with the name it was saved under, so anything the host has to say about
+            // this plugin later can call it what the user calls it.
+            var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format);
+            var effect = PluginHost.Load(described, sampleRate, maxFrames);
 
             if (effect == null)
             {

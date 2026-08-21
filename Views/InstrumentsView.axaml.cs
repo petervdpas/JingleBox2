@@ -115,7 +115,7 @@ public partial class InstrumentsView : UserControl
         editor.Closing -= CloseOpenEditor;
         _openEditor = null;
 
-        PluginWindow.Close(editor);
+        PluginWindow.CloseFor(editor);
     }
 
     private void NewFromPlugin_Click(object? sender, RoutedEventArgs e)

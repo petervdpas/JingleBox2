@@ -72,7 +72,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         {
             // Written down before the plugin is touched, because if it goes down there is no
             // afterwards in which to write anything.
-            PluginCrashGuard.Opening(Plugin.Info);
+            PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
 
             try
             {
@@ -159,10 +159,16 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         var editor = Editor;
         Editor = null;
 
-        editor?.Dispose();
+        if (editor == null) return;
 
-        // Closed by hand, which means opening it did not kill anything.
-        if (editor != null) PluginCrashGuard.Survived(Plugin.Info);
+        // Taking a plugin's window away is as likely to go wrong as putting it up, and a
+        // crash there used to leave nothing behind to find afterwards: the note from opening
+        // had already been rubbed out. So closing is written down too.
+        PluginCrashGuard.Risky(Plugin.Info, PluginStage.Window);
+
+        editor.Dispose();
+
+        PluginCrashGuard.Survived(Plugin.Info);
 
         OnPropertyChanged(nameof(Editor));
         OnPropertyChanged(nameof(HasOwnWindow));

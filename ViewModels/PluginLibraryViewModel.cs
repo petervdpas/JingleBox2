@@ -145,8 +145,12 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     {
         Audio.Plugins.PluginCrashGuard.AllowEverything();
 
+        // Anything kept out of the pickers for being unloadable comes back into them.
+        Sort();
+
         OnPropertyChanged(nameof(BlockedPlugins));
         OnPropertyChanged(nameof(HasBlockedPlugins));
+
 
         Status = "Those plugins may open their own windows again.";
     }
@@ -169,7 +173,9 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         foreach (var plugin in Plugins)
         {
-            if (plugin.CanInsert) Effects.Add(plugin);
+            // Not offered if loading it is what killed the last run. It stays on the list
+            // above, where the reason for that is shown and can be undone.
+            if (plugin.CanInsert && !Audio.Plugins.PluginCrashGuard.IsLoadBlocked(plugin)) Effects.Add(plugin);
         }
 
         OnPropertyChanged(nameof(HasPlugins));

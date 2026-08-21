@@ -188,6 +188,13 @@ internal static unsafe class Vst3RunLoop
 
         foreach (var timer in due)
         {
+            // Asked again, right before ringing. A plugin closing its window takes its timers
+            // away, and it can do that from inside another one of its own timers or from the
+            // call that closes it. The list copied a moment ago may already name something
+            // that has been deleted, and ringing a deleted object is a crash in somebody
+            // else's code with our name on it.
+            if (!StillWanted(timer.Handler, Timers)) continue;
+
             try
             {
                 Call(timer.Handler);
@@ -226,6 +233,10 @@ internal static unsafe class Vst3RunLoop
         for (int index = 0; index < watching.Length; index++)
         {
             if (!ready[index]) continue;
+
+            // Same again: a plugin shutting down takes its files back, and telling a handler
+            // that no longer exists about one is a crash on the way out of a window.
+            if (!StillWatched(watching[index].Handler)) continue;
 
             try
             {
@@ -320,6 +331,34 @@ internal static unsafe class Vst3RunLoop
 
     [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
     private static extern int Poll(PollFile* files, nuint count, int timeoutMilliseconds);
+
+    /// <summary>True when this timer is still one the plugin wants ringing.</summary>
+    private static bool StillWanted(nint handler, List<Timer> timers)
+    {
+        lock (Gate)
+        {
+            foreach (var timer in timers)
+            {
+                if (timer.Handler == handler) return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>True when this file is still one the plugin wants watching.</summary>
+    private static bool StillWatched(nint handler)
+    {
+        lock (Gate)
+        {
+            foreach (var watch in Watches)
+            {
+                if (watch.Handler == handler) return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Rings one timer, through the fourth entry of its table.</summary>
     private static void Call(nint handler)

@@ -16,18 +16,39 @@ namespace JingleBox2.Audio.Plugins;
 public static class PluginHost
 {
     /// <summary>Opens a plugin, whichever standard it speaks.</summary>
-    public static IPluginEffect? Load(string path, string id, PluginFormat format, int sampleRate, int maxFrames)
-    {
-        return format switch
-        {
-            PluginFormat.Vst3 => Vst3Plugin.Load(path, id, sampleRate, maxFrames),
-            _ => ClapEffect.Load(path, id, sampleRate, maxFrames)
-        };
-    }
-
     public static IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
     {
-        return plugin == null ? null : Load(plugin.Path, plugin.Id, plugin.Format, sampleRate, maxFrames);
+        return Open(plugin, sampleRate, maxFrames) as IPluginEffect;
+    }
+
+    /// <summary>
+    /// Opens a plugin with the crash guard around it.
+    /// </summary>
+    /// <remarks>
+    /// Loading is where a plugin gets to run its own start-up code, which is exactly the sort
+    /// of thing that goes wrong on somebody else's machine. Written down before and rubbed out
+    /// after, so that a plugin which kills the application on the way in is not tried again on
+    /// the way back up. See <see cref="PluginCrashGuard"/>.
+    /// </remarks>
+    private static object? Open(PluginInfo? plugin, int sampleRate, int maxFrames)
+    {
+        if (plugin == null) return null;
+
+        // A plugin that killed the last run while loading does not get to load this one.
+        if (PluginCrashGuard.IsLoadBlocked(plugin)) return null;
+
+        PluginCrashGuard.Risky(plugin, PluginStage.Load);
+
+        try
+        {
+            return plugin.Format == PluginFormat.Vst3
+                ? Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames)
+                : ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+        }
+        finally
+        {
+            PluginCrashGuard.Survived(plugin);
+        }
     }
 
     /// <summary>
@@ -43,12 +64,13 @@ public static class PluginHost
     {
         if (plugin == null || plugin.Format != PluginFormat.Vst3) return null;
 
-        return Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+        return Open(plugin, sampleRate, maxFrames) as IPluginInstrument;
     }
 
     /// <summary>True when this host can play notes into a plugin of this kind.</summary>
     public static bool CanPlay(PluginInfo plugin) =>
-        plugin != null && plugin.IsInstrument && plugin.Format == PluginFormat.Vst3;
+        plugin != null && plugin.IsInstrument && plugin.Format == PluginFormat.Vst3 &&
+        !PluginCrashGuard.IsLoadBlocked(plugin);
 
     /// <summary>Every directory either standard keeps plugins in, plus the user's own.</summary>
     public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)

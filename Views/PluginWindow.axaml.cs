@@ -82,21 +82,31 @@ public partial class PluginWindow : Window
 
         Open[key] = window;
 
-        window.Closed += (_, _) =>
+        // On the way out rather than after. The plugin has to be taken out of its window
+        // while that window still exists: letting the window go first leaves the plugin
+        // drawing into something that is not there, which is a crash on closing rather than
+        // on opening.
+        window.Closing += (_, _) =>
         {
-            Open.Remove(key);
-            closed?.Invoke();
-
             // The plugin's interface goes with the window. The plugin itself carries on
             // playing; only its picture is put away.
             panel.Close();
         };
 
+        window.Closed += (_, _) =>
+        {
+            Open.Remove(key);
+            closed?.Invoke();
+        };
+
         window.Show(owner);
     }
 
-    /// <summary>Closes a window, for whatever owned it going away.</summary>
-    public static void Close(object key)
+    /// <summary>
+    /// Closes a window, for whatever owned it going away. Named apart from Window.Close so
+    /// that closing a key and closing a window cannot be mistaken for each other.
+    /// </summary>
+    public static void CloseFor(object key)
     {
         if (key == null || !Open.TryGetValue(key, out var window)) return;
 

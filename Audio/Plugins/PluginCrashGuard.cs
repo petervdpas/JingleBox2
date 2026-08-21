@@ -5,6 +5,16 @@ using System.Text.Json;
 
 namespace JingleBox2.Audio.Plugins;
 
+/// <summary>What the host was doing with a plugin when everything stopped.</summary>
+public enum PluginStage
+{
+    /// <summary>Opening or closing the plugin's own window.</summary>
+    Window = 0,
+
+    /// <summary>Loading the plugin at all, before any audio or any window.</summary>
+    Load = 1
+}
+
 /// <summary>One plugin that took the application down, and when.</summary>
 public sealed class PluginCrash
 {
@@ -16,6 +26,13 @@ public sealed class PluginCrash
 
     /// <summary>When it happened, so a note about it can say something better than "once".</summary>
     public DateTime When { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// What was being done at the time. A plugin that cannot open a window is still a plugin
+    /// that plays; one that cannot be loaded is of no use at all, and the two are not the
+    /// same punishment.
+    /// </summary>
+    public PluginStage Stage { get; set; } = PluginStage.Window;
 }
 
 /// <summary>
@@ -116,28 +133,57 @@ public static class PluginCrashGuard
 
             Blocked_.AddRange(Load<List<PluginCrash>>(BlockedFile) ?? new List<PluginCrash>());
 
-            var left = Load<PluginCrash>(MarkerFile);
-            if (left == null) return;
+            var left = Load<List<PluginCrash>>(MarkerFile);
+            if (left == null || left.Count == 0) return;
 
-            // The last run died with this plugin's window opening. That is what the note is
-            // for, and it is the only way this file survives a run.
-            if (!Holds(left.Path, left.Id))
+            // The last run died with these in the middle of something. That is what the notes
+            // are for, and the only way they survive a run is if nobody got to rub them out.
+            bool added = false;
+
+            foreach (var note in left)
             {
-                Blocked_.Insert(0, left);
-                Save(BlockedFile, Blocked_);
+                if (Holds(note.Path, note.Id)) continue;
+
+                Blocked_.Insert(0, note);
+                added = true;
             }
 
-            Rub();
+            if (added) Save(BlockedFile, Blocked_);
+
+            Marks.Clear();
+            Write();
         }
     }
 
-    /// <summary>True when this plugin is not to be given a window.</summary>
+    /// <summary>True when this plugin is not to be given a window of its own.</summary>
     public static bool IsBlocked(PluginInfo? plugin)
     {
         if (plugin == null) return false;
 
         Read();
         lock (Gate) return Holds(plugin.Path, plugin.Id);
+    }
+
+    /// <summary>
+    /// True when this plugin is not to be loaded at all, because loading it is what killed
+    /// the application last time.
+    /// </summary>
+    public static bool IsLoadBlocked(PluginInfo? plugin)
+    {
+        if (plugin == null) return false;
+
+        Read();
+
+        lock (Gate)
+        {
+            foreach (var blocked in Blocked_)
+            {
+                if (blocked.Stage == PluginStage.Load && Same(blocked.Path, blocked.Id, plugin.Path, plugin.Id))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>What to tell somebody who asked for a window they are not getting.</summary>
@@ -157,37 +203,78 @@ public static class PluginCrashGuard
 
         string when = crash == null ? "" : " on " + crash.When.ToString("d MMMM, HH:mm");
 
-        return $"'{plugin.Name}' brought the application down while opening its own window{when}. " +
-               "Its knobs are shown here instead. The sound is unaffected: it still plays and still saves.";
+        if (crash != null && crash.Stage == PluginStage.Load)
+        {
+            return $"'{plugin.Name}' brought the application down while being loaded{when}, " +
+                   "so it is not being loaded again.";
+        }
+
+        return $"'{plugin.Name}' brought the application down while its own window was opening " +
+               $"or closing{when}. Its knobs are shown here instead. The sound is unaffected: it " +
+               "still plays and still saves.";
     }
 
+    /// <summary>What is in the middle of happening, ready to be written down.</summary>
+    private static readonly List<PluginCrash> Marks = new();
+
     /// <summary>
-    /// About to hand this plugin a window. Written down before rather than after, because
-    /// afterwards may not happen.
+    /// About to do something with this plugin that has been known to kill a host. Written down
+    /// before rather than after, because afterwards may not happen.
     /// </summary>
-    public static void Opening(PluginInfo? plugin)
+    /// <remarks>
+    /// More than one can be in the air at once: a song opening loads a chain while somebody
+    /// has a window up, so these are kept as a list rather than a single note. If the worst
+    /// happens with two in flight both are blocked, which is the safe way round and either
+    /// can be let through again.
+    /// </remarks>
+    public static void Risky(PluginInfo? plugin, PluginStage stage)
     {
         if (plugin == null) return;
 
         Read();
 
-        Save(MarkerFile, new PluginCrash
+        lock (Gate)
         {
-            Path = plugin.Path,
-            Id = plugin.Id,
-            Name = plugin.Name,
-            When = DateTime.Now
-        });
+            Marks.RemoveAll(mark => Same(mark.Path, mark.Id, plugin.Path, plugin.Id) && mark.Stage == stage);
+
+            Marks.Add(new PluginCrash
+            {
+                Path = plugin.Path,
+                Id = plugin.Id,
+                Name = plugin.Name,
+                Stage = stage,
+                When = DateTime.Now
+            });
+
+            Write();
+        }
     }
 
     /// <summary>
-    /// The window has been up long enough to be believed. The note comes off.
+    /// That went well. The note comes off.
     /// </summary>
     public static void Survived(PluginInfo? plugin)
     {
         if (plugin == null) return;
 
-        Rub();
+        lock (Gate)
+        {
+            if (Marks.RemoveAll(mark => Same(mark.Path, mark.Id, plugin.Path, plugin.Id)) == 0) return;
+
+            Write();
+        }
+    }
+
+    /// <summary>Writes down whatever is in the air, or rubs the note out when nothing is.</summary>
+    private static void Write()
+    {
+        if (Marks.Count == 0)
+        {
+            Rub();
+            return;
+        }
+
+        Save(MarkerFile, Marks);
     }
 
     /// <summary>
