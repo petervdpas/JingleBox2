@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Media;
+using Avalonia.Threading;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
@@ -55,6 +56,16 @@ public partial class RecordView : UserControl
     private bool _onScreen;
 
     /// <summary>
+    /// A theme swap and other re-templating detach this page and put it straight back. Closing
+    /// the input on the way out and opening it again on the way in would lose the routing every
+    /// time, since the system wires a new capture stream to its own default, so a departure has
+    /// to prove itself before the input is let go.
+    /// </summary>
+    private DispatcherTimer? _closing;
+
+    private static readonly TimeSpan CloseDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>
     /// The input is watched while this page is up, so the meter reads before a take rather
     /// than only during one. It is closed again on the way out: holding a capture device open
     /// for a tab nobody is looking at is rude to whatever else wants the microphone.
@@ -86,9 +97,40 @@ public partial class RecordView : UserControl
 
         if (vm == null) return;
 
-        if (_onScreen) vm.StartInputMonitoring();
-        else vm.StopInputMonitoring();
+        if (_onScreen)
+        {
+            _closing?.Stop();
+            vm.StartInputMonitoring();
+            return;
+        }
+
+        ScheduleClose(vm);
     }
+
+    /// <summary>Lets go of the input only if the page is still gone a moment later.</summary>
+    private void ScheduleClose(RecordViewModel vm)
+    {
+        _closing ??= new DispatcherTimer { Interval = CloseDelay };
+        _closing.Stop();
+
+        void Close(object? sender, EventArgs e)
+        {
+            _closing!.Tick -= Close;
+            _closing.Stop();
+
+            if (!_onScreen) vm.StopInputMonitoring();
+        }
+
+        _closing.Tick += Close;
+        _closing.Start();
+    }
+
+    /// <summary>
+    /// Opening the list is the moment it has to be right: a program only appears in the graph
+    /// while it is playing, so what was true a minute ago usually is not.
+    /// </summary>
+    private void Routes_DropDownOpened(object? sender, EventArgs e) =>
+        (DataContext as RecordViewModel)?.RefreshRoutesCommand.Execute(null);
 
     private WaveformData? CurrentWaveform() => (this.DataContext as RecordViewModel)?.CurrentWaveform;
 

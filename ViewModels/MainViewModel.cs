@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Midi;
 using JingleBox2.Tracker;
@@ -80,7 +81,8 @@ public sealed partial class MainViewModel : ObservableObject
         AppConfig cfg,
         IMidiService midiService,
         IRecordingService recordingService,
-        IWaveformService waveformService)
+        IWaveformService waveformService,
+        IAudioRouting routing)
     {
         _audio = audio;
         _pickFileAsync = pickFileAsync;
@@ -88,7 +90,7 @@ public sealed partial class MainViewModel : ObservableObject
         _cfg = cfg;
 
         Midi = new MidiViewModel(store, cfg, midiService);
-        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
 
         // Instruments are their own library, shared by every song, and built from recordings
         // on the INSTRUMENTS tab. The tracker borrows the library to fill a song's slots.

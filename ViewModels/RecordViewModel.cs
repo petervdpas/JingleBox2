@@ -4,10 +4,12 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Models;
 using JingleBox2.Views;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -25,6 +27,29 @@ public sealed partial class RecordViewModel : ObservableObject
     private readonly AppConfig _cfg;
     private Stopwatch _recordingTimer = new();
     private System.Timers.Timer? _levelUpdateTimer;
+    private readonly IAudioRouting _routing;
+
+    /// <summary>Set while a route is being read back, so showing it does not re-apply it.</summary>
+    private bool _readingRoute;
+
+    /// <summary>Set while one is being applied, so reading it back does not start another.</summary>
+    private bool _applyingRoute;
+
+    /// <summary>Set while the graph is being read, so ticks do not pile up on each other.</summary>
+    private bool _refreshingRoutes;
+
+    /// <summary>Watches the graph while the page is open, so a source that appears is used.</summary>
+    private DispatcherTimer? _routeWatch;
+
+    /// <summary>Two seconds is quick enough to feel automatic and slow enough to be cheap.</summary>
+    private static readonly TimeSpan RouteWatchInterval = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// What was picked, as opposed to what happens to be wired up. The input is reopened every
+    /// time this page comes back, and the system wires the new stream to its own default, so
+    /// without this a choice would last until the next tab switch.
+    /// </summary>
+    private AudioRoute? _preferredRoute;
     private readonly DispatcherTimer _gainSaveTimer;
     private bool _gainLoaded;
     private bool _deviceLoaded;
@@ -66,8 +91,10 @@ public sealed partial class RecordViewModel : ObservableObject
     public bool HasNameError => NameError != null;
     public bool CanRecord => !IsRecording && NameError == null;
 
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing)
     {
+        _routing = routing;
+
         _cfg = cfg;
         _recordingService = recordingService;
         _levelMeter = levelMeter;
@@ -277,6 +304,165 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>What the input can be taken from, where the system lets that be chosen.</summary>
+    public ObservableCollection<AudioRoute> Routes { get; } = new();
+
+    [ObservableProperty] private AudioRoute? selectedRoute;
+
+    /// <summary>False on a system with no graph to patch, and the picker stays hidden.</summary>
+    public bool IsRoutingAvailable => _routing.IsAvailable;
+
+    public IRelayCommand RefreshRoutesCommand => new RelayCommand(RefreshRoutes);
+
+    /// <summary>
+    /// Reads the graph and shows what is feeding the recorder. The tools take a moment, so
+    /// this happens off the UI thread.
+    /// </summary>
+    private async void RefreshRoutes()
+    {
+        if (!_routing.IsAvailable || _refreshingRoutes) return;
+
+        try
+        {
+            _refreshingRoutes = true;
+
+            var routes = await Task.Run(() => _routing.GetRoutes());
+            var current = await Task.Run(() => _routing.GetCurrentRoute());
+
+            _readingRoute = true;
+
+            Merge(routes);
+
+            // Match by node: the list is read afresh, so the object from before is not in it.
+            var showing = current == null ? null : Routes.FirstOrDefault(r => r.Node == current.Node);
+            if (!ReferenceEquals(showing, SelectedRoute)) SelectedRoute = showing;
+
+            _readingRoute = false;
+            RestorePreferred(current);
+        }
+        catch (Exception ex)
+        {
+            Status = $"Could not read the audio routing: {ex.Message}";
+        }
+        finally
+        {
+            _readingRoute = false;
+            _refreshingRoutes = false;
+        }
+    }
+
+    /// <summary>
+    /// Keeps an eye on the graph while the page is up. A program appears in it only while it
+    /// is playing, so a source picked before it started, or restarted since, would otherwise
+    /// sit there unconnected until someone pressed Refresh.
+    /// </summary>
+    private void StartRouteWatch()
+    {
+        if (!_routing.IsAvailable || _routeWatch != null) return;
+
+        _routeWatch = new DispatcherTimer { Interval = RouteWatchInterval };
+        _routeWatch.Tick += (_, _) => RefreshRoutes();
+        _routeWatch.Start();
+    }
+
+    private void StopRouteWatch()
+    {
+        _routeWatch?.Stop();
+        _routeWatch = null;
+    }
+
+    /// <summary>
+    /// Brings the list up to date without rebuilding it. Clearing and refilling would drop the
+    /// selection and shut a dropdown that is open at the time, which is exactly when this runs.
+    /// </summary>
+    private void Merge(IReadOnlyList<AudioRoute> routes)
+    {
+        for (int i = Routes.Count - 1; i >= 0; i--)
+        {
+            if (!routes.Any(r => r.Node == Routes[i].Node)) Routes.RemoveAt(i);
+        }
+
+        for (int i = 0; i < routes.Count; i++)
+        {
+            var route = routes[i];
+            int existing = IndexOfRoute(route.Node);
+
+            if (existing < 0) Routes.Insert(Math.Min(i, Routes.Count), route);
+            else if (Routes[existing] != route) Routes[existing] = route;
+        }
+    }
+
+    private int IndexOfRoute(string node)
+    {
+        for (int i = 0; i < Routes.Count; i++)
+        {
+            if (Routes[i].Node == node) return i;
+        }
+
+        return -1;
+    }
+
+    partial void OnSelectedRouteChanged(AudioRoute? value)
+    {
+        if (_readingRoute || value == null) return;
+
+        // Picked, rather than merely being shown: this is the one to put back later.
+        _preferredRoute = value;
+        ApplyRoute(value, announce: true);
+    }
+
+    /// <summary>
+    /// Puts the chosen source back after the input has been reopened. Silent when the choice is
+    /// already in place, and gives up when whatever was chosen has since stopped playing.
+    /// </summary>
+    private void RestorePreferred(AudioRoute? current)
+    {
+        if (_applyingRoute || _preferredRoute == null) return;
+        if (current != null && current.Node == _preferredRoute.Node) return;
+
+        var still = Routes.FirstOrDefault(r => r.Node == _preferredRoute.Node);
+        if (still == null) return;
+
+        // A retry, not a request: it says nothing unless it works, since the source coming and
+        // going is normal and there is nothing for anyone to do about it.
+        ApplyRoute(still, announce: false);
+    }
+
+    /// <summary>
+    /// Rewires the input. Off the UI thread: connecting runs a handful of command line tools,
+    /// and half a second of frozen window is not something a dropdown should cost.
+    /// </summary>
+    private async void ApplyRoute(AudioRoute route, bool announce)
+    {
+        if (_applyingRoute) return;
+
+        try
+        {
+            _applyingRoute = true;
+            if (announce) Status = $"Taking audio from {route.Name}...";
+
+            // Applying it replaces whatever the system wired up, which is the whole point.
+            bool connected = await Task.Run(() => _routing.Connect(route));
+
+            // Show what was applied, without that showing counting as a new choice.
+            _readingRoute = true;
+            var showing = Routes.FirstOrDefault(r => r.Node == route.Node);
+            if (connected && showing != null) SelectedRoute = showing;
+            _readingRoute = false;
+
+            if (connected) Status = $"Recording from {route.Display}";
+            else if (announce) Status = $"{route.Name} is not giving anything to record yet. It will be picked up as soon as it does.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Could not change the input: {ex.Message}";
+        }
+        finally
+        {
+            _applyingRoute = false;
+        }
+    }
+
     /// <summary>
     /// Watches the input's level without keeping any of it, so the meter is live while a gain
     /// is being set. Called when the RECORD page comes up.
@@ -287,6 +473,11 @@ public sealed partial class RecordViewModel : ObservableObject
         {
             _recordingService.StartMonitoring();
             StartLevelPolling();
+
+            // The recorder only appears in the graph once it is listening, so the routes are
+            // read after the input is open, not before.
+            RefreshRoutes();
+            StartRouteWatch();
         }
         catch (Exception ex)
         {
@@ -301,6 +492,7 @@ public sealed partial class RecordViewModel : ObservableObject
 
         if (_recordingService.IsRecording) return;
 
+        StopRouteWatch();
         StopLevelPolling();
 
         Level = 0;

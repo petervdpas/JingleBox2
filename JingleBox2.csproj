@@ -22,6 +22,7 @@
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="ManagedBass.Wasapi" Version="4.0.2" />
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.2" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="ManagedBass" Version="4.0.2" />
@@ -34,6 +35,9 @@
   <ItemGroup>
     <None Include="native\win-x64\bass.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
     <None Include="native\win-x64\bass_aac.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
+    <!-- Recording what an output is playing. Optional: without it the RECORD page simply has no
+         monitor entries, so a build with no basswasapi.dll is a smaller feature set, not a break. -->
+    <None Include="native\win-x64\basswasapi.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="Exists('native\win-x64\basswasapi.dll') And ('$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'))" />
     <None Include="native/linux-x64/libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass.so')">
       <TargetPath>runtimes/linux-x64/native/libbass.so</TargetPath>
     </None>
@@ -60,6 +64,7 @@
   <Target Name="CopyBassToOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
+    <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
   </Target>
   <Target Name="CopyBassToLinuxOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
     <Copy SourceFiles="native/linux-x64/libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
@@ -68,5 +73,6 @@
   <Target Name="EnsureBassDllInPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
+    <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
   </Target>
 </Project>

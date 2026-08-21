@@ -45,12 +45,30 @@ public interface IRecordingService
 
     byte[] GetRecentRecordingData(int maxBytes);
     Task<string> SaveRecordingAsync(string fileName);
+
+    /// <summary>
+    /// The output to record the playback of, or null to record from the selected input device.
+    /// Setting it while the input is open reopens it on the other path.
+    /// </summary>
+    int? LoopbackDevice { get; set; }
+
+    /// <summary>The outputs whose playback can be captured. Empty where the system cannot.</summary>
+    IReadOnlyList<LoopbackDevice> GetLoopbackDevices();
+
+    /// <summary>
+    /// Closes and reopens the input if anything is listening, for a change that only takes
+    /// effect on a fresh capture. Does nothing when nothing is open.
+    /// </summary>
+    void ReopenInput();
 }
 
 public sealed class RecordingService : IRecordingService, IDisposable
 {
     private const int NoDevice = int.MinValue;
     private const int DefaultDevice = -1;
+
+    private const int DefaultSampleRate = 44100;
+    private const int DefaultChannels = 2;
 
     private int _recordHandle;
     private readonly string _recordingsDir;
@@ -66,10 +84,50 @@ public sealed class RecordingService : IRecordingService, IDisposable
     /// the input all afternoon costs nothing.
     /// </summary>
     private const int MonitorBufferBytes = 44100 / 5 * 4;
-    private readonly int _sampleRate = 44100;
-    private readonly int _channels = 2;
+
+    /// <summary>
+    /// How long the recent window keeps answering after the last audio arrived. A source that
+    /// stops sending stops the callbacks with it, and without this the meter would sit at
+    /// whatever it was reading when the sound stopped.
+    /// </summary>
+    private const long RecentDataStaleMs = 200;
+
+    /// <summary>When audio last came in, for telling silence apart from nothing at all.</summary>
+    private long _lastDataTick = long.MinValue / 2;
+    private readonly WasapiLoopback _loopback = new();
+
+    // What the current capture is running at. Loopback comes in at whatever the output mixes
+    // at, usually 48k, and the WAV is written at that rate rather than being resampled.
+    private int _sampleRate = 44100;
+    private int _channels = 2;
+    private int? _loopbackDevice;
 
     public int Channels => _channels;
+
+    public IReadOnlyList<LoopbackDevice> GetLoopbackDevices() => WasapiLoopback.GetDevices();
+
+    public int? LoopbackDevice
+    {
+        get => _loopbackDevice;
+        set
+        {
+            if (_loopbackDevice == value) return;
+
+            _loopbackDevice = value;
+
+            // Reopen on the other path if something is listening, so the change is heard now
+            // rather than at the next take.
+            ReopenInput();
+        }
+    }
+
+    public void ReopenInput()
+    {
+        if (!_capturing) return;
+
+        CloseInput();
+        OpenInput();
+    }
     private int _initializedDevice = NoDevice;
     private int _resolvedDevice = NoDevice;
     private RecordProcedure? _recordCallback;
@@ -215,6 +273,23 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     private void StartOnDevice(int deviceIndex)
     {
+        // Recording what an output is playing is a different capture altogether, so it takes
+        // the other path and none of the device handling below applies to it.
+        if (_loopbackDevice is int loopback)
+        {
+            if (!_loopback.Start(loopback, OnLoopbackData))
+                throw new InvalidOperationException("The output could not be captured.");
+
+            _sampleRate = _loopback.SampleRate;
+            _channels = _loopback.Channels;
+            _capturing = true;
+
+            return;
+        }
+
+        _sampleRate = DefaultSampleRate;
+        _channels = DefaultChannels;
+
         if (_initializedDevice != deviceIndex)
         {
             FreeDevice();
@@ -260,6 +335,13 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (!_capturing) return;
 
+        if (_loopback.IsRunning)
+        {
+            _loopback.Stop();
+            _capturing = false;
+            return;
+        }
+
         Bass.ChannelStop(_recordHandle);
         Bass.StreamFree(_recordHandle);
         _recordHandle = 0;
@@ -284,6 +366,10 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     public byte[] GetRecentRecordingData(int maxBytes)
     {
+        // Nothing has arrived for a while: the source is not sending, which is silence and not
+        // the last thing it sent.
+        if (Environment.TickCount64 - _lastDataTick > RecentDataStaleMs) return Array.Empty<byte>();
+
         lock (_recordingBuffer)
         {
             if (_recordingBuffer.Count == 0) return Array.Empty<byte>();
@@ -324,10 +410,37 @@ public sealed class RecordingService : IRecordingService, IDisposable
         });
     }
 
+    /// <summary>
+    /// Audio from the loopback capture. It has already been turned into 16 bit samples, so from
+    /// here it goes the same way as anything from a microphone.
+    /// </summary>
+    private void OnLoopbackData(byte[] data)
+    {
+        if (data.Length == 0) return;
+
+        _lastDataTick = Environment.TickCount64;
+
+        if (ApplyGainAndDetectClipping(data))
+        {
+            _lastClipTick = Environment.TickCount64;
+            _clippedDuringTake = true;
+        }
+
+        lock (_recordingBuffer)
+        {
+            _recordingBuffer.AddRange(data);
+
+            if (!_isRecording && _recordingBuffer.Count > MonitorBufferBytes)
+                _recordingBuffer.RemoveRange(0, _recordingBuffer.Count - MonitorBufferBytes);
+        }
+    }
+
     private bool OnRecordData(int handle, IntPtr buffer, int length, IntPtr user)
     {
         if (buffer != IntPtr.Zero && length > 0)
         {
+            _lastDataTick = Environment.TickCount64;
+
             byte[] data = new byte[length];
             System.Runtime.InteropServices.Marshal.Copy(buffer, data, 0, length);
 

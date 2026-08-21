@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Midi;
 using JingleBox2.ViewModels;
@@ -18,6 +19,10 @@ public partial class MainWindow : Window
     private readonly IMidiService _midi = new MidiService();
     private readonly IRecordingService _recording = new RecordingService();
     private readonly IWaveformService _waveform = new WaveformService();
+
+    // What the machine can be asked to record: a graph to patch on Linux, an output's playback
+    // on Windows, and nothing at all elsewhere, in which case the RECORD page hides the picker.
+    private readonly IAudioRouting _routing;
 
     private AppConfig? _cfg;
     private DispatcherTimer? _saveWindowTimer;
@@ -38,6 +43,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        _routing = AudioRouting.Create(_recording);
 
         var cfg = _store.LoadOrCreateDefault();
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
@@ -60,7 +67,7 @@ public partial class MainWindow : Window
             return files.Count == 1 ? files[0].Path.LocalPath : null;
         }
 
-        var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi, _recording, _waveform);
+        var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi, _recording, _waveform, _routing);
         DataContext = vm;
 
         var version = Assembly.GetExecutingAssembly()
