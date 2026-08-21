@@ -219,6 +219,9 @@ public sealed class TrackerPlayer : IDisposable
     /// </summary>
     public (float Left, float Right) LevelFor(int track)
     {
+        // Asked several times a second by the meters, and before anything has played there is
+        // no mixer yet. Building one here would fix the rate before the device is even open.
+        if (!_synth.HasMixer) return (0, 0);
         if (track < 0 || track >= _noteGain.Length) return (0, 0);
 
         var (left, right) = _synth.Mixer.LevelFor(track);
@@ -231,6 +234,15 @@ public sealed class TrackerPlayer : IDisposable
     /// are whatever the device asks for; anything longer than this is fed through in pieces.
     /// </summary>
     public const int MaxPluginFrames = 2048;
+
+    /// <summary>What the engine is running at, which is what a plugin here has to be built for.</summary>
+    public int SampleRate => _synth.SampleRate;
+
+    /// <summary>
+    /// Asks the engine to run at a rate, or at the device's own. Only heard before the first
+    /// note, so it comes from settings when the tracker is built.
+    /// </summary>
+    public void UseSampleRate(int rate) => _synth.UseSampleRate(rate);
 
     /// <summary>
     /// The chain of effects on a track, made and put into the mix the first time it is asked
@@ -277,7 +289,7 @@ public sealed class TrackerPlayer : IDisposable
         {
             var chain = ChainFor(track);
             missing.AddRange(PluginChainState.Restore(
-                chain, song.Mix[track].Plugins, SynthOutput.SampleRate, MaxPluginFrames));
+                chain, song.Mix[track].Plugins, _synth.SampleRate, MaxPluginFrames));
         }
 
         return missing;

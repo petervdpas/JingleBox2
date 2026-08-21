@@ -67,10 +67,16 @@
                   <ToggleButton Classes="tiny" Content="⏻"
                                 IsChecked="{Binding IsBypassed}"
                                 ToolTip.Tip="Switch it off without taking it out" />
+
+                  <Button Classes="tiny" Content="⤢"
+                          Click="OnOpenDevice"
+                          ToolTip.Tip="Open this one in a window of its own" />
                 </StackPanel>
 
                 <Border.ContextMenu>
                   <ContextMenu>
+                    <MenuItem Header="Open in a window" Click="OnOpenDevice" />
+                    <Separator />
                     <MenuItem Header="Move earlier" Command="{Binding MoveLeftCommand}" />
                     <MenuItem Header="Move later" Command="{Binding MoveRightCommand}" />
                     <Separator />
@@ -121,28 +127,7 @@
            and scroll rather than pushing the page about. -->
       <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto"
                     IsVisible="{Binding HasSelection}">
-        <ItemsControl ItemsSource="{Binding Selected.Parameters}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <WrapPanel Orientation="Horizontal" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:PluginParameterViewModel">
-              <views:Knob Margin="0,0,10,6"
-                          DialSize="30"
-                          Label="{Binding Name}"
-                          Display="{Binding Text}"
-                          Minimum="{Binding Minimum}"
-                          Maximum="{Binding Maximum}"
-                          DefaultValue="{Binding Default}"
-                          SmallStep="{Binding SmallStep}"
-                          LargeStep="{Binding LargeStep}"
-                          Value="{Binding Value}" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <views:PluginParameters DataContext="{Binding Selected}" />
       </ScrollViewer>
 
       <TextBlock Classes="cardHint"

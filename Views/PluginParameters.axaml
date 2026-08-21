@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             x:Class="JingleBox2.Views.PluginParameters"
+             x:DataType="vm:PluginDeviceViewModel">
+
+  <!-- One device's controls. Shared by the strip and by the window a device opens in, so a
+       plugin looks the same wherever it is being worked on. -->
+  <ItemsControl ItemsSource="{Binding Parameters}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <WrapPanel Orientation="Horizontal" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:PluginParameterViewModel">
+        <views:Knob Margin="0,0,10,6"
+                    DialSize="30"
+                    Label="{Binding Name}"
+                    Display="{Binding Text}"
+                    Minimum="{Binding Minimum}"
+                    Maximum="{Binding Maximum}"
+                    DefaultValue="{Binding Default}"
+                    SmallStep="{Binding SmallStep}"
+                    LargeStep="{Binding LargeStep}"
+                    Value="{Binding Value}" />
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

@@ -32,6 +32,51 @@ public sealed partial class MainViewModel : ObservableObject
     public TrackerViewModel Tracker { get; }
     public InstrumentLibraryViewModel Instruments { get; }
 
+    /// <summary>
+    /// What the engine runs at. Zero follows the output device, which is what keeps the audio
+    /// from being resampled on its way out and tells a plugin the rate it is really fed at.
+    /// </summary>
+    public static (int Rate, string Label)[] EngineRates { get; } =
+    {
+        (Audio.SynthOutput.FollowDevice, "Follow the output device"),
+        (44100, "44100 Hz"),
+        (48000, "48000 Hz"),
+        (96000, "96000 Hz")
+    };
+
+    public string SelectedEngineRate
+    {
+        get
+        {
+            foreach (var (rate, label) in EngineRates)
+            {
+                if (rate == _cfg.EngineSampleRate) return label;
+            }
+
+            return EngineRates[0].Label;
+        }
+        set
+        {
+            foreach (var (rate, label) in EngineRates)
+            {
+                if (label != value || _cfg.EngineSampleRate == rate) continue;
+
+                _cfg.EngineSampleRate = rate;
+                _store.Save(_cfg);
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(EngineRateHint));
+                return;
+            }
+        }
+    }
+
+    /// <summary>What is actually running, as against what has been asked for.</summary>
+    public string EngineRateHint =>
+        $"Running at {Tracker.EngineSampleRate} Hz. A change takes effect when the app is started again.";
+
+    public string[] EngineRateLabels { get; } = EngineRates.Select(r => r.Label).ToArray();
+
     /// <summary>What plugins this machine has. Scanned from SETTINGS, on demand.</summary>
     public PluginLibraryViewModel Plugins { get; private set; } = new();
 

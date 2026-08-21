@@ -97,6 +97,26 @@
 
       <Border Classes="card">
         <StackPanel Classes="cardBody">
+          <TextBlock Classes="cardTitle" Text="Engine" />
+
+          <TextBlock Classes="cardHint"
+                     Text="What the tracker, the synth and any plugins on them run at. Following the device means nothing is resampled on the way out, and a plugin is told the rate it is really being fed at." />
+
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <TextBlock Grid.Column="0" Classes="label" Text="Sample rate:" />
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding EngineRateLabels}"
+                      SelectedItem="{Binding SelectedEngineRate}"
+                      HorizontalAlignment="Left"
+                      MinWidth="220" />
+          </Grid>
+
+          <TextBlock Classes="cardHint" Text="{Binding EngineRateHint}" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Classes="cardBody">
           <TextBlock Classes="cardTitle" Text="Audio Plugins" />
 
           <TextBlock Classes="cardHint"

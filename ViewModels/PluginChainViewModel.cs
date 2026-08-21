@@ -56,10 +56,12 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
     private void Poll()
     {
-        var device = Selected;
-        if (device == null) return;
-
-        foreach (var parameter in device.Parameters) parameter.Refresh();
+        // Every device, not just the picked one: a plugin opened in a window of its own is
+        // still on screen, and its meters have to move too.
+        foreach (var device in Devices)
+        {
+            foreach (var parameter in device.Parameters) parameter.Refresh();
+        }
     }
 
     /// <summary>Everything installed, as scanned in SETTINGS.</summary>
@@ -113,6 +115,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         Devices.Add(row);
         Select(row);
+        _poll.Start();
 
         Status = "";
         OnPropertyChanged(nameof(IsEmpty));
@@ -124,9 +127,14 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         // Out of the chain first, then let go: the audio thread must not be inside something
         // that is being taken apart.
+        // A device on its way out must not leave a window of itself behind.
+        DeviceClosing?.Invoke(device);
+
         Target.Chain.Remove(device.Device);
         Devices.Remove(device);
         device.Effect.Dispose();
+
+        if (Devices.Count == 0) _poll.Stop();
 
         if (ReferenceEquals(Selected, device)) Select(Devices.Count > 0 ? Devices[0] : null);
 
@@ -152,8 +160,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         Selected = device;
 
-        // Only the device on screen is polled, and only while there is one.
-        if (device == null) _poll.Stop();
+        // Polling runs while this chain has anything in it at all.
+        if (Devices.Count == 0) _poll.Stop();
         else _poll.Start();
     }
 
@@ -164,8 +172,16 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// Reads the chain back out of whatever it is attached to. Only the boxes this view made
     /// are shown; a chain built elsewhere would need its own rows, which nothing does yet.
     /// </summary>
+    /// <summary>
+    /// Raised for a device that is going away, so anything showing it can let go. A view
+    /// concern reaching back into the view model would be worse than one event.
+    /// </summary>
+    public event System.Action<PluginDeviceViewModel>? DeviceClosing;
+
     private void Rebuild()
     {
+        foreach (var device in Devices) DeviceClosing?.Invoke(device);
+
         Devices.Clear();
         Selected = null;
 

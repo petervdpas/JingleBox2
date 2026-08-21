@@ -146,6 +146,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
 
         _player = new TrackerPlayer(audio);
+
+        // Before anything sounds: the rate cannot move once the engine is built.
+        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
         _store = new SongStore();
         _library = library;
         _recordings = recordings;
@@ -555,6 +558,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _config.IgnoreKeyVelocity = value;
         _configStore.Save(_config);
     }
+
+    /// <summary>What the engine ended up running at, for SETTINGS to report.</summary>
+    public int EngineSampleRate => _player.SampleRate;
 
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);

@@ -48,6 +48,10 @@ public sealed class AppConfig
     // keeps their plugins somewhere of their own says so here.
     public List<string> PluginFolders { get; set; } = new();
 
+    // What the tracker and synth run at. Zero means whatever the output device is running at,
+    // which is what stops everything being resampled on the way out.
+    public int EngineSampleRate { get; set; }
+
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";
 

@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.Views.PluginWindow"
+        x:DataType="vm:PluginDeviceViewModel"
+        Title="{Binding Name}"
+        Width="520"
+        Height="360"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel Margin="12">
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+      <Border Classes="badge" VerticalAlignment="Center">
+        <TextBlock Text="{Binding Name}" />
+      </Border>
+
+      <ToggleButton Content="Bypass"
+                    IsChecked="{Binding IsBypassed}"
+                    ToolTip.Tip="Switch it off without taking it out of the chain" />
+    </StackPanel>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <views:PluginParameters />
+    </ScrollViewer>
+  </DockPanel>
+</Window>

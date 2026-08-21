@@ -20,5 +20,5 @@ public sealed class TrackPluginTarget : IPluginHost
 
     public PluginChain Chain => _player.ChainFor(_track);
 
-    public int SampleRate => JingleBox2.Audio.SynthOutput.SampleRate;
+    public int SampleRate => _player.SampleRate;
 }
