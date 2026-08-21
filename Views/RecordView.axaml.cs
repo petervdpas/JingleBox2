@@ -43,10 +43,52 @@ public partial class RecordView : UserControl
                 _subscribedVm.PropertyChanged += OnViewModelPropertyChanged;
                 DrawWaveform(_subscribedVm.CurrentWaveform);
             }
+
+            // The data context can arrive after the page is already up, so the input is opened
+            // from here as well as from the attach.
+            UpdateMonitoring();
         };
     }
 
     private RecordViewModel? _subscribedVm;
+    private RecordViewModel? _monitoring;
+    private bool _onScreen;
+
+    /// <summary>
+    /// The input is watched while this page is up, so the meter reads before a take rather
+    /// than only during one. It is closed again on the way out: holding a capture device open
+    /// for a tab nobody is looking at is rude to whatever else wants the microphone.
+    /// </summary>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        _onScreen = true;
+        UpdateMonitoring();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        _onScreen = false;
+        UpdateMonitoring();
+    }
+
+    private void UpdateMonitoring()
+    {
+        var vm = DataContext as RecordViewModel;
+
+        // A view model this page has let go of must not be left holding the input open.
+        if (!ReferenceEquals(_monitoring, vm)) _monitoring?.StopInputMonitoring();
+
+        _monitoring = vm;
+
+        if (vm == null) return;
+
+        if (_onScreen) vm.StartInputMonitoring();
+        else vm.StopInputMonitoring();
+    }
 
     private WaveformData? CurrentWaveform() => (this.DataContext as RecordViewModel)?.CurrentWaveform;
 

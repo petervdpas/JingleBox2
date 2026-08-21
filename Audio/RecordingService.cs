@@ -16,6 +16,16 @@ public interface IRecordingService
     bool IsRecording { get; }
 
     /// <summary>
+    /// Opens the input to watch its level without keeping any of it, so a gain can be set
+    /// before the take rather than during it.
+    /// </summary>
+    void StartMonitoring();
+
+    void StopMonitoring();
+
+    bool IsMonitoring { get; }
+
+    /// <summary>
     /// Set when StartRecording could not use the selected device and fell back to the
     /// system default. Null when the selected device was used as-is.
     /// </summary>
@@ -46,6 +56,16 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private readonly string _recordingsDir;
     private readonly List<byte> _recordingBuffer = new();
     private bool _isRecording;
+    private bool _isMonitoring;
+
+    /// <summary>True while the input is open, whether for a take or only for the meter.</summary>
+    private bool _capturing;
+
+    /// <summary>
+    /// A fifth of a second of audio: enough for a meter to read, small enough that watching
+    /// the input all afternoon costs nothing.
+    /// </summary>
+    private const int MonitorBufferBytes = 44100 / 5 * 4;
     private readonly int _sampleRate = 44100;
     private readonly int _channels = 2;
 
@@ -59,6 +79,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     public string? SelectedDevice { get; set; }
     public bool IsRecording => _isRecording;
+    public bool IsMonitoring => _isMonitoring;
     public string? LastStartWarning { get; private set; }
 
     private int BytesPerFrame => _channels * 2;
@@ -139,13 +160,43 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         if (_isRecording) return;
 
-        LastStartWarning = null;
         _clippedDuringTake = false;
         _lastClipTick = long.MinValue / 2;
         lock (_recordingBuffer)
         {
             _recordingBuffer.Clear();
         }
+
+        // Already open for the meter: keep the same capture and start keeping what it hears,
+        // rather than closing the device and opening it again under the user.
+        if (!_capturing) OpenInput();
+
+        _isRecording = true;
+    }
+
+    public void StartMonitoring()
+    {
+        if (_isMonitoring) return;
+
+        if (!_capturing) OpenInput();
+
+        _isMonitoring = true;
+    }
+
+    public void StopMonitoring()
+    {
+        if (!_isMonitoring) return;
+
+        _isMonitoring = false;
+
+        // A take keeps the input open, whatever the meter is doing.
+        if (!_isRecording) CloseInput();
+    }
+
+    /// <summary>Opens the selected input, falling back to the default when it will not open.</summary>
+    private void OpenInput()
+    {
+        LastStartWarning = null;
 
         int deviceIndex = GetDeviceIndex(SelectedDevice);
 
@@ -192,17 +243,27 @@ public sealed class RecordingService : IRecordingService, IDisposable
             throw new InvalidOperationException($"Bass.RecordStart failed: {error}");
         }
 
-        _isRecording = true;
+        _capturing = true;
     }
 
     public void StopRecording()
     {
         if (!_isRecording) return;
 
+        _isRecording = false;
+
+        // Still watching the level: leave the input open so the meter keeps reading.
+        if (!_isMonitoring) CloseInput();
+    }
+
+    private void CloseInput()
+    {
+        if (!_capturing) return;
+
         Bass.ChannelStop(_recordHandle);
         Bass.StreamFree(_recordHandle);
         _recordHandle = 0;
-        _isRecording = false;
+        _capturing = false;
         _recordCallback = null;
 
         FreeDevice();
@@ -279,6 +340,11 @@ public sealed class RecordingService : IRecordingService, IDisposable
             lock (_recordingBuffer)
             {
                 _recordingBuffer.AddRange(data);
+
+                // Only watching the level: keep the last moment and let the rest go, or an
+                // afternoon of monitoring would fill memory with audio nobody asked for.
+                if (!_isRecording && _recordingBuffer.Count > MonitorBufferBytes)
+                    _recordingBuffer.RemoveRange(0, _recordingBuffer.Count - MonitorBufferBytes);
             }
         }
         return true;

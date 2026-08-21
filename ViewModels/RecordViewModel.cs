@@ -277,6 +277,76 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Watches the input's level without keeping any of it, so the meter is live while a gain
+    /// is being set. Called when the RECORD page comes up.
+    /// </summary>
+    public void StartInputMonitoring()
+    {
+        try
+        {
+            _recordingService.StartMonitoring();
+            StartLevelPolling();
+        }
+        catch (Exception ex)
+        {
+            Status = $"Could not open the input: {ex.Message}";
+        }
+    }
+
+    /// <summary>Stops watching, unless a take is running, which keeps the input open anyway.</summary>
+    public void StopInputMonitoring()
+    {
+        _recordingService.StopMonitoring();
+
+        if (_recordingService.IsRecording) return;
+
+        StopLevelPolling();
+
+        Level = 0;
+        LevelLeft = 0;
+        LevelRight = 0;
+        IsClipping = false;
+    }
+
+    /// <summary>
+    /// One poll for both jobs. It runs while the input is open, for a take or for the meter,
+    /// and reads the last moment of audio rather than being pushed at from the audio thread.
+    /// </summary>
+    private void StartLevelPolling()
+    {
+        if (_levelUpdateTimer != null) return;
+
+        _levelUpdateTimer = new System.Timers.Timer(50);
+        _levelUpdateTimer.Elapsed += (_, _) =>
+        {
+            var recentData = _recordingService.GetRecentRecordingData(4410);
+            var stereo = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
+
+            bool clipping = _recordingService.IsClipping;
+            bool recording = _recordingService.IsRecording;
+
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                Level = stereo.Peak;
+                LevelLeft = stereo.Left;
+                LevelRight = stereo.Right;
+                IsClipping = clipping;
+
+                if (recording) RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
+            });
+        };
+
+        _levelUpdateTimer.Start();
+    }
+
+    private void StopLevelPolling()
+    {
+        _levelUpdateTimer?.Stop();
+        _levelUpdateTimer?.Dispose();
+        _levelUpdateTimer = null;
+    }
+
     private async Task StartRecording()
     {
         ValidateName();
@@ -293,24 +363,7 @@ public sealed partial class RecordViewModel : ObservableObject
             Status = _recordingService.LastStartWarning ?? "Recording...";
 
             _recordingTimer.Restart();
-            _levelUpdateTimer = new System.Timers.Timer(50);
-            _levelUpdateTimer.Elapsed += (s, e) =>
-            {
-                var recentData = _recordingService.GetRecentRecordingData(4410);
-                var stereo = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
-
-                bool clipping = _recordingService.IsClipping;
-
-                Dispatcher.UIThread.Invoke(() =>
-                {
-                    Level = stereo.Peak;
-                    LevelLeft = stereo.Left;
-                    LevelRight = stereo.Right;
-                    IsClipping = clipping;
-                    RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
-                });
-            };
-            _levelUpdateTimer.Start();
+            StartLevelPolling();
         }
         catch (Exception ex)
         {
@@ -324,11 +377,13 @@ public sealed partial class RecordViewModel : ObservableObject
     {
         try
         {
-            _levelUpdateTimer?.Stop();
-            _levelUpdateTimer?.Dispose();
             _recordingTimer.Stop();
-
             _recordingService.StopRecording();
+
+            // The meter keeps reading if the page is still watching the input; if it is not,
+            // the poll goes with the take.
+            if (!_recordingService.IsMonitoring) StopLevelPolling();
+
             IsRecording = false;
             IsClipping = false;
 
