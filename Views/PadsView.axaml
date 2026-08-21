@@ -217,6 +217,9 @@
                     </StackPanel>
                   </Grid>
 
+                  <!-- The same slot the tracker uses, pointed at this pad. -->
+                  <views:PluginStrip DataContext="{Binding Effect}" />
+
                 </StackPanel>
               </Border>
             </DataTemplate>

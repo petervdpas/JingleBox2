@@ -460,6 +460,40 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static byte IgnoreEvent(ClapOutputEvents* list, ClapEventHeader* header) => 1;
 
+    /// <summary>
+    /// Hands over any parameter moves now, without waiting for a block. What CLAP's flush is
+    /// for: settings restored from a song have to take effect on a plugin that is not being
+    /// played yet, or the knobs would read the plugin's defaults until something did.
+    /// </summary>
+    public void FlushParameters()
+    {
+        if (_disposed || _params == null || _params->Flush == null) return;
+
+        lock (_flush)
+        {
+            TakePending();
+            if (_eventCount == 0) return;
+
+            _current = this;
+
+            try
+            {
+                _params->Flush(_plugin, _inEvents, _outEvents);
+            }
+            finally
+            {
+                _current = null;
+                _eventCount = 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Held while handing parameters over outside a block, so two of those cannot overlap.
+    /// The audio thread does not take it: it never waits on the UI thread.
+    /// </summary>
+    private readonly object _flush = new();
+
     /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
     public IReadOnlyList<ClapParameter> Parameters()
     {

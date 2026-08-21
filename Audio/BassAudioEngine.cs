@@ -28,6 +28,20 @@ public sealed class BassAudioEngine : IAudioEngine
     // ManagedBass sync must be kept alive
     private readonly SyncProcedure _endSync;
 
+    /// <summary>Effects on pads, and the BASS handles that run them.</summary>
+    private Plugins.IAudioInsert?[] _padInserts;
+
+    private int[] _padDsp;
+
+    /// <summary>Kept alive for as long as any pad has an effect: BASS holds the pointer.</summary>
+    private readonly DSPProcedure _dspProcedure;
+
+    /// <summary>One scratch buffer per pad, taken on the UI thread, used on the audio one.</summary>
+    private float[]?[] _padScratch;
+
+    /// <summary>How many channels each pad's stream carries, read when the effect is hung on.</summary>
+    private int[] _padChannels;
+
     public int PadCount { get { lock (_lock) return _padStreams.Length; } }
 
     public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged;
@@ -43,6 +57,12 @@ public sealed class BassAudioEngine : IAudioEngine
         _padFadeOut = new double[padCount];
 
         _endSync = OnChannelEnd;
+        _dspProcedure = OnPadDsp;
+
+        _padInserts = new Plugins.IAudioInsert?[padCount];
+        _padDsp = new int[padCount];
+        _padScratch = new float[padCount][];
+        _padChannels = new int[padCount];
 
         for (int i = 0; i < padCount; i++)
         {
@@ -239,12 +259,19 @@ public sealed class BassAudioEngine : IAudioEngine
 
             if (handle == 0)
             {
-                var flags = BassFlags.Prescan | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default);
+                // Float, so a plugin on this pad gets the samples as they are rather than
+                // through a conversion each way.
+                var flags = BassFlags.Prescan | BassFlags.Float
+                    | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default);
+
                 handle = Bass.CreateStream(filePath, Flags: flags);
                 if (handle == 0)
                     throw new InvalidOperationException($"CreateStream(file) failed: {Bass.LastError}");
 
                 _padStreams[padIndex] = handle;
+
+                // A pad keeps its effect across whatever it plays next.
+                if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
                 // Only register end-sync for non-looping streams; looping streams never end
                 if (!_padLoops[padIndex])
@@ -312,13 +339,15 @@ public sealed class BassAudioEngine : IAudioEngine
                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" +
                     "Referer: https://www.mixcloud.com/\r\n";
 
-                var flags = BassFlags.AutoFree | BassFlags.StreamDownloadBlocks;
+                var flags = BassFlags.AutoFree | BassFlags.StreamDownloadBlocks | BassFlags.Float;
 
                 handle = Bass.CreateStream(urlWithHeaders, 0, flags, null);
                 if (handle == 0)
                     throw new InvalidOperationException($"CreateStream(url) failed: {Bass.LastError}");
 
                 _padStreams[padIndex] = handle;
+
+                if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
                 // For streams, "end" can occur if connection drops or stream closes.
                 Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
@@ -466,6 +495,9 @@ public sealed class BassAudioEngine : IAudioEngine
 
         _padStreams[padIndex] = 0;
 
+        // The effect stays with the pad, but its hook belongs to the stream that is going.
+        _padDsp[padIndex] = 0;
+
         // Check if BASS still knows about this handle (may be auto-freed already)
         var state = Bass.ChannelIsActive(handle);
         if (state != PlaybackState.Stopped)
@@ -479,6 +511,174 @@ public sealed class BassAudioEngine : IAudioEngine
     {
         for (int i = 0; i < _padStreams.Length; i++)
             FreeStreamLocked(i);
+    }
+
+    public void SetPadInsert(int padIndex, Plugins.IAudioInsert? insert)
+    {
+        lock (_lock)
+        {
+            if (!InRange(padIndex)) return;
+
+            _padInserts[padIndex] = insert;
+
+            int handle = _padStreams[padIndex];
+            if (handle == 0) return;
+
+            // The effect is hung on whatever that pad is playing now. A pad with nothing
+            // loaded gets it when its next stream is made.
+            if (insert == null) RemoveDspLocked(padIndex, handle);
+            else AttachDspLocked(padIndex, handle);
+        }
+    }
+
+    public Plugins.IAudioInsert? GetPadInsert(int padIndex)
+    {
+        lock (_lock) return InRange(padIndex) ? _padInserts[padIndex] : null;
+    }
+
+    /// <summary>
+    /// The rate a pad's audio runs at. A plugin works out its filters from the rate it was
+    /// given, so it has to be told the rate of the thing it is actually processing, which for
+    /// a pad is the file's own rate rather than the device's.
+    /// </summary>
+    public int PadSampleRate(int padIndex)
+    {
+        lock (_lock)
+        {
+            if (!InRange(padIndex)) return 0;
+
+            int handle = _padStreams[padIndex];
+            if (handle == 0) return 0;
+
+            var info = Bass.ChannelGetInfo(handle);
+            return info.Frequency;
+        }
+    }
+
+    /// <summary>
+    /// Hangs the effect on a pad's stream, and takes everything the audio thread will need
+    /// while it is here: the channel count and a buffer to work in.
+    /// </summary>
+    /// <remarks>
+    /// Prepared here rather than in the callback on purpose. The callback runs on the audio
+    /// thread and must not allocate, and it must not ask this class anything either: this
+    /// method runs under the engine's lock, and a callback waiting for that same lock while
+    /// the lock holder waits for BASS to finish a call is a deadlock, which is an application
+    /// that stops responding rather than one that crashes.
+    /// </remarks>
+    private void AttachDspLocked(int padIndex, int handle)
+    {
+        var info = Bass.ChannelGetInfo(handle);
+
+        _padChannels[padIndex] = Math.Max(1, info.Channels);
+        _padScratch[padIndex] = new float[MaxDspFrames * 2];
+
+        if (_padDsp[padIndex] != 0) return;
+
+        _padDsp[padIndex] = Bass.ChannelSetDSP(handle, _dspProcedure, new IntPtr(padIndex));
+    }
+
+    /// <summary>
+    /// The longest block the pad effects are prepared for. BASS hands out far less than this;
+    /// anything longer is left alone rather than allocated for on the audio thread.
+    /// </summary>
+    private const int MaxDspFrames = 8192;
+
+    private void RemoveDspLocked(int padIndex, int handle)
+    {
+        if (_padDsp[padIndex] == 0) return;
+
+        Bass.ChannelRemoveDSP(handle, _padDsp[padIndex]);
+        _padDsp[padIndex] = 0;
+    }
+
+    /// <summary>
+    /// The pad's audio, on its way out, handed to whatever effect is on that pad.
+    /// </summary>
+    /// <remarks>
+    /// Runs on the audio thread with the channel's own samples in front of it. The streams are
+    /// created as float for exactly this reason: a 16 bit stream would mean converting a
+    /// buffer twice per block for no reason. A mono pad is widened into a stereo scratch and
+    /// folded back afterwards, because an effect is a stereo thing.
+    /// </remarks>
+    private void OnPadDsp(int handle, int channel, IntPtr buffer, int length, IntPtr user)
+    {
+        int padIndex = user.ToInt32();
+
+        // Read without taking the lock. This runs on the audio thread while the UI thread may
+        // be holding the lock inside a BASS call, and BASS waits for this callback to return.
+        // Waiting for that lock here is a deadlock; the arrays are only ever swapped by a
+        // resize, which stops everything first, so a local copy of the reference is enough.
+        var inserts = _padInserts;
+        var scratchpads = _padScratch;
+        var counts = _padChannels;
+
+        if (padIndex < 0 || padIndex >= inserts.Length) return;
+
+        var insert = inserts[padIndex];
+        if (insert == null) return;
+
+        int channels = Math.Max(1, counts[padIndex]);
+
+        int samples = length / sizeof(float);
+        if (samples <= 0) return;
+
+        int frames = samples / channels;
+        if (frames <= 0) return;
+
+        var scratch = scratchpads[padIndex];
+
+        // No buffer, or a block longer than anything prepared for: left alone rather than
+        // allocated for here.
+        if (scratch == null || scratch.Length < frames * 2) return;
+
+        unsafe
+        {
+            float* audio = (float*)buffer;
+
+            if (channels == 1)
+            {
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    scratch[frame * 2] = audio[frame];
+                    scratch[frame * 2 + 1] = audio[frame];
+                }
+            }
+            else
+            {
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    scratch[frame * 2] = audio[frame * channels];
+                    scratch[frame * 2 + 1] = audio[frame * channels + 1];
+                }
+            }
+
+            try
+            {
+                insert.Process(scratch, frames);
+            }
+            catch (Exception)
+            {
+                // A managed fault in an effect costs this block, not the pad.
+                return;
+            }
+
+            if (channels == 1)
+            {
+                for (int frame = 0; frame < frames; frame++)
+                    audio[frame] = (scratch[frame * 2] + scratch[frame * 2 + 1]) * 0.5f;
+            }
+            else
+            {
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    audio[frame * channels] = scratch[frame * 2];
+                    audio[frame * channels + 1] = scratch[frame * 2 + 1];
+
+                    // More than two channels on a pad is unusual; the rest are left alone.
+                }
+            }
+        }
     }
 
     public void Resize(int newPadCount)
@@ -496,6 +696,10 @@ public sealed class BassAudioEngine : IAudioEngine
             _padLoops = new bool[newPadCount];
             _padFadeIn = new double[newPadCount];
             _padFadeOut = new double[newPadCount];
+            _padInserts = new Plugins.IAudioInsert?[newPadCount];
+            _padDsp = new int[newPadCount];
+            _padScratch = new float[newPadCount][];
+            _padChannels = new int[newPadCount];
 
             for (int i = 0; i < newPadCount; i++)
             {

@@ -17,6 +17,10 @@ public sealed class PadConfig
     public double FadeIn { get; set; } = 0;
     public double FadeOut { get; set; } = 0;
     public string Color { get; set; } = "";
+
+    // The effects on this pad. Null for a pad with none, so a profile is not full of empty
+    // chains.
+    public Audio.Plugins.PluginChainConfig? Plugins { get; set; }
 }
 
 public sealed class ConfigProfile
@@ -39,6 +43,10 @@ public sealed class AppConfig
     // A velocity sensitive keyboard writes a different level for every hit. Some parts want
     // that; a kick almost never does.
     public bool IgnoreKeyVelocity { get; set; }
+
+    // Extra places to look for plugins, on top of the ones the format specifies. Someone who
+    // keeps their plugins somewhere of their own says so here.
+    public List<string> PluginFolders { get; set; } = new();
 
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";

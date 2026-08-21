@@ -32,6 +32,9 @@ public sealed partial class MainViewModel : ObservableObject
     public TrackerViewModel Tracker { get; }
     public InstrumentLibraryViewModel Instruments { get; }
 
+    /// <summary>What plugins this machine has. Scanned from SETTINGS, on demand.</summary>
+    public PluginLibraryViewModel Plugins { get; private set; } = new();
+
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
 
@@ -90,13 +93,17 @@ public sealed partial class MainViewModel : ObservableObject
         _cfg = cfg;
 
         Midi = new MidiViewModel(store, cfg, midiService);
+
+        // The plugin list keeps the folders it was told to look in, which live with the rest
+        // of the settings.
+        Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
 
         // Instruments are their own library, shared by every song, and built from recordings
         // on the INSTRUMENTS tab. The tracker borrows the library to fill a song's slots.
         var library = new InstrumentLibrary();
 
-        Tracker = new TrackerViewModel(audio, library, Record.Recordings, store, cfg);
+        Tracker = new TrackerViewModel(audio, library, Record.Recordings, store, cfg, Plugins);
         Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService);
 
         Instruments.InstrumentChanged += (_, instrument) =>
@@ -442,6 +449,11 @@ public sealed partial class MainViewModel : ObservableObject
                 PadColor = padCfg.Color
             };
 
+            // Every pad gets an effect chain of its own, pointed at itself, and whatever the
+            // profile saved is put back on it.
+            pad.UsePlugins(Plugins);
+            pad.RestoreEffects(padCfg.Plugins);
+
             pad.PropertyChanged += OnPadChanged;
             Pads.Add(pad);
         }
@@ -499,6 +511,12 @@ public sealed partial class MainViewModel : ObservableObject
             pc.FadeIn = vm.FadeIn;
             pc.FadeOut = vm.FadeOut;
             pc.Color = vm.PadColor;
+
+            // What is loaded on the pad right now, rather than what it was opened with.
+            var captured = JingleBox2.Audio.Plugins.PluginChainState.Capture(
+                _audio.GetPadInsert(i) as JingleBox2.Audio.Plugins.PluginChain);
+
+            pc.Plugins = captured.IsEmpty ? null : captured;
         }
     }
 
@@ -627,7 +645,8 @@ public sealed partial class MainViewModel : ObservableObject
         Loop = p.Loop,
         FadeIn = p.FadeIn,
         FadeOut = p.FadeOut,
-        Color = p.Color
+        Color = p.Color,
+        Plugins = p.Plugins?.Clone()
     };
 
     private static string NormalizeProfileName(string name)

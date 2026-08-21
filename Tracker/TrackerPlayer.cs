@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Plugins;
 using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker;
@@ -222,6 +224,63 @@ public sealed class TrackerPlayer : IDisposable
         var (left, right) = _synth.Mixer.LevelFor(track);
 
         return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+    }
+
+    /// <summary>
+    /// The largest block a plugin is asked to handle in one go. The audio callback's blocks
+    /// are whatever the device asks for; anything longer than this is fed through in pieces.
+    /// </summary>
+    public const int MaxPluginFrames = 2048;
+
+    /// <summary>
+    /// The chain of effects on a track, made and put into the mix the first time it is asked
+    /// for. A track with nothing on it costs an empty chain, which does nothing per block.
+    /// </summary>
+    public PluginChain ChainFor(int track)
+    {
+        if (_synth.Mixer.InsertOn(track) is PluginChain existing) return existing;
+
+        var chain = new PluginChain();
+        _synth.Mixer.SetInsert(track, chain);
+
+        return chain;
+    }
+
+    /// <summary>
+    /// Writes every track's chain into the song, ready to be saved with it.
+    /// </summary>
+    public void CaptureChains(Song song)
+    {
+        if (song == null) return;
+
+        for (int track = 0; track < song.Mix.Count; track++)
+        {
+            var chain = _synth.Mixer.InsertOn(track) as PluginChain;
+            var captured = PluginChainState.Capture(chain);
+
+            // Null rather than an empty list: a song with no effects should not be full of
+            // empty chains.
+            song.Mix[track].Plugins = captured.IsEmpty ? null : captured;
+        }
+    }
+
+    /// <summary>
+    /// Builds every track's chain from what the song holds. Returns the plugins it could not
+    /// find, so the song can say so rather than quietly sounding different.
+    /// </summary>
+    public IReadOnlyList<string> RestoreChains(Song song)
+    {
+        var missing = new List<string>();
+        if (song == null) return missing;
+
+        for (int track = 0; track < song.Mix.Count; track++)
+        {
+            var chain = ChainFor(track);
+            missing.AddRange(PluginChainState.Restore(
+                chain, song.Mix[track].Plugins, SynthOutput.SampleRate, MaxPluginFrames));
+        }
+
+        return missing;
     }
 
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>

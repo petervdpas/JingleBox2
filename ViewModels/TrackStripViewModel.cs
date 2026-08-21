@@ -48,6 +48,39 @@ public sealed class TrackStripViewModel : ObservableObject
 
     public int Track { get; }
 
+    private bool selected;
+
+    /// <summary>True for the strip the effect panel is about.</summary>
+    public bool IsSelected
+    {
+        get => selected;
+        set
+        {
+            if (selected == value) return;
+
+            selected = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private string effect = "";
+
+    /// <summary>The effect running on this track, or empty. Shown on the strip as a tag.</summary>
+    public string EffectName
+    {
+        get => effect;
+        set
+        {
+            if (effect == value) return;
+
+            effect = value ?? "";
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasEffect));
+        }
+    }
+
+    public bool HasEffect => EffectName.Length > 0;
+
     /// <summary>The same two-digit form the pattern header and the instrument badges use.</summary>
     public string Label => "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
 

@@ -22,6 +22,38 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
     public int Index { get; }
 
+    /// <summary>
+    /// The effect on this pad. Set once the pad knows which engine it plays through, so a pad
+    /// built without one simply has no slot rather than a broken one.
+    /// </summary>
+    public PluginChainViewModel? Effect { get; private set; }
+
+    /// <summary>Gives this pad its effect chain, pointed at itself.</summary>
+    public void UsePlugins(PluginLibraryViewModel plugins)
+    {
+        Effect = new PluginChainViewModel(plugins) { Target = new PadPluginTarget(_audio, Index) };
+        OnPropertyChanged(nameof(Effect));
+    }
+
+    /// <summary>
+    /// Puts back the effects this pad was saved with. A plugin that is no longer on the
+    /// machine is named rather than passed over.
+    /// </summary>
+    public void RestoreEffects(JingleBox2.Audio.Plugins.PluginChainConfig? saved)
+    {
+        if (Effect?.Target == null || saved == null || saved.IsEmpty) return;
+
+        var missing = JingleBox2.Audio.Plugins.PluginChainState.Restore(
+            Effect.Target.Chain,
+            saved,
+            Effect.Target.SampleRate,
+            PluginChainViewModel.MaxFrames);
+
+        Effect.Reload();
+
+        if (missing.Count > 0) Effect.Status = "Missing: " + string.Join(", ", missing);
+    }
+
     public static PadSourceKind[] SourceKinds { get; } =
         new[] { PadSourceKind.File, PadSourceKind.StreamUrl };
 

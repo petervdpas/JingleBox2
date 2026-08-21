@@ -14,10 +14,22 @@ public static class ClapScanner
 {
     public const string Extension = ".clap";
 
-    /// <summary>Every directory this platform keeps plugins in, whether or not it exists.</summary>
-    public static IReadOnlyList<string> SearchPaths()
+    /// <summary>
+    /// Every directory this platform keeps plugins in, plus any the user has added, whether
+    /// or not they exist.
+    /// </summary>
+    public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
     {
         var paths = new List<string>();
+
+        // The user's own folders come first: someone who names a folder means it.
+        if (extra != null)
+        {
+            foreach (var folder in extra)
+            {
+                if (!string.IsNullOrWhiteSpace(folder)) paths.Add(folder.Trim());
+            }
+        }
 
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
@@ -38,11 +50,12 @@ public static class ClapScanner
             paths.Add("/usr/local/lib/clap");
         }
 
-        // The format lets the user say where else to look, and some distributions rely on it.
-        string? extra = Environment.GetEnvironmentVariable("CLAP_PATH");
-        if (!string.IsNullOrWhiteSpace(extra))
+        // The format lets the environment say where else to look, and some distributions
+        // rely on it.
+        string? fromEnvironment = Environment.GetEnvironmentVariable("CLAP_PATH");
+        if (!string.IsNullOrWhiteSpace(fromEnvironment))
         {
-            foreach (var part in extra.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            foreach (var part in fromEnvironment.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
                 paths.Add(part.Trim());
         }
 
@@ -50,12 +63,12 @@ public static class ClapScanner
     }
 
     /// <summary>Every .clap found on the search paths, sorted by name. Unreadable ones are skipped.</summary>
-    public static IReadOnlyList<string> Bundles()
+    public static IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null)
     {
         var found = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var directory in SearchPaths())
+        foreach (var directory in SearchPaths(extra))
         {
             if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) continue;
 

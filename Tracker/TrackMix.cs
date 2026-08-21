@@ -47,6 +47,12 @@ public sealed class TrackMix
     /// <summary>How long the track takes to come back up once the key stops.</summary>
     public double DuckReleaseMs { get; set; } = DefaultDuckReleaseMs;
 
+    /// <summary>
+    /// The effects on this track, saved with the song. Null for a track that has none, so a
+    /// song file does not carry a row of empty chains.
+    /// </summary>
+    public Audio.Plugins.PluginChainConfig? Plugins { get; set; }
+
     public TrackMix Clone() => new()
     {
         Volume = Volume,
@@ -55,7 +61,8 @@ public sealed class TrackMix
         Solo = Solo,
         Duck = Duck,
         DuckFrom = DuckFrom,
-        DuckReleaseMs = DuckReleaseMs
+        DuckReleaseMs = DuckReleaseMs,
+        Plugins = Plugins?.Clone()
     };
 
     public void Clamp()

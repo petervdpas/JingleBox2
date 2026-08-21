@@ -50,4 +50,16 @@ public interface IAudioEngine : IDisposable
     void SetPadFadeOut(int padIndex, double seconds);
 
     void Resize(int newPadCount);
+
+    /// <summary>
+    /// Puts an effect in a pad's path, or takes one off with null. The effect hears that pad
+    /// and nothing else, and it stays with the pad across the next thing it plays.
+    /// </summary>
+    void SetPadInsert(int padIndex, Plugins.IAudioInsert? insert);
+
+    /// <summary>What is on a pad, or null.</summary>
+    Plugins.IAudioInsert? GetPadInsert(int padIndex);
+
+    /// <summary>The rate a pad's audio is running at, for a plugin that has to match it.</summary>
+    int PadSampleRate(int padIndex);
 }

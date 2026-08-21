@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             x:Class="JingleBox2.Views.PluginStrip"
+             x:DataType="vm:PluginChainViewModel">
+
+  <UserControl.Styles>
+    <!-- A device reads as a box you can pick up, and the picked one is lit. -->
+    <Style Selector="Border.device">
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Border.device.picked">
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+      </Setter>
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.18" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Border.device.off">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <Style Selector="Button.tiny">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- The chain: a row of devices in the order the audio goes through them, a plus to add
+       another, and the knobs of whichever one is picked. -->
+  <Border Classes="inset">
+    <StackPanel Spacing="6">
+
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Border Classes="badge" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Label}" />
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="4" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginDeviceViewModel">
+              <Border Classes="device"
+                      Classes.picked="{Binding IsSelected}"
+                      Classes.off="{Binding IsBypassed}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Classes="tiny" Content="{Binding Name}"
+                          Command="{Binding SelectCommand}"
+                          Background="Transparent" BorderThickness="0"
+                          ToolTip.Tip="Show this one's controls" />
+
+                  <ToggleButton Classes="tiny" Content="⏻"
+                                IsChecked="{Binding IsBypassed}"
+                                ToolTip.Tip="Switch it off without taking it out" />
+                </StackPanel>
+
+                <Border.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Move earlier" Command="{Binding MoveLeftCommand}" />
+                    <MenuItem Header="Move later" Command="{Binding MoveRightCommand}" />
+                    <Separator />
+                    <MenuItem Header="Remove" Command="{Binding RemoveCommand}" />
+                  </ContextMenu>
+                </Border.ContextMenu>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- The plus, holding everything installed. -->
+        <Button Classes="tiny" Content="+" Width="28"
+                IsEnabled="{Binding HasTarget}"
+                ToolTip.Tip="Add an effect to the end of the chain">
+          <Button.Flyout>
+            <Flyout Placement="Bottom">
+              <StackPanel Spacing="6" Width="240">
+                <TextBlock Classes="section" Text="Add effect" />
+
+                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding Plugins.Plugins}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Button HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Background="Transparent" BorderThickness="0"
+                                Content="{Binding Name}"
+                                Command="{Binding $parent[UserControl].((vm:PluginChainViewModel)DataContext).AddCommand}"
+                                CommandParameter="{Binding .}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+
+                <TextBlock Classes="cardHint"
+                           IsVisible="{Binding !Plugins.HasPlugins}"
+                           Text="No plugins yet. Scan for them in SETTINGS." />
+              </StackPanel>
+            </Flyout>
+          </Button.Flyout>
+        </Button>
+
+        <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Status}" />
+      </StackPanel>
+
+      <!-- The picked device's controls. A plugin with thirty of them is normal, so they wrap
+           and scroll rather than pushing the page about. -->
+      <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                    IsVisible="{Binding HasSelection}">
+        <ItemsControl ItemsSource="{Binding Selected.Parameters}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PluginParameterViewModel">
+              <views:Knob Margin="0,0,10,6"
+                          DialSize="30"
+                          Label="{Binding Name}"
+                          Display="{Binding Text}"
+                          Minimum="{Binding Minimum}"
+                          Maximum="{Binding Maximum}"
+                          DefaultValue="{Binding Default}"
+                          SmallStep="{Binding SmallStep}"
+                          LargeStep="{Binding LargeStep}"
+                          Value="{Binding Value}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <TextBlock Classes="cardHint"
+                 IsVisible="{Binding IsEmpty}"
+                 Text="No effects here. The plus adds one; right click a box to move or remove it." />
+    </StackPanel>
+  </Border>
+</UserControl>

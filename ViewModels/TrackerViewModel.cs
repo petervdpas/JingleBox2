@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Plugins;
 using JingleBox2.Config;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
@@ -39,8 +40,37 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [NotifyPropertyChangedFor(nameof(SelectedTrack))]
     [NotifyPropertyChangedFor(nameof(CursorTrackLabel))]
     private PatternCursor cursor = PatternCursor.Start;
+
+    partial void OnCursorChanged(PatternCursor value) => FollowCursorTrack();
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
+
+    /// <summary>What plugins this machine has, for the picker on the mixer page.</summary>
+    public PluginLibraryViewModel Plugins { get; }
+
+    /// <summary>
+    /// The effect slot for whichever track is picked. One slot, retargeted as the selection
+    /// moves, rather than a set of controls repeated down every channel.
+    /// </summary>
+    public PluginChainViewModel TrackEffect { get; }
+
+    /// <summary>Which track the effect slot is pointed at, so the cursor does not retarget it
+    /// on every keystroke that stays in the same column.</summary>
+    private int _effectTrack = -1;
+
+    /// <summary>
+    /// Points the effect slot at the track the cursor is on. Moving between tracks changes
+    /// what the panel under the pattern is about; moving up and down a track does not.
+    /// </summary>
+    private void FollowCursorTrack()
+    {
+        int track = Cursor.Track;
+        if (track == _effectTrack && TrackEffect.Target != null) return;
+
+        _effectTrack = track;
+
+        TrackEffect.Target = new TrackPluginTarget(_player, track);
+    }
 
     /// <summary>
     /// The block being worked on, or nothing. Kept here rather than in the grid so the menu
@@ -102,10 +132,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         InstrumentLibrary library,
         ObservableCollection<Recording> recordings,
         ConfigStore? configStore = null,
-        AppConfig? config = null)
+        AppConfig? config = null,
+        PluginLibraryViewModel? plugins = null)
     {
         _configStore = configStore;
         _config = config;
+        Plugins = plugins ?? new PluginLibraryViewModel();
+        TrackEffect = new PluginChainViewModel(Plugins);
+
 
         // Assigned to the field rather than the property: this is what was saved, not a
         // change to save again.
@@ -132,6 +166,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         RefreshSavedSongs();
         RefreshLibrary();
         RefreshStrips();
+
+        FollowCursorTrack();
     }
 
     public double Bpm
@@ -960,6 +996,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             SongName = name;
             Song.Name = name;
 
+            // What is actually loaded on the tracks is what gets saved, rather than whatever
+            // the song was opened with.
+            _player.CaptureChains(Song);
+
             string path = _store.PathFor(name);
             _store.Save(Song, path);
 
@@ -1022,6 +1062,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         SyncInstruments();
         RefreshStrips();
+
+        // The effects come back with the song. A plugin that is not on this machine is
+        // reported rather than passed over in silence.
+        var missing = _player.RestoreChains(Song);
+        if (missing.Count > 0)
+            Status = "Missing plugin(s): " + string.Join(", ", missing);
+
+        // The panel is about a track whose chain has just been rebuilt.
+        _effectTrack = -1;
+        FollowCursorTrack();
 
         // The order list is rebuilt before the slot is chosen, so a fresh song opens on its
         // first pattern rather than on nothing.
