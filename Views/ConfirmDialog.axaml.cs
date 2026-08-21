@@ -40,6 +40,35 @@ public partial class ConfirmDialog : Window
         return ShowAsync(desktop.MainWindow, title, message, confirmText);
     }
 
+    /// <summary>
+    /// The same window with nothing to decide: one button, and no red on it. Used where the
+    /// app has already made the decision and is only saying so.
+    /// </summary>
+    public static Task NoteAsync(string title, string message)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
+            || desktop.MainWindow is null)
+            return Task.CompletedTask;
+
+        var dialog = new ConfirmDialog { Title = title };
+
+        var messageText = dialog.FindControl<TextBlock>("MessageText");
+        if (messageText != null) messageText.Text = message;
+
+        var cancelButton = dialog.FindControl<Button>("CancelButton");
+        if (cancelButton != null) cancelButton.IsVisible = false;
+
+        var confirmButton = dialog.FindControl<Button>("ConfirmButton");
+        if (confirmButton != null)
+        {
+            confirmButton.Content = "OK";
+            confirmButton.Classes.Remove("danger");
+            confirmButton.IsCancel = true;
+        }
+
+        return dialog.ShowDialog<bool>(desktop.MainWindow);
+    }
+
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(false);
 
     private void Confirm_Click(object? sender, RoutedEventArgs e) => Close(true);

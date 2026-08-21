@@ -505,14 +505,28 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MarkDirty();
     }
 
+    /// <summary>
+    /// Rebuilds the order list, keeping the slot that was selected. Emptying the list makes
+    /// the ListBox drop its selection, and that writes -1 straight back into OrderIndex, which
+    /// takes the pattern off the screen with it. So the wanted slot is held here and put back
+    /// once the list is whole again.
+    /// </summary>
     private void RefreshOrder()
     {
+        int wanted = OrderIndex;
+
         OrderEntries.Clear();
         for (int i = 0; i < Song.Order.Count; i++)
         {
             var pattern = Song.PatternAt(i);
             OrderEntries.Add($"{i:00}   {pattern?.Name ?? "--"}");
         }
+
+        OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);
+
+        // Set outright rather than left to the change hook: restoring the same number is not
+        // a change, and the grid would stay empty.
+        CurrentPattern = Song.PatternAt(OrderIndex);
     }
 
     /// <summary>
@@ -725,14 +739,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SongName = name;
         Song.Name = name;
 
+        SyncInstruments();
+        RefreshStrips();
+
+        // The order list is rebuilt before the slot is chosen, so a fresh song opens on its
+        // first pattern rather than on nothing.
+        RefreshOrder();
+
         OrderIndex = 0;
         CurrentPattern = Song.PatternAt(0);
         Cursor = PatternCursor.Start.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
         PlayingLine = -1;
-
-        SyncInstruments();
-        RefreshOrder();
-        RefreshStrips();
 
         // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
         IsDirty = false;

@@ -13,6 +13,17 @@ public sealed partial class Recording : ObservableObject
     // Observable: trimming a recording changes its duration while the list is on screen.
     [ObservableProperty] private string name = "";
     [ObservableProperty] private long durationMs;
+
+    /// <summary>
+    /// The instruments that play this recording, as a phrase, or empty when nothing does. A
+    /// sample instrument points at the file itself, so one that is spoken for cannot be
+    /// deleted without silencing every song that uses it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsInUse))]
+    private string usedBy = "";
+
+    public bool IsInUse => !string.IsNullOrEmpty(UsedBy);
 }
 
 public class WaveformData

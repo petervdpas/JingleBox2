@@ -99,11 +99,31 @@ public sealed partial class MainViewModel : ObservableObject
         Tracker = new TrackerViewModel(audio, library, Record.Recordings);
         Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings);
 
-        Instruments.InstrumentChanged += (_, instrument) => Tracker.ApplyLibraryEdit(instrument);
-        Instruments.LibraryChanged += (_, _) => Tracker.RefreshLibrary();
+        Instruments.InstrumentChanged += (_, instrument) =>
+        {
+            Tracker.ApplyLibraryEdit(instrument);
+
+            // An instrument can be pointed at a different recording, which frees the old one
+            // and claims the new one.
+            Record.RefreshUsage();
+        };
+
+        Instruments.LibraryChanged += (_, _) =>
+        {
+            Tracker.RefreshLibrary();
+            Record.RefreshUsage();
+        };
 
         // And the other way: a song can put one of its own instruments into the library.
-        Tracker.LibraryChanged += (_, _) => Instruments.Refresh();
+        Tracker.LibraryChanged += (_, _) =>
+        {
+            Instruments.Refresh();
+            Record.RefreshUsage();
+        };
+
+        // A recording that an instrument is built on cannot be thrown away, so the RECORD page
+        // asks the library before it deletes anything.
+        Record.SampleUsage = library;
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

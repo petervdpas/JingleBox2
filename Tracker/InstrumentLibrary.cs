@@ -16,7 +16,7 @@ namespace JingleBox2.Tracker;
 /// by id when it opens. That way an edit here reaches every song, and a song handed to someone
 /// without your library still plays.
 /// </remarks>
-public sealed class InstrumentLibrary
+public sealed class InstrumentLibrary : ISampleUsage
 {
     public const string Extension = ".json";
 
@@ -65,6 +65,12 @@ public sealed class InstrumentLibrary
         instrument.EnsureId();
         File.WriteAllText(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
     }
+
+    /// <summary>
+    /// The instruments that play a given recording. A sample instrument owns no copy of its
+    /// file, so this is what a recording has to be asked about before it is thrown away.
+    /// </summary>
+    public IReadOnlyList<string> InstrumentsUsing(string filePath) => SampleUsage.By(List(), filePath);
 
     /// <summary>False when there was nothing to remove.</summary>
     public bool Delete(string id)

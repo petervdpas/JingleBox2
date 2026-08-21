@@ -7,6 +7,7 @@ using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Models;
+using JingleBox2.Tracker;
 using JingleBox2.Views;
 using System;
 using System.Collections.Generic;
@@ -28,6 +29,9 @@ public sealed partial class RecordViewModel : ObservableObject
     private Stopwatch _recordingTimer = new();
     private System.Timers.Timer? _levelUpdateTimer;
     private readonly IAudioRouting _routing;
+
+    /// <summary>Who to ask whether a recording is spoken for. Null before the library exists.</summary>
+    private ISampleUsage? _sampleUsage;
 
     /// <summary>Set while a route is being read back, so showing it does not re-apply it.</summary>
     private bool _readingRoute;
@@ -272,9 +276,69 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The instrument library, set once it has been built. Recordings are its raw material,
+    /// so the page has to be able to ask what is still in use before it removes anything.
+    /// </summary>
+    public ISampleUsage? SampleUsage
+    {
+        get => _sampleUsage;
+        set
+        {
+            _sampleUsage = value;
+            RefreshUsage();
+        }
+    }
+
+    /// <summary>
+    /// Marks each recording with the instruments that play it. Called whenever the library
+    /// changes, so a recording becomes free again the moment its last instrument goes.
+    /// </summary>
+    public void RefreshUsage()
+    {
+        foreach (var recording in Recordings)
+            recording.UsedBy = Tracker.SampleUsage.Describe(UsersOf(recording));
+    }
+
+    /// <summary>The instruments playing a recording, right now rather than as last stamped.</summary>
+    private IReadOnlyList<string> UsersOf(Recording recording)
+    {
+        if (_sampleUsage == null) return Array.Empty<string>();
+
+        try
+        {
+            return _sampleUsage.InstrumentsUsing(recording.FilePath);
+        }
+        catch (Exception)
+        {
+            // An unreadable library is no reason to start deleting things, so this reads as
+            // "nothing known" and the delete still asks before it acts.
+            return Array.Empty<string>();
+        }
+    }
+
     private async Task DeleteRecording(Recording? recording)
     {
         if (recording == null) return;
+
+        // Asked again here rather than trusting the stamp: the library may have gained an
+        // instrument since the list was last marked up.
+        var used = UsersOf(recording);
+        recording.UsedBy = Tracker.SampleUsage.Describe(used);
+
+        if (used.Count > 0)
+        {
+            Status = $"'{recording.Name}' is the sound of {recording.UsedBy} and was not deleted";
+
+            await ConfirmDialog.NoteAsync(
+                "Recording in use",
+                $"'{recording.Name}' is the sound of {recording.UsedBy}.\n\n"
+                + "A sample instrument plays the file itself, so deleting this recording would "
+                + "silence it in every song that uses it. Delete the instrument first, or point "
+                + "it at another recording.");
+
+            return;
+        }
 
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete recording",
