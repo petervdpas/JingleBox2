@@ -238,7 +238,6 @@ public sealed class TrackerPlayer : IDisposable
             sequencer = _sequencer;
         }
 
-        double secondsPerLine = song.Timing.SecondsPerLine;
         var clock = Stopwatch.StartNew();
 
         var position = Position;
@@ -260,7 +259,13 @@ public sealed class TrackerPlayer : IDisposable
             if (next == null) break;
             position = next.Value;
 
-            nextLine += secondsPerLine;
+            // Read per step rather than once: a tempo moved while playing has to be heard on
+            // the next line, not at the next take. The times are still absolute from the
+            // start, so the clock does not drift; a change simply lengthens or shortens the
+            // steps from here on. The song's tempo is written by the UI thread while this one
+            // reads it, which is why every use goes through the clamped timing: even a value
+            // caught mid-write can only be a tempo, never a stall or a division by zero.
+            nextLine += song.Timing.SecondsPerLine;
             if (!WaitUntil(clock, nextLine, token)) return;
         }
 

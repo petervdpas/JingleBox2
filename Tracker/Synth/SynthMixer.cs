@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins;
 using System;
 using System.Collections.Generic;
 
@@ -41,6 +42,9 @@ public sealed class SynthMixer
     private readonly Ducker?[] _duckers = new Ducker[MaxTracks];
     private readonly float[] _duckGain = new float[MaxTracks];
 
+    /// <summary>What each track's audio passes through before the mix, if anything.</summary>
+    private readonly IAudioInsert?[] _inserts = new IAudioInsert[MaxTracks];
+
     private int _bufferFrames;
 
     /// <summary>What one strip's side chain is set to.</summary>
@@ -71,6 +75,20 @@ public sealed class SynthMixer
 
         lock (_lock) _ducking[track] = new DuckSetting(Math.Clamp(depth, 0, 1), key, releaseMs);
     }
+
+    /// <summary>
+    /// Puts an effect in a track's path, or takes one out with null. The track is rendered on
+    /// its own bus, so what the effect sees is that track and nothing else.
+    /// </summary>
+    public void SetInsert(int track, IAudioInsert? insert)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        lock (_lock) _inserts[track] = insert;
+    }
+
+    public IAudioInsert? InsertOn(int track) =>
+        track >= 0 && track < MaxTracks ? _inserts[track] : null;
 
     /// <summary>How far a track is being pushed down right now, 1 being not at all.</summary>
     public float DuckGainFor(int track) =>
@@ -233,6 +251,10 @@ public sealed class SynthMixer
         // added together there is nothing left to measure.
         RenderBusses(playing, frames, samples);
 
+        // Inserts run on the bus, before the side chains: what keys a duck is the track as it
+        // sounds, effects included, which is what anyone listening would call the track.
+        ApplyInserts(frames);
+
         for (int track = 0; track < MaxTracks; track++)
             MixTrack(buffer, track, ducking[track], frames, samples);
 
@@ -284,6 +306,34 @@ public sealed class SynthMixer
 
             var target = track >= 0 && track < MaxTracks ? _busses[track] : _loose;
             if (target != null) voice.Render(target, frames);
+        }
+    }
+
+    /// <summary>Runs each sounding track's audio through whatever is inserted on it.</summary>
+    private void ApplyInserts(int frames)
+    {
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            if (!_sounding[track]) continue;
+
+            IAudioInsert? insert;
+            lock (_lock) insert = _inserts[track];
+
+            if (insert == null) continue;
+
+            var bus = _busses[track];
+            if (bus == null) continue;
+
+            try
+            {
+                // Edited in place: the bus is this track and nothing else, which is exactly
+                // what an insert is supposed to see.
+                insert.Process(bus, frames);
+            }
+            catch (Exception)
+            {
+                // A managed fault in an insert costs that block, not the audio thread.
+            }
         }
     }
 
