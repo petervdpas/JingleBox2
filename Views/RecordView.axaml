@@ -129,6 +129,19 @@
                       <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" Opacity="0.7" FontSize="12" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <!-- Hearing a take is the first thing anyone does with this list, so it
+                           is a button on the row rather than a trip through the editor. -->
+                      <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding !IsPlaying}"
+                              Command="{Binding $parent[UserControl].DataContext.PlayRecordingCommand}"
+                              CommandParameter="{Binding .}"
+                              ToolTip.Tip="Play this recording" />
+                      <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding IsPlaying}"
+                              Command="{Binding $parent[UserControl].DataContext.StopRecordingPlaybackCommand}"
+                              CommandParameter="{Binding .}"
+                              ToolTip.Tip="Stop playing" />
+
                       <Button Content="Edit" MinWidth="64" Padding="10,5"
                               Command="{Binding $parent[UserControl].DataContext.EditRecordingCommand}"
                               CommandParameter="{Binding .}" />

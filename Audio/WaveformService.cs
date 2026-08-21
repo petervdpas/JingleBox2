@@ -12,6 +12,9 @@ public interface IWaveformService
     /// <summary>Duration of a recording, read from its headers alone.</summary>
     TimeSpan GetDuration(string filePath);
 
+    /// <summary>How many sample frames a recording holds, from its headers alone.</summary>
+    long GetFrameCount(string filePath);
+
     /// <summary>
     /// Rewrites the file to contain only the frames in [startFrame, endFrame). Destructive:
     /// the original audio outside the region is gone once this returns.
@@ -53,6 +56,13 @@ public sealed class WaveformService : IWaveformService
 
         var info = WavFile.ReadInfo(filePath);
         return TimeSpan.FromSeconds((double)info.FrameCount / info.SampleRate);
+    }
+
+    public long GetFrameCount(string filePath)
+    {
+        if (!File.Exists(filePath)) return 0;
+
+        return WavFile.ReadInfo(filePath).FrameCount;
     }
 
     public void TrimFile(string filePath, long startFrame, long endFrame)

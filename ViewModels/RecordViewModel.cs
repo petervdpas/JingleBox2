@@ -33,6 +33,14 @@ public sealed partial class RecordViewModel : ObservableObject
     /// <summary>Who to ask whether a recording is spoken for. Null before the library exists.</summary>
     private ISampleUsage? _sampleUsage;
 
+    /// <summary>
+    /// Auditions a recording from the list. One at a time on purpose: this is for hearing
+    /// what a take is, and two of them at once tells you nothing.
+    /// </summary>
+    private readonly Waveform.WaveformPlayer _preview = new();
+
+    private Recording? _playing;
+
     /// <summary>Set while a route is being read back, so showing it does not re-apply it.</summary>
     private bool _readingRoute;
 
@@ -126,6 +134,13 @@ public sealed partial class RecordViewModel : ObservableObject
         // Deleting a recording frees its name again, so the check has to follow the list.
         Recordings.CollectionChanged += (_, _) => ValidateName();
 
+        // Whether it ran out or was stopped, the row it was playing goes back to idle.
+        _preview.Stopped += () =>
+        {
+            if (_playing != null) _playing.IsPlaying = false;
+            _playing = null;
+        };
+
         RecordingName = NextRecordingName(RecordingNameValidator.DefaultBaseName);
         ValidateName();
     }
@@ -135,6 +150,10 @@ public sealed partial class RecordViewModel : ObservableObject
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
     public IRelayCommand<Recording> EditRecordingCommand => new RelayCommand<Recording>(EditRecording);
     public IAsyncRelayCommand<Recording> DeleteRecordingCommand => new AsyncRelayCommand<Recording>(DeleteRecording);
+
+    public IRelayCommand<Recording> PlayRecordingCommand => new RelayCommand<Recording>(PlayRecording);
+
+    public IRelayCommand<Recording> StopRecordingPlaybackCommand => new RelayCommand<Recording>(_ => StopPreview());
 
     /// <summary>
     /// Raised with the path of a recording whose audio has changed, so anything playing it
@@ -218,6 +237,9 @@ public sealed partial class RecordViewModel : ObservableObject
     private void EditRecording(Recording? recording)
     {
         if (recording == null) return;
+
+        // The dialog has a player of its own, and the list's would go on underneath it.
+        StopPreview();
 
         try
         {
@@ -370,6 +392,48 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>Plays a recording whole, from the list, so a take can be heard without opening it.</summary>
+    private void PlayRecording(Recording? recording)
+    {
+        if (recording == null) return;
+
+        StopPreview();
+
+        long frames;
+        try
+        {
+            frames = _waveformService.GetFrameCount(recording.FilePath);
+        }
+        catch (Exception)
+        {
+            frames = 0;
+        }
+
+        if (frames <= 0)
+        {
+            Status = $"'{recording.Name}' could not be read.";
+            return;
+        }
+
+        _preview.Play(recording.FilePath, 0, 1, frames);
+
+        // The stream can refuse to open, and a row that says it is playing when nothing is
+        // would leave its stop button as the only way out.
+        if (!_preview.IsPlaying)
+        {
+            Status = $"'{recording.Name}' could not be played.";
+            return;
+        }
+
+        _playing = recording;
+        recording.IsPlaying = true;
+
+        Status = $"Playing '{recording.Name}'";
+    }
+
+    /// <summary>Silence, whichever recording it was. Safe to call when nothing is playing.</summary>
+    public void StopPreview() => _preview.Stop();
+
     private async Task DeleteRecording(Recording? recording)
     {
         if (recording == null) return;
@@ -402,6 +466,10 @@ public sealed partial class RecordViewModel : ObservableObject
 
         try
         {
+            // A file that is being played is a file that is open, which on Windows is a file
+            // that will not delete.
+            if (ReferenceEquals(_playing, recording)) StopPreview();
+
             if (File.Exists(recording.FilePath))
                 File.Delete(recording.FilePath);
 
@@ -664,6 +732,10 @@ public sealed partial class RecordViewModel : ObservableObject
             Status = NameError;
             return;
         }
+
+        // Auditioning an old take while capturing a new one would put the first one into the
+        // second, on any source that carries what the machine is playing.
+        StopPreview();
 
         try
         {

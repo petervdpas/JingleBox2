@@ -24,6 +24,9 @@ public sealed partial class Recording : ObservableObject
     private string usedBy = "";
 
     public bool IsInUse => !string.IsNullOrEmpty(UsedBy);
+
+    /// <summary>True while this recording is the one being auditioned from the list.</summary>
+    [ObservableProperty] private bool isPlaying;
 }
 
 public class WaveformData
