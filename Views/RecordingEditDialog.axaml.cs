@@ -381,9 +381,40 @@ public partial class RecordingEditDialog : Window
         }
     }
 
+    /// <summary>
+    /// Lifts the file's level. The audio changes under every stored position but the timeline
+    /// does not, so the trim region and the playhead stay where they are.
+    /// </summary>
+    private async void Normalize_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm == null || _applying) return;
+
+        _player.Stop();
+
+        _applying = true;
+        SetApplyEnabled(false);
+
+        try
+        {
+            if (await _vm.NormalizeAsync()) Redraw();
+        }
+        finally
+        {
+            _applying = false;
+            SetApplyEnabled(true);
+        }
+    }
+
+    /// <summary>
+    /// Both destructive buttons go together: while the file is being rewritten, neither the
+    /// trim nor the normalize may start a second write over the top of it.
+    /// </summary>
     private void SetApplyEnabled(bool enabled)
     {
-        var button = this.FindControl<Button>("ApplyTrimButton");
-        if (button != null) button.IsEnabled = enabled;
+        var trim = this.FindControl<Button>("ApplyTrimButton");
+        if (trim != null) trim.IsEnabled = enabled;
+
+        var normalize = this.FindControl<Button>("NormalizeButton");
+        if (normalize != null) normalize.IsEnabled = enabled;
     }
 }

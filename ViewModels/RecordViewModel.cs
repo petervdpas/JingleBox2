@@ -285,6 +285,50 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>Where a normalize puts the loudest moment, in dBFS.</summary>
+    [ObservableProperty] private double normalizeTargetDb = Normalization.DefaultTargetDecibels;
+
+    public double MinNormalizeDb => Normalization.MinTargetDecibels;
+    public double MaxNormalizeDb => Normalization.MaxTargetDecibels;
+
+    /// <summary>
+    /// Lifts the whole recording so its loudest moment sits on the target. The trim region is
+    /// not involved: this is about the level of the file, not about part of it.
+    /// </summary>
+    /// <summary>Returns true when the file was rewritten, so callers can redraw.</summary>
+    public async Task<bool> NormalizeAsync()
+    {
+        var recording = SelectedRecordingForEdit;
+        if (recording == null) return false;
+
+        try
+        {
+            Status = "Normalizing...";
+
+            double target = NormalizeTargetDb;
+            double moved = await Task.Run(() => _waveformService.NormalizeFile(recording.FilePath, target));
+
+            if (Math.Abs(moved) < 0.001)
+            {
+                Status = $"'{recording.Name}' is already at {target:0.0} dB";
+                return false;
+            }
+
+            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
+
+            // The audio has changed under any instrument built on it.
+            RecordingChanged?.Invoke(this, recording.FilePath);
+
+            Status = $"Normalized '{recording.Name}' by {moved:+0.0;-0.0} dB";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Normalize failed: {ex.Message}";
+            return false;
+        }
+    }
+
     /// <summary>
     /// The instrument library, set once it has been built. Recordings are its raw material,
     /// so the page has to be able to ask what is still in use before it removes anything.

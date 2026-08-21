@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
         x:Class="JingleBox2.Views.RecordingEditDialog"
         x:DataType="vm:RecordViewModel"
         Title="Edit Recording"
@@ -14,11 +15,22 @@
     <!-- Waveform Editor -->
     <Border Classes="card">
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,auto,auto,auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="*,auto,auto,auto,auto,auto,auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Text="Trim Region" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Content="🔍-" Click="ZoomOut_Click" Width="40" />
-          <Button Grid.Column="2" Content="🔍+" Click="ZoomIn_Click" Width="40" />
-          <Button Grid.Column="3" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
+
+          <!-- Normalizing is about the level of the whole recording, so it sits apart from
+               the region controls rather than among them. -->
+          <TextBlock Grid.Column="1" Text="Peak" VerticalAlignment="Center" Opacity="0.8" FontSize="12" />
+          <views:NumberField Grid.Column="2" Width="66" Format="0.0"
+                             Minimum="-24" Maximum="0" SmallStep="0.5" LargeStep="3"
+                             Value="{Binding NormalizeTargetDb}"
+                             ToolTip.Tip="Where the loudest moment ends up, in dBFS. Just under zero leaves room for a resampled note to overshoot." />
+          <Button Grid.Column="3" Name="NormalizeButton" Content="Normalize" Click="Normalize_Click"
+                  ToolTip.Tip="Lifts the whole recording so its loudest moment sits on the peak above. Changes the file." />
+
+          <Button Grid.Column="4" Content="🔍-" Click="ZoomOut_Click" Width="40" />
+          <Button Grid.Column="5" Content="🔍+" Click="ZoomIn_Click" Width="40" />
+          <Button Grid.Column="6" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
         </Grid>
         <Canvas Height="200" Width="760" Background="#1F2937" Name="EditWaveformCanvas" />
         <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
@@ -26,9 +38,11 @@
     </Border>
 
     <!-- Controls -->
-    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
-      <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" />
-      <Button Grid.Column="1" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" />
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" MinWidth="120" />
+      <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.75" FontSize="12"
+                 VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <Button Grid.Column="2" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" MinWidth="120" />
     </Grid>
   </StackPanel>
 

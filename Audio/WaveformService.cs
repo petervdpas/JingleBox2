@@ -17,6 +17,13 @@ public interface IWaveformService
     /// the original audio outside the region is gone once this returns.
     /// </summary>
     void TrimFile(string filePath, long startFrame, long endFrame);
+
+    /// <summary>
+    /// Lifts the whole file so its loudest moment sits on the target, in dBFS. Destructive,
+    /// like the trim. Returns how far it moved in decibels, which is zero when the recording
+    /// was already there or has nothing in it to lift.
+    /// </summary>
+    double NormalizeFile(string filePath, double targetDecibels);
 }
 
 public sealed class WaveformService : IWaveformService
@@ -68,11 +75,39 @@ public sealed class WaveformService : IWaveformService
         var trimmed = new short[frames * info.Channels];
         Array.Copy(samples, startFrame * info.Channels, trimmed, 0, trimmed.Length);
 
-        // Write to a sibling file first so a failure part-way cannot destroy the recording.
-        string tempPath = filePath + ".trim.tmp";
+        Write(filePath, trimmed, info, ".trim.tmp");
+    }
+
+    public double NormalizeFile(string filePath, double targetDecibels)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"File not found: {filePath}");
+
+        var (samples, info) = WavFile.Read(filePath);
+
+        double peak = Normalization.PeakOf(samples);
+        double gain = Normalization.GainFor(peak, targetDecibels);
+
+        // Already where it should be, or nothing but silence: the file is not worth rewriting.
+        if (Math.Abs(gain - 1) < 0.001) return 0;
+
+        Normalization.Apply(samples, gain);
+        Write(filePath, samples, info, ".norm.tmp");
+
+        return Normalization.ToDecibels(gain);
+    }
+
+    /// <summary>
+    /// Writes over a recording through a sibling file, so a failure part way through leaves
+    /// the original where it was rather than half of it.
+    /// </summary>
+    private static void Write(string filePath, short[] samples, WavFile.Info info, string suffix)
+    {
+        string tempPath = filePath + suffix;
+
         try
         {
-            WavFile.Write(tempPath, trimmed, info.SampleRate, info.Channels);
+            WavFile.Write(tempPath, samples, info.SampleRate, info.Channels);
             File.Move(tempPath, filePath, overwrite: true);
         }
         catch
