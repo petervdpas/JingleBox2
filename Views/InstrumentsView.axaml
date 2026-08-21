@@ -167,6 +167,30 @@
             <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.IsSynth}">
 
               <StackPanel Classes="group">
+                <TextBlock Classes="section" Text="Shape" />
+
+                <views:WaveScope Width="150" Height="58"
+                                 Patch="{Binding Editor.Patch.Patch}"
+                                 Revision="{Binding Editor.Patch.Revision}"
+                                 Cycles="{Binding ScopeCycles}"
+                                 Trigger="{Binding NoteTrigger}"
+                                 ToolTip.Tip="A window of time onto the wave, with duty and drive applied. Tuning fits more or fewer cycles into it, and a played note bends it as the pitch envelope and vibrato do." />
+
+                <views:Knob Label="Cycles" Format="0" DefaultValue="2"
+                            Minimum="1" Maximum="8" SmallStep="1" LargeStep="2"
+                            HorizontalAlignment="Center"
+                            ToolTip.Tip="How much of the wave the view shows. A view setting: it is not part of the sound."
+                            Value="{Binding ScopeCycles}" />
+
+                <views:EnvelopeScope Width="150" Height="58"
+                                     Patch="{Binding Editor.Patch.Patch}"
+                                     Revision="{Binding Editor.Patch.Revision}"
+                                     HoldSeconds="{Binding HoldSeconds}"
+                                     Trigger="{Binding NoteTrigger}"
+                                     ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
+              </StackPanel>
+
+              <StackPanel Classes="group">
                 <TextBlock Classes="section" Text="Envelope" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
                   <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
@@ -192,8 +216,20 @@
               </StackPanel>
 
               <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Modulation" />
-                <UniformGrid Columns="3" Rows="2">
+                <TextBlock Classes="section" Text="Pitch and modulation" />
+                <UniformGrid Columns="4" Rows="2">
+                  <views:Knob Label="Tune" Unit="st" Format="0" DefaultValue="0"
+                              Minimum="-24" Maximum="24" SmallStep="1" LargeStep="12"
+                              Margin="0,0,10,8"
+                              ToolTip.Tip="Whole semitones added to every note this instrument plays."
+                              Value="{Binding Editor.Patch.TuneSemitones}" />
+
+                  <views:Knob Label="Fine" Unit="c" Format="0" DefaultValue="0"
+                              Minimum="-100" Maximum="100" SmallStep="1" LargeStep="10"
+                              Margin="0,0,10,8"
+                              ToolTip.Tip="Hundredths of a semitone, for sitting this voice against another."
+                              Value="{Binding Editor.Patch.FineCents}" />
+
                   <views:Knob Label="Vib rate" Unit="Hz" Format="0.0" DefaultValue="0"
                               Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
                               Margin="0,0,10,8"
@@ -201,13 +237,18 @@
 
                   <views:Knob Label="Vib depth" Unit="c" Format="0" DefaultValue="0"
                               Minimum="0" Maximum="200" SmallStep="1" LargeStep="10"
-                              Margin="0,0,10,8"
+                              Margin="0,0,0,8"
                               Value="{Binding Editor.Patch.VibratoDepthCents}" />
 
                   <views:Knob Label="Pitch env" Unit="st" Format="0" DefaultValue="0"
                               Minimum="-24" Maximum="24" SmallStep="1" LargeStep="6"
-                              Margin="0,0,0,8"
+                              Margin="0,0,10,0"
                               Value="{Binding Editor.Patch.PitchEnvSemitones}" />
+
+                  <views:Knob Label="Pitch time" Unit="ms" Format="0" DefaultValue="60"
+                              Minimum="0" Maximum="2000" SmallStep="5" LargeStep="50"
+                              Margin="0,0,10,0"
+                              Value="{Binding Editor.Patch.PitchEnvMs}" />
 
                   <views:Knob Label="Trem rate" Unit="Hz" Format="0.0" DefaultValue="0"
                               Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
@@ -216,12 +257,7 @@
 
                   <views:Knob Label="Trem depth" Format="0.00" DefaultValue="0"
                               Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
-                              Margin="0,0,10,0"
                               Value="{Binding Editor.Patch.TremoloDepth}" />
-
-                  <views:Knob Label="Pitch time" Unit="ms" Format="0" DefaultValue="60"
-                              Minimum="0" Maximum="2000" SmallStep="5" LargeStep="50"
-                              Value="{Binding Editor.Patch.PitchEnvMs}" />
                 </UniformGrid>
               </StackPanel>
 

@@ -36,6 +36,12 @@ public sealed class SynthPatch
     public const double MinDrive = 1;
     public const double MaxDrive = 10;
 
+    public const double MinTuneSemitones = -24;
+    public const double MaxTuneSemitones = 24;
+
+    public const double MinFineCents = -100;
+    public const double MaxFineCents = 100;
+
     public SynthWave Wave { get; set; } = SynthWave.Square;
 
     /// <summary>How much of the pulse wave's cycle is high. Ignored by the other waves.</summary>
@@ -45,6 +51,12 @@ public sealed class SynthPatch
     public double DecayMs { get; set; } = 40;
     public double Sustain { get; set; } = 0.6;
     public double ReleaseMs { get; set; } = 80;
+
+    /// <summary>Whole semitones added to every note this instrument plays.</summary>
+    public double TuneSemitones { get; set; }
+
+    /// <summary>The last hundredth of a semitone, for sitting a voice against another.</summary>
+    public double FineCents { get; set; }
 
     /// <summary>
     /// How hard the voice is pushed into its saturation. One is untouched; above that the tone
@@ -72,6 +84,8 @@ public sealed class SynthPatch
         DecayMs = DecayMs,
         Sustain = Sustain,
         ReleaseMs = ReleaseMs,
+        TuneSemitones = TuneSemitones,
+        FineCents = FineCents,
         Drive = Drive,
         VibratoRateHz = VibratoRateHz,
         VibratoDepthCents = VibratoDepthCents,
@@ -92,6 +106,8 @@ public sealed class SynthPatch
         Sustain = Clamp(Sustain, MinSustain, MaxSustain);
         ReleaseMs = Clamp(ReleaseMs, MinTimeMs, MaxReleaseMs);
         Drive = Clamp(Drive, MinDrive, MaxDrive);
+        TuneSemitones = Clamp(TuneSemitones, MinTuneSemitones, MaxTuneSemitones);
+        FineCents = Clamp(FineCents, MinFineCents, MaxFineCents);
 
         VibratoRateHz = Clamp(VibratoRateHz, MinRateHz, MaxRateHz);
         VibratoDepthCents = Clamp(VibratoDepthCents, MinVibratoDepthCents, MaxVibratoDepthCents);

@@ -34,13 +34,15 @@ public sealed class SynthVoice
 
         _sampleRate = sampleRate <= 0 ? 1 : sampleRate;
         _envelope = new SynthEnvelope(_patch, _sampleRate);
-        _baseFrequency = NoteFrequency.Hz(note);
+        // The instrument's own tuning is folded in once here rather than being worked out for
+        // every sample: it does not change while the note lasts.
+        _baseFrequency = NoteFrequency.Hz(note) * PitchMotion.Ratio(PitchMotion.Tuning(_patch));
         _pitchEnvSeconds = _patch.PitchEnvMs / 1000.0;
 
         // The makeup keeps the level where it was, so turning drive up changes the tone rather
         // than the loudness. That is what the level fader is for.
         _drive = _patch.Drive;
-        _driveMakeup = _drive > 1 ? 1.0 / Math.Tanh(_drive) : 1.0;
+        _driveMakeup = Saturation.Makeup(_drive);
         _noise = new Random(noiseSeed);
 
         Track = track;
@@ -110,7 +112,7 @@ public sealed class SynthVoice
             double level = _envelope.Next();
             if (_envelope.IsFinished) return;
 
-            double frequency = _baseFrequency * Math.Pow(2.0, SemitoneOffsetAt(_time) / 12.0);
+            double frequency = _baseFrequency * PitchMotion.Ratio(PitchMotion.MotionAt(_patch, _time));
 
             _phase = Oscillator.Wrap(_phase + frequency * step);
 
@@ -129,22 +131,7 @@ public sealed class SynthVoice
     /// Rounds the wave off into itself. Applied before the envelope, so a note keeps its shape
     /// as it decays instead of losing its edge along with its level.
     /// </summary>
-    private double Drive(double sample) =>
-        _drive > 1 ? Math.Tanh(sample * _drive) * _driveMakeup : sample;
-
-    /// <summary>Vibrato and the pitch envelope, both in semitones, at a point in the note.</summary>
-    private double SemitoneOffsetAt(double time)
-    {
-        double offset = 0;
-
-        if (_patch.VibratoDepthCents > 0 && _patch.VibratoRateHz > 0)
-            offset += _patch.VibratoDepthCents / 100.0 * Math.Sin(2 * Math.PI * _patch.VibratoRateHz * time);
-
-        if (_patch.PitchEnvSemitones != 0 && _pitchEnvSeconds > 0 && time < _pitchEnvSeconds)
-            offset += _patch.PitchEnvSemitones * (1.0 - time / _pitchEnvSeconds);
-
-        return offset;
-    }
+    private double Drive(double sample) => Saturation.Apply(sample, _drive, _driveMakeup);
 
     /// <summary>Amplitude modulation between full and (1 - depth).</summary>
     private double TremoloAt(double time)

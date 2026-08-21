@@ -32,7 +32,7 @@ public sealed class TrackerPlayer : IDisposable
     private const double SpinThresholdSeconds = 0.002;
 
     /// <summary>How long an audition holds before it releases, since no key is let go of.</summary>
-    private const double PreviewHoldSeconds = 0.4;
+    public const double PreviewHoldSeconds = 0.4;
 
     private readonly IAudioEngine _audio;
     private readonly TrackerSampleBank _bank = new();

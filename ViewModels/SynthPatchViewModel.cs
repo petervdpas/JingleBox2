@@ -21,6 +21,12 @@ public sealed class SynthPatchViewModel : ObservableObject
 
     public SynthPatch Patch => _patch;
 
+    /// <summary>
+    /// Bumped on every change. The scopes read the patch itself, which is plain data and says
+    /// nothing when it changes, so this is what tells them to redraw.
+    /// </summary>
+    public int Revision { get; private set; }
+
     public SynthWave[] Waves { get; } = Enum.GetValues<SynthWave>();
 
     public SynthWave Wave
@@ -31,6 +37,8 @@ public sealed class SynthPatchViewModel : ObservableObject
             if (_patch.Wave == value) return;
 
             _patch.Wave = value;
+            Bump();
+
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsPulse));
             _changed();
@@ -73,6 +81,20 @@ public sealed class SynthPatchViewModel : ObservableObject
         get => _patch.ReleaseMs;
         set => Set(v => _patch.ReleaseMs = v, _patch.ReleaseMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxReleaseMs,
             nameof(ReleaseMs));
+    }
+
+    public double TuneSemitones
+    {
+        get => _patch.TuneSemitones;
+        set => Set(v => _patch.TuneSemitones = v, _patch.TuneSemitones, value,
+            SynthPatch.MinTuneSemitones, SynthPatch.MaxTuneSemitones, nameof(TuneSemitones));
+    }
+
+    public double FineCents
+    {
+        get => _patch.FineCents;
+        set => Set(v => _patch.FineCents = v, _patch.FineCents, value,
+            SynthPatch.MinFineCents, SynthPatch.MaxFineCents, nameof(FineCents));
     }
 
     public double Drive
@@ -125,7 +147,17 @@ public sealed class SynthPatchViewModel : ObservableObject
     }
 
     /// <summary>Called after a preset lands on top of the patch: every value may have moved.</summary>
-    public void RefreshAll() => OnPropertyChanged(string.Empty);
+    public void RefreshAll()
+    {
+        Bump();
+        OnPropertyChanged(string.Empty);
+    }
+
+    private void Bump()
+    {
+        Revision++;
+        OnPropertyChanged(nameof(Revision));
+    }
 
     private void Set(Action<double> assign, double current, double value, double min, double max, params string[] changed)
     {
@@ -133,6 +165,7 @@ public sealed class SynthPatchViewModel : ObservableObject
         if (Math.Abs(current - clamped) < 0.0001) return;
 
         assign(clamped);
+        Bump();
 
         foreach (var name in changed)
             OnPropertyChanged(name);

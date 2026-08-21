@@ -73,6 +73,21 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
 
     [ObservableProperty] private int octave = 4;
 
+    /// <summary>
+    /// Bumped on every note. The envelope view watches it to start its playhead: a counter
+    /// rather than an event keeps the view a plain binding.
+    /// </summary>
+    [ObservableProperty] private int noteTrigger;
+
+    /// <summary>How long an audition holds the note, so the drawn envelope matches what you hear.</summary>
+    public double HoldSeconds => TrackerPlayer.PreviewHoldSeconds;
+
+    /// <summary>
+    /// How many cycles the wave view shows. A view setting, not part of the sound, so it stays
+    /// out of the patch and out of the presets.
+    /// </summary>
+    [ObservableProperty] private double scopeCycles = 2;
+
     [ObservableProperty] private string status = "Ready";
 
     /// <summary>True while this page is on screen, so MIDI notes come here instead of the pattern.</summary>
@@ -121,6 +136,8 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         }
 
         _audition.Audition(instrument, note, volume);
+
+        NoteTrigger++;
 
         // Say what was heard: a silent key press is otherwise impossible to tell from a key
         // press that never arrived.

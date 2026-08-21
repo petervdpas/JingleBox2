@@ -13,4 +13,5 @@ public static class NoteFrequency
     public static double Hz(Note note) => Hz(note.Semitone);
 
     public static double Hz(int semitone) => A4Hz * Math.Pow(2.0, (semitone - A4Semitone) / 12.0);
+
 }
