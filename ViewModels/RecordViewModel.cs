@@ -38,6 +38,13 @@ public sealed partial class RecordViewModel : ObservableObject
     private bool isRecording;
     [ObservableProperty] private string recordingTime = "00:00:00";
     [ObservableProperty] private float level;
+
+    /// <summary>True when the input is captured in stereo, so the meter shows two bars.</summary>
+    public bool IsStereoInput => _recordingService.Channels >= 2;
+
+    /// <summary>The two sides on their own, for the meter. Mono input reports the same twice.</summary>
+    [ObservableProperty] private float levelLeft;
+    [ObservableProperty] private float levelRight;
     [ObservableProperty] private WaveformData? currentWaveform;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
@@ -290,13 +297,15 @@ public sealed partial class RecordViewModel : ObservableObject
             _levelUpdateTimer.Elapsed += (s, e) =>
             {
                 var recentData = _recordingService.GetRecentRecordingData(4410);
-                float level = _levelMeter.GetLevelFromBytes(recentData);
+                var stereo = _levelMeter.GetStereoFromBytes(recentData, _recordingService.Channels);
 
                 bool clipping = _recordingService.IsClipping;
 
                 Dispatcher.UIThread.Invoke(() =>
                 {
-                    Level = level;
+                    Level = stereo.Peak;
+                    LevelLeft = stereo.Left;
+                    LevelRight = stereo.Right;
                     IsClipping = clipping;
                     RecordingTime = _recordingTimer.Elapsed.ToString(@"hh\:mm\:ss");
                 });
@@ -357,6 +366,8 @@ public sealed partial class RecordViewModel : ObservableObject
                 Status = "Saved, but the input clipped. Lower the input gain or the source level.";
 
             Level = 0;
+            LevelLeft = 0;
+            LevelRight = 0;
             RecordingTime = "00:00:00";
             RecordingName = NextRecordingName(savedName);
         }

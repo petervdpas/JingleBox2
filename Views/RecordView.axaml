@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.RecordView"
              x:DataType="vm:RecordViewModel">
 
@@ -9,7 +10,10 @@
 
       <!-- Recording Controls -->
       <Border Classes="card">
-        <StackPanel Spacing="12">
+        <!-- The gain sits down the right, where a desk keeps it: the controls that start and
+             stop a take belong together, and the fader belongs next to the meter it feeds. -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+        <StackPanel Grid.Column="0" Spacing="12">
           <StackPanel Spacing="4">
             <TextBlock Text="Recording Name" Opacity="0.8" />
             <TextBox Text="{Binding RecordingName}"
@@ -37,17 +41,6 @@
                      Foreground="#FF6B7280"
                      HorizontalAlignment="Center" />
 
-          <!-- Input Gain -->
-          <StackPanel Spacing="4">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <TextBlock Grid.Column="0" Text="Input Gain" Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="2" Text="{Binding RecordGainDb, StringFormat='{}{0:0.0} dB'}"
-                         Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
-            </Grid>
-            <Slider Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}"
-                    Value="{Binding RecordGainDb}" TickFrequency="6" />
-          </StackPanel>
-
           <!-- Level Meter -->
           <StackPanel Spacing="4">
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
@@ -58,13 +51,28 @@
               <Border Grid.Column="3" Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
                       Classes="cliplight" Classes.clipping="{Binding IsClipping}" />
             </Grid>
-            <ProgressBar Value="{Binding Level}" Minimum="0" Maximum="1" Height="6" />
+            <views:LevelMeter Height="14"
+                              Orientation="Horizontal"
+                              Stereo="{Binding IsStereoInput}"
+                              Left="{Binding LevelLeft}"
+                              Right="{Binding LevelRight}"
+                              ToolTip.Tip="Peak level, left over right. Green to -6 dB, amber to -1, red above." />
           </StackPanel>
 
           <TextBlock Text="{Binding Status}"
                      Opacity="0.7"
                      FontSize="12" />
         </StackPanel>
+
+        <views:Fader Grid.Column="1"
+                     Label="Input gain" Unit=" dB" Format="0.0" DefaultValue="0"
+                     Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}"
+                     SmallStep="0.5" LargeStep="3"
+                     TrackLength="150"
+                     VerticalAlignment="Center"
+                     ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
+                     Value="{Binding RecordGainDb}" />
+        </Grid>
       </Border>
 
       <!-- Waveform Display -->

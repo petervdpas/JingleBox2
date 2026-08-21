@@ -23,6 +23,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
     private readonly InstrumentLibrary _library;
+    private readonly DispatcherTimer _meters;
     private readonly ObservableCollection<Recording> _recordings;
 
     [ObservableProperty] private Song song;
@@ -82,6 +83,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         song = Song.CreateDefault();
         currentPattern = song.Patterns[0];
+
+        // The meters are polled rather than pushed: the audio side should not be calling into
+        // the UI dozens of times a second, and a meter that misses a frame costs nothing.
+        _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _meters.Tick += (_, _) => ReadMeters();
 
         _player.PositionChanged += OnPositionChanged;
         _player.StateChanged += OnPlayerStateChanged;
@@ -213,7 +219,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             Transport = state;
             if (state == TrackerTransportState.Stopped) PlayingLine = -1;
+
+            if (state == TrackerTransportState.Playing) _meters.Start();
+            else StopMeters();
         });
+
+    /// <summary>Reads what each track is sounding and hands it to its strip.</summary>
+    private void ReadMeters()
+    {
+        foreach (var strip in Strips)
+        {
+            var (left, right) = _player.LevelFor(strip.Track);
+
+            strip.Left = left;
+            strip.Right = right;
+        }
+    }
+
+    /// <summary>Stops polling and empties the meters, so none is left holding a level.</summary>
+    private void StopMeters()
+    {
+        _meters.Stop();
+
+        foreach (var strip in Strips)
+        {
+            strip.Left = 0;
+            strip.Right = 0;
+        }
+    }
 
     private void OnPlayerStopped(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(() =>
@@ -736,5 +769,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == keep);
     }
 
-    public void Dispose() => _player.Dispose();
+    public void Dispose()
+    {
+        _meters.Stop();
+        _player.Dispose();
+    }
 }

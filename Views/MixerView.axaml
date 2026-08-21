@@ -53,35 +53,48 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TrackStripViewModel">
                 <Border Classes="inset" Width="96">
-                  <StackPanel Spacing="8" HorizontalAlignment="Center">
-                    <Border Classes="badge" HorizontalAlignment="Center">
-                      <TextBlock Text="{Binding Label}" />
-                    </Border>
+                  <!-- The meter takes whatever height is left, so the strips grow with the page
+                       instead of leaving a hole under the buttons. -->
+                  <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
+                      <Border Classes="badge" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding Label}" />
+                      </Border>
 
-                    <TextBlock Classes="cardHint"
-                               HorizontalAlignment="Center"
-                               MaxWidth="80"
-                               TextTrimming="CharacterEllipsis"
-                               Text="{Binding InstrumentName}" />
+                      <TextBlock Classes="cardHint"
+                                 HorizontalAlignment="Center"
+                                 MaxWidth="80"
+                                 TextTrimming="CharacterEllipsis"
+                                 Text="{Binding InstrumentName}" />
 
-                    <views:Knob Label="Pan" Format="0.00" DefaultValue="0"
-                                Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
-                                HorizontalAlignment="Center"
-                                Value="{Binding Pan}" />
+                      <views:Knob Label="Pan" Format="0.00" DefaultValue="0"
+                                  Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                                  HorizontalAlignment="Center"
+                                  Value="{Binding Pan}" />
 
+                      <views:LevelMeter Width="26" Height="110"
+                                        Stereo="True"
+                                        Left="{Binding Left}"
+                                        Right="{Binding Right}"
+                                        HorizontalAlignment="Center"
+                                        ToolTip.Tip="What this track is sounding, left and right." />
+
+                      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                        <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
+                                      ToolTip.Tip="Mute this track" />
+                        <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
+                                      ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- Zero track length: the fader takes whatever height is left in the strip. -->
                     <views:Fader Label="Level" Format="0.00" DefaultValue="1"
                                  Minimum="0" Maximum="2" SmallStep="0.01" LargeStep="0.1"
-                                 TrackLength="120"
+                                 TrackLength="0"
+                                 Margin="0,10,0,0"
                                  HorizontalAlignment="Center"
                                  Value="{Binding Volume}" />
-
-                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                      <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                                    ToolTip.Tip="Mute this track" />
-                      <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
-                                    ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
-                    </StackPanel>
-                  </StackPanel>
+                  </DockPanel>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

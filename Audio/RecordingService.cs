@@ -24,6 +24,9 @@ public interface IRecordingService
     /// <summary>Gain applied to incoming audio, in dB. 0 is unity.</summary>
     double GainDb { get; set; }
 
+    /// <summary>How many channels the input is captured with, so a meter knows what to show.</summary>
+    int Channels { get; }
+
     /// <summary>True while clipping was seen in the last moment or so. Decays on its own.</summary>
     bool IsClipping { get; }
 
@@ -45,6 +48,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private bool _isRecording;
     private readonly int _sampleRate = 44100;
     private readonly int _channels = 2;
+
+    public int Channels => _channels;
     private int _initializedDevice = NoDevice;
     private int _resolvedDevice = NoDevice;
     private RecordProcedure? _recordCallback;

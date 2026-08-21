@@ -60,6 +60,9 @@ public sealed class SynthVoice
 
     public float Pan { get; set; }
 
+    /// <summary>How loud this voice is right now, for metering. Zero once it has finished.</summary>
+    public float Level { get; private set; }
+
     public bool IsFinished => _envelope.IsFinished;
 
     public bool IsReleasing => _envelope.Stage == EnvelopeStage.Release;
@@ -86,12 +89,17 @@ public sealed class SynthVoice
     /// </summary>
     public void Render(float[] buffer, int frames)
     {
-        if (_envelope.IsFinished) return;
+        if (_envelope.IsFinished)
+        {
+            Level = 0;
+            return;
+        }
 
         // A blank or note-off cell is not a pitch, and must not be turned into one.
         if (!Note.IsPlayable)
         {
             _envelope.Kill();
+            Level = 0;
             return;
         }
 
@@ -110,7 +118,13 @@ public sealed class SynthVoice
             }
 
             double level = _envelope.Next();
-            if (_envelope.IsFinished) return;
+            if (_envelope.IsFinished)
+            {
+                Level = 0;
+                return;
+            }
+
+            Level = (float)(level * Gain);
 
             double frequency = _baseFrequency * PitchMotion.Ratio(PitchMotion.MotionAt(_patch, _time));
 

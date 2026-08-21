@@ -26,6 +26,9 @@ public class Fader : ThemedControl
     private const double CapHeight = 11;
     private const double TextGap = 4;
 
+    /// <summary>Short enough to fit anywhere, long enough to still be a fader.</summary>
+    private const double MinimumTrackLength = 40;
+
     private const double LabelFontSize = 11;
     private const double ValueFontSize = 11.5;
 
@@ -56,7 +59,10 @@ public class Fader : ThemedControl
     public static readonly StyledProperty<string> FormatProperty =
         AvaloniaProperty.Register<Fader, string>(nameof(Format), "0.00");
 
-    /// <summary>How long the throw is. Longer means finer control for the same range.</summary>
+    /// <summary>
+    /// How long the throw is. Longer means finer control for the same range. Zero means take
+    /// whatever height the fader is given, for a strip that should fill its panel.
+    /// </summary>
     public static readonly StyledProperty<double> TrackLengthProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(TrackLength), 110.0);
 
@@ -155,8 +161,12 @@ public class Fader : ThemedControl
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
+        // Asking for the minimum when stretching: a panel that hands out the space left over
+        // gives it the whole area anyway, whatever was asked for.
+        double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
+
         double width = Math.Max(CapWidth, Math.Max(label.Width, value.Width));
-        double height = label.Height + TextGap + TrackLength + CapHeight + TextGap + value.Height;
+        double height = label.Height + TextGap + throwLength + CapHeight + TextGap + value.Height;
 
         return new Size(width, height);
     }
@@ -170,26 +180,26 @@ public class Fader : ThemedControl
 
         context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, 0));
 
-        double trackTop = TrackTop(label.Height);
-        DrawTrack(context, palette, trackTop);
+        var (trackTop, trackLength) = Track();
+        DrawTrack(context, palette, trackTop, trackLength);
 
         context.DrawText(value, new Point(
             (Bounds.Width - value.Width) / 2,
-            trackTop + TrackLength + CapHeight / 2 + TextGap));
+            trackTop + trackLength + CapHeight / 2 + TextGap));
     }
 
-    private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop)
+    private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop, double trackLength)
     {
         double centerX = Bounds.Width / 2;
-        double capY = FaderMath.CapCenterY(Value, trackTop, TrackLength, Minimum, Maximum);
+        double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         // The groove, then the travelled part of it. Both rounded, so the ends do not look cut.
-        var groove = new Rect(centerX - GrooveWidth / 2, trackTop, GrooveWidth, TrackLength);
+        var groove = new Rect(centerX - GrooveWidth / 2, trackTop, GrooveWidth, trackLength);
         context.DrawRectangle(palette.BorderBrush, null, new RoundedRect(groove, GrooveWidth / 2));
 
-        if (capY < trackTop + TrackLength)
+        if (capY < trackTop + trackLength)
         {
-            var travelled = new Rect(groove.X, capY, GrooveWidth, trackTop + TrackLength - capY);
+            var travelled = new Rect(groove.X, capY, GrooveWidth, trackTop + trackLength - capY);
             context.DrawRectangle(palette.AccentTint(190), null, new RoundedRect(travelled, GrooveWidth / 2));
         }
 
@@ -219,13 +229,22 @@ public class Fader : ThemedControl
     private Rect CapRect(double capY) =>
         new(Bounds.Width / 2 - CapWidth / 2, capY - CapHeight / 2, CapWidth, CapHeight);
 
-    /// <summary>The label sits above the track, so the track starts under whatever it measures.</summary>
-    private double TrackTop(double labelHeight) => labelHeight + TextGap + CapHeight / 2;
-
-    private double CurrentTrackTop()
+    /// <summary>
+    /// Where the throw starts and how long it is. The label sits above it and the value below,
+    /// so a stretching fader gives the groove whatever is left between them.
+    /// </summary>
+    private (double Top, double Length) Track()
     {
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
-        return TrackTop(label.Height);
+        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
+
+        double top = label.Height + TextGap + CapHeight / 2;
+
+        double length = TrackLength > 0
+            ? TrackLength
+            : Math.Max(MinimumTrackLength, Bounds.Height - top - CapHeight / 2 - TextGap - value.Height);
+
+        return (top, length);
     }
 
     private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush) =>
@@ -259,8 +278,8 @@ public class Fader : ThemedControl
         Focus();
 
         double y = e.GetPosition(this).Y;
-        double trackTop = CurrentTrackTop();
-        double capY = FaderMath.CapCenterY(Value, trackTop, TrackLength, Minimum, Maximum);
+        var (trackTop, trackLength) = Track();
+        double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         // On the cap: pick it up where it is. Anywhere else: send it there first.
         if (CapRect(capY).Contains(new Point(Bounds.Width / 2, y)))
@@ -270,7 +289,7 @@ public class Fader : ThemedControl
         else
         {
             _grabOffset = 0;
-            Value = FaderMath.ValueAt(y, trackTop, TrackLength, Minimum, Maximum, SmallStep);
+            Value = FaderMath.ValueAt(y, trackTop, trackLength, Minimum, Maximum, SmallStep);
         }
 
         _dragging = true;
@@ -289,13 +308,14 @@ public class Fader : ThemedControl
         if (!_dragging) return;
 
         double y = e.GetPosition(this).Y;
+        var (trackTop, trackLength) = Track();
 
         // Shift trades the cap following the pointer for a quarter-speed drag from the press.
         bool fine = _fineDrag || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         Value = fine
-            ? RangeValue.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, TrackLength, fine: true)
-            : FaderMath.ValueAt(y - _grabOffset, CurrentTrackTop(), TrackLength, Minimum, Maximum, SmallStep);
+            ? RangeValue.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, trackLength, fine: true)
+            : FaderMath.ValueAt(y - _grabOffset, trackTop, trackLength, Minimum, Maximum, SmallStep);
 
         e.Handled = true;
     }

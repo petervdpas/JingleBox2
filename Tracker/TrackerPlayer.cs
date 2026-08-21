@@ -208,6 +208,31 @@ public sealed class TrackerPlayer : IDisposable
         Bass.ChannelPlay(channel);
     }
 
+    /// <summary>
+    /// How loud a track is right now, both sides, for the mixer's meters. Zero for a track that
+    /// is not sounding, and for every track when nothing is playing.
+    /// </summary>
+    public (float Left, float Right) LevelFor(int track)
+    {
+        if (track < 0 || track >= _voices.Length) return (0, 0);
+
+        var (left, right) = _synth.Mixer.LevelFor(track);
+
+        int channel = _voices[track];
+        if (channel != 0)
+        {
+            // BASS packs the two sides into one value: the left in the high word, the right low.
+            int level = Bass.ChannelGetLevel(channel);
+            if (level > 0)
+            {
+                left = Math.Max(left, ((level >> 16) & 0xFFFF) / 32768f);
+                right = Math.Max(right, (level & 0xFFFF) / 32768f);
+            }
+        }
+
+        return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+    }
+
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>
     public void ReloadInstrument(string filePath) => _bank.Invalidate(filePath);
 

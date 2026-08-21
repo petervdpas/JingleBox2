@@ -151,6 +151,34 @@ public sealed class SynthMixer
     /// </summary>
     private static float SoftClip(float value) => MathF.Tanh(value);
 
+    /// <summary>
+    /// How loud a track is sounding, for a meter. Taken from the voices rather than from the
+    /// mixed buffer: the voices are already summed together by the time that exists.
+    /// </summary>
+    public (float Left, float Right) LevelFor(int track)
+    {
+        if (track < 0) return (0, 0);
+
+        float left = 0;
+        float right = 0;
+
+        lock (_lock)
+        {
+            foreach (var voice in _voices)
+            {
+                if (voice.Track != track || voice.IsFinished) continue;
+
+                float level = voice.Level * MasterGain;
+                float pan = voice.Pan;
+
+                left = Math.Max(left, level * (pan <= 0 ? 1f : 1f - pan));
+                right = Math.Max(right, level * (pan >= 0 ? 1f : 1f + pan));
+            }
+        }
+
+        return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+    }
+
     /// <summary>Drops finished voices. Called after rendering, off the note-on path.</summary>
     private void Reap()
     {

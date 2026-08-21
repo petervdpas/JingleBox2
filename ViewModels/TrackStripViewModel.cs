@@ -67,6 +67,22 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
+    private double left;
+    private double right;
+
+    /// <summary>What the track is sounding right now, for the strip's meter.</summary>
+    public double Left
+    {
+        get => left;
+        set => SetProperty(ref left, value);
+    }
+
+    public double Right
+    {
+        get => right;
+        set => SetProperty(ref right, value);
+    }
+
     public bool Solo
     {
         get => _strip.Solo;
