@@ -56,11 +56,37 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// The plugin moved one of its own knobs. The host's copy of that knob follows it, and
     /// whatever owns the plugin is told there is something worth saving.
     /// </summary>
+    /// <remarks>
+    /// Except for the ones the plugin moves by itself. A compressor reports its gain reduction
+    /// and its output level the same way it reports a knob, sixty times a second, and treating
+    /// those as edits would leave a song that can never be saved because it is always about to
+    /// need saving again.
+    /// </remarks>
     private void Moved(uint id, double value)
     {
         if (_rows.TryGetValue(id, out var row)) row.Adopt(value);
 
+        if (Reads(id)) return;
+
         _changed?.Invoke();
+    }
+
+    /// <summary>Which parameters the plugin is reporting rather than being set to.</summary>
+    private System.Collections.Generic.HashSet<uint>? _readings;
+
+    private bool Reads(uint id)
+    {
+        if (_readings == null)
+        {
+            _readings = new System.Collections.Generic.HashSet<uint>();
+
+            foreach (var parameter in Plugin.Parameters())
+            {
+                if (parameter.IsReadOnly) _readings.Add(parameter.Id);
+            }
+        }
+
+        return _readings.Contains(id);
     }
 
     /// <summary>True when the plugin's process has gone and it is not playing.</summary>

@@ -214,6 +214,7 @@ public static class PluginHostProcess
         Say("pump running");
 
         long census = Environment.TickCount64;
+        long asked = census;
 
         while (_running)
         {
@@ -228,6 +229,16 @@ public static class PluginHostProcess
             while (Errands.TryDequeue(out var errand))
             {
                 try { errand(); } catch (Exception error) { Say("run loop: " + error.Message); }
+            }
+
+            // An idle plugin is asked now and then whether it has moved anything itself. CLAP
+            // hands a knob back during a block or a flush and at no other time, so a plugin
+            // nobody is playing needs to be asked or its own window is a secret.
+            if (Environment.TickCount64 - asked > 30)
+            {
+                asked = Environment.TickCount64;
+
+                try { (_plugin as ClapEffect)?.Poll(); } catch (Exception) { }
             }
 
             while (Moves.TryDequeue(out var move))

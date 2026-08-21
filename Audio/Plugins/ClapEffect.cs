@@ -547,10 +547,17 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     internal void Moved(uint id, double value) => Edited?.Invoke(id, value);
 
     /// <summary>
-    /// Hands over any parameter moves now, without waiting for a block. What CLAP's flush is
-    /// for: settings restored from a song have to take effect on a plugin that is not being
-    /// played yet, or the knobs would read the plugin's defaults until something did.
+    /// Hands over any parameter moves now, without waiting for a block, and collects anything
+    /// the plugin has to say back.
     /// </summary>
+    /// <remarks>
+    /// What CLAP's flush is for, and it goes both ways. Settings restored from a song have to
+    /// take effect on a plugin that is not being played yet, or the knobs would read the
+    /// plugin's defaults until something did. And a knob turned in the plugin's own window is
+    /// only ever handed back during a block or a flush, so an idle plugin whose flush nobody
+    /// calls can be turned all day without the host hearing a word of it. That is what
+    /// <see cref="Poll"/> is for.
+    /// </remarks>
     public void FlushParameters()
     {
         if (_disposed || _params == null || _params->Flush == null) return;
@@ -562,7 +569,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         try
         {
             TakePending();
-            if (_eventCount == 0) return;
 
             _current = this;
 
@@ -580,6 +586,21 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         {
             System.Threading.Monitor.Exit(_flush);
         }
+    }
+
+    /// <summary>
+    /// Asks an idle plugin whether it has changed anything itself. Called on the thread the
+    /// plugin's window lives on, every so often, for as long as it is loaded.
+    /// </summary>
+    /// <remarks>
+    /// Only while idle. A plugin being played hands the same things back at the end of each
+    /// block, and CLAP is clear that a flush and a block are not to be in the plugin at once.
+    /// </remarks>
+    public void Poll()
+    {
+        if (_disposed || !IsIdle) return;
+
+        FlushParameters();
     }
 
     /// <summary>How long since a block went through, for telling a running plugin from an idle one.</summary>
