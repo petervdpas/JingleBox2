@@ -5,31 +5,6 @@ using System.Runtime.InteropServices;
 
 namespace JingleBox2.Audio.Plugins;
 
-/// <summary>One plugin parameter, as the host sees it.</summary>
-public sealed record ClapParameter(uint Id, string Name, double Minimum, double Maximum, double Default, uint Flags)
-{
-    // From the CLAP parameter flags, declared rather than worked out from a shift each time.
-    private const uint SteppedFlag = 1 << 0;
-    private const uint HiddenFlag = 1 << 2;
-    private const uint ReadOnlyFlag = 1 << 3;
-    private const uint BypassFlag = 1 << 4;
-
-    /// <summary>Whole numbers only: a mode or a count rather than a dial.</summary>
-    public bool IsStepped => (Flags & SteppedFlag) != 0;
-
-    /// <summary>Not meant to be shown at all.</summary>
-    public bool IsHidden => (Flags & HiddenFlag) != 0;
-
-    /// <summary>
-    /// The plugin talking rather than listening: a gain reduction or an output level. Shown as
-    /// a reading, never as something to drag.
-    /// </summary>
-    public bool IsReadOnly => (Flags & ReadOnlyFlag) != 0;
-
-    /// <summary>The plugin's own bypass, which the host offers in its own way.</summary>
-    public bool IsBypass => (Flags & BypassFlag) != 0;
-}
-
 /// <summary>
 /// A loaded plugin with audio running through it: the host side of one insert slot.
 /// </summary>
@@ -42,10 +17,16 @@ public sealed record ClapParameter(uint Id, string Name, double Minimum, double 
 /// at the start of a block, so a knob leaves its value in a queue here and the audio thread
 /// hands it over on its next pass.
 /// </remarks>
-public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
+public sealed unsafe class ClapEffect : IPluginEffect
 {
     /// <summary>Stereo in, stereo out. Wider plugins are fed and read on their first two.</summary>
     public const int Channels = 2;
+
+    // From the CLAP parameter flags, declared rather than worked out from a shift each time.
+    private const uint SteppedFlag = 1 << 0;
+    private const uint HiddenFlag = 1 << 2;
+    private const uint ReadOnlyFlag = 1 << 3;
+    private const uint BypassFlag = 1 << 4;
 
     private readonly ClapBundle _bundle;
     private readonly ClapPlugin* _plugin;
@@ -74,7 +55,7 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
     private bool _active;
     private bool _disposed;
 
-    private ClapEffect(ClapBundle bundle, ClapPlugin* plugin, ClapHost* host, ClapPluginInfo info)
+    private ClapEffect(ClapBundle bundle, ClapPlugin* plugin, ClapHost* host, PluginInfo info)
     {
         _bundle = bundle;
         _plugin = plugin;
@@ -143,7 +124,7 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
 
     private const int MaxChannelsPerPort = 8;
 
-    public ClapPluginInfo Info { get; }
+    public PluginInfo Info { get; }
 
     public bool IsActive => _active;
 
@@ -224,7 +205,7 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
         return effect;
     }
 
-    private static ClapPluginInfo? FindPlugin(ClapBundle bundle, string pluginId)
+    private static PluginInfo? FindPlugin(ClapBundle bundle, string pluginId)
     {
         var plugins = bundle.Plugins();
         if (plugins.Count == 0) return null;
@@ -541,9 +522,9 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
     private readonly object _flush = new();
 
     /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
-    public IReadOnlyList<ClapParameter> Parameters()
+    public IReadOnlyList<PluginParameter> Parameters()
     {
-        var parameters = new List<ClapParameter>();
+        var parameters = new List<PluginParameter>();
         if (_disposed || _params == null || _params->Count == null) return parameters;
 
         uint count = _params->Count(_plugin);
@@ -553,13 +534,17 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
         {
             if (_params->GetInfo(_plugin, index, &info) == 0) continue;
 
-            parameters.Add(new ClapParameter(
+            parameters.Add(new PluginParameter(
                 info.Id,
                 ReadFixed(info.Name, ClapAbi.NameSize),
                 info.MinValue,
                 info.MaxValue,
                 info.DefaultValue,
-                info.Flags));
+                (info.Flags & SteppedFlag) != 0 ? (int)Math.Round(info.MaxValue - info.MinValue) : 0,
+                (info.Flags & HiddenFlag) != 0,
+                (info.Flags & ReadOnlyFlag) != 0,
+                (info.Flags & BypassFlag) != 0,
+                Normalized: false));
         }
 
         return parameters;

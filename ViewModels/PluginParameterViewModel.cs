@@ -16,8 +16,8 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class PluginParameterViewModel : ObservableObject
 {
-    private readonly ClapEffect _effect;
-    private readonly ClapParameter _parameter;
+    private readonly IPluginEffect _effect;
+    private readonly PluginParameter _parameter;
 
     /// <summary>Told when this moves, so whatever owns the chain knows it has something to save.</summary>
     private readonly Action? _changed;
@@ -27,7 +27,7 @@ public sealed class PluginParameterViewModel : ObservableObject
     /// <summary>When this was last moved here, so a poll does not fight a hand on the knob.</summary>
     private long _movedAt;
 
-    public PluginParameterViewModel(ClapEffect effect, ClapParameter parameter, Action? changed = null)
+    public PluginParameterViewModel(IPluginEffect effect, PluginParameter parameter, Action? changed = null)
     {
         _effect = effect;
         _parameter = parameter;
@@ -49,7 +49,7 @@ public sealed class PluginParameterViewModel : ObservableObject
     public bool IsStepped => _parameter.IsStepped;
 
     /// <summary>A stepped parameter with two positions is an on and an off, not a dial.</summary>
-    public bool IsSwitch => IsStepped && Math.Abs(Maximum - Minimum - 1) < 0.0001;
+    public bool IsSwitch => _parameter.IsSwitch;
 
     /// <summary>The same parameter as a tick box, for the ones that are one.</summary>
     public bool IsOn
@@ -115,8 +115,34 @@ public sealed class PluginParameterViewModel : ObservableObject
         get
         {
             string worded = _effect.TextFor(_parameter.Id, _value);
+
+            // A VST3 parameter is nought to one whatever it actually means, so the plugin's
+            // wording is the only thing that says anything at all. Printing 0.53 for a filter
+            // cutoff would be worse than printing nothing.
+            if (_parameter.Normalized) return Plain(worded);
+
             return Worthwhile(worded) ? worded : Number(_value);
         }
+    }
+
+    /// <summary>
+    /// A normalized parameter as the plugin words it, tidied. Plugins that hand back a real
+    /// unit are left alone; the many that hand back "50.000000" are cut down to "50" and given
+    /// the unit the plugin declared separately.
+    /// </summary>
+    private string Plain(string worded)
+    {
+        if (string.IsNullOrWhiteSpace(worded)) return Number(_value);
+        if (Worthwhile(worded)) return worded;
+
+        if (!double.TryParse(worded, NumberStyles.Float, CultureInfo.InvariantCulture, out double plain))
+            return worded;
+
+        string text = Math.Abs(plain) >= 100
+            ? plain.ToString("0.#", CultureInfo.InvariantCulture)
+            : plain.ToString("0.##", CultureInfo.InvariantCulture);
+
+        return string.IsNullOrWhiteSpace(_parameter.Units) ? text : text + " " + _parameter.Units;
     }
 
     /// <summary>True when the plugin's wording carries something the bare number does not.</summary>

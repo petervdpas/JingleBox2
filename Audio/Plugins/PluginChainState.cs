@@ -11,6 +11,12 @@ public sealed class PluginDeviceConfig
 
     public string Id { get; set; } = "";
 
+    /// <summary>
+    /// Which standard the plugin speaks. Absent from anything saved before VST3 was hosted,
+    /// which reads back as CLAP, and that is what those chains were.
+    /// </summary>
+    public PluginFormat Format { get; set; } = PluginFormat.Clap;
+
     /// <summary>Kept so a missing plugin can be named rather than silently dropped.</summary>
     public string Name { get; set; } = "";
 
@@ -40,6 +46,7 @@ public sealed class PluginChainConfig
             {
                 Path = device.Path,
                 Id = device.Id,
+                Format = device.Format,
                 Name = device.Name,
                 Bypassed = device.Bypassed,
                 Parameters = new Dictionary<string, double>(device.Parameters)
@@ -57,7 +64,7 @@ public sealed class PluginChainConfig
 /// Parameter values, not plugin state. Most effects are nothing but their parameters, and
 /// these are readable, diffable and survive a plugin being updated. A plugin that keeps
 /// something else inside it, a sampler with a file loaded or a sequencer with a pattern,
-/// would need CLAP's state extension, which this does not do yet.
+/// would need the state extension either standard offers, which this does not do yet.
 /// </remarks>
 public static class PluginChainState
 {
@@ -68,12 +75,13 @@ public static class PluginChainState
 
         foreach (var device in chain.Devices)
         {
-            if (device.Insert is not ClapEffect effect) continue;
+            if (device.Insert is not IPluginEffect effect) continue;
 
             var saved = new PluginDeviceConfig
             {
                 Path = effect.Info.Path,
                 Id = effect.Info.Id,
+                Format = effect.Info.Format,
                 Name = effect.Info.Name,
                 Bypassed = device.Bypassed
             };
@@ -107,14 +115,14 @@ public static class PluginChainState
         foreach (var device in chain.Devices)
         {
             chain.Remove(device);
-            (device.Insert as ClapEffect)?.Dispose();
+            (device.Insert as IPluginEffect)?.Dispose();
         }
 
         if (config == null || config.IsEmpty) return missing;
 
         foreach (var saved in config.Devices)
         {
-            var effect = ClapEffect.Load(saved.Path, saved.Id, sampleRate, maxFrames);
+            var effect = PluginHost.Load(saved.Path, saved.Id, saved.Format, sampleRate, maxFrames);
 
             if (effect == null)
             {

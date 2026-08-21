@@ -96,22 +96,26 @@
                 <TextBlock Classes="section" Text="Add effect" />
 
                 <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
-                  <ItemsControl ItemsSource="{Binding Plugins.Plugins}">
+                  <ItemsControl ItemsSource="{Binding Plugins.Effects}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
                         <Button HorizontalAlignment="Stretch"
                                 HorizontalContentAlignment="Left"
                                 Background="Transparent" BorderThickness="0"
-                                Content="{Binding Name}"
                                 Command="{Binding $parent[UserControl].((vm:PluginChainViewModel)DataContext).AddCommand}"
-                                CommandParameter="{Binding .}" />
+                                CommandParameter="{Binding .}">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBlock Grid.Column="0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Classes="cardHint" Text="{Binding FormatName}" />
+                          </Grid>
+                        </Button>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                 </ScrollViewer>
 
                 <TextBlock Classes="cardHint"
-                           IsVisible="{Binding !Plugins.HasPlugins}"
+                           IsVisible="{Binding !Plugins.HasEffects}"
                            Text="No plugins yet. Scan for them in SETTINGS." />
               </StackPanel>
             </Flyout>

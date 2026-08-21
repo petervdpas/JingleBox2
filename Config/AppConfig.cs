@@ -54,7 +54,7 @@ public sealed class AppConfig
 
     // What the last scan found, so the app knows its plugins at startup instead of opening
     // every plugin library again to ask.
-    public List<Audio.Plugins.ClapPluginInfo> KnownPlugins { get; set; } = new();
+    public List<Audio.Plugins.PluginInfo> KnownPlugins { get; set; } = new();
 
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";

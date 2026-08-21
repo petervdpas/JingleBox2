@@ -108,9 +108,9 @@ public sealed unsafe class ClapBundle : IDisposable
     }
 
     /// <summary>What this bundle holds. Most hold one plugin; a suite holds dozens.</summary>
-    public IReadOnlyList<ClapPluginInfo> Plugins()
+    public IReadOnlyList<PluginInfo> Plugins()
     {
-        var plugins = new List<ClapPluginInfo>();
+        var plugins = new List<PluginInfo>();
 
         uint count = _factory->Count(_factory);
 
@@ -122,16 +122,41 @@ public sealed unsafe class ClapBundle : IDisposable
             string id = NativeText.Read(descriptor->Id);
             if (string.IsNullOrEmpty(id)) continue;
 
-            plugins.Add(new ClapPluginInfo(
+            plugins.Add(new PluginInfo(
                 id,
                 NativeText.Read(descriptor->Name),
                 NativeText.Read(descriptor->Vendor),
                 NativeText.Read(descriptor->PluginVersion),
-                Path));
+                Path,
+                PluginFormat.Clap,
+                IsInstrument(descriptor)));
         }
 
         return plugins;
     }
+
+    /// <summary>
+    /// Whether a plugin makes sound from notes rather than from audio. CLAP says so in the
+    /// list of words a plugin describes itself with, so this costs nothing to ask.
+    /// </summary>
+    private static bool IsInstrument(ClapPluginDescriptor* descriptor)
+    {
+        if (descriptor->Features == null) return false;
+
+        for (int index = 0; index < MaxFeatures; index++)
+        {
+            byte* feature = descriptor->Features[index];
+            if (feature == null) break;
+
+            string word = NativeText.Read(feature);
+            if (string.Equals(word, "instrument", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Where the walk over a plugin's own description gives up, if it is not ended.</summary>
+    private const int MaxFeatures = 64;
 
     /// <summary>
     /// Makes an instance of one of the plugins in this bundle, ready to be activated.

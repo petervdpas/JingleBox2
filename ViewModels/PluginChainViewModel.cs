@@ -62,7 +62,10 @@ public sealed partial class PluginChainViewModel : ObservableObject
         {
             if (!device.IsOpen) continue;
 
-            foreach (var parameter in device.Parameters) parameter.Refresh();
+            // Only the readings. Those are the ones the plugin moves by itself; a knob only
+            // moves when a hand moves it, and reading every knob back would mean thousands of
+            // calls into a plugin every tick. Serum alone declares 2622 parameters.
+            foreach (var parameter in device.Readouts) parameter.Refresh();
         }
     }
 
@@ -86,7 +89,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public string Label => Target?.Label ?? "Nothing picked";
 
     /// <summary>Adds a plugin to the end of the chain. What the plus button does.</summary>
-    public IRelayCommand<ClapPluginInfo> AddCommand => new RelayCommand<ClapPluginInfo>(Add);
+    public IRelayCommand<PluginInfo> AddCommand => new RelayCommand<PluginInfo>(Add);
 
     partial void OnTargetChanged(IPluginHost? value)
     {
@@ -95,11 +98,20 @@ public sealed partial class PluginChainViewModel : ObservableObject
         Rebuild();
     }
 
-    public void Add(ClapPluginInfo? plugin)
+    public void Add(PluginInfo? plugin)
     {
         if (plugin == null || Target == null) return;
 
-        var effect = ClapEffect.Load(plugin.Path, plugin.Id, Target.SampleRate, MaxFrames);
+        // An instrument has no audio input, so in a chain it would put out its own silence
+        // over whatever the track was playing. Refused with a reason rather than accepted and
+        // then wondered about.
+        if (plugin.IsInstrument)
+        {
+            Status = $"'{plugin.Name}' is an instrument, not an effect";
+            return;
+        }
+
+        var effect = PluginHost.Load(plugin, Target.SampleRate, MaxFrames);
         if (effect == null)
         {
             Status = $"'{plugin.Name}' would not load";
@@ -189,7 +201,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         foreach (var device in Target.Chain.Devices)
         {
-            if (device.Insert is not ClapEffect effect) continue;
+            if (device.Insert is not IPluginEffect effect) continue;
 
             Devices.Add(new PluginDeviceViewModel(this, effect, device));
         }

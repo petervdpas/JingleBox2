@@ -47,7 +47,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// every plugin library to ask what is inside it, which is slow and is what makes hosts
     /// crash; there is no reason to do it again every time the app starts.
     /// </summary>
-    private void Remember(List<ClapPluginInfo>? known)
+    private void Remember(List<PluginInfo>? known)
     {
         if (known == null || known.Count == 0) return;
 
@@ -57,7 +57,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         {
             // A plugin uninstalled since the last scan is dropped rather than offered and then
             // failing to load.
-            if (!File.Exists(plugin.Path))
+            if (!PluginHost.Exists(plugin))
             {
                 gone++;
                 continue;
@@ -66,7 +66,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
             Plugins.Add(plugin);
         }
 
-        OnPropertyChanged(nameof(HasPlugins));
+        Sort();
 
         Status = gone == 0
             ? $"{Plugins.Count} plugin(s) known. Scan again after installing more."
@@ -111,7 +111,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     }
 
     /// <summary>Keeps what was found, so the next start does not have to look again.</summary>
-    private void Save(List<ClapPluginInfo> found)
+    private void Save(List<PluginInfo> found)
     {
         if (_store == null || _config == null) return;
 
@@ -130,12 +130,35 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         _store.Save(_config);
     }
 
-    public ObservableCollection<ClapPluginInfo> Plugins { get; } = new();
+    public ObservableCollection<PluginInfo> Plugins { get; } = new();
+
+    /// <summary>
+    /// The ones that can go in a chain. An instrument makes sound from notes and has no audio
+    /// input at all, so putting one on a pad would replace the pad with silence. They stay on
+    /// the SETTINGS list, because knowing they are installed is worth something.
+    /// </summary>
+    public ObservableCollection<PluginInfo> Effects { get; } = new();
+
+    public bool HasEffects => Effects.Count > 0;
+
+    /// <summary>Refills the effects list from the full one. Called after either is rebuilt.</summary>
+    private void Sort()
+    {
+        Effects.Clear();
+
+        foreach (var plugin in Plugins)
+        {
+            if (plugin.CanInsert) Effects.Add(plugin);
+        }
+
+        OnPropertyChanged(nameof(HasPlugins));
+        OnPropertyChanged(nameof(HasEffects));
+    }
 
     [ObservableProperty] private string status = "Not scanned yet";
 
     /// <summary>The directories a scan looks in, as one line for the page to show.</summary>
-    public string SearchPaths => string.Join("\n", ClapScanner.SearchPaths(Folders));
+    public string SearchPaths => string.Join("\n", PluginHost.SearchPaths(Folders));
 
     public bool HasPlugins => Plugins.Count > 0;
 
@@ -156,17 +179,17 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         try
         {
             var folders = Folders.ToList();
-            var found = await Task.Run(() => Scan(folders));
+            var found = await Task.Run(() => PluginHost.Scan(folders));
 
             Plugins.Clear();
             foreach (var plugin in found) Plugins.Add(plugin);
 
-            OnPropertyChanged(nameof(HasPlugins));
+            Sort();
 
             Save(found);
 
             Status = found.Count == 0
-                ? "No CLAP plugins found. The places looked in are listed above."
+                ? "No CLAP or VST3 plugins found. The places looked in are listed above."
                 : $"{found.Count} plugin(s) found";
         }
         catch (Exception ex)
@@ -179,23 +202,4 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         }
     }
 
-    private static List<ClapPluginInfo> Scan(IReadOnlyList<string> folders)
-    {
-        var found = new List<ClapPluginInfo>();
-
-        foreach (var path in ClapScanner.Bundles(folders))
-        {
-            var bundle = ClapBundle.Acquire(path);
-            if (bundle == null) continue;
-
-            found.AddRange(bundle.Plugins());
-
-            // The reference goes back straight away. The library itself stays loaded, which is
-            // deliberate and explained where that is decided.
-            bundle.Dispose();
-        }
-
-        found.Sort((first, second) => string.Compare(first.Name, second.Name, StringComparison.OrdinalIgnoreCase));
-        return found;
-    }
 }

@@ -12,7 +12,7 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
 {
     private readonly PluginChainViewModel _chain;
 
-    public PluginDeviceViewModel(PluginChainViewModel chain, ClapEffect effect, PluginChain.Device device)
+    public PluginDeviceViewModel(PluginChainViewModel chain, IPluginEffect effect, PluginChain.Device device)
     {
         _chain = chain;
         Effect = effect;
@@ -24,6 +24,13 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
             // something the host offers in its own way.
             if (parameter.IsHidden || parameter.IsBypass) continue;
 
+            Total++;
+
+            // A big synth declares thousands. Serum has 2622, and a window with 2622 knobs in
+            // it is not a window anybody can use, so what is shown stops here and says so.
+            // Everything is still loaded, still played and still saved; only the drawing stops.
+            if (Parameters.Count >= MaxShown) continue;
+
             var row = new PluginParameterViewModel(effect, parameter, chain.NotifyChanged);
 
             Parameters.Add(row);
@@ -34,7 +41,22 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
         }
     }
 
-    public ClapEffect Effect { get; }
+    /// <summary>How many knobs one window will draw before it stops.</summary>
+    public const int MaxShown = 256;
+
+    /// <summary>How many the plugin actually has, shown or not.</summary>
+    public int Total { get; private set; }
+
+    /// <summary>True when the plugin has more than a window can usefully hold.</summary>
+    public bool IsTruncated => Total > Parameters.Count;
+
+    /// <summary>Said out loud rather than left as a list that quietly stops.</summary>
+    public string TruncationNote =>
+        IsTruncated
+            ? $"Showing the first {Parameters.Count} of {Total} parameters. The rest are loaded and saved, just not drawn."
+            : "";
+
+    public IPluginEffect Effect { get; }
 
     public PluginChain.Device Device { get; }
 

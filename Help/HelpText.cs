@@ -78,12 +78,20 @@ public static class HelpText
         [SettingsPlugins] = new(
             SettingsPlugins,
             "Audio plugins",
-            "CLAP plugins this machine has.",
+            "CLAP and VST3 plugins this machine has.",
             """
-            CLAP plugins installed on this machine. CLAP is the format this app hosts: it is the
-            one with a plain C interface, so the same host code works on Linux and Windows. LSP,
-            Surge, Vital and many others ship it. A plugin that only ships VST is not listed
-            here, and VST would need a different host of its own.
+            Plugins installed on this machine, in either of the two formats this app hosts.
+
+            CLAP is the newer one, with a plain C interface. LSP, Surge and Vital ship it, and
+            on Linux it lives in ~/.clap and /usr/lib/clap. VST3 is the one nearly everything
+            ships, Serum included, and it lives in ~/.vst3 and /usr/lib/vst3.
+
+            Effects from either format go in the same chain, side by side, on a pad or a tracker
+            track. Instruments are listed but cannot be played yet: an instrument takes notes
+            rather than audio, and that is a different job from an insert.
+
+            Windows plugins are not Linux plugins. A Windows VST3 holds a .dll and needs wine
+            and yabridge to run at all; what is listed here is what runs natively.
 
             Scanning opens each plugin to ask what is inside it. They stay loaded until the app
             closes, on purpose: unloading plugin libraries after they have been used is what

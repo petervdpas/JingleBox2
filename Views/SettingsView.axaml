@@ -134,7 +134,12 @@
                   <DataTemplate>
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
                       <StackPanel Grid.Column="0" Spacing="1">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                          <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding FormatName}" />
+                          <TextBlock Classes="cardHint" VerticalAlignment="Center"
+                                     Text="instrument" IsVisible="{Binding IsInstrument}" />
+                        </StackPanel>
                         <TextBlock Classes="cardHint" Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"

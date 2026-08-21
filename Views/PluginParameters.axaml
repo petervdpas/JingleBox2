@@ -34,6 +34,13 @@
        shows a plugin, so it looks the same wherever it is worked on. -->
   <StackPanel Spacing="10">
 
+    <!-- A plugin with thousands of parameters has a list that stops somewhere. Where it stops
+         is said out loud rather than left to look like the plugin is missing controls. -->
+    <TextBlock Classes="cardHint"
+               TextWrapping="Wrap"
+               IsVisible="{Binding IsTruncated}"
+               Text="{Binding TruncationNote}" />
+
     <ItemsControl ItemsSource="{Binding Controls}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
