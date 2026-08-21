@@ -1,5 +1,8 @@
+using System;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Reactive;
 using Avalonia.Interactivity;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
@@ -19,9 +22,31 @@ public partial class TrackerView : UserControl
 
         Grid.CursorMoved += (_, cursor) => ViewModel?.SetCursor(cursor);
         AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
+
+        // The header sits outside the scroll area, so it has to be told how far the pattern
+        // has scrolled sideways and what character width the grid settled on.
+        Header.TrackClicked += (_, track) => SelectTrack(track);
+        GridScroll.GetObservable(ScrollViewer.OffsetProperty)
+            .Subscribe(new AnonymousObserver<Vector>(offset => Header.ScrollOffset = offset.X));
+
+        Grid.LayoutUpdated += (_, _) =>
+        {
+            var metrics = Grid.Metrics;
+            if (metrics.CharWidth > 0) Header.CharWidth = metrics.CharWidth;
+            Header.RowHeight = Grid.RowHeight;
+        };
     }
 
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
+
+    private void SelectTrack(int track)
+    {
+        var vm = ViewModel;
+        if (vm == null) return;
+
+        vm.SetCursor(vm.Cursor with { Track = track });
+        Grid.Focus();
+    }
 
     private void AddInstrument_Click(object? sender, RoutedEventArgs e)
     {

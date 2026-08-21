@@ -23,7 +23,9 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     [ObservableProperty] private Song song;
     [ObservableProperty] private Pattern? currentPattern;
-    [ObservableProperty] private PatternCursor cursor = PatternCursor.Start;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedTrack))]
+    private PatternCursor cursor = PatternCursor.Start;
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
 
@@ -90,6 +92,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
 
     public int TrackCount => Song.TrackCount;
+
+    /// <summary>The track the cursor is in, for the header to pick out.</summary>
+    public int SelectedTrack => Cursor.Track;
 
     public bool IsPlaying => Transport == TrackerTransportState.Playing;
     public bool IsPaused => Transport == TrackerTransportState.Paused;
@@ -294,8 +299,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
 
+        // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
-        OnPropertyChanged(nameof(CurrentPattern));
     }
 
     private void RefreshOrder()

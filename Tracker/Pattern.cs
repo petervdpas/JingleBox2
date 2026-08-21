@@ -9,6 +9,13 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public sealed class Pattern
 {
+    /// <summary>
+    /// Raised whenever the contents or the shape change. A pattern is edited in place, so
+    /// without this a view bound to the pattern has no way to know anything happened: the
+    /// reference it holds is still the same object.
+    /// </summary>
+    public event EventHandler? Changed;
+
     public const int MinLines = 1;
     public const int MaxLines = 256;
     public const int DefaultLines = 64;
@@ -36,7 +43,12 @@ public sealed class Pattern
         set
         {
             RequireInRange(line, track);
-            _cells[line * TrackCount + track] = value;
+
+            int index = line * TrackCount + track;
+            if (_cells[index] == value) return;
+
+            _cells[index] = value;
+            Changed?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -49,7 +61,11 @@ public sealed class Pattern
     /// <summary>Changes the track count, keeping whatever still fits.</summary>
     public void SetTrackCount(int trackCount) => Rebuild(Lines, trackCount);
 
-    public void Clear() => Array.Fill(_cells, TrackerCell.Empty);
+    public void Clear()
+    {
+        Array.Fill(_cells, TrackerCell.Empty);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
 
     public void ClearTrack(int track)
     {
@@ -89,6 +105,8 @@ public sealed class Pattern
         _cells = replacement;
         Lines = newLines;
         TrackCount = newTracks;
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private static TrackerCell[] NewCells(int lines, int trackCount)

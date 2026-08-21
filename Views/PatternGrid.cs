@@ -72,15 +72,56 @@ public sealed class PatternGrid : Control
     /// <summary>Raised when a click moves the cursor, so the view model can follow.</summary>
     public event EventHandler<PatternCursor>? CursorMoved;
 
-    // Column layout, in characters, matching the text each column renders.
-    private const int LineNumberChars = 3;
-    private const string ColumnGap = " ";
-
-    private static readonly int[] ColumnWidths = { 3, 2, 2, 3 }; // note, instrument, volume, effect
-
     private double _charWidth = 8;
     private double _fontSize = 13;
     private Typeface _typeface = new(FontFamily.Default);
+
+    /// <summary>Layout for the pattern currently bound, shared with the header control.</summary>
+    public PatternMetrics Metrics => new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0);
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        if (Pattern != null)
+        {
+            Pattern.Changed -= OnPatternChanged;
+            Pattern.Changed += OnPatternChanged;
+        }
+
+        // The pattern binding lands after the first measure, so without this the control
+        // keeps the zero size it was first measured at and the ScrollViewer clips it away.
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        if (Pattern != null) Pattern.Changed -= OnPatternChanged;
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property != PatternProperty) return;
+
+        // Patterns are edited in place, so watching the property alone is not enough: the
+        // same object grows tracks and gains notes without the reference ever changing.
+        if (change.OldValue is Pattern previous) previous.Changed -= OnPatternChanged;
+        if (change.NewValue is Pattern current) current.Changed += OnPatternChanged;
+
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    private void OnPatternChanged(object? sender, EventArgs e)
+    {
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -89,18 +130,8 @@ public sealed class PatternGrid : Control
 
         EnsureMetrics();
 
-        double width = (LineNumberChars + 1) * _charWidth + pattern.TrackCount * TrackWidth;
-        return new Size(width, pattern.Lines * RowHeight);
-    }
-
-    private double TrackWidth
-    {
-        get
-        {
-            int chars = 0;
-            foreach (int w in ColumnWidths) chars += w + ColumnGap.Length;
-            return (chars + 1) * _charWidth;
-        }
+        var metrics = Metrics;
+        return new Size(metrics.ContentWidth, metrics.ContentHeight(pattern.Lines));
     }
 
     public override void Render(DrawingContext context)
@@ -110,80 +141,122 @@ public sealed class PatternGrid : Control
 
         EnsureMetrics();
 
+        var metrics = Metrics;
         var bounds = new Rect(Bounds.Size);
+
         var text = Brush(ThemeKey.Text, Colors.Gainsboro);
         var muted = Brush(ThemeKey.Muted, Color.FromRgb(0x6B, 0x72, 0x80));
         var accent = Brush(ThemeKey.Accent, Color.FromRgb(0xFB, 0x8C, 0x00));
+
+        double contentHeight = metrics.ContentHeight(pattern.Lines);
+
+        // Before the first arrange the bounds are empty. Drawing the whole pattern is better
+        // than culling every row against a size that is not real yet.
+        double visibleHeight = bounds.Height > 0 ? bounds.Height : contentHeight;
+        double rowWidth = Math.Max(bounds.Width, metrics.ContentWidth);
+
+        var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount);
+        var barShade = RowShade(0x1C);
+        var beatShade = RowShade(0x0E);
+
+        DrawSelectedTrack(context, metrics, cursor.Track, contentHeight);
 
         int lpb = Math.Max(1, LinesPerBeat);
 
         for (int line = 0; line < pattern.Lines; line++)
         {
-            double y = line * RowHeight;
-            if (y + RowHeight < 0 || y > bounds.Height) continue; // outside the viewport
+            double y = metrics.RowY(line);
+            if (y + RowHeight < 0 || y > visibleHeight) continue; // outside the viewport
 
-            bool isBeat = line % lpb == 0;
-            bool isBar = line % (lpb * 4) == 0;
-
-            if (isBar)
-                context.FillRectangle(new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)),
-                    new Rect(0, y, bounds.Width, RowHeight));
-            else if (isBeat)
-                context.FillRectangle(new SolidColorBrush(Color.FromArgb(14, 255, 255, 255)),
-                    new Rect(0, y, bounds.Width, RowHeight));
+            if (line % (lpb * 4) == 0)
+                context.FillRectangle(barShade, new Rect(0, y, rowWidth, RowHeight));
+            else if (line % lpb == 0)
+                context.FillRectangle(beatShade, new Rect(0, y, rowWidth, RowHeight));
 
             if (line == PlayingLine)
                 context.FillRectangle(new SolidColorBrush(Color.FromArgb(60, 0xFB, 0x8C, 0x00)),
-                    new Rect(0, y, bounds.Width, RowHeight));
+                    new Rect(0, y, rowWidth, RowHeight));
 
             DrawText(context, line.ToString("00", CultureInfo.InvariantCulture), 0, y, muted);
 
             for (int track = 0; track < pattern.TrackCount; track++)
             {
                 var cell = pattern[line, track];
-                double x = (LineNumberChars + 1) * _charWidth + track * TrackWidth;
 
-                DrawColumn(context, cell.Note.ToString(), x, y, cell.Note.IsEmpty ? muted : text);
-                x += (ColumnWidths[0] + ColumnGap.Length) * _charWidth;
+                DrawText(context, cell.Note.ToString(),
+                    metrics.ColumnX(track, CellColumn.Note), y, cell.Note.IsEmpty ? muted : text);
 
-                DrawColumn(context, cell.InstrumentText, x, y,
+                DrawText(context, cell.InstrumentText,
+                    metrics.ColumnX(track, CellColumn.Instrument), y,
                     cell.Instrument == TrackerCell.NoInstrument ? muted : text);
-                x += (ColumnWidths[1] + ColumnGap.Length) * _charWidth;
 
-                DrawColumn(context, cell.VolumeText, x, y,
+                DrawText(context, cell.VolumeText,
+                    metrics.ColumnX(track, CellColumn.Volume), y,
                     cell.Volume == TrackerCell.NoVolume ? muted : text);
-                x += (ColumnWidths[2] + ColumnGap.Length) * _charWidth;
 
-                DrawColumn(context, cell.Effect.ToString(), x, y, cell.Effect.IsNone ? muted : text);
+                DrawText(context, cell.Effect.ToString(),
+                    metrics.ColumnX(track, CellColumn.Effect), y, cell.Effect.IsNone ? muted : text);
             }
         }
 
-        DrawCursor(context, pattern, accent);
+        DrawTrackSeparators(context, metrics, pattern.TrackCount, contentHeight);
+        DrawCursor(context, metrics, cursor, accent);
     }
 
-    private void DrawCursor(DrawingContext context, Pattern pattern, IBrush accent)
+    /// <summary>
+    /// A tint down the whole track the cursor is in. On a wide pattern the cursor box alone
+    /// is a few pixels of a very repetitive grid, which is not enough to find at a glance.
+    /// </summary>
+    private void DrawSelectedTrack(DrawingContext context, PatternMetrics metrics, int track, double height)
     {
-        var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount);
+        var brush = new SolidColorBrush(Color.FromArgb(22, 0xFB, 0x8C, 0x00));
+        context.FillRectangle(brush,
+            new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height));
+    }
 
-        double x = ColumnX(cursor.Track, cursor.Column);
-        double width = ColumnWidths[(int)cursor.Column] * _charWidth;
-        double y = cursor.Line * RowHeight;
+    /// <summary>
+    /// A vertical rule down each track boundary. Without them the columns of a wide pattern
+    /// read as one block of text and it is hard to tell which track a note belongs to.
+    /// </summary>
+    private void DrawTrackSeparators(DrawingContext context, PatternMetrics metrics, int trackCount, double height)
+    {
+        var pen = new Pen(Brush(ThemeKey.Border, Color.FromArgb(60, 128, 128, 128)), 1);
+
+        // One after the line numbers, then one at the start of every track after the first.
+        for (int track = 0; track <= trackCount; track++)
+        {
+            double x = Math.Round(metrics.TrackDividerX(track)) - 0.5;
+            context.DrawLine(pen, new Point(x, 0), new Point(x, height));
+        }
+    }
+
+    private void DrawCursor(DrawingContext context, PatternMetrics metrics, PatternCursor cursor, IBrush accent)
+    {
+        double x = metrics.ColumnX(cursor.Track, cursor.Column);
+        double width = metrics.ColumnWidth(cursor.Column);
+        double y = metrics.RowY(cursor.Line);
 
         context.FillRectangle(new SolidColorBrush(Color.FromArgb(48, 0xFB, 0x8C, 0x00)),
             new Rect(x - 1, y, width + 2, RowHeight));
         context.DrawRectangle(new Pen(accent, 1), new Rect(x - 1, y, width + 2, RowHeight));
     }
 
-    private double ColumnX(int track, CellColumn column)
+    /// <summary>
+    /// Beat shading has to darken a light theme and lighten a dark one, so it follows the
+    /// background rather than always painting white over the top.
+    /// </summary>
+    private IBrush RowShade(byte alpha)
     {
-        double x = (LineNumberChars + 1) * _charWidth + track * TrackWidth;
-        for (int i = 0; i < (int)column; i++)
-            x += (ColumnWidths[i] + ColumnGap.Length) * _charWidth;
-        return x;
+        bool lightBackground = Brush(ThemeKey.Background, Colors.Black) is ISolidColorBrush background
+                               && Luminance(background.Color) > 0.5;
+
+        return lightBackground
+            ? new SolidColorBrush(Color.FromArgb(alpha, 0, 0, 0))
+            : new SolidColorBrush(Color.FromArgb(alpha, 255, 255, 255));
     }
 
-    private void DrawColumn(DrawingContext context, string text, double x, double y, IBrush brush) =>
-        DrawText(context, text, x, y, brush);
+    private static double Luminance(Color color) =>
+        (0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B) / 255.0;
 
     private void DrawText(DrawingContext context, string text, double x, double y, IBrush brush)
     {
@@ -203,23 +276,8 @@ public sealed class PatternGrid : Control
         Focus();
 
         var point = e.GetPosition(this);
-        int line = Math.Clamp((int)(point.Y / RowHeight), 0, pattern.Lines - 1);
+        var cursor = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
 
-        double trackArea = point.X - (LineNumberChars + 1) * _charWidth;
-        int track = Math.Clamp((int)(trackArea / TrackWidth), 0, pattern.TrackCount - 1);
-
-        // Which of the four columns inside that track the click landed on.
-        double insideTrack = trackArea - track * TrackWidth;
-        var column = CellColumn.Note;
-        double edge = 0;
-        for (int i = 0; i < ColumnWidths.Length; i++)
-        {
-            edge += (ColumnWidths[i] + ColumnGap.Length) * _charWidth;
-            if (insideTrack < edge) { column = (CellColumn)i; break; }
-            column = (CellColumn)Math.Min(i + 1, ColumnWidths.Length - 1);
-        }
-
-        var cursor = new PatternCursor(line, track, column);
         EditCursor = cursor;
         CursorMoved?.Invoke(this, cursor);
         e.Handled = true;
@@ -230,7 +288,7 @@ public sealed class PatternGrid : Control
         // A monospace face is what makes the columns line up; measuring one glyph gives the
         // cell width every column position is derived from.
         _fontSize = Math.Max(9, RowHeight - 5);
-        _typeface = new Typeface(new FontFamily("Cascadia Mono,Consolas,DejaVu Sans Mono,Menlo,monospace"));
+        _typeface = new Typeface(PatternFont.Family);
 
         var probe = new FormattedText("0", CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight, _typeface, _fontSize, Brushes.White);
@@ -242,6 +300,8 @@ public sealed class PatternGrid : Control
         public const string Text = "TextPrimaryBrush";
         public const string Muted = "TextMutedBrush";
         public const string Accent = "AccentBrush";
+        public const string Border = "BorderBrush";
+        public const string Background = "BgBrush";
     }
 
     private IBrush Brush(string key, Color fallback) =>
