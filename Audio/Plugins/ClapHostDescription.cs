@@ -9,9 +9,10 @@ namespace JingleBox2.Audio.Plugins;
 /// </summary>
 /// <remarks>
 /// The struct is unmanaged and lives as long as the plugin does, because the plugin keeps the
-/// pointer. Extensions are answered with null: this host provides none yet, which is a legal
-/// answer to every one of them and is what keeps a first plugin working without implementing
-/// half the specification.
+/// pointer. Most extensions are answered with null, which is a legal answer to every one of
+/// them. The three that are not are the ones a plugin needs before it can draw anything: a
+/// clock, a way to have its X11 connection watched, and somewhere to ask for a different size.
+/// See <see cref="ClapHostExtensions"/>.
 /// </remarks>
 internal static unsafe class ClapHostDescription
 {
@@ -44,11 +45,13 @@ internal static unsafe class ClapHostDescription
         host->RequestProcess = &RequestProcess;
         host->RequestCallback = &RequestCallback;
 
+        ClapHostExtensions.Reserve(host);
+
         return host;
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
-    private static void* GetExtension(ClapHost* host, byte* id) => null;
+    private static void* GetExtension(ClapHost* host, byte* id) => ClapHostExtensions.Extension(id);
 
     /// <summary>
     /// A plugin asking to be restarted, to be scheduled, or for a call on the main thread.

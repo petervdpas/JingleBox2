@@ -1,5 +1,7 @@
+using JingleBox2.Audio.Plugins.Bridge;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace JingleBox2.Audio.Plugins;
@@ -15,10 +17,23 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public static class PluginHost
 {
+    /// <summary>
+    /// True when plugins are given a process of their own, which is everywhere except when
+    /// somebody has deliberately turned it off to debug something.
+    /// </summary>
+    /// <remarks>
+    /// A plugin in its own process cannot take the application down, so everything the crash
+    /// guard was written for stops applying: nothing needs blocking, because nothing that goes
+    /// wrong in a plugin is fatal any more. See <see cref="PluginCrashGuard"/>, which stands
+    /// down while this is true.
+    /// </remarks>
+    public static bool Isolated =>
+        Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) != "1";
+
     /// <summary>Opens a plugin, whichever standard it speaks.</summary>
     public static IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
     {
-        return Open(plugin, sampleRate, maxFrames) as IPluginEffect;
+        return Open(plugin, sampleRate, maxFrames, false) as IPluginEffect;
     }
 
     /// <summary>
@@ -30,9 +45,13 @@ public static class PluginHost
     /// after, so that a plugin which kills the application on the way in is not tried again on
     /// the way back up. See <see cref="PluginCrashGuard"/>.
     /// </remarks>
-    private static object? Open(PluginInfo? plugin, int sampleRate, int maxFrames)
+    private static object? Open(PluginInfo? plugin, int sampleRate, int maxFrames, bool asInstrument)
     {
         if (plugin == null) return null;
+
+        // The normal way: the plugin gets a process of its own and nothing it does can reach
+        // this one. Nothing is written down beforehand because nothing here is at risk.
+        if (Isolated) return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
 
         // A plugin that killed the last run while loading does not get to load this one.
         if (PluginCrashGuard.IsLoadBlocked(plugin)) return null;
@@ -64,13 +83,13 @@ public static class PluginHost
     {
         if (plugin == null || plugin.Format != PluginFormat.Vst3) return null;
 
-        return Open(plugin, sampleRate, maxFrames) as IPluginInstrument;
+        return Open(plugin, sampleRate, maxFrames, true) as IPluginInstrument;
     }
 
     /// <summary>True when this host can play notes into a plugin of this kind.</summary>
     public static bool CanPlay(PluginInfo plugin) =>
         plugin != null && plugin.IsInstrument && plugin.Format == PluginFormat.Vst3 &&
-        !PluginCrashGuard.IsLoadBlocked(plugin);
+        (Isolated || !PluginCrashGuard.IsLoadBlocked(plugin));
 
     /// <summary>Every directory either standard keeps plugins in, plus the user's own.</summary>
     public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
@@ -108,6 +127,80 @@ public static class PluginHost
     /// not a machine with no plugins.
     /// </summary>
     public static List<PluginInfo> Scan(IReadOnlyList<string> folders)
+    {
+        return Isolated ? ScanElsewhere(folders) : ScanHere(folders);
+    }
+
+    /// <summary>
+    /// Reads the folders in a process of its own, so a plugin that falls over while being asked
+    /// what it is costs one empty list rather than the application.
+    /// </summary>
+    /// <remarks>
+    /// Scanning is the one place a plugin gets to run code before anybody has chosen to use it,
+    /// which makes a bad one here worse than a bad one anywhere else: it would go off every time
+    /// the program started. Out of process it is somebody else's problem, and if the answer does
+    /// not arrive the scan comes back empty and the plugins already known about stay known.
+    /// </remarks>
+    private static List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders)
+    {
+        string? self = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(self)) return ScanHere(folders);
+
+        string answer = Path.Combine(Path.GetTempPath(), "jinglebox-scan-" + Guid.NewGuid().ToString("N") + ".json");
+
+        var start = new ProcessStartInfo
+        {
+            FileName = self,
+            UseShellExecute = false,
+            WorkingDirectory = AppContext.BaseDirectory
+        };
+
+        if (string.Equals(Path.GetFileNameWithoutExtension(self), "dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            string assembly = System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "";
+            if (string.IsNullOrEmpty(assembly)) return ScanHere(folders);
+
+            start.ArgumentList.Add(assembly);
+        }
+
+        start.ArgumentList.Add(PluginBridge.ScanArgument);
+        start.ArgumentList.Add(answer);
+
+        foreach (var folder in folders) start.ArgumentList.Add(folder);
+
+        try
+        {
+            using var child = Process.Start(start);
+            if (child == null) return new List<PluginInfo>();
+
+            if (!child.WaitForExit(ScanSeconds * 1000))
+            {
+                child.Kill(entireProcessTree: true);
+                return new List<PluginInfo>();
+            }
+
+            if (!File.Exists(answer)) return new List<PluginInfo>();
+
+            var found = System.Text.Json.JsonSerializer.Deserialize<List<PluginInfo>>(File.ReadAllText(answer));
+
+            return found ?? new List<PluginInfo>();
+        }
+        catch (Exception)
+        {
+            return new List<PluginInfo>();
+        }
+        finally
+        {
+            try { if (File.Exists(answer)) File.Delete(answer); } catch (Exception) { }
+        }
+    }
+
+    /// <summary>How long a whole scan is given before it is assumed to have hung.</summary>
+    private const int ScanSeconds = 120;
+
+    /// <summary>The scan itself, run wherever it is called: in the child, or in this process
+    /// when isolation has been turned off.</summary>
+    internal static List<PluginInfo> ScanHere(IReadOnlyList<string> folders)
     {
         var found = new List<PluginInfo>();
 

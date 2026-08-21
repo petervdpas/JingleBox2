@@ -23,7 +23,7 @@ public partial class App : Application
         // Plugins with interfaces of their own have to be called on the thread their windows
         // live on. Until this is said, the run loop pumps on a thread of its own, which is
         // right for effects with no window and wrong the moment one has.
-        JingleBox2.Audio.Plugins.Vst3RunLoop.DriveWith(round => Dispatcher.UIThread.Post(round));
+        JingleBox2.Audio.Plugins.PluginRunLoop.DriveWith(round => Dispatcher.UIThread.Post(round));
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

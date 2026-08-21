@@ -86,6 +86,26 @@ public sealed class PluginParameterViewModel : ObservableObject
     private const long SettleMilliseconds = 500;
 
     /// <summary>
+    /// Takes a value the plugin set itself, in its own window. Shown, not sent back: the
+    /// plugin is the one that moved it and telling it so again would be an argument.
+    /// </summary>
+    public void Adopt(double value)
+    {
+        double clamped = double.IsNaN(value) ? _parameter.Default : Math.Clamp(value, Minimum, Maximum);
+        if (Math.Abs(_value - clamped) < 0.000001) return;
+
+        _value = clamped;
+        _movedAt = Environment.TickCount64;
+
+        OnPropertyChanged(nameof(Value));
+        OnPropertyChanged(nameof(IsOn));
+        OnPropertyChanged(nameof(Text));
+    }
+
+    /// <summary>Which parameter this is, for matching up a move the plugin reported.</summary>
+    public uint Id => _parameter.Id;
+
+    /// <summary>
     /// Takes the value back from the plugin. Some parameters are the plugin talking rather
     /// than listening: a gain reduction or an output level is a meter, and without this it
     /// would sit at whatever it read when the effect was loaded.

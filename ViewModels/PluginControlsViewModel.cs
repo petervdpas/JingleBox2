@@ -1,6 +1,8 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.Audio.Plugins.Bridge;
 using System;
 using System.Collections.ObjectModel;
 
@@ -36,6 +38,75 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     {
         Plugin = plugin;
         _changed = changed;
+
+        // A plugin runs in a process of its own, so it can go away while the application
+        // carries on. That is the whole point of putting it there, and it means somebody has
+        // to say so and offer to start it again.
+        if (plugin is BridgedPlugin bridged) bridged.Stopped += () => Dispatcher.UIThread.Post(Fell);
+
+        // A knob turned in the plugin's own window is still a change to whatever holds this
+        // plugin, and without this nothing would ever know there was something to save.
+        plugin.Edited += (id, value) => Dispatcher.UIThread.Post(() => Moved(id, value));
+    }
+
+    /// <summary>The knobs by the parameter they stand for, for a move reported by the plugin.</summary>
+    private readonly System.Collections.Generic.Dictionary<uint, PluginParameterViewModel> _rows = new();
+
+    /// <summary>
+    /// The plugin moved one of its own knobs. The host's copy of that knob follows it, and
+    /// whatever owns the plugin is told there is something worth saving.
+    /// </summary>
+    private void Moved(uint id, double value)
+    {
+        if (_rows.TryGetValue(id, out var row)) row.Adopt(value);
+
+        _changed?.Invoke();
+    }
+
+    /// <summary>True when the plugin's process has gone and it is not playing.</summary>
+    [ObservableProperty] private bool hasStopped;
+
+    /// <summary>What happened to it, in words fit to put on the page.</summary>
+    [ObservableProperty] private string stoppedNote = "";
+
+    private void Fell()
+    {
+        if (Plugin is not BridgedPlugin bridged) return;
+
+        StoppedNote = bridged.StoppedNote + " Nothing else was affected.";
+        HasStopped = true;
+
+        // The window it was drawing in belongs to a process that is not there any more.
+        Editor = null;
+
+        OnPropertyChanged(nameof(Editor));
+        OnPropertyChanged(nameof(HasOwnWindow));
+        OnPropertyChanged(nameof(HasKnobs));
+    }
+
+    /// <summary>
+    /// Starts the plugin again, with the settings it had. Anything it was holding that was
+    /// never saved is not coming back, which is why the button says settings.
+    /// </summary>
+    public IRelayCommand RestartCommand => new RelayCommand(Restart);
+
+    private void Restart()
+    {
+        if (Plugin is not BridgedPlugin bridged) return;
+
+        if (!bridged.Restart())
+        {
+            StoppedNote = Plugin.Info.Name + " would not start again.";
+            return;
+        }
+
+        HasStopped = false;
+        StoppedNote = "";
+
+        _prepared = false;
+        Prepare();
+
+        _changed?.Invoke();
     }
 
     /// <summary>The plugin's own interface, when it has one and it has been opened.</summary>
@@ -156,6 +227,11 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         _settle?.Dispose();
         _settle = null;
 
+        // Ready to be got ready again. Without this a plugin opens once: the second window
+        // finds the panel already prepared, and prepared means an interface that has just
+        // been put away and knobs that were never built.
+        _prepared = false;
+
         var editor = Editor;
         Editor = null;
 
@@ -176,6 +252,16 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
     private void BuildKnobs()
     {
+        // Built from scratch each time, because a plugin that has been started again is a new
+        // plugin with the same name and its parameters are read fresh.
+        Parameters.Clear();
+        Controls.Clear();
+        Switches.Clear();
+        Readouts.Clear();
+        _rows.Clear();
+
+        Total = 0;
+
         foreach (var parameter in Plugin.Parameters())
         {
             // A hidden parameter is one the plugin does not want shown, and its own bypass is
@@ -192,6 +278,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
             var row = new PluginParameterViewModel(Plugin, parameter, _changed);
 
             Parameters.Add(row);
+            _rows[parameter.Id] = row;
 
             if (parameter.IsReadOnly) Readouts.Add(row);
             else if (row.IsSwitch) Switches.Add(row);

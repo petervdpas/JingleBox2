@@ -159,7 +159,9 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
 
         var controller = OpenController(module, component, out bool shared);
-        void* handler = Vst3Host.CreateHandler();
+
+        int slot = Vst3Host.NextSlot();
+        void* handler = Vst3Host.CreateHandler(slot);
 
         if (controller != null)
         {
@@ -168,7 +170,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
             CopyState(component, controller);
         }
 
-        var effect = new Vst3Plugin(module, component, processor, controller, handler, shared, info) { _key = key };
+        var effect = new Vst3Plugin(module, component, processor, controller, handler, shared, info) { _key = key, _slot = slot };
+
+        // From here a knob turned in the plugin's own window comes back to this instance.
+        Vst3Host.Listen(slot, effect.Moved);
 
         if (effect.Activate(sampleRate, maxFrames)) return effect;
 
@@ -217,6 +222,27 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         fromAudio->Vtbl->Connect(fromAudio, fromSettings);
         fromSettings->Vtbl->Connect(fromSettings, fromAudio);
+    }
+
+    /// <summary>
+    /// Takes the two halves apart again, which is the other half of introducing them.
+    /// </summary>
+    /// <remarks>
+    /// A plugin left connected while its halves are being terminated is a plugin holding a
+    /// pointer to something on its way out. Plugins say so out loud when it happens; DPF ones
+    /// print an assertion about it on the way down.
+    /// </remarks>
+    private static void Part(IComponent* component, IEditController* controller)
+    {
+        if (component == null || controller == null) return;
+
+        var fromAudio = (IConnectionPoint*)Query(component, Vst3Abi.ConnectionPointId);
+        var fromSettings = (IConnectionPoint*)Query(controller, Vst3Abi.ConnectionPointId);
+
+        if (fromAudio == null || fromSettings == null) return;
+
+        fromAudio->Vtbl->Disconnect(fromAudio, fromSettings);
+        fromSettings->Vtbl->Disconnect(fromSettings, fromAudio);
     }
 
     /// <summary>
@@ -658,6 +684,30 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         lock (_lock) _pending[id] = clamped;
     }
 
+    /// <summary>Which slot this plugin answers on, for knob moves coming back from its window.</summary>
+    private int _slot;
+
+    public event Action<uint, double>? Edited;
+
+    /// <summary>
+    /// A knob turned in the plugin's own window.
+    /// </summary>
+    /// <remarks>
+    /// The half that draws already knows; it is the half that plays that has not heard, and in
+    /// VST3 the only road between them is through here. Queued rather than written, like every
+    /// other parameter move, because a plugin hears about values at the start of a block.
+    /// </remarks>
+    internal void Moved(uint id, double value)
+    {
+        if (_disposed) return;
+
+        double clamped = Math.Clamp(value, 0, 1);
+
+        lock (_lock) _pending[id] = clamped;
+
+        Edited?.Invoke(id, clamped);
+    }
+
     /// <summary>
     /// Nothing to do. VST3 has no way to hand a plugin a value outside of a block, so the
     /// queue simply waits, and the settings half already knows. This is what stops a knob on
@@ -912,6 +962,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         if (_disposed) return;
         _disposed = true;
 
+        // Nothing more from its window: the handler is native memory the plugin may still be
+        // holding, and what it points at has to stop being this instance before this instance
+        // goes anywhere.
+        Vst3Host.Forget(_slot);
+
         if (_processing)
         {
             _processor->Vtbl->SetProcessing(_processor, 0);
@@ -926,6 +981,8 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         if (_controller != null && !_sharedController)
         {
+            Part(_component, _controller);
+
             _controller->Vtbl->SetComponentHandler(_controller, null);
             _controller->Vtbl->Terminate(_controller);
             Release(_controller);

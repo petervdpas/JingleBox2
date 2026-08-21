@@ -20,6 +20,13 @@ namespace JingleBox2.Views;
 /// the plugin draws perfectly into something nobody can see. That looks exactly like a plugin
 /// that does not draw at all.
 ///
+/// The plugin is not given the window the moment there is one. Avalonia makes the native child
+/// before the first layout, so at that point it is one pixel square and not yet on screen, and
+/// a plugin handed that builds its whole interface against it. Some cope. Serum does not: it
+/// makes its drawing surface there and then, and dies on the first thing it tries to paint.
+/// So the handle is held until the window is really up, at the size it is going to be, and the
+/// plugin is let in then.
+///
 /// What the host still owes the plugin is a run loop, which is what carries a click from the X
 /// server to it, and a frame, which is how it asks to be a different size.
 /// </remarks>
@@ -29,10 +36,15 @@ public sealed class PluginEditorHost : NativeControlHost
     public static readonly StyledProperty<IPluginEditor?> EditorProperty =
         AvaloniaProperty.Register<PluginEditorHost, IPluginEditor?>(nameof(Editor));
 
+    /// <summary>How long to wait for the window to appear before giving the plugin it anyway.</summary>
+    private const int SettleRounds = 120;
+
     private int _width;
     private int _height;
 
+    private nint _handle;
     private bool _attached;
+    private DispatcherTimer? _settling;
 
     public IPluginEditor? Editor
     {
@@ -50,7 +62,23 @@ public sealed class PluginEditorHost : NativeControlHost
         if (change.Property != EditorProperty) return;
 
         if (change.OldValue is IPluginEditor leaving) leaving.ResizeRequested -= OnResizeRequested;
-        if (change.NewValue is IPluginEditor arriving) arriving.ResizeRequested += OnResizeRequested;
+
+        if (change.NewValue is IPluginEditor arriving)
+        {
+            arriving.ResizeRequested += OnResizeRequested;
+
+            // Asked for at the plugin's own size from the start, so that the window it is
+            // eventually handed is already the size it asked for.
+            var wanted = arriving.Size;
+
+            if (wanted.Width > 0 && wanted.Height > 0)
+            {
+                _width = wanted.Width;
+                _height = wanted.Height;
+
+                InvalidateMeasure();
+            }
+        }
     }
 
     /// <summary>
@@ -68,7 +96,8 @@ public sealed class PluginEditorHost : NativeControlHost
             _height = height;
 
             InvalidateMeasure();
-            Editor?.Resized(width, height);
+
+            if (_attached) Editor?.Resized(width, height);
         });
     }
 
@@ -88,20 +117,61 @@ public sealed class PluginEditorHost : NativeControlHost
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
         // Avalonia's own child window, made the way this platform makes one. Whatever the
-        // platform calls it, the plugin is told the same handle.
+        // platform calls it, the plugin is told the same handle, but not yet.
         var handle = base.CreateNativeControlCore(parent);
 
+        _handle = handle.Handle;
+
+        if (Editor != null && _handle != 0) Settle();
+
+        return handle;
+    }
+
+    /// <summary>
+    /// Waits for the window to be on screen at a real size, then lets the plugin in.
+    /// </summary>
+    /// <remarks>
+    /// A round every frame or so, for up to two seconds. If the window never turns up the
+    /// plugin is given it anyway: a plugin drawing into something odd is worth more than a
+    /// plugin never shown at all, and on a platform where the question cannot be asked the
+    /// answer is yes on the first round.
+    /// </remarks>
+    private void Settle()
+    {
+        _settling?.Stop();
+
+        int rounds = 0;
+
+        _settling = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+
+        _settling.Tick += (_, _) =>
+        {
+            rounds++;
+
+            if (_attached || _handle == 0 || Editor == null)
+            {
+                _settling?.Stop();
+                return;
+            }
+
+            if (rounds < SettleRounds && !XEmbed.OnScreen(_handle, out _, out _)) return;
+
+            _settling?.Stop();
+
+            Show();
+        };
+
+        _settling.Start();
+    }
+
+    private void Show()
+    {
         var editor = Editor;
-        if (editor == null || handle.Handle == 0) return handle;
-
-        var (width, height) = editor.Size;
-
-        _width = width > 0 ? width : 0;
-        _height = height > 0 ? height : 0;
+        if (editor == null || _handle == 0 || _attached) return;
 
         try
         {
-            _attached = editor.Attach(handle.Handle);
+            _attached = editor.Attach(_handle);
         }
         catch (Exception)
         {
@@ -110,26 +180,29 @@ public sealed class PluginEditorHost : NativeControlHost
             _attached = false;
         }
 
-        if (!_attached) return handle;
+        if (!_attached) return;
 
         // Told its size once it is in place. Some plugins lay themselves out here rather than
         // when they were attached, and stay blank until they are asked.
         var settled = editor.Size;
 
-        if (settled.Width > 0 && settled.Height > 0)
-        {
-            _width = settled.Width;
-            _height = settled.Height;
+        if (settled.Width <= 0 || settled.Height <= 0) return;
 
-            editor.Resized(settled.Width, settled.Height);
-            InvalidateMeasure();
-        }
+        _width = settled.Width;
+        _height = settled.Height;
 
-        return handle;
+        editor.Resized(settled.Width, settled.Height);
+
+        InvalidateMeasure();
     }
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
+        _settling?.Stop();
+        _settling = null;
+
+        _handle = 0;
+
         // The plugin comes out before the window goes: a plugin still drawing into a window
         // that has been destroyed is a crash inside its own toolkit.
         if (_attached)

@@ -37,7 +37,9 @@ public sealed class PluginCrash
 
 /// <summary>
 /// Remembers which plugins have crashed the application while opening their own window, and
-/// refuses to open those again.
+/// refuses to open those again. Stands down while plugins run in their own processes, which
+/// is normally, because then a plugin crashing is not something the application survives by
+/// luck. See <see cref="PluginHost.Isolated"/>.
 /// </summary>
 /// <remarks>
 /// A plugin runs inside this process, so a plugin that dereferences a null pointer takes the
@@ -136,6 +138,16 @@ public static class PluginCrashGuard
             var left = Load<List<PluginCrash>>(MarkerFile);
             if (left == null || left.Count == 0) return;
 
+            // A note left over from before plugins were given their own processes is not
+            // evidence about anything any more, and turning it into a block would say a plugin
+            // is being kept from its window when it is not. Rubbed out instead.
+            if (PluginHost.Isolated)
+            {
+                Marks.Clear();
+                Write();
+                return;
+            }
+
             // The last run died with these in the middle of something. That is what the notes
             // are for, and the only way they survive a run is if nobody got to rub them out.
             bool added = false;
@@ -158,7 +170,7 @@ public static class PluginCrashGuard
     /// <summary>True when this plugin is not to be given a window of its own.</summary>
     public static bool IsBlocked(PluginInfo? plugin)
     {
-        if (plugin == null) return false;
+        if (plugin == null || PluginHost.Isolated) return false;
 
         Read();
         lock (Gate) return Holds(plugin.Path, plugin.Id);
@@ -170,7 +182,7 @@ public static class PluginCrashGuard
     /// </summary>
     public static bool IsLoadBlocked(PluginInfo? plugin)
     {
-        if (plugin == null) return false;
+        if (plugin == null || PluginHost.Isolated) return false;
 
         Read();
 
@@ -229,7 +241,7 @@ public static class PluginCrashGuard
     /// </remarks>
     public static void Risky(PluginInfo? plugin, PluginStage stage)
     {
-        if (plugin == null) return;
+        if (plugin == null || PluginHost.Isolated) return;
 
         Read();
 

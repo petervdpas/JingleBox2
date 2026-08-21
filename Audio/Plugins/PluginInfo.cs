@@ -93,6 +93,21 @@ public interface IPluginParameters
 
     /// <summary>Moves a parameter.</summary>
     void SetValue(uint id, double value);
+
+    /// <summary>
+    /// The plugin moving one of its own knobs, in its own window. The parameter and its new
+    /// value.
+    /// </summary>
+    /// <remarks>
+    /// Without this a plugin's own interface is a picture: the host never learns what was
+    /// changed, so nothing is marked as worth saving, and for VST3 the sound does not even
+    /// follow, because the half that draws and the half that plays only ever hear about a
+    /// parameter through the host.
+    ///
+    /// Raised on whichever thread the plugin was on, which is not the drawing one. Whoever
+    /// listens has to get itself back there.
+    /// </remarks>
+    event Action<uint, double>? Edited;
 }
 
 /// <summary>

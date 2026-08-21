@@ -1,0 +1,516 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+namespace JingleBox2.Audio.Plugins.Bridge;
+
+/// <summary>
+/// The other side of the bridge: this program, started again, being one plugin and nothing else.
+/// </summary>
+/// <remarks>
+/// No window, no audio device, no configuration, no user interface. It loads one plugin, does
+/// what it is told through a socket, and goes away when the parent does. If it falls over, it
+/// falls over alone, which is the entire reason it exists.
+///
+/// One thread does everything the plugin can see except audio. A plugin's toolkit expects its
+/// timers, its window and its parameters all on the same thread, and giving it anything else is
+/// a crash in somebody else's code rather than a bug report. Audio has a thread of its own
+/// because it has a deadline.
+/// </remarks>
+public static class PluginHostProcess
+{
+    private static readonly ConcurrentQueue<(BridgeCall Call, byte[] Payload)> Incoming = new();
+    private static readonly ConcurrentQueue<Action> Errands = new();
+
+    /// <summary>Knobs the plugin turned in its own window, waiting to be sent home.</summary>
+    private static readonly ConcurrentQueue<(uint Id, double Value)> Moves = new();
+    private static readonly AutoResetEvent Knock = new(false);
+
+    private static BridgeLink? _control;
+    private static BridgeBlock? _block;
+    private static IPluginParameters? _plugin;
+    private static IPluginEditor? _editor;
+    private static volatile bool _running = true;
+    private static bool _trace;
+
+    /// <summary>True when these arguments mean this process is meant to be a plugin's process.</summary>
+    public static bool Claims(string[] args) =>
+        args != null && args.Length > 0 &&
+        (args[0] == PluginBridge.HostArgument || args[0] == PluginBridge.ScanArgument);
+
+    /// <summary>
+    /// Does whatever the arguments asked for and returns the exit code. Nothing here ever
+    /// returns to the application: a process that is a plugin is only ever a plugin.
+    /// </summary>
+    public static int Run(string[] args)
+    {
+        _trace = Environment.GetEnvironmentVariable(PluginBridge.TraceVariable) == "1";
+
+        return args[0] == PluginBridge.ScanArgument ? Scan(args) : Serve(args);
+    }
+
+    /// <summary>
+    /// Writes a line about what the child is doing, when somebody asked for that.
+    /// </summary>
+    /// <remarks>
+    /// To a file rather than to the error output, because a plugin is entitled to do whatever
+    /// it likes with the handles it inherited and some of them close or redirect the lot. A
+    /// trace that stops the moment the interesting part starts is worse than no trace.
+    /// </remarks>
+    private static void Say(string message)
+    {
+        if (!_trace) return;
+
+        // The file first and the error output second, each on its own. A plugin that has
+        // closed the handles it inherited makes the second one throw, and a trace that gives
+        // up because nobody was listening on one of two channels is no trace at all.
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(Path.GetTempPath(), "jinglebox-plugin-" + Environment.ProcessId + ".log"),
+                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + message + Environment.NewLine);
+        }
+        catch (Exception)
+        {
+        }
+
+        try { Console.Error.WriteLine("[plugin host] " + message); } catch (Exception) { }
+    }
+
+    /// <summary>
+    /// Reads folders full of plugins and writes what is in them to a file.
+    /// </summary>
+    /// <remarks>
+    /// Scanning means loading somebody's library and asking it questions, and a library that
+    /// falls over while being asked used to take the scan and the application with it. Out here
+    /// a bad plugin costs one empty scan. The answer goes to a file rather than to the output,
+    /// because plugins print things and there is no telling what would end up mixed in with it.
+    /// </remarks>
+    private static int Scan(string[] args)
+    {
+        if (args.Length < 2) return 2;
+
+        string destination = args[1];
+        var folders = new List<string>();
+
+        for (int index = 2; index < args.Length; index++) folders.Add(args[index]);
+
+        try
+        {
+            var found = PluginHost.ScanHere(folders);
+
+            var json = System.Text.Json.JsonSerializer.Serialize(found);
+
+            File.WriteAllText(destination, json, new UTF8Encoding(false));
+
+            return 0;
+        }
+        catch (Exception error)
+        {
+            Say("scan failed: " + error.Message);
+            return 1;
+        }
+    }
+
+    /// <summary>Loads one plugin and serves it until the parent has had enough.</summary>
+    private static int Serve(string[] args)
+    {
+        if (args.Length < 9) return 2;
+
+        string socketPath = args[1];
+        string blockPath = args[2];
+        bool isVst3 = args[3] == "vst3";
+        string path = args[4];
+        string id = args[5];
+
+        int sampleRate = int.TryParse(args[6], out int rate) ? rate : 48000;
+        int maxFrames = int.TryParse(args[7], out int frames) ? frames : 512;
+        bool asInstrument = args[8] == "instrument";
+
+        Socket control;
+        Socket audio;
+
+        try
+        {
+            control = Connect(socketPath);
+            audio = Connect(socketPath);
+        }
+        catch (Exception error)
+        {
+            Say("could not reach the parent: " + error.Message);
+            return 3;
+        }
+
+        _control = new BridgeLink(control);
+        _block = BridgeBlock.Open(blockPath);
+
+        if (_block == null)
+        {
+            Say("the shared block was not there");
+            return 4;
+        }
+
+        Say("loading " + path);
+
+        _plugin = isVst3
+            ? Vst3Plugin.Load(path, id, sampleRate, maxFrames)
+            : ClapEffect.Load(path, id, sampleRate, maxFrames);
+
+        if (_plugin == null)
+        {
+            Say("the plugin would not load");
+            _control.Send(BridgeCall.Fail, BridgeBody.Words("the plugin would not load"));
+            return 5;
+        }
+
+        // A knob the plugin turns itself. Queued rather than sent where it happens: for CLAP
+        // that is the audio thread, and an audio thread has no business waiting on a socket.
+        _plugin.Edited += (id, value) =>
+        {
+            Moves.Enqueue((id, value));
+            Knock.Set();
+        };
+
+        bool hasWindow = _plugin is IPluginWindowSource;
+
+        _control.Send(BridgeCall.Hello, BridgeBody.Words(hasWindow ? "window" : "plain"));
+
+        // Timers and windows belong to this thread from here on, whoever asks for them.
+        PluginRunLoop.DriveWith(round => { Errands.Enqueue(round); Knock.Set(); });
+
+        var reader = new Thread(() => Listen(_control)) { IsBackground = true, Name = "bridge control" };
+        reader.Start();
+
+        var mixer = new Thread(() => Mix(audio, asInstrument, maxFrames)) { IsBackground = true, Name = "bridge audio" };
+        mixer.Start();
+
+        Pump();
+
+        Say("stopping");
+
+        try { (_plugin as IDisposable)?.Dispose(); } catch (Exception) { }
+
+        return 0;
+    }
+
+    private static Socket Connect(string path)
+    {
+        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+
+        socket.Connect(new UnixDomainSocketEndPoint(path));
+
+        return socket;
+    }
+
+    /// <summary>
+    /// The one thread the plugin is allowed to see: its timers, its window, its parameters.
+    /// </summary>
+    private static void Pump()
+    {
+        Say("pump running");
+
+        long census = Environment.TickCount64;
+
+        while (_running)
+        {
+            Knock.WaitOne(5);
+
+            if (_trace && Environment.TickCount64 - census > 2000)
+            {
+                census = Environment.TickCount64;
+                Say("run loop: " + PluginRunLoop.Census());
+            }
+
+            while (Errands.TryDequeue(out var errand))
+            {
+                try { errand(); } catch (Exception error) { Say("run loop: " + error.Message); }
+            }
+
+            while (Moves.TryDequeue(out var move))
+            {
+                try { _control?.Send(BridgeCall.Edited, BridgeBody.Number(move.Id, move.Value)); }
+                catch (Exception) { }
+            }
+
+            while (Incoming.TryDequeue(out var message))
+            {
+                Say("-> " + message.Call);
+
+                try { Handle(message.Call, message.Payload); }
+                catch (Exception error) { Say("message " + message.Call + ": " + error.Message); }
+
+                Say("<- " + message.Call);
+            }
+        }
+    }
+
+    private static void Listen(BridgeLink control)
+    {
+        while (_running)
+        {
+            var message = control.Receive();
+
+            if (message == null)
+            {
+                // The parent is gone. There is nobody left to be a plugin for.
+                _running = false;
+                Knock.Set();
+                return;
+            }
+
+            Incoming.Enqueue(message.Value);
+            Knock.Set();
+        }
+    }
+
+    private static void Handle(BridgeCall call, byte[] payload)
+    {
+        var control = _control;
+        var plugin = _plugin;
+
+        if (control == null || plugin == null) return;
+
+        switch (call)
+        {
+            case BridgeCall.Parameters:
+                control.Send(BridgeCall.Parameters, BridgeBody.Parameters(plugin.Parameters()));
+                break;
+
+            case BridgeCall.SetValue:
+            {
+                var move = BridgeBody.ReadNumber(payload);
+                plugin.SetValue(move.Id, move.Value);
+                control.Send(BridgeCall.Ok);
+                break;
+            }
+
+            case BridgeCall.ValueOf:
+            {
+                var ask = BridgeBody.ReadNumber(payload);
+                control.Send(BridgeCall.Value, BridgeBody.Double(plugin.ValueOf(ask.Id)));
+                break;
+            }
+
+            case BridgeCall.TextFor:
+            {
+                var ask = BridgeBody.ReadNumber(payload);
+                control.Send(BridgeCall.Text, BridgeBody.Words(plugin.TextFor(ask.Id, ask.Value)));
+                break;
+            }
+
+            case BridgeCall.Flush:
+                (plugin as IPluginEffect)?.FlushParameters();
+                control.Send(BridgeCall.Ok);
+                break;
+
+            case BridgeCall.SaveState:
+                control.Send(BridgeCall.State, (plugin as IPluginInstrument)?.SaveState() ?? Array.Empty<byte>());
+                break;
+
+            case BridgeCall.LoadState:
+                (plugin as IPluginInstrument)?.LoadState(payload);
+                control.Send(BridgeCall.Ok);
+                break;
+
+            case BridgeCall.OpenEditor:
+                OpenEditor(control, plugin);
+                break;
+
+            case BridgeCall.Attach:
+                Attach(control, BridgeBody.ReadHandle(payload));
+                break;
+
+            case BridgeCall.Detach:
+                _editor?.Detach();
+                control.Send(BridgeCall.Ok);
+                break;
+
+            case BridgeCall.Resized:
+            {
+                var size = BridgeBody.ReadPair(payload);
+                _editor?.Resized(size.First, size.Second);
+                control.Send(BridgeCall.Ok);
+                break;
+            }
+
+            case BridgeCall.CloseEditor:
+                CloseEditor();
+                control.Send(BridgeCall.Ok);
+                break;
+
+            case BridgeCall.Quit:
+                _running = false;
+                Knock.Set();
+                break;
+        }
+    }
+
+    private static void OpenEditor(BridgeLink control, IPluginParameters plugin)
+    {
+        CloseEditor();
+
+        var editor = (plugin as IPluginWindowSource)?.OpenEditor();
+
+        if (editor == null)
+        {
+            control.Send(BridgeCall.Fail, BridgeBody.Words("this plugin has no window of its own"));
+            return;
+        }
+
+        _editor = editor;
+
+        editor.ResizeRequested += (width, height) =>
+            control.Send(BridgeCall.ResizeRequested, BridgeBody.Pair(width, height));
+
+        control.Send(BridgeCall.Ok, BridgeBody.Three(editor.Size.Width, editor.Size.Height, editor.CanResize ? 1 : 0));
+    }
+
+    private static void Attach(BridgeLink control, nint window)
+    {
+        var editor = _editor;
+
+        if (editor == null || window == 0)
+        {
+            control.Send(BridgeCall.Fail, BridgeBody.Words("there is no interface to put in a window"));
+            return;
+        }
+
+        bool attached = editor.Attach(window);
+
+        if (!attached)
+        {
+            control.Send(BridgeCall.Fail, BridgeBody.Words("the plugin would not take the window"));
+            return;
+        }
+
+        // Whatever the plugin put inside the window is told it is embedded, which some toolkits
+        // wait for before they will draw anything. See XEmbed.
+        Say("embedding: " + XEmbed.Complete(window));
+
+        control.Send(BridgeCall.Ok, BridgeBody.Pair(editor.Size.Width, editor.Size.Height));
+    }
+
+    private static void CloseEditor()
+    {
+        var editor = _editor;
+        _editor = null;
+
+        if (editor == null) return;
+
+        try { editor.Dispose(); } catch (Exception error) { Say("closing the window: " + error.Message); }
+    }
+
+    /// <summary>
+    /// The audio thread: waits for a block, runs it, says it is done.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here allocates once it is going. The buffer is made at the size the parent asked
+    /// for and reused for every block after that, because a garbage collection in the middle of
+    /// an audio block is a click.
+    /// </remarks>
+    private static unsafe void Mix(Socket audio, bool asInstrument, int maxFrames)
+    {
+        var block = _block;
+        var plugin = _plugin;
+
+        if (block == null || plugin == null) return;
+
+        var buffer = new float[maxFrames * PluginBridge.Channels];
+
+        var message = new byte[8];
+        var reply = new byte[8];
+
+        reply[0] = (byte)BridgeCall.Rendered;
+
+        var effect = plugin as IPluginEffect;
+        var instrument = plugin as IPluginInstrument;
+
+        while (_running)
+        {
+            int read = 0;
+
+            while (read < 8)
+            {
+                int got;
+
+                try { got = audio.Receive(message, read, 8 - read, SocketFlags.None); }
+                catch (Exception) { return; }
+
+                if (got <= 0) return;
+                read += got;
+            }
+
+            if (message[0] != (byte)BridgeCall.Process) continue;
+
+            int frames = BitConverter.ToInt32(message, 4);
+            if (frames <= 0 || frames > maxFrames) frames = Math.Min(Math.Max(frames, 0), maxFrames);
+
+            Deliver(block, instrument, plugin);
+
+            int samples = frames * PluginBridge.Channels;
+
+            if (asInstrument && instrument != null)
+            {
+                instrument.Render(buffer, frames);
+            }
+            else
+            {
+                fixed (float* destination = buffer)
+                {
+                    Buffer.MemoryCopy(block.Input, destination, (long)samples * sizeof(float), (long)samples * sizeof(float));
+                }
+
+                effect?.Process(buffer, frames);
+            }
+
+            fixed (float* source = buffer)
+            {
+                Buffer.MemoryCopy(source, block.Output, (long)samples * sizeof(float), (long)samples * sizeof(float));
+            }
+
+            BitConverter.TryWriteBytes(reply.AsSpan(4, 4), frames);
+
+            try
+            {
+                int sent = 0;
+                while (sent < 8) sent += audio.Send(reply, sent, 8 - sent, SocketFlags.None);
+            }
+            catch (Exception)
+            {
+                return;
+            }
+        }
+    }
+
+    /// <summary>Hands the plugin everything the parent queued since the last block.</summary>
+    private static void Deliver(BridgeBlock block, IPluginInstrument? instrument, IPluginParameters plugin)
+    {
+        var events = block.Take();
+
+        foreach (var queued in events)
+        {
+            switch (queued.Kind)
+            {
+                case BridgeEvent.ParameterValue:
+                    plugin.SetValue(queued.Id, queued.Value);
+                    break;
+
+                case BridgeEvent.NoteOn:
+                    instrument?.NoteOn((int)queued.Id, queued.Value);
+                    break;
+
+                case BridgeEvent.NoteOff:
+                    instrument?.NoteOff((int)queued.Id);
+                    break;
+
+                case BridgeEvent.AllNotesOff:
+                    instrument?.AllNotesOff();
+                    break;
+            }
+        }
+    }
+}

@@ -17,7 +17,7 @@ namespace JingleBox2.Audio.Plugins;
 /// at the start of a block, so a knob leaves its value in a queue here and the audio thread
 /// hands it over on its next pass.
 /// </remarks>
-public sealed unsafe class ClapEffect : IPluginEffect
+public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 {
     /// <summary>Stereo in, stereo out. Wider plugins are fed and read on their first two.</summary>
     public const int Channels = 2;
@@ -128,6 +128,47 @@ public sealed unsafe class ClapEffect : IPluginEffect
 
     public bool IsActive => _active;
 
+    /// <summary>The plugin itself, for the parts of the ABI that live in another file.</summary>
+    internal ClapPlugin* Handle => _plugin;
+
+    /// <summary>
+    /// Opens the plugin's own interface, when it has one.
+    /// </summary>
+    /// <remarks>
+    /// Every plugin that draws itself should be allowed to. Nobody sets a compressor by reading
+    /// its parameter names off an alphabetical list when the plugin has a picture of a meter it
+    /// would rather show. See <see cref="ClapEditor"/>.
+    /// </remarks>
+    public IPluginEditor? OpenEditor() => _disposed ? null : ClapEditor.Open(this);
+
+    /// <summary>One of the plugin's timers has come round. Called on the thread that draws.</summary>
+    internal void RingTimer(uint id)
+    {
+        if (_disposed || _plugin == null || _plugin->GetExtension == null) return;
+
+        using var name = new NativeText(ClapAbi.TimerExtension);
+
+        var timers = (ClapPluginTimerSupport*)_plugin->GetExtension(_plugin, name.Pointer);
+
+        if (timers == null || timers->OnTimer == null) return;
+
+        timers->OnTimer(_plugin, id);
+    }
+
+    /// <summary>One of the plugin's files has something on it. Its X11 connection, in practice.</summary>
+    internal void RingFile(int file, uint flags)
+    {
+        if (_disposed || _plugin == null || _plugin->GetExtension == null) return;
+
+        using var name = new NativeText(ClapAbi.PosixFdExtension);
+
+        var files = (ClapPluginPosixFd*)_plugin->GetExtension(_plugin, name.Pointer);
+
+        if (files == null || files->OnFd == null) return;
+
+        files->OnFd(_plugin, file, flags);
+    }
+
     /// <summary>
     /// Loads a plugin and gets it ready to run. Returns null when the bundle cannot be opened,
     /// does not hold that plugin, or the plugin refuses to start.
@@ -162,6 +203,8 @@ public sealed unsafe class ClapEffect : IPluginEffect
         }
 
         var effect = new ClapEffect(bundle, plugin, host, info) { _key = key };
+
+        ClapHostExtensions.Bind(host, effect);
 
         if (effect.Activate(sampleRate, maxFrames)) return effect;
 
@@ -257,7 +300,7 @@ public sealed unsafe class ClapEffect : IPluginEffect
         _inEvents->Get = &EventAt;
 
         _outEvents = Alloc<ClapOutputEvents>(1);
-        _outEvents->TryPush = &IgnoreEvent;
+        _outEvents->TryPush = &TakeEvent;
 
         _process = Alloc<ClapProcess>(1);
         _process->AudioInputs = _inputBuffer;
@@ -465,11 +508,43 @@ public sealed unsafe class ClapEffect : IPluginEffect
     }
 
     /// <summary>
-    /// Plugins report their own parameter changes back this way. Nothing here listens yet, so
-    /// they are accepted and dropped rather than refused, which some plugins treat as an error.
+    /// Plugins report their own parameter changes back this way: a knob turned in the plugin's
+    /// own window arrives here, on the audio thread, at the end of the block it happened in.
+    /// Anything else is accepted and dropped rather than refused, which some plugins treat as
+    /// an error.
     /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
-    private static byte IgnoreEvent(ClapOutputEvents* list, ClapEventHeader* header) => 1;
+    private static byte TakeEvent(ClapOutputEvents* list, ClapEventHeader* header)
+    {
+        if (header == null) return 1;
+
+        var effect = _current;
+        if (effect == null) return 1;
+
+        if (header->SpaceId != ClapAbi.CoreEventSpace || header->Type != ClapAbi.ParamValueEvent) return 1;
+
+        var moved = (ClapEventParamValue*)header;
+
+        try
+        {
+            effect.Moved(moved->ParamId, moved->Value);
+        }
+        catch (Exception)
+        {
+            // A knob move is not worth throwing back into somebody else's audio thread.
+        }
+
+        return 1;
+    }
+
+    public event Action<uint, double>? Edited;
+
+    /// <summary>
+    /// A knob turned in the plugin's own window. CLAP is one object rather than two, so the
+    /// plugin already has the value and is only saying so; the host's part is to know that
+    /// there is something worth saving.
+    /// </summary>
+    internal void Moved(uint id, double value) => Edited?.Invoke(id, value);
 
     /// <summary>
     /// Hands over any parameter moves now, without waiting for a block. What CLAP's flush is
@@ -645,6 +720,8 @@ public sealed unsafe class ClapEffect : IPluginEffect
             if (_plugin->Deactivate != null) _plugin->Deactivate(_plugin);
             _active = false;
         }
+
+        ClapHostExtensions.Unbind(_host);
 
         if (_plugin != null && _plugin->Destroy != null) _plugin->Destroy(_plugin);
 

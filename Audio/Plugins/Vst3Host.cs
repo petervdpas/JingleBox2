@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -63,10 +64,10 @@ internal static unsafe class Vst3Host
         }
 
         // The run loop is a separate object, handed out from here because the host context is
-        // where a plugin looks for it. On X11 this is not optional: see Vst3RunLoop.
+        // where a plugin looks for it. On X11 this is not optional: see PluginRunLoop.
         if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && Vst3Abi.SameId(id, Vst3Abi.RunLoopId))
         {
-            *result = Vst3RunLoop.Instance();
+            *result = PluginRunLoop.Instance();
             return Vst3Abi.ResultOk;
         }
 
@@ -94,28 +95,33 @@ internal static unsafe class Vst3Host
     }
 
     /// <summary>
-    /// Making host objects on a plugin's behalf, which for now means saying no.
+    /// Making host objects on a plugin's behalf: a message, or the list of things written on it.
     /// </summary>
     /// <remarks>
-    /// This is where a plugin asks for a message or an attribute list so its two halves can
-    /// talk. Refusing costs a plugin whatever it was going to say to itself; every plugin
-    /// tested here carries on without it. Worth revisiting the day one does not.
+    /// This is where a plugin asks for an envelope so its two halves can post to each other.
+    /// Refusing is not the harmless answer it looks like. The plugin gets nothing back and most
+    /// of them do not check, because no real host refuses, and the ones that do not check die
+    /// on the next line. See <see cref="Vst3Messages"/>.
     /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static int ApplicationCreate(void* self, byte* cid, byte* id, void** result)
-    {
-        if (result != null) *result = null;
-        return Vst3Abi.NotImplemented;
-    }
+    private static int ApplicationCreate(void* self, byte* cid, byte* id, void** result) =>
+        Vst3Messages.Create(cid, id, result);
 
     /// <summary>
     /// What a controller reports knob moves to. One per plugin, since a plugin holds it.
     /// </summary>
     /// <remarks>
-    /// Nothing is done with the moves yet: without the plugin's own window there is nothing to
-    /// move a knob. The object still has to exist and answer, which is the whole job for now.
+    /// This is the only way a knob moved in a plugin's own window reaches anything. VST3 keeps
+    /// the half that draws and the half that plays apart on purpose, and neither tells the
+    /// other: the drawing half reports the move here, and the host is expected to hand it to
+    /// the playing half on its next block. A host that ignores this has plugin windows whose
+    /// knobs turn and change nothing.
+    ///
+    /// The object carries a number rather than a pointer back to the plugin, because it is
+    /// native memory a plugin holds for as long as it likes and a managed object cannot be
+    /// left lying in it.
     /// </remarks>
-    public static void* CreateHandler()
+    public static void* CreateHandler(int slot)
     {
         var table = (nint*)NativeMemory.AllocZeroed(7, (nuint)sizeof(nint));
 
@@ -127,10 +133,43 @@ internal static unsafe class Vst3Host
         table[5] = (nint)(delegate* unmanaged[Cdecl]<void*, uint, int>)&HandlerEndEdit;
         table[6] = (nint)(delegate* unmanaged[Cdecl]<void*, int, int>)&HandlerRestart;
 
-        var handler = (nint*)NativeMemory.AllocZeroed(1, (nuint)sizeof(nint));
+        var handler = (nint*)NativeMemory.AllocZeroed(2, (nuint)sizeof(nint));
         handler[0] = (nint)table;
+        handler[1] = slot;
 
         return handler;
+    }
+
+    private static readonly Dictionary<int, Action<uint, double>> Moves = new();
+    private static readonly object MoveGate = new();
+
+    private static int _slots;
+
+    /// <summary>A number for a plugin about to be loaded, to find it again from a callback.</summary>
+    public static int NextSlot()
+    {
+        lock (MoveGate) return ++_slots;
+    }
+
+    /// <summary>Says where a slot's knob moves should go.</summary>
+    public static void Listen(int slot, Action<uint, double> moved)
+    {
+        lock (MoveGate) Moves[slot] = moved;
+    }
+
+    /// <summary>Stops listening, for a plugin going away.</summary>
+    public static void Forget(int slot)
+    {
+        lock (MoveGate) Moves.Remove(slot);
+    }
+
+    private static Action<uint, double>? Whose(void* self)
+    {
+        if (self == null) return null;
+
+        int slot = (int)((nint*)self)[1];
+
+        lock (MoveGate) return Moves.TryGetValue(slot, out var moved) ? moved : null;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -151,8 +190,24 @@ internal static unsafe class Vst3Host
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerBeginEdit(void* self, uint id) => Vst3Abi.ResultOk;
 
+    /// <summary>
+    /// The plugin's own window reporting a knob. Passed on to the plugin, which queues it for
+    /// the half that plays and tells the host it has something worth saving.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static int HandlerPerformEdit(void* self, uint id, double value) => Vst3Abi.ResultOk;
+    private static int HandlerPerformEdit(void* self, uint id, double value)
+    {
+        try
+        {
+            Whose(self)?.Invoke(id, value);
+        }
+        catch (Exception)
+        {
+            // A knob move is not worth throwing back into somebody else's toolkit.
+        }
+
+        return Vst3Abi.ResultOk;
+    }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerEndEdit(void* self, uint id) => Vst3Abi.ResultOk;

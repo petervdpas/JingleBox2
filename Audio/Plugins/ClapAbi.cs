@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 
 namespace JingleBox2.Audio.Plugins;
@@ -25,6 +26,22 @@ internal static class ClapAbi
     public const string ParamsExtension = "clap.params";
 
     public const string AudioPortsExtension = "clap.audio-ports";
+
+    /// <summary>The plugin's own window, when it has one.</summary>
+    public const string GuiExtension = "clap.gui";
+
+    /// <summary>A clock the plugin asks the host to hold, the same one VST3 calls a run loop.</summary>
+    public const string TimerExtension = "clap.timer-support";
+
+    /// <summary>Files the plugin wants watching. Its X11 connection, in practice.</summary>
+    public const string PosixFdExtension = "clap.posix-fd-support";
+
+    /// <summary>What a window is called on this platform, in CLAP's spelling.</summary>
+    public static string WindowApi =>
+        OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "cocoa" : "x11";
+
+    /// <summary>Something to read on a watched file.</summary>
+    public const uint PosixFdRead = 1 << 0;
 
     /// <summary>Fixed width name fields in the ABI.</summary>
     public const int NameSize = 256;
@@ -214,4 +231,80 @@ internal unsafe struct ClapAudioPortInfo
     public uint ChannelCount;
     public byte* PortType;
     public uint InPlacePair;
+}
+
+/// <summary>A window handed to a plugin: what kind it is, and which one.</summary>
+/// <remarks>
+/// The second field is a union in the header, of a pointer on Windows and macOS and an
+/// unsigned long on X11. Both are eight bytes on the machines this runs on, so one native
+/// integer covers all three.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapWindow
+{
+    public byte* Api;
+    public nint Handle;
+}
+
+/// <summary>The plugin's window, as the plugin offers it.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapPluginGui
+{
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte*, byte, byte> IsApiSupported;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte**, byte*, byte> GetPreferredApi;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte*, byte, byte> Create;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, void> Destroy;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, double, byte> SetScale;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, uint*, uint*, byte> GetSize;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte> CanResize;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, void*, byte> GetResizeHints;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, uint*, uint*, byte> AdjustSize;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, uint, uint, byte> SetSize;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, ClapWindow*, byte> SetParent;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, ClapWindow*, byte> SetTransient;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte*, void> SuggestTitle;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte> Show;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, byte> Hide;
+}
+
+/// <summary>The plugin's end of the clock: it is told which of its timers came round.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapPluginTimerSupport
+{
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, uint, void> OnTimer;
+}
+
+/// <summary>The plugin's end of the doorbell: it is told a file has something on it.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapPluginPosixFd
+{
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, int, uint, void> OnFd;
+}
+
+/// <summary>What the host offers a plugin about its window.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapHostGui
+{
+    public delegate* unmanaged[Cdecl]<ClapHost*, void> ResizeHintsChanged;
+    public delegate* unmanaged[Cdecl]<ClapHost*, uint, uint, byte> RequestResize;
+    public delegate* unmanaged[Cdecl]<ClapHost*, byte> RequestShow;
+    public delegate* unmanaged[Cdecl]<ClapHost*, byte> RequestHide;
+    public delegate* unmanaged[Cdecl]<ClapHost*, byte, void> Closed;
+}
+
+/// <summary>What the host offers a plugin about timers.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapHostTimerSupport
+{
+    public delegate* unmanaged[Cdecl]<ClapHost*, uint, uint*, byte> RegisterTimer;
+    public delegate* unmanaged[Cdecl]<ClapHost*, uint, byte> UnregisterTimer;
+}
+
+/// <summary>What the host offers a plugin about files it wants watching.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapHostPosixFd
+{
+    public delegate* unmanaged[Cdecl]<ClapHost*, int, uint, byte> RegisterFd;
+    public delegate* unmanaged[Cdecl]<ClapHost*, int, uint, byte> ModifyFd;
+    public delegate* unmanaged[Cdecl]<ClapHost*, int, byte> UnregisterFd;
 }

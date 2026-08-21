@@ -99,6 +99,11 @@ public static class HelpText
             draws nothing, and are what a plugin gets on a platform where its window will not
             open. Plugin windows are X11 only so far.
 
+            Every plugin runs in a process of its own, and so does the scan. A plugin that
+            falls over takes nothing with it: the effect passes its audio through untouched or
+            the instrument goes quiet, a note says which plugin stopped, and there is a button
+            to start it again with the settings it had. Nothing else in the app notices.
+
             Scanning opens each plugin to ask what is inside it. They stay loaded until the app
             closes, on purpose: unloading plugin libraries after they have been used is what
             makes hosts crash.

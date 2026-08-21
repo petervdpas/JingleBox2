@@ -7,13 +7,17 @@ using System.Threading;
 namespace JingleBox2.Audio.Plugins;
 
 /// <summary>
-/// The clock and the doorbell a Linux VST3 plugin expects the host to hold for it.
+/// The clock and the doorbell a Linux plugin expects the host to hold for it.
 /// </summary>
 /// <remarks>
 /// Every other platform gives a plugin a run loop for free: Windows has a message pump and
 /// macOS has a run loop, both already running before the plugin arrives. X11 has no such thing,
-/// so VST3 makes it the host's job. A plugin hands over a timer, or a file the plugin wants to
-/// be told about when there is something to read on it, and the host is expected to come back.
+/// so the host is expected to hold one. A plugin hands over a timer, or a file it wants to be
+/// told about when there is something to read on it, and the host is expected to come back.
+///
+/// Both standards ask for the same thing in different words. VST3 calls it IRunLoop and hands
+/// over C++ objects; CLAP calls it timer support and posix fd support and hands over numbers.
+/// The pump underneath does not care which, so there is one of it.
 ///
 /// This is not only a window concern. Serum asks for one the moment it is created and says in
 /// as many words that it cannot function without it, editor or no editor, which is what a host
@@ -24,7 +28,7 @@ namespace JingleBox2.Audio.Plugins;
 /// toolkit drawing into an X11 window expects to be called where the window lives, and calling
 /// it from anywhere else is a crash inside somebody else's code rather than a bug report.
 /// </remarks>
-internal static unsafe class Vst3RunLoop
+internal static unsafe class PluginRunLoop
 {
     /// <summary>How often the pump comes round. Fine enough for a blinking meter.</summary>
     private const int TickMilliseconds = 16;
@@ -34,17 +38,26 @@ internal static unsafe class Vst3RunLoop
         public nint Handler;
         public long Interval;
         public long Due;
+
+        /// <summary>What to do when it is due, for a plugin that did not hand over an object.</summary>
+        public Action? Fire;
     }
 
     private sealed class Watch
     {
         public nint Handler;
         public int File;
+
+        /// <summary>The same, for a file with something waiting on it.</summary>
+        public Action<int>? Fire;
     }
 
     private static readonly List<Timer> Timers = new();
     private static readonly List<Watch> Watches = new();
     private static readonly object Gate = new();
+
+    private static long _rings;
+    private static long _deliveries;
 
     private static void* _instance;
     private static Thread? _pump;
@@ -151,8 +164,11 @@ internal static unsafe class Vst3RunLoop
     /// <summary>One round: whatever is due, and whatever has something to read.</summary>
     private static void Pump()
     {
-        Ring();
+        // Files before timers, deliberately. A plugin's timer is where it draws, and what it
+        // draws depends on what it has been told; a plugin that repaints before it has read
+        // the message saying its window is on screen is a plugin drawing into nothing.
         Deliver();
+        Ring();
     }
 
     private static void Ring()
@@ -197,7 +213,10 @@ internal static unsafe class Vst3RunLoop
 
             try
             {
-                Call(timer.Handler);
+                _rings++;
+
+                if (timer.Fire != null) timer.Fire();
+                else Call(timer.Handler);
             }
             catch (Exception)
             {
@@ -240,7 +259,10 @@ internal static unsafe class Vst3RunLoop
 
             try
             {
-                Ready(watching[index].Handler, watching[index].File);
+                _deliveries++;
+
+                if (watching[index].Fire != null) watching[index].Fire!(watching[index].File);
+                else Ready(watching[index].Handler, watching[index].File);
             }
             catch (Exception)
             {
@@ -372,6 +394,104 @@ internal static unsafe class Vst3RunLoop
         if (onTimer == null) return;
 
         onTimer((void*)handler);
+    }
+
+    /// <summary>
+    /// What the loop is holding and how much of it has gone off, for a plugin that has been
+    /// given a window and is not drawing in it. The first thing worth knowing then is whether
+    /// the plugin ever asked for anything at all.
+    /// </summary>
+    public static string Census()
+    {
+        lock (Gate)
+        {
+            return Timers.Count + " timers, " + Watches.Count + " files, " +
+                   _rings + " rings, " + _deliveries + " deliveries";
+        }
+    }
+
+    /// <summary>
+    /// Takes a timer from a plugin that speaks in numbers rather than in objects.
+    /// </summary>
+    /// <remarks>
+    /// CLAP hands the host a period and takes back an id, and expects to be called on its own
+    /// plugin pointer when the time is up. There is no object to call, so the caller says what
+    /// to do instead, and the key is only there so it can be taken away again.
+    /// </remarks>
+    public static void Keep(nint key, long milliseconds, Action fire)
+    {
+        if (key == 0 || fire == null) return;
+
+        long interval = Math.Max(TickMilliseconds, milliseconds);
+
+        lock (Gate)
+        {
+            foreach (var timer in Timers)
+            {
+                if (timer.Handler != key) continue;
+
+                timer.Interval = interval;
+                timer.Due = Environment.TickCount64 + interval;
+                timer.Fire = fire;
+                return;
+            }
+
+            Timers.Add(new Timer
+            {
+                Handler = key,
+                Interval = interval,
+                Due = Environment.TickCount64 + interval,
+                Fire = fire
+            });
+        }
+
+        Start();
+    }
+
+    /// <summary>Gives a timer back.</summary>
+    public static void Drop(nint key)
+    {
+        lock (Gate)
+        {
+            for (int index = Timers.Count - 1; index >= 0; index--)
+            {
+                if (Timers[index].Handler == key) Timers.RemoveAt(index);
+            }
+        }
+    }
+
+    /// <summary>Takes a file to watch from a plugin that speaks in numbers.</summary>
+    public static void Watching(nint key, int file, Action<int> fire)
+    {
+        if (key == 0 || fire == null) return;
+
+        lock (Gate)
+        {
+            foreach (var watch in Watches)
+            {
+                if (watch.Handler != key) continue;
+
+                watch.File = file;
+                watch.Fire = fire;
+                return;
+            }
+
+            Watches.Add(new Watch { Handler = key, File = file, Fire = fire });
+        }
+
+        Start();
+    }
+
+    /// <summary>Gives a watched file back.</summary>
+    public static void Unwatch(nint key)
+    {
+        lock (Gate)
+        {
+            for (int index = Watches.Count - 1; index >= 0; index--)
+            {
+                if (Watches[index].Handler == key) Watches.RemoveAt(index);
+            }
+        }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]

@@ -159,6 +159,12 @@ internal static class Vst3Abi
     public static readonly byte[] AudioProcessorId = Uid(0x42043F99, 0xB7DA453C, 0xA569E79D, 0x9AAEC33D);
     public static readonly byte[] EditControllerId = Uid(0xDCD7BBE3, 0x7742448D, 0xA874AACC, 0x979C759E);
     public static readonly byte[] ConnectionPointId = Uid(0x70A4156F, 0x6E6E4026, 0x989148BF, 0xAA60D8D1);
+
+    /// <summary>One thing a plugin's two halves say to each other.</summary>
+    public static readonly byte[] MessageId = Uid(0x936F033B, 0xC6C047DB, 0xBB0882F8, 0x13C1E613);
+
+    /// <summary>What is written on a message: named values of a few kinds.</summary>
+    public static readonly byte[] AttributeListId = Uid(0x1E5F0AEB, 0xCC7F4533, 0xA2544011, 0x38AD5EE4);
     public static readonly byte[] ComponentHandlerId = Uid(0x93A0BEA3, 0x0BD045DB, 0x8E890B0C, 0xC1E46AC6);
     public static readonly byte[] HostApplicationId = Uid(0x58E595CC, 0xDB2D4969, 0x8B6AAF8C, 0x36A664E5);
     public static readonly byte[] ParameterChangesId = Uid(0xA4779663, 0x0BB64A56, 0xB44384A8, 0x466FEB9D);

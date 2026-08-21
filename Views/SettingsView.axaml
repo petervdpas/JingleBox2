@@ -151,6 +151,9 @@
             </ScrollViewer>
           </Border>
 
+          <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                     Text="Plugins run in a process of their own. One that falls over stops on its own and can be started again; it cannot take the app with it." />
+
           <!-- Plugins that crashed the application while opening their own window. Kept out
                of the way until there is one, because most of the time there is not. -->
           <Border Classes="inset" IsVisible="{Binding Plugins.HasBlockedPlugins}">

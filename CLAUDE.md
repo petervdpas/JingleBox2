@@ -27,6 +27,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 ### Key Directories
 
 - `Audio/` - Audio playback engine using ManagedBass (BASS library wrapper)
+- `Audio/Plugins/` - CLAP and VST3 hosting: scanning, loading, parameters, chains, plugin windows
+- `Audio/Plugins/Bridge/` - Runs each plugin in a process of its own and talks to it
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
 - `Tracker/` - Song model, sequencing, playback, JSON song files, and the instrument library
@@ -46,6 +48,12 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 ### Key Classes
 
 - `BassAudioEngine` (Audio/): Manages pad audio playback, device selection, file/stream sources, dynamic resize
+- `PluginHost` (Audio/Plugins/): The one place that knows both plugin standards. Everything above it deals in `PluginInfo` and `IPluginEffect`
+- `BridgedPlugin` / `PluginProcess` (Audio/Plugins/Bridge/): A plugin running in another process, wearing the same face as one that is not. Socket for messages, shared memory for audio
+- `PluginHostProcess` (Audio/Plugins/Bridge/): This same executable started again with `--plugin-host`, being one plugin and nothing else
+- `PluginRunLoop` (Audio/Plugins/): The clock and the doorbell an X11 plugin needs. Both standards ask for the same thing in different words
+- `Vst3Messages` (Audio/Plugins/): The envelope a VST3 plugin's two halves post to each other. A host that refuses to supply one crashes plugins that do not check
+- `XEmbed` (Audio/Plugins/): The handshake a plugin window from another program waits for before it will draw
 - `ConfigStore` (Config/): JSON persistence with profile migration support
 - `MidiRouter` (Midi/): Maps MIDI messages to pad triggers with toggle/start modes
 - `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
@@ -73,6 +81,14 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   tracker only ever loads instruments; whether one is a sample or a synth is its own business
 - Three places things are stored, on purpose: presets (a starting sound), instruments (a voice
   you own, shared by every song), and songs (patterns plus the instruments they use)
+- Plugins run out of process, one process per plugin, and so does the scan. A plugin that
+  crashes stops on its own: an effect passes its audio through, an instrument goes quiet, and
+  the panel offers to start it again. Set `JB_PLUGINS_INPROCESS=1` to load them in this process
+  instead, and `JB_PLUGIN_TRACE=1` to have the child write what it is doing to
+  `/tmp/jinglebox-plugin-<pid>.log`
+- A plugin's own window is given to it only once the window is really on screen at its full
+  size. Handing over the one-pixel window Avalonia makes before the first layout is what killed
+  Serum
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
 - Startup errors logged to `startup.log` for debugging

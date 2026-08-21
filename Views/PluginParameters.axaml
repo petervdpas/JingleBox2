@@ -34,6 +34,18 @@
        shows a plugin, so it looks the same wherever it is worked on. -->
   <StackPanel Spacing="10">
 
+    <!-- A plugin runs in a process of its own. When one falls over, this is what is left: a
+         note saying so, and a button. Nothing else in the application noticed. -->
+    <Border Classes="inset" IsVisible="{Binding HasStopped}">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding StoppedNote}" />
+        <Button Content="Start it again"
+                HorizontalAlignment="Left"
+                Command="{Binding RestartCommand}"
+                ToolTip.Tip="Loads it again with the settings it had. Anything it was holding that was never saved does not come back." />
+      </StackPanel>
+    </Border>
+
     <!-- The plugin's own interface, where it has one. Everything inside it is the plugin's
          doing; the host only lends it the window. -->
     <views:PluginEditorHost IsVisible="{Binding HasOwnWindow}"

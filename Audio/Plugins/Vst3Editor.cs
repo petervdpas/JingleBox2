@@ -199,7 +199,7 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         // cannot find it either way will not draw.
         if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && Vst3Abi.SameId(id, Vst3Abi.RunLoopId))
         {
-            *result = Vst3RunLoop.Instance();
+            *result = PluginRunLoop.Instance();
             return Vst3Abi.ResultOk;
         }
 
