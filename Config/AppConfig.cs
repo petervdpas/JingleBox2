@@ -36,6 +36,10 @@ public sealed class AppConfig
     public MidiConfig Midi { get; set; } = new();
     public double RecordGainDb { get; set; } = 0;
 
+    // A velocity sensitive keyboard writes a different level for every hit. Some parts want
+    // that; a kick almost never does.
+    public bool IgnoreKeyVelocity { get; set; }
+
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";
 

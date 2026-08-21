@@ -103,6 +103,37 @@ public static class PatternEdit
         };
     }
 
+    /// <summary>
+    /// Gives every note on a track the same volume, or takes the volume column off them
+    /// entirely with <see cref="TrackerCell.NoVolume"/>, which leaves the instrument's own
+    /// level to decide. What a velocity sensitive keyboard needs after a take: a kick that
+    /// came out a little different every time becomes one kick again. Returns how many changed.
+    /// </summary>
+    public static int SetTrackVolume(Pattern pattern, int track, int volume)
+    {
+        if (track < 0 || track >= pattern.TrackCount) return 0;
+
+        int wanted = volume == TrackerCell.NoVolume
+            ? TrackerCell.NoVolume
+            : Math.Clamp(volume, 0, TrackerCell.MaxVolume);
+
+        int changed = 0;
+
+        for (int line = 0; line < pattern.Lines; line++)
+        {
+            var cell = pattern[line, track];
+
+            // Only cells that sound a note carry a volume; a note off with a level would be
+            // a contradiction, and an empty cell with one is invisible.
+            if (!cell.Note.IsPlayable || cell.Volume == wanted) continue;
+
+            pattern[line, track] = cell with { Volume = wanted };
+            changed++;
+        }
+
+        return changed;
+    }
+
     /// <summary>Moves every note on a track by semitones. Empty cells and note-offs are left alone.</summary>
     public static void TransposeTrack(Pattern pattern, int track, int semitones)
     {
@@ -115,6 +146,63 @@ public static class PatternEdit
 
             pattern[line, track] = cell with { Note = cell.Note.Transpose(semitones) };
         }
+    }
+
+    /// <summary>
+    /// Empties every cell in a block. What Delete does with a selection up, and the only way
+    /// to take out a phrase rather than a note at a time.
+    /// </summary>
+    public static int ClearRegion(Pattern pattern, PatternSelection selection)
+    {
+        return Apply(pattern, selection, cell => TrackerCell.Empty);
+    }
+
+    /// <summary>Moves every note in a block, leaving note-offs and empty cells alone.</summary>
+    public static int TransposeRegion(Pattern pattern, PatternSelection selection, int semitones)
+    {
+        return Apply(pattern, selection, cell =>
+            cell.Note.IsPlayable ? cell with { Note = cell.Note.Transpose(semitones) } : cell);
+    }
+
+    /// <summary>Gives every note in a block the same volume, or takes the column off them.</summary>
+    public static int SetRegionVolume(Pattern pattern, PatternSelection selection, int volume)
+    {
+        int wanted = volume == TrackerCell.NoVolume
+            ? TrackerCell.NoVolume
+            : Math.Clamp(volume, 0, TrackerCell.MaxVolume);
+
+        return Apply(pattern, selection, cell =>
+            cell.Note.IsPlayable ? cell with { Volume = wanted } : cell);
+    }
+
+    /// <summary>
+    /// Runs an edit over every cell of a block and reports how many it actually changed.
+    /// Cells the edit leaves alone are not counted, so "3 notes moved" means three.
+    /// </summary>
+    private static int Apply(Pattern pattern, PatternSelection selection, Func<TrackerCell, TrackerCell> edit)
+    {
+        if (selection.IsEmpty) return 0;
+
+        var block = selection.Clamp(pattern.Lines, pattern.TrackCount);
+        if (block.IsEmpty) return 0;
+
+        int changed = 0;
+
+        for (int line = block.FirstLine; line <= block.LastLine; line++)
+        {
+            for (int track = block.FirstTrack; track <= block.LastTrack; track++)
+            {
+                var cell = pattern[line, track];
+                var edited = edit(cell);
+
+                if (edited == cell) continue;
+
+                pattern[line, track] = edited;
+                changed++;
+            }
+        }
+
+        return changed;
     }
 
     /// <summary>Empties one track, leaving every other track as it was.</summary>

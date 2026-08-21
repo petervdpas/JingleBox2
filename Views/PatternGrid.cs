@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Tracker;
@@ -29,6 +30,11 @@ public sealed class PatternGrid : ThemedControl
 
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternGrid, double>(nameof(RowHeight), 18);
+
+    /// <summary>The block being worked on, dragged here and shown here.</summary>
+    public static readonly StyledProperty<PatternSelection> SelectionProperty =
+        AvaloniaProperty.Register<PatternGrid, PatternSelection>(
+            nameof(Selection), PatternSelection.None, defaultBindingMode: BindingMode.TwoWay);
 
     public static readonly StyledProperty<int> DropTargetTrackProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(DropTargetTrack), -1);
@@ -73,6 +79,12 @@ public sealed class PatternGrid : ThemedControl
     }
 
     /// <summary>The track a drag is hovering, or -1. Drawn as a drop outline down the column.</summary>
+    public PatternSelection Selection
+    {
+        get => GetValue(SelectionProperty);
+        set => SetValue(SelectionProperty, value);
+    }
+
     public int DropTargetTrack
     {
         get => GetValue(DropTargetTrackProperty);
@@ -182,6 +194,7 @@ public sealed class PatternGrid : ThemedControl
         var beatShade = palette.RowShade(0x0E);
 
         DrawSelectedTrack(context, metrics, palette, cursor.Track, contentHeight);
+        DrawSelection(context, metrics, palette, pattern);
 
         int lpb = Math.Max(1, LinesPerBeat);
 
@@ -223,6 +236,27 @@ public sealed class PatternGrid : ThemedControl
         DrawTrackSeparators(context, metrics, palette, pattern.TrackCount, contentHeight);
         DrawDropTarget(context, metrics, palette, contentHeight);
         DrawCursor(context, metrics, palette, cursor);
+    }
+
+    /// <summary>
+    /// The block, as a wash over the cells it covers. Drawn under the text so the notes in it
+    /// stay readable: a selection has to show what it holds, not hide it.
+    /// </summary>
+    private void DrawSelection(DrawingContext context, PatternMetrics metrics, ThemePalette palette, Pattern pattern)
+    {
+        var block = Selection.Clamp(pattern.Lines, pattern.TrackCount);
+        if (block.IsEmpty) return;
+
+        double top = metrics.RowY(block.FirstLine);
+        double height = block.LineCount * RowHeight;
+
+        double left = metrics.TrackDividerX(block.FirstTrack);
+        double width = block.TrackCount * metrics.TrackWidth;
+
+        var area = new Rect(left, top, width, height);
+
+        context.FillRectangle(palette.AccentTint(48), area);
+        context.DrawRectangle(null, new Pen(palette.AccentBrush, 1), area);
     }
 
     /// <summary>
@@ -297,6 +331,28 @@ public sealed class PatternGrid : ThemedControl
 
         var point = e.GetPosition(this);
         var cursor = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
+        bool left = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+
+        // Shift keeps the anchor where it was, which is how a block is grown after the fact.
+        if (left && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            Selection = Selection.IsEmpty
+                ? PatternSelection.At(EditCursor).ExtendTo(cursor)
+                : Selection.ExtendTo(cursor);
+        }
+        else if (left)
+        {
+            // A plain click puts the cursor down and drops any block. A drag from here turns
+            // into one as soon as the pointer moves onto another cell.
+            _dragAnchor = cursor;
+            Selection = PatternSelection.None;
+        }
+        else if (!Selection.Contains(cursor.Line, cursor.Track))
+        {
+            // A right click outside the block works on what was clicked, not on the block
+            // that happens to be somewhere else.
+            Selection = PatternSelection.None;
+        }
 
         EditCursor = cursor;
         CursorMoved?.Invoke(this, cursor);
@@ -304,7 +360,40 @@ public sealed class PatternGrid : ThemedControl
         // A right click moves the cursor too, so the menu that follows acts on the track
         // under the pointer. It is deliberately not handled: handling it here swallows the
         // request for the menu itself.
-        e.Handled = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
+        e.Handled = left;
+    }
+
+    /// <summary>Where a left press landed, so a drag from it can become a block.</summary>
+    private PatternCursor? _dragAnchor;
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        var pattern = Pattern;
+        if (pattern == null || _dragAnchor == null) return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+
+        var point = e.GetPosition(this);
+        var at = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
+
+        // Still on the cell it started on: a click, not a drag, and a click selects nothing.
+        if (Selection.IsEmpty && at.Line == _dragAnchor.Value.Line && at.Track == _dragAnchor.Value.Track) return;
+
+        Selection = Selection.IsEmpty
+            ? PatternSelection.At(_dragAnchor.Value).ExtendTo(at)
+            : Selection.ExtendTo(at);
+
+        EditCursor = at;
+        CursorMoved?.Invoke(this, at);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        _dragAnchor = null;
     }
 
     private void EnsureMetrics()

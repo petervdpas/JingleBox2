@@ -179,18 +179,38 @@ public partial class TrackerView : UserControl
         var vm = ViewModel;
         if (vm == null || !Grid.IsFocused) return;
 
+        // Shift with a movement key grows the block instead of moving away from it.
+        bool extend = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
         switch (e.Key)
         {
-            case Key.Up: vm.MoveCursor(-1, 0, 0); e.Handled = true; return;
-            case Key.Down: vm.MoveCursor(1, 0, 0); e.Handled = true; return;
-            case Key.Left: vm.MoveCursor(0, 0, -1); e.Handled = true; return;
-            case Key.Right: vm.MoveCursor(0, 0, 1); e.Handled = true; return;
-            case Key.PageUp: vm.MoveCursor(-vm.LinesPerBeat * 4, 0, 0); e.Handled = true; return;
-            case Key.PageDown: vm.MoveCursor(vm.LinesPerBeat * 4, 0, 0); e.Handled = true; return;
+            case Key.Up: vm.MoveCursor(-1, 0, 0, extend); e.Handled = true; return;
+            case Key.Down: vm.MoveCursor(1, 0, 0, extend); e.Handled = true; return;
+            case Key.Left: vm.MoveCursor(0, extend ? -1 : 0, extend ? 0 : -1, extend); e.Handled = true; return;
+            case Key.Right: vm.MoveCursor(0, extend ? 1 : 0, extend ? 0 : 1, extend); e.Handled = true; return;
+            case Key.PageUp: vm.MoveCursor(-vm.LinesPerBeat * 4, 0, 0, extend); e.Handled = true; return;
+            case Key.PageDown: vm.MoveCursor(vm.LinesPerBeat * 4, 0, 0, extend); e.Handled = true; return;
             case Key.Tab:
-                vm.MoveCursor(0, e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1, 0);
+                vm.MoveCursor(0, extend ? -1 : 1, 0);
                 e.Handled = true;
                 return;
+            case Key.A when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                vm.SelectAll();
+                e.Handled = true;
+                return;
+            case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                vm.CopySelection();
+                e.Handled = true;
+                return;
+            case Key.X when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                vm.CutSelection();
+                e.Handled = true;
+                return;
+            case Key.V when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                vm.Paste();
+                e.Handled = true;
+                return;
+            case Key.Escape: vm.ClearSelection(); e.Handled = true; return;
             case Key.Delete: vm.ClearAtCursor(); e.Handled = true; return;
             case Key.Insert: vm.InsertLine(); e.Handled = true; return;
             case Key.Back: vm.DeleteLine(); e.Handled = true; return;

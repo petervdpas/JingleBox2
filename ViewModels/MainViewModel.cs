@@ -96,7 +96,7 @@ public sealed partial class MainViewModel : ObservableObject
         // on the INSTRUMENTS tab. The tracker borrows the library to fill a song's slots.
         var library = new InstrumentLibrary();
 
-        Tracker = new TrackerViewModel(audio, library, Record.Recordings);
+        Tracker = new TrackerViewModel(audio, library, Record.Recordings, store, cfg);
         Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService);
 
         Instruments.InstrumentChanged += (_, instrument) =>

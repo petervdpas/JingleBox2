@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
+using JingleBox2.Config;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
@@ -27,6 +28,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private readonly DispatcherTimer _meters;
     private readonly ObservableCollection<Recording> _recordings;
 
+    /// <summary>Where the velocity preference is kept. Null in a test or a headless run.</summary>
+    private readonly ConfigStore? _configStore;
+
+    private readonly AppConfig? _config;
+
     [ObservableProperty] private Song song;
     [ObservableProperty] private Pattern? currentPattern;
     [ObservableProperty]
@@ -35,6 +41,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private PatternCursor cursor = PatternCursor.Start;
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
+
+    /// <summary>
+    /// The block being worked on, or nothing. Kept here rather than in the grid so the menu
+    /// and the keyboard both act on the same thing.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection))]
+    [NotifyPropertyChangedFor(nameof(SelectionLabel))]
+    private PatternSelection selection = PatternSelection.None;
+
+    /// <summary>
+    /// Drops how hard a key was hit, on the way in. A preference rather than part of a song,
+    /// so it is remembered between runs.
+    /// </summary>
+    [ObservableProperty] private bool ignoreVelocity;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPlaying))]
@@ -76,8 +97,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     [ObservableProperty] private SongFile? selectedSongFile;
 
-    public TrackerViewModel(IAudioEngine audio, InstrumentLibrary library, ObservableCollection<Recording> recordings)
+    public TrackerViewModel(
+        IAudioEngine audio,
+        InstrumentLibrary library,
+        ObservableCollection<Recording> recordings,
+        ConfigStore? configStore = null,
+        AppConfig? config = null)
     {
+        _configStore = configStore;
+        _config = config;
+
+        // Assigned to the field rather than the property: this is what was saved, not a
+        // change to save again.
+        ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
+
         _player = new TrackerPlayer(audio);
         _store = new SongStore();
         _library = library;
@@ -266,6 +299,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     partial void OnCurrentPatternChanged(Pattern? oldValue, Pattern? newValue)
     {
+        // A block belongs to the pattern it was drawn on.
+        Selection = PatternSelection.None;
+
         if (oldValue != null) oldValue.Changed -= OnPatternEdited;
         if (newValue != null) newValue.Changed += OnPatternEdited;
     }
@@ -273,6 +309,111 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
 
     partial void OnSongNameChanged(string value) => MarkDirty();
+
+    public bool HasSelection => !Selection.IsEmpty;
+
+    /// <summary>What the menu is about to act on: a block, or the track the cursor is on.</summary>
+    public string SelectionLabel => HasSelection ? Selection.Describe() : CursorTrackLabel;
+
+    /// <summary>Starts a block at the cursor, for a shift-click or a drag.</summary>
+    public void BeginSelection(PatternCursor at) => Selection = PatternSelection.At(at);
+
+    /// <summary>Drags the loose corner of the block to here.</summary>
+    public void ExtendSelection(PatternCursor to) => Selection = Selection.ExtendTo(to);
+
+    public void ClearSelection() => Selection = PatternSelection.None;
+
+    public IRelayCommand SelectAllCommand => new RelayCommand(SelectAll);
+
+    public IRelayCommand CopySelectionCommand => new RelayCommand(CopySelection);
+
+    public IRelayCommand CutSelectionCommand => new RelayCommand(CutSelection);
+
+    public IRelayCommand PasteCommand => new RelayCommand(Paste);
+
+    /// <summary>
+    /// What was last copied. Held here rather than in a pattern, so a phrase can be carried
+    /// between patterns and between songs for as long as the app is open.
+    /// </summary>
+    private PatternBlock? _clipboard;
+
+    public bool HasClipboard => _clipboard != null;
+
+    /// <summary>What the paste would put down, for the menu.</summary>
+    public string ClipboardLabel => _clipboard == null ? "nothing copied" : _clipboard.Describe();
+
+    /// <summary>
+    /// Copies the block, or the single cell under the cursor when there is no block. Copying
+    /// one cell is the quickest way to repeat a note down a track.
+    /// </summary>
+    public void CopySelection()
+    {
+        var block = PatternBlock.Copy(CurrentPattern, HasSelection ? Selection : PatternSelection.At(Cursor));
+        if (block == null) return;
+
+        _clipboard = block;
+
+        OnPropertyChanged(nameof(HasClipboard));
+        OnPropertyChanged(nameof(ClipboardLabel));
+
+        Status = "Copied " + block.Describe();
+    }
+
+    public void CutSelection()
+    {
+        var taken = HasSelection ? Selection : PatternSelection.At(Cursor);
+
+        CopySelection();
+
+        if (CurrentPattern == null || _clipboard == null) return;
+
+        PatternEdit.ClearRegion(CurrentPattern, taken);
+        Status = "Cut " + _clipboard.Describe();
+    }
+
+    /// <summary>
+    /// Puts the copy down with its corner at the cursor, and leaves it selected: paste, move,
+    /// paste again is how a pattern gets built.
+    /// </summary>
+    public void Paste()
+    {
+        if (CurrentPattern == null || _clipboard == null) return;
+
+        var landed = _clipboard.Paste(CurrentPattern, Cursor);
+        if (landed.IsEmpty)
+        {
+            Status = "Nowhere to paste from here";
+            return;
+        }
+
+        Selection = landed;
+        Status = "Pasted " + landed.Describe();
+    }
+
+    public IRelayCommand ClearSelectionCommand => new RelayCommand(DeleteSelection);
+
+    public void SelectAll()
+    {
+        if (CurrentPattern == null) return;
+
+        Selection = PatternSelection.All(CurrentPattern.Lines, CurrentPattern.TrackCount);
+        Status = "Selected " + Selection.Describe();
+    }
+
+    /// <summary>
+    /// Empties the block. This is what Delete does when there is one, and it is not gated on
+    /// record: selecting a block and pressing delete is not something anyone does by accident.
+    /// </summary>
+    public void DeleteSelection()
+    {
+        if (CurrentPattern == null || !HasSelection) return;
+
+        int cleared = PatternEdit.ClearRegion(CurrentPattern, Selection);
+
+        Status = cleared == 0
+            ? "Nothing to clear in " + Selection.Describe()
+            : $"Cleared {cleared} cell(s) in " + Selection.Describe();
+    }
 
     /// <summary>The track the cursor is on, named as the grid and the mixer name it.</summary>
     public string CursorTrackLabel => "Track " + (Cursor.Track + 1).ToString("00", CultureInfo.InvariantCulture);
@@ -284,6 +425,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand ClearPatternCommand => new RelayCommand(ClearPattern);
 
     public IRelayCommand<string> TransposeTrackCommand => new RelayCommand<string>(TransposeTrack);
+
+    public IRelayCommand<string> SetTrackVolumeCommand => new RelayCommand<string>(SetTrackVolume);
 
     public IRelayCommand ClearTrackInstrumentCommand =>
         new RelayCommand(() => ClearTrackInstrument(Cursor.Track));
@@ -297,11 +440,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (CurrentPattern == null) return;
         if (!int.TryParse(grid, NumberStyles.Integer, CultureInfo.InvariantCulture, out int lines)) return;
 
-        int moved = PatternEdit.Quantize(CurrentPattern, Cursor.Track, lines);
+        int moved = 0;
+
+        if (HasSelection)
+        {
+            // Whole tracks, even from a part-height block: a note is early or late against
+            // the beat, which is a property of the track's timeline, not of the lines picked.
+            for (int track = Selection.FirstTrack; track <= Selection.LastTrack; track++)
+                moved += PatternEdit.Quantize(CurrentPattern, track, lines);
+        }
+        else
+        {
+            moved = PatternEdit.Quantize(CurrentPattern, Cursor.Track, lines);
+        }
 
         Status = moved == 0
-            ? $"{CursorTrackLabel} was already on {lines}"
-            : $"Quantized {CursorTrackLabel} to {lines}: {moved} note(s) moved";
+            ? $"{SelectionLabel} was already on {lines}"
+            : $"Quantized {SelectionLabel} to {lines}: {moved} note(s) moved";
     }
 
     private void ClearTrack()
@@ -320,13 +475,49 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Cleared pattern '{CurrentPattern.Name}'";
     }
 
+    /// <summary>
+    /// Levels a track's notes out. The menu carries the value as text, with -1 meaning the
+    /// volume column comes off and the instrument's own level takes over.
+    /// </summary>
+    private void SetTrackVolume(string? volume)
+    {
+        if (CurrentPattern == null) return;
+        if (!int.TryParse(volume, NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)) return;
+
+        int changed = HasSelection
+            ? PatternEdit.SetRegionVolume(CurrentPattern, Selection, level)
+            : PatternEdit.SetTrackVolume(CurrentPattern, Cursor.Track, level);
+
+        string what = level == TrackerCell.NoVolume
+            ? "the instrument's own level"
+            : level.ToString("X2", CultureInfo.InvariantCulture);
+
+        Status = changed == 0
+            ? $"{SelectionLabel} was already at {what}"
+            : $"{SelectionLabel} set to {what}: {changed} note(s) changed";
+    }
+
     private void TransposeTrack(string? semitones)
     {
         if (CurrentPattern == null) return;
         if (!int.TryParse(semitones, NumberStyles.Integer, CultureInfo.InvariantCulture, out int steps)) return;
 
-        PatternEdit.TransposeTrack(CurrentPattern, Cursor.Track, steps);
-        Status = $"Transposed {CursorTrackLabel} by {steps:+0;-0} semitone(s)";
+        if (HasSelection) PatternEdit.TransposeRegion(CurrentPattern, Selection, steps);
+        else PatternEdit.TransposeTrack(CurrentPattern, Cursor.Track, steps);
+
+        Status = $"Transposed {SelectionLabel} by {steps:+0;-0} semitone(s)";
+    }
+
+    partial void OnIgnoreVelocityChanged(bool value)
+    {
+        Status = value
+            ? "Key velocity ignored: notes come in at the instrument's own level"
+            : "Key velocity followed: how hard you play is written into the volume column";
+
+        if (_configStore == null || _config == null) return;
+
+        _config.IgnoreKeyVelocity = value;
+        _configStore.Save(_config);
     }
 
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
@@ -354,6 +545,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     public void EnterNote(Note note, int volume)
     {
+        // A velocity sensitive keyboard makes every hit a little different. With this on, how
+        // hard a key is pressed is dropped on the way in, so a part comes out even and the
+        // instrument's own level is the only thing deciding how loud it is.
+        if (IgnoreVelocity) volume = TrackerCell.NoVolume;
+
         PreviewNote(note, volume);
 
         if (CurrentPattern == null || !IsRecording) return;
@@ -404,25 +600,46 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         PatternEdit.EnterEffectCommand(CurrentPattern, Cursor, command);
     }
 
+    /// <summary>
+    /// Delete. Clears the block if there is one, otherwise the column under the cursor.
+    /// </summary>
+    /// <remarks>
+    /// Not gated on record, unlike typing a note. Hitting a letter key while jamming is easy
+    /// to do by accident; pressing Delete is not, and a tracker where notes cannot be taken
+    /// out without arming a record button is a tracker nobody can edit.
+    /// </remarks>
     public void ClearAtCursor()
     {
-        if (CurrentPattern == null || !IsRecording) return;
+        if (CurrentPattern == null) return;
+
+        if (HasSelection)
+        {
+            DeleteSelection();
+            return;
+        }
 
         PatternEdit.ClearAtCursor(CurrentPattern, Cursor);
-        StepDown();
+        if (IsRecording) StepDown();
     }
 
     public void InsertLine()
     {
-        if (CurrentPattern != null && IsRecording) PatternEdit.InsertLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null) PatternEdit.InsertLine(CurrentPattern, Cursor);
     }
 
     public void DeleteLine()
     {
-        if (CurrentPattern != null && IsRecording) PatternEdit.DeleteLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null) PatternEdit.DeleteLine(CurrentPattern, Cursor);
     }
 
-    public void MoveCursor(int lineDelta, int trackDelta, int columnDelta)
+    public void MoveCursor(int lineDelta, int trackDelta, int columnDelta) =>
+        MoveCursor(lineDelta, trackDelta, columnDelta, extend: false);
+
+    /// <summary>
+    /// Moves the cursor, and with <paramref name="extend"/> drags the block along with it.
+    /// Moving without extending drops the block, the way every editor does it.
+    /// </summary>
+    public void MoveCursor(int lineDelta, int trackDelta, int columnDelta, bool extend)
     {
         if (CurrentPattern == null) return;
 
@@ -430,6 +647,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (lineDelta != 0) moved = moved.MoveLine(lineDelta, CurrentPattern.Lines);
         if (trackDelta != 0) moved = moved.MoveTrack(trackDelta, CurrentPattern.TrackCount);
         if (columnDelta != 0) moved = moved.MoveColumn(columnDelta, CurrentPattern.TrackCount);
+
+        if (extend) Selection = Selection.IsEmpty ? PatternSelection.At(Cursor).ExtendTo(moved) : Selection.ExtendTo(moved);
+        else Selection = PatternSelection.None;
 
         Cursor = moved;
     }
