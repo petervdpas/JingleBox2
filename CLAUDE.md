@@ -28,7 +28,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
 - `Audio/` - Audio playback engine using ManagedBass (BASS library wrapper)
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
-- `Midi/` - MIDI input handling and routing to pads
+- `Midi/` - MIDI input handling and routing to pads and to the tracker
+- `Tracker/` - Song model, sequencing, playback, and JSON song files
+- `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
 - `Themes/` - XAML resource dictionaries (Dark, Light, Neon, Industrial)
@@ -38,7 +40,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
 - **Playback**: PadViewModel → BassAudioEngine → BASS library → PadPlaybackChanged event → UI update
 - **Config**: PadViewModel property change → MainViewModel → ConfigStore.Save() → JSON file
-- **MIDI**: MidiService.MessageReceived → MidiRouter → PadTriggerAdapter → PadViewModel.TogglePlayCommand
+- **MIDI**: MidiService.MessageReceived → MidiDispatcher → (MidiRouter → PadTriggerAdapter → PadViewModel.TogglePlayCommand) or (MidiNoteRouter → TrackerNoteAdapter → TrackerViewModel)
+- **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (TrackerSampleBank) or synth voices (SynthMixer → SynthOutput → one BASS stream)
 
 ### Key Classes
 
@@ -47,6 +50,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiRouter` (Midi/): Maps MIDI messages to pad triggers with toggle/start modes
 - `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
+- `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice
+- `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
+- `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters
+- `Knob` / `NumberField` (Views/): The app's own numeric controls; a pot knob and a compact stepper field
+- `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 
@@ -57,6 +65,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - Maximum: 16 pads total (e.g., 4x4, 2x8, 8x2)
   - Default: 4 rows x 2 columns = 8 pads (backward compatible)
 - Two source types per pad: local files (WAV/MP3/OGG/FLAC) or HTTP streams
+- Tracker instruments come in two kinds: a recording pitched by resampling, or a synth patch
+  generated at playback time (the parameter set mirrors MappoGraph's chiptune synth)
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
 - Startup errors logged to `startup.log` for debugging

@@ -1,0 +1,184 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             x:Class="JingleBox2.Views.InstrumentsView"
+             x:DataType="vm:TrackerViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.field">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.8" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,6,0,0" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel Margin="16">
+
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
+      <TextBlock Classes="cardHint" Text="{Binding Status}" />
+    </Border>
+
+    <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Instruments" />
+
+          <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
+            <Button Content="+ Synth" HorizontalAlignment="Stretch"
+                    Command="{Binding AddSynthInstrumentCommand}" />
+
+            <TextBlock Classes="cardHint" Text="Or add one of your recordings:" Margin="0,6,0,0" />
+            <ComboBox x:Name="RecordingPicker"
+                      ItemsSource="{Binding AvailableRecordings}"
+                      DisplayMemberBinding="{Binding Name}"
+                      HorizontalAlignment="Stretch" />
+            <Button Content="+ Sample" HorizontalAlignment="Stretch"
+                    Click="AddInstrument_Click" />
+          </StackPanel>
+
+          <ListBox ItemsSource="{Binding Instruments}"
+                   SelectedIndex="{Binding SelectedInstrument}"
+                   ItemTemplate="{StaticResource InstrumentRow}" />
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="1" Classes="card">
+        <ScrollViewer>
+          <StackPanel Spacing="8"
+                      IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+              <TextBlock Grid.Column="0" Classes="field" Text="Name" />
+              <TextBox Grid.Column="1" Text="{Binding Editor.Name}" />
+            </Grid>
+
+            <TextBlock Classes="cardHint" Text="{Binding Editor.SourceText}" />
+
+            <!-- Sample instruments -->
+            <StackPanel Spacing="8" IsVisible="{Binding Editor.IsSample}">
+              <TextBlock Classes="section" Text="Sample" />
+
+              <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="field" Text="Base note" />
+                <views:NumberField Grid.Column="1"
+                                   Value="{Binding Editor.BaseNoteSemitone}"
+                                   Minimum="0" Maximum="119" Width="70" />
+                <TextBlock Grid.Column="2" Classes="field" Text="{Binding Editor.BaseNoteText}" />
+              </Grid>
+
+              <TextBlock Classes="field" Text="{Binding Editor.VolumeText}" />
+              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Volume}" />
+
+              <CheckBox Content="Loop" IsChecked="{Binding Editor.Loop}" />
+            </StackPanel>
+
+            <!-- Synth instruments -->
+            <StackPanel Spacing="8" IsVisible="{Binding Editor.IsSynth}">
+
+              <TextBlock Classes="section" Text="Preset library" />
+              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="6">
+                <ComboBox Grid.Column="0"
+                          ItemsSource="{Binding Presets}"
+                          SelectedItem="{Binding SelectedPreset}"
+                          DisplayMemberBinding="{Binding Name}"
+                          HorizontalAlignment="Stretch"
+                          PlaceholderText="Load preset..." />
+                <Button Grid.Column="1" Content="Load" Command="{Binding LoadPresetCommand}" />
+                <Button Grid.Column="2" Content="Save" Command="{Binding SavePresetCommand}" />
+                <Button Grid.Column="3" Content="Del" Classes="danger"
+                        Command="{Binding DeletePresetCommand}" />
+              </Grid>
+              <Button Content="Reset starter presets"
+                      HorizontalAlignment="Left"
+                      Command="{Binding ResetPresetsCommand}" />
+
+              <TextBlock Classes="section" Text="Wave" />
+              <ComboBox ItemsSource="{Binding Editor.Patch.Waves}"
+                        SelectedItem="{Binding Editor.Patch.Wave}"
+                        HorizontalAlignment="Stretch" />
+
+              <views:Knob IsVisible="{Binding Editor.Patch.IsPulse}"
+                          HorizontalAlignment="Left"
+                          Label="Duty" Format="0.00" DefaultValue="0.5"
+                          Minimum="0.05" Maximum="0.95"
+                          SmallStep="0.01" LargeStep="0.05"
+                          Value="{Binding Editor.Patch.Duty}" />
+
+              <TextBlock Classes="section" Text="Envelope" />
+
+              <TextBlock Classes="field" Text="{Binding Editor.Patch.AttackText}" />
+              <Slider Minimum="0" Maximum="2000" Value="{Binding Editor.Patch.AttackMs}" />
+
+              <TextBlock Classes="field" Text="{Binding Editor.Patch.DecayText}" />
+              <Slider Minimum="0" Maximum="5000" Value="{Binding Editor.Patch.DecayMs}" />
+
+              <TextBlock Classes="field" Text="{Binding Editor.Patch.SustainText}" />
+              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Patch.Sustain}" />
+
+              <TextBlock Classes="field" Text="{Binding Editor.Patch.ReleaseText}" />
+              <Slider Minimum="0" Maximum="5000" Value="{Binding Editor.Patch.ReleaseMs}" />
+
+              <TextBlock Classes="section" Text="Modulation" />
+
+              <WrapPanel Orientation="Horizontal" ItemWidth="92" ItemHeight="72">
+                <views:Knob Label="Vib rate" Unit="Hz" Format="0.0" DefaultValue="0"
+                            Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
+                            Value="{Binding Editor.Patch.VibratoRateHz}" />
+
+                <views:Knob Label="Vib depth" Unit="c" Format="0" DefaultValue="0"
+                            Minimum="0" Maximum="200" SmallStep="1" LargeStep="10"
+                            Value="{Binding Editor.Patch.VibratoDepthCents}" />
+
+                <views:Knob Label="Trem rate" Unit="Hz" Format="0.0" DefaultValue="0"
+                            Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
+                            Value="{Binding Editor.Patch.TremoloRateHz}" />
+
+                <views:Knob Label="Trem depth" Format="0.00" DefaultValue="0"
+                            Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                            Value="{Binding Editor.Patch.TremoloDepth}" />
+
+                <views:Knob Label="Pitch env" Unit="st" Format="0" DefaultValue="0"
+                            Minimum="-24" Maximum="24" SmallStep="1" LargeStep="6"
+                            Value="{Binding Editor.Patch.PitchEnvSemitones}" />
+
+                <views:Knob Label="Pitch time" Unit="ms" Format="0" DefaultValue="60"
+                            Minimum="0" Maximum="2000" SmallStep="5" LargeStep="50"
+                            Value="{Binding Editor.Patch.PitchEnvMs}" />
+              </WrapPanel>
+
+              <TextBlock Classes="cardHint"
+                         Text="Drag a knob up or down to turn it. The wheel and the arrow keys step it, shift goes further, and a double click puts it back." />
+
+              <TextBlock Classes="field" Text="{Binding Editor.VolumeText}" />
+              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Volume}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" VerticalAlignment="Center">
+              <Button Content="Test" Command="{Binding TestInstrumentCommand}" />
+
+              <TextBlock Classes="field" Text="Oct" Margin="6,0,0,0" />
+              <views:NumberField Value="{Binding Octave}"
+                                 Minimum="0" Maximum="9" Width="62"
+                                 ToolTip.Tip="The octave Test plays at, shared with the tracker." />
+
+              <Button Content="Remove" Classes="danger"
+                      Margin="12,0,0,0"
+                      IsEnabled="{Binding HasInstruments}"
+                      Command="{Binding RemoveInstrumentCommand}" />
+            </StackPanel>
+
+            <TextBlock Classes="cardHint"
+                       Text="A synth needs no recording: it is generated as it plays. Put an instrument on a track by dragging it onto that track on the TRACKER tab." />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

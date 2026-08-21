@@ -1,14 +1,30 @@
+using JingleBox2.Tracker.Synth;
 using System.Text.Json.Serialization;
 
 namespace JingleBox2.Tracker;
 
+public enum TrackerInstrumentKind
+{
+    /// <summary>One of your recordings, pitched by resampling.</summary>
+    Sample = 0,
+
+    /// <summary>Generated on the fly from a patch, so it needs no file at all.</summary>
+    Synth = 1
+}
+
 /// <summary>
-/// A sample and how to play it. There is no synthesis: an instrument is one of your
-/// recordings plus the pitch it was recorded at, which is what makes transposing correct.
+/// What a pattern cell's instrument number points at. Either a recording played back at a
+/// pitch, or a synth voice built from a patch. Both carry a name and a level, and the rest
+/// only applies to one of the two.
 /// </summary>
 public sealed class TrackerInstrument
 {
     public string Name { get; set; } = "";
+
+    public TrackerInstrumentKind Kind { get; set; } = TrackerInstrumentKind.Sample;
+
+    /// <summary>The synth settings. Carried by every instrument, used when Kind is Synth.</summary>
+    public SynthPatch Patch { get; set; } = new();
 
     /// <summary>Absolute path to the WAV file.</summary>
     public string FilePath { get; set; } = "";
@@ -25,15 +41,28 @@ public sealed class TrackerInstrument
     public bool Loop { get; set; }
 
     [JsonIgnore]
+    public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
+
+    [JsonIgnore]
     public Note BaseNote
     {
         get => new(BaseNoteSemitone);
         set => BaseNoteSemitone = value.Semitone;
     }
 
+    /// <summary>A synth instrument with the starting patch, ready to be edited.</summary>
+    public static TrackerInstrument CreateSynth(string name) => new()
+    {
+        Name = name,
+        Kind = TrackerInstrumentKind.Synth,
+        Patch = new SynthPatch()
+    };
+
     public TrackerInstrument Clone() => new()
     {
         Name = Name,
+        Kind = Kind,
+        Patch = Patch.Clone(),
         FilePath = FilePath,
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,

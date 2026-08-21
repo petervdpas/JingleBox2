@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace JingleBox2.Tracker;
 
@@ -16,10 +15,12 @@ public sealed class SongStore
 {
     public const string Extension = ".json";
 
+    // Defaults are written out rather than skipped. A synth patch is full of settings whose
+    // zero is a real choice (no attack, no sustain, no vibrato), and skipping them would let
+    // the property initializers put their own values back on load.
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        WriteIndented = true
     };
 
     public string SongsDirectory { get; }

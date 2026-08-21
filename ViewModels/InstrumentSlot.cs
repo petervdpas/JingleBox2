@@ -25,7 +25,11 @@ public sealed partial class InstrumentSlot : ObservableObject
 
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
-    public string BaseNoteText => Instrument.BaseNote.ToString();
+
+    /// <summary>The second line of the row: a synth says what it is, a sample says its pitch.</summary>
+    public string DetailText => Instrument.IsSynth
+        ? Instrument.Patch.Wave.ToString().ToLowerInvariant() + " synth"
+        : Instrument.BaseNote.ToString();
 
     public bool HasTrack => Track >= 0;
 
@@ -33,6 +37,13 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string TrackBadge => HasTrack
         ? "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture)
         : "";
+
+    /// <summary>Redraws the row after the editor changed the instrument behind it.</summary>
+    public void Refresh()
+    {
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(DetailText));
+    }
 
     public override string ToString() => $"{Number}  {Name}";
 }

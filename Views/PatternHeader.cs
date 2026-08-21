@@ -103,7 +103,7 @@ public sealed class PatternHeader : Control
         var metrics = Metrics;
         double height = Bounds.Height;
 
-        var palette = PatternPalette.From(this);
+        var palette = ThemePalette.From(this);
         var text = palette.TextBrush;
         var muted = palette.MutedBrush;
         var selectedPen = new Pen(palette.AccentBrush, 1);

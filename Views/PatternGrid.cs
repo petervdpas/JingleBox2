@@ -179,7 +179,7 @@ public sealed class PatternGrid : Control
 
         var metrics = Metrics;
         var bounds = new Rect(Bounds.Size);
-        var palette = PatternPalette.From(this);
+        var palette = ThemePalette.From(this);
 
         var text = palette.TextBrush;
         var muted = palette.MutedBrush;
@@ -244,7 +244,7 @@ public sealed class PatternGrid : Control
     /// is a few pixels of a very repetitive grid, which is not enough to find at a glance.
     /// </summary>
     private static void DrawSelectedTrack(DrawingContext context, PatternMetrics metrics,
-        PatternPalette palette, int track, double height)
+        ThemePalette palette, int track, double height)
     {
         context.FillRectangle(palette.AccentTint(22),
             new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height));
@@ -255,7 +255,7 @@ public sealed class PatternGrid : Control
     /// read as one block of text and it is hard to tell which track a note belongs to.
     /// </summary>
     private static void DrawTrackSeparators(DrawingContext context, PatternMetrics metrics,
-        PatternPalette palette, int trackCount, double height)
+        ThemePalette palette, int trackCount, double height)
     {
         var pen = new Pen(palette.BorderBrush, 1);
 
@@ -269,7 +269,7 @@ public sealed class PatternGrid : Control
 
     /// <summary>The column a dragged instrument would land on.</summary>
     private void DrawDropTarget(DrawingContext context, PatternMetrics metrics,
-        PatternPalette palette, double height)
+        ThemePalette palette, double height)
     {
         int track = DropTargetTrack;
         if (track < 0 || track >= (Pattern?.TrackCount ?? 0)) return;
@@ -281,7 +281,7 @@ public sealed class PatternGrid : Control
     }
 
     private void DrawCursor(DrawingContext context, PatternMetrics metrics,
-        PatternPalette palette, PatternCursor cursor)
+        ThemePalette palette, PatternCursor cursor)
     {
         double x = metrics.ColumnX(cursor.Track, cursor.Column);
         double width = metrics.ColumnWidth(cursor.Column);

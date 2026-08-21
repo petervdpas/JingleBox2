@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using JingleBox2.Audio;
+using JingleBox2.Tracker.Synth;
 using ManagedBass;
 
 namespace JingleBox2.Tracker;
@@ -29,8 +31,12 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>Below this the thread spins instead of sleeping, since sleep is not that precise.</summary>
     private const double SpinThresholdSeconds = 0.002;
 
+    /// <summary>How long an audition holds before it releases, since no key is let go of.</summary>
+    private const double PreviewHoldSeconds = 0.4;
+
     private readonly IAudioEngine _audio;
     private readonly TrackerSampleBank _bank = new();
+    private readonly SynthOutput _synth = new();
     private readonly object _lock = new();
 
     private Thread? _clock;
@@ -89,6 +95,10 @@ public sealed class TrackerPlayer : IDisposable
         }
 
         _bank.Preload(song.Instruments);
+
+        // The synth stream is only opened when the song actually has a synth in it.
+        if (song.Instruments.Any(i => i.IsSynth)) _synth.EnsureStarted(_audio);
+
         StartClock();
     }
 
@@ -176,6 +186,13 @@ public sealed class TrackerPlayer : IDisposable
         if (!note.IsPlayable) return;
 
         _audio.EnsureInitialized();
+
+        if (instrument.IsSynth)
+        {
+            _synth.EnsureStarted(_audio);
+            _synth.Mixer.Preview(instrument.Patch, note, gain * (float)instrument.Volume, PreviewHoldSeconds);
+            return;
+        }
 
         int channel = _bank.GetChannel(instrument, note);
         if (channel == 0) return;
@@ -267,6 +284,7 @@ public sealed class TrackerPlayer : IDisposable
             {
                 case TrackerEventKind.Stop:
                     StopVoice(e.Track);
+                    _synth.Mixer.NoteOff(e.Track);
                     break;
 
                 case TrackerEventKind.Trigger:
@@ -288,10 +306,21 @@ public sealed class TrackerPlayer : IDisposable
         // One voice per track, as a tracker has always worked: a new note cuts the old one.
         StopVoice(e.Track);
 
+        var (gain, pan) = LevelsFor(e, instrument);
+
+        if (instrument.IsSynth)
+        {
+            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, gain, pan ?? 0f);
+            return;
+        }
+
+        // A track that switches from a synth to a sample must not leave the synth ringing.
+        _synth.Mixer.NoteOff(e.Track);
+
         int channel = _bank.GetChannel(instrument, e.Note);
         if (channel == 0) return;
 
-        ApplyVoiceSettings(channel, e, instrument);
+        ApplyVoiceSettings(channel, gain, pan);
 
         if (!Bass.ChannelPlay(channel)) return;
         _voices[e.Track] = channel;
@@ -299,14 +328,26 @@ public sealed class TrackerPlayer : IDisposable
 
     private void Adjust(TrackerEvent e, Song song)
     {
+        var instrument = song.InstrumentAt(e.Instrument);
+        var (gain, pan) = LevelsFor(e, instrument);
+
+        if (instrument?.IsSynth == true)
+        {
+            _synth.Mixer.SetLevels(e.Track, gain, pan);
+            return;
+        }
+
         int channel = _voices[e.Track];
         if (channel == 0) return;
 
-        var instrument = song.InstrumentAt(e.Instrument);
-        ApplyVoiceSettings(channel, e, instrument);
+        ApplyVoiceSettings(channel, gain, pan);
     }
 
-    private static void ApplyVoiceSettings(int channel, TrackerEvent e, TrackerInstrument? instrument)
+    /// <summary>
+    /// The level and placement a voice should have, from the cell and the instrument. Shared
+    /// by both kinds of instrument so the volume column means the same thing either way.
+    /// </summary>
+    private static (float Gain, float? Pan) LevelsFor(TrackerEvent e, TrackerInstrument? instrument)
     {
         float gain = (e.Gain ?? 1f) * (float)(instrument?.Volume ?? 1.0);
 
@@ -314,14 +355,22 @@ public sealed class TrackerPlayer : IDisposable
         if (e.Effect.Command == TrackerEffect.SetVolume)
             gain = Math.Clamp(e.Effect.Parameter / (float)TrackerCell.MaxVolume, 0f, 1f);
 
-        Bass.ChannelSetAttribute(channel, ChannelAttribute.Volume, Math.Clamp(gain, 0f, 1f));
-
+        float? pan = null;
         if (e.Effect.Command == TrackerEffect.SetPan)
         {
             // 00 hard left, 40 centre, 80 hard right.
-            float pan = Math.Clamp((e.Effect.Parameter - 64) / 64f, -1f, 1f);
-            Bass.ChannelSetAttribute(channel, ChannelAttribute.Pan, pan);
+            pan = Math.Clamp((e.Effect.Parameter - 64) / 64f, -1f, 1f);
         }
+
+        return (Math.Clamp(gain, 0f, 1f), pan);
+    }
+
+    private static void ApplyVoiceSettings(int channel, float gain, float? pan)
+    {
+        Bass.ChannelSetAttribute(channel, ChannelAttribute.Volume, gain);
+
+        if (pan.HasValue)
+            Bass.ChannelSetAttribute(channel, ChannelAttribute.Pan, pan.Value);
     }
 
     private void StopVoice(int track)
@@ -337,11 +386,14 @@ public sealed class TrackerPlayer : IDisposable
     {
         for (int track = 0; track < _voices.Length; track++)
             StopVoice(track);
+
+        _synth.Silence();
     }
 
     public void Dispose()
     {
         Stop();
         _bank.Dispose();
+        _synth.Dispose();
     }
 }

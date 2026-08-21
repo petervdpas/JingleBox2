@@ -2,9 +2,8 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Reactive;
 using Avalonia.Interactivity;
-using JingleBox2.Models;
+using Avalonia.Reactive;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 
@@ -173,12 +172,6 @@ public partial class TrackerView : UserControl
 
         vm.SetCursor(vm.Cursor with { Track = track });
         Grid.Focus();
-    }
-
-    private void AddInstrument_Click(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel != null && RecordingPicker.SelectedItem is Recording recording)
-            ViewModel.AddInstrumentCommand.Execute(recording);
     }
 
     private void OnGridKeyDown(object? sender, KeyEventArgs e)

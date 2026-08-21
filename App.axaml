@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:JingleBox2.Converters"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              x:Class="JingleBox2.App"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -178,6 +179,31 @@
                 </ControlTemplate>
             </Setter>
         </ControlTheme>
+
+        <!-- One instrument row, shared by the list beside the pattern and the one in the editor. -->
+        <DataTemplate x:Key="InstrumentRow" x:DataType="vm:InstrumentSlot">
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" Grid.RowSpan="2"
+                           Text="{Binding Number}"
+                           FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
+                           VerticalAlignment="Center"
+                           Opacity="0.7" />
+
+                <TextBlock Grid.Column="1" Grid.Row="0"
+                           Text="{Binding Name}"
+                           TextTrimming="CharacterEllipsis" />
+
+                <TextBlock Grid.Column="1" Grid.Row="1"
+                           Classes="cardHint"
+                           Text="{Binding DetailText}" />
+
+                <Border Grid.Column="2" Grid.Row="1"
+                        Classes="badge"
+                        IsVisible="{Binding HasTrack}">
+                    <TextBlock Text="{Binding TrackBadge}" />
+                </Border>
+            </Grid>
+        </DataTemplate>
 
         <conv:NullToUnsetConverter x:Key="NullToUnset" />
         <conv:IsSelectedColorConverter x:Key="IsSelectedColor" />

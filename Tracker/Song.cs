@@ -193,6 +193,14 @@ public sealed class Song
         if (Order.Count == 0)
             Order.Add(0);
 
+        // A hand-edited file can leave a patch missing or out of range, and a voice built from
+        // one of those is either a crash or a noise nobody asked for.
+        foreach (var instrument in Instruments)
+        {
+            instrument.Patch ??= new Synth.SynthPatch();
+            instrument.Patch.Clamp();
+        }
+
         EnsureTrackInstruments();
         for (int track = 0; track < TrackInstruments.Count; track++)
         {

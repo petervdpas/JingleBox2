@@ -5,7 +5,7 @@ using Avalonia.Controls;
 namespace JingleBox2.Views;
 
 /// <summary>
-/// The theme colours the pattern grid and its header draw with, resolved once per render.
+/// The theme colours a custom-drawn control paints with, resolved once per render.
 /// </summary>
 /// <remarks>
 /// Colours are looked up rather than brushes on purpose. The theme's brushes are declared as
@@ -13,12 +13,13 @@ namespace JingleBox2.Views;
 /// swap that indirection has not resolved yet, so the brush paints transparent. The Color
 /// keys are plain values with no indirection, so they are correct the moment they are read.
 /// </remarks>
-public readonly record struct PatternPalette(
+public readonly record struct ThemePalette(
     Color Text,
     Color Muted,
     Color Accent,
     Color Border,
-    Color Background)
+    Color Background,
+    Color Surface)
 {
     // Declared, not built from a variable, so the keys stay greppable.
     private const string TextKey = "Color.TextPrimary";
@@ -26,20 +27,23 @@ public readonly record struct PatternPalette(
     private const string AccentKey = "Color.Accent";
     private const string BorderKey = "Color.Border";
     private const string BackgroundKey = "Color.Background";
+    private const string SurfaceKey = "Color.Surface";
 
-    public static readonly PatternPalette Fallback = new(
+    public static readonly ThemePalette Fallback = new(
         Colors.Gainsboro,
         Color.FromRgb(0x6B, 0x72, 0x80),
         Color.FromRgb(0xFB, 0x8C, 0x00),
         Color.FromRgb(0x3A, 0x40, 0x46),
-        Colors.Black);
+        Colors.Black,
+        Color.FromRgb(0x1E, 0x1E, 0x1E));
 
-    public static PatternPalette From(StyledElement element) => new(
+    public static ThemePalette From(StyledElement element) => new(
         Resolve(element, TextKey, Fallback.Text),
         Resolve(element, MutedKey, Fallback.Muted),
         Resolve(element, AccentKey, Fallback.Accent),
         Resolve(element, BorderKey, Fallback.Border),
-        Resolve(element, BackgroundKey, Fallback.Background));
+        Resolve(element, BackgroundKey, Fallback.Background),
+        Resolve(element, SurfaceKey, Fallback.Surface));
 
     private static Color Resolve(StyledElement element, string key, Color fallback)
     {
@@ -60,6 +64,7 @@ public readonly record struct PatternPalette(
     public IBrush MutedBrush => new SolidColorBrush(Muted);
     public IBrush AccentBrush => new SolidColorBrush(Accent);
     public IBrush BorderBrush => new SolidColorBrush(Border);
+    public IBrush SurfaceBrush => new SolidColorBrush(Surface);
 
     public IBrush AccentTint(byte alpha) => new SolidColorBrush(Alpha(Accent, alpha));
 

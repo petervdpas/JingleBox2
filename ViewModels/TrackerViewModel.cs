@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
+using JingleBox2.Tracker.Synth;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -19,6 +20,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
+    private readonly SynthPresetStore _presets = new();
     private readonly ObservableCollection<Recording> _recordings;
 
     [ObservableProperty] private Song song;
@@ -48,6 +50,13 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string songName = "untitled";
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
+
+    /// <summary>The instrument open on the INSTRUMENTS page, or null when there is none.</summary>
+    [ObservableProperty] private InstrumentEditorViewModel? editor;
+
+    public ObservableCollection<SynthPreset> Presets { get; } = new();
+
+    [ObservableProperty] private SynthPreset? selectedPreset;
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
@@ -68,6 +77,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         RefreshOrder();
         RefreshSavedSongs();
+        RefreshPresets();
     }
 
     public double Bpm
@@ -126,6 +136,12 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
     public IRelayCommand<Recording> AddInstrumentCommand => new RelayCommand<Recording>(AddInstrument);
     public IRelayCommand RemoveInstrumentCommand => new RelayCommand(RemoveSelectedInstrument);
+    public IRelayCommand AddSynthInstrumentCommand => new RelayCommand(AddSynthInstrument);
+    public IRelayCommand TestInstrumentCommand => new RelayCommand(TestInstrument);
+    public IRelayCommand LoadPresetCommand => new RelayCommand(LoadPreset);
+    public IRelayCommand SavePresetCommand => new RelayCommand(SavePreset);
+    public IRelayCommand DeletePresetCommand => new RelayCommand(DeletePreset);
+    public IRelayCommand ResetPresetsCommand => new RelayCommand(ResetPresets);
 
     public bool HasInstruments => Instruments.Count > 0;
 
@@ -197,6 +213,8 @@ public sealed partial class TrackerViewModel : ObservableObject
         });
 
     partial void OnOrderIndexChanged(int value) => CurrentPattern = Song.PatternAt(value);
+
+    partial void OnSelectedInstrumentChanged(int value) => BuildEditor();
 
     partial void OnIsRecordingChanged(bool value) =>
         Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";
@@ -386,6 +404,154 @@ public sealed partial class TrackerViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Opens whichever instrument is selected. Rebuilt rather than repointed: a synth and a
+    /// sample are different pages, and the patch view model is tied to one patch object.
+    /// </summary>
+    private void BuildEditor()
+    {
+        var instrument = Song.InstrumentAt(SelectedInstrument);
+
+        Editor = instrument == null
+            ? null
+            : new InstrumentEditorViewModel(SelectedInstrument, instrument, OnInstrumentEdited);
+    }
+
+    /// <summary>
+    /// A field in the editor changed. The row in the list is refreshed in place: rebuilding the
+    /// collection here would replace the editor under the cursor on every keystroke.
+    /// </summary>
+    private void OnInstrumentEdited()
+    {
+        foreach (var slot in Instruments)
+        {
+            if (slot.Index == SelectedInstrument) slot.Refresh();
+        }
+    }
+
+    private void AddSynthInstrument()
+    {
+        var instrument = TrackerInstrument.CreateSynth(NextSynthName());
+
+        Song.Instruments.Add(instrument);
+        SyncInstruments();
+
+        SelectedInstrument = Song.Instruments.Count - 1;
+        BuildEditor();
+
+        Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
+    }
+
+    /// <summary>A name that is not in use yet, so two synths are never both called "synth 01".</summary>
+    private string NextSynthName()
+    {
+        for (int number = 1; ; number++)
+        {
+            string name = $"synth {number:00}";
+            if (!Song.Instruments.Any(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return name;
+        }
+    }
+
+    /// <summary>Sounds the selected instrument on its own, whatever the cursor is sitting on.</summary>
+    private void TestInstrument()
+    {
+        var instrument = Song.InstrumentAt(SelectedInstrument);
+        if (instrument == null)
+        {
+            Status = "No instrument to test.";
+            return;
+        }
+
+        _player.Preview(instrument, Note.FromOctave(0, Octave), 1f);
+        Status = $"Testing '{instrument.Name}'";
+    }
+
+    private void RefreshPresets()
+    {
+        string? keep = SelectedPreset?.Name;
+
+        Presets.Clear();
+        foreach (var preset in _presets.List())
+            Presets.Add(preset);
+
+        SelectedPreset = Presets.FirstOrDefault(p => p.Name == keep);
+    }
+
+    private void LoadPreset()
+    {
+        var preset = SelectedPreset;
+        var instrument = Song.InstrumentAt(SelectedInstrument);
+
+        if (preset == null || instrument == null || !instrument.IsSynth)
+        {
+            Status = "Pick a synth instrument and a preset first.";
+            return;
+        }
+
+        // Copied into the patch the instrument already owns, so nothing else has to be repointed.
+        instrument.Patch = preset.Patch.Clone();
+        BuildEditor();
+        OnInstrumentEdited();
+
+        Status = $"Loaded preset '{preset.Name}' into '{instrument.Name}'";
+    }
+
+    private void SavePreset()
+    {
+        var instrument = Song.InstrumentAt(SelectedInstrument);
+        if (instrument == null || !instrument.IsSynth)
+        {
+            Status = "Only a synth instrument can be saved as a preset.";
+            return;
+        }
+
+        try
+        {
+            string name = SynthPresetStore.SafeName(instrument.Name);
+            _presets.Save(name, instrument.Patch);
+
+            RefreshPresets();
+            SelectedPreset = Presets.FirstOrDefault(p => p.Name == name);
+            Status = $"Saved preset '{name}'";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Preset save failed: {ex.Message}";
+        }
+    }
+
+    private void DeletePreset()
+    {
+        var preset = SelectedPreset;
+        if (preset == null) return;
+
+        try
+        {
+            _presets.Delete(preset.Name);
+            RefreshPresets();
+            Status = $"Deleted preset '{preset.Name}'";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Preset delete failed: {ex.Message}";
+        }
+    }
+
+    private void ResetPresets()
+    {
+        try
+        {
+            _presets.ResetStarters();
+            RefreshPresets();
+            Status = "Starter presets restored";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Preset reset failed: {ex.Message}";
+        }
+    }
+
     private void AddInstrument(Recording? recording)
     {
         if (recording == null) return;
@@ -518,6 +684,9 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         // Rebuilding the list drops the selection; put it back where it was.
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
+
+        // The index may not have moved even though the instrument behind it did.
+        BuildEditor();
 
         OnPropertyChanged(nameof(HasInstruments));
     }

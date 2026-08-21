@@ -137,49 +137,14 @@
             <TextBlock Classes="cardHint"
                        Text="Drag an instrument onto a track, anywhere in its column, to put it there. An instrument sits on one track only: to use the same sample twice, add the recording again." />
 
-            <Button Content="Remove instrument" HorizontalAlignment="Stretch"
-                    Classes="danger"
-                    IsEnabled="{Binding HasInstruments}"
-                    Command="{Binding RemoveInstrumentCommand}" />
-
-            <TextBlock Classes="cardHint" Text="Add a recording as an instrument:" Margin="0,6,0,0" />
-            <ComboBox x:Name="RecordingPicker"
-                      ItemsSource="{Binding AvailableRecordings}"
-                      DisplayMemberBinding="{Binding Name}"
-                      HorizontalAlignment="Stretch" />
-            <Button Content="Add instrument" HorizontalAlignment="Stretch"
-                    Click="AddInstrument_Click" />
+            <TextBlock Classes="cardHint"
+                       Text="Add, edit and remove instruments on the INSTRUMENTS tab." />
           </StackPanel>
 
           <ListBox x:Name="InstrumentList"
                    ItemsSource="{Binding Instruments}"
-                   SelectedIndex="{Binding SelectedInstrument}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:InstrumentSlot">
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                  <TextBlock Grid.Column="0" Grid.RowSpan="2"
-                             Text="{Binding Number}"
-                             FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
-                             VerticalAlignment="Center"
-                             Opacity="0.7" />
-
-                  <TextBlock Grid.Column="1" Grid.Row="0"
-                             Text="{Binding Name}"
-                             TextTrimming="CharacterEllipsis" />
-
-                  <TextBlock Grid.Column="1" Grid.Row="1"
-                             Classes="cardHint"
-                             Text="{Binding BaseNoteText}" />
-
-                  <Border Grid.Column="2" Grid.Row="1"
-                          Classes="badge"
-                          IsVisible="{Binding HasTrack}">
-                    <TextBlock Text="{Binding TrackBadge}" />
-                  </Border>
-                </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+                   SelectedIndex="{Binding SelectedInstrument}"
+                   ItemTemplate="{StaticResource InstrumentRow}" />
         </DockPanel>
       </Border>
     </Grid>
