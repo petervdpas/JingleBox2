@@ -11,74 +11,78 @@ using System.Globalization;
 namespace JingleBox2.Views;
 
 /// <summary>
-/// A pot knob: drag up or down to turn it, with the label and the value underneath. Drawn
-/// rather than templated, because a dial is one ellipse, one line, and two pieces of text,
-/// and every one of them follows the theme's colours.
+/// A vertical fader, with its label above and its value below. The same shape as
+/// <see cref="Knob"/>, for the settings that read better as a throw than as a dial.
 /// </summary>
 /// <remarks>
-/// The turning maths lives in <see cref="KnobMath"/>. What is left here is input handling and
-/// painting, the same split the pattern grid uses.
+/// Pressing the cap picks it up where it is; pressing anywhere else on the track sends it
+/// there first, which is what a mixer fader does. Holding shift switches to a fine drag
+/// measured from the press, for the last few units.
 /// </remarks>
-public class Knob : Control
+public class Fader : Control
 {
-    /// <summary>Gap between the dial and the label, and between the label and the value.</summary>
-    private const double TextGap = 2;
+    private const double GrooveWidth = 5;
+    private const double CapWidth = 22;
+    private const double CapHeight = 11;
+    private const double TextGap = 4;
 
     private const double LabelFontSize = 11;
     private const double ValueFontSize = 11.5;
 
     public static readonly StyledProperty<double> ValueProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(Value), defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<Fader, double>(nameof(Value), defaultBindingMode: BindingMode.TwoWay);
 
     public static readonly StyledProperty<double> MinimumProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(Minimum));
+        AvaloniaProperty.Register<Fader, double>(nameof(Minimum));
 
     public static readonly StyledProperty<double> MaximumProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(Maximum), 1.0);
+        AvaloniaProperty.Register<Fader, double>(nameof(Maximum), 1.0);
 
     /// <summary>The grid the value snaps to, and one press of an arrow key.</summary>
     public static readonly StyledProperty<double> SmallStepProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(SmallStep), 0.01);
+        AvaloniaProperty.Register<Fader, double>(nameof(SmallStep), 0.01);
 
     /// <summary>One press with shift held.</summary>
     public static readonly StyledProperty<double> LargeStepProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(LargeStep), 0.1);
+        AvaloniaProperty.Register<Fader, double>(nameof(LargeStep), 0.1);
 
     public static readonly StyledProperty<string> LabelProperty =
-        AvaloniaProperty.Register<Knob, string>(nameof(Label), "");
+        AvaloniaProperty.Register<Fader, string>(nameof(Label), "");
 
-    /// <summary>Written straight after the number, as in "5.0Hz".</summary>
+    /// <summary>Written straight after the number, as in "80ms".</summary>
     public static readonly StyledProperty<string> UnitProperty =
-        AvaloniaProperty.Register<Knob, string>(nameof(Unit), "");
+        AvaloniaProperty.Register<Fader, string>(nameof(Unit), "");
 
     public static readonly StyledProperty<string> FormatProperty =
-        AvaloniaProperty.Register<Knob, string>(nameof(Format), "0.00");
+        AvaloniaProperty.Register<Fader, string>(nameof(Format), "0.00");
 
-    public static readonly StyledProperty<double> DialSizeProperty =
-        AvaloniaProperty.Register<Knob, double>(nameof(DialSize), 34.0);
+    /// <summary>How long the throw is. Longer means finer control for the same range.</summary>
+    public static readonly StyledProperty<double> TrackLengthProperty =
+        AvaloniaProperty.Register<Fader, double>(nameof(TrackLength), 110.0);
 
-    /// <summary>Where a double click puts the knob back to. Nothing happens when it is not set.</summary>
+    /// <summary>Where a double click puts the fader back to. Nothing happens when it is not set.</summary>
     public static readonly StyledProperty<double?> DefaultValueProperty =
-        AvaloniaProperty.Register<Knob, double?>(nameof(DefaultValue));
+        AvaloniaProperty.Register<Fader, double?>(nameof(DefaultValue));
 
-    /// <summary>One cursor for every knob: each instance would otherwise hold a platform handle.</summary>
     private static readonly Cursor DragCursor = new(StandardCursorType.SizeNorthSouth);
 
     private bool _dragging;
+    private bool _fineDrag;
+    private double _grabOffset;
     private double _dragStartY;
     private double _dragStartValue;
     private bool _hovered;
 
-    static Knob()
+    static Fader()
     {
-        AffectsRender<Knob>(
+        AffectsRender<Fader>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
-            UnitProperty, FormatProperty, DialSizeProperty);
+            UnitProperty, FormatProperty, TrackLengthProperty);
 
-        AffectsMeasure<Knob>(LabelProperty, UnitProperty, FormatProperty, DialSizeProperty);
+        AffectsMeasure<Fader>(LabelProperty, UnitProperty, FormatProperty, TrackLengthProperty);
     }
 
-    public Knob()
+    public Fader()
     {
         Focusable = true;
         Cursor = DragCursor;
@@ -132,10 +136,10 @@ public class Knob : Control
         set => SetValue(FormatProperty, value);
     }
 
-    public double DialSize
+    public double TrackLength
     {
-        get => GetValue(DialSizeProperty);
-        set => SetValue(DialSizeProperty, value);
+        get => GetValue(TrackLengthProperty);
+        set => SetValue(TrackLengthProperty, value);
     }
 
     public double? DefaultValue
@@ -151,8 +155,8 @@ public class Knob : Control
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
-        double width = Math.Max(DialSize, Math.Max(label.Width, value.Width));
-        double height = DialSize + TextGap + label.Height + TextGap + value.Height;
+        double width = Math.Max(CapWidth, Math.Max(label.Width, value.Width));
+        double height = label.Height + TextGap + TrackLength + CapHeight + TextGap + value.Height;
 
         return new Size(width, height);
     }
@@ -161,62 +165,67 @@ public class Knob : Control
     {
         var palette = ThemePalette.From(this);
 
-        double radius = Math.Max(4, DialSize / 2 - 1);
-        double centerX = Bounds.Width / 2;
-        double centerY = radius + 1;
+        var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush);
+        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, palette.TextBrush);
 
-        DrawDial(context, palette, centerX, centerY, radius);
-        DrawText(context, palette, centerY + radius + 1);
+        context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, 0));
+
+        double trackTop = TrackTop(label.Height);
+        DrawTrack(context, palette, trackTop);
+
+        context.DrawText(value, new Point(
+            (Bounds.Width - value.Width) / 2,
+            trackTop + TrackLength + CapHeight / 2 + TextGap));
     }
 
-    private void DrawDial(DrawingContext context, ThemePalette palette, double centerX, double centerY, double radius)
+    private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop)
     {
-        var center = new Point(centerX, centerY);
+        double centerX = Bounds.Width / 2;
+        double capY = FaderMath.CapCenterY(Value, trackTop, TrackLength, Minimum, Maximum);
 
-        // The face is lit from above, the way a real pot catches the light.
+        // The groove, then the travelled part of it. Both rounded, so the ends do not look cut.
+        var groove = new Rect(centerX - GrooveWidth / 2, trackTop, GrooveWidth, TrackLength);
+        context.DrawRectangle(palette.BorderBrush, null, new RoundedRect(groove, GrooveWidth / 2));
+
+        if (capY < trackTop + TrackLength)
+        {
+            var travelled = new Rect(groove.X, capY, GrooveWidth, trackTop + TrackLength - capY);
+            context.DrawRectangle(palette.AccentTint(190), null, new RoundedRect(travelled, GrooveWidth / 2));
+        }
+
+        var cap = CapRect(capY);
         var face = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
             EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Lighten(palette.Surface, 0.14), 0),
+                new GradientStop(Lighten(palette.Surface, 0.16), 0),
                 new GradientStop(palette.Background, 1)
             }
         };
 
         var rim = IsFocused || _hovered ? palette.Accent : palette.Border;
-        context.DrawEllipse(face, new Pen(new SolidColorBrush(rim), IsFocused ? 1.6 : 1), center, radius, radius);
+        context.DrawRectangle(face, new Pen(new SolidColorBrush(rim), IsFocused ? 1.6 : 1),
+            new RoundedRect(cap, 3));
 
-        // The travel the pointer sweeps, so the ends of the range are visible when it is not there.
-        DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees);
-        DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees + KnobMath.SweepDegrees);
-
-        double angle = KnobMath.AngleFor(Value, Minimum, Maximum);
-        var (innerX, innerY) = KnobMath.PointAt(centerX, centerY, radius * 0.15, angle);
-        var (outerX, outerY) = KnobMath.PointAt(centerX, centerY, radius * 0.82, angle);
-
-        var pointer = new Pen(palette.AccentBrush, 2, lineCap: PenLineCap.Round);
-        context.DrawLine(pointer, new Point(innerX, innerY), new Point(outerX, outerY));
+        // The grip line across the middle of the cap, which is what the eye reads the value off.
+        context.DrawLine(
+            new Pen(palette.AccentBrush, 1.5),
+            new Point(cap.X + 4, capY),
+            new Point(cap.Right - 4, capY));
     }
 
-    /// <summary>A short mark just outside the dial, at one end of the sweep.</summary>
-    private static void DrawTick(DrawingContext context, IBrush brush, Point center, double radius, double angleDegrees)
+    private Rect CapRect(double capY) =>
+        new(Bounds.Width / 2 - CapWidth / 2, capY - CapHeight / 2, CapWidth, CapHeight);
+
+    /// <summary>The label sits above the track, so the track starts under whatever it measures.</summary>
+    private double TrackTop(double labelHeight) => labelHeight + TextGap + CapHeight / 2;
+
+    private double CurrentTrackTop()
     {
-        var (x1, y1) = KnobMath.PointAt(center.X, center.Y, radius + 1, angleDegrees);
-        var (x2, y2) = KnobMath.PointAt(center.X, center.Y, radius + 3.5, angleDegrees);
-
-        context.DrawLine(new Pen(brush, 1), new Point(x1, y1), new Point(x2, y2));
-    }
-
-    private void DrawText(DrawingContext context, ThemePalette palette, double top)
-    {
-        var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush);
-        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, palette.TextBrush);
-
-        double labelY = top + TextGap;
-        context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, labelY));
-        context.DrawText(value, new Point((Bounds.Width - value.Width) / 2, labelY + label.Height + TextGap));
+        var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
+        return TrackTop(label.Height);
     }
 
     private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush) =>
@@ -249,8 +258,24 @@ public class Knob : Control
 
         Focus();
 
+        double y = e.GetPosition(this).Y;
+        double trackTop = CurrentTrackTop();
+        double capY = FaderMath.CapCenterY(Value, trackTop, TrackLength, Minimum, Maximum);
+
+        // On the cap: pick it up where it is. Anywhere else: send it there first.
+        if (CapRect(capY).Contains(new Point(Bounds.Width / 2, y)))
+        {
+            _grabOffset = y - capY;
+        }
+        else
+        {
+            _grabOffset = 0;
+            Value = FaderMath.ValueAt(y, trackTop, TrackLength, Minimum, Maximum, SmallStep);
+        }
+
         _dragging = true;
-        _dragStartY = e.GetPosition(this).Y;
+        _fineDrag = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        _dragStartY = y;
         _dragStartValue = Value;
 
         e.Pointer.Capture(this);
@@ -263,13 +288,14 @@ public class Knob : Control
 
         if (!_dragging) return;
 
-        // Measured from where the drag started, so going down and back up returns the value
-        // it began with instead of drifting.
-        double draggedUp = _dragStartY - e.GetPosition(this).Y;
+        double y = e.GetPosition(this).Y;
 
-        Value = RangeValue.FromDrag(
-            _dragStartValue, draggedUp, Minimum, Maximum, SmallStep,
-            KnobMath.DragPixelsForFullRange, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+        // Shift trades the cap following the pointer for a quarter-speed drag from the press.
+        bool fine = _fineDrag || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+        Value = fine
+            ? RangeValue.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, TrackLength, fine: true)
+            : FaderMath.ValueAt(y - _grabOffset, CurrentTrackTop(), TrackLength, Minimum, Maximum, SmallStep);
 
         e.Handled = true;
     }
@@ -281,13 +307,14 @@ public class Knob : Control
         if (!_dragging) return;
 
         _dragging = false;
+        _fineDrag = false;
         e.Pointer.Capture(null);
         e.Handled = true;
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
-        // Deliberately not calling the base: over a knob the wheel turns it rather than
+        // Deliberately not calling the base: over a fader the wheel moves it rather than
         // scrolling the panel it sits in.
         StepBy(Math.Sign(e.Delta.Y), e.KeyModifiers);
         e.Handled = true;
@@ -310,11 +337,11 @@ public class Knob : Control
                 break;
 
             case Key.Home:
-                Value = RangeValue.Quantize(Minimum, Minimum, Maximum, SmallStep);
+                Value = RangeValue.Quantize(Maximum, Minimum, Maximum, SmallStep);
                 break;
 
             case Key.End:
-                Value = RangeValue.Quantize(Maximum, Minimum, Maximum, SmallStep);
+                Value = RangeValue.Quantize(Minimum, Minimum, Maximum, SmallStep);
                 break;
 
             default:
@@ -324,7 +351,7 @@ public class Knob : Control
         e.Handled = true;
     }
 
-    /// <summary>Double click puts a knob back where it started, the way a pot has a detent.</summary>
+    /// <summary>Double click puts a fader back where it started.</summary>
     protected override void OnDoubleTapped(TappedEventArgs e)
     {
         base.OnDoubleTapped(e);

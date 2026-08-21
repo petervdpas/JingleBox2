@@ -53,7 +53,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
 - `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters
-- `Knob` / `NumberField` (Views/): The app's own numeric controls; a pot knob and a compact stepper field
+- `Knob` / `Fader` / `NumberField` (Views/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field
 - `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)

@@ -73,8 +73,11 @@
                 <TextBlock Grid.Column="2" Classes="field" Text="{Binding Editor.BaseNoteText}" />
               </Grid>
 
-              <TextBlock Classes="field" Text="{Binding Editor.VolumeText}" />
-              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Volume}" />
+              <views:Fader HorizontalAlignment="Left"
+                           Label="Level" Format="0.00" DefaultValue="1"
+                           Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                           TrackLength="90"
+                           Value="{Binding Editor.Volume}" />
 
               <CheckBox Content="Loop" IsChecked="{Binding Editor.Loop}" />
             </StackPanel>
@@ -113,17 +116,23 @@
 
               <TextBlock Classes="section" Text="Envelope" />
 
-              <TextBlock Classes="field" Text="{Binding Editor.Patch.AttackText}" />
-              <Slider Minimum="0" Maximum="2000" Value="{Binding Editor.Patch.AttackMs}" />
+              <StackPanel Orientation="Horizontal" Spacing="16">
+                <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
+                             Minimum="0" Maximum="2000" SmallStep="1" LargeStep="25"
+                             Value="{Binding Editor.Patch.AttackMs}" />
 
-              <TextBlock Classes="field" Text="{Binding Editor.Patch.DecayText}" />
-              <Slider Minimum="0" Maximum="5000" Value="{Binding Editor.Patch.DecayMs}" />
+                <views:Fader Label="Decay" Unit="ms" Format="0" DefaultValue="40"
+                             Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
+                             Value="{Binding Editor.Patch.DecayMs}" />
 
-              <TextBlock Classes="field" Text="{Binding Editor.Patch.SustainText}" />
-              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Patch.Sustain}" />
+                <views:Fader Label="Sustain" Format="0.00" DefaultValue="0.6"
+                             Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                             Value="{Binding Editor.Patch.Sustain}" />
 
-              <TextBlock Classes="field" Text="{Binding Editor.Patch.ReleaseText}" />
-              <Slider Minimum="0" Maximum="5000" Value="{Binding Editor.Patch.ReleaseMs}" />
+                <views:Fader Label="Release" Unit="ms" Format="0" DefaultValue="80"
+                             Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
+                             Value="{Binding Editor.Patch.ReleaseMs}" />
+              </StackPanel>
 
               <TextBlock Classes="section" Text="Modulation" />
 
@@ -154,10 +163,13 @@
               </WrapPanel>
 
               <TextBlock Classes="cardHint"
-                         Text="Drag a knob up or down to turn it. The wheel and the arrow keys step it, shift goes further, and a double click puts it back." />
+                         Text="Drag a knob or a fader to move it. The wheel and the arrow keys step it, shift is finer, and a double click puts it back." />
 
-              <TextBlock Classes="field" Text="{Binding Editor.VolumeText}" />
-              <Slider Minimum="0" Maximum="1" Value="{Binding Editor.Volume}" />
+              <views:Fader HorizontalAlignment="Left"
+                           Label="Level" Format="0.00" DefaultValue="1"
+                           Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                           TrackLength="90"
+                           Value="{Binding Editor.Volume}" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" VerticalAlignment="Center">

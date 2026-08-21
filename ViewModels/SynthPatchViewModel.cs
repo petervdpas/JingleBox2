@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker.Synth;
 using System;
-using System.Globalization;
 
 namespace JingleBox2.ViewModels;
 
@@ -45,35 +44,35 @@ public sealed class SynthPatchViewModel : ObservableObject
     {
         get => _patch.Duty;
         set => Set(v => _patch.Duty = v, _patch.Duty, value, SynthPatch.MinDuty, SynthPatch.MaxDuty,
-            nameof(Duty), nameof(DutyText));
+            nameof(Duty));
     }
 
     public double AttackMs
     {
         get => _patch.AttackMs;
         set => Set(v => _patch.AttackMs = v, _patch.AttackMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxAttackMs,
-            nameof(AttackMs), nameof(AttackText));
+            nameof(AttackMs));
     }
 
     public double DecayMs
     {
         get => _patch.DecayMs;
         set => Set(v => _patch.DecayMs = v, _patch.DecayMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxDecayMs,
-            nameof(DecayMs), nameof(DecayText));
+            nameof(DecayMs));
     }
 
     public double Sustain
     {
         get => _patch.Sustain;
         set => Set(v => _patch.Sustain = v, _patch.Sustain, value, SynthPatch.MinSustain, SynthPatch.MaxSustain,
-            nameof(Sustain), nameof(SustainText));
+            nameof(Sustain));
     }
 
     public double ReleaseMs
     {
         get => _patch.ReleaseMs;
         set => Set(v => _patch.ReleaseMs = v, _patch.ReleaseMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxReleaseMs,
-            nameof(ReleaseMs), nameof(ReleaseText));
+            nameof(ReleaseMs));
     }
 
     public double VibratoRateHz
@@ -118,17 +117,8 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, nameof(PitchEnvMs));
     }
 
-    public string AttackText => Ms("Attack", _patch.AttackMs);
-    public string DecayText => Ms("Decay", _patch.DecayMs);
-    public string ReleaseText => Ms("Release", _patch.ReleaseMs);
-    public string SustainText => "Sustain " + _patch.Sustain.ToString("0.00", CultureInfo.InvariantCulture);
-    public string DutyText => "Duty " + _patch.Duty.ToString("0.00", CultureInfo.InvariantCulture);
-
     /// <summary>Called after a preset lands on top of the patch: every value may have moved.</summary>
     public void RefreshAll() => OnPropertyChanged(string.Empty);
-
-    private static string Ms(string label, double value) =>
-        label + " " + value.ToString("0", CultureInfo.InvariantCulture) + "ms";
 
     private void Set(Action<double> assign, double current, double value, double min, double max, params string[] changed)
     {

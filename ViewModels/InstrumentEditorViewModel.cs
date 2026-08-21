@@ -65,12 +65,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
             _instrument.Volume = clamped;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(VolumeText));
             _changed();
         }
     }
-
-    public string VolumeText => "Level " + _instrument.Volume.ToString("0.00", CultureInfo.InvariantCulture);
 
     /// <summary>The pitch the file sounds at, which every other note is measured against.</summary>
     public double BaseNoteSemitone
