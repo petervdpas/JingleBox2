@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -31,17 +30,13 @@ public sealed class PatternHeader : Control
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(RowHeight), 18);
 
-    public static readonly StyledProperty<IList<string>?> TrackLabelsProperty =
-        AvaloniaProperty.Register<PatternHeader, IList<string>?>(nameof(TrackLabels));
-
     public static readonly StyledProperty<int> DropTargetTrackProperty =
         AvaloniaProperty.Register<PatternHeader, int>(nameof(DropTargetTrack), -1);
 
     static PatternHeader()
     {
         AffectsRender<PatternHeader>(TrackCountProperty, SelectedTrackProperty,
-            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty,
-            TrackLabelsProperty, DropTargetTrackProperty);
+            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty, DropTargetTrackProperty);
         AffectsMeasure<PatternHeader>(RowHeightProperty);
     }
 
@@ -75,13 +70,6 @@ public sealed class PatternHeader : Control
     {
         get => GetValue(RowHeightProperty);
         set => SetValue(RowHeightProperty, value);
-    }
-
-    /// <summary>What each header reads. Falls back to a plain track number when not supplied.</summary>
-    public IList<string>? TrackLabels
-    {
-        get => GetValue(TrackLabelsProperty);
-        set => SetValue(TrackLabelsProperty, value);
     }
 
     /// <summary>The track a drag is currently hovering, or -1. Drawn as a drop outline.</summary>
@@ -142,9 +130,7 @@ public sealed class PatternHeader : Control
             context.FillRectangle(dropTarget ? palette.AccentTint(90) : selected ? selectedFill : idleFill, area, 3);
             context.DrawRectangle(dropTarget ? dropPen : selected ? selectedPen : idlePen, area, 3);
 
-            string label = track < (TrackLabels?.Count ?? 0)
-                ? TrackLabels![track]
-                : "Track " + (track + 1).ToString("00", CultureInfo.InvariantCulture);
+            string label = "Track " + (track + 1).ToString("00", CultureInfo.InvariantCulture);
             var formatted = new FormattedText(label, CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight, typeface, fontSize, selected || dropTarget ? text : muted)
             {

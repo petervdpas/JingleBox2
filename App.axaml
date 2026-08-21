@@ -63,6 +63,28 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <!-- A small corner tag, for marking a list item with where something is assigned. -->
+        <Style Selector="Border.badge">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.22" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.55" />
+            </Setter>
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="5,1" />
+            <Setter Property="VerticalAlignment" Value="Bottom" />
+        </Style>
+        <Style Selector="Border.badge > TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
+            </Setter>
+        </Style>
+
         <!-- The spinner buttons take a fixed slice of a NumericUpDown, so a field sized by
              its digits alone clips the value. These give the text room and contrast. -->
         <Style Selector="NumericUpDown.tracker">

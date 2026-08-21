@@ -47,9 +47,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string songName = "untitled";
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
-
-    /// <summary>What each track header shows: its number and the instrument it defaults to.</summary>
-    public ObservableCollection<string> TrackLabels { get; } = new();
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
@@ -69,7 +66,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         _player.Stopped += OnPlayerStopped;
 
         RefreshOrder();
-        RefreshTrackLabels();
         RefreshSavedSongs();
     }
 
@@ -286,7 +282,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         var displaced = Song.InstrumentAt(Song.GetTrackInstrument(track));
 
         Song.SetTrackInstrument(track, instrument);
-        RefreshTrackLabels();
         SyncInstruments();
 
         // An instrument lives on one track, so say what moved and what was pushed off.
@@ -304,7 +299,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     public void ClearTrackInstrument(int track)
     {
         Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
-        RefreshTrackLabels();
         SyncInstruments();
         Status = $"Track {track + 1:00} has no instrument";
     }
@@ -317,19 +311,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         int assigned = Song.GetTrackInstrument(track);
         return assigned == TrackerCell.NoInstrument ? SelectedInstrument : assigned;
-    }
-
-    private void RefreshTrackLabels()
-    {
-        TrackLabels.Clear();
-
-        for (int track = 0; track < Song.TrackCount; track++)
-        {
-            string number = "Track " + (track + 1).ToString("00");
-            var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
-
-            TrackLabels.Add(instrument == null ? number : number + "  " + instrument.Name);
-        }
     }
 
     private void StepDown()
@@ -364,7 +345,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
-        RefreshTrackLabels();
+        SyncInstruments();
 
         // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
@@ -393,7 +374,6 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.Instruments.Add(instrument);
         SyncInstruments();
-        RefreshTrackLabels();
 
         SelectedInstrument = Song.Instruments.Count - 1;
         Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
@@ -409,7 +389,6 @@ public sealed partial class TrackerViewModel : ObservableObject
         if (!Song.RemoveInstrumentAt(index)) return;
 
         SyncInstruments();
-        RefreshTrackLabels();
         SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
         Status = $"Removed '{instrument.Name}'";
     }
@@ -496,7 +475,6 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         SyncInstruments();
         RefreshOrder();
-        RefreshTrackLabels();
 
         // The tempo and track count live on the song, so the whole transport bar is stale.
         OnPropertyChanged(nameof(Bpm));

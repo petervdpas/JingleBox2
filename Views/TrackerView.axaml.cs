@@ -26,7 +26,6 @@ public partial class TrackerView : UserControl
         // The header sits outside the scroll area, so it has to be told how far the pattern
         // has scrolled sideways and what character width the grid settled on.
         Header.TrackClicked += (_, track) => SelectTrack(track);
-        Header.TrackLabels = null; // set from the view model once the DataContext arrives
 
         SetUpInstrumentDragAndDrop();
         GridScroll.GetObservable(ScrollViewer.OffsetProperty)

@@ -29,9 +29,10 @@ public sealed partial class InstrumentSlot : ObservableObject
 
     public bool HasTrack => Track >= 0;
 
-    public string TrackText => HasTrack
-        ? "Track " + (Track + 1).ToString("00", CultureInfo.InvariantCulture)
-        : "not on a track";
+    /// <summary>Short form for the corner badge. Two digits covers every track a song can have.</summary>
+    public string TrackBadge => HasTrack
+        ? "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture)
+        : "";
 
     public override string ToString() => $"{Number}  {Name}";
 }
