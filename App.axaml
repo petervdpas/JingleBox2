@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:JingleBox2.Converters"
+             xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.App"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -63,6 +64,20 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <!-- The stepper buttons inside a NumberField: as small as a glyph allows. -->
+        <Style Selector="RepeatButton.stepper">
+            <Setter Property="FontSize" Value="6" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="0,0,0,1" />
+        </Style>
+
         <!-- A small corner tag, for marking a list item with where something is assigned. -->
         <Style Selector="Border.badge">
             <Setter Property="Background">
@@ -85,21 +100,8 @@
             </Setter>
         </Style>
 
-        <!-- The spinner buttons take a fixed slice of a NumericUpDown, so a field sized by
-             its digits alone clips the value. These give the text room and contrast. -->
-        <Style Selector="NumericUpDown.tracker">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="Foreground">
-                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
-            </Setter>
-        </Style>
-        <Style Selector="NumericUpDown.tracker /template/ TextBox">
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Foreground">
-                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
-            </Setter>
-        </Style>
+        <!-- Compact value fields: no spinner buttons, so the field is only as wide as the
+             number it holds. Scroll or arrow to change it. -->
 
         <!-- Transport glyphs need size and weight of their own: at the default button
              metrics they render as small, low-contrast marks. -->
@@ -141,6 +143,42 @@
     </Application.Styles>
 
     <Application.Resources>
+
+        <!-- A number field with its own compact stepper: two buttons stacked in the height of
+             the input, rather than the full-size pair a NumericUpDown reserves room for. -->
+        <ControlTheme x:Key="{x:Type views:NumberField}" TargetType="views:NumberField">
+            <Setter Property="Height" Value="30" />
+            <Setter Property="FontSize" Value="13" />
+
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Name="PART_TextBox"
+                                 Grid.Column="0"
+                                 Text="{TemplateBinding Text}"
+                                 FontSize="{TemplateBinding FontSize}"
+                                 MinWidth="0"
+                                 MinHeight="0"
+                                 Height="30"
+                                 Padding="4,0"
+                                 TextAlignment="Center"
+                                 VerticalContentAlignment="Center" />
+
+                        <Grid Grid.Column="1" RowDefinitions="*,*" Margin="2,0,0,0" Width="16">
+                            <RepeatButton Name="PART_Up"
+                                          Grid.Row="0"
+                                          Classes="stepper"
+                                          Content="▲" />
+                            <RepeatButton Name="PART_Down"
+                                          Grid.Row="1"
+                                          Classes="stepper"
+                                          Content="▼" />
+                        </Grid>
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </ControlTheme>
+
         <conv:NullToUnsetConverter x:Key="NullToUnset" />
         <conv:IsSelectedColorConverter x:Key="IsSelectedColor" />
         <conv:SelectedSwatchSizeConverter x:Key="SelectedSwatchSize" />

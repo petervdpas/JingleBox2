@@ -41,25 +41,26 @@
                   Margin="6,0,0,0" />
 
         <TextBlock Classes="field" Text="BPM" Margin="12,0,0,0" />
-        <NumericUpDown Classes="tracker" Value="{Binding Bpm}"
-                       Minimum="20" Maximum="400" FormatString="0" Width="136" />
+        <views:NumberField Value="{Binding Bpm}"
+                           Minimum="20" Maximum="400" SmallStep="1" LargeStep="10" Width="76"
+                           ToolTip.Tip="Scroll or use the arrow keys. Hold Shift for larger steps." />
 
         <TextBlock Classes="field" Text="LPB" />
-        <NumericUpDown Classes="tracker" Value="{Binding LinesPerBeat}"
-                       Minimum="1" Maximum="16" FormatString="0" Width="112" />
+        <views:NumberField Value="{Binding LinesPerBeat}"
+                           Minimum="1" Maximum="16" Width="62" />
 
         <TextBlock Classes="field" Text="Step" />
-        <NumericUpDown Classes="tracker" Value="{Binding EditStep}"
-                       Minimum="0" Maximum="16" FormatString="0" Width="112" />
+        <views:NumberField Value="{Binding EditStep}"
+                           Minimum="0" Maximum="16" Width="62" />
 
         <TextBlock Classes="field" Text="Oct" />
-        <NumericUpDown Classes="tracker" Value="{Binding Octave}"
-                       Minimum="0" Maximum="9" FormatString="0" Width="104" />
+        <views:NumberField Value="{Binding Octave}"
+                           Minimum="0" Maximum="9" Width="62" />
 
         <TextBlock Classes="field" Text="Tracks" Margin="12,0,0,0" />
-        <Button Content="-" Command="{Binding RemoveTrackCommand}" />
-        <TextBlock Classes="field" Text="{Binding TrackCount}" />
-        <Button Content="+" Command="{Binding AddTrackCommand}" />
+        <views:NumberField Value="{Binding TrackCount}"
+                           Minimum="{Binding MinTrackCount}" Maximum="{Binding MaxTrackCount}"
+                           Width="62" />
       </StackPanel>
     </Border>
 

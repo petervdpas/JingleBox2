@@ -39,7 +39,8 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Typed notes are written into the pattern only while this is on.</summary>
     [ObservableProperty] private bool isRecording;
 
-    [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Song;
+    /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
+    [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
     [ObservableProperty] private int octave = 4;
     [ObservableProperty] private int selectedInstrument;
     [ObservableProperty] private int editStep = 1;
@@ -91,7 +92,14 @@ public sealed partial class TrackerViewModel : ObservableObject
         }
     }
 
-    public int TrackCount => Song.TrackCount;
+    public int TrackCount
+    {
+        get => Song.TrackCount;
+        set => SetTrackCount(value);
+    }
+
+    public int MinTrackCount => Song.MinTrackCount;
+    public int MaxTrackCount => Song.MaxTrackCount;
 
     /// <summary>The track the cursor is in, for the header to pick out.</summary>
     public int SelectedTrack => Cursor.Track;
@@ -104,7 +112,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     public bool CanPause => Transport == TrackerTransportState.Playing;
 
     /// <summary>The two things the play button can walk through.</summary>
-    public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Song, TrackerPlayMode.Pattern };
+    public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Pattern, TrackerPlayMode.Song };
 
     public IRelayCommand PlayCommand => new RelayCommand(Play);
     public IRelayCommand PauseCommand => new RelayCommand(Pause);
@@ -112,8 +120,6 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IRelayCommand ToggleRecordCommand => new RelayCommand(() => IsRecording = !IsRecording);
     public IRelayCommand AddPatternCommand => new RelayCommand(AddPattern);
     public IRelayCommand RemoveOrderEntryCommand => new RelayCommand(RemoveOrderEntry);
-    public IRelayCommand AddTrackCommand => new RelayCommand(() => SetTrackCount(Song.TrackCount + 1));
-    public IRelayCommand RemoveTrackCommand => new RelayCommand(() => SetTrackCount(Song.TrackCount - 1));
     public IRelayCommand SaveCommand => new RelayCommand(Save);
     public IRelayCommand LoadCommand => new RelayCommand(Load);
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);

@@ -12,7 +12,10 @@ namespace JingleBox2.Tracker;
 public sealed class Song
 {
     public const int MinTrackCount = 1;
-    public const int MaxTrackCount = 16;
+
+    /// <summary>Two digits is as wide as the track badges and headers are built for.</summary>
+    public const int MaxTrackCount = 32;
+
     public const int DefaultTrackCount = 4;
 
     public string Name { get; set; } = "untitled";
