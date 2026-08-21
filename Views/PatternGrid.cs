@@ -30,10 +30,13 @@ public sealed class PatternGrid : Control
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternGrid, double>(nameof(RowHeight), 18);
 
+    public static readonly StyledProperty<int> DropTargetTrackProperty =
+        AvaloniaProperty.Register<PatternGrid, int>(nameof(DropTargetTrack), -1);
+
     static PatternGrid()
     {
         AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty, PlayingLineProperty,
-            LinesPerBeatProperty, RowHeightProperty);
+            LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty);
         AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty);
         FocusableProperty.OverrideDefaultValue<PatternGrid>(true);
     }
@@ -69,8 +72,27 @@ public sealed class PatternGrid : Control
         set => SetValue(RowHeightProperty, value);
     }
 
+    /// <summary>The track a drag is hovering, or -1. Drawn as a drop outline down the column.</summary>
+    public int DropTargetTrack
+    {
+        get => GetValue(DropTargetTrackProperty);
+        set => SetValue(DropTargetTrackProperty, value);
+    }
+
     /// <summary>Raised when a click moves the cursor, so the view model can follow.</summary>
     public event EventHandler<PatternCursor>? CursorMoved;
+
+    /// <summary>The track under a point, or -1 for the line number gutter and empty space.</summary>
+    public int TrackAtPoint(Point point)
+    {
+        var pattern = Pattern;
+        if (pattern == null) return -1;
+
+        var metrics = Metrics;
+        if (point.X < metrics.GutterWidth || point.X > metrics.ContentWidth) return -1;
+
+        return metrics.TrackAt(point.X);
+    }
 
     private double _charWidth = 8;
     private double _fontSize = 13;
@@ -213,6 +235,7 @@ public sealed class PatternGrid : Control
         }
 
         DrawTrackSeparators(context, metrics, palette, pattern.TrackCount, contentHeight);
+        DrawDropTarget(context, metrics, palette, contentHeight);
         DrawCursor(context, metrics, palette, cursor);
     }
 
@@ -242,6 +265,19 @@ public sealed class PatternGrid : Control
             double x = Math.Round(metrics.TrackDividerX(track)) - 0.5;
             context.DrawLine(pen, new Point(x, 0), new Point(x, height));
         }
+    }
+
+    /// <summary>The column a dragged instrument would land on.</summary>
+    private void DrawDropTarget(DrawingContext context, PatternMetrics metrics,
+        PatternPalette palette, double height)
+    {
+        int track = DropTargetTrack;
+        if (track < 0 || track >= (Pattern?.TrackCount ?? 0)) return;
+
+        var area = new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height);
+
+        context.FillRectangle(palette.AccentTint(40), area);
+        context.DrawRectangle(new Pen(palette.AccentBrush, 2), area);
     }
 
     private void DrawCursor(DrawingContext context, PatternMetrics metrics,

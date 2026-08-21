@@ -28,6 +28,13 @@ public sealed class Song
 
     public List<TrackerInstrument> Instruments { get; set; } = new();
 
+    /// <summary>
+    /// Which instrument each track holds, by index, or -1 for none. The mapping is one to one
+    /// in both directions: an instrument sits on a single track, and a track holds a single
+    /// instrument. To play one sample on two tracks, add the recording twice.
+    /// </summary>
+    public List<int> TrackInstruments { get; set; } = new();
+
     [JsonIgnore]
     public TrackerTiming Timing => new(Bpm, LinesPerBeat);
 
@@ -49,6 +56,60 @@ public sealed class Song
 
     public TrackerInstrument? InstrumentAt(int index) =>
         index >= 0 && index < Instruments.Count ? Instruments[index] : null;
+
+    /// <summary>The instrument a track defaults to, or <see cref="TrackerCell.NoInstrument"/>.</summary>
+    public int GetTrackInstrument(int track)
+    {
+        if (track < 0 || track >= TrackInstruments.Count) return TrackerCell.NoInstrument;
+
+        int index = TrackInstruments[track];
+        return index >= 0 && index < Instruments.Count ? index : TrackerCell.NoInstrument;
+    }
+
+    /// <summary>The track an instrument sits on, or -1 when it is not on one.</summary>
+    public int GetInstrumentTrack(int instrument)
+    {
+        if (instrument < 0 || instrument >= Instruments.Count) return -1;
+
+        for (int track = 0; track < TrackInstruments.Count && track < TrackCount; track++)
+            if (TrackInstruments[track] == instrument) return track;
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Puts an instrument on a track. Because the mapping is one to one, this moves the
+    /// instrument off whatever track it was on and displaces whatever that track was holding.
+    /// </summary>
+    public void SetTrackInstrument(int track, int instrument)
+    {
+        if (track < 0 || track >= TrackCount) return;
+
+        EnsureTrackInstruments();
+
+        int value = instrument >= 0 && instrument < Instruments.Count
+            ? instrument
+            : TrackerCell.NoInstrument;
+
+        if (value != TrackerCell.NoInstrument) ClearInstrumentFromTracks(value);
+
+        TrackInstruments[track] = value;
+    }
+
+    private void ClearInstrumentFromTracks(int instrument)
+    {
+        for (int track = 0; track < TrackInstruments.Count; track++)
+            if (TrackInstruments[track] == instrument)
+                TrackInstruments[track] = TrackerCell.NoInstrument;
+    }
+
+    /// <summary>Keeps the per-track list the same length as the track count.</summary>
+    private void EnsureTrackInstruments()
+    {
+        while (TrackInstruments.Count < TrackCount) TrackInstruments.Add(TrackerCell.NoInstrument);
+        if (TrackInstruments.Count > TrackCount)
+            TrackInstruments.RemoveRange(TrackCount, TrackInstruments.Count - TrackCount);
+    }
 
     /// <summary>Adds a pattern sized to match the song and returns its index.</summary>
     public int AddPattern(int lines = Pattern.DefaultLines)
@@ -72,6 +133,13 @@ public sealed class Song
 
         Instruments.RemoveAt(index);
 
+        // Track defaults point at instruments by index too, so they renumber alongside cells.
+        for (int track = 0; track < TrackInstruments.Count; track++)
+        {
+            if (TrackInstruments[track] == index) TrackInstruments[track] = TrackerCell.NoInstrument;
+            else if (TrackInstruments[track] > index) TrackInstruments[track]--;
+        }
+
         foreach (var pattern in Patterns)
             for (int line = 0; line < pattern.Lines; line++)
                 for (int track = 0; track < pattern.TrackCount; track++)
@@ -94,6 +162,8 @@ public sealed class Song
         TrackCount = Math.Clamp(trackCount, MinTrackCount, MaxTrackCount);
         foreach (var pattern in Patterns)
             pattern.SetTrackCount(TrackCount);
+
+        EnsureTrackInstruments();
     }
 
     public TimeSpan Duration =>
@@ -119,5 +189,24 @@ public sealed class Song
         Order.RemoveAll(index => index < 0 || index >= Patterns.Count);
         if (Order.Count == 0)
             Order.Add(0);
+
+        EnsureTrackInstruments();
+        for (int track = 0; track < TrackInstruments.Count; track++)
+        {
+            int instrument = TrackInstruments[track];
+
+            // Anything outside the instrument list becomes "none", including junk negatives
+            // from a hand-edited file, so nothing invalid is ever written back out.
+            if (instrument < 0 || instrument >= Instruments.Count)
+            {
+                TrackInstruments[track] = TrackerCell.NoInstrument;
+                continue;
+            }
+
+            // A hand-edited file can put one instrument on two tracks. The first keeps it.
+            for (int later = track + 1; later < TrackInstruments.Count; later++)
+                if (TrackInstruments[later] == instrument)
+                    TrackInstruments[later] = TrackerCell.NoInstrument;
+        }
     }
 }

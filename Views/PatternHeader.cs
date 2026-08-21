@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -30,10 +31,17 @@ public sealed class PatternHeader : Control
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(RowHeight), 18);
 
+    public static readonly StyledProperty<IList<string>?> TrackLabelsProperty =
+        AvaloniaProperty.Register<PatternHeader, IList<string>?>(nameof(TrackLabels));
+
+    public static readonly StyledProperty<int> DropTargetTrackProperty =
+        AvaloniaProperty.Register<PatternHeader, int>(nameof(DropTargetTrack), -1);
+
     static PatternHeader()
     {
         AffectsRender<PatternHeader>(TrackCountProperty, SelectedTrackProperty,
-            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty);
+            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty,
+            TrackLabelsProperty, DropTargetTrackProperty);
         AffectsMeasure<PatternHeader>(RowHeightProperty);
     }
 
@@ -69,8 +77,29 @@ public sealed class PatternHeader : Control
         set => SetValue(RowHeightProperty, value);
     }
 
+    /// <summary>What each header reads. Falls back to a plain track number when not supplied.</summary>
+    public IList<string>? TrackLabels
+    {
+        get => GetValue(TrackLabelsProperty);
+        set => SetValue(TrackLabelsProperty, value);
+    }
+
+    /// <summary>The track a drag is currently hovering, or -1. Drawn as a drop outline.</summary>
+    public int DropTargetTrack
+    {
+        get => GetValue(DropTargetTrackProperty);
+        set => SetValue(DropTargetTrackProperty, value);
+    }
+
     /// <summary>Raised when a header is clicked, so the cursor can jump to that track.</summary>
     public event EventHandler<int>? TrackClicked;
+
+    /// <summary>The track under a point, for drag and drop. Takes the scroll offset into account.</summary>
+    public int TrackAtPoint(Point point)
+    {
+        double x = point.X + ScrollOffset;
+        return x < Metrics.GutterWidth ? -1 : Metrics.TrackAt(x);
+    }
 
     private const double VerticalPadding = 5;
 
@@ -91,6 +120,7 @@ public sealed class PatternHeader : Control
         var muted = palette.MutedBrush;
         var selectedPen = new Pen(palette.AccentBrush, 1);
         var idlePen = new Pen(palette.BorderBrush, 1);
+        var dropPen = new Pen(palette.AccentBrush, 2);
         var selectedFill = palette.AccentTint(56);
         var idleFill = palette.RowShade(0x12);
 
@@ -107,12 +137,20 @@ public sealed class PatternHeader : Control
             var area = new Rect(x + 1, 2, metrics.TrackWidth - 2, height - 4);
             bool selected = track == SelectedTrack;
 
-            context.FillRectangle(selected ? selectedFill : idleFill, area, 3);
-            context.DrawRectangle(selected ? selectedPen : idlePen, area, 3);
+            bool dropTarget = track == DropTargetTrack;
 
-            string label = "Track " + (track + 1).ToString("00", CultureInfo.InvariantCulture);
+            context.FillRectangle(dropTarget ? palette.AccentTint(90) : selected ? selectedFill : idleFill, area, 3);
+            context.DrawRectangle(dropTarget ? dropPen : selected ? selectedPen : idlePen, area, 3);
+
+            string label = track < (TrackLabels?.Count ?? 0)
+                ? TrackLabels![track]
+                : "Track " + (track + 1).ToString("00", CultureInfo.InvariantCulture);
             var formatted = new FormattedText(label, CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight, typeface, fontSize, selected ? text : muted);
+                FlowDirection.LeftToRight, typeface, fontSize, selected || dropTarget ? text : muted)
+            {
+                MaxTextWidth = Math.Max(1, area.Width - 6),
+                Trimming = TextTrimming.CharacterEllipsis
+            };
 
             context.DrawText(formatted, new Point(
                 area.X + Math.Max(2, (area.Width - formatted.Width) / 2),

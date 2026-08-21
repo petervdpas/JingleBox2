@@ -26,6 +26,9 @@ public partial class TrackerView : UserControl
         // The header sits outside the scroll area, so it has to be told how far the pattern
         // has scrolled sideways and what character width the grid settled on.
         Header.TrackClicked += (_, track) => SelectTrack(track);
+        Header.TrackLabels = null; // set from the view model once the DataContext arrives
+
+        SetUpInstrumentDragAndDrop();
         GridScroll.GetObservable(ScrollViewer.OffsetProperty)
             .Subscribe(new AnonymousObserver<Vector>(offset => Header.ScrollOffset = offset.X));
 
@@ -45,6 +48,82 @@ public partial class TrackerView : UserControl
     }
 
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
+
+    /// <summary>
+    /// Dragging an instrument onto a track header points that track at it. Existing notes keep
+    /// whatever instrument they were written with; only new notes on that track are affected.
+    /// </summary>
+    private void SetUpInstrumentDragAndDrop()
+    {
+        // Bubble with handledEventsToo: the ListBox marks the press handled once it has
+        // updated the selection, which is exactly the state the drag needs to read.
+        InstrumentList.AddHandler(PointerPressedEvent, OnInstrumentPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+
+        // The whole track column takes a drop, not just its header.
+        DragDrop.SetAllowDrop(Header, true);
+        Header.AddHandler(DragDrop.DragOverEvent, OnHeaderDragOver);
+        Header.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        Header.AddHandler(DragDrop.DropEvent, OnHeaderDrop);
+
+        DragDrop.SetAllowDrop(Grid, true);
+        Grid.AddHandler(DragDrop.DragOverEvent, OnGridDragOver);
+        Grid.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        Grid.AddHandler(DragDrop.DropEvent, OnGridDrop);
+    }
+
+    private async void OnInstrumentPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(InstrumentList).Properties.IsLeftButtonPressed) return;
+        if (InstrumentList.SelectedItem is not InstrumentSlot slot) return;
+
+        // Releasing without moving simply ends the drag with no effect, so this does not get
+        // in the way of clicking a row to select it.
+        await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
+    }
+
+    private void OnHeaderDragOver(object? sender, DragEventArgs e) =>
+        HandleDragOver(e, Header.TrackAtPoint(e.GetPosition(Header)));
+
+    private void OnGridDragOver(object? sender, DragEventArgs e) =>
+        HandleDragOver(e, Grid.TrackAtPoint(e.GetPosition(Grid)));
+
+    private void OnHeaderDrop(object? sender, DragEventArgs e) =>
+        HandleDrop(e, Header.TrackAtPoint(e.GetPosition(Header)));
+
+    private void OnGridDrop(object? sender, DragEventArgs e) =>
+        HandleDrop(e, Grid.TrackAtPoint(e.GetPosition(Grid)));
+
+    private void HandleDragOver(DragEventArgs e, int track)
+    {
+        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        bool valid = instrument >= 0 && track >= 0;
+
+        // Both surfaces light up together, so the header names the column being targeted.
+        ShowDropTarget(valid ? track : -1);
+
+        e.DragEffects = valid ? DragDropEffects.Link : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void HandleDrop(DragEventArgs e, int track)
+    {
+        ShowDropTarget(-1);
+
+        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        if (instrument < 0 || track < 0) return;
+
+        ViewModel?.AssignInstrumentToTrack(track, instrument);
+        e.Handled = true;
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e) => ShowDropTarget(-1);
+
+    private void ShowDropTarget(int track)
+    {
+        Header.DropTargetTrack = track;
+        Grid.DropTargetTrack = track;
+    }
 
     private void FollowCursor(PatternCursor cursor)
     {

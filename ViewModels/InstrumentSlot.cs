@@ -10,18 +10,28 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed partial class InstrumentSlot : ObservableObject
 {
-    public InstrumentSlot(int index, TrackerInstrument instrument)
+    public InstrumentSlot(int index, TrackerInstrument instrument, int track)
     {
         Index = index;
         Instrument = instrument;
+        Track = track;
     }
 
     public int Index { get; }
     public TrackerInstrument Instrument { get; }
 
+    /// <summary>The track this instrument sits on, or -1 when it is not on one.</summary>
+    public int Track { get; }
+
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
     public string BaseNoteText => Instrument.BaseNote.ToString();
+
+    public bool HasTrack => Track >= 0;
+
+    public string TrackText => HasTrack
+        ? "Track " + (Track + 1).ToString("00", CultureInfo.InvariantCulture)
+        : "not on a track";
 
     public override string ToString() => $"{Number}  {Name}";
 }

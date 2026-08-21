@@ -113,6 +113,7 @@
                                DockPanel.Dock="Top"
                                TrackCount="{Binding TrackCount}"
                                SelectedTrack="{Binding SelectedTrack}"
+                               TrackLabels="{Binding TrackLabels}"
                                Margin="0,0,0,4" />
 
           <ScrollViewer x:Name="GridScroll"
@@ -134,7 +135,7 @@
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
             <TextBlock Classes="cardHint"
-                       Text="The selected instrument is written into the cell you type a note in. Tracks are not tied to an instrument." />
+                       Text="Drag an instrument onto a track, anywhere in its column, to put it there. An instrument sits on one track only: to use the same sample twice, add the recording again." />
 
             <Button Content="Remove instrument" HorizontalAlignment="Stretch"
                     Classes="danger"
@@ -150,7 +151,8 @@
                     Click="AddInstrument_Click" />
           </StackPanel>
 
-          <ListBox ItemsSource="{Binding Instruments}"
+          <ListBox x:Name="InstrumentList"
+                   ItemsSource="{Binding Instruments}"
                    SelectedIndex="{Binding SelectedInstrument}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:InstrumentSlot">
@@ -162,7 +164,11 @@
                              Opacity="0.7" />
                   <StackPanel Grid.Column="1" Spacing="2">
                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="cardHint" Text="{Binding BaseNoteText}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Classes="cardHint" Text="{Binding TrackText}"
+                                 FontWeight="{Binding HasTrack, Converter={x:Static views:TrackWeight.Instance}}" />
+                      <TextBlock Classes="cardHint" Text="{Binding BaseNoteText}" />
+                    </StackPanel>
                   </StackPanel>
                 </Grid>
               </DataTemplate>

@@ -47,6 +47,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string songName = "untitled";
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
+
+    /// <summary>What each track header shows: its number and the instrument it defaults to.</summary>
+    public ObservableCollection<string> TrackLabels { get; } = new();
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
@@ -66,6 +69,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         _player.Stopped += OnPlayerStopped;
 
         RefreshOrder();
+        RefreshTrackLabels();
         RefreshSavedSongs();
     }
 
@@ -198,7 +202,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Auditions the note under the cursor's instrument, for note entry feedback.</summary>
     public void PreviewNote(Note note)
     {
-        var instrument = Song.InstrumentAt(SelectedInstrument);
+        var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument != null) _player.Preview(instrument, note);
     }
 
@@ -211,7 +215,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         // While playing, notes land on the line you can hear, not the line you left the cursor on.
         var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
 
-        PatternEdit.EnterNote(CurrentPattern, target, note, SelectedInstrument);
+        PatternEdit.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track));
         if (!IsPlaying) StepDown();
     }
 
@@ -267,6 +271,67 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public void SetCursor(PatternCursor value) => Cursor = value;
 
+    /// <summary>
+    /// Points a track at an instrument. Existing notes keep the instrument they were written
+    /// with; this only decides what new notes on that track get.
+    /// </summary>
+    public void AssignInstrumentToTrack(int track, int instrument)
+    {
+        if (track < 0 || track >= Song.TrackCount) return;
+
+        var chosen = Song.InstrumentAt(instrument);
+        if (chosen == null) return;
+
+        int previous = Song.GetInstrumentTrack(instrument);
+        var displaced = Song.InstrumentAt(Song.GetTrackInstrument(track));
+
+        Song.SetTrackInstrument(track, instrument);
+        RefreshTrackLabels();
+        SyncInstruments();
+
+        // An instrument lives on one track, so say what moved and what was pushed off.
+        if (previous == track)
+            Status = $"'{chosen.Name}' is already on track {track + 1:00}";
+        else if (displaced != null && displaced != chosen)
+            Status = $"Track {track + 1:00} now plays '{chosen.Name}'. '{displaced.Name}' came off it.";
+        else if (previous >= 0)
+            Status = $"Moved '{chosen.Name}' from track {previous + 1:00} to track {track + 1:00}";
+        else
+            Status = $"Track {track + 1:00} plays '{chosen.Name}'";
+    }
+
+    /// <summary>Clears a track's default so it falls back to the selected instrument.</summary>
+    public void ClearTrackInstrument(int track)
+    {
+        Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
+        RefreshTrackLabels();
+        SyncInstruments();
+        Status = $"Track {track + 1:00} has no instrument";
+    }
+
+    /// <summary>
+    /// The instrument a note typed on this track should carry: the track's own if it has one,
+    /// otherwise whatever is selected in the instrument list.
+    /// </summary>
+    private int InstrumentForTrack(int track)
+    {
+        int assigned = Song.GetTrackInstrument(track);
+        return assigned == TrackerCell.NoInstrument ? SelectedInstrument : assigned;
+    }
+
+    private void RefreshTrackLabels()
+    {
+        TrackLabels.Clear();
+
+        for (int track = 0; track < Song.TrackCount; track++)
+        {
+            string number = "Track " + (track + 1).ToString("00");
+            var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
+
+            TrackLabels.Add(instrument == null ? number : number + "  " + instrument.Name);
+        }
+    }
+
     private void StepDown()
     {
         if (CurrentPattern == null || EditStep <= 0) return;
@@ -299,6 +364,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
+        RefreshTrackLabels();
 
         // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
@@ -327,6 +393,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.Instruments.Add(instrument);
         SyncInstruments();
+        RefreshTrackLabels();
 
         SelectedInstrument = Song.Instruments.Count - 1;
         Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
@@ -342,6 +409,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         if (!Song.RemoveInstrumentAt(index)) return;
 
         SyncInstruments();
+        RefreshTrackLabels();
         SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
         Status = $"Removed '{instrument.Name}'";
     }
@@ -428,6 +496,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         SyncInstruments();
         RefreshOrder();
+        RefreshTrackLabels();
 
         // The tempo and track count live on the song, so the whole transport bar is stale.
         OnPropertyChanged(nameof(Bpm));
@@ -438,9 +507,14 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Rebuilds the list so every row carries its current number.</summary>
     private void SyncInstruments()
     {
+        int selected = SelectedInstrument;
+
         Instruments.Clear();
         for (int i = 0; i < Song.Instruments.Count; i++)
-            Instruments.Add(new InstrumentSlot(i, Song.Instruments[i]));
+            Instruments.Add(new InstrumentSlot(i, Song.Instruments[i], Song.GetInstrumentTrack(i)));
+
+        // Rebuilding the list drops the selection; put it back where it was.
+        SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
 
         OnPropertyChanged(nameof(HasInstruments));
     }
