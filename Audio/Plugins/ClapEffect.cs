@@ -357,6 +357,8 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
 
     private void ProcessBlock(float[] buffer, int offset, int frames)
     {
+        _lastProcess = Environment.TickCount64;
+
 
         // The track goes into the main port. Everything else the plugin declared, a side
         // chain included, is given silence rather than whatever was left in it last block.
@@ -392,16 +394,22 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
 
         // The event list is read through static callbacks, which have no instance to work
         // from: the block being processed is handed over here for the length of the call.
-        _current = this;
+        // Held so a parameter handed over from the UI cannot land in the middle of a block.
+        // The other side of this uses TryEnter and gives up, so the audio thread waits for
+        // nothing longer than one short flush.
+        lock (_flush)
+        {
+            _current = this;
 
-        try
-        {
-            _plugin->Process(_plugin, _process);
-        }
-        finally
-        {
-            _current = null;
-            _eventCount = 0;
+            try
+            {
+                _plugin->Process(_plugin, _process);
+            }
+            finally
+            {
+                _current = null;
+                _eventCount = 0;
+            }
         }
 
         if (OutputChannels == 1)
@@ -491,7 +499,11 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
     {
         if (_disposed || _params == null || _params->Flush == null) return;
 
-        lock (_flush)
+        // If the audio thread is inside the plugin, it is about to take the pending values
+        // itself, and a flush now would be a second call into the plugin at the same time.
+        if (!System.Threading.Monitor.TryEnter(_flush)) return;
+
+        try
         {
             TakePending();
             if (_eventCount == 0) return;
@@ -508,7 +520,19 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
                 _eventCount = 0;
             }
         }
+        finally
+        {
+            System.Threading.Monitor.Exit(_flush);
+        }
     }
+
+    /// <summary>How long since a block went through, for telling a running plugin from an idle one.</summary>
+    private long _lastProcess;
+
+    /// <summary>Longer than any block, short enough that a knob never feels late.</summary>
+    private const long IdleMilliseconds = 200;
+
+    private bool IsIdle => Environment.TickCount64 - _lastProcess > IdleMilliseconds;
 
     /// <summary>
     /// Held while handing parameters over outside a block, so two of those cannot overlap.
@@ -570,6 +594,11 @@ public sealed unsafe class ClapEffect : IAudioInsert, IDisposable
         if (_disposed) return;
 
         lock (_lock) _pending[id] = value;
+
+        // A plugin that is not playing anything will never take the queue itself: a pad sitting
+        // idle, or a track between takes. Without this the value waits, the plugin still
+        // reports the old one, and the knob springs back to it.
+        if (IsIdle) FlushParameters();
     }
 
     private static string ReadFixed(byte* text, int size)

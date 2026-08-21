@@ -627,58 +627,77 @@ public sealed class BassAudioEngine : IAudioEngine
         if (frames <= 0) return;
 
         var scratch = scratchpads[padIndex];
+        if (scratch == null) return;
 
-        // No buffer, or a block longer than anything prepared for: left alone rather than
-        // allocated for here.
-        if (scratch == null || scratch.Length < frames * 2) return;
+        int most = scratch.Length / 2;
 
-        unsafe
+        // In pieces, never skipped. The first block BASS asks for is the whole playback
+        // buffer, half a second of it, which is far more than the working buffer holds; a
+        // block passed over would be the start of every pad playing dry.
+        for (int start = 0; start < frames; start += most)
         {
-            float* audio = (float*)buffer;
+            int take = Math.Min(most, frames - start);
+            if (!ProcessPadBlock(insert, scratch, buffer, start, take, channels)) return;
+        }
+    }
 
-            if (channels == 1)
-            {
-                for (int frame = 0; frame < frames; frame++)
-                {
-                    scratch[frame * 2] = audio[frame];
-                    scratch[frame * 2 + 1] = audio[frame];
-                }
-            }
-            else
-            {
-                for (int frame = 0; frame < frames; frame++)
-                {
-                    scratch[frame * 2] = audio[frame * channels];
-                    scratch[frame * 2 + 1] = audio[frame * channels + 1];
-                }
-            }
+    /// <summary>
+    /// One piece of a block: out of the channel's buffer, through the effect, and back in.
+    /// Returns false when the effect fell over, which costs the rest of that block only.
+    /// </summary>
+    private static unsafe bool ProcessPadBlock(
+        Plugins.IAudioInsert insert,
+        float[] scratch,
+        IntPtr buffer,
+        int start,
+        int frames,
+        int channels)
+    {
+        float* audio = (float*)buffer + start * channels;
 
-            try
+        if (channels == 1)
+        {
+            for (int frame = 0; frame < frames; frame++)
             {
-                insert.Process(scratch, frames);
-            }
-            catch (Exception)
-            {
-                // A managed fault in an effect costs this block, not the pad.
-                return;
-            }
-
-            if (channels == 1)
-            {
-                for (int frame = 0; frame < frames; frame++)
-                    audio[frame] = (scratch[frame * 2] + scratch[frame * 2 + 1]) * 0.5f;
-            }
-            else
-            {
-                for (int frame = 0; frame < frames; frame++)
-                {
-                    audio[frame * channels] = scratch[frame * 2];
-                    audio[frame * channels + 1] = scratch[frame * 2 + 1];
-
-                    // More than two channels on a pad is unusual; the rest are left alone.
-                }
+                scratch[frame * 2] = audio[frame];
+                scratch[frame * 2 + 1] = audio[frame];
             }
         }
+        else
+        {
+            for (int frame = 0; frame < frames; frame++)
+            {
+                scratch[frame * 2] = audio[frame * channels];
+                scratch[frame * 2 + 1] = audio[frame * channels + 1];
+            }
+        }
+
+        try
+        {
+            insert.Process(scratch, frames);
+        }
+        catch (Exception)
+        {
+            // A managed fault in an effect costs this block, not the pad.
+            return false;
+        }
+
+        if (channels == 1)
+        {
+            for (int frame = 0; frame < frames; frame++)
+                audio[frame] = (scratch[frame * 2] + scratch[frame * 2 + 1]) * 0.5f;
+        }
+        else
+        {
+            // More than two channels on a pad is unusual; the rest are left alone.
+            for (int frame = 0; frame < frames; frame++)
+            {
+                audio[frame * channels] = scratch[frame * 2];
+                audio[frame * channels + 1] = scratch[frame * 2 + 1];
+            }
+        }
+
+        return true;
     }
 
     public void Resize(int newPadCount)

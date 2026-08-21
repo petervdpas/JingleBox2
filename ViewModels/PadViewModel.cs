@@ -32,8 +32,22 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     public void UsePlugins(PluginLibraryViewModel plugins)
     {
         Effect = new PluginChainViewModel(plugins) { Target = new PadPluginTarget(_audio, Index) };
+        Effect.Changed += OnEffectChanged;
+
         OnPropertyChanged(nameof(Effect));
     }
+
+    /// <summary>
+    /// The chain changed, so the profile has something new to save. A knob dragged across its
+    /// travel is a hundred of these, so the writing waits for the hand to stop.
+    /// </summary>
+    private void OnEffectChanged()
+    {
+        _effectSave.Stop();
+        _effectSave.Start();
+    }
+
+    private readonly DispatcherTimer _effectSave = new() { Interval = TimeSpan.FromMilliseconds(600) };
 
     /// <summary>
     /// Puts back the effects this pad was saved with. A plugin that is no longer on the
@@ -226,6 +240,13 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
             }
         };
         _progressTimer.Start();
+
+        // Fires once the hand has come off the knob, and is what makes the profile save.
+        _effectSave.Tick += (_, _) =>
+        {
+            _effectSave.Stop();
+            OnPropertyChanged(nameof(Effect));
+        };
     }
 
     private void TryStart()

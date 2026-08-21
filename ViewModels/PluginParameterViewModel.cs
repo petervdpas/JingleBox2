@@ -19,15 +19,19 @@ public sealed class PluginParameterViewModel : ObservableObject
     private readonly ClapEffect _effect;
     private readonly ClapParameter _parameter;
 
+    /// <summary>Told when this moves, so whatever owns the chain knows it has something to save.</summary>
+    private readonly Action? _changed;
+
     private double _value;
 
     /// <summary>When this was last moved here, so a poll does not fight a hand on the knob.</summary>
     private long _movedAt;
 
-    public PluginParameterViewModel(ClapEffect effect, ClapParameter parameter)
+    public PluginParameterViewModel(ClapEffect effect, ClapParameter parameter, Action? changed = null)
     {
         _effect = effect;
         _parameter = parameter;
+        _changed = changed;
         _value = effect.ValueOf(parameter.Id);
     }
 
@@ -72,6 +76,9 @@ public sealed class PluginParameterViewModel : ObservableObject
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(Text));
+
+            // A reading moves on its own; only something the user set is worth saving.
+            if (!IsReadOnly) _changed?.Invoke();
         }
     }
 

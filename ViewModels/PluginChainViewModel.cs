@@ -112,6 +112,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
         Devices.Add(row);
         _poll.Start();
 
+        NotifyChanged();
+
         Status = "";
         OnPropertyChanged(nameof(IsEmpty));
     }
@@ -132,6 +134,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
         if (Devices.Count == 0) _poll.Stop();
 
         OnPropertyChanged(nameof(IsEmpty));
+        NotifyChanged();
     }
 
     public void Move(PluginDeviceViewModel device, int offset)
@@ -145,6 +148,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
         if (from < 0 || to < 0 || to >= Devices.Count) return;
 
         Devices.Move(from, to);
+
+        NotifyChanged();
     }
 
     /// <summary>Reads the chain back out of its host, after something else has changed it.</summary>
@@ -159,6 +164,16 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// concern reaching back into the view model would be worse than one event.
     /// </summary>
     public event System.Action<PluginDeviceViewModel>? DeviceClosing;
+
+    /// <summary>
+    /// Raised whenever the chain or anything in it changes: a device added, moved, removed,
+    /// bypassed, or a knob turned. What a pad or a song listens to in order to know that it
+    /// has something new to save.
+    /// </summary>
+    public event System.Action? Changed;
+
+    /// <summary>Says something changed here. Called by the devices as well as by this class.</summary>
+    public void NotifyChanged() => Changed?.Invoke();
 
     private void Rebuild()
     {

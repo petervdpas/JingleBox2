@@ -24,7 +24,7 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
             // something the host offers in its own way.
             if (parameter.IsHidden || parameter.IsBypass) continue;
 
-            var row = new PluginParameterViewModel(effect, parameter);
+            var row = new PluginParameterViewModel(effect, parameter, chain.NotifyChanged);
 
             Parameters.Add(row);
 
@@ -71,6 +71,7 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
 
             Device.Bypassed = value;
             OnPropertyChanged();
+            _chain.NotifyChanged();
         }
     }
 

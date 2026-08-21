@@ -139,6 +139,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
         TrackEffect = new PluginChainViewModel(Plugins);
+        TrackEffect.Changed += MarkDirty;
 
 
         // Assigned to the field rather than the property: this is what was saved, not a
