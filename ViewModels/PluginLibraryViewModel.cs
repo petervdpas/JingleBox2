@@ -38,6 +38,39 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         {
             if (!string.IsNullOrWhiteSpace(folder)) Folders.Add(folder);
         }
+
+        Remember(config?.KnownPlugins);
+    }
+
+    /// <summary>
+    /// Takes the last scan's results as they are, without opening anything. A scan has to load
+    /// every plugin library to ask what is inside it, which is slow and is what makes hosts
+    /// crash; there is no reason to do it again every time the app starts.
+    /// </summary>
+    private void Remember(List<ClapPluginInfo>? known)
+    {
+        if (known == null || known.Count == 0) return;
+
+        int gone = 0;
+
+        foreach (var plugin in known)
+        {
+            // A plugin uninstalled since the last scan is dropped rather than offered and then
+            // failing to load.
+            if (!File.Exists(plugin.Path))
+            {
+                gone++;
+                continue;
+            }
+
+            Plugins.Add(plugin);
+        }
+
+        OnPropertyChanged(nameof(HasPlugins));
+
+        Status = gone == 0
+            ? $"{Plugins.Count} plugin(s) known. Scan again after installing more."
+            : $"{Plugins.Count} plugin(s) known, {gone} no longer installed. Scan again to tidy the list.";
     }
 
     /// <summary>
@@ -75,6 +108,15 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         SaveFolders();
         _ = ScanAsync();
+    }
+
+    /// <summary>Keeps what was found, so the next start does not have to look again.</summary>
+    private void Save(List<ClapPluginInfo> found)
+    {
+        if (_store == null || _config == null) return;
+
+        _config.KnownPlugins = found;
+        _store.Save(_config);
     }
 
     private void SaveFolders()
@@ -120,6 +162,8 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
             foreach (var plugin in found) Plugins.Add(plugin);
 
             OnPropertyChanged(nameof(HasPlugins));
+
+            Save(found);
 
             Status = found.Count == 0
                 ? "No CLAP plugins found. The places looked in are listed above."

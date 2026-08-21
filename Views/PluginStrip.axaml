@@ -16,7 +16,7 @@
       </Setter>
     </Style>
 
-    <Style Selector="Border.device.picked">
+    <Style Selector="Border.device.open">
       <Setter Property="BorderBrush">
         <SolidColorBrush Color="{DynamicResource Color.Accent}" />
       </Setter>
@@ -46,6 +46,8 @@
           <TextBlock Text="{Binding Label}" />
         </Border>
 
+        <views:HelpBadge Topic="tracker.effects" />
+
         <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Center">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -56,26 +58,22 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:PluginDeviceViewModel">
               <Border Classes="device"
-                      Classes.picked="{Binding IsSelected}"
+                      Classes.open="{Binding IsOpen}"
                       Classes.off="{Binding IsBypassed}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <Button Classes="tiny" Content="{Binding Name}"
-                          Command="{Binding SelectCommand}"
+                          Click="OnOpenDevice"
                           Background="Transparent" BorderThickness="0"
-                          ToolTip.Tip="Show this one's controls" />
+                          ToolTip.Tip="Open this one's controls in a window" />
 
                   <ToggleButton Classes="tiny" Content="⏻"
                                 IsChecked="{Binding IsBypassed}"
                                 ToolTip.Tip="Switch it off without taking it out" />
-
-                  <Button Classes="tiny" Content="⤢"
-                          Click="OnOpenDevice"
-                          ToolTip.Tip="Open this one in a window of its own" />
                 </StackPanel>
 
                 <Border.ContextMenu>
                   <ContextMenu>
-                    <MenuItem Header="Open in a window" Click="OnOpenDevice" />
+                    <MenuItem Header="Open controls" Click="OnOpenDevice" />
                     <Separator />
                     <MenuItem Header="Move earlier" Command="{Binding MoveLeftCommand}" />
                     <MenuItem Header="Move later" Command="{Binding MoveRightCommand}" />
@@ -123,16 +121,9 @@
         <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Status}" />
       </StackPanel>
 
-      <!-- The picked device's controls. A plugin with thirty of them is normal, so they wrap
-           and scroll rather than pushing the page about. -->
-      <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto"
-                    IsVisible="{Binding HasSelection}">
-        <views:PluginParameters DataContext="{Binding Selected}" />
-      </ScrollViewer>
-
       <TextBlock Classes="cardHint"
                  IsVisible="{Binding IsEmpty}"
-                 Text="No effects here. The plus adds one; right click a box to move or remove it." />
+                 Text="No effects here." />
     </StackPanel>
   </Border>
 </UserControl>

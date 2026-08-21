@@ -197,6 +197,8 @@
 
         <!-- One instrument row, shared by the list beside the pattern and the one in the editor. -->
         <DataTemplate x:Key="InstrumentRow" x:DataType="vm:InstrumentSlot">
+            <!-- Two lines, as close together as they read well: a song with eight instruments
+                 should not need scrolling to see them. -->
             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
                 <TextBlock Grid.Column="0" Grid.RowSpan="2"
                            Text="{Binding Number}"
@@ -206,10 +208,12 @@
 
                 <TextBlock Grid.Column="1" Grid.Row="0"
                            Text="{Binding Name}"
+                           LineHeight="16"
                            TextTrimming="CharacterEllipsis" />
 
                 <TextBlock Grid.Column="1" Grid.Row="1"
                            Classes="cardHint"
+                           LineHeight="14"
                            Text="{Binding DetailText}" />
 
                 <Border Grid.Column="2" Grid.Row="1"

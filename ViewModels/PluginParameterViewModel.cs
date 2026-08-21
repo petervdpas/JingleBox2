@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Audio.Plugins;
 using System;
+using System.Globalization;
 
 namespace JingleBox2.ViewModels;
 
@@ -37,6 +38,25 @@ public sealed class PluginParameterViewModel : ObservableObject
     public double Maximum => _parameter.Maximum;
 
     public double Default => _parameter.Default;
+
+    /// <summary>The plugin reporting rather than listening: shown as a reading, not a knob.</summary>
+    public bool IsReadOnly => _parameter.IsReadOnly;
+
+    public bool IsStepped => _parameter.IsStepped;
+
+    /// <summary>A stepped parameter with two positions is an on and an off, not a dial.</summary>
+    public bool IsSwitch => IsStepped && Math.Abs(Maximum - Minimum - 1) < 0.0001;
+
+    /// <summary>The same parameter as a tick box, for the ones that are one.</summary>
+    public bool IsOn
+    {
+        get => Value >= Maximum - 0.0001;
+        set
+        {
+            Value = value ? Maximum : Minimum;
+            OnPropertyChanged();
+        }
+    }
 
     public double Value
     {
@@ -78,14 +98,49 @@ public sealed class PluginParameterViewModel : ObservableObject
         OnPropertyChanged(nameof(Text));
     }
 
-    /// <summary>The plugin's own words for the current value, for the knob's reading.</summary>
+    /// <summary>
+    /// What the control reads. The plugin's own wording is used when it says something a
+    /// number cannot, "-6.0 dB" or "Peak", and dropped when it is only the number again with
+    /// six decimals after it, which is most of them.
+    /// </summary>
     public string Text
     {
         get
         {
             string worded = _effect.TextFor(_parameter.Id, _value);
-            return string.IsNullOrEmpty(worded) ? _value.ToString("0.00") : worded;
+            return Worthwhile(worded) ? worded : Number(_value);
         }
+    }
+
+    /// <summary>True when the plugin's wording carries something the bare number does not.</summary>
+    private static bool Worthwhile(string worded)
+    {
+        if (string.IsNullOrWhiteSpace(worded)) return false;
+
+        foreach (char character in worded)
+        {
+            // A letter or a percent sign means a unit or a name; digits, signs and separators
+            // are the number this class can print better itself.
+            if (char.IsLetter(character) || character == '%') return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// A number as anyone would write it: whole where the parameter is whole, two decimals
+    /// where the range is wide enough not to need more, and no trailing zeros.
+    /// </summary>
+    private string Number(double value)
+    {
+        if (IsStepped) return Math.Round(value).ToString("0", CultureInfo.InvariantCulture);
+
+        double span = Math.Abs(Maximum - Minimum);
+        string text = span >= 100
+            ? value.ToString("0.#", CultureInfo.InvariantCulture)
+            : value.ToString("0.##", CultureInfo.InvariantCulture);
+
+        return text;
     }
 
     /// <summary>

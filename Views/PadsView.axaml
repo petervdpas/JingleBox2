@@ -207,10 +207,16 @@
                                 Orientation="Horizontal"
                                 Spacing="8"
                                 HorizontalAlignment="Right">
-                      <Button Content="Test"
-                              Command="{Binding PlayCommand}" />
-                      <Button Content="Stop"
-                              Command="{Binding StopCommand}" />
+                      <!-- The same pair as the recordings list: the shape says play and stop
+                           without a word, and each is lit only when it is the one to press. -->
+                      <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding !IsPlaying}"
+                              Command="{Binding PlayCommand}"
+                              ToolTip.Tip="Play this pad" />
+                      <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding IsPlaying}"
+                              Command="{Binding StopCommand}"
+                              ToolTip.Tip="Stop playing" />
                       <Button Content="Clear"
                               Command="{Binding ClearCommand}"
                               Classes="danger" />

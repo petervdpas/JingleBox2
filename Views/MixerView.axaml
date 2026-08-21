@@ -37,10 +37,11 @@
 
     <Border Classes="card">
       <DockPanel>
-        <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Mixer" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+          <TextBlock Classes="cardTitle" Text="Mixer" />
 
-        <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" Margin="0,8,0,0"
-                   Text="One strip per track. Solo silences every track that is not soloed, and a duck pushes a track down while the track it listens to is sounding. The mix is part of the song and is saved with it. Moves are heard straight away, even mid-take." />
+          <views:HelpBadge Topic="mixer.strips" />
+        </StackPanel>
 
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding Strips}">

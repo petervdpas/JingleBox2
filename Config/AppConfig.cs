@@ -52,6 +52,10 @@ public sealed class AppConfig
     // which is what stops everything being resampled on the way out.
     public int EngineSampleRate { get; set; }
 
+    // What the last scan found, so the app knows its plugins at startup instead of opening
+    // every plugin library again to ask.
+    public List<Audio.Plugins.ClapPluginInfo> KnownPlugins { get; set; } = new();
+
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";
 

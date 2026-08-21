@@ -56,10 +56,12 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
     private void Poll()
     {
-        // Every device, not just the picked one: a plugin opened in a window of its own is
-        // still on screen, and its meters have to move too.
+        // Only what is on screen. A plugin reports its own meters, and reading them back for
+        // a device nobody is looking at is work for nothing.
         foreach (var device in Devices)
         {
+            if (!device.IsOpen) continue;
+
             foreach (var parameter in device.Parameters) parameter.Refresh();
         }
     }
@@ -75,15 +77,9 @@ public sealed partial class PluginChainViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Label))]
     private IPluginHost? target;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelection))]
-    private PluginDeviceViewModel? selected;
-
     [ObservableProperty] private string status = "";
 
     public bool HasTarget => Target != null;
-
-    public bool HasSelection => Selected != null;
 
     public bool IsEmpty => Devices.Count == 0;
 
@@ -114,7 +110,6 @@ public sealed partial class PluginChainViewModel : ObservableObject
         var row = new PluginDeviceViewModel(this, effect, device);
 
         Devices.Add(row);
-        Select(row);
         _poll.Start();
 
         Status = "";
@@ -136,8 +131,6 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         if (Devices.Count == 0) _poll.Stop();
 
-        if (ReferenceEquals(Selected, device)) Select(Devices.Count > 0 ? Devices[0] : null);
-
         OnPropertyChanged(nameof(IsEmpty));
     }
 
@@ -152,17 +145,6 @@ public sealed partial class PluginChainViewModel : ObservableObject
         if (from < 0 || to < 0 || to >= Devices.Count) return;
 
         Devices.Move(from, to);
-    }
-
-    public void Select(PluginDeviceViewModel? device)
-    {
-        foreach (var row in Devices) row.IsSelected = ReferenceEquals(row, device);
-
-        Selected = device;
-
-        // Polling runs while this chain has anything in it at all.
-        if (Devices.Count == 0) _poll.Stop();
-        else _poll.Start();
     }
 
     /// <summary>Reads the chain back out of its host, after something else has changed it.</summary>
@@ -183,7 +165,6 @@ public sealed partial class PluginChainViewModel : ObservableObject
         foreach (var device in Devices) DeviceClosing?.Invoke(device);
 
         Devices.Clear();
-        Selected = null;
 
         if (Target == null)
         {
@@ -198,7 +179,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
             Devices.Add(new PluginDeviceViewModel(this, effect, device));
         }
 
-        if (Devices.Count > 0) Select(Devices[0]);
+        if (Devices.Count > 0) _poll.Start();
+        else _poll.Stop();
 
         OnPropertyChanged(nameof(IsEmpty));
     }

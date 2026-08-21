@@ -5,22 +5,27 @@
         x:Class="JingleBox2.Views.PluginWindow"
         x:DataType="vm:PluginDeviceViewModel"
         Title="{Binding Name}"
-        Width="520"
-        Height="360"
+        SizeToContent="WidthAndHeight"
+        MinWidth="320"
+        MaxWidth="900"
+        MaxHeight="720"
         WindowStartupLocation="CenterOwner">
 
-  <DockPanel Margin="12">
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
-      <Border Classes="badge" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Name}" />
-      </Border>
+  <!-- Sized to what the plugin actually has: a two-knob effect gets a small window and a
+       thirty-knob one gets a wide one, rather than both getting the same half-empty box. -->
+  <DockPanel Margin="14">
+    <Border DockPanel.Dock="Top" Classes="inset" Padding="8,5" Margin="0,0,0,12">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Name}" />
 
-      <ToggleButton Content="Bypass"
-                    IsChecked="{Binding IsBypassed}"
-                    ToolTip.Tip="Switch it off without taking it out of the chain" />
-    </StackPanel>
+        <ToggleButton Content="Bypass"
+                      MinWidth="0" Padding="10,2" FontSize="12"
+                      IsChecked="{Binding IsBypassed}"
+                      ToolTip.Tip="Switch it off without taking it out of the chain" />
+      </StackPanel>
+    </Border>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <views:PluginParameters />
     </ScrollViewer>
   </DockPanel>

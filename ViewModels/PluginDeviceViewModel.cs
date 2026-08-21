@@ -19,7 +19,19 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
         Device = device;
 
         foreach (var parameter in effect.Parameters())
-            Parameters.Add(new PluginParameterViewModel(effect, parameter));
+        {
+            // A hidden parameter is one the plugin does not want shown, and its own bypass is
+            // something the host offers in its own way.
+            if (parameter.IsHidden || parameter.IsBypass) continue;
+
+            var row = new PluginParameterViewModel(effect, parameter);
+
+            Parameters.Add(row);
+
+            if (parameter.IsReadOnly) Readouts.Add(row);
+            else if (row.IsSwitch) Switches.Add(row);
+            else Controls.Add(row);
+        }
     }
 
     public ClapEffect Effect { get; }
@@ -28,11 +40,26 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
 
     public string Name => Effect.Info.Name;
 
+    /// <summary>Everything shown, controls and readings alike, for polling.</summary>
     public ObservableCollection<PluginParameterViewModel> Parameters { get; } = new();
+
+    /// <summary>The knobs: what you set.</summary>
+    public ObservableCollection<PluginParameterViewModel> Controls { get; } = new();
+
+    /// <summary>The two-position ones, which are tick boxes rather than dials.</summary>
+    public ObservableCollection<PluginParameterViewModel> Switches { get; } = new();
+
+    /// <summary>The readings: what the plugin reports back, such as gain reduction.</summary>
+    public ObservableCollection<PluginParameterViewModel> Readouts { get; } = new();
+
+    public bool HasSwitches => Switches.Count > 0;
 
     public bool HasParameters => Parameters.Count > 0;
 
-    [ObservableProperty] private bool isSelected;
+    public bool HasReadouts => Readouts.Count > 0;
+
+    /// <summary>True while this one's window is open, so the box in the strip says so.</summary>
+    [ObservableProperty] private bool isOpen;
 
     /// <summary>Switched off but still in the chain, so it can be switched back on.</summary>
     public bool IsBypassed
@@ -46,8 +73,6 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
             OnPropertyChanged();
         }
     }
-
-    public IRelayCommand SelectCommand => new RelayCommand(() => _chain.Select(this));
 
     public IRelayCommand RemoveCommand => new RelayCommand(() => _chain.Remove(this));
 

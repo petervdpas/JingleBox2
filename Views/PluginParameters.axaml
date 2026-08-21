@@ -5,28 +5,95 @@
              x:Class="JingleBox2.Views.PluginParameters"
              x:DataType="vm:PluginDeviceViewModel">
 
-  <!-- One device's controls. Shared by the strip and by the window a device opens in, so a
-       plugin looks the same wherever it is being worked on. -->
-  <ItemsControl ItemsSource="{Binding Parameters}">
-    <ItemsControl.ItemsPanel>
-      <ItemsPanelTemplate>
-        <WrapPanel Orientation="Horizontal" />
-      </ItemsPanelTemplate>
-    </ItemsControl.ItemsPanel>
+  <UserControl.Styles>
+    <!-- A reading is not a control: no dial, no hover, nothing to grab. -->
+    <Style Selector="Border.readout">
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="MinWidth" Value="96" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" />
+      </Setter>
+    </Style>
 
-    <ItemsControl.ItemTemplate>
-      <DataTemplate x:DataType="vm:PluginParameterViewModel">
-        <views:Knob Margin="0,0,10,6"
-                    DialSize="30"
-                    Label="{Binding Name}"
-                    Display="{Binding Text}"
-                    Minimum="{Binding Minimum}"
-                    Maximum="{Binding Maximum}"
-                    DefaultValue="{Binding Default}"
-                    SmallStep="{Binding SmallStep}"
-                    LargeStep="{Binding LargeStep}"
-                    Value="{Binding Value}" />
-      </DataTemplate>
-    </ItemsControl.ItemTemplate>
-  </ItemsControl>
+    <Style Selector="Border.readout TextBlock.value">
+      <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Border.readout TextBlock.name">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- One device's controls. Shared by the window a device opens in and by anywhere else that
+       shows a plugin, so it looks the same wherever it is worked on. -->
+  <StackPanel Spacing="10">
+
+    <ItemsControl ItemsSource="{Binding Controls}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PluginParameterViewModel">
+          <views:Knob Margin="0,0,14,10"
+                      DialSize="38"
+                      Label="{Binding Name}"
+                      Display="{Binding Text}"
+                      Minimum="{Binding Minimum}"
+                      Maximum="{Binding Maximum}"
+                      DefaultValue="{Binding Default}"
+                      SmallStep="{Binding SmallStep}"
+                      LargeStep="{Binding LargeStep}"
+                      Value="{Binding Value}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- The on and off ones. A dial with two positions is a tick box wearing a hat. -->
+    <ItemsControl ItemsSource="{Binding Switches}" IsVisible="{Binding HasSwitches}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:PluginParameterViewModel">
+          <CheckBox Margin="0,0,14,0" Content="{Binding Name}" IsChecked="{Binding IsOn}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- What the plugin reports back, kept apart from what you set. -->
+    <StackPanel Spacing="6" IsVisible="{Binding HasReadouts}">
+      <TextBlock Classes="section" Text="Reading" />
+
+      <ItemsControl ItemsSource="{Binding Readouts}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PluginParameterViewModel">
+            <Border Classes="readout" Margin="0,0,8,6">
+              <StackPanel Spacing="1">
+                <TextBlock Classes="value" Text="{Binding Text}" />
+                <TextBlock Classes="name" Text="{Binding Name}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </StackPanel>
 </UserControl>

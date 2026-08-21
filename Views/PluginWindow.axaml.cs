@@ -41,8 +41,18 @@ public partial class PluginWindow : Window
             Title = device.Name
         };
 
+        // Wide plugins wrap rather than running off the edge; the window sizes itself to what
+        // is in it, up to the caps set in the XAML.
+        window.MaxWidth = Math.Min(900, owner.Bounds.Width > 0 ? owner.Bounds.Width : 900);
+
         Open[device] = window;
-        window.Closed += (_, _) => Open.Remove(device);
+        device.IsOpen = true;
+
+        window.Closed += (_, _) =>
+        {
+            Open.Remove(device);
+            device.IsOpen = false;
+        };
 
         window.Show(owner);
     }
@@ -53,6 +63,7 @@ public partial class PluginWindow : Window
         if (device == null || !Open.TryGetValue(device, out var window)) return;
 
         Open.Remove(device);
+        device.IsOpen = false;
         window.Close();
     }
 }
