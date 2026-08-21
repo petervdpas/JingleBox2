@@ -46,7 +46,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     [ObservableProperty] private string status = "Ready";
     [ObservableProperty] private string songName = "untitled";
 
-    public ObservableCollection<TrackerInstrument> Instruments { get; } = new();
+    public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
@@ -119,8 +119,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
     public IRelayCommand<Recording> AddInstrumentCommand => new RelayCommand<Recording>(AddInstrument);
-    public IRelayCommand<TrackerInstrument> RemoveInstrumentCommand =>
-        new RelayCommand<TrackerInstrument>(RemoveInstrument);
+    public IRelayCommand RemoveInstrumentCommand => new RelayCommand(RemoveSelectedInstrument);
+
+    public bool HasInstruments => Instruments.Count > 0;
 
     /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
     public ObservableCollection<Recording> AvailableRecordings => _recordings;
@@ -325,18 +326,24 @@ public sealed partial class TrackerViewModel : ObservableObject
         };
 
         Song.Instruments.Add(instrument);
-        Instruments.Add(instrument);
+        SyncInstruments();
+
         SelectedInstrument = Song.Instruments.Count - 1;
-        Status = $"Added instrument '{instrument.Name}'";
+        Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
     }
 
-    private void RemoveInstrument(TrackerInstrument? instrument)
+    private void RemoveSelectedInstrument()
     {
+        int index = SelectedInstrument;
+        var instrument = Song.InstrumentAt(index);
         if (instrument == null) return;
 
-        Song.Instruments.Remove(instrument);
-        Instruments.Remove(instrument);
-        SelectedInstrument = Math.Clamp(SelectedInstrument, 0, Math.Max(0, Song.Instruments.Count - 1));
+        // Cells point at instruments by number, so the song renumbers them as it removes one.
+        if (!Song.RemoveInstrumentAt(index)) return;
+
+        SyncInstruments();
+        SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
+        Status = $"Removed '{instrument.Name}'";
     }
 
     private void Save()
@@ -428,13 +435,14 @@ public sealed partial class TrackerViewModel : ObservableObject
         OnPropertyChanged(nameof(TrackCount));
     }
 
+    /// <summary>Rebuilds the list so every row carries its current number.</summary>
     private void SyncInstruments()
     {
         Instruments.Clear();
-        foreach (var instrument in Song.Instruments)
-            Instruments.Add(instrument);
+        for (int i = 0; i < Song.Instruments.Count; i++)
+            Instruments.Add(new InstrumentSlot(i, Song.Instruments[i]));
 
-        SelectedInstrument = Song.Instruments.Count > 0 ? 0 : 0;
+        OnPropertyChanged(nameof(HasInstruments));
     }
 
     private void RefreshSavedSongs()

@@ -35,9 +35,58 @@ public partial class TrackerView : UserControl
             if (metrics.CharWidth > 0) Header.CharWidth = metrics.CharWidth;
             Header.RowHeight = Grid.RowHeight;
         };
+
+        // Follow the cursor, and follow the player while it is running.
+        Grid.GetObservable(PatternGrid.EditCursorProperty)
+            .Subscribe(new AnonymousObserver<PatternCursor>(FollowCursor));
+
+        Grid.GetObservable(PatternGrid.PlayingLineProperty)
+            .Subscribe(new AnonymousObserver<int>(FollowPlayhead));
     }
 
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
+
+    private void FollowCursor(PatternCursor cursor)
+    {
+        ScrollToRow(cursor.Line);
+        ScrollToTrack(cursor.Track);
+    }
+
+    private void FollowPlayhead(int line)
+    {
+        // Only chase the playhead while it is actually moving, or stopping would yank the
+        // view away from wherever the cursor was left.
+        if (line >= 0 && ViewModel?.IsPlaying == true) ScrollToRow(line);
+    }
+
+    private void ScrollToRow(int row)
+    {
+        var pattern = Grid.Pattern;
+        if (pattern == null) return;
+
+        double offset = ViewportScroller.KeepRowVisible(
+            GridScroll.Offset.Y, GridScroll.Viewport.Height, Grid.Metrics, row, pattern.Lines);
+
+        SetScrollOffset(offset, GridScroll.Offset.X);
+    }
+
+    private void ScrollToTrack(int track)
+    {
+        if (Grid.Pattern == null) return;
+
+        double offset = ViewportScroller.KeepTrackVisible(
+            GridScroll.Offset.X, GridScroll.Viewport.Width, Grid.Metrics, track);
+
+        SetScrollOffset(GridScroll.Offset.Y, offset);
+    }
+
+    private void SetScrollOffset(double y, double x)
+    {
+        // Writing an unchanged offset would restart the scroll animation on every keystroke.
+        if (Math.Abs(x - GridScroll.Offset.X) < 0.5 && Math.Abs(y - GridScroll.Offset.Y) < 0.5) return;
+
+        GridScroll.Offset = new Vector(x, y);
+    }
 
     private void SelectTrack(int track)
     {

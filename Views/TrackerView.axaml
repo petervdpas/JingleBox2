@@ -133,7 +133,15 @@
           <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Instruments" />
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
-            <TextBlock Classes="cardHint" Text="Add a recording as an instrument:" />
+            <TextBlock Classes="cardHint"
+                       Text="The selected instrument is written into the cell you type a note in. Tracks are not tied to an instrument." />
+
+            <Button Content="Remove instrument" HorizontalAlignment="Stretch"
+                    Classes="danger"
+                    IsEnabled="{Binding HasInstruments}"
+                    Command="{Binding RemoveInstrumentCommand}" />
+
+            <TextBlock Classes="cardHint" Text="Add a recording as an instrument:" Margin="0,6,0,0" />
             <ComboBox x:Name="RecordingPicker"
                       ItemsSource="{Binding AvailableRecordings}"
                       DisplayMemberBinding="{Binding Name}"
@@ -145,11 +153,18 @@
           <ListBox ItemsSource="{Binding Instruments}"
                    SelectedIndex="{Binding SelectedInstrument}">
             <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="tracker:TrackerInstrument">
-                <StackPanel Spacing="2">
-                  <TextBlock Text="{Binding Name}" />
-                  <TextBlock Classes="cardHint" Text="{Binding BaseNote}" />
-                </StackPanel>
+              <DataTemplate x:DataType="vm:InstrumentSlot">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding Number}"
+                             FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
+                             VerticalAlignment="Center"
+                             Opacity="0.7" />
+                  <StackPanel Grid.Column="1" Spacing="2">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="cardHint" Text="{Binding BaseNoteText}" />
+                  </StackPanel>
+                </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>

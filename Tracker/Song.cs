@@ -61,6 +61,33 @@ public sealed class Song
         return Patterns.Count - 1;
     }
 
+    /// <summary>
+    /// Removes an instrument and repairs every cell that referred to one. Cells point at
+    /// instruments by index, so deleting one without renumbering would silently repoint every
+    /// note above it at the wrong sample.
+    /// </summary>
+    public bool RemoveInstrumentAt(int index)
+    {
+        if (index < 0 || index >= Instruments.Count) return false;
+
+        Instruments.RemoveAt(index);
+
+        foreach (var pattern in Patterns)
+            for (int line = 0; line < pattern.Lines; line++)
+                for (int track = 0; track < pattern.TrackCount; track++)
+                {
+                    var cell = pattern[line, track];
+                    if (cell.Instrument == TrackerCell.NoInstrument) continue;
+
+                    if (cell.Instrument == index)
+                        pattern[line, track] = cell with { Instrument = TrackerCell.NoInstrument };
+                    else if (cell.Instrument > index)
+                        pattern[line, track] = cell with { Instrument = cell.Instrument - 1 };
+                }
+
+        return true;
+    }
+
     /// <summary>Applies a new track count to the song and every pattern in it.</summary>
     public void SetTrackCount(int trackCount)
     {
