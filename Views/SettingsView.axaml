@@ -51,7 +51,7 @@
           <TextBlock Classes="cardTitle" Text="MIDI Input" />
 
           <TextBlock Classes="cardHint"
-                     Text="Tick what each controller drives. A pad box and a keyboard can be connected at the same time. Map the pads themselves on the MIDI tab." />
+                     Text="Tick what each controller drives. A pad box and a keyboard can be connected at the same time. Pad Mapping is where a pad controller learns its notes." />
 
           <ItemsControl ItemsSource="{Binding Midi.Devices}">
             <ItemsControl.ItemTemplate>
@@ -80,9 +80,14 @@
                      Text="No MIDI devices found."
                      IsVisible="{Binding !Midi.HasDevices}" />
 
-          <Button Content="Refresh Devices"
-                  HorizontalAlignment="Left"
-                  Command="{Binding Midi.RefreshDevicesCommand}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+            <Button Content="Refresh Devices"
+                    Command="{Binding Midi.RefreshDevicesCommand}" />
+
+            <Button Content="Pad Mapping..."
+                    IsEnabled="{Binding Midi.HasPadDevice}"
+                    Click="OnOpenPadMapping" />
+          </StackPanel>
 
           <TextBlock Classes="cardHint"
                      Text="{Binding Midi.Status}"

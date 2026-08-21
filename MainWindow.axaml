@@ -64,10 +64,6 @@
         <views:TrackerView DataContext="{Binding Tracker}" />
       </TabItem>
 
-      <TabItem Header="MIDI">
-        <views:MidiView DataContext="{Binding Midi}" />
-      </TabItem>
-
       <TabItem Header="SETTINGS">
         <views:SettingsView />
       </TabItem>

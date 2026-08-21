@@ -27,6 +27,12 @@ public sealed partial class MidiViewModel : ObservableObject
     [ObservableProperty] private bool toggleMode;
     [ObservableProperty] private string status = "";
 
+    /// <summary>The controller the pad mapping belongs to; blank when none is assigned.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPadDevice))]
+    [NotifyPropertyChangedFor(nameof(PadDeviceSummary))]
+    private string padDevice = "";
+
     public MidiViewModel(ConfigStore store, AppConfig cfg, IMidiService midi)
     {
         _store = store;
@@ -48,6 +54,13 @@ public sealed partial class MidiViewModel : ObservableObject
         _midi.MessageReceived += OnMidi;
     }
 
+    public bool HasPadDevice => PadDevice.Length > 0;
+
+    /// <summary>Line above the mapping table: a mapping without a pad controller does nothing.</summary>
+    public string PadDeviceSummary => HasPadDevice
+        ? $"These pads are triggered by '{PadDevice}'."
+        : "No controller drives the pads yet. Tick Pads in SETTINGS.";
+
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
 
     public IRelayCommand<PadMidiMappingViewModel?> LearnCommand =>
@@ -61,6 +74,7 @@ public sealed partial class MidiViewModel : ObservableObject
 
         HasDevices = Devices.Count > 0;
 
+        UpdatePadDevice();
         ApplyBindings();
         Status = DescribeDevices();
     }
@@ -69,6 +83,7 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         MidiDeviceBindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
 
+        UpdatePadDevice();
         ApplyBindings();
         SaveMidi();
 
@@ -93,6 +108,12 @@ public sealed partial class MidiViewModel : ObservableObject
 
         foreach (var device in wanted)
             _midi.Open(device);
+    }
+
+    private void UpdatePadDevice()
+    {
+        var pads = MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Pads);
+        PadDevice = pads.Count == 0 ? "" : string.Join(", ", pads);
     }
 
     private string DescribeDevices()

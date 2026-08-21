@@ -30,7 +30,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Midi/` - MIDI input handling and routing to pads
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
-- `Views/` - Avalonia user controls (UseView, PadsView, MidiView, SettingsView)
+- `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
 - `Themes/` - XAML resource dictionaries (Dark, Light, Neon, Industrial)
 - `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64
 
@@ -45,6 +45,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `BassAudioEngine` (Audio/): Manages pad audio playback, device selection, file/stream sources, dynamic resize
 - `ConfigStore` (Config/): JSON persistence with profile migration support
 - `MidiRouter` (Midi/): Maps MIDI messages to pad triggers with toggle/start modes
+- `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
+- `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 

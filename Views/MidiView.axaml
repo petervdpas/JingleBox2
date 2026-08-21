@@ -18,6 +18,8 @@
         <StackPanel Classes="cardBody">
           <TextBlock Classes="cardTitle" Text="Pad mapping (global)" />
 
+          <TextBlock Classes="cardHint" Text="{Binding PadDeviceSummary}" />
+
           <TextBlock Text="{Binding Status}" Opacity="0.85"
             IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -60,6 +62,7 @@
 
                   <Button Grid.Column="4"
                     Content="{Binding IsLearning, Converter={StaticResource LearnText}}"
+                    IsEnabled="{Binding ((vm:MidiViewModel)DataContext).HasPadDevice, ElementName=Root}"
                     Command="{Binding ((vm:MidiViewModel)DataContext).LearnCommand, ElementName=Root}"
                     CommandParameter="{Binding}" />
                 </Grid>
