@@ -41,37 +41,37 @@
                      Foreground="#FF6B7280"
                      HorizontalAlignment="Center" />
 
-          <!-- Level Meter -->
-          <StackPanel Spacing="4">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-              <TextBlock Grid.Column="0" Text="Level" Opacity="0.8" FontSize="12" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="2" Text="CLIP" FontSize="10" FontWeight="SemiBold"
-                         Margin="0,0,6,0" VerticalAlignment="Center"
-                         Classes="cliptext" Classes.clipping="{Binding IsClipping}" />
-              <Border Grid.Column="3" Width="10" Height="10" CornerRadius="5" VerticalAlignment="Center"
-                      Classes="cliplight" Classes.clipping="{Binding IsClipping}" />
-            </Grid>
-            <views:LevelMeter Height="14"
-                              Orientation="Horizontal"
-                              Stereo="{Binding IsStereoInput}"
-                              Left="{Binding LevelLeft}"
-                              Right="{Binding LevelRight}"
-                              ToolTip.Tip="Peak level, left over right. Green to -6 dB, amber to -1, red above." />
-          </StackPanel>
-
           <TextBlock Text="{Binding Status}"
                      Opacity="0.7"
                      FontSize="12" />
         </StackPanel>
 
-        <views:Fader Grid.Column="1"
-                     Label="Input gain" Unit=" dB" Format="0.0" DefaultValue="0"
-                     Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}"
-                     SmallStep="0.5" LargeStep="3"
-                     TrackLength="150"
-                     VerticalAlignment="Center"
-                     ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
-                     Value="{Binding RecordGainDb}" />
+        <!-- The gain and what it is doing, side by side, the way a channel strip has them. -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <views:Fader Label="Input gain" Unit=" dB" Format="0.0" DefaultValue="0"
+                       Minimum="{Binding MinGainDb}" Maximum="{Binding MaxGainDb}"
+                       SmallStep="0.5" LargeStep="3"
+                       TrackLength="150"
+                       Ticks="12,6,0,-6,-12,-24"
+                       ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
+                       Value="{Binding RecordGainDb}" />
+
+          <StackPanel Spacing="6" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+              <TextBlock Text="CLIP" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"
+                         Classes="cliptext" Classes.clipping="{Binding IsClipping}" />
+              <Border Width="9" Height="9" CornerRadius="5" VerticalAlignment="Center"
+                      Classes="cliplight" Classes.clipping="{Binding IsClipping}" />
+            </StackPanel>
+
+            <views:LevelMeter Width="26" Height="150"
+                              Stereo="{Binding IsStereoInput}"
+                              Left="{Binding LevelLeft}"
+                              Right="{Binding LevelRight}"
+                              HorizontalAlignment="Center"
+                              ToolTip.Tip="Peak level, left and right. Accent to -6 dB, amber to -1, red above." />
+          </StackPanel>
+        </StackPanel>
         </Grid>
       </Border>
 

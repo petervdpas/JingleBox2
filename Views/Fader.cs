@@ -31,6 +31,11 @@ public class Fader : ThemedControl
 
     private const double LabelFontSize = 11;
     private const double ValueFontSize = 11.5;
+    private const double TickFontSize = 9;
+
+    /// <summary>How far the marks and their labels sit from the cap.</summary>
+    private const double TickGap = 3;
+    private const double TickLength = 5;
 
     public static readonly StyledProperty<double> ValueProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(Value), defaultBindingMode: BindingMode.TwoWay);
@@ -66,11 +71,24 @@ public class Fader : ThemedControl
     public static readonly StyledProperty<double> TrackLengthProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(TrackLength), 110.0);
 
+    /// <summary>
+    /// The scale beside the groove, as the values to mark: "6,0,-6,-12,-24,-40,-60". Empty for
+    /// no scale at all.
+    /// </summary>
+    public static readonly StyledProperty<string> TicksProperty =
+        AvaloniaProperty.Register<Fader, string>(nameof(Ticks), "");
+
+    /// <summary>Whether each mark is written out as well as drawn.</summary>
+    public static readonly StyledProperty<bool> ShowTickLabelsProperty =
+        AvaloniaProperty.Register<Fader, bool>(nameof(ShowTickLabels), true);
+
     /// <summary>Where a double click puts the fader back to. Nothing happens when it is not set.</summary>
     public static readonly StyledProperty<double?> DefaultValueProperty =
         AvaloniaProperty.Register<Fader, double?>(nameof(DefaultValue));
 
     private static readonly Cursor DragCursor = new(StandardCursorType.SizeNorthSouth);
+
+    private double[] _ticks = Array.Empty<double>();
 
     private bool _dragging;
     private bool _fineDrag;
@@ -83,9 +101,11 @@ public class Fader : ThemedControl
     {
         AffectsRender<Fader>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
-            UnitProperty, FormatProperty, TrackLengthProperty);
+            UnitProperty, FormatProperty, TrackLengthProperty, TicksProperty, ShowTickLabelsProperty);
 
-        AffectsMeasure<Fader>(LabelProperty, UnitProperty, FormatProperty, TrackLengthProperty);
+        AffectsMeasure<Fader>(
+            LabelProperty, UnitProperty, FormatProperty, TrackLengthProperty,
+            TicksProperty, ShowTickLabelsProperty);
     }
 
     public Fader()
@@ -154,6 +174,26 @@ public class Fader : ThemedControl
         set => SetValue(DefaultValueProperty, value);
     }
 
+    public string Ticks
+    {
+        get => GetValue(TicksProperty);
+        set => SetValue(TicksProperty, value);
+    }
+
+    public bool ShowTickLabels
+    {
+        get => GetValue(ShowTickLabelsProperty);
+        set => SetValue(ShowTickLabelsProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        // Parsed once when it is set, not on every frame of a drag.
+        if (change.Property == TicksProperty) _ticks = TickList.Parse(Ticks);
+    }
+
     public string ValueText => NumericInput.Format(Value, Format) + Unit;
 
     protected override Size MeasureOverride(Size availableSize)
@@ -165,7 +205,7 @@ public class Fader : ThemedControl
         // gives it the whole area anyway, whatever was asked for.
         double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
 
-        double width = Math.Max(CapWidth, Math.Max(label.Width, value.Width));
+        double width = Math.Max(CapWidth, Math.Max(label.Width, value.Width)) + ScaleWidth();
         double height = label.Height + TextGap + throwLength + CapHeight + TextGap + value.Height;
 
         return new Size(width, height);
@@ -181,6 +221,7 @@ public class Fader : ThemedControl
         context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, 0));
 
         var (trackTop, trackLength) = Track();
+        DrawScale(context, palette, trackTop, trackLength);
         DrawTrack(context, palette, trackTop, trackLength);
 
         context.DrawText(value, new Point(
@@ -190,7 +231,7 @@ public class Fader : ThemedControl
 
     private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop, double trackLength)
     {
-        double centerX = Bounds.Width / 2;
+        double centerX = TrackCenterX();
         double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         // The groove, then the travelled part of it. Both rounded, so the ends do not look cut.
@@ -227,7 +268,62 @@ public class Fader : ThemedControl
     }
 
     private Rect CapRect(double capY) =>
-        new(Bounds.Width / 2 - CapWidth / 2, capY - CapHeight / 2, CapWidth, CapHeight);
+        new(TrackCenterX() - CapWidth / 2, capY - CapHeight / 2, CapWidth, CapHeight);
+
+    /// <summary>
+    /// The groove keeps to the left of the scale, so adding marks moves the numbers in rather
+    /// than sliding the fader out from under the pointer.
+    /// </summary>
+    private double TrackCenterX() => (Bounds.Width - ScaleWidth()) / 2;
+
+    /// <summary>How much room the scale takes beside the groove, including its labels.</summary>
+    private double ScaleWidth()
+    {
+        if (_ticks.Length == 0) return 0;
+
+        double width = TickGap + TickLength;
+        if (!ShowTickLabels) return width;
+
+        double widest = 0;
+        foreach (double mark in _ticks)
+            widest = Math.Max(widest, BuildText(TickText(mark), TickFontSize, FontFamily.Default, Brushes.Black).Width);
+
+        return width + 2 + widest;
+    }
+
+    /// <summary>
+    /// The scale beside the groove. Unity is drawn in the accent: on a level fader that is the
+    /// mark you aim for, and it should be findable without reading the numbers.
+    /// </summary>
+    private void DrawScale(DrawingContext context, ThemePalette palette, double trackTop, double trackLength)
+    {
+        if (_ticks.Length == 0) return;
+
+        double x = TrackCenterX() + CapWidth / 2 + TickGap;
+
+        foreach (double mark in _ticks)
+        {
+            if (mark < Minimum || mark > Maximum) continue;
+
+            double y = FaderMath.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
+            bool unity = Math.Abs(mark) < 0.0001;
+
+            context.DrawLine(
+                new Pen(unity ? palette.AccentBrush : palette.BorderBrush, 1),
+                new Point(x, y),
+                new Point(x + TickLength, y));
+
+            if (!ShowTickLabels) continue;
+
+            var text = BuildText(TickText(mark), TickFontSize, FontFamily.Default,
+                unity ? palette.TextBrush : palette.MutedBrush);
+
+            context.DrawText(text, new Point(x + TickLength + 2, y - text.Height / 2));
+        }
+    }
+
+    private static string TickText(double mark) =>
+        mark.ToString("0.#", CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Where the throw starts and how long it is. The label sits above it and the value below,
@@ -282,7 +378,7 @@ public class Fader : ThemedControl
         double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         // On the cap: pick it up where it is. Anywhere else: send it there first.
-        if (CapRect(capY).Contains(new Point(Bounds.Width / 2, y)))
+        if (CapRect(capY).Contains(new Point(TrackCenterX(), y)))
         {
             _grabOffset = y - capY;
         }

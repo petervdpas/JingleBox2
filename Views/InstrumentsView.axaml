@@ -155,11 +155,12 @@
 
               <StackPanel Classes="group">
                 <TextBlock Classes="section" Text="Output" />
-                <views:Fader Label="Level" Format="0.00" DefaultValue="1"
-                             Minimum="0" Maximum="2" SmallStep="0.01" LargeStep="0.1"
+                <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                             Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                              TrackLength="90"
-                             ToolTip.Tip="Loudness. Past 1.00 is makeup gain."
-                             Value="{Binding Editor.Volume}" />
+                             Ticks="6,0,-12,-40"
+                             ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
+                             Value="{Binding Editor.VolumeDecibels}" />
               </StackPanel>
             </WrapPanel>
 
@@ -264,11 +265,12 @@
               <StackPanel Classes="group">
                 <TextBlock Classes="section" Text="Output" />
                 <StackPanel Orientation="Horizontal" Spacing="12">
-                  <views:Fader Label="Level" Format="0.00" DefaultValue="1"
-                               Minimum="0" Maximum="2" SmallStep="0.01" LargeStep="0.1"
+                  <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                               Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                TrackLength="96"
-                               ToolTip.Tip="Loudness. Past 1.00 is makeup gain."
-                               Value="{Binding Editor.Volume}" />
+                               Ticks="6,0,-12,-40"
+                               ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
+                               Value="{Binding Editor.VolumeDecibels}" />
 
                   <StackPanel Spacing="8" VerticalAlignment="Top">
                     <views:Knob Label="Drive" Format="0.0" DefaultValue="1"

@@ -52,7 +52,7 @@
 
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TrackStripViewModel">
-                <Border Classes="inset" Width="96">
+                <Border Classes="inset" Width="110">
                   <!-- The meter takes whatever height is left, so the strips grow with the page
                        instead of leaving a hole under the buttons. -->
                   <DockPanel>
@@ -88,12 +88,14 @@
                     </StackPanel>
 
                     <!-- Zero track length: the fader takes whatever height is left in the strip. -->
-                    <views:Fader Label="Level" Format="0.00" DefaultValue="1"
-                                 Minimum="0" Maximum="2" SmallStep="0.01" LargeStep="0.1"
+                    <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                                 Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                  TrackLength="0"
+                                 Ticks="6,0,-6,-12,-24,-40,-60"
+                                 ToolTip.Tip="Unity is 0 dB. Double click to go back to it."
                                  Margin="0,10,0,0"
                                  HorizontalAlignment="Center"
-                                 Value="{Binding Volume}" />
+                                 Value="{Binding VolumeDecibels}" />
                   </DockPanel>
                 </Border>
               </DataTemplate>

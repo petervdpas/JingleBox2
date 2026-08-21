@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker;
+using JingleBox2.UI;
 using System;
 using System.Globalization;
 
@@ -45,7 +46,18 @@ public sealed class TrackStripViewModel : ObservableObject
     public double Volume
     {
         get => _strip.Volume;
-        set => Set(v => _strip.Volume = v, _strip.Volume, value, TrackMix.MinVolume, TrackMix.MaxVolume, nameof(Volume));
+        set => Set(v => _strip.Volume = v, _strip.Volume, value, TrackMix.MinVolume, TrackMix.MaxVolume,
+            nameof(Volume), nameof(VolumeDecibels));
+    }
+
+    /// <summary>
+    /// The same level as the fader reads it. The strip stores an amplitude, because that is
+    /// what the engine multiplies by; a desk is marked in decibels with unity at zero.
+    /// </summary>
+    public double VolumeDecibels
+    {
+        get => GainScale.ToDecibels(_strip.Volume);
+        set => Volume = GainScale.ToAmplitude(value);
     }
 
     public double Pan
@@ -53,6 +65,7 @@ public sealed class TrackStripViewModel : ObservableObject
         get => _strip.Pan;
         set => Set(v => _strip.Pan = v, _strip.Pan, value, -1, 1, nameof(Pan));
     }
+
 
     public bool Mute
     {
@@ -96,13 +109,16 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
-    private void Set(Action<double> assign, double current, double value, double min, double max, string name)
+    private void Set(Action<double> assign, double current, double value, double min, double max, params string[] changed)
     {
         double clamped = double.IsNaN(value) ? min : Math.Clamp(value, min, max);
         if (Math.Abs(current - clamped) < 0.0001) return;
 
         assign(clamped);
-        OnPropertyChanged(name);
+
+        foreach (var name in changed)
+            OnPropertyChanged(name);
+
         _changed();
     }
 }

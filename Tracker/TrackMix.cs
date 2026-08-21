@@ -8,7 +8,11 @@ public sealed class TrackMix
 {
     public const double MinVolume = 0;
 
-    /// <summary>Past unity, so a quiet track can be pushed up rather than everything else down.</summary>
+    /// <summary>
+    /// Past unity, so a quiet track can be pushed up rather than everything else down. Stored
+    /// as an amplitude, because that is what the engine multiplies by; the fader reads it in
+    /// decibels, where this is +6.
+    /// </summary>
     public const double MaxVolume = 2;
 
     public const double DefaultVolume = 1;

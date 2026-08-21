@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker;
+using JingleBox2.UI;
 using System;
 using System.Globalization;
 
@@ -68,8 +69,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
             _instrument.Volume = clamped;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(VolumeDecibels));
             _changed();
         }
+    }
+
+    /// <summary>The same level as a fader reads it: decibels, with unity at zero.</summary>
+    public double VolumeDecibels
+    {
+        get => GainScale.ToDecibels(_instrument.Volume);
+        set => Volume = GainScale.ToAmplitude(value);
     }
 
     /// <summary>The pitch the file sounds at, which every other note is measured against.</summary>
