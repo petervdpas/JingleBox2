@@ -8,6 +8,7 @@ using JingleBox2.Tracker.Synth;
 using JingleBox2.Views;
 using System;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -30,6 +31,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty] private Pattern? currentPattern;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedTrack))]
+    [NotifyPropertyChangedFor(nameof(CursorTrackLabel))]
     private PatternCursor cursor = PatternCursor.Start;
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
@@ -272,6 +274,61 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     partial void OnSongNameChanged(string value) => MarkDirty();
 
+    /// <summary>The track the cursor is on, named as the grid and the mixer name it.</summary>
+    public string CursorTrackLabel => "Track " + (Cursor.Track + 1).ToString("00", CultureInfo.InvariantCulture);
+
+    public IRelayCommand<string> QuantizeTrackCommand => new RelayCommand<string>(QuantizeTrack);
+
+    public IRelayCommand ClearTrackCommand => new RelayCommand(ClearTrack);
+
+    public IRelayCommand ClearPatternCommand => new RelayCommand(ClearPattern);
+
+    public IRelayCommand<string> TransposeTrackCommand => new RelayCommand<string>(TransposeTrack);
+
+    public IRelayCommand ClearTrackInstrumentCommand =>
+        new RelayCommand(() => ClearTrackInstrument(Cursor.Track));
+
+    /// <summary>
+    /// Pulls the track's notes onto every nth line. The grid comes from the menu as text,
+    /// since that is what a menu item can carry.
+    /// </summary>
+    private void QuantizeTrack(string? grid)
+    {
+        if (CurrentPattern == null) return;
+        if (!int.TryParse(grid, NumberStyles.Integer, CultureInfo.InvariantCulture, out int lines)) return;
+
+        int moved = PatternEdit.Quantize(CurrentPattern, Cursor.Track, lines);
+
+        Status = moved == 0
+            ? $"{CursorTrackLabel} was already on {lines}"
+            : $"Quantized {CursorTrackLabel} to {lines}: {moved} note(s) moved";
+    }
+
+    private void ClearTrack()
+    {
+        if (CurrentPattern == null) return;
+
+        PatternEdit.ClearTrack(CurrentPattern, Cursor.Track);
+        Status = $"Cleared {CursorTrackLabel}";
+    }
+
+    private void ClearPattern()
+    {
+        if (CurrentPattern == null) return;
+
+        PatternEdit.ClearPattern(CurrentPattern);
+        Status = $"Cleared pattern '{CurrentPattern.Name}'";
+    }
+
+    private void TransposeTrack(string? semitones)
+    {
+        if (CurrentPattern == null) return;
+        if (!int.TryParse(semitones, NumberStyles.Integer, CultureInfo.InvariantCulture, out int steps)) return;
+
+        PatternEdit.TransposeTrack(CurrentPattern, Cursor.Track, steps);
+        Status = $"Transposed {CursorTrackLabel} by {steps:+0;-0} semitone(s)";
+    }
+
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 
@@ -483,7 +540,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int track = 0; track < Song.TrackCount && track < Song.Mix.Count; track++)
         {
             var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
-            Strips.Add(new TrackStripViewModel(track, Song.Mix[track], instrument?.Name ?? "", OnMixChanged));
+            Strips.Add(new TrackStripViewModel(
+                track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount, OnMixChanged));
         }
     }
 

@@ -124,7 +124,44 @@
                                Pattern="{Binding CurrentPattern}"
                                EditCursor="{Binding Cursor, Mode=TwoWay}"
                                PlayingLine="{Binding PlayingLine}"
-                               LinesPerBeat="{Binding LinesPerBeat}" />
+                               LinesPerBeat="{Binding LinesPerBeat}">
+
+              <!-- Everything here acts on the track the cursor is on, and a right click puts
+                   the cursor where it was clicked first, so the menu always means the column
+                   under the pointer. -->
+              <views:PatternGrid.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="{Binding CursorTrackLabel}" IsEnabled="False" />
+                  <Separator />
+
+                  <MenuItem Header="Quantize to">
+                    <MenuItem Header="Every 2 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="2" />
+                    <MenuItem Header="Every 3 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="3" />
+                    <MenuItem Header="Every 4 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="4" />
+                    <MenuItem Header="Every 6 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="6" />
+                    <MenuItem Header="Every 8 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="8" />
+                    <MenuItem Header="Every 16 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="16" />
+                  </MenuItem>
+
+                  <MenuItem Header="Transpose">
+                    <MenuItem Header="Up a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="1" />
+                    <MenuItem Header="Down a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="-1" />
+                    <MenuItem Header="Up an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="12" />
+                    <MenuItem Header="Down an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="-12" />
+                  </MenuItem>
+
+                  <Separator />
+
+                  <MenuItem Header="Clear track" Command="{Binding ClearTrackCommand}" />
+                  <MenuItem Header="Clear pattern" Command="{Binding ClearPatternCommand}" />
+
+                  <Separator />
+
+                  <MenuItem Header="Take the instrument off this track"
+                            Command="{Binding ClearTrackInstrumentCommand}" />
+                </ContextMenu>
+              </views:PatternGrid.ContextMenu>
+            </views:PatternGrid>
           </ScrollViewer>
         </DockPanel>
       </Border>

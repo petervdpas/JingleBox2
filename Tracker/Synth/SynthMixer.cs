@@ -24,14 +24,57 @@ public sealed class SynthMixer
     /// </summary>
     public const float MasterGain = 0.9f;
 
+    /// <summary>As many tracks as a song can have, so a strip always has a bus of its own.</summary>
+    private const int MaxTracks = Song.MaxTrackCount;
+
     private readonly List<IVoice> _voices = new();
     private readonly object _lock = new();
+
+    /// <summary>One buffer per track, so a track can be measured and moved on its own.</summary>
+    private readonly float[]?[] _busses = new float[MaxTracks][];
+
+    /// <summary>Auditions and anything else with no track of its own.</summary>
+    private float[] _loose = Array.Empty<float>();
+
+    private readonly bool[] _sounding = new bool[MaxTracks];
+    private readonly DuckSetting[] _ducking = new DuckSetting[MaxTracks];
+    private readonly Ducker?[] _duckers = new Ducker[MaxTracks];
+    private readonly float[] _duckGain = new float[MaxTracks];
+
+    private int _bufferFrames;
+
+    /// <summary>What one strip's side chain is set to.</summary>
+    private readonly record struct DuckSetting(double Depth, int Key, double ReleaseMs);
 
     private IVoice[] _snapshot = Array.Empty<IVoice>();
     private bool _snapshotStale = true;
     private int _noiseSeed;
 
-    public SynthMixer(int sampleRate) => SampleRate = sampleRate;
+    public SynthMixer(int sampleRate)
+    {
+        SampleRate = sampleRate;
+
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            _ducking[track] = new DuckSetting(0, TrackMix.NoKey, TrackMix.DefaultDuckReleaseMs);
+            _duckGain[track] = 1f;
+        }
+    }
+
+    /// <summary>
+    /// Points one strip's side chain at another track. Depth of zero, or no key, is a strip
+    /// that plays at its own level.
+    /// </summary>
+    public void SetDucking(int track, double depth, int key, double releaseMs)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        lock (_lock) _ducking[track] = new DuckSetting(Math.Clamp(depth, 0, 1), key, releaseMs);
+    }
+
+    /// <summary>How far a track is being pushed down right now, 1 being not at all.</summary>
+    public float DuckGainFor(int track) =>
+        track >= 0 && track < MaxTracks ? _duckGain[track] : 1f;
 
     public int SampleRate { get; }
 
@@ -150,6 +193,8 @@ public sealed class SynthMixer
 
             _voices.Clear();
             _snapshotStale = true;
+
+            Rest();
         }
     }
 
@@ -163,9 +208,15 @@ public sealed class SynthMixer
         Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
 
         IVoice[] playing;
+        DuckSetting[] ducking;
+
         lock (_lock)
         {
-            if (_voices.Count == 0) return;
+            if (_voices.Count == 0)
+            {
+                Rest();
+                return;
+            }
 
             if (_snapshotStale)
             {
@@ -174,15 +225,130 @@ public sealed class SynthMixer
             }
 
             playing = _snapshot;
+            ducking = (DuckSetting[])_ducking.Clone();
         }
 
-        foreach (var voice in playing)
-            voice.Render(buffer, frames);
+        // Each track is rendered on its own before anything is summed. Ducking needs one
+        // track to be measurable while another is being moved by it, and once everything is
+        // added together there is nothing left to measure.
+        RenderBusses(playing, frames, samples);
+
+        for (int track = 0; track < MaxTracks; track++)
+            MixTrack(buffer, track, ducking[track], frames, samples);
+
+        for (int i = 0; i < samples; i++)
+            buffer[i] += _loose[i];
 
         for (int i = 0; i < samples; i++)
             buffer[i] = SoftClip(buffer[i] * MasterGain);
 
         Reap();
+    }
+
+    /// <summary>Nothing is playing: the side chains fall back open rather than staying shut.</summary>
+    private void Rest()
+    {
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            _duckGain[track] = 1f;
+            _duckers[track]?.Reset();
+        }
+    }
+
+    /// <summary>Puts every voice on its own track's bus, auditions aside.</summary>
+    private void RenderBusses(IVoice[] playing, int frames, int samples)
+    {
+        EnsureBusses(frames);
+
+        Array.Clear(_sounding, 0, MaxTracks);
+
+        foreach (var voice in playing)
+        {
+            int track = voice.Track;
+            if (track >= 0 && track < MaxTracks) _sounding[track] = true;
+        }
+
+        Array.Clear(_loose, 0, samples);
+
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            if (!_sounding[track]) continue;
+
+            _busses[track] ??= new float[samples];
+            Array.Clear(_busses[track]!, 0, samples);
+        }
+
+        foreach (var voice in playing)
+        {
+            int track = voice.Track;
+
+            var target = track >= 0 && track < MaxTracks ? _busses[track] : _loose;
+            if (target != null) voice.Render(target, frames);
+        }
+    }
+
+    /// <summary>
+    /// Adds one track into the mix, through its side chain if it has one. The key is read
+    /// before it is itself ducked, so two tracks keying each other cannot chase each other
+    /// down into silence.
+    /// </summary>
+    private void MixTrack(float[] buffer, int track, DuckSetting setting, int frames, int samples)
+    {
+        var source = _sounding[track] ? _busses[track] : null;
+
+        bool ducked = setting.Depth > 0
+            && setting.Key >= 0
+            && setting.Key < MaxTracks
+            && setting.Key != track;
+
+        if (!ducked)
+        {
+            _duckGain[track] = 1f;
+            _duckers[track]?.Reset();
+
+            if (source == null) return;
+
+            for (int i = 0; i < samples; i++) buffer[i] += source[i];
+            return;
+        }
+
+        var ducker = _duckers[track] ??= new Ducker(setting.ReleaseMs, SampleRate);
+        ducker.ReleaseMs = setting.ReleaseMs;
+
+        var key = _sounding[setting.Key] ? _busses[setting.Key] : null;
+        float gain = 1f;
+
+        for (int frame = 0; frame < frames; frame++)
+        {
+            int i = frame * 2;
+
+            double magnitude = key == null ? 0 : Math.Max(Math.Abs(key[i]), Math.Abs(key[i + 1]));
+            gain = Ducker.GainFor(ducker.Next(magnitude), setting.Depth);
+
+            // The follower still has to run for a silent track, or the first note after a
+            // rest would come in at whatever gain the duck was left at.
+            if (source == null) continue;
+
+            buffer[i] += source[i] * gain;
+            buffer[i + 1] += source[i + 1] * gain;
+        }
+
+        _duckGain[track] = gain;
+    }
+
+    private void EnsureBusses(int frames)
+    {
+        int samples = frames * 2;
+        if (_bufferFrames == frames && _loose.Length >= samples) return;
+
+        _bufferFrames = frames;
+        _loose = new float[samples];
+
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            // Only tracks that have sounded have a bus; the rest are made when they are needed.
+            if (_busses[track] != null) _busses[track] = new float[samples];
+        }
     }
 
     /// <summary>Below this the bus is a wire; above it, it bends. Roughly -3 dB.</summary>
@@ -226,7 +392,7 @@ public sealed class SynthMixer
             {
                 if (voice.Track != track || voice.IsFinished) continue;
 
-                float level = voice.Level * MasterGain;
+                float level = voice.Level * MasterGain * DuckGainFor(track);
                 float pan = voice.Pan;
 
                 left = Math.Max(left, level * (pan <= 0 ? 1f : 1f - pan));

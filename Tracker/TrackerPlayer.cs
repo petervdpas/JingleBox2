@@ -104,6 +104,10 @@ public sealed class TrackerPlayer : IDisposable
         // for any song that has an instrument at all.
         if (song.Instruments.Count > 0) _synth.EnsureStarted(_audio);
 
+        // The strips are pushed once up front: a side chain set while stopped has nowhere to
+        // go until there is a song to take it.
+        ApplyMix();
+
         StartClock();
     }
 
@@ -385,6 +389,13 @@ public sealed class TrackerPlayer : IDisposable
             var (mixed, placed) = WithMix(song, track, _noteGain[track], _notePan[track]);
 
             _synth.Mixer.SetLevels(track, mixed, placed);
+
+            // The side chain is part of the strip, so it is pushed with the rest of it.
+            _synth.Mixer.SetDucking(
+                track,
+                MixLevels.DuckFor(song.Mix, track, song.TrackCount),
+                MixLevels.KeyFor(song.Mix, track, song.TrackCount),
+                MixLevels.DuckReleaseFor(song.Mix, track));
         }
     }
 

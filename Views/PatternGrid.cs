@@ -300,7 +300,11 @@ public sealed class PatternGrid : ThemedControl
 
         EditCursor = cursor;
         CursorMoved?.Invoke(this, cursor);
-        e.Handled = true;
+
+        // A right click moves the cursor too, so the menu that follows acts on the track
+        // under the pointer. It is deliberately not handled: handling it here swallows the
+        // request for the menu itself.
+        e.Handled = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
     }
 
     private void EnsureMetrics()

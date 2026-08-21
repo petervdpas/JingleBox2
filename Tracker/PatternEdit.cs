@@ -117,6 +117,90 @@ public static class PatternEdit
         }
     }
 
+    /// <summary>Empties one track, leaving every other track as it was.</summary>
+    public static void ClearTrack(Pattern pattern, int track)
+    {
+        if (track < 0 || track >= pattern.TrackCount) return;
+
+        for (int line = 0; line < pattern.Lines; line++)
+            pattern[line, track] = TrackerCell.Empty;
+    }
+
+    /// <summary>Empties the whole pattern.</summary>
+    public static void ClearPattern(Pattern pattern)
+    {
+        for (int track = 0; track < pattern.TrackCount; track++)
+            ClearTrack(pattern, track);
+    }
+
+    /// <summary>
+    /// Snaps a track's cells onto every nth line, which is what a tracker means by quantizing:
+    /// notes played in live sit a line or two off the beat, and this pulls them onto it.
+    /// Returns how many moved.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is ever lost. Where two cells want the same line, the second keeps the line it
+    /// was already on, and if that is taken too it takes the nearest free line to where it was
+    /// meant to land. A tidy pattern is worth less than the notes in it.
+    /// </remarks>
+    public static int Quantize(Pattern pattern, int track, int grid)
+    {
+        if (track < 0 || track >= pattern.TrackCount || grid <= 1) return 0;
+
+        var placed = new TrackerCell[pattern.Lines];
+        for (int line = 0; line < placed.Length; line++) placed[line] = TrackerCell.Empty;
+
+        int moved = 0;
+
+        for (int line = 0; line < pattern.Lines; line++)
+        {
+            var cell = pattern[line, track];
+            if (cell.IsEmpty) continue;
+
+            int target = SnapLine(line, grid, pattern.Lines);
+
+            if (!placed[target].IsEmpty) target = placed[line].IsEmpty ? line : NearestFree(placed, target);
+            if (target < 0) continue;
+
+            placed[target] = cell;
+            if (target != line) moved++;
+        }
+
+        for (int line = 0; line < pattern.Lines; line++)
+            pattern[line, track] = placed[line];
+
+        return moved;
+    }
+
+    /// <summary>The nearest line that is a multiple of the grid, kept inside the pattern.</summary>
+    public static int SnapLine(int line, int grid, int lines)
+    {
+        if (grid <= 1 || lines <= 0) return Math.Clamp(line, 0, Math.Max(0, lines - 1));
+
+        int snapped = (int)Math.Round(line / (double)grid, MidpointRounding.AwayFromZero) * grid;
+
+        // The last grid line can fall off the end of a pattern whose length is not a multiple
+        // of the grid, and a note pushed past the end is a note thrown away.
+        while (snapped > lines - 1) snapped -= grid;
+
+        return Math.Max(0, snapped);
+    }
+
+    /// <summary>The free line closest to where a cell wanted to go, or -1 when the track is full.</summary>
+    private static int NearestFree(TrackerCell[] placed, int wanted)
+    {
+        for (int distance = 1; distance < placed.Length; distance++)
+        {
+            int before = wanted - distance;
+            if (before >= 0 && placed[before].IsEmpty) return before;
+
+            int after = wanted + distance;
+            if (after < placed.Length && placed[after].IsEmpty) return after;
+        }
+
+        return -1;
+    }
+
     /// <summary>
     /// Pushes every cell on a track down one line from the cursor, dropping the last one.
     /// The insert-line edit every tracker has.
