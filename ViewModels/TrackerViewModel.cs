@@ -202,24 +202,43 @@ public sealed partial class TrackerViewModel : ObservableObject
         Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";
 
     /// <summary>Auditions the note under the cursor's instrument, for note entry feedback.</summary>
-    public void PreviewNote(Note note)
+    public void PreviewNote(Note note) => PreviewNote(note, TrackerCell.NoVolume);
+
+    /// <summary>Auditions at a given volume, which is what makes a keyboard's velocity audible.</summary>
+    public void PreviewNote(Note note, int volume)
     {
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
-        if (instrument != null) _player.Preview(instrument, note);
+        if (instrument == null) return;
+
+        _player.Preview(instrument, note, GainFor(volume));
     }
 
-    public void EnterNote(Note note)
+    public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
+
+    public void EnterNote(Note note, int volume)
     {
-        PreviewNote(note);
+        PreviewNote(note, volume);
 
         if (CurrentPattern == null || !IsRecording) return;
 
         // While playing, notes land on the line you can hear, not the line you left the cursor on.
         var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
 
-        PatternEdit.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track));
+        PatternEdit.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
         if (!IsPlaying) StepDown();
     }
+
+    /// <summary>
+    /// A note from a MIDI keyboard. It arrives on the MIDI thread, and everything it touches
+    /// from there (the cursor, the pattern, the grid's redraw) belongs to the UI thread.
+    /// </summary>
+    public void PlayMidiNote(Note note, int volume) =>
+        Dispatcher.UIThread.Post(() => EnterNote(note, volume));
+
+    private static float GainFor(int volume) =>
+        volume == TrackerCell.NoVolume
+            ? 1f
+            : Math.Clamp(volume, 0, TrackerCell.MaxVolume) / (float)TrackerCell.MaxVolume;
 
     public void EnterNoteOff()
     {

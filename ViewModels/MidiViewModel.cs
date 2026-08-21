@@ -1,8 +1,9 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Midi;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 
@@ -16,12 +17,13 @@ public sealed partial class MidiViewModel : ObservableObject
 
     private PadMidiMappingViewModel? _learningTarget;
 
-    public ObservableCollection<string> Devices { get; } = new();
+    /// <summary>Every controller with a row in SETTINGS, connected or merely remembered.</summary>
+    public ObservableCollection<MidiDeviceViewModel> Devices { get; } = new();
 
     // Row VMs so changes from code (learning) refresh the UI immediately
     public ObservableCollection<PadMidiMappingViewModel> Pads { get; }
 
-    [ObservableProperty] private string? selectedDevice;
+    [ObservableProperty] private bool hasDevices;
     [ObservableProperty] private bool toggleMode;
     [ObservableProperty] private string status = "";
 
@@ -34,14 +36,13 @@ public sealed partial class MidiViewModel : ObservableObject
         // cfg.Midi should exist (you normalize it), but guard anyway
         _cfg.Midi ??= new MidiConfig();
         _cfg.Midi.Pads ??= new();
+        _cfg.Midi.Devices ??= new();
 
         Pads = new ObservableCollection<PadMidiMappingViewModel>(
             _cfg.Midi.Pads.Select(m => new PadMidiMappingViewModel(m)));
 
         ToggleMode = _cfg.Midi.ToggleMode;
 
-        // Build the list first: assigning SelectedDevice before the list exists leaves the
-        // combo blank and the saved device unopened.
         RefreshDevices();
 
         _midi.MessageReceived += OnMidi;
@@ -54,42 +55,67 @@ public sealed partial class MidiViewModel : ObservableObject
 
     private void RefreshDevices()
     {
-        string? previous = SelectedDevice ?? _cfg.Midi.InputDevice;
-
         Devices.Clear();
-        foreach (var d in _midi.GetInputDevices())
-            Devices.Add(d);
+        foreach (var entry in MidiDeviceBindings.Merge(_midi.GetInputDevices(), _cfg.Midi.Devices))
+            Devices.Add(new MidiDeviceViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged));
 
-        SelectedDevice = InputDeviceSelector.Preserve(Devices, previous);
+        HasDevices = Devices.Count > 0;
 
-        if (Devices.Count == 0)
-            Status = "No MIDI devices found.";
-        else if (SelectedDevice == null && !string.IsNullOrEmpty(previous))
-            Status = $"'{previous}' is not connected.";
+        ApplyBindings();
+        Status = DescribeDevices();
     }
 
-    partial void OnSelectedDeviceChanged(string? value)
+    private void OnDeviceRoleChanged(MidiDeviceViewModel device)
     {
-        // An unplugged device drops out of the list and lands here as null. Keep the saved
-        // name in that case so it reconnects on its own once the hardware is back.
-        if (value != null)
-        {
-            _cfg.Midi.InputDevice = value;
-            SaveMidi();
-        }
+        MidiDeviceBindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
 
-        _midi.Close();
+        ApplyBindings();
+        SaveMidi();
 
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            _midi.Open(value);
-            Status = $"Opened: {value}";
-        }
-        else
-        {
-            Status = "MIDI device closed.";
-        }
+        Status = device.Role == MidiDeviceRole.None
+            ? $"'{device.Name}' drives nothing."
+            : $"'{device.Name}' drives {DescribeRole(device.Role)}.";
     }
+
+    /// <summary>
+    /// Opens exactly the devices that were given a job, and closes the rest. Nothing else holds
+    /// a port open, so the role list is the single source of truth for what is listening.
+    /// </summary>
+    private void ApplyBindings()
+    {
+        var wanted = MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.AnyRole);
+
+        foreach (var open in _midi.OpenDevices)
+        {
+            if (!wanted.Contains(open, StringComparer.OrdinalIgnoreCase))
+                _midi.Close(open);
+        }
+
+        foreach (var device in wanted)
+            _midi.Open(device);
+    }
+
+    private string DescribeDevices()
+    {
+        if (Devices.Count == 0) return "No MIDI devices found.";
+
+        int open = _midi.OpenDevices.Count;
+        if (open == 0) return "No controller assigned yet. Tick Pads or Tracker.";
+
+        var missing = Devices.Where(d => !d.IsConnected && d.Role != MidiDeviceRole.None).ToList();
+        if (missing.Count > 0)
+            return $"{open} controller(s) open. Not connected: {string.Join(", ", missing.Select(d => d.Name))}.";
+
+        return $"{open} controller(s) open.";
+    }
+
+    private static string DescribeRole(MidiDeviceRole role) => role switch
+    {
+        MidiDeviceRole.Pads => "the pads",
+        MidiDeviceRole.Tracker => "the tracker",
+        MidiDeviceBindings.AnyRole => "the pads and the tracker",
+        _ => "nothing"
+    };
 
     partial void OnToggleModeChanged(bool value)
     {
@@ -117,12 +143,18 @@ public sealed partial class MidiViewModel : ObservableObject
         _learningTarget = row;
         _learningTarget.IsLearning = true;
 
-        Status = $"Listening… Press a key/pad for Pad {row.PadIndex}.";
+        Status = $"Listening... Press a key/pad for Pad {row.PadIndex}.";
     }
 
-    private void OnMidi(object? sender, MidiMessage msg)
+    /// <summary>
+    /// MIDI arrives on its own thread, so the status text and the learn result are handed to
+    /// the UI thread before anything bound to them is touched.
+    /// </summary>
+    private void OnMidi(object? sender, MidiMessage msg) => Dispatcher.UIThread.Post(() => HandleMidi(msg));
+
+    private void HandleMidi(MidiMessage msg)
     {
-        Status = $"MIDI: {msg.Type} ch{msg.Channel} val={msg.Value} data={msg.Data} on={msg.IsOn}";
+        Status = $"{msg.Device}: {msg.Type} ch{msg.Channel} val={msg.Value} data={msg.Data} on={msg.IsOn}";
 
         if (_learningTarget is null)
             return;
@@ -130,6 +162,14 @@ public sealed partial class MidiViewModel : ObservableObject
         // Only learn "on" events
         if (!msg.IsOn)
             return;
+
+        // A keyboard sitting on the tracker must not end up mapped to a pad.
+        var role = MidiDeviceBindings.RoleFor(_cfg.Midi.Devices, msg.Device);
+        if ((role & MidiDeviceRole.Pads) == 0)
+        {
+            Status = $"'{msg.Device}' does not drive the pads, so it cannot be learned here.";
+            return;
+        }
 
         _learningTarget.Type = msg.Type;
         _learningTarget.Channel = msg.Channel;

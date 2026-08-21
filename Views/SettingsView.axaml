@@ -51,15 +51,34 @@
           <TextBlock Classes="cardTitle" Text="MIDI Input" />
 
           <TextBlock Classes="cardHint"
-                     Text="Pick the controller that triggers pads. Map the pads themselves on the MIDI tab." />
+                     Text="Tick what each controller drives. A pad box and a keyboard can be connected at the same time. Map the pads themselves on the MIDI tab." />
 
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <TextBlock Grid.Column="0" Classes="label" Text="MIDI device:" />
-            <ComboBox Grid.Column="1"
-                      ItemsSource="{Binding Midi.Devices}"
-                      SelectedItem="{Binding Midi.SelectedDevice}"
-                      HorizontalAlignment="Stretch" />
-          </Grid>
+          <ItemsControl ItemsSource="{Binding Midi.Devices}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="cardHint"
+                               Text="not connected"
+                               IsVisible="{Binding !IsConnected}" />
+                  </StackPanel>
+
+                  <CheckBox Grid.Column="1" Content="Pads"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding DrivesPads}" />
+
+                  <CheckBox Grid.Column="2" Content="Tracker"
+                            VerticalAlignment="Center"
+                            IsChecked="{Binding DrivesTracker}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Classes="cardHint"
+                     Text="No MIDI devices found."
+                     IsVisible="{Binding !Midi.HasDevices}" />
 
           <Button Content="Refresh Devices"
                   HorizontalAlignment="Left"

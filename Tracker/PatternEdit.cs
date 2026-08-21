@@ -10,12 +10,22 @@ namespace JingleBox2.Tracker;
 public static class PatternEdit
 {
     /// <summary>Writes a note and the current instrument, leaving the other columns alone.</summary>
-    public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument)
+    public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument) =>
+        EnterNote(pattern, cursor, note, instrument, TrackerCell.NoVolume);
+
+    /// <summary>
+    /// As above, and writes the volume column too. That is how a velocity sensitive keyboard
+    /// records: NoVolume leaves the column as it was, which is what typing a note does.
+    /// </summary>
+    public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument, int volume)
     {
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         var cell = pattern[cursor.Line, cursor.Track];
-        pattern[cursor.Line, cursor.Track] = cell with { Note = note, Instrument = instrument };
+
+        pattern[cursor.Line, cursor.Track] = volume == TrackerCell.NoVolume
+            ? cell with { Note = note, Instrument = instrument }
+            : cell with { Note = note, Instrument = instrument, Volume = TrackerCell.ClampVolume(volume) };
     }
 
     /// <summary>Writes a note-off, which stops the track without starting anything.</summary>

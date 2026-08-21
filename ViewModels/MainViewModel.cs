@@ -139,13 +139,15 @@ public sealed partial class MainViewModel : ObservableObject
         // Pads
         BuildPadsFromSelectedProfile(PadCount);
 
-        // MIDI routing: global, profile-independent mapping
-        var padTrigger = new JingleBox2.Midi.PadTriggerAdapter(Pads);
-        var router = new JingleBox2.Midi.MidiRouter(_cfg.Midi, padTrigger);
+        // MIDI routing: global, profile-independent mapping. Which controller reaches which
+        // half of the app is decided by the roles in SETTINGS, not here.
+        var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
+        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker));
+        var dispatcher = new MidiDispatcher(_cfg.Midi, padRouter.Handle, noteRouter.Handle);
 
         // NOTE: MidiViewModel already subscribes for learn/status.
-        // This subscription is for triggering pads.
-        midiService.MessageReceived += (_, msg) => router.Handle(msg);
+        // This subscription is for playing things.
+        midiService.MessageReceived += (_, msg) => dispatcher.Handle(msg);
 
         // Apply initial theme once
         ThemeManager.Apply(SelectedTheme);

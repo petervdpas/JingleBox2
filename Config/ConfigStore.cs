@@ -91,6 +91,9 @@ public sealed class ConfigStore
         cfg.Midi ??= new MidiConfig();
         cfg.Midi.Pads ??= new List<MidiMapping>();
 
+        // Cleans the device roles and brings a single-device config file across.
+        MidiDeviceBindings.Normalize(cfg.Midi);
+
         // Ensure exactly padCount mappings
         while (cfg.Midi.Pads.Count < padCount)
         {

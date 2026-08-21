@@ -12,19 +12,6 @@ public static class InputDeviceSelector
     public const string Fallback = "Default";
 
     /// <summary>
-    /// Returns <paramref name="preferred"/> when it is still present, otherwise null.
-    /// For device kinds where "nothing selected" is a valid state and picking an arbitrary
-    /// replacement would be wrong, such as MIDI input.
-    /// </summary>
-    public static string? Preserve(IEnumerable<string> devices, string? preferred)
-    {
-        if (string.IsNullOrEmpty(preferred)) return null;
-
-        var list = devices as IList<string> ?? devices.ToList();
-        return list.Contains(preferred) ? preferred : null;
-    }
-
-    /// <summary>
     /// Returns <paramref name="preferred"/> when it is still present, otherwise the first
     /// available device, otherwise <see cref="Fallback"/>.
     /// </summary>

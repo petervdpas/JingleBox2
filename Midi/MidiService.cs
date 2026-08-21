@@ -10,8 +10,10 @@ public sealed class MidiService : IMidiService
     #pragma warning disable CS0618
     private readonly IMidiAccess? _access;
     #pragma warning restore CS0618
-    
-    private IMidiInput? _input;
+
+    // Keyed by the same display name the device list shows, so bindings and open ports match up.
+    private readonly Dictionary<string, OpenPort> _ports = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _lock = new();
 
     public event EventHandler<MidiMessage>? MessageReceived;
 
@@ -34,7 +36,7 @@ public sealed class MidiService : IMidiService
         try
         {
             return _access.Inputs
-                .Select(p => string.IsNullOrWhiteSpace(p.Name) ? p.Id : p.Name)
+                .Select(DisplayName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -45,12 +47,18 @@ public sealed class MidiService : IMidiService
         }
     }
 
-    public void Open(string deviceIdOrName)
+    public IReadOnlyList<string> OpenDevices
     {
-        Close();
+        get
+        {
+            lock (_lock) return _ports.Keys.ToList();
+        }
+    }
 
-        if (_access is null) return;
-        if (string.IsNullOrWhiteSpace(deviceIdOrName)) return;
+    public bool Open(string deviceIdOrName)
+    {
+        if (_access is null) return false;
+        if (string.IsNullOrWhiteSpace(deviceIdOrName)) return false;
 
         IMidiPortDetails? port;
         try
@@ -61,47 +69,112 @@ public sealed class MidiService : IMidiService
         }
         catch
         {
-            return;
+            return false;
         }
 
-        if (port is null) return;
+        if (port is null) return false;
 
+        string name = DisplayName(port);
+
+        lock (_lock)
+        {
+            if (_ports.ContainsKey(name)) return true;
+        }
+
+        IMidiInput input;
         try
         {
-            _input = _access.OpenInputAsync(port.Id).GetAwaiter().GetResult();
-            _input.MessageReceived += OnMessageReceived;
+            input = _access.OpenInputAsync(port.Id).GetAwaiter().GetResult();
         }
         catch
         {
-            Close();
+            return false;
         }
+
+        // The handler closes over the name: that is the only place the port identity is still
+        // known by the time a message arrives.
+        EventHandler<MidiReceivedEventArgs> handler = (_, e) => OnMessageReceived(name, e);
+
+        lock (_lock)
+        {
+            if (_ports.ContainsKey(name))
+            {
+                TryDispose(input);
+                return true;
+            }
+
+            _ports[name] = new OpenPort(input, handler);
+        }
+
+        input.MessageReceived += handler;
+        return true;
     }
 
-    public void Close()
+    public void Close(string deviceIdOrName)
     {
-        if (_input is null) return;
+        if (string.IsNullOrWhiteSpace(deviceIdOrName)) return;
 
+        OpenPort? port;
+        lock (_lock)
+        {
+            if (!_ports.Remove(deviceIdOrName, out port)) return;
+        }
+
+        Release(port);
+    }
+
+    public void CloseAll()
+    {
+        List<OpenPort> ports;
+        lock (_lock)
+        {
+            ports = _ports.Values.ToList();
+            _ports.Clear();
+        }
+
+        foreach (var port in ports)
+            Release(port);
+    }
+
+    public void Dispose() => CloseAll();
+
+    private static void Release(OpenPort port)
+    {
         try
         {
-            _input.MessageReceived -= OnMessageReceived;
-            _input.Dispose();
+            port.Input.MessageReceived -= port.Handler;
         }
-        finally
+        catch
         {
-            _input = null;
+            // A device pulled out mid-session can throw on the way down; it is going away anyway.
+        }
+
+        TryDispose(port.Input);
+    }
+
+    private static void TryDispose(IMidiInput input)
+    {
+        try
+        {
+            input.Dispose();
+        }
+        catch
+        {
+            // Same as above.
         }
     }
 
-    public void Dispose() => Close();
+    private static string DisplayName(IMidiPortDetails port) =>
+        string.IsNullOrWhiteSpace(port.Name) ? port.Id : port.Name;
 
-    private void OnMessageReceived(object? sender, MidiReceivedEventArgs e)
+    private void OnMessageReceived(string device, MidiReceivedEventArgs e)
     {
-        var msg = Convert(e.Data, e.Start, e.Length);
+        var msg = Convert(device, e.Data, e.Start, e.Length);
         if (msg is null) return;
         MessageReceived?.Invoke(this, msg);
     }
 
-    private static MidiMessage? Convert(byte[] data, int start, int length)
+    private static MidiMessage? Convert(string device, byte[] data, int start, int length)
     {
         if (data == null || length <= 0 || start < 0 || start >= data.Length) return null;
         if (start + 2 >= data.Length) return null;
@@ -115,10 +188,12 @@ public sealed class MidiService : IMidiService
 
         return type switch
         {
-            0x90 => new MidiMessage { Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
-            0x80 => new MidiMessage { Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = false },
-            0xB0 => new MidiMessage { Type = MidiMessageType.ControlChange, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
+            0x90 => new MidiMessage { Device = device, Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
+            0x80 => new MidiMessage { Device = device, Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = false },
+            0xB0 => new MidiMessage { Device = device, Type = MidiMessageType.ControlChange, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
             _ => null
         };
     }
+
+    private sealed record OpenPort(IMidiInput Input, EventHandler<MidiReceivedEventArgs> Handler);
 }

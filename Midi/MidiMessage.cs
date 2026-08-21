@@ -8,6 +8,9 @@ public enum MidiMessageType
 
 public sealed class MidiMessage
 {
+    /// <summary>Which controller sent it, so routing can tell a pad box from a keyboard.</summary>
+    public string Device { get; init; } = "";
+
     public MidiMessageType Type { get; init; }
     public int Channel { get; init; }   // 1..16
     public int Value { get; init; }     // Note or CC number
