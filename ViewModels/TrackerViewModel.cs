@@ -58,6 +58,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
 
+    /// <summary>One channel strip per track, for the MIXER page.</summary>
+    public ObservableCollection<TrackStripViewModel> Strips { get; } = new();
+
     /// <summary>Raised when this song puts an instrument into the library, so the library page follows.</summary>
     public event EventHandler? LibraryChanged;
 
@@ -87,6 +90,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         RefreshOrder();
         RefreshSavedSongs();
         RefreshLibrary();
+        RefreshStrips();
     }
 
     public double Bpm
@@ -355,6 +359,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Song.SetTrackInstrument(track, instrument);
         SyncInstruments();
+        RefreshStrips();
         MarkDirty();
 
         // An instrument lives on one track, so say what moved and what was pushed off.
@@ -373,6 +378,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
         SyncInstruments();
+        RefreshStrips();
         MarkDirty();
         Status = $"Track {track + 1:00} has no instrument";
     }
@@ -422,10 +428,48 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
         SyncInstruments();
+        RefreshStrips();
         MarkDirty();
 
         // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
+    }
+
+    /// <summary>
+    /// Rebuilds the mixer from the song. Called whenever the track count or the instrument on a
+    /// track changes, since a strip is named after what plays through it.
+    /// </summary>
+    private void RefreshStrips()
+    {
+        Song.Normalize();
+
+        Strips.Clear();
+        for (int track = 0; track < Song.TrackCount && track < Song.Mix.Count; track++)
+        {
+            var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
+            Strips.Add(new TrackStripViewModel(track, Song.Mix[track], instrument?.Name ?? "", OnMixChanged));
+        }
+    }
+
+    /// <summary>
+    /// A strip is named after whatever plays through it, so a rename in the library shows up
+    /// here. Updated in place rather than rebuilt: the mixer is full of controls you may be
+    /// holding on to.
+    /// </summary>
+    private void RefreshStripNames()
+    {
+        foreach (var strip in Strips)
+        {
+            var instrument = Song.InstrumentAt(Song.GetTrackInstrument(strip.Track));
+            strip.InstrumentName = instrument?.Name ?? "";
+        }
+    }
+
+    /// <summary>A fader or a mute moved: hear it now, and remember the song has changed.</summary>
+    private void OnMixChanged()
+    {
+        _player.ApplyMix();
+        MarkDirty();
     }
 
     private void RefreshOrder()
@@ -531,11 +575,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             if (i < Instruments.Count) Instruments[i].Refresh();
         }
 
-        // The library list on the tracker side shows the name, so it follows too.
+        // The picker holds its own objects, listed when the library was last read, so they are
+        // brought up to date rather than merely told to redraw the name they already had.
         foreach (var row in LibraryInstruments)
         {
-            if (row.Id == edited.Id) row.Refresh();
+            if (row.Id != edited.Id) continue;
+
+            row.Instrument.CopyFrom(edited);
+            row.Refresh();
         }
+
+        RefreshStripNames();
     }
 
     private async Task RemoveSelectedInstrument()
@@ -649,6 +699,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         SyncInstruments();
         RefreshOrder();
+        RefreshStrips();
 
         // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
         IsDirty = false;

@@ -90,6 +90,7 @@ public sealed class SongStore
         public int TrackCount { get; set; } = Song.DefaultTrackCount;
         public List<int> Order { get; set; } = new();
         public List<int> TrackInstruments { get; set; } = new();
+        public List<TrackMix> Mix { get; set; } = new();
         public List<TrackerInstrument> Instruments { get; set; } = new();
         public List<PatternDocument> Patterns { get; set; } = new();
 
@@ -101,6 +102,7 @@ public sealed class SongStore
             TrackCount = song.TrackCount,
             Order = new List<int>(song.Order),
             TrackInstruments = new List<int>(song.TrackInstruments),
+            Mix = song.Mix.Select(m => m.Clone()).ToList(),
             Instruments = song.Instruments.Select(i => i.Clone()).ToList(),
             Patterns = song.Patterns.Select(PatternDocument.From).ToList()
         };
@@ -115,6 +117,7 @@ public sealed class SongStore
                 TrackCount = TrackCount,
                 Order = new List<int>(Order),
                 TrackInstruments = new List<int>(TrackInstruments),
+                Mix = Mix.Select(m => m.Clone()).ToList(),
                 Instruments = Instruments.Select(i => i.Clone()).ToList()
             };
 

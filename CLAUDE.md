@@ -50,7 +50,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiRouter` (Midi/): Maps MIDI messages to pad triggers with toggle/start modes
 - `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
-- `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice
+- `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
+- `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
 - `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Songs store a copy of each instrument they use and rebind it by id on load
 - `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters. A preset is where a new instrument starts

@@ -52,6 +52,11 @@ public sealed class TrackerPlayer : IDisposable
     private TrackerSequencer? _sequencer;
     private int[] _voices = Array.Empty<int>();
 
+    // What the note itself asked for, kept so the mixer can be re-applied to a voice that is
+    // already sounding: a fader move has to be heard now, not at the next note.
+    private float[] _noteGain = Array.Empty<float>();
+    private float?[] _notePan = Array.Empty<float?>();
+
     public TrackerPlayer(IAudioEngine audio) => _audio = audio;
 
     /// <summary>Raised from the clock thread. Marshal before touching UI.</summary>
@@ -90,6 +95,8 @@ public sealed class TrackerPlayer : IDisposable
             _song = song;
             _sequencer = new TrackerSequencer(song.TrackCount);
             _voices = new int[song.TrackCount];
+            _noteGain = new float[song.TrackCount];
+            _notePan = new float?[song.TrackCount];
             Mode = mode;
             Position = from;
         }
@@ -308,9 +315,14 @@ public sealed class TrackerPlayer : IDisposable
 
         var (gain, pan) = LevelsFor(e, instrument);
 
+        _noteGain[e.Track] = gain;
+        _notePan[e.Track] = pan;
+
+        var (mixed, placed) = WithMix(song, e.Track, gain, pan);
+
         if (instrument.IsSynth)
         {
-            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, gain, pan ?? 0f);
+            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f);
             return;
         }
 
@@ -320,7 +332,7 @@ public sealed class TrackerPlayer : IDisposable
         int channel = _bank.GetChannel(instrument, e.Note);
         if (channel == 0) return;
 
-        ApplyVoiceSettings(channel, gain, pan);
+        ApplyVoiceSettings(channel, mixed, placed);
 
         if (!Bass.ChannelPlay(channel)) return;
         _voices[e.Track] = channel;
@@ -331,16 +343,53 @@ public sealed class TrackerPlayer : IDisposable
         var instrument = song.InstrumentAt(e.Instrument);
         var (gain, pan) = LevelsFor(e, instrument);
 
+        _noteGain[e.Track] = gain;
+        _notePan[e.Track] = pan;
+
+        var (mixed, placed) = WithMix(song, e.Track, gain, pan);
+
         if (instrument?.IsSynth == true)
         {
-            _synth.Mixer.SetLevels(e.Track, gain, pan);
+            _synth.Mixer.SetLevels(e.Track, mixed, placed);
             return;
         }
 
         int channel = _voices[e.Track];
         if (channel == 0) return;
 
-        ApplyVoiceSettings(channel, gain, pan);
+        ApplyVoiceSettings(channel, mixed, placed);
+    }
+
+    /// <summary>
+    /// Puts a note's own level through the track's strip. The cell's pan effect wins when it
+    /// set one: an effect written into the pattern is a decision about that note.
+    /// </summary>
+    private static (float Gain, float? Pan) WithMix(Song song, int track, float gain, float? pan)
+    {
+        float mixed = Math.Clamp(gain * MixLevels.GainFor(song.Mix, track), 0f, MaxGain);
+
+        return (mixed, pan ?? MixLevels.PanFor(song.Mix, track));
+    }
+
+    /// <summary>
+    /// Re-applies the mix to whatever is sounding, for a fader or a mute moved mid-take. The
+    /// note's own level is kept, so the two are combined rather than one replacing the other.
+    /// </summary>
+    public void ApplyMix()
+    {
+        Song? song;
+        lock (_lock) song = _song;
+        if (song == null) return;
+
+        for (int track = 0; track < _voices.Length; track++)
+        {
+            var (mixed, placed) = WithMix(song, track, _noteGain[track], _notePan[track]);
+
+            _synth.Mixer.SetLevels(track, mixed, placed);
+
+            int channel = _voices[track];
+            if (channel != 0) ApplyVoiceSettings(channel, mixed, placed);
+        }
     }
 
     /// <summary>

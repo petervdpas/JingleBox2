@@ -68,6 +68,10 @@
         <views:TrackerView DataContext="{Binding Tracker}" />
       </TabItem>
 
+      <TabItem Header="MIXER">
+        <views:MixerView DataContext="{Binding Tracker}" />
+      </TabItem>
+
       <TabItem Header="SETTINGS">
         <views:SettingsView />
       </TabItem>

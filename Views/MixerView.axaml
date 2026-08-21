@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             x:Class="JingleBox2.Views.MixerView"
+             x:DataType="vm:TrackerViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.field">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.8" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Mute and solo read as lit or unlit, so they need a state the eye can catch. -->
+    <Style Selector="ToggleButton.strip">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="ToggleButton.strip:checked">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+      </Setter>
+      <Setter Property="Foreground" Value="Black" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel Margin="16">
+
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
+      <TextBlock Classes="cardHint" Text="{Binding Status}" />
+    </Border>
+
+    <Border Classes="card">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Mixer" />
+
+        <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" Margin="0,8,0,0"
+                   Text="One strip per track. Solo silences every track that is not soloed; the mix is part of the song and is saved with it. Moves are heard straight away, even mid-take." />
+
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Strips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="10" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TrackStripViewModel">
+                <Border Classes="inset" Width="96">
+                  <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <Border Classes="badge" HorizontalAlignment="Center">
+                      <TextBlock Text="{Binding Label}" />
+                    </Border>
+
+                    <TextBlock Classes="cardHint"
+                               HorizontalAlignment="Center"
+                               MaxWidth="80"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding InstrumentName}" />
+
+                    <views:Knob Label="Pan" Format="0.00" DefaultValue="0"
+                                Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                                HorizontalAlignment="Center"
+                                Value="{Binding Pan}" />
+
+                    <views:Fader Label="Level" Format="0.00" DefaultValue="1"
+                                 Minimum="0" Maximum="2" SmallStep="0.01" LargeStep="0.1"
+                                 TrackLength="120"
+                                 HorizontalAlignment="Center"
+                                 Value="{Binding Volume}" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                      <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
+                                    ToolTip.Tip="Mute this track" />
+                      <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
+                                    ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </DockPanel>
+</UserControl>

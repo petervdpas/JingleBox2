@@ -38,6 +38,9 @@ public sealed class Song
     /// </summary>
     public List<int> TrackInstruments { get; set; } = new();
 
+    /// <summary>One strip per track: level, placement, mute and solo.</summary>
+    public List<TrackMix> Mix { get; set; } = new();
+
     [JsonIgnore]
     public TrackerTiming Timing => new(Bpm, LinesPerBeat);
 
@@ -114,6 +117,21 @@ public sealed class Song
             TrackInstruments.RemoveRange(TrackCount, TrackInstruments.Count - TrackCount);
     }
 
+    /// <summary>
+    /// A strip per track. Kept alongside rather than inside the pattern: adding a track should
+    /// give it a fader at unity, and removing one should not take another track's settings.
+    /// </summary>
+    private void EnsureMix()
+    {
+        Mix ??= new List<TrackMix>();
+
+        while (Mix.Count < TrackCount) Mix.Add(new TrackMix());
+        if (Mix.Count > TrackCount) Mix.RemoveRange(TrackCount, Mix.Count - TrackCount);
+
+        foreach (var strip in Mix)
+            strip.Clamp();
+    }
+
     /// <summary>Adds a pattern sized to match the song and returns its index.</summary>
     public int AddPattern(int lines = Pattern.DefaultLines)
     {
@@ -167,6 +185,7 @@ public sealed class Song
             pattern.SetTrackCount(TrackCount);
 
         EnsureTrackInstruments();
+        EnsureMix();
     }
 
     public TimeSpan Duration =>
@@ -202,6 +221,8 @@ public sealed class Song
         }
 
         EnsureTrackInstruments();
+        EnsureMix();
+
         for (int track = 0; track < TrackInstruments.Count; track++)
         {
             int instrument = TrackInstruments[track];
