@@ -13,7 +13,7 @@ namespace JingleBox2.Views;
 /// pattern's scroll area so it stays put vertically, and takes the horizontal scroll offset
 /// so it stays aligned with the columns it names.
 /// </summary>
-public sealed class PatternHeader : Control
+public sealed class PatternHeader : ThemedControl
 {
     public static readonly StyledProperty<int> TrackCountProperty =
         AvaloniaProperty.Register<PatternHeader, int>(nameof(TrackCount), Song.DefaultTrackCount);
@@ -157,24 +157,4 @@ public sealed class PatternHeader : Control
         e.Handled = true;
     }
 
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-
-        ActualThemeVariantChanged += OnThemeChanged;
-        ResourcesChanged += OnResourcesChanged;
-        InvalidateVisual();
-    }
-
-    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnDetachedFromVisualTree(e);
-
-        ActualThemeVariantChanged -= OnThemeChanged;
-        ResourcesChanged -= OnResourcesChanged;
-    }
-
-    private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
-
-    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
 }

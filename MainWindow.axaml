@@ -61,7 +61,7 @@
       </TabItem>
 
       <TabItem Header="INSTRUMENTS">
-        <views:InstrumentsView DataContext="{Binding Tracker}" />
+        <views:InstrumentsView DataContext="{Binding Instruments}" />
       </TabItem>
 
       <TabItem Header="TRACKER">

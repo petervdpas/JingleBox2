@@ -75,6 +75,13 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(ReleaseMs));
     }
 
+    public double Drive
+    {
+        get => _patch.Drive;
+        set => Set(v => _patch.Drive = v, _patch.Drive, value, SynthPatch.MinDrive, SynthPatch.MaxDrive,
+            nameof(Drive));
+    }
+
     public double VibratoRateHz
     {
         get => _patch.VibratoRateHz;

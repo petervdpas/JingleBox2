@@ -19,7 +19,7 @@ namespace JingleBox2.Views;
 /// there first, which is what a mixer fader does. Holding shift switches to a fine drag
 /// measured from the press, for the last few units.
 /// </remarks>
-public class Fader : Control
+public class Fader : ThemedControl
 {
     private const double GrooveWidth = 5;
     private const double CapWidth = 22;

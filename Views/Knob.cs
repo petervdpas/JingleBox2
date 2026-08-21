@@ -19,7 +19,7 @@ namespace JingleBox2.Views;
 /// The turning maths lives in <see cref="KnobMath"/>. What is left here is input handling and
 /// painting, the same split the pattern grid uses.
 /// </remarks>
-public class Knob : Control
+public class Knob : ThemedControl
 {
     /// <summary>Gap between the dial and the label, and between the label and the value.</summary>
     private const double TextGap = 2;

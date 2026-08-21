@@ -17,8 +17,12 @@ public sealed class SynthMixer
     /// <summary>Past this, the oldest voice is taken rather than growing the mix forever.</summary>
     public const int MaxVoices = 48;
 
-    /// <summary>Room for several voices before the sum reaches full scale.</summary>
-    public const float MasterGain = 0.3f;
+    /// <summary>
+    /// The level a single voice comes out at. High enough to sit next to a sample played at
+    /// its own level; several voices at once are held in by the saturation below rather than
+    /// by leaving headroom nobody ever uses.
+    /// </summary>
+    public const float MasterGain = 0.9f;
 
     private readonly List<SynthVoice> _voices = new();
     private readonly object _lock = new();
@@ -136,10 +140,16 @@ public sealed class SynthMixer
             voice.Render(buffer, frames);
 
         for (int i = 0; i < samples; i++)
-            buffer[i] = Math.Clamp(buffer[i] * MasterGain, -1f, 1f);
+            buffer[i] = SoftClip(buffer[i] * MasterGain);
 
         Reap();
     }
+
+    /// <summary>
+    /// Saturates rather than clipping. A chord of voices can sum past full scale, and a hard
+    /// clip on that sounds like a fault; this bends instead, and leaves quiet signals alone.
+    /// </summary>
+    private static float SoftClip(float value) => MathF.Tanh(value);
 
     /// <summary>Drops finished voices. Called after rendering, off the note-on path.</summary>
     private void Reap()

@@ -1,4 +1,5 @@
 using JingleBox2.Tracker.Synth;
+using System;
 using System.Text.Json.Serialization;
 
 namespace JingleBox2.Tracker;
@@ -13,12 +14,18 @@ public enum TrackerInstrumentKind
 }
 
 /// <summary>
-/// What a pattern cell's instrument number points at. Either a recording played back at a
-/// pitch, or a synth voice built from a patch. Both carry a name and a level, and the rest
-/// only applies to one of the two.
+/// A playable voice: either a recording played back at a pitch, or a synth built from a patch.
+/// Instruments live in a library of their own and are used by any number of songs, so the
+/// identity below is what a song holds on to, not the position in a list.
 /// </summary>
 public sealed class TrackerInstrument
 {
+    /// <summary>
+    /// Stable across renames, which is what lets a song find its instrument again after you
+    /// have called it something else.
+    /// </summary>
+    public string Id { get; set; } = "";
+
     public string Name { get; set; } = "";
 
     public TrackerInstrumentKind Kind { get; set; } = TrackerInstrumentKind.Sample;
@@ -51,15 +58,49 @@ public sealed class TrackerInstrument
     }
 
     /// <summary>A synth instrument with the starting patch, ready to be edited.</summary>
-    public static TrackerInstrument CreateSynth(string name) => new()
+    public static TrackerInstrument CreateSynth(string name) => CreateSynth(name, new SynthPatch());
+
+    /// <summary>A synth instrument built from a patch, which is how a preset starts a new one.</summary>
+    public static TrackerInstrument CreateSynth(string name, SynthPatch patch)
     {
-        Name = name,
-        Kind = TrackerInstrumentKind.Synth,
-        Patch = new SynthPatch()
-    };
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Synth,
+            Patch = patch.Clone()
+        };
+
+        instrument.EnsureId();
+        return instrument;
+    }
+
+    /// <summary>Gives an instrument an identity if it has none, for anything read off disk.</summary>
+    public void EnsureId()
+    {
+        if (string.IsNullOrWhiteSpace(Id)) Id = Guid.NewGuid().ToString("N");
+    }
+
+    /// <summary>
+    /// Takes on another instrument's sound and name, keeping this object. A song's copy is
+    /// refreshed this way, so everything already pointing at it stays pointing at it.
+    /// </summary>
+    public void CopyFrom(TrackerInstrument other)
+    {
+        if (other is null || ReferenceEquals(other, this)) return;
+
+        Id = other.Id;
+        Name = other.Name;
+        Kind = other.Kind;
+        Patch = other.Patch.Clone();
+        FilePath = other.FilePath;
+        BaseNoteSemitone = other.BaseNoteSemitone;
+        Volume = other.Volume;
+        Loop = other.Loop;
+    }
 
     public TrackerInstrument Clone() => new()
     {
+        Id = Id,
         Name = Name,
         Kind = Kind,
         Patch = Patch.Clone(),

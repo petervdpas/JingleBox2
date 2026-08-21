@@ -5,10 +5,12 @@ using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
+using JingleBox2.Views;
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace JingleBox2.ViewModels;
 
@@ -16,11 +18,11 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
-    private readonly SynthPresetStore _presets = new();
+    private readonly InstrumentLibrary _library;
     private readonly ObservableCollection<Recording> _recordings;
 
     [ObservableProperty] private Song song;
@@ -41,6 +43,11 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Typed notes are written into the pattern only while this is on.</summary>
     [ObservableProperty] private bool isRecording;
 
+    /// <summary>Set by every edit, cleared by a save. Nothing here is on disk until then.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SaveSongText))]
+    private bool isDirty;
+
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
     [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
     [ObservableProperty] private int octave = 4;
@@ -51,21 +58,23 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
 
-    /// <summary>The instrument open on the INSTRUMENTS page, or null when there is none.</summary>
-    [ObservableProperty] private InstrumentEditorViewModel? editor;
+    /// <summary>Raised when this song puts an instrument into the library, so the library page follows.</summary>
+    public event EventHandler? LibraryChanged;
 
-    public ObservableCollection<SynthPreset> Presets { get; } = new();
+    /// <summary>The library, for bringing an instrument into this song.</summary>
+    public ObservableCollection<LibraryInstrument> LibraryInstruments { get; } = new();
 
-    [ObservableProperty] private SynthPreset? selectedPreset;
+    [ObservableProperty] private LibraryInstrument? selectedLibraryInstrument;
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
     [ObservableProperty] private SongFile? selectedSongFile;
 
-    public TrackerViewModel(IAudioEngine audio, ObservableCollection<Recording> recordings)
+    public TrackerViewModel(IAudioEngine audio, InstrumentLibrary library, ObservableCollection<Recording> recordings)
     {
         _player = new TrackerPlayer(audio);
         _store = new SongStore();
+        _library = library;
         _recordings = recordings;
 
         song = Song.CreateDefault();
@@ -77,7 +86,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         RefreshOrder();
         RefreshSavedSongs();
-        RefreshPresets();
+        RefreshLibrary();
     }
 
     public double Bpm
@@ -88,6 +97,7 @@ public sealed partial class TrackerViewModel : ObservableObject
             if (Math.Abs(Song.Bpm - value) < 0.001) return;
             Song.Bpm = Math.Clamp(value, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
             OnPropertyChanged();
+            MarkDirty();
         }
     }
 
@@ -99,6 +109,7 @@ public sealed partial class TrackerViewModel : ObservableObject
             if (Song.LinesPerBeat == value) return;
             Song.LinesPerBeat = Math.Clamp(value, TrackerTiming.MinLinesPerBeat, TrackerTiming.MaxLinesPerBeat);
             OnPropertyChanged();
+            MarkDirty();
         }
     }
 
@@ -121,6 +132,9 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// <summary>Pause only means anything while something is running.</summary>
     public bool CanPause => Transport == TrackerTransportState.Playing;
 
+    /// <summary>The save button carries the unsaved marker, so it is visible where it matters.</summary>
+    public string SaveSongText => IsDirty ? "Save song *" : "Save song";
+
     /// <summary>The two things the play button can walk through.</summary>
     public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Pattern, TrackerPlayMode.Song };
 
@@ -134,19 +148,12 @@ public sealed partial class TrackerViewModel : ObservableObject
     public IRelayCommand LoadCommand => new RelayCommand(Load);
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
-    public IRelayCommand<Recording> AddInstrumentCommand => new RelayCommand<Recording>(AddInstrument);
-    public IRelayCommand RemoveInstrumentCommand => new RelayCommand(RemoveSelectedInstrument);
-    public IRelayCommand AddSynthInstrumentCommand => new RelayCommand(AddSynthInstrument);
-    public IRelayCommand TestInstrumentCommand => new RelayCommand(TestInstrument);
-    public IRelayCommand LoadPresetCommand => new RelayCommand(LoadPreset);
-    public IRelayCommand SavePresetCommand => new RelayCommand(SavePreset);
-    public IRelayCommand DeletePresetCommand => new RelayCommand(DeletePreset);
-    public IRelayCommand ResetPresetsCommand => new RelayCommand(ResetPresets);
+    public IAsyncRelayCommand RemoveInstrumentCommand => new AsyncRelayCommand(RemoveSelectedInstrument);
+    public IRelayCommand AddFromLibraryCommand => new RelayCommand(AddFromLibrary);
+    public IRelayCommand PromoteToLibraryCommand => new RelayCommand(PromoteToLibrary);
+    public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshLibrary);
 
     public bool HasInstruments => Instruments.Count > 0;
-
-    /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
-    public ObservableCollection<Recording> AvailableRecordings => _recordings;
 
     private void Play()
     {
@@ -214,7 +221,22 @@ public sealed partial class TrackerViewModel : ObservableObject
 
     partial void OnOrderIndexChanged(int value) => CurrentPattern = Song.PatternAt(value);
 
-    partial void OnSelectedInstrumentChanged(int value) => BuildEditor();
+    /// <summary>
+    /// Patterns are edited in place, so the one on screen is watched rather than every edit
+    /// method remembering to report itself.
+    /// </summary>
+    partial void OnCurrentPatternChanged(Pattern? oldValue, Pattern? newValue)
+    {
+        if (oldValue != null) oldValue.Changed -= OnPatternEdited;
+        if (newValue != null) newValue.Changed += OnPatternEdited;
+    }
+
+    private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
+
+    partial void OnSongNameChanged(string value) => MarkDirty();
+
+    /// <summary>Something about the song changed and the file on disk no longer matches.</summary>
+    private void MarkDirty() => IsDirty = true;
 
     partial void OnIsRecordingChanged(bool value) =>
         Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";
@@ -252,6 +274,13 @@ public sealed partial class TrackerViewModel : ObservableObject
     /// </summary>
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => EnterNote(note, volume));
+
+    /// <summary>
+    /// Sounds one note on any instrument, for the library's auditioning. The engine lives
+    /// here, so the library borrows it rather than opening a second one.
+    /// </summary>
+    public void Audition(TrackerInstrument instrument, Note note, int volume) =>
+        _player.Preview(instrument, note, GainFor(volume));
 
     private static float GainFor(int volume) =>
         volume == TrackerCell.NoVolume
@@ -326,6 +355,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.SetTrackInstrument(track, instrument);
         SyncInstruments();
+        MarkDirty();
 
         // An instrument lives on one track, so say what moved and what was pushed off.
         if (previous == track)
@@ -343,6 +373,7 @@ public sealed partial class TrackerViewModel : ObservableObject
     {
         Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
         SyncInstruments();
+        MarkDirty();
         Status = $"Track {track + 1:00} has no instrument";
     }
 
@@ -367,6 +398,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         int index = Song.AddPattern();
         Song.Order.Add(index);
         RefreshOrder();
+        MarkDirty();
         OrderIndex = Song.Order.Count - 1;
         Status = $"Added pattern {Song.Patterns[index].Name}";
     }
@@ -377,6 +409,7 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         Song.Order.RemoveAt(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1));
         RefreshOrder();
+        MarkDirty();
         OrderIndex = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
         CurrentPattern = Song.PatternAt(OrderIndex);
     }
@@ -389,6 +422,7 @@ public sealed partial class TrackerViewModel : ObservableObject
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
         SyncInstruments();
+        MarkDirty();
 
         // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
@@ -405,183 +439,127 @@ public sealed partial class TrackerViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Opens whichever instrument is selected. Rebuilt rather than repointed: a synth and a
-    /// sample are different pages, and the patch view model is tied to one patch object.
+    /// The library, refreshed for the picker that brings an instrument into this song.
     /// </summary>
-    private void BuildEditor()
+    public void RefreshLibrary()
     {
-        var instrument = Song.InstrumentAt(SelectedInstrument);
+        string? keep = SelectedLibraryInstrument?.Id;
 
-        Editor = instrument == null
-            ? null
-            : new InstrumentEditorViewModel(SelectedInstrument, instrument, OnInstrumentEdited);
+        LibraryInstruments.Clear();
+        foreach (var instrument in _library.List())
+            LibraryInstruments.Add(new LibraryInstrument(instrument));
+
+        SelectedLibraryInstrument = LibraryInstruments.FirstOrDefault(i => i.Id == keep);
     }
 
     /// <summary>
-    /// A field in the editor changed. The row in the list is refreshed in place: rebuilding the
-    /// collection here would replace the editor under the cursor on every keystroke.
+    /// Gives the song a slot for a library instrument, so its cells can name it. The slot holds
+    /// a copy: a song opened without the library still plays, and the copy is brought back up
+    /// to date whenever the library has the instrument.
     /// </summary>
-    private void OnInstrumentEdited()
+    private void AddFromLibrary()
     {
-        foreach (var slot in Instruments)
+        var chosen = SelectedLibraryInstrument?.Instrument;
+        if (chosen == null)
         {
-            if (slot.Index == SelectedInstrument) slot.Refresh();
+            Status = "Pick an instrument from the library first.";
+            return;
         }
-    }
 
-    private void AddSynthInstrument()
-    {
-        var instrument = TrackerInstrument.CreateSynth(NextSynthName());
+        int existing = Song.Instruments.FindIndex(i => i.Id == chosen.Id && !string.IsNullOrEmpty(i.Id));
+        if (existing >= 0)
+        {
+            SelectedInstrument = existing;
+            Status = $"'{chosen.Name}' is already in this song as {existing:00}";
+            return;
+        }
 
-        Song.Instruments.Add(instrument);
+        Song.Instruments.Add(chosen.Clone());
         SyncInstruments();
+        MarkDirty();
 
         SelectedInstrument = Song.Instruments.Count - 1;
-        BuildEditor();
-
-        Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
+        Status = $"Added '{chosen.Name}' to the song as instrument {SelectedInstrument:00}";
     }
 
-    /// <summary>A name that is not in use yet, so two synths are never both called "synth 01".</summary>
-    private string NextSynthName()
-    {
-        for (int number = 1; ; number++)
-        {
-            string name = $"synth {number:00}";
-            if (!Song.Instruments.Any(i => string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase)))
-                return name;
-        }
-    }
-
-    /// <summary>Sounds the selected instrument on its own, whatever the cursor is sitting on.</summary>
-    private void TestInstrument()
+    /// <summary>
+    /// Puts a song's own instrument into the library, which is how an instrument from before
+    /// the library existed gets there, and how a one-off you built for this song becomes
+    /// something the next song can use.
+    /// </summary>
+    private void PromoteToLibrary()
     {
         var instrument = Song.InstrumentAt(SelectedInstrument);
         if (instrument == null)
         {
-            Status = "No instrument to test.";
-            return;
-        }
-
-        _player.Preview(instrument, Note.FromOctave(0, Octave), 1f);
-        Status = $"Testing '{instrument.Name}'";
-    }
-
-    private void RefreshPresets()
-    {
-        string? keep = SelectedPreset?.Name;
-
-        Presets.Clear();
-        foreach (var preset in _presets.List())
-            Presets.Add(preset);
-
-        SelectedPreset = Presets.FirstOrDefault(p => p.Name == keep);
-    }
-
-    private void LoadPreset()
-    {
-        var preset = SelectedPreset;
-        var instrument = Song.InstrumentAt(SelectedInstrument);
-
-        if (preset == null || instrument == null || !instrument.IsSynth)
-        {
-            Status = "Pick a synth instrument and a preset first.";
-            return;
-        }
-
-        // Copied into the patch the instrument already owns, so nothing else has to be repointed.
-        instrument.Patch = preset.Patch.Clone();
-        BuildEditor();
-        OnInstrumentEdited();
-
-        Status = $"Loaded preset '{preset.Name}' into '{instrument.Name}'";
-    }
-
-    private void SavePreset()
-    {
-        var instrument = Song.InstrumentAt(SelectedInstrument);
-        if (instrument == null || !instrument.IsSynth)
-        {
-            Status = "Only a synth instrument can be saved as a preset.";
+            Status = "Pick an instrument in the song first.";
             return;
         }
 
         try
         {
-            string name = SynthPresetStore.SafeName(instrument.Name);
-            _presets.Save(name, instrument.Patch);
+            // The song's copy keeps the same id, so from here on the two are the same voice.
+            instrument.EnsureId();
+            _library.Save(instrument);
 
-            RefreshPresets();
-            SelectedPreset = Presets.FirstOrDefault(p => p.Name == name);
-            Status = $"Saved preset '{name}'";
+            RefreshLibrary();
+            LibraryChanged?.Invoke(this, EventArgs.Empty);
+
+            // The slot now carries an id, and that is part of the song file.
+            MarkDirty();
+            Status = $"'{instrument.Name}' is in the library now, and this song follows it.";
         }
         catch (Exception ex)
         {
-            Status = $"Preset save failed: {ex.Message}";
+            Status = $"Could not add it to the library: {ex.Message}";
         }
     }
 
-    private void DeletePreset()
+    /// <summary>
+    /// An instrument was edited in the library: bring this song's copy of it along, so what
+    /// you hear here is what you just built there.
+    /// </summary>
+    public void ApplyLibraryEdit(TrackerInstrument edited)
     {
-        var preset = SelectedPreset;
-        if (preset == null) return;
+        if (edited == null || string.IsNullOrEmpty(edited.Id)) return;
 
-        try
+        for (int i = 0; i < Song.Instruments.Count; i++)
         {
-            _presets.Delete(preset.Name);
-            RefreshPresets();
-            Status = $"Deleted preset '{preset.Name}'";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Preset delete failed: {ex.Message}";
-        }
-    }
+            if (Song.Instruments[i].Id != edited.Id) continue;
 
-    private void ResetPresets()
-    {
-        try
-        {
-            _presets.ResetStarters();
-            RefreshPresets();
-            Status = "Starter presets restored";
+            Song.Instruments[i].CopyFrom(edited);
+            if (i < Instruments.Count) Instruments[i].Refresh();
         }
-        catch (Exception ex)
+
+        // The library list on the tracker side shows the name, so it follows too.
+        foreach (var row in LibraryInstruments)
         {
-            Status = $"Preset reset failed: {ex.Message}";
+            if (row.Id == edited.Id) row.Refresh();
         }
     }
 
-    private void AddInstrument(Recording? recording)
-    {
-        if (recording == null) return;
-
-        var instrument = new TrackerInstrument
-        {
-            Name = recording.Name,
-            FilePath = recording.FilePath,
-            BaseNote = Note.C4
-        };
-
-        Song.Instruments.Add(instrument);
-        SyncInstruments();
-
-        SelectedInstrument = Song.Instruments.Count - 1;
-        Status = $"Added '{instrument.Name}' as instrument {SelectedInstrument:00}";
-    }
-
-    private void RemoveSelectedInstrument()
+    private async Task RemoveSelectedInstrument()
     {
         int index = SelectedInstrument;
         var instrument = Song.InstrumentAt(index);
         if (instrument == null) return;
 
+        // Cells are renumbered around the gap, so this rewrites the pattern as well.
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Remove from song",
+            $"Take '{instrument.Name}' out of this song? Cells that used it lose their instrument, "
+                + "and the rest are renumbered. The instrument stays in the library.",
+            "Remove");
+
+        if (!confirmed) return;
+
         // Cells point at instruments by number, so the song renumbers them as it removes one.
         if (!Song.RemoveInstrumentAt(index)) return;
 
         SyncInstruments();
+        MarkDirty();
         SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
-        Status = $"Removed '{instrument.Name}'";
+        Status = $"Removed '{instrument.Name}' from the song. It is still in the library.";
     }
 
     private void Save()
@@ -609,6 +587,8 @@ public sealed partial class TrackerViewModel : ObservableObject
 
             RefreshSavedSongs();
             SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == path);
+
+            IsDirty = false;
             Status = $"Saved '{name}'";
         }
         catch (Exception ex)
@@ -655,6 +635,9 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         replacement.Normalize();
 
+        // The song stores a copy of every instrument it uses; the library is the master.
+        _library.Rebind(replacement);
+
         Song = replacement;
         SongName = name;
         Song.Name = name;
@@ -666,6 +649,9 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         SyncInstruments();
         RefreshOrder();
+
+        // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
+        IsDirty = false;
 
         // The tempo and track count live on the song, so the whole transport bar is stale.
         OnPropertyChanged(nameof(Bpm));
@@ -684,9 +670,6 @@ public sealed partial class TrackerViewModel : ObservableObject
 
         // Rebuilding the list drops the selection; put it back where it was.
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
-
-        // The index may not have moved even though the instrument behind it did.
-        BuildEditor();
 
         OnPropertyChanged(nameof(HasInstruments));
     }

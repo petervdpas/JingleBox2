@@ -19,6 +19,8 @@ public sealed class SynthVoice
     private readonly int _sampleRate;
     private readonly double _baseFrequency;
     private readonly double _pitchEnvSeconds;
+    private readonly double _drive;
+    private readonly double _driveMakeup;
     private readonly Random _noise;
 
     private double _phase;
@@ -34,6 +36,11 @@ public sealed class SynthVoice
         _envelope = new SynthEnvelope(_patch, _sampleRate);
         _baseFrequency = NoteFrequency.Hz(note);
         _pitchEnvSeconds = _patch.PitchEnvMs / 1000.0;
+
+        // The makeup keeps the level where it was, so turning drive up changes the tone rather
+        // than the loudness. That is what the level fader is for.
+        _drive = _patch.Drive;
+        _driveMakeup = _drive > 1 ? 1.0 / Math.Tanh(_drive) : 1.0;
         _noise = new Random(noiseSeed);
 
         Track = track;
@@ -86,8 +93,10 @@ public sealed class SynthVoice
             return;
         }
 
-        double left = Math.Sqrt((1.0 - Pan) / 2.0);
-        double right = Math.Sqrt((1.0 + Pan) / 2.0);
+        // A balance control, not an equal-power pan: centre stays at full level on both sides,
+        // which is what BASS does for the sampled instruments, so the two match in the mix.
+        double left = Pan <= 0 ? 1.0 : 1.0 - Pan;
+        double right = Pan >= 0 ? 1.0 : 1.0 + Pan;
         double step = 1.0 / _sampleRate;
 
         for (int frame = 0; frame < frames; frame++)
@@ -106,7 +115,7 @@ public sealed class SynthVoice
             _phase = Oscillator.Wrap(_phase + frequency * step);
 
             double sample = Oscillator.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
-            double value = sample * level * TremoloAt(_time) * Gain;
+            double value = Drive(sample) * level * TremoloAt(_time) * Gain;
 
             int index = frame * 2;
             buffer[index] += (float)(value * left);
@@ -115,6 +124,13 @@ public sealed class SynthVoice
             _time += step;
         }
     }
+
+    /// <summary>
+    /// Rounds the wave off into itself. Applied before the envelope, so a note keeps its shape
+    /// as it decays instead of losing its edge along with its level.
+    /// </summary>
+    private double Drive(double sample) =>
+        _drive > 1 ? Math.Tanh(sample * _drive) * _driveMakeup : sample;
 
     /// <summary>Vibrato and the pitch envelope, both in semitones, at a point in the note.</summary>
     private double SemitoneOffsetAt(double time)

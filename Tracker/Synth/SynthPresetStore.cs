@@ -63,6 +63,9 @@ public sealed class SynthPresetStore
             .ToList();
     }
 
+    /// <summary>True when saving under this name would replace a preset that is already there.</summary>
+    public bool Exists(string name) => File.Exists(PathFor(name));
+
     public SynthPatch? Load(string name)
     {
         var preset = List().FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -77,10 +80,17 @@ public sealed class SynthPresetStore
         File.WriteAllText(PathFor(name), JsonSerializer.Serialize(stored, JsonOptions));
     }
 
-    public void Delete(string name)
+    /// <summary>
+    /// Removes a saved preset. False when there was no file to remove, which is the case for a
+    /// starter nobody has saved over: those are built in and cannot be deleted.
+    /// </summary>
+    public bool Delete(string name)
     {
         string path = PathFor(name);
-        if (File.Exists(path)) File.Delete(path);
+        if (!File.Exists(path)) return false;
+
+        File.Delete(path);
+        return true;
     }
 
     /// <summary>
@@ -91,6 +101,7 @@ public sealed class SynthPresetStore
     {
         foreach (var preset in Starters())
             Delete(preset.Name);
+
     }
 
     private static SynthPatch? Read(string path)

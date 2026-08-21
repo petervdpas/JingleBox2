@@ -21,6 +21,21 @@
             <Setter Property="Padding" Value="12" />
         </Style>
 
+        <!-- A block inside a card: the page background shows through, so it reads as set into
+             the card rather than stacked on it. Works either way round, since the background is
+             darker than the surface in the dark themes and greyer than it in the light one. -->
+        <Style Selector="Border.inset">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Background}" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Border}" />
+            </Setter>
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+
         <!-- One set of tab metrics, so every tab breathes the same. -->
         <Style Selector="StackPanel.tabRoot">
             <Setter Property="Margin" Value="16" />
@@ -203,6 +218,14 @@
                     <TextBlock Text="{Binding TrackBadge}" />
                 </Border>
             </Grid>
+        </DataTemplate>
+
+        <!-- A library instrument: no cell number to answer to, so just what it is. -->
+        <DataTemplate x:Key="LibraryRow" x:DataType="vm:LibraryInstrument">
+            <StackPanel>
+                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="cardHint" Text="{Binding DetailText}" />
+            </StackPanel>
         </DataTemplate>
 
         <conv:NullToUnsetConverter x:Key="NullToUnset" />

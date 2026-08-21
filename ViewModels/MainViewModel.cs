@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Midi;
+using JingleBox2.Tracker;
 using JingleBox2.Models;
 using JingleBox2.UI;
 using System;
@@ -28,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MidiViewModel Midi { get; }
     public RecordViewModel Record { get; }
     public TrackerViewModel Tracker { get; }
+    public InstrumentLibraryViewModel Instruments { get; }
 
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
@@ -88,8 +90,18 @@ public sealed partial class MainViewModel : ObservableObject
         Midi = new MidiViewModel(store, cfg, midiService);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg);
 
-        // The tracker turns those same recordings into instruments, so it shares the list.
-        Tracker = new TrackerViewModel(audio, Record.Recordings);
+        // Instruments are their own library, shared by every song, and built from recordings
+        // on the INSTRUMENTS tab. The tracker borrows the library to fill a song's slots.
+        var library = new InstrumentLibrary();
+
+        Tracker = new TrackerViewModel(audio, library, Record.Recordings);
+        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings);
+
+        Instruments.InstrumentChanged += (_, instrument) => Tracker.ApplyLibraryEdit(instrument);
+        Instruments.LibraryChanged += (_, _) => Tracker.RefreshLibrary();
+
+        // And the other way: a song can put one of its own instruments into the library.
+        Tracker.LibraryChanged += (_, _) => Instruments.Refresh();
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);
@@ -142,7 +154,7 @@ public sealed partial class MainViewModel : ObservableObject
         // MIDI routing: global, profile-independent mapping. Which controller reaches which
         // half of the app is decided by the roles in SETTINGS, not here.
         var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
-        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker));
+        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker, Instruments));
         var dispatcher = new MidiDispatcher(_cfg.Midi, padRouter.Handle, noteRouter.Handle);
 
         // NOTE: MidiViewModel already subscribes for learn/status.

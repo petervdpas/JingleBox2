@@ -29,7 +29,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Audio/` - Audio playback engine using ManagedBass (BASS library wrapper)
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
-- `Tracker/` - Song model, sequencing, playback, and JSON song files
+- `Tracker/` - Song model, sequencing, playback, JSON song files, and the instrument library
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
@@ -52,7 +52,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
-- `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters
+- `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Songs store a copy of each instrument they use and rebind it by id on load
+- `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters. A preset is where a new instrument starts
 - `Knob` / `Fader` / `NumberField` (Views/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field
 - `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
@@ -66,7 +67,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - Default: 4 rows x 2 columns = 8 pads (backward compatible)
 - Two source types per pad: local files (WAV/MP3/OGG/FLAC) or HTTP streams
 - Tracker instruments come in two kinds: a recording pitched by resampling, or a synth patch
-  generated at playback time (the parameter set mirrors MappoGraph's chiptune synth)
+  generated at playback time (the parameter set mirrors MappoGraph's chiptune synth, plus a
+  drive control). The
+  tracker only ever loads instruments; whether one is a sample or a synth is its own business
+- Three places things are stored, on purpose: presets (a starting sound), instruments (a voice
+  you own, shared by every song), and songs (patterns plus the instruments they use)
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
 - Startup errors logged to `startup.log` for debugging

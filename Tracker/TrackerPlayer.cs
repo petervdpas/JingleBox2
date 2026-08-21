@@ -347,6 +347,9 @@ public sealed class TrackerPlayer : IDisposable
     /// The level and placement a voice should have, from the cell and the instrument. Shared
     /// by both kinds of instrument so the volume column means the same thing either way.
     /// </summary>
+    /// <summary>An instrument can be pushed past unity, so the ceiling is not one.</summary>
+    private const float MaxGain = 2f;
+
     private static (float Gain, float? Pan) LevelsFor(TrackerEvent e, TrackerInstrument? instrument)
     {
         float gain = (e.Gain ?? 1f) * (float)(instrument?.Volume ?? 1.0);
@@ -362,7 +365,7 @@ public sealed class TrackerPlayer : IDisposable
             pan = Math.Clamp((e.Effect.Parameter - 64) / 64f, -1f, 1f);
         }
 
-        return (Math.Clamp(gain, 0f, 1f), pan);
+        return (Math.Clamp(gain, 0f, MaxGain), pan);
     }
 
     private static void ApplyVoiceSettings(int channel, float gain, float? pan)

@@ -82,7 +82,8 @@
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Classes="field" Text="Save as:" />
           <TextBox Grid.Column="1" Text="{Binding SongName}" />
-          <Button Grid.Column="2" Content="Save" Command="{Binding SaveCommand}" />
+          <Button Grid.Column="2" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"
+                  ToolTip.Tip="A star means there are changes that are not on disk yet." />
         </Grid>
 
         <TextBlock Classes="cardHint" Text="{Binding Status}" />
@@ -131,14 +132,32 @@
       <!-- Instruments -->
       <Border Grid.Column="2" Classes="card">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Instruments" />
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Song instruments" />
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
             <TextBlock Classes="cardHint"
-                       Text="Drag an instrument onto a track, anywhere in its column, to put it there. An instrument sits on one track only: to use the same sample twice, add the recording again." />
+                       Text="Drag one onto a track, anywhere in its column, to put it there. An instrument sits on one track only: to use the same sound twice, add it twice." />
 
-            <TextBlock Classes="cardHint"
-                       Text="Add, edit and remove instruments on the INSTRUMENTS tab." />
+            <TextBlock Classes="cardHint" Text="Bring one in from the library:" Margin="0,6,0,0" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+              <ComboBox Grid.Column="0"
+                        ItemsSource="{Binding LibraryInstruments}"
+                        SelectedItem="{Binding SelectedLibraryInstrument}"
+                        DisplayMemberBinding="{Binding Name}"
+                        HorizontalAlignment="Stretch"
+                        PlaceholderText="Pick an instrument" />
+              <Button Grid.Column="1" Content="+ Add" Command="{Binding AddFromLibraryCommand}" />
+            </Grid>
+
+            <Button Content="Add to library" HorizontalAlignment="Stretch"
+                    IsEnabled="{Binding HasInstruments}"
+                    Command="{Binding PromoteToLibraryCommand}"
+                    ToolTip.Tip="Puts this song's instrument into the library, so other songs can use it and the INSTRUMENTS tab can edit it." />
+
+            <Button Content="Remove from song" HorizontalAlignment="Stretch" Classes="danger"
+                    IsEnabled="{Binding HasInstruments}"
+                    Command="{Binding RemoveInstrumentCommand}"
+                    ToolTip.Tip="Takes the slot out of this song. The instrument stays in the library." />
           </StackPanel>
 
           <ListBox x:Name="InstrumentList"

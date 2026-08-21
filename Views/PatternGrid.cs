@@ -13,7 +13,7 @@ namespace JingleBox2.Views;
 /// controls: a 64 line pattern across 8 tracks is 2048 cells, and one Render pass over the
 /// visible rows costs a fraction of what that many TextBlocks would.
 /// </summary>
-public sealed class PatternGrid : Control
+public sealed class PatternGrid : ThemedControl
 {
     public static readonly StyledProperty<Pattern?> PatternProperty =
         AvaloniaProperty.Register<PatternGrid, Pattern?>(nameof(Pattern));
@@ -111,29 +111,15 @@ public sealed class PatternGrid : Control
             Pattern.Changed += OnPatternChanged;
         }
 
-        ActualThemeVariantChanged += OnThemeChanged;
-        ResourcesChanged += OnResourcesChanged;
-
         // The pattern binding lands after the first measure, so without this the control
         // keeps the zero size it was first measured at and the ScrollViewer clips it away.
         InvalidateMeasure();
         InvalidateVisual();
     }
 
-    /// <summary>
-    /// Custom-drawn controls are not repainted by a theme change on their own, so a swap
-    /// would otherwise leave the grid drawn in the previous theme's colours.
-    /// </summary>
-    private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
-
-    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
-
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-
-        ActualThemeVariantChanged -= OnThemeChanged;
-        ResourcesChanged -= OnResourcesChanged;
 
         if (Pattern != null) Pattern.Changed -= OnPatternChanged;
     }

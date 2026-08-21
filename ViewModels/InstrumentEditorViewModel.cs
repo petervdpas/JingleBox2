@@ -55,12 +55,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>Past unity is makeup gain: a quiet sample or a soft patch can be pushed up.</summary>
+    public const double MaxVolume = 2.0;
+
     public double Volume
     {
         get => _instrument.Volume;
         set
         {
-            double clamped = Math.Clamp(double.IsNaN(value) ? 0 : value, 0, 1);
+            double clamped = Math.Clamp(double.IsNaN(value) ? 0 : value, 0, MaxVolume);
             if (Math.Abs(_instrument.Volume - clamped) < 0.0001) return;
 
             _instrument.Volume = clamped;

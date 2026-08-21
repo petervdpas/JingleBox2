@@ -242,12 +242,7 @@ public sealed partial class RecordViewModel : ObservableObject
     {
         if (recording == null) return;
 
-        if (App.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
-            || desktop.MainWindow is null)
-            return;
-
-        bool confirmed = await ConfirmDialog.ShowAsync(
-            desktop.MainWindow,
+        bool confirmed = await ConfirmDialog.AskAsync(
             "Delete recording",
             $"Delete '{recording.Name}' permanently? This cannot be undone.",
             "Delete");

@@ -33,6 +33,9 @@ public sealed class SynthPatch
     public const double MinDuty = 0.05;
     public const double MaxDuty = 0.95;
 
+    public const double MinDrive = 1;
+    public const double MaxDrive = 10;
+
     public SynthWave Wave { get; set; } = SynthWave.Square;
 
     /// <summary>How much of the pulse wave's cycle is high. Ignored by the other waves.</summary>
@@ -42,6 +45,12 @@ public sealed class SynthPatch
     public double DecayMs { get; set; } = 40;
     public double Sustain { get; set; } = 0.6;
     public double ReleaseMs { get; set; } = 80;
+
+    /// <summary>
+    /// How hard the voice is pushed into its saturation. One is untouched; above that the tone
+    /// fills out and squares off without getting louder, since the drive is levelled out again.
+    /// </summary>
+    public double Drive { get; set; } = 1;
 
     public double VibratoRateHz { get; set; }
     public double VibratoDepthCents { get; set; }
@@ -63,6 +72,7 @@ public sealed class SynthPatch
         DecayMs = DecayMs,
         Sustain = Sustain,
         ReleaseMs = ReleaseMs,
+        Drive = Drive,
         VibratoRateHz = VibratoRateHz,
         VibratoDepthCents = VibratoDepthCents,
         TremoloRateHz = TremoloRateHz,
@@ -81,6 +91,7 @@ public sealed class SynthPatch
         DecayMs = Clamp(DecayMs, MinTimeMs, MaxDecayMs);
         Sustain = Clamp(Sustain, MinSustain, MaxSustain);
         ReleaseMs = Clamp(ReleaseMs, MinTimeMs, MaxReleaseMs);
+        Drive = Clamp(Drive, MinDrive, MaxDrive);
 
         VibratoRateHz = Clamp(VibratoRateHz, MinRateHz, MaxRateHz);
         VibratoDepthCents = Clamp(VibratoDepthCents, MinVibratoDepthCents, MaxVibratoDepthCents);
