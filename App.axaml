@@ -63,6 +63,48 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+        <!-- The spinner buttons take a fixed slice of a NumericUpDown, so a field sized by
+             its digits alone clips the value. These give the text room and contrast. -->
+        <Style Selector="NumericUpDown.tracker">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
+            </Setter>
+        </Style>
+        <Style Selector="NumericUpDown.tracker /template/ TextBox">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
+            </Setter>
+        </Style>
+
+        <!-- Transport glyphs need size and weight of their own: at the default button
+             metrics they render as small, low-contrast marks. -->
+        <Style Selector="Button.transport">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="MinWidth" Value="46" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
+            </Setter>
+        </Style>
+        <Style Selector="Button.transport.record">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+            </Setter>
+        </Style>
+        <Style Selector="Button.transport.active">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
+        <Style Selector="Button.transport:disabled">
+            <Setter Property="Opacity" Value="0.45" />
+        </Style>
         <Style Selector="Button.armed">
             <Setter Property="Background">
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />

@@ -89,15 +89,29 @@ public sealed class PatternGrid : Control
             Pattern.Changed += OnPatternChanged;
         }
 
+        ActualThemeVariantChanged += OnThemeChanged;
+        ResourcesChanged += OnResourcesChanged;
+
         // The pattern binding lands after the first measure, so without this the control
         // keeps the zero size it was first measured at and the ScrollViewer clips it away.
         InvalidateMeasure();
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Custom-drawn controls are not repainted by a theme change on their own, so a swap
+    /// would otherwise leave the grid drawn in the previous theme's colours.
+    /// </summary>
+    private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
+
+    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+
+        ActualThemeVariantChanged -= OnThemeChanged;
+        ResourcesChanged -= OnResourcesChanged;
 
         if (Pattern != null) Pattern.Changed -= OnPatternChanged;
     }
@@ -143,10 +157,10 @@ public sealed class PatternGrid : Control
 
         var metrics = Metrics;
         var bounds = new Rect(Bounds.Size);
+        var palette = PatternPalette.From(this);
 
-        var text = Brush(ThemeKey.Text, Colors.Gainsboro);
-        var muted = Brush(ThemeKey.Muted, Color.FromRgb(0x6B, 0x72, 0x80));
-        var accent = Brush(ThemeKey.Accent, Color.FromRgb(0xFB, 0x8C, 0x00));
+        var text = palette.TextBrush;
+        var muted = palette.MutedBrush;
 
         double contentHeight = metrics.ContentHeight(pattern.Lines);
 
@@ -156,10 +170,10 @@ public sealed class PatternGrid : Control
         double rowWidth = Math.Max(bounds.Width, metrics.ContentWidth);
 
         var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount);
-        var barShade = RowShade(0x1C);
-        var beatShade = RowShade(0x0E);
+        var barShade = palette.RowShade(0x1C);
+        var beatShade = palette.RowShade(0x0E);
 
-        DrawSelectedTrack(context, metrics, cursor.Track, contentHeight);
+        DrawSelectedTrack(context, metrics, palette, cursor.Track, contentHeight);
 
         int lpb = Math.Max(1, LinesPerBeat);
 
@@ -174,8 +188,7 @@ public sealed class PatternGrid : Control
                 context.FillRectangle(beatShade, new Rect(0, y, rowWidth, RowHeight));
 
             if (line == PlayingLine)
-                context.FillRectangle(new SolidColorBrush(Color.FromArgb(60, 0xFB, 0x8C, 0x00)),
-                    new Rect(0, y, rowWidth, RowHeight));
+                context.FillRectangle(palette.AccentTint(60), new Rect(0, y, rowWidth, RowHeight));
 
             DrawText(context, line.ToString("00", CultureInfo.InvariantCulture), 0, y, muted);
 
@@ -199,18 +212,18 @@ public sealed class PatternGrid : Control
             }
         }
 
-        DrawTrackSeparators(context, metrics, pattern.TrackCount, contentHeight);
-        DrawCursor(context, metrics, cursor, accent);
+        DrawTrackSeparators(context, metrics, palette, pattern.TrackCount, contentHeight);
+        DrawCursor(context, metrics, palette, cursor);
     }
 
     /// <summary>
     /// A tint down the whole track the cursor is in. On a wide pattern the cursor box alone
     /// is a few pixels of a very repetitive grid, which is not enough to find at a glance.
     /// </summary>
-    private void DrawSelectedTrack(DrawingContext context, PatternMetrics metrics, int track, double height)
+    private static void DrawSelectedTrack(DrawingContext context, PatternMetrics metrics,
+        PatternPalette palette, int track, double height)
     {
-        var brush = new SolidColorBrush(Color.FromArgb(22, 0xFB, 0x8C, 0x00));
-        context.FillRectangle(brush,
+        context.FillRectangle(palette.AccentTint(22),
             new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height));
     }
 
@@ -218,9 +231,10 @@ public sealed class PatternGrid : Control
     /// A vertical rule down each track boundary. Without them the columns of a wide pattern
     /// read as one block of text and it is hard to tell which track a note belongs to.
     /// </summary>
-    private void DrawTrackSeparators(DrawingContext context, PatternMetrics metrics, int trackCount, double height)
+    private static void DrawTrackSeparators(DrawingContext context, PatternMetrics metrics,
+        PatternPalette palette, int trackCount, double height)
     {
-        var pen = new Pen(Brush(ThemeKey.Border, Color.FromArgb(60, 128, 128, 128)), 1);
+        var pen = new Pen(palette.BorderBrush, 1);
 
         // One after the line numbers, then one at the start of every track after the first.
         for (int track = 0; track <= trackCount; track++)
@@ -230,33 +244,17 @@ public sealed class PatternGrid : Control
         }
     }
 
-    private void DrawCursor(DrawingContext context, PatternMetrics metrics, PatternCursor cursor, IBrush accent)
+    private void DrawCursor(DrawingContext context, PatternMetrics metrics,
+        PatternPalette palette, PatternCursor cursor)
     {
         double x = metrics.ColumnX(cursor.Track, cursor.Column);
         double width = metrics.ColumnWidth(cursor.Column);
         double y = metrics.RowY(cursor.Line);
+        var area = new Rect(x - 1, y, width + 2, RowHeight);
 
-        context.FillRectangle(new SolidColorBrush(Color.FromArgb(48, 0xFB, 0x8C, 0x00)),
-            new Rect(x - 1, y, width + 2, RowHeight));
-        context.DrawRectangle(new Pen(accent, 1), new Rect(x - 1, y, width + 2, RowHeight));
+        context.FillRectangle(palette.AccentTint(48), area);
+        context.DrawRectangle(new Pen(palette.AccentBrush, 1), area);
     }
-
-    /// <summary>
-    /// Beat shading has to darken a light theme and lighten a dark one, so it follows the
-    /// background rather than always painting white over the top.
-    /// </summary>
-    private IBrush RowShade(byte alpha)
-    {
-        bool lightBackground = Brush(ThemeKey.Background, Colors.Black) is ISolidColorBrush background
-                               && Luminance(background.Color) > 0.5;
-
-        return lightBackground
-            ? new SolidColorBrush(Color.FromArgb(alpha, 0, 0, 0))
-            : new SolidColorBrush(Color.FromArgb(alpha, 255, 255, 255));
-    }
-
-    private static double Luminance(Color color) =>
-        (0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B) / 255.0;
 
     private void DrawText(DrawingContext context, string text, double x, double y, IBrush brush)
     {
@@ -295,17 +293,4 @@ public sealed class PatternGrid : Control
         _charWidth = probe.Width > 0 ? probe.Width : _fontSize * 0.6;
     }
 
-    private static class ThemeKey
-    {
-        public const string Text = "TextPrimaryBrush";
-        public const string Muted = "TextMutedBrush";
-        public const string Accent = "AccentBrush";
-        public const string Border = "BorderBrush";
-        public const string Background = "BgBrush";
-    }
-
-    private IBrush Brush(string key, Color fallback) =>
-        this.TryFindResource(key, out var value) && value is IBrush brush
-            ? brush
-            : new SolidColorBrush(fallback);
 }

@@ -86,10 +86,13 @@ public sealed class PatternHeader : Control
         var metrics = Metrics;
         double height = Bounds.Height;
 
-        var text = Brush(ThemeKey.Text, Colors.Gainsboro);
-        var muted = Brush(ThemeKey.Muted, Color.FromRgb(0x6B, 0x72, 0x80));
-        var accent = Brush(ThemeKey.Accent, Color.FromRgb(0xFB, 0x8C, 0x00));
-        var border = Brush(ThemeKey.Border, Color.FromArgb(60, 128, 128, 128));
+        var palette = PatternPalette.From(this);
+        var text = palette.TextBrush;
+        var muted = palette.MutedBrush;
+        var selectedPen = new Pen(palette.AccentBrush, 1);
+        var idlePen = new Pen(palette.BorderBrush, 1);
+        var selectedFill = palette.AccentTint(56);
+        var idleFill = palette.RowShade(0x12);
 
         // Everything shifts with the pattern's horizontal scroll so the labels stay over
         // their own columns.
@@ -104,16 +107,8 @@ public sealed class PatternHeader : Control
             var area = new Rect(x + 1, 2, metrics.TrackWidth - 2, height - 4);
             bool selected = track == SelectedTrack;
 
-            context.FillRectangle(
-                selected
-                    ? new SolidColorBrush(Color.FromArgb(56, 0xFB, 0x8C, 0x00))
-                    : new SolidColorBrush(Color.FromArgb(18, 128, 128, 128)),
-                area, 3);
-
-            if (selected)
-                context.DrawRectangle(new Pen(accent, 1), area, 3);
-            else
-                context.DrawRectangle(new Pen(border, 1), area, 3);
+            context.FillRectangle(selected ? selectedFill : idleFill, area, 3);
+            context.DrawRectangle(selected ? selectedPen : idlePen, area, 3);
 
             string label = "Track " + (track + 1).ToString("00", CultureInfo.InvariantCulture);
             var formatted = new FormattedText(label, CultureInfo.InvariantCulture,
@@ -138,16 +133,24 @@ public sealed class PatternHeader : Control
         e.Handled = true;
     }
 
-    private static class ThemeKey
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        public const string Text = "TextPrimaryBrush";
-        public const string Muted = "TextMutedBrush";
-        public const string Accent = "AccentBrush";
-        public const string Border = "BorderBrush";
+        base.OnAttachedToVisualTree(e);
+
+        ActualThemeVariantChanged += OnThemeChanged;
+        ResourcesChanged += OnResourcesChanged;
+        InvalidateVisual();
     }
 
-    private IBrush Brush(string key, Color fallback) =>
-        this.TryFindResource(key, out var value) && value is IBrush brush
-            ? brush
-            : new SolidColorBrush(fallback);
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        ActualThemeVariantChanged -= OnThemeChanged;
+        ResourcesChanged -= OnResourcesChanged;
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
+
+    private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
 }
