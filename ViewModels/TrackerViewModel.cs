@@ -367,7 +367,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             if (instrument.Track < 0) continue;
 
-            instrument.Level = _player.LevelFor(instrument.Track).Left;
+            var (left, right) = _player.LevelFor(instrument.Track);
+            instrument.Level = Math.Max(left, right);
         }
     }
 

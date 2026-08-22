@@ -880,6 +880,13 @@ public sealed class SynthMixer
                 left = Math.Max(left, level * (pan <= 0 ? 1f : 1f - pan));
                 right = Math.Max(right, level * (pan >= 0 ? 1f : 1f + pan));
             }
+
+            if (_instruments[track] != null && _trackLevels[track] > 0)
+            {
+                float level = _trackLevels[track] * MasterGain * DuckGainFor(track);
+                left = Math.Max(left, level);
+                right = Math.Max(right, level);
+            }
         }
 
         return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
