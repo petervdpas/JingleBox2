@@ -6,6 +6,9 @@ using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
@@ -29,11 +32,14 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         TrackerInstrument instrument,
         Action changed,
         IWaveformService? waveforms = null,
-        IInstrumentAudition? audition = null)
+        IInstrumentAudition? audition = null,
+        ObservableCollection<Recording>? recordings = null)
     {
         Index = index;
         _instrument = instrument;
         _changed = changed;
+
+        Recordings = recordings ?? new ObservableCollection<Recording>();
 
         if (instrument.IsPlugin)
         {
@@ -50,6 +56,21 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         {
             instrument.Ouroboros ??= new OuroborosPatch();
             Ouroboros = new OuroborosPatchViewModel(instrument.Ouroboros, changed);
+        }
+
+        if (instrument.IsZampler)
+        {
+            instrument.Zones ??= ZoneMap.Empty();
+            instrument.Zones.Clamp();
+
+            instrument.Zampler ??= new ZamplerPatch();
+            instrument.Zampler.Clamp();
+
+            Zones = new ZoneMapViewModel(
+                instrument.Zones, changed,
+                note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
+
+            Zampler = new ZamplerPatchViewModel(instrument.Zampler, changed);
         }
 
         if (instrument.IsBongaBong)
@@ -86,6 +107,44 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     public bool IsBongaBong => _instrument.IsBongaBong;
 
     /// <summary>
+    /// Your own takes, offered to the machines that put recordings on things.
+    /// </summary>
+    /// <remarks>
+    /// The RECORD tab is the sampler's input. On the machine Zampler is named for, sampling and
+    /// playing were one box: you sampled into it and put the result on the keyboard, and there
+    /// was no step in between called finding the file. This is that step removed.
+    ///
+    /// It is the same list the RECORD tab shows, live, so a take made a moment ago is on a pad
+    /// without anything being refreshed.
+    /// </remarks>
+    public ObservableCollection<Recording> Recordings { get; }
+
+    /// <summary>
+    /// Brings recordings in from the disc and puts them on the shelf of takes.
+    /// </summary>
+    /// <remarks>
+    /// Copied in rather than pointed at, so a song never depends on a folder somebody else is
+    /// free to tidy. What comes back are the paths as they now are, ready to go straight onto
+    /// pads or zones.
+    /// </remarks>
+    public IReadOnlyList<string> Import(IEnumerable<string> paths)
+    {
+        var taken = RecordingImport.Take(paths);
+
+        foreach (var recording in taken) Recordings.Add(recording);
+
+        return taken.Select(r => r.FilePath).ToList();
+    }
+
+    /// <summary>Zampler's map, when that is the machine. Null on every other.</summary>
+    public ZoneMapViewModel? Zones { get; }
+
+    /// <summary>Zampler's filter and envelopes, when that is the machine.</summary>
+    public ZamplerPatchViewModel? Zampler { get; }
+
+    public bool IsZampler => _instrument.IsZampler;
+
+    /// <summary>
     /// A preset has landed on the instrument: everything the panel shows may have moved.
     /// </summary>
     /// <remarks>
@@ -97,6 +156,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         Patch?.RefreshAll();
         Ouroboros?.RefreshAll();
         Kit?.Refresh();
+        Zones?.Refresh();
+        Zampler?.RefreshAll();
 
         OnPropertyChanged(string.Empty);
 
@@ -130,7 +191,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     public bool IsPlugin => _instrument.IsPlugin;
 
-    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros && !IsBongaBong;
+    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros && !IsBongaBong && !IsZampler;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }

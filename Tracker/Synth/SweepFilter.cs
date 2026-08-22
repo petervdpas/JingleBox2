@@ -17,6 +17,11 @@ namespace JingleBox2.Tracker.Synth;
 /// The coefficients are worked out every <see cref="Interval"/> samples rather than every one.
 /// A tangent per sample per voice is real money on the audio thread, and a cutoff that catches
 /// up a third of a millisecond later is not a thing anybody has heard.
+///
+/// That counting happens as samples go through rather than as the cutoff is set, which matters:
+/// a filter set once and then left alone has to end up where it was put, and one set every
+/// sixteenth sample has to as well. Counting the calls to <see cref="Set"/> instead would mean
+/// the filter quietly ignoring whoever did not call it often enough.
 /// </remarks>
 public sealed class SweepFilter
 {
@@ -33,6 +38,9 @@ public sealed class SweepFilter
     private double _first;
     private double _second;
 
+    private double _wantCutoff;
+    private double _wantResonance;
+
     private double _setCutoff = -1;
     private double _setResonance = -1;
     private int _since;
@@ -43,29 +51,33 @@ public sealed class SweepFilter
         _nyquist = _rate / 2;
 
         Set(20000, 0);
+        Recompute();
     }
 
-    /// <summary>Where the filter is now. Called per sample; most calls do nothing.</summary>
+    /// <summary>
+    /// Where the filter should be. Cheap enough to call every sample and safe to call once.
+    /// </summary>
     public void Set(double cutoffHz, double resonance)
     {
-        if (--_since > 0) return;
-
-        _since = Interval;
-
-        double cutoff = Math.Clamp(
+        _wantCutoff = Math.Clamp(
             double.IsNaN(cutoffHz) ? 20000 : cutoffHz,
             ToneFilter.MinHz,
             Math.Min(ToneFilter.OpenHz, _nyquist * 0.99));
 
-        double q = Math.Clamp(double.IsNaN(resonance) ? 0 : resonance, 0, ToneFilter.MaxResonance);
+        _wantResonance = Math.Clamp(double.IsNaN(resonance) ? 0 : resonance, 0, ToneFilter.MaxResonance);
+    }
 
-        if (Math.Abs(cutoff - _setCutoff) < 0.5 && Math.Abs(q - _setResonance) < 0.001) return;
+    /// <summary>Works the coefficients out again, if the filter has moved since last time.</summary>
+    private void Recompute()
+    {
+        if (Math.Abs(_wantCutoff - _setCutoff) < 0.5 && Math.Abs(_wantResonance - _setResonance) < 0.001)
+            return;
 
-        _setCutoff = cutoff;
-        _setResonance = q;
+        _setCutoff = _wantCutoff;
+        _setResonance = _wantResonance;
 
-        _g = Math.Tan(Math.PI * cutoff / _rate);
-        _k = 2.0 - 1.9 * q;
+        _g = Math.Tan(Math.PI * _setCutoff / _rate);
+        _k = 2.0 - 1.9 * _setResonance;
 
         _a1 = 1.0 / (1.0 + _g * (_g + _k));
         _a2 = _g * _a1;
@@ -75,6 +87,12 @@ public sealed class SweepFilter
     /// <summary>One sample through, out of whichever end is asked for.</summary>
     public double Process(double input, FilterMode mode)
     {
+        if (--_since <= 0)
+        {
+            _since = Interval;
+            Recompute();
+        }
+
         double third = input - _second;
         double v1 = _a1 * _first + _a2 * third;
         double v2 = _second + _a2 * _first + _a3 * third;

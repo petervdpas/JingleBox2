@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Tracker;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.IO;
@@ -65,6 +66,32 @@ public sealed partial class DrumKitViewModel : ObservableObject
     private void Light(SoundingNotes sounding)
     {
         foreach (var pad in Pads) pad.IsLit = sounding.Lit.Contains(pad.Semitone);
+    }
+
+    /// <summary>
+    /// Fills the pads from a folder of recordings, in the order the folder lists them.
+    /// </summary>
+    /// <remarks>
+    /// How a kit is actually made. Sixteen pads loaded one file dialog at a time is sixteen
+    /// dialogs; a folder of drum hits is one, and it is how the folder already sits on the
+    /// disc. Pads past the end of the list are left alone rather than emptied, so dropping
+    /// four hits onto a kit adds four rather than wiping the other twelve.
+    /// </remarks>
+    public int Fill(IReadOnlyList<string> paths)
+    {
+        if (paths == null || paths.Count == 0) return 0;
+
+        int put = 0;
+
+        for (int i = 0; i < Pads.Count && i < paths.Count; i++)
+        {
+            Pads[i].Take(paths[i]);
+            put++;
+        }
+
+        Selected = Pads.FirstOrDefault();
+
+        return put;
     }
 
     /// <summary>Reads the kit again, for a preset that has just landed on it.</summary>

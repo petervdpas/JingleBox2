@@ -219,7 +219,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
         Editor = value == null
             ? null
-            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition);
+            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition, _recordings);
 
         Presets = value == null
             ? null

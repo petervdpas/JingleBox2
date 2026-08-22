@@ -21,6 +21,29 @@ public sealed class SampleVoice : IVoice
     private readonly ToneFilter _left;
     private readonly ToneFilter _right;
 
+    /// <summary>
+    /// Zampler's own shaping, when this voice is one of its. Null on every other machine, and
+    /// the plain filter above is used instead.
+    /// </summary>
+    private readonly ZamplerPatch? _zampler;
+
+    private readonly LadderFilter? _ladderLeft;
+    private readonly LadderFilter? _ladderRight;
+    private readonly SynthEnvelope? _filterEnvelope;
+    private readonly int _root;
+
+    /// <summary>
+    /// How often the swept cutoff is worked out again, in samples.
+    /// </summary>
+    /// <remarks>
+    /// Recomputing a filter's coefficients every sample costs more than the filter does. Every
+    /// sixteenth is under a millisecond at any rate worth using, which is faster than a sweep
+    /// can be heard to step.
+    /// </remarks>
+    private const int SweepEvery = 16;
+
+    private int _sinceSweep;
+
     private readonly int _sampleRate;
     private readonly double _rateRatio;
     private readonly double _noteRatio;
@@ -51,7 +74,8 @@ public sealed class SampleVoice : IVoice
         int track,
         float gain,
         float pan,
-        int sampleRate)
+        int sampleRate,
+        ZamplerPatch? zampler = null)
     {
         _sample = sample;
         _patch = patch.Clone();
@@ -75,6 +99,28 @@ public sealed class SampleVoice : IVoice
         _left = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _right = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
 
+        _root = baseNote.Semitone;
+
+        if (zampler != null)
+        {
+            _zampler = zampler.Clone();
+            _zampler.Clamp();
+
+            // Two four pole filters and a second envelope, which is the machine this is named
+            // for: the loudness and the brightness are not the same shape.
+            _ladderLeft = new LadderFilter(_sampleRate);
+            _ladderRight = new LadderFilter(_sampleRate);
+
+            _envelope = new SynthEnvelope(Shaped(
+                _zampler.AttackMs, _zampler.DecayMs, _zampler.Sustain, _zampler.ReleaseMs), _sampleRate);
+
+            _filterEnvelope = new SynthEnvelope(Shaped(
+                _zampler.FilterAttackMs, _zampler.FilterDecayMs,
+                _zampler.FilterSustain, _zampler.FilterReleaseMs), _sampleRate);
+
+            Sweep(0);
+        }
+
         Track = track;
         Note = note;
         Gain = gain;
@@ -91,14 +137,50 @@ public sealed class SampleVoice : IVoice
 
     public float Level { get; private set; }
 
+    /// <summary>
+    /// A patch carrying nothing but one envelope's times, so the shared envelope can run it.
+    /// </summary>
+    /// <remarks>
+    /// One envelope in the codebase rather than two that have to be kept sounding alike. The
+    /// filter and the amplifier ask it the same question and only differ in what they do with
+    /// the answer.
+    /// </remarks>
+    private static SynthPatch Shaped(double attack, double decay, double sustain, double release) =>
+        new()
+        {
+            AttackMs = attack,
+            DecayMs = decay,
+            Sustain = sustain,
+            ReleaseMs = release
+        };
+
+    /// <summary>Puts the four pole filters where the envelope and the keyboard say they go.</summary>
+    private void Sweep(double envelope)
+    {
+        if (_zampler == null) return;
+
+        double cutoff = _zampler.CutoffFor(envelope, Note.Semitone, _root);
+
+        _ladderLeft!.Set(cutoff, _zampler.Resonance);
+        _ladderRight!.Set(cutoff, _zampler.Resonance);
+    }
+
     /// <summary>Finished when the envelope closes, or when a one-shot runs off its end.</summary>
     public bool IsFinished => _ended || _envelope.IsFinished;
 
     public void HoldFor(double seconds) => _holdSeconds = seconds;
 
-    public void NoteOff() => _envelope.NoteOff();
+    public void NoteOff()
+    {
+        _envelope.NoteOff();
+        _filterEnvelope?.NoteOff();
+    }
 
-    public void Cut() => _envelope.NoteOff(SynthVoice.CutSeconds);
+    public void Cut()
+    {
+        _envelope.NoteOff(SynthVoice.CutSeconds);
+        _filterEnvelope?.NoteOff(SynthVoice.CutSeconds);
+    }
 
     public void Kill()
     {
@@ -132,6 +214,20 @@ public sealed class SampleVoice : IVoice
             {
                 _holdSeconds = 0;
                 _envelope.NoteOff();
+                _filterEnvelope?.NoteOff();
+            }
+
+            // The filter's envelope runs whether or not it is doing anything, so that turning
+            // the amount up mid note does not start it late.
+            if (_filterEnvelope != null)
+            {
+                double brightness = _filterEnvelope.Next();
+
+                if (--_sinceSweep <= 0)
+                {
+                    Sweep(brightness);
+                    _sinceSweep = SweepEvery;
+                }
             }
 
             double level = _envelope.Next();
@@ -146,8 +242,13 @@ public sealed class SampleVoice : IVoice
 
             double shared = level * TremoloAt(_time) * Gain;
 
-            double shapedLeft = _left.Process(Saturation.Apply(a, _drive, _driveMakeup)) * shared;
-            double shapedRight = _right.Process(Saturation.Apply(b, _drive, _driveMakeup)) * shared;
+            double shapedLeft = _zampler == null
+                ? _left.Process(Saturation.Apply(a, _drive, _driveMakeup)) * shared
+                : _ladderLeft!.Process(a) * shared * _zampler.Volume;
+
+            double shapedRight = _zampler == null
+                ? _right.Process(Saturation.Apply(b, _drive, _driveMakeup)) * shared
+                : _ladderRight!.Process(b) * shared * _zampler.Volume;
 
             float loudest = (float)Math.Max(Math.Abs(shapedLeft), Math.Abs(shapedRight));
             if (loudest > Level) Level = loudest;

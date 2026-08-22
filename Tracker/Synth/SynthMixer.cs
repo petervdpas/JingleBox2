@@ -605,6 +605,46 @@ public sealed class SynthMixer
         }
     }
 
+    /// <summary>
+    /// Plays one zone of a map: its recording, read at whatever speed the key asks for.
+    /// </summary>
+    /// <remarks>
+    /// The kit's method with one word changed. There the played note goes in as the root, so
+    /// the ratio comes out at one; here the zone's own root goes in, so the note decides how
+    /// fast to read. That one word is the whole difference between BongaBong and Zampler.
+    ///
+    /// And unlike a kit, the track's last note is cut: this is an instrument rather than a rack
+    /// of them, and one voice to a track is how the tracker has always played one.
+    /// </remarks>
+    public void NoteOn(int track, SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain, float pan)
+    {
+        if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
+            track, gain, pan, SampleRate, patch);
+
+        lock (_lock)
+        {
+            Cut(track);
+            Add(voice);
+        }
+    }
+
+    /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
+    public void Preview(SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain, double holdSeconds)
+    {
+        if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
+            SynthVoice.NoTrack, gain, 0f, SampleRate, patch);
+
+        voice.HoldFor(holdSeconds);
+
+        lock (_lock) Add(voice);
+    }
+
     /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
     public void Preview(DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, double holdSeconds)
     {

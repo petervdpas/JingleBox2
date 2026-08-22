@@ -264,6 +264,21 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
+        if (instrument.IsZampler)
+        {
+            var zone = instrument.Zones?.For(note);
+            var zoneSample = zone == null ? null : _samples.Load(zone.FilePath);
+
+            if (zone != null && zoneSample != null)
+            {
+                _synth.Mixer.Preview(
+                    zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, note,
+                    (float)(level * zone.Volume), PreviewHoldSeconds);
+            }
+
+            return;
+        }
+
         if (instrument.IsBongaBong)
         {
             var pad = instrument.Kit?.For(note);
@@ -760,6 +775,35 @@ public sealed class TrackerPlayer : IDisposable
             {
                 Where(e.Track, e.Instrument, instrument, song, "its plugin would not load, so nothing was played");
             }
+
+            return;
+        }
+
+        if (instrument.IsZampler)
+        {
+            var zone = instrument.Zones?.For(e.Note);
+
+            if (zone == null)
+            {
+                Where(e.Track, e.Instrument, instrument, song, "no zone on its map answers to that note");
+                _synth.Mixer.NoteOff(e.Track);
+                return;
+            }
+
+            var zoneSample = _samples.Load(zone.FilePath);
+
+            if (zoneSample == null)
+            {
+                Where(e.Track, e.Instrument, instrument, song, "its zone's recording would not load");
+                _synth.Mixer.NoteOff(e.Track);
+                return;
+            }
+
+            Where(e.Track, e.Instrument, instrument, song, "played on Zampler");
+
+            _synth.Mixer.NoteOn(
+                e.Track, zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, e.Note,
+                (float)(mixed * zone.Volume), Placed(placed, zone.Pan));
 
             return;
         }

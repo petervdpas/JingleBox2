@@ -94,6 +94,24 @@ public sealed record Machine(
         "A kit. Sixteen pads, one recording to a key, sounding over each other.",
         true);
 
+    /// <summary>
+    /// The sampling machine: recordings laid across the keyboard, each transposed from its root.
+    /// </summary>
+    /// <remarks>
+    /// The recording machine with a map in front of it, the same way BongaBong is, and the two
+    /// differ in one line: a pad passes the played note as its own root so nothing moves, and a
+    /// zone passes the note it was recorded at so everything does. A piano sampled every fourth
+    /// key is thirteen zones, each covering the keys either side of its own.
+    ///
+    /// Named for the Emulator, which is where the idea comes from: a keyboard is a map, and
+    /// what a key does is look itself up on it.
+    /// </remarks>
+    public static readonly Machine Zampler = new(
+        TrackerInstrumentKind.Zampler,
+        "Zampler",
+        "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
+        true);
+
     /// <summary>Somebody else's instrument, hosted: Serum, Vital, anything that takes notes.</summary>
     public static readonly Machine Plugin = new(
         TrackerInstrumentKind.Plugin,
@@ -102,7 +120,7 @@ public sealed record Machine(
         false);
 
     /// <summary>Every machine there is, in the order they are offered.</summary>
-    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, BongaBong, Recording, Plugin };
+    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Zampler, BongaBong, Recording, Plugin };
 
     /// <summary>The ones that are ours to program, as opposed to a plugin we only host.</summary>
     public static IReadOnlyList<Machine> Ours { get; } = All.Where(m => m.IsOurs).ToList();

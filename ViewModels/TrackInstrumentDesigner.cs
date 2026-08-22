@@ -31,7 +31,8 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         Action changed,
         IWaveformService? waveforms = null,
         ITrackerPanel? tracker = null,
-        InstrumentLibrary? library = null)
+        InstrumentLibrary? library = null,
+        System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null)
     {
         Track = track;
         _instrument = instrument;
@@ -47,7 +48,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
             tracker.NotePlayed += OnTrackerNote;
         }
 
-        Editor = new InstrumentEditorViewModel(track, instrument, changed, waveforms, audition);
+        Editor = new InstrumentEditorViewModel(track, instrument, changed, waveforms, audition, recordings);
 
         // A panel opened from a track can say where that track is. One opened without a tracker
         // still gets the lamps, with nothing behind them: they are greyed rather than removed,

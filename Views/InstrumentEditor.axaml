@@ -137,6 +137,166 @@
               </StackPanel>
             </WrapPanel>
 
+            <!-- Zampler. The map first, drawn rather than listed, because what you need to
+                 see is whether the keyboard is covered and a table of ranges will not tell you.
+                 Then the zone in hand, then the filter and the two envelopes it lands in,
+                 which on the machine this follows was the whole of the instrument. -->
+            <StackPanel Spacing="12" IsVisible="{Binding Editor.IsZampler}">
+
+              <StackPanel Spacing="6">
+                <TextBlock Classes="section" Text="Map" />
+
+                <views:ZoneStrip Height="86"
+                                 Zones="{Binding Editor.Zones.Zones}"
+                                 Selected="{Binding Editor.Zones.Selected}"
+                                 Revision="{Binding Editor.Zones.Revision}"
+                                 ToolTip.Tip="Drag an edge to move it, drag the middle to slide the whole zone along, drag the white line to say which key the recording was made at. Where two zones overlap, the one in front wins." />
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Add zone" Command="{Binding Editor.Zones.AddCommand}" />
+                  <Button Content="Remove" Command="{Binding Editor.Zones.RemoveCommand}"
+                          IsEnabled="{Binding Editor.Zones.CanRemove}" />
+                  <Button Content="Spread" Command="{Binding Editor.Zones.SpreadCommand}"
+                          ToolTip.Tip="Lays every zone that has a recording out evenly across the keyboard, each rooted in its own middle." />
+                </StackPanel>
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="24">
+
+                <!-- The zone in hand. -->
+                <StackPanel Spacing="8" IsVisible="{Binding Editor.Zones.HasZone}">
+                  <TextBlock Classes="section" Text="Zone" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox Width="150"
+                              ItemsSource="{Binding Editor.Zones.Zones}"
+                              SelectedItem="{Binding Editor.Zones.Selected}" />
+
+                    <Button Content="Clear" Click="ClearZoneSample_Click" />
+                  </StackPanel>
+
+                  <!-- The only way onto a zone. On the machine this follows, sampling and
+                       playing were one box and there was no step between them called finding
+                       the file; here the RECORD tab is that box's input. -->
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" Text="Take" />
+                    <ComboBox Name="ZoneRecordingPicker" Width="196"
+                              ItemsSource="{Binding Editor.Recordings}"
+                              SelectionChanged="ZoneRecording_Changed"
+                              PlaceholderText="Pick a recording..."
+                              ToolTip.Tip="One of your recordings, put straight on this zone. Anything from elsewhere is imported on the RECORD tab first." />
+                  </StackPanel>
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Load samples..." Click="ImportZones_Click"
+                            ToolTip.Tip="Pick any number of samples from anywhere. They are copied into JingleBox and laid across the keyboard, one zone apiece." />
+
+                    <Button Content="Map from recordings" Click="FillZonesFromTakes_Click"
+                            ToolTip.Tip="Builds the whole map from the recordings JingleBox already holds. Replaces what is there." />
+                  </StackPanel>
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" Text="Name" />
+                    <TextBox Width="150" Text="{Binding Editor.Zones.Selected.Name}" />
+                  </StackPanel>
+
+                  <TextBlock Classes="cardHint" Text="{Binding Editor.Zones.Selected.FileText}"
+                             TextTrimming="CharacterEllipsis" MaxWidth="260" />
+
+                  <!-- The range and the root are set on the map by dragging, so they are read
+                       out here rather than dialled. -->
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Classes="field" Text="Keys" />
+                    <TextBlock Classes="section" Text="{Binding Editor.Zones.Selected.RangeText}" />
+                    <TextBlock Classes="field" Text="Root" Margin="10,0,0,0" />
+                    <TextBlock Classes="section" Text="{Binding Editor.Zones.Selected.RootText}" />
+                  </StackPanel>
+
+                  <views:PanelStrip CellSize="26" Gap="4" Columns="3 3 3">
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Level"
+                                Format="0.00" DefaultValue="1" Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Zones.Selected.Volume}" />
+
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Pan"
+                                Format="0.00" DefaultValue="0" Minimum="-1" Maximum="1" SmallStep="0.02" LargeStep="0.2"
+                                Value="{Binding Editor.Zones.Selected.Pan}" />
+
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Fine"
+                                Unit="c" Format="0" DefaultValue="0" Minimum="-100" Maximum="100" SmallStep="1" LargeStep="10"
+                                Value="{Binding Editor.Zones.Selected.FineCents}"
+                                ToolTip.Tip="Hundredths of a semitone, for sitting one zone against the next." />
+                  </views:PanelStrip>
+                </StackPanel>
+
+                <!-- The filter and the two envelopes: a four pole low pass with an envelope of
+                     its own, which is what an Emulator put every voice through. -->
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="section" Text="Filter" />
+
+                  <views:PanelStrip CellSize="26" Gap="4" Columns="3 3 3 3 3">
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Cutoff"
+                                Format="0.00" DefaultValue="1" Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.08"
+                                Display="{Binding Editor.Zampler.CutoffText}"
+                                Value="{Binding Editor.Zampler.Cutoff}"
+                                ToolTip.Tip="A four pole low pass, twenty four decibels an octave, as the SSM2045 in an Emulator II was." />
+
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Resonance"
+                                Format="0.00" DefaultValue="0" Minimum="0" Maximum="0.98" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Zampler.Resonance}" />
+
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Env amount"
+                                Format="0.00" DefaultValue="0" Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Zampler.EnvelopeAmount}"
+                                ToolTip.Tip="How far the filter's own envelope moves the cutoff, up to six octaves." />
+
+                    <views:Switch views:PanelStrip.Span="3" TitleLines="2" Label="Env polarity"
+                                  OnLabel="Close" OffLabel="Open"
+                                  IsChecked="{Binding Editor.Zampler.EnvelopeInverted}" />
+
+                    <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Key follow"
+                                Format="0.00" DefaultValue="0" Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Zampler.KeyFollow}"
+                                ToolTip.Tip="How much the cutoff rises with the keyboard, so the top does not go dull." />
+                  </views:PanelStrip>
+
+                  <TextBlock Classes="section" Text="Filter envelope" />
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
+                                 Minimum="0" Maximum="4000" SmallStep="1" LargeStep="25" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.FilterAttackMs}" />
+                    <views:Fader Label="Decay" Unit="ms" Format="0" DefaultValue="300"
+                                 Minimum="0" Maximum="8000" SmallStep="5" LargeStep="50" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.FilterDecayMs}" />
+                    <views:Fader Label="Sustain" Format="0.00" DefaultValue="0.5"
+                                 Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.FilterSustain}" />
+                    <views:Fader Label="Release" Unit="ms" Format="0" DefaultValue="200"
+                                 Minimum="0" Maximum="8000" SmallStep="5" LargeStep="50" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.FilterReleaseMs}" />
+                  </StackPanel>
+
+                  <TextBlock Classes="section" Text="Amplifier" />
+                  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
+                                 Minimum="0" Maximum="4000" SmallStep="1" LargeStep="25" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.AttackMs}" />
+                    <views:Fader Label="Decay" Unit="ms" Format="0" DefaultValue="200"
+                                 Minimum="0" Maximum="8000" SmallStep="5" LargeStep="50" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.DecayMs}" />
+                    <views:Fader Label="Sustain" Format="0.00" DefaultValue="1"
+                                 Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.Sustain}" />
+                    <views:Fader Label="Release" Unit="ms" Format="0" DefaultValue="160"
+                                 Minimum="0" Maximum="8000" SmallStep="5" LargeStep="50" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.ReleaseMs}" />
+                    <views:Fader Label="Level" Format="0.00" DefaultValue="1"
+                                 Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1" TrackLength="76"
+                                 Value="{Binding Editor.Zampler.Volume}" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+
             <!-- BongaBong. Four rows of four, because that is the shape a hand knows: the
                  pads are where they are on every drum machine ever made, and the key each one
                  answers to runs across then down from C-4. A pad lights while it is sounding,
@@ -173,11 +333,28 @@
                               SelectedItem="{Binding Editor.Kit.Selected}"
                               ToolTip.Tip="Which pad the settings below are about." />
 
-                    <Button Content="Load..." Click="LoadPadSample_Click"
-                            ToolTip.Tip="Puts one of your recordings on this pad." />
-
                     <Button Content="Clear" Click="ClearPadSample_Click"
                             ToolTip.Tip="Takes the recording off this pad." />
+                  </StackPanel>
+
+                  <!-- The only way onto a pad, and deliberately: everything a machine plays is
+                       one of your recordings, which means JingleBox owns every file a song
+                       depends on. Bring anything else in on the RECORD tab first. -->
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" Text="Take" />
+                    <ComboBox Name="PadRecordingPicker" Width="196"
+                              ItemsSource="{Binding Editor.Recordings}"
+                              SelectionChanged="PadRecording_Changed"
+                              PlaceholderText="Pick a recording..."
+                              ToolTip.Tip="One of your recordings, put straight on this pad. Anything from elsewhere is imported on the RECORD tab first." />
+                  </StackPanel>
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Load samples..." Click="ImportPads_Click"
+                            ToolTip.Tip="Pick any number of samples from anywhere. They are copied into JingleBox and put on the pads in order, so the kit no longer depends on where they came from." />
+
+                    <Button Content="Fill from recordings" Click="FillPadsFromTakes_Click"
+                            ToolTip.Tip="Fills the pads from the recordings JingleBox already holds. Pads past the end of the list are left alone." />
                   </StackPanel>
 
                   <StackPanel Orientation="Horizontal" Spacing="8">

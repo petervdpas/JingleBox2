@@ -4,9 +4,14 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia;
+using JingleBox2.Audio;
+using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace JingleBox2.Views;
 
@@ -80,38 +85,123 @@ public partial class InstrumentEditor : UserControl
     }
 
     /// <summary>
-    /// Puts one of your recordings on the pad in hand.
+    /// One of your own takes, straight onto the pad in hand.
     /// </summary>
     /// <remarks>
-    /// The picker belongs to the window, so it is opened here and only the answer goes to the
-    /// view model, the same way the plugin folder is chosen in SETTINGS.
+    /// The picker is cleared afterwards so it reads as an action rather than a setting: what
+    /// is on the pad is written under it, and a box still showing the last thing you put there
+    /// would be claiming to be the pad's own.
     /// </remarks>
-    private async void LoadPadSample_Click(object? sender, RoutedEventArgs e)
-    {
-        var pad = Designer?.Editor?.Kit?.Selected;
-        if (pad == null) return;
+    private void PadRecording_Changed(object? sender, SelectionChangedEventArgs e) =>
+        Took(sender, path => Designer?.Editor?.Kit?.Selected?.Take(path));
 
+    /// <summary>One of your own takes, straight onto the zone in hand.</summary>
+    private void ZoneRecording_Changed(object? sender, SelectionChangedEventArgs e) =>
+        Took(sender, path => Designer?.Editor?.Zones?.Selected?.Take(path));
+
+    /// <summary>Hands a picked take's path on, then puts the picker back to empty.</summary>
+    private void Took(object? sender, Action<string> onto)
+    {
+        if (sender is not ComboBox picker) return;
+
+        if (picker.SelectedItem is Recording recording && recording.FilePath.Length > 0)
+            onto(recording.FilePath);
+
+        // Cleared without running this again: a null selection has nothing to put anywhere.
+        picker.SelectedItem = null;
+    }
+
+    /// <summary>
+    /// Brings samples in from the disc and fills the pads with them.
+    /// </summary>
+    /// <remarks>
+    /// Many at once, because a kit is a folder of hits rather than one file. They are copied
+    /// into JingleBox on the way, so from here on the machine is playing its own.
+    /// </remarks>
+    private async void ImportPads_Click(object? sender, RoutedEventArgs e)
+    {
+        var editor = Designer?.Editor;
+        if (editor?.Kit == null) return;
+
+        var found = await AskFiles("Samples to load onto the pads");
+        if (found.Count == 0) return;
+
+        editor.Kit.Fill(editor.Import(found));
+    }
+
+    /// <summary>Brings samples in from the disc and builds the whole map from them.</summary>
+    private async void ImportZones_Click(object? sender, RoutedEventArgs e)
+    {
+        var editor = Designer?.Editor;
+        if (editor?.Zones == null) return;
+
+        var found = await AskFiles("Samples to load onto the keyboard");
+        if (found.Count == 0) return;
+
+        editor.Zones.Fill(editor.Import(found));
+    }
+
+    /// <summary>Fills the pads from the recordings JingleBox already holds.</summary>
+    private void FillPadsFromTakes_Click(object? sender, RoutedEventArgs e)
+    {
+        var editor = Designer?.Editor;
+
+        editor?.Kit?.Fill(Takes(editor));
+    }
+
+    /// <summary>Builds the whole map from the recordings JingleBox already holds.</summary>
+    private void FillZonesFromTakes_Click(object? sender, RoutedEventArgs e)
+    {
+        var editor = Designer?.Editor;
+
+        editor?.Zones?.Fill(Takes(editor));
+    }
+
+    /// <summary>The paths of your recordings, in the order the list holds them.</summary>
+    private static IReadOnlyList<string> Takes(InstrumentEditorViewModel editor) =>
+        editor.Recordings
+            .Where(r => r.FilePath.Length > 0)
+            .Select(r => r.FilePath)
+            .ToList();
+
+    /// <summary>
+    /// Asks for any number of samples, sorted by name.
+    /// </summary>
+    /// <remarks>
+    /// Sorted the way the folder would be read, since a set of samples is nearly always named
+    /// so that it sorts, and that order is very often the order across the pads or up the
+    /// keyboard. The picker belongs to the window, so it is opened here and only the answer
+    /// goes to the view model.
+    /// </remarks>
+    private async System.Threading.Tasks.Task<IReadOnlyList<string>> AskFiles(string title)
+    {
         var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
-        if (storage == null) return;
+        if (storage == null) return Array.Empty<string>();
 
         var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "A recording for " + pad.CapText,
-            AllowMultiple = false,
+            Title = title,
+            AllowMultiple = true,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("Recordings")
+                new FilePickerFileType("Samples")
                 {
-                    Patterns = new[] { "*.wav", "*.mp3", "*.ogg", "*.flac" }
+                    Patterns = RecordingImport.Kinds.Select(k => "*" + k).ToArray()
                 }
             }
         });
 
-        if (picked.Count == 0) return;
-
-        string? path = picked[0].TryGetLocalPath();
-        if (!string.IsNullOrWhiteSpace(path)) pad.Take(path);
+        return picked
+            .Select(f => f.TryGetLocalPath())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!)
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
     }
+
+    /// <summary>Takes the recording off the zone in hand, leaving the zone where it is.</summary>
+    private void ClearZoneSample_Click(object? sender, RoutedEventArgs e) =>
+        Designer?.Editor?.Zones?.Selected?.Take(null);
 
     /// <summary>Takes the recording off the pad in hand, leaving the pad where it is.</summary>
     private void ClearPadSample_Click(object? sender, RoutedEventArgs e) =>

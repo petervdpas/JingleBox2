@@ -100,13 +100,20 @@ public static class MachinePresets
     /// </remarks>
     private static void Locate(TrackerInstrument sound, string? folder)
     {
-        if (folder == null || sound.Kit == null) return;
+        if (folder == null) return;
 
-        foreach (var pad in sound.Kit.Pads)
+        foreach (var pad in sound.Kit?.Pads ?? Enumerable.Empty<DrumPad>())
         {
             if (!pad.HasSound || Path.IsPathRooted(pad.FilePath)) continue;
 
             pad.FilePath = Path.GetFullPath(Path.Combine(folder, pad.FilePath));
+        }
+
+        foreach (var zone in sound.Zones?.Zones ?? Enumerable.Empty<SampleZone>())
+        {
+            if (!zone.HasSound || Path.IsPathRooted(zone.FilePath)) continue;
+
+            zone.FilePath = Path.GetFullPath(Path.Combine(folder, zone.FilePath));
         }
 
         if (sound.FilePath.Length > 0 && !Path.IsPathRooted(sound.FilePath))
@@ -126,6 +133,8 @@ public static class MachinePresets
             sound.Patch.Clamp();
             sound.Ouroboros?.Clamp();
             sound.Kit?.Clamp();
+            sound.Zones?.Clamp();
+            sound.Zampler?.Clamp();
 
             Locate(sound, Path.GetDirectoryName(path));
 

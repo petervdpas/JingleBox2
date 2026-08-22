@@ -45,6 +45,12 @@ public sealed class SampleStore
                 continue;
             }
 
+            if (instrument.Zones != null)
+            {
+                foreach (string path in instrument.Zones.Files) Load(path);
+                continue;
+            }
+
             if (!instrument.IsSynth) Load(instrument.FilePath);
         }
     }
