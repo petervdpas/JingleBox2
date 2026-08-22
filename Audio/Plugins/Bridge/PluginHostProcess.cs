@@ -586,6 +586,17 @@ public static class PluginHostProcess
                 effect?.Process(buffer, frames);
             }
 
+            bool hasAudio = false;
+            for (int i = 0; i < Math.Min(samples, 100); i++)
+            {
+                if (buffer[i] != 0)
+                {
+                    hasAudio = true;
+                    break;
+                }
+            }
+            if (hasAudio) Say("audio generated: buffer has signal");
+
             fixed (float* source = buffer)
             {
                 Buffer.MemoryCopy(source, block.Output, (long)samples * sizeof(float), (long)samples * sizeof(float));
