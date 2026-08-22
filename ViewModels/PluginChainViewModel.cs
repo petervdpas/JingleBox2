@@ -193,6 +193,19 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// bypassed, or a knob turned. What a pad or a song listens to in order to know that it
     /// has something new to save.
     /// </summary>
+    /// <summary>
+    /// The plugin this track plays, when it plays one, shown at the head of the strip.
+    /// </summary>
+    /// <remarks>
+    /// Null for anything that is not a track: a pad has effects but nothing that makes the
+    /// sound in the first place.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasInstrument))]
+    private PluginInstrumentViewModel? instrument;
+
+    public bool HasInstrument => Instrument != null;
+
     public event System.Action? Changed;
 
     /// <summary>Says something changed here. Called by the devices as well as by this class.</summary>

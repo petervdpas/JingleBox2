@@ -63,22 +63,30 @@ public sealed class PluginEditorHost : NativeControlHost
 
         if (change.OldValue is IPluginEditor leaving) leaving.ResizeRequested -= OnResizeRequested;
 
-        if (change.NewValue is IPluginEditor arriving)
+        // Whatever was in the window is not in it any more. A plugin that has been started
+        // again is a different plugin with the same name, and it has never seen this window.
+        _attached = false;
+
+        if (change.NewValue is not IPluginEditor arriving) return;
+
+        arriving.ResizeRequested += OnResizeRequested;
+
+        // Asked for at the plugin's own size from the start, so that the window it is
+        // eventually handed is already the size it asked for.
+        var wanted = arriving.Size;
+
+        if (wanted.Width > 0 && wanted.Height > 0)
         {
-            arriving.ResizeRequested += OnResizeRequested;
+            _width = wanted.Width;
+            _height = wanted.Height;
 
-            // Asked for at the plugin's own size from the start, so that the window it is
-            // eventually handed is already the size it asked for.
-            var wanted = arriving.Size;
-
-            if (wanted.Width > 0 && wanted.Height > 0)
-            {
-                _width = wanted.Width;
-                _height = wanted.Height;
-
-                InvalidateMeasure();
-            }
+            InvalidateMeasure();
         }
+
+        // An editor that arrives after the window was made has to be let in now. Only the
+        // first one ever came through CreateNativeControlCore, so without this a plugin
+        // started again after a crash gets a window it is never given.
+        if (_handle != 0) Settle();
     }
 
     /// <summary>

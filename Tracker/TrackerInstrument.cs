@@ -233,6 +233,15 @@ public sealed class TrackerInstrument
         Volume = other.Volume;
         Loop = other.Loop;
         Shape = other.Shape?.Clone();
+
+        // What makes a plugin instrument a plugin instrument. Left out of here, an instrument
+        // copied into a song is one that says it is a plugin and cannot say which, so it plays
+        // nothing and opens nothing.
+        PluginPath = other.PluginPath;
+        PluginId = other.PluginId;
+        PluginFormat = other.PluginFormat;
+        PluginName = other.PluginName;
+        PluginState = other.PluginState;
     }
 
     public TrackerInstrument Clone() => new()
@@ -245,6 +254,11 @@ public sealed class TrackerInstrument
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,
         Loop = Loop,
-        Shape = Shape?.Clone()
+        Shape = Shape?.Clone(),
+        PluginPath = PluginPath,
+        PluginId = PluginId,
+        PluginFormat = PluginFormat,
+        PluginName = PluginName,
+        PluginState = PluginState
     };
 }

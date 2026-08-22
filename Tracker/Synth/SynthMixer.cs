@@ -215,6 +215,41 @@ public sealed class SynthMixer
         instrument.NoteOn(note.Semitone, 1f);
     }
 
+    /// <summary>When a track's plugin lets go of a note played by hand. Zero when there is none.</summary>
+    private readonly long[] _heldUntil = new long[MaxTracks];
+
+    /// <summary>Reused, because this runs on the audio thread and must not make work for the collector.</summary>
+    private readonly List<IPluginInstrument> _letting = new(MaxTracks);
+
+    /// <summary>
+    /// Plays a note by hand on the plugin a track is already playing, letting go of it after a
+    /// while.
+    /// </summary>
+    /// <remarks>
+    /// The track's own copy rather than the audition one, deliberately. It is the copy whose
+    /// window is open and whose knobs have just been turned; a second copy would be a second
+    /// sound, playing whatever the song was last saved with.
+    /// </remarks>
+    public void PreviewOnTrack(int track, Note note, float gain, double holdSeconds)
+    {
+        if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
+
+        IPluginInstrument? instrument;
+
+        lock (_lock)
+        {
+            instrument = _instruments[track];
+
+            _instrumentGain[track] = gain;
+            _heldUntil[track] = Environment.TickCount64 + (long)(Math.Max(0.05, holdSeconds) * 1000);
+        }
+
+        if (instrument == null) return;
+
+        instrument.AllNotesOff();
+        instrument.NoteOn(note.Semitone, 1f);
+    }
+
     public IPluginInstrument? InstrumentOn(int track) =>
         track >= 0 && track < MaxTracks ? _instruments[track] : null;
 
@@ -404,6 +439,11 @@ public sealed class SynthMixer
         IPluginInstrument? releasing = null;
         float previewGain;
 
+        // Collected under the lock and let go of outside it: a plugin being told to stop is
+        // somebody else's code, and it has no business running with our lock held.
+        var letting = _letting;
+        letting.Clear();
+
         lock (_lock)
         {
             if (Diagnostics.Log.IsOn && Environment.TickCount64 - _said > 2000)
@@ -443,6 +483,16 @@ public sealed class SynthMixer
                 _previewUntil = 0;
                 releasing = preview;
             }
+
+            // And the same for a note played by hand on a track's own plugin.
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                if (_heldUntil[track] == 0 || Environment.TickCount64 < _heldUntil[track]) continue;
+
+                _heldUntil[track] = 0;
+
+                if (_instruments[track] != null) letting.Add(_instruments[track]!);
+            }
             ducking = (DuckSetting[])_ducking.Clone();
         }
 
@@ -450,6 +500,10 @@ public sealed class SynthMixer
         // track to be measurable while another is being moved by it, and once everything is
         // added together there is nothing left to measure.
         releasing?.AllNotesOff();
+
+        foreach (var held in letting) held.AllNotesOff();
+
+        letting.Clear();
 
         RenderBusses(playing, instruments, preview, previewGain, frames, samples);
 

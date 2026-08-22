@@ -172,8 +172,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         var effect = new Vst3Plugin(module, component, processor, controller, handler, shared, info) { _key = key, _slot = slot };
 
-        // From here a knob turned in the plugin's own window comes back to this instance.
+        // From here a knob turned in the plugin's own window comes back to this instance, and
+        // so does a whole preset arriving.
         Vst3Host.Listen(slot, effect.Moved);
+        Vst3Host.ListenForReload(slot, effect.Reload);
 
         if (effect.Activate(sampleRate, maxFrames)) return effect;
 
@@ -688,6 +690,16 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     private int _slot;
 
     public event Action<uint, double>? Edited;
+
+    public event Action? Reloaded;
+
+    /// <summary>The plugin says everything about it may have changed, which is a preset.</summary>
+    internal void Reload()
+    {
+        if (_disposed) return;
+
+        Reloaded?.Invoke();
+    }
 
     /// <summary>
     /// A knob turned in the plugin's own window.

@@ -167,7 +167,10 @@ internal enum BridgeCall : byte
     Note = 23,
 
     /// <summary>Child to parent, unasked: the plugin moved one of its own knobs.</summary>
-    Edited = 24
+    Edited = 24,
+
+    /// <summary>Child to parent, unasked: everything about the plugin may have changed at once.</summary>
+    Reloaded = 25
 }
 
 /// <summary>What one queued event is. Written into the shared block before a block is asked for.</summary>

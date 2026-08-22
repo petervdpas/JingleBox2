@@ -160,7 +160,11 @@ internal static unsafe class Vst3Host
     /// <summary>Stops listening, for a plugin going away.</summary>
     public static void Forget(int slot)
     {
-        lock (MoveGate) Moves.Remove(slot);
+        lock (MoveGate)
+        {
+            Moves.Remove(slot);
+            Reloaded.Remove(slot);
+        }
     }
 
     private static Action<uint, double>? Whose(void* self)
@@ -212,8 +216,41 @@ internal static unsafe class Vst3Host
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerEndEdit(void* self, uint id) => Vst3Abi.ResultOk;
 
+    /// <summary>
+    /// The plugin asking to be looked at again, which is what loading a preset in its own
+    /// window comes through as. Nothing is restarted here: what matters to the host is that
+    /// the sound is not the sound it was, so there is something to save.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static int HandlerRestart(void* self, int flags) => Vst3Abi.ResultOk;
+    private static int HandlerRestart(void* self, int flags)
+    {
+        try
+        {
+            Reloads(self)?.Invoke();
+        }
+        catch (Exception)
+        {
+        }
+
+        return Vst3Abi.ResultOk;
+    }
+
+    private static readonly Dictionary<int, Action> Reloaded = new();
+
+    /// <summary>Says where a slot's "everything changed" should go.</summary>
+    public static void ListenForReload(int slot, Action reloaded)
+    {
+        lock (MoveGate) Reloaded[slot] = reloaded;
+    }
+
+    private static Action? Reloads(void* self)
+    {
+        if (self == null) return null;
+
+        int slot = (int)((nint*)self)[1];
+
+        lock (MoveGate) return Reloaded.TryGetValue(slot, out var reloaded) ? reloaded : null;
+    }
 }
 
 /// <summary>

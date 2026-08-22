@@ -48,6 +48,19 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         // A knob turned in the plugin's own window is still a change to whatever holds this
         // plugin, and without this nothing would ever know there was something to save.
         plugin.Edited += (id, value) => Dispatcher.UIThread.Post(() => Moved(id, value));
+
+        // A preset arriving is every knob at once, and no plugin reports two thousand moves
+        // for it. It comes through on its own and means the same thing: there is something to
+        // save, and what is on screen is out of date.
+        plugin.Reloaded += () => Dispatcher.UIThread.Post(Reloaded);
+    }
+
+    /// <summary>The plugin loaded a whole new sound.</summary>
+    private void Reloaded()
+    {
+        foreach (var row in Parameters) row.Refresh();
+
+        _changed?.Invoke();
     }
 
     /// <summary>The knobs by the parameter they stand for, for a move reported by the plugin.</summary>

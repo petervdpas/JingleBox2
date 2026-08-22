@@ -104,6 +104,9 @@ internal sealed class PluginProcess : IDisposable
     /// <summary>The plugin reporting a knob it moved itself, in its own window.</summary>
     public event Action<uint, double>? Edited;
 
+    /// <summary>The plugin reporting that everything about it may have changed, which is a preset.</summary>
+    public event Action? Reloaded;
+
     /// <summary>
     /// Starts a plugin in its own process and waits until it says it is ready.
     /// </summary>
@@ -428,6 +431,10 @@ internal sealed class PluginProcess : IDisposable
                 case BridgeCall.Edited:
                     var move = BridgeBody.ReadNumber(message.Value.Payload);
                     Edited?.Invoke(move.Id, move.Value);
+                    break;
+
+                case BridgeCall.Reloaded:
+                    Reloaded?.Invoke();
                     break;
 
                 case BridgeCall.Note:

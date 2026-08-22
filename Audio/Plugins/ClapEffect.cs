@@ -539,6 +539,21 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
     public event Action<uint, double>? Edited;
 
+    public event Action? Reloaded;
+
+    /// <summary>The plugin says everything about it may have changed, which is a preset.</summary>
+    internal void Reload()
+    {
+        if (_disposed) return;
+
+        // Whatever was known about its knobs is out of date, so they are read again from
+        // scratch rather than compared against what they used to be.
+        _watched = null;
+        _seen = null;
+
+        Reloaded?.Invoke();
+    }
+
     /// <summary>
     /// A knob turned in the plugin's own window. CLAP is one object rather than two, so the
     /// plugin already has the value and is only saying so; the host's part is to know that

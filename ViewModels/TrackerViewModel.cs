@@ -71,6 +71,58 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _effectTrack = track;
 
         TrackEffect.Target = new TrackPluginTarget(_player, track);
+        TrackEffect.Instrument = InstrumentBoxFor(track);
+    }
+
+    /// <summary>
+    /// The box at the head of a track's strip: the plugin that track plays, when it plays one.
+    /// </summary>
+    /// <remarks>
+    /// Made from what the song says is on the track, not from what is loaded: the plugin
+    /// itself is not asked for until somebody opens the box.
+    /// </remarks>
+    private PluginInstrumentViewModel? InstrumentBoxFor(int track)
+    {
+        var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
+
+        if (instrument == null || !instrument.IsPlugin)
+        {
+            _instrumentBoxes.Remove(track);
+            return null;
+        }
+
+        // The same box every time, or coming back to a track would make a second one and open
+        // a second window onto one plugin's interface, which some plugins do not survive.
+        if (_instrumentBoxes.TryGetValue(track, out var existing) &&
+            ReferenceEquals(existing.Instrument, instrument))
+        {
+            return existing;
+        }
+
+        var box = new PluginInstrumentViewModel(
+            instrument,
+            () => _player.EnsurePlayerOn(track, instrument),
+            MarkDirty);
+
+        _instrumentBoxes[track] = box;
+
+        return box;
+    }
+
+    /// <summary>One box per track, kept so that a track always shows the same one.</summary>
+    private readonly System.Collections.Generic.Dictionary<int, PluginInstrumentViewModel> _instrumentBoxes = new();
+
+    /// <summary>
+    /// Puts away every plugin instrument window, for a song being left. What is behind them is
+    /// about to be somebody else's plugin.
+    /// </summary>
+    private void CloseInstrumentBoxes()
+    {
+        foreach (var box in _instrumentBoxes.Values) Views.PluginWindow.CloseFor(box);
+
+        _instrumentBoxes.Clear();
+
+        TrackEffect.Instrument = null;
     }
 
     /// <summary>
@@ -608,7 +660,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument == null) return;
 
-        _player.Preview(instrument, note, GainFor(volume));
+        // Played on the track the cursor is on, so a plugin instrument sounds through the copy
+        // that track plays rather than through an audition copy of its own.
+        _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
     }
 
     public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
@@ -1047,6 +1101,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             // the song was opened with.
             _player.CaptureChains(Song);
 
+            // And the same for the sound a plugin instrument is making: whatever was turned in
+            // its own window is read back onto the instrument before the song is written.
+            TrackEffect.Instrument?.SyncPatch();
+
             string path = _store.PathFor(name);
             _store.Save(Song, path);
 
@@ -1112,6 +1170,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         // The plugins the last song had on its tracks belong to that song, not this one.
         // Left in place they would keep playing under the new song's notes.
+        CloseInstrumentBoxes();
         _player.ClearPlayers();
 
         // The effects come back with the song. A plugin that is not on this machine is

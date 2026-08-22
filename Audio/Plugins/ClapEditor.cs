@@ -290,8 +290,21 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>
+    /// The plugin asking the host to read its parameters again, which is what loading a preset
+    /// in its own window comes through as.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static void Rescan(ClapHost* host, uint flags) { }
+    private static void Rescan(ClapHost* host, uint flags)
+    {
+        try
+        {
+            Find(host)?.Effect?.Reload();
+        }
+        catch (Exception)
+        {
+        }
+    }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Clear(ClapHost* host, uint id, uint flags) { }

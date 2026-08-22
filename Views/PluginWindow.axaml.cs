@@ -37,9 +37,9 @@ public partial class PluginWindow : Window
     /// Opens a plugin that is not in a chain, an instrument for instance, in the same kind of
     /// window. The key is whatever owns it, so asking twice brings the same window forward.
     /// </summary>
-    public static void Show(object key, PluginControlsViewModel panel, string title, Window owner)
+    public static void Show(object key, PluginControlsViewModel panel, string title, Window owner, Action? closed = null)
     {
-        Show(key, panel, title, owner, null, null);
+        Show(key, panel, title, owner, null, closed);
     }
 
     private static void Show(

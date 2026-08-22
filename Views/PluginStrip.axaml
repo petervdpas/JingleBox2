@@ -11,6 +11,11 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="6,3" />
+
+      <!-- The same height whatever is in it. An effect carries a power button and an
+           instrument does not, and without this they are two different sizes in one row. -->
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="BorderBrush">
         <SolidColorBrush Color="{DynamicResource Color.Border}" />
       </Setter>
@@ -48,6 +53,17 @@
 
         <views:HelpBadge Topic="tracker.effects" />
 
+        <!-- The plugin the track plays, at the head of the row because that is where it is in
+             the audio: it makes the sound and everything after works on what it made. -->
+        <Border Classes="device" Classes.open="{Binding Instrument.IsOpen}"
+                IsVisible="{Binding HasInstrument}">
+          <Button Classes="tiny" Content="{Binding Instrument.Name}"
+                  Click="OnOpenInstrument"
+                  VerticalAlignment="Center"
+                  Background="Transparent" BorderThickness="0"
+                  ToolTip.Tip="The plugin this track plays. Opens its own interface in a window." />
+        </Border>
+
         <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Center">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -60,9 +76,10 @@
               <Border Classes="device"
                       Classes.open="{Binding IsOpen}"
                       Classes.off="{Binding IsBypassed}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                   <Button Classes="tiny" Content="{Binding Name}"
                           Click="OnOpenDevice"
+                          VerticalAlignment="Center"
                           Background="Transparent" BorderThickness="0"
                           ToolTip.Tip="Open this one's controls in a window" />
 

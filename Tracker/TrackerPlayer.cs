@@ -196,7 +196,7 @@ public sealed class TrackerPlayer : IDisposable
     }
 
     /// <summary>Sounds a single note, for auditioning while editing. Independent of playback.</summary>
-    public void Preview(TrackerInstrument instrument, Note note, float gain = 1f)
+    public void Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return;
 
@@ -207,6 +207,26 @@ public sealed class TrackerPlayer : IDisposable
 
         if (instrument.IsPlugin)
         {
+            // The copy already on a track wins. It is the one whose window is open and whose
+            // knobs have just been turned; auditioning through a second copy would play the
+            // sound the song was last saved with and leave you wondering what you changed.
+            int playing = TrackPlaying(instrument.Id);
+
+            // Not loaded yet, and this is the instrument that track plays: load it there. A
+            // note played on a track should sound through that track's plugin whether or not
+            // anybody has opened its window, and through one copy of it rather than two.
+            if (playing < 0 && track >= 0 && OnTrack(track, instrument))
+            {
+                EnsurePlayerOn(track, instrument);
+                playing = TrackPlaying(instrument.Id);
+            }
+
+            if (playing >= 0)
+            {
+                _synth.Mixer.PreviewOnTrack(playing, note, level, PreviewHoldSeconds);
+                return;
+            }
+
             var player = PreviewPlayerFor(instrument);
             if (player == null) return;
 
@@ -342,6 +362,18 @@ public sealed class TrackerPlayer : IDisposable
     /// been opened in the editor is already in memory, and a plugin put down is parked rather
     /// than taken apart, so picking it up again costs almost nothing.
     /// </remarks>
+    /// <summary>
+    /// The plugin a track plays, loaded if it is not already. The same one the notes go to,
+    /// deliberately: a second copy would be a second sound, and turning a knob on it would
+    /// change something nobody can hear.
+    /// </summary>
+    public IPluginInstrument? EnsurePlayerOn(int track, TrackerInstrument instrument)
+    {
+        EnsureEngine();
+
+        return PlayerFor(track, instrument);
+    }
+
     private IPluginInstrument? PlayerFor(int track, TrackerInstrument instrument)
     {
         if (track < 0 || instrument == null || !instrument.IsPlugin) return null;
@@ -375,6 +407,33 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
+    /// <summary>True when this instrument is the one the song has on this track.</summary>
+    private bool OnTrack(int track, TrackerInstrument instrument)
+    {
+        Song? song;
+        lock (_lock) song = _song;
+
+        if (song == null || instrument == null) return false;
+
+        return ReferenceEquals(song.InstrumentAt(song.GetTrackInstrument(track)), instrument);
+    }
+
+    /// <summary>The track already playing this instrument, or -1 when none is.</summary>
+    private int TrackPlaying(string instrumentId)
+    {
+        if (string.IsNullOrEmpty(instrumentId)) return -1;
+
+        lock (_playerLock)
+        {
+            foreach (var (track, loaded) in _players)
+            {
+                if (string.Equals(loaded.Instrument, instrumentId, StringComparison.Ordinal)) return track;
+            }
+        }
+
+        return -1;
+    }
+
     /// <summary>
     /// The plugin a track is playing, without loading one. What the editor asks when it wants
     /// to save a patch back.
@@ -397,6 +456,17 @@ public sealed class TrackerPlayer : IDisposable
     public IPluginInstrument? PreviewPlayerFor(TrackerInstrument instrument)
     {
         if (instrument == null || !instrument.IsPlugin) return null;
+
+        // One copy of a plugin, not two. If a track is already playing this instrument, that is
+        // the copy to work on: a second one is a second process holding a second set of
+        // wavetables, and a knob turned on it would change something nobody can hear.
+        int onTrack = TrackPlaying(instrument.Id);
+
+        if (onTrack >= 0)
+        {
+            var playing = PlayerOn(onTrack);
+            if (playing != null) return playing;
+        }
 
         lock (_playerLock)
         {

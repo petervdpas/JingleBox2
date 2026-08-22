@@ -29,6 +29,9 @@ public static class PluginHostProcess
 
     /// <summary>Knobs the plugin turned in its own window, waiting to be sent home.</summary>
     private static readonly ConcurrentQueue<(uint Id, double Value)> Moves = new();
+
+    /// <summary>Set when the plugin has loaded a whole new sound and the parent has not heard.</summary>
+    private static volatile bool Reloads;
     private static readonly AutoResetEvent Knock = new(false);
 
     /// <summary>How often the audio thread looks up when nothing is being played through it.</summary>
@@ -146,6 +149,11 @@ public static class PluginHostProcess
             return 4;
         }
 
+        // Before the plugin is loaded, not after. Until somebody takes the loop over it pumps
+        // on a thread of its own, and a plugin registering something during load would then be
+        // called from one thread while this one is still building it.
+        Vst3RunLoopDriveHere();
+
         Say("loading " + path);
 
         _plugin = isVst3
@@ -167,12 +175,15 @@ public static class PluginHostProcess
             Knock.Set();
         };
 
+        _plugin.Reloaded += () =>
+        {
+            Reloads = true;
+            Knock.Set();
+        };
+
         bool hasWindow = _plugin is IPluginWindowSource;
 
         _control.Send(BridgeCall.Hello, BridgeBody.Words(hasWindow ? "window" : "plain"));
-
-        // Timers and windows belong to this thread from here on, whoever asks for them.
-        PluginRunLoop.DriveWith(round => { Errands.Enqueue(round); Knock.Set(); });
 
         var reader = new Thread(() => Listen(_control)) { IsBackground = true, Name = "bridge control" };
         reader.Start();
@@ -187,6 +198,14 @@ public static class PluginHostProcess
         try { (_plugin as IDisposable)?.Dispose(); } catch (Exception) { }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Says that timers and windows belong to this thread, whoever asks for them.
+    /// </summary>
+    private static void Vst3RunLoopDriveHere()
+    {
+        PluginRunLoop.DriveWith(round => { Errands.Enqueue(round); Knock.Set(); });
     }
 
     private static Socket Connect(string path)
@@ -240,6 +259,13 @@ public static class PluginHostProcess
 
                 try { (_plugin as ClapEffect)?.Poll(); }
                 catch (Exception error) { Say("asking the plugin about its knobs went wrong: " + error.Message); }
+            }
+
+            if (Reloads)
+            {
+                Reloads = false;
+
+                try { _control?.Send(BridgeCall.Reloaded); } catch (Exception) { }
             }
 
             while (Moves.TryDequeue(out var move))

@@ -108,6 +108,17 @@ public interface IPluginParameters
     /// listens has to get itself back there.
     /// </remarks>
     event Action<uint, double>? Edited;
+
+    /// <summary>
+    /// The plugin saying that everything about it may have changed at once.
+    /// </summary>
+    /// <remarks>
+    /// What loading a preset looks like from the host's side. A knob moved one at a time comes
+    /// through <see cref="Edited"/>; a whole patch arriving does not, because no plugin reports
+    /// two thousand parameter moves for it. Both standards have a way of saying it and both say
+    /// the same thing: read me again, and whatever you were holding about me is out of date.
+    /// </remarks>
+    event Action? Reloaded;
 }
 
 /// <summary>

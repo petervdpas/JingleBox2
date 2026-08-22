@@ -76,7 +76,21 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 
         process.Died += OnDied;
         process.Edited += OnEdited;
+        process.Reloaded += OnReloaded;
     }
+
+    /// <summary>Everything about the plugin may have changed, which is a preset having arrived.</summary>
+    private void OnReloaded()
+    {
+        // Nothing that was known about its knobs is worth keeping. They are asked for again on
+        // the next look rather than compared against what they used to be.
+        lock (_values) _values.Clear();
+
+        Reloaded?.Invoke();
+    }
+
+    /// <summary>Raised when the plugin loads a whole new sound. Not on the drawing thread.</summary>
+    public event Action? Reloaded;
 
     /// <summary>
     /// The plugin moved one of its own knobs, over in its own window.
@@ -129,6 +143,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
             {
                 old.Died -= OnDied;
                 old.Edited -= OnEdited;
+                old.Reloaded -= OnReloaded;
                 old.Dispose();
             }
 
@@ -394,6 +409,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
             {
                 process.Died -= OnDied;
                 process.Edited -= OnEdited;
+                process.Reloaded -= OnReloaded;
                 process.Dispose();
             }
         }

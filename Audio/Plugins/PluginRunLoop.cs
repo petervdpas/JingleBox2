@@ -175,9 +175,11 @@ internal static unsafe class PluginRunLoop
     {
         long now = Environment.TickCount64;
 
-        // Copied out under the lock and called outside it: a plugin is entitled to add or
-        // remove a timer from inside its own timer, and doing that under our lock would be a
-        // deadlock in somebody else's code.
+        // Held for the calls as well as for the copy. A timer or a watched file is a plugin's
+        // own object, and the plugin frees it when it takes it back; calling one that has been
+        // taken back in between is a read of freed memory, which is a dead plugin rather than
+        // a wrong answer. The lock is reentrant, so a plugin adding or removing a timer from
+        // inside one of its own is fine: that arrives on this same thread.
         Timer[] due;
 
         lock (Gate)
@@ -202,26 +204,27 @@ internal static unsafe class PluginRunLoop
             }
         }
 
-        foreach (var timer in due)
+        lock (Gate)
         {
-            // Asked again, right before ringing. A plugin closing its window takes its timers
-            // away, and it can do that from inside another one of its own timers or from the
-            // call that closes it. The list copied a moment ago may already name something
-            // that has been deleted, and ringing a deleted object is a crash in somebody
-            // else's code with our name on it.
-            if (!StillWanted(timer.Handler, Timers)) continue;
-
-            try
+            foreach (var timer in due)
             {
-                _rings++;
+                // Asked again, right before ringing. A plugin closing its window takes its
+                // timers away, and it can do that from inside another one of its own timers or
+                // from the call that closes it.
+                if (!StillWanted(timer.Handler, Timers)) continue;
 
-                if (timer.Fire != null) timer.Fire();
-                else Call(timer.Handler);
-            }
-            catch (Exception)
-            {
-                // A plugin's timer throwing is that plugin's problem for this round, not a
-                // reason to stop ringing everybody else's.
+                try
+                {
+                    _rings++;
+
+                    if (timer.Fire != null) timer.Fire();
+                    else Call(timer.Handler);
+                }
+                catch (Exception)
+                {
+                    // A plugin's timer throwing is that plugin's problem for this round, not a
+                    // reason to stop ringing everybody else's.
+                }
             }
         }
     }
@@ -249,24 +252,29 @@ internal static unsafe class PluginRunLoop
 
         if (Waiting(files, ready) <= 0) return;
 
-        for (int index = 0; index < watching.Length; index++)
+        // Held for the calls, for the same reason the timers are: the handler belongs to the
+        // plugin and the plugin frees it when it takes it back.
+        lock (Gate)
         {
-            if (!ready[index]) continue;
-
-            // Same again: a plugin shutting down takes its files back, and telling a handler
-            // that no longer exists about one is a crash on the way out of a window.
-            if (!StillWatched(watching[index].Handler)) continue;
-
-            try
+            for (int index = 0; index < watching.Length; index++)
             {
-                _deliveries++;
+                if (!ready[index]) continue;
 
-                if (watching[index].Fire != null) watching[index].Fire!(watching[index].File);
-                else Ready(watching[index].Handler, watching[index].File);
-            }
-            catch (Exception)
-            {
-                // One plugin's event handling is that plugin's problem for this round.
+                // Same again: a plugin shutting down takes its files back, and telling a
+                // handler that no longer exists about one is a read of freed memory.
+                if (!StillWatched(watching[index].Handler)) continue;
+
+                try
+                {
+                    _deliveries++;
+
+                    if (watching[index].Fire != null) watching[index].Fire!(watching[index].File);
+                    else Ready(watching[index].Handler, watching[index].File);
+                }
+                catch (Exception)
+                {
+                    // One plugin's event handling is that plugin's problem for this round.
+                }
             }
         }
     }

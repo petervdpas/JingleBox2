@@ -29,6 +29,31 @@ public partial class PluginStrip : UserControl
         };
     }
 
+    /// <summary>
+    /// Opens the plugin the track plays, in the same kind of window an effect gets.
+    /// </summary>
+    /// <remarks>
+    /// The plugin is loaded here rather than when the track was picked: a track selection
+    /// should not cost the time a big synth takes to come up. It is the one the notes go to,
+    /// so a knob turned in it changes what is actually heard.
+    /// </remarks>
+    private void OnOpenInstrument(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not PluginChainViewModel chain) return;
+
+        var instrument = chain.Instrument;
+        if (instrument == null) return;
+
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+
+        var panel = instrument.Prepare();
+        if (panel == null) return;
+
+        instrument.IsOpen = true;
+
+        PluginWindow.Show(instrument, panel, instrument.Title, owner, () => instrument.Close());
+    }
+
     private void OnOpenDevice(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control control) return;
