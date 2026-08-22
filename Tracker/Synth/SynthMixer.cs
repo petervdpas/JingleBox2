@@ -626,11 +626,33 @@ public sealed class SynthMixer
 
             try
             {
+                if (Diagnostics.Log.IsOn)
+                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                        $"Track {track} instrument {instrument.GetType().Name} - rendering");
+
                 instrument.Render(bus, frames);
+
+                if (Diagnostics.Log.IsOn)
+                {
+                    bool hasAudio = false;
+                    for (int i = 0; i < samples; i++)
+                    {
+                        if (Math.Abs(bus[i]) > 0.0001f)
+                        {
+                            hasAudio = true;
+                            break;
+                        }
+                    }
+                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                        $"Track {track} instrument output: {(hasAudio ? "has audio" : "silent")}");
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // A managed fault in a plugin costs that block, not the audio thread.
+                if (Diagnostics.Log.IsOn)
+                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                        $"Track {track} instrument error: {ex.Message}");
                 Array.Clear(bus, 0, samples);
             }
 
@@ -679,11 +701,43 @@ public sealed class SynthMixer
             var bus = _busses[track];
             if (bus == null) continue;
 
+            bool hasSoundBefore = false;
+            if (Diagnostics.Log.IsOn)
+            {
+                int samples = frames * 2;
+                for (int i = 0; i < samples; i++)
+                {
+                    if (Math.Abs(bus[i]) > 0.0001f)
+                    {
+                        hasSoundBefore = true;
+                        break;
+                    }
+                }
+            }
+
             try
             {
-                // Edited in place: the bus is this track and nothing else, which is exactly
-                // what an insert is supposed to see.
+                if (Diagnostics.Log.IsOn)
+                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                        $"Track {track} effect {insert.GetType().Name} - before: {(hasSoundBefore ? "has audio" : "silent")}");
+
                 insert.Process(bus, frames);
+
+                if (Diagnostics.Log.IsOn)
+                {
+                    bool hasSoundAfter = false;
+                    int samples = frames * 2;
+                    for (int i = 0; i < samples; i++)
+                    {
+                        if (Math.Abs(bus[i]) > 0.0001f)
+                        {
+                            hasSoundAfter = true;
+                            break;
+                        }
+                    }
+                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                        $"Track {track} effect {insert.GetType().Name} - after: {(hasSoundAfter ? "has audio" : "silent")}");
+                }
             }
             catch (Exception)
             {
@@ -700,6 +754,21 @@ public sealed class SynthMixer
     private void MixTrack(float[] buffer, int track, DuckSetting setting, int frames, int samples)
     {
         var source = _sounding[track] ? _busses[track] : null;
+
+        if (Diagnostics.Log.IsOn && source != null)
+        {
+            bool hasAudio = false;
+            for (int i = 0; i < samples; i++)
+            {
+                if (Math.Abs(source[i]) > 0.0001f)
+                {
+                    hasAudio = true;
+                    break;
+                }
+            }
+            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                $"Mixing track {track}: {(hasAudio ? "has audio" : "silent")}");
+        }
 
         bool ducked = setting.Depth > 0
             && setting.Key >= 0
