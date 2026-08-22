@@ -35,6 +35,10 @@ public static class PluginHostProcess
 
     /// <summary>The moment the plugin's window opened, so what it asked for can go with it.</summary>
     private static long _windowMark;
+
+    /// <summary>How long the plugin has been inside its own run loop, and how many rounds.</summary>
+    private static long _inLoop;
+    private static long _rounds;
     private static readonly AutoResetEvent Knock = new(false);
 
     /// <summary>How often the audio thread looks up when nothing is being played through it.</summary>
@@ -240,7 +244,14 @@ public static class PluginHostProcess
                 census = Environment.TickCount64;
                 long blocks = _blocks;
 
-                Say("run loop: " + PluginRunLoop.Census() +
+                long rounds = _rounds;
+                double spent = _inLoop * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+                _rounds = 0;
+                _inLoop = 0;
+
+                Say("run loop: " + rounds + " rounds taking " + spent.ToString("0") + " ms in the plugin; " +
+                    PluginRunLoop.Census() +
                     "; " + (blocks - counted) + " blocks of audio in the last two seconds" +
                     ((_plugin as ClapEffect)?.IsWaitingToSpeak == true ? "; the plugin is waiting to say something" : ""));
 
@@ -249,7 +260,12 @@ public static class PluginHostProcess
 
             while (Errands.TryDequeue(out var errand))
             {
+                long began = System.Diagnostics.Stopwatch.GetTimestamp();
+
                 try { errand(); } catch (Exception error) { Say("run loop: " + error.Message); }
+
+                _inLoop += System.Diagnostics.Stopwatch.GetTimestamp() - began;
+                _rounds++;
             }
 
             // A CLAP plugin with a window open is asked now and then what its knobs are set to.

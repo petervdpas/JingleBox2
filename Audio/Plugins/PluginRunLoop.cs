@@ -30,8 +30,18 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 internal static unsafe class PluginRunLoop
 {
-    /// <summary>How often the pump comes round. Fine enough for a blinking meter.</summary>
+    /// <summary>How often the pump comes round when nothing is happening. Fine for a meter.</summary>
     private const int TickMilliseconds = 16;
+
+    /// <summary>
+    /// And how soon it comes back when something was happening.
+    /// </summary>
+    /// <remarks>
+    /// A hand on a knob makes messages faster than sixty a second, and a round that always
+    /// waits its full turn before looking again turns that into a window that lags behind the
+    /// mouse. Busy means come straight back; quiet means take the sixteen milliseconds.
+    /// </remarks>
+    private const int BusyMilliseconds = 1;
 
     private sealed class Timer
     {
@@ -144,7 +154,9 @@ internal static unsafe class PluginRunLoop
     {
         while (true)
         {
-            Thread.Sleep(TickMilliseconds);
+            Thread.Sleep(_busy ? BusyMilliseconds : TickMilliseconds);
+
+            _busy = false;
 
             Action<Action>? post;
             bool idle;
@@ -267,34 +279,55 @@ internal static unsafe class PluginRunLoop
 
         for (int index = 0; index < watching.Length; index++) files[index] = watching[index].File;
 
-        if (Waiting(files, ready) <= 0) return;
-
-        // Held for the calls, for the same reason the timers are: the handler belongs to the
-        // plugin and the plugin frees it when it takes it back.
+        // Held for the calls: the handler belongs to the plugin and the plugin frees it when
+        // it takes it back.
         lock (Calling)
         {
-            for (int index = 0; index < watching.Length; index++)
+            // Drained rather than one message per round. A toolkit handles one message per
+            // call, and a mouse being dragged makes hundreds a second; handing over one every
+            // sixteen milliseconds is a window that answers sixty times a second at best,
+            // which is what a plugin that will not keep up with a knob feels like. Bounded, so
+            // a plugin that never empties its own queue cannot hold this thread forever.
+            for (int pass = 0; pass < MaxDrain; pass++)
             {
-                if (!ready[index]) continue;
+                if (Waiting(files, ready) <= 0) return;
 
-                // Same again: a plugin shutting down takes its files back, and telling a
-                // handler that no longer exists about one is a read of freed memory.
-                if (!StillWatched(watching[index].Handler)) continue;
+                bool any = false;
 
-                try
+                for (int index = 0; index < watching.Length; index++)
                 {
+                    if (!ready[index]) continue;
+
+                    // Same as the timers: a plugin shutting down takes its files back, and
+                    // telling a handler that no longer exists about one is a read of freed
+                    // memory.
+                    if (!StillWatched(watching[index].Handler)) continue;
+
+                    any = true;
+                    _busy = true;
                     _deliveries++;
 
-                    if (watching[index].Fire != null) watching[index].Fire!(watching[index].File);
-                    else Ready(watching[index].Handler, watching[index].File);
+                    try
+                    {
+                        if (watching[index].Fire != null) watching[index].Fire!(watching[index].File);
+                        else Ready(watching[index].Handler, watching[index].File);
+                    }
+                    catch (Exception)
+                    {
+                        // One plugin's event handling is that plugin's problem for this round.
+                    }
                 }
-                catch (Exception)
-                {
-                    // One plugin's event handling is that plugin's problem for this round.
-                }
+
+                if (!any) return;
             }
         }
     }
+
+    /// <summary>How many messages one round will hand over before it comes back for air.</summary>
+    private const int MaxDrain = 64;
+
+    /// <summary>Set by a round that had something to do, so the next one comes sooner.</summary>
+    private static volatile bool _busy;
 
     /// <summary>
     /// Which of these files have something waiting. Asked and answered at once: this runs on
