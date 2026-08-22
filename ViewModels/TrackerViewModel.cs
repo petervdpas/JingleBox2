@@ -352,7 +352,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             else StopMeters();
         });
 
-    /// <summary>Reads what each track is sounding and hands it to its strip.</summary>
+    /// <summary>Reads what each track is sounding and hands it to its strip and instruments.</summary>
     private void ReadMeters()
     {
         foreach (var strip in Strips)
@@ -361,6 +361,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             strip.Left = left;
             strip.Right = right;
+        }
+
+        foreach (var instrument in Instruments)
+        {
+            if (instrument.Track < 0) continue;
+
+            instrument.Level = _player.LevelFor(instrument.Track).Left;
         }
     }
 
@@ -373,6 +380,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             strip.Left = 0;
             strip.Right = 0;
+        }
+
+        foreach (var instrument in Instruments)
+        {
+            instrument.Level = 0;
         }
     }
 

@@ -41,6 +41,7 @@ public sealed class SynthMixer
     private readonly DuckSetting[] _ducking = new DuckSetting[MaxTracks];
     private readonly Ducker?[] _duckers = new Ducker[MaxTracks];
     private readonly float[] _duckGain = new float[MaxTracks];
+    private readonly float[] _trackLevels = new float[MaxTracks];
 
     /// <summary>What each track's audio passes through before the mix, if anything.</summary>
     private readonly IAudioInsert?[] _inserts = new IAudioInsert[MaxTracks];
@@ -140,6 +141,10 @@ public sealed class SynthMixer
 
     public IAudioInsert? InsertOn(int track) =>
         track >= 0 && track < MaxTracks ? _inserts[track] : null;
+
+    /// <summary>Gets the current audio level (0-1) for a track, for UI display.</summary>
+    public float GetTrackLevel(int track) =>
+        track >= 0 && track < MaxTracks ? _trackLevels[track] : 0f;
 
     /// <summary>
     /// Puts a plugin on a track, or takes one off with null. Whatever was there is told to
@@ -755,17 +760,20 @@ public sealed class SynthMixer
     {
         var source = _sounding[track] ? _busses[track] : null;
 
-        if (Diagnostics.Log.IsOn && source != null)
+        float peak = 0f;
+        if (source != null)
         {
-            bool hasAudio = false;
             for (int i = 0; i < samples; i++)
             {
-                if (Math.Abs(source[i]) > 0.0001f)
-                {
-                    hasAudio = true;
-                    break;
-                }
+                float abs = Math.Abs(source[i]);
+                if (abs > peak) peak = abs;
             }
+        }
+        _trackLevels[track] = peak;
+
+        if (Diagnostics.Log.IsOn && source != null)
+        {
+            bool hasAudio = peak > 0.0001f;
             Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
                 $"Mixing track {track}: {(hasAudio ? "has audio" : "silent")}");
         }

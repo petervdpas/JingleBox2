@@ -23,6 +23,8 @@ public sealed partial class InstrumentSlot : ObservableObject
     /// <summary>The track this instrument sits on, or -1 when it is not on one.</summary>
     public int Track { get; }
 
+    [ObservableProperty] private float level;
+
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
 

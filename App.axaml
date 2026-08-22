@@ -199,24 +199,32 @@
         <DataTemplate x:Key="InstrumentRow" x:DataType="vm:InstrumentSlot">
             <!-- Two lines, as close together as they read well: a song with eight instruments
                  should not need scrolling to see them. -->
-            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                <TextBlock Grid.Column="0" Grid.RowSpan="2"
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                <views:LevelMeter Grid.Column="0" Grid.RowSpan="3"
+                                 Left="{Binding Level}"
+                                 Width="10"
+                                 Height="42"
+                                 IsVisible="{Binding HasTrack}"
+                                 ShowPeak="False"
+                                 VerticalAlignment="Center" />
+
+                <TextBlock Grid.Column="1" Grid.RowSpan="3"
                            Text="{Binding Number}"
                            FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
                            VerticalAlignment="Center"
                            Opacity="0.7" />
 
-                <TextBlock Grid.Column="1" Grid.Row="0"
+                <TextBlock Grid.Column="2" Grid.Row="0"
                            Text="{Binding Name}"
                            LineHeight="16"
                            TextTrimming="CharacterEllipsis" />
 
-                <TextBlock Grid.Column="1" Grid.Row="1"
+                <TextBlock Grid.Column="2" Grid.Row="2"
                            Classes="cardHint"
                            LineHeight="14"
                            Text="{Binding DetailText}" />
 
-                <Border Grid.Column="2" Grid.Row="1"
+                <Border Grid.Column="3" Grid.Row="0"
                         Classes="badge"
                         IsVisible="{Binding HasTrack}">
                     <TextBlock Text="{Binding TrackBadge}" />
