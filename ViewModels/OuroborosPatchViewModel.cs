@@ -30,6 +30,13 @@ public sealed class OuroborosPatchViewModel : ObservableObject
     /// <summary>Bumped on every change, so a scope watching plain data knows to redraw.</summary>
     public int Revision { get; private set; }
 
+    /// <summary>Called after a preset lands on top of the patch: every value may have moved.</summary>
+    public void RefreshAll()
+    {
+        Revision++;
+        OnPropertyChanged(string.Empty);
+    }
+
     /// <summary>
     /// The low frequency oscillator's lamp, going round at whatever rate is dialled in.
     /// </summary>

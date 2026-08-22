@@ -30,7 +30,8 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         IInstrumentAudition audition,
         Action changed,
         IWaveformService? waveforms = null,
-        ITrackerPanel? tracker = null)
+        ITrackerPanel? tracker = null,
+        InstrumentLibrary? library = null)
     {
         Track = track;
         _instrument = instrument;
@@ -52,6 +53,10 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         // still gets the lamps, with nothing behind them: they are greyed rather than removed,
         // so the panel is the same panel wherever it is opened.
         Location = new TrackLocationViewModel(tracker);
+
+        // The shelf is where a sound starts, and it does not stop being that once an instrument
+        // is standing in a track: every other OddSkilla on it is somewhere this one can go.
+        Presets = new InstrumentPresets(instrument, Reloaded);
     }
 
     /// <summary>Which track this is the instrument of, for a title that says so.</summary>
@@ -100,6 +105,16 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     public double HoldSeconds => TrackerPlayer.PreviewHoldSeconds;
 
     public IRelayCommand TestCommand => new RelayCommand(Test);
+
+    /// <summary>Somewhere to start: the shelf's other instruments on this same machine.</summary>
+    public InstrumentPresets? Presets { get; }
+
+    /// <summary>A preset has landed on the instrument, so the panel and the song both hear it.</summary>
+    private void Reloaded()
+    {
+        Editor?.Reloaded();
+        _changed();
+    }
 
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
     public SoundingNotes Sounding { get; } = new();

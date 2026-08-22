@@ -17,6 +17,10 @@ namespace JingleBox2.Tracker;
 /// song will start from. Two songs can therefore use the same kick sounding differently, which
 /// is what anyone who has built a kick for one track and not for another expects.
 ///
+/// The shelf starts empty and stays that way until you put something on it. What a new
+/// instrument starts from is its machine's presets, which belong to the machine and are never
+/// written here: see <see cref="MachinePreset"/>. Everything on this shelf is yours.
+///
 /// A synth or a plugin travels inside the song that way, patch and all. A recording does not:
 /// the instrument keeps the path it was made from and the audio stays where it is, so a song
 /// moved to another machine finds a sample instrument pointing at nothing. Making an instrument
@@ -36,92 +40,6 @@ public sealed class InstrumentLibrary : ISampleUsage
         InstrumentsDirectory = Path.Combine(baseDir, appName, "instruments");
         Directory.CreateDirectory(InstrumentsDirectory);
 
-        Seed();
-    }
-
-    /// <summary>
-    /// Puts a handful of sounds on the shelf the first time there is nothing on it.
-    /// </summary>
-    /// <remarks>
-    /// An empty library is a wall with no answer to "what do I start from". These are six
-    /// ordinary starting points, not presets: once one is in the library it is an instrument
-    /// like any other, to be renamed, rebuilt or thrown away. Only ever written when the shelf
-    /// is bare, so deleting one keeps it deleted.
-    /// </remarks>
-    private void Seed()
-    {
-        try
-        {
-            if (Directory.EnumerateFiles(InstrumentsDirectory, "*" + Extension).Any()) return;
-
-            foreach (var instrument in Starters()) Save(instrument);
-        }
-        catch (Exception)
-        {
-            // A shelf that could not be stocked is an empty shelf, not a failure to start.
-        }
-    }
-
-    /// <summary>
-    /// The sounds a fresh library is stocked with: a drum kit's worth and two to play.
-    /// </summary>
-    /// <remarks>
-    /// Written out as instruments rather than kept as a separate kind of thing. A sound you
-    /// start from and a sound you own turned out to be the same object once a song stopped
-    /// taking its instruments from here and started keeping its own.
-    /// </remarks>
-    public static IReadOnlyList<TrackerInstrument> Starters() => new List<TrackerInstrument>
-    {
-        Starter("Kick", new SynthPatch
-        {
-            Wave = SynthWave.Sine,
-            AttackMs = 0, DecayMs = 150, Sustain = 0, ReleaseMs = 40,
-            PitchEnvSemitones = 30, PitchEnvMs = 55
-        }),
-        Starter("Hihat", new SynthPatch
-        {
-            Wave = SynthWave.Noise,
-            AttackMs = 0, DecayMs = 35, Sustain = 0, ReleaseMs = 12
-        }),
-        Starter("Snare", new SynthPatch
-        {
-            Wave = SynthWave.Noise,
-            AttackMs = 0, DecayMs = 130, Sustain = 0, ReleaseMs = 20,
-            PitchEnvSemitones = 8, PitchEnvMs = 35
-        }),
-        Starter("Bass", new SynthPatch
-        {
-            Wave = SynthWave.Square,
-            AttackMs = 0, DecayMs = 160, Sustain = 0.82, ReleaseMs = 70,
-            PitchEnvSemitones = 5, PitchEnvMs = 30
-        }),
-        Starter("Lead", new SynthPatch
-        {
-            Wave = SynthWave.Pulse, Duty = 0.5,
-            AttackMs = 4, DecayMs = 70, Sustain = 0.55, ReleaseMs = 90,
-            VibratoRateHz = 5, VibratoDepthCents = 18
-        }),
-        Starter("Pad", new SynthPatch
-        {
-            Wave = SynthWave.Saw,
-            AttackMs = 220, DecayMs = 300, Sustain = 0.7, ReleaseMs = 450,
-            VibratoRateHz = 3, VibratoDepthCents = 8
-        })
-    };
-
-    private static TrackerInstrument Starter(string name, SynthPatch patch)
-    {
-        var instrument = new TrackerInstrument
-        {
-            Name = name,
-            Kind = TrackerInstrumentKind.Synth,
-            Patch = patch
-        };
-
-        instrument.EnsureId();
-        instrument.EnsureShape();
-
-        return instrument;
     }
 
     public string PathFor(string id) => Path.Combine(InstrumentsDirectory, id + Extension);

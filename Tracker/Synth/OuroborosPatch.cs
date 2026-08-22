@@ -190,6 +190,40 @@ public sealed class OuroborosPatch
         Volume = Volume
     };
 
+    /// <summary>
+    /// Takes on another patch's settings without becoming another object, for a preset landing
+    /// on the patch the panel and any sounding voice are already holding.
+    /// </summary>
+    public void CopyFrom(OuroborosPatch other)
+    {
+        if (other is null || ReferenceEquals(other, this)) return;
+
+        Wave = other.Wave;
+        PulseWidth = other.PulseWidth;
+        TuneSemitones = other.TuneSemitones;
+        FineCents = other.FineCents;
+        GlideMs = other.GlideMs;
+        NoiseMix = other.NoiseMix;
+        FilterMode = other.FilterMode;
+        CutoffHz = other.CutoffHz;
+        Resonance = other.Resonance;
+        AttackMs = other.AttackMs;
+        DecayMs = other.DecayMs;
+        Sustain = other.Sustain;
+        EnvelopeToAmp = other.EnvelopeToAmp;
+        LfoRateHz = other.LfoRateHz;
+        LfoWave = other.LfoWave;
+        VcoModSource = other.VcoModSource;
+        VcoModAmount = other.VcoModAmount;
+        VcoModTarget = other.VcoModTarget;
+        VcfModSource = other.VcfModSource;
+        VcfModAmount = other.VcfModAmount;
+        VcfModInverted = other.VcfModInverted;
+        Volume = other.Volume;
+
+        Clamp();
+    }
+
     /// <summary>Brings a patch read off disk back into range, whatever was in the file.</summary>
     public void Clamp()
     {

@@ -39,17 +39,25 @@ public sealed record Machine(
         true);
 
     /// <summary>
-    /// A recording played back at a pitch. The machine that will become Zampler.
+    /// One of your recordings, played back at a pitch: the raw form of Zampler and BongaBong.
     /// </summary>
     /// <remarks>
-    /// Not yet a machine of its own: it plays one recording, resampled, with the same envelope
-    /// and filter OddSkilla uses. What would make it Zampler is holding a set of recordings
-    /// mapped across the keyboard rather than a single one.
+    /// One file, resampled, through the same envelope and filter OddSkilla uses. This is what
+    /// the tracker played recordings with before there were machines at all, and it is the bare
+    /// engine both sampling machines are made of rather than a stand-in for either of them.
+    ///
+    /// What they add to it is a zone map. Zampler spreads recordings across the keyboard and
+    /// transposes each one over its range; BongaBong puts one on every key and transposes none
+    /// of them. Both are this, plus a list of these and the notes each answers to, so building
+    /// them is building the map rather than building the playback.
+    ///
+    /// Not called "Sampler", which reads as the thing that makes recordings. That is the RECORD
+    /// tab; this only plays what comes out of it.
     /// </remarks>
-    public static readonly Machine Sampler = new(
+    public static readonly Machine Recording = new(
         TrackerInstrumentKind.Sample,
-        "Sampler",
-        "One recording, pitched by resampling.",
+        "Recording",
+        "One of your recordings, pitched by resampling.",
         true);
 
     /// <summary>
@@ -75,7 +83,7 @@ public sealed record Machine(
         false);
 
     /// <summary>Every machine there is, in the order they are offered.</summary>
-    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Sampler, Plugin };
+    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Recording, Plugin };
 
     /// <summary>The ones that are ours to program, as opposed to a plugin we only host.</summary>
     public static IReadOnlyList<Machine> Ours { get; } = All.Where(m => m.IsOurs).ToList();

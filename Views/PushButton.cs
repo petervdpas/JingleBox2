@@ -24,8 +24,8 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class PushButton : ThemedControl
 {
-    private const double LampGap = 3;
-    private const double LabelGap = 3;
+    private const double LampGap = 2;
+    private const double LabelGap = 2;
 
     public static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<PushButton, string?>(nameof(Label));

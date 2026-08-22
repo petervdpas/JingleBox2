@@ -111,6 +111,39 @@ public sealed class SynthPatch
         FilterResonance = FilterResonance
     };
 
+    /// <summary>
+    /// Takes on another patch's settings without becoming another object.
+    /// </summary>
+    /// <remarks>
+    /// A preset lands on the patch that is already there rather than replacing it, because the
+    /// panel, the scopes and any voice in the air are all holding this one. Swap the object and
+    /// they would go on showing and sounding the patch nobody can reach any more.
+    /// </remarks>
+    public void CopyFrom(SynthPatch other)
+    {
+        if (other is null || ReferenceEquals(other, this)) return;
+
+        Wave = other.Wave;
+        Duty = other.Duty;
+        AttackMs = other.AttackMs;
+        DecayMs = other.DecayMs;
+        Sustain = other.Sustain;
+        ReleaseMs = other.ReleaseMs;
+        TuneSemitones = other.TuneSemitones;
+        FineCents = other.FineCents;
+        Drive = other.Drive;
+        VibratoRateHz = other.VibratoRateHz;
+        VibratoDepthCents = other.VibratoDepthCents;
+        TremoloRateHz = other.TremoloRateHz;
+        TremoloDepth = other.TremoloDepth;
+        PitchEnvSemitones = other.PitchEnvSemitones;
+        PitchEnvMs = other.PitchEnvMs;
+        FilterCutoffHz = other.FilterCutoffHz;
+        FilterResonance = other.FilterResonance;
+
+        Clamp();
+    }
+
     /// <summary>Pulls every value back into range, for anything read off disk.</summary>
     public void Clamp()
     {

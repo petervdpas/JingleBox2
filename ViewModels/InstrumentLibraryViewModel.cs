@@ -140,6 +140,15 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => PlayNote(note, volume));
 
+    /// <summary>
+    /// Somewhere to start: the shelf's other instruments on this same machine.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilt whenever the selection moves, since which instruments count as presets depends
+    /// on which machine the one being edited is on.
+    /// </remarks>
+    [ObservableProperty] private InstrumentPresets? presets;
+
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
     public SoundingNotes Sounding { get; } = new();
 
@@ -211,6 +220,17 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         Editor = value == null
             ? null
             : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition);
+
+        Presets = value == null
+            ? null
+            : new InstrumentPresets(value.Instrument, Reloaded);
+    }
+
+    /// <summary>A preset has landed on the instrument being edited: reread it and write it.</summary>
+    private void Reloaded()
+    {
+        Editor?.Reloaded();
+        OnInstrumentEdited();
     }
 
     partial void OnIsEditingChanged(bool value)

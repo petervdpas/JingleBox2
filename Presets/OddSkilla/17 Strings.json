@@ -1,0 +1,42 @@
+{
+  "Id": "",
+  "Name": "Strings",
+  "Kind": 1,
+  "Patch": {
+    "Wave": 2,
+    "Duty": 0.5,
+    "AttackMs": 320,
+    "DecayMs": 400,
+    "Sustain": 0.8,
+    "ReleaseMs": 600,
+    "TuneSemitones": 0,
+    "FineCents": 0,
+    "Drive": 1,
+    "VibratoRateHz": 4.5,
+    "VibratoDepthCents": 10,
+    "TremoloRateHz": 0,
+    "TremoloDepth": 0,
+    "PitchEnvSemitones": 0,
+    "PitchEnvMs": 60,
+    "FilterCutoffHz": 3400,
+    "FilterResonance": 0
+  },
+  "FilePath": "",
+  "BaseNoteSemitone": 48,
+  "Volume": 1,
+  "Loop": false,
+  "Shape": {
+    "Start": 0,
+    "End": 1,
+    "LoopMode": 0,
+    "LoopStart": 0,
+    "LoopEnd": 1,
+    "Reverse": false,
+    "IsLooping": false
+  },
+  "PluginPath": "",
+  "PluginId": "",
+  "PluginFormat": 0,
+  "PluginName": "",
+  "PluginState": ""
+}

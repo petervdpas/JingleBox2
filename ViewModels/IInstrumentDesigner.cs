@@ -59,6 +59,14 @@ public interface IInstrumentDesigner
     /// <summary>Plays a key on the panel's keyboard, named by its absolute semitone.</summary>
     IRelayCommand<int> KeyCommand { get; }
 
+    /// <summary>
+    /// Somewhere to start: the instruments the shelf already holds on this same machine.
+    /// </summary>
+    /// <remarks>
+    /// Null when there is no shelf to read, which greys the picker rather than removing it.
+    /// </remarks>
+    InstrumentPresets? Presets { get; }
+
 
     /// <summary>
     /// Where the track playing this instrument has got to, or null when there is no track.

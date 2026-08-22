@@ -70,6 +70,23 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>Ouroboros's own patch, when that is the machine. Null on every other.</summary>
     public OuroborosPatchViewModel? Ouroboros { get; }
 
+    /// <summary>
+    /// A preset has landed on the instrument: everything the panel shows may have moved.
+    /// </summary>
+    /// <remarks>
+    /// The patches were written into rather than replaced, so the panel is still bound to the
+    /// right objects and only has to be told to read them again.
+    /// </remarks>
+    public void Reloaded()
+    {
+        Patch?.RefreshAll();
+        Ouroboros?.RefreshAll();
+
+        OnPropertyChanged(string.Empty);
+
+        _changed();
+    }
+
     /// <summary>What the machine is called, so the panel can say which one this is.</summary>
     public string MachineName => _instrument.Machine.Name;
 
@@ -82,7 +99,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// A plugin does its own envelope and filter, and Ouroboros brings its own panel, so
     /// neither shows the shared one. Without this both panels are drawn at once.
     /// </remarks>
-    public bool HasCommonVoice => !IsPlugin && !IsOuroboros;
+    /// <summary>
+    /// True for the machines that still share the general voice editor rather than having a
+    /// front panel of their own.
+    /// </summary>
+    /// <remarks>
+    /// Only the sampler now. OddSkilla and Ouroboros each have a panel of their own and a
+    /// plugin has its own interface, so what is left is the one that is not a machine yet, and
+    /// it keeps the shared editor until Zampler is built to replace it.
+    /// </remarks>
+    public bool HasCommonVoice => IsSample;
 
     public bool IsSynth => _instrument.IsSynth;
 

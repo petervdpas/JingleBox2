@@ -288,6 +288,50 @@ public sealed class TrackerInstrument
         PluginState = other.PluginState;
     }
 
+    /// <summary>
+    /// Takes on another instrument's sound, keeping its own name, its own id and its own level.
+    /// </summary>
+    /// <remarks>
+    /// What a preset is. The machines the library offers as presets are the instruments already
+    /// on it, so loading one means copying what it plays from and nothing else: this is still
+    /// the track's instrument, called what it is called, at the level it was set to.
+    ///
+    /// Only what the machine in question actually plays from is copied, so a preset picked for
+    /// one machine cannot quietly write over another's settings.
+    /// </remarks>
+    public void TakeSoundFrom(TrackerInstrument other)
+    {
+        if (other is null || ReferenceEquals(other, this) || other.Kind != Kind) return;
+
+        switch (Kind)
+        {
+            case TrackerInstrumentKind.Synth:
+                Patch.CopyFrom(other.Patch);
+                break;
+
+            case TrackerInstrumentKind.Ouroboros:
+                Ouroboros ??= new Synth.OuroborosPatch();
+                Ouroboros.CopyFrom(other.Ouroboros ?? new Synth.OuroborosPatch());
+                break;
+
+            case TrackerInstrumentKind.Sample:
+                FilePath = other.FilePath;
+                BaseNoteSemitone = other.BaseNoteSemitone;
+                Loop = other.Loop;
+                Shape = other.Shape?.Clone();
+                Patch.CopyFrom(other.Patch);
+                break;
+
+            case TrackerInstrumentKind.Plugin:
+                // Only between two instruments on the same plugin: another plugin's state is
+                // not a preset for this one, it is a file it cannot read.
+                if (other.PluginId == PluginId && other.PluginPath == PluginPath)
+                    PluginState = other.PluginState;
+
+                break;
+        }
+    }
+
     public TrackerInstrument Clone() => new()
     {
         Id = Id,

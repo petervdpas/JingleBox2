@@ -1,0 +1,42 @@
+{
+  "Id": "",
+  "Name": "Chip",
+  "Kind": 1,
+  "Patch": {
+    "Wave": 4,
+    "Duty": 0.25,
+    "AttackMs": 0,
+    "DecayMs": 45,
+    "Sustain": 0.3,
+    "ReleaseMs": 25,
+    "TuneSemitones": 0,
+    "FineCents": 0,
+    "Drive": 1,
+    "VibratoRateHz": 0,
+    "VibratoDepthCents": 0,
+    "TremoloRateHz": 0,
+    "TremoloDepth": 0,
+    "PitchEnvSemitones": 0,
+    "PitchEnvMs": 60,
+    "FilterCutoffHz": 20000,
+    "FilterResonance": 0
+  },
+  "FilePath": "",
+  "BaseNoteSemitone": 48,
+  "Volume": 1,
+  "Loop": false,
+  "Shape": {
+    "Start": 0,
+    "End": 1,
+    "LoopMode": 0,
+    "LoopStart": 0,
+    "LoopEnd": 1,
+    "Reverse": false,
+    "IsLooping": false
+  },
+  "PluginPath": "",
+  "PluginId": "",
+  "PluginFormat": 0,
+  "PluginName": "",
+  "PluginState": ""
+}

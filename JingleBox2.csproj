@@ -78,4 +78,10 @@
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
   </Target>
+  <!-- The machines' presets: a folder to a machine, a file to a preset. They go beside the
+       program rather than into your data, because they are part of it. -->
+  <ItemGroup>
+    <None Include="Presets\**\*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Presets" />
+  </ItemGroup>
+
 </Project>
