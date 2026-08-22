@@ -18,14 +18,17 @@ namespace JingleBox2.Audio.Plugins;
 public static class PluginHost
 {
     /// <summary>
-    /// True when plugins are given a process of their own, which is everywhere except when
-    /// somebody has deliberately turned it off to debug something.
+    /// True when plugins are given a process of their own. On Linux/Mac only; Windows requires
+    /// in-process loading for proper window embedding.
     /// </summary>
     /// <remarks>
     /// A plugin in its own process cannot take the application down, so everything the crash
     /// guard was written for stops applying: nothing needs blocking, because nothing that goes
     /// wrong in a plugin is fatal any more. See <see cref="PluginCrashGuard"/>, which stands
     /// down while this is true.
+    ///
+    /// On Windows, the plugin window embedding architecture doesn't support out-of-process plugins.
+    /// VST3 plugins need to run in-process for UI interaction to work properly.
     /// </remarks>
     public static bool Isolated =>
         !OperatingSystem.IsWindows() &&
@@ -50,20 +53,47 @@ public static class PluginHost
     {
         if (plugin == null) return null;
 
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            $"Opening {plugin.Name} ({plugin.FormatName}), Isolated={Isolated}, InstrumentMode={asInstrument}");
+
         // The normal way: the plugin gets a process of its own and nothing it does can reach
         // this one. Nothing is written down beforehand because nothing here is at risk.
-        if (Isolated) return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
+        if (Isolated)
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using isolated (out-of-process) loading");
+            return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
+        }
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using in-process loading");
 
         // A plugin that killed the last run while loading does not get to load this one.
-        if (PluginCrashGuard.IsLoadBlocked(plugin)) return null;
+        if (PluginCrashGuard.IsLoadBlocked(plugin))
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => $"Plugin blocked by crash guard");
+            return null;
+        }
 
         PluginCrashGuard.Risky(plugin, PluginStage.Load);
 
         try
         {
-            return plugin.Format == PluginFormat.Vst3
-                ? Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames)
-                : ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                $"Loading {plugin.Format} plugin at {plugin.Path}");
+
+            object? result;
+            if (plugin.Format == PluginFormat.Vst3)
+            {
+                result = Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            }
+            else
+            {
+                result = ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            }
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                result != null ? $"Successfully loaded {plugin.Name}" : $"Failed to load {plugin.Name}");
+
+            return result;
         }
         finally
         {
