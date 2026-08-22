@@ -193,6 +193,13 @@
                             IsChecked="{Binding IgnoreVelocity}"
                             ToolTip.Tip="How hard you play stops being written into the pattern. Remembered between runs." />
 
+                  <!-- And what the other half of a key press does. Off by default: at a step
+                       of one, every release writing a note-off fills a pattern quickly. -->
+                  <MenuItem Header="Record note-offs"
+                            ToggleType="CheckBox"
+                            IsChecked="{Binding RecordNoteOffs}"
+                            ToolTip.Tip="Letting a key up on a MIDI keyboard writes OFF where the cursor is, the way Renoise does. Remembered between runs." />
+
                   <Separator />
 
                   <MenuItem Header="Clear track" Command="{Binding ClearTrackCommand}" />

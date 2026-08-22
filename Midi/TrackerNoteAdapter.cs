@@ -25,4 +25,15 @@ public sealed class TrackerNoteAdapter : INoteTrigger
         if (_library.IsEditing || !_tracker.HasInstruments) _library.PlayMidiNote(note, volume);
         else _tracker.PlayMidiNote(note, volume);
     }
+
+    /// <summary>
+    /// A key coming up. Only the pattern has anywhere to put one: the library is auditioning a
+    /// sound, and there is nothing there for a note-off to be written into.
+    /// </summary>
+    public void ReleaseNote(Note note)
+    {
+        if (_library.IsEditing || !_tracker.HasInstruments) return;
+
+        _tracker.ReleaseMidiNote(note);
+    }
 }

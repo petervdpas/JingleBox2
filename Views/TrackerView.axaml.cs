@@ -282,6 +282,14 @@ public partial class TrackerView : UserControl
 
         if (vm.Cursor.Column == CellColumn.Note)
         {
+            // Only here: on the other columns the digit row types values.
+            if (KeyboardNoteMap.IsNoteOffInNotes(key))
+            {
+                vm.EnterNoteOff();
+                e.Handled = true;
+                return;
+            }
+
             if (KeyboardNoteMap.NoteFor(key, vm.Octave) is Note note)
             {
                 vm.EnterNote(note);

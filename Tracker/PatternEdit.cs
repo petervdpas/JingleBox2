@@ -29,11 +29,23 @@ public static class PatternEdit
     }
 
     /// <summary>Writes a note-off, which stops the track without starting anything.</summary>
+    /// <remarks>
+    /// Written through the cell rather than over it. The note and the instrument are what a
+    /// note-off replaces; the volume and the effect are not, and a line that stops a note is a
+    /// perfectly ordinary place to also ride the volume down or run an effect. Emptying the
+    /// cell first threw those away without saying so.
+    /// </remarks>
     public static void EnterNoteOff(Pattern pattern, PatternCursor cursor)
     {
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
-        pattern[cursor.Line, cursor.Track] = TrackerCell.Empty with { Note = Note.Off };
+        var cell = pattern[cursor.Line, cursor.Track];
+
+        pattern[cursor.Line, cursor.Track] = cell with
+        {
+            Note = Note.Off,
+            Instrument = TrackerCell.NoInstrument
+        };
     }
 
     /// <summary>

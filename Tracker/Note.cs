@@ -16,7 +16,19 @@ public readonly record struct Note(int Semitone)
     public const int MaxSemitone = 119;  // B-9
 
     public const string EmptyText = "---";
-    public const string OffText = "===";
+
+    /// <summary>How a note-off is written and shown. Three characters, as every column here is.</summary>
+    public const string OffText = "OFF";
+
+    /// <summary>
+    /// What a note-off used to be written as. Read, never written.
+    /// </summary>
+    /// <remarks>
+    /// The note column is what goes into a song file, so changing what a note-off looks like
+    /// changes the file as well. Songs written before this still say the old thing and still
+    /// have to open, so it stays understood; only what comes out is new.
+    /// </remarks>
+    public const string OldOffText = "===";
 
     public static readonly Note Empty = new(EmptyValue);
     public static readonly Note Off = new(OffValue);
@@ -49,7 +61,7 @@ public readonly record struct Note(int Semitone)
         return NoteNames[Semitone % 12] + (Semitone / 12).ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Parses "C-4", "C#4", "---" and "===". Returns false for anything else.</summary>
+    /// <summary>Parses "C-4", "C#4", "---", "OFF" and the older "===". Anything else is false.</summary>
     public static bool TryParse(string? text, out Note note)
     {
         note = Empty;
@@ -57,7 +69,7 @@ public readonly record struct Note(int Semitone)
 
         string s = text.Trim();
         if (s == EmptyText) { note = Empty; return true; }
-        if (s == OffText) { note = Off; return true; }
+        if (s == OffText || s == OldOffText) { note = Off; return true; }
         if (s.Length != 3) return false;
 
         string name = s[..2].ToUpperInvariant();

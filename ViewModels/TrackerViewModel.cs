@@ -198,6 +198,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // Assigned to the field rather than the property: this is what was saved, not a
         // change to save again.
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
+        recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio);
 
@@ -614,6 +615,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Transposed {SelectionLabel} by {steps:+0;-0} semitone(s)";
     }
 
+    /// <summary>
+    /// Whether a key coming up on a MIDI keyboard writes a note-off, as Renoise's own
+    /// RecordNoteOffs does. Off by default, and remembered between runs.
+    /// </summary>
+    [ObservableProperty] private bool recordNoteOffs;
+
+    partial void OnRecordNoteOffsChanged(bool value)
+    {
+        Status = value
+            ? "Note-offs recorded: letting a key up writes OFF where the cursor is"
+            : "Note-offs not recorded: use the note-off key to write one";
+
+        if (_configStore == null || _config == null) return;
+
+        _config.RecordNoteOffs = value;
+        _configStore.Save(_config);
+    }
+
     partial void OnIgnoreVelocityChanged(bool value)
     {
         Status = value
@@ -704,6 +723,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => EnterNote(note, volume));
+
+    /// <summary>
+    /// A key coming up on the keyboard, which writes a note-off when that has been asked for.
+    /// </summary>
+    /// <remarks>
+    /// The note is not looked at. A note-off ends whatever that track is sounding rather than
+    /// one particular note, so which key was let go of does not change what gets written; it
+    /// is here because the caller has it and a later reading of this may want it.
+    /// </remarks>
+    public void ReleaseMidiNote(Note note)
+    {
+        if (!RecordNoteOffs) return;
+
+        Dispatcher.UIThread.Post(EnterNoteOff);
+    }
 
     /// <summary>
     /// Sounds one note on any instrument, for the library's auditioning. The engine lives

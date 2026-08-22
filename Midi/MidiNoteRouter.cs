@@ -5,14 +5,19 @@ namespace JingleBox2.Midi;
 public interface INoteTrigger
 {
     void TriggerNote(Note note, int volume);
+
+    /// <summary>A key coming up. Whether that writes anything is not this end's business.</summary>
+    void ReleaseNote(Note note);
 }
 
 /// <summary>
 /// Turns note messages from a keyboard into tracker notes.
-///
-/// Key releases are dropped on purpose: writing a note-off every time a key comes up would
-/// fill the pattern. The note-off key on the computer keyboard stays the way to write one.
 /// </summary>
+/// <remarks>
+/// Both halves of a key are passed on. What a release turns into is decided further along,
+/// where the setting for it lives: writing a note-off for every key that comes up fills a
+/// pattern quickly at a step of one, so it is something to ask for rather than the default.
+/// </remarks>
 public sealed class MidiNoteRouter
 {
     private readonly INoteTrigger _notes;
@@ -24,9 +29,10 @@ public sealed class MidiNoteRouter
 
     public void Handle(MidiMessage msg)
     {
-        if (msg is null || msg.Type != MidiMessageType.Note || !msg.IsOn) return;
+        if (msg is null || msg.Type != MidiMessageType.Note) return;
         if (!MidiNoteInput.TryNote(msg.Value, out var note)) return;
 
-        _notes.TriggerNote(note, MidiNoteInput.VolumeFor(msg.Data));
+        if (msg.IsOn) _notes.TriggerNote(note, MidiNoteInput.VolumeFor(msg.Data));
+        else _notes.ReleaseNote(note);
     }
 }

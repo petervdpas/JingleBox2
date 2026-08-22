@@ -44,6 +44,11 @@ public sealed class AppConfig
     // that; a kick almost never does.
     public bool IgnoreKeyVelocity { get; set; }
 
+    // Off, a key coming up on a MIDI keyboard writes nothing. On, it writes a note-off where
+    // the cursor is, the way Renoise's own RecordNoteOffs does. Off by default: with a step of
+    // one it fills a pattern quickly, and that suits playing in rather than stepping notes.
+    public bool RecordNoteOffs { get; set; }
+
     // Extra places to look for plugins, on top of the ones the format specifies. Someone who
     // keeps their plugins somewhere of their own says so here.
     public List<string> PluginFolders { get; set; } = new();

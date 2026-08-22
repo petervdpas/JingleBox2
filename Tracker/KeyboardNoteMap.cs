@@ -25,10 +25,37 @@ public static class KeyboardNoteMap
         ["I"] = 24, ["D9"] = 25, ["O"] = 26, ["D0"] = 27, ["P"] = 28
     };
 
-    /// <summary>The key that writes a note-off into the cell.</summary>
+    /// <summary>The key that writes a note-off wherever the cursor is.</summary>
     public const string NoteOffKey = "Oem3";
 
-    public static bool IsNoteOff(string key) => key == NoteOffKey;
+    /// <summary>
+    /// The other key that writes one, and only while the cursor is on the note column.
+    /// </summary>
+    /// <remarks>
+    /// The digit row is how the instrument and volume columns are typed, so a 1 that always
+    /// meant note-off would be a 1 that could never be typed into a volume. On the note column
+    /// there is no such thing as typing a digit, so there it is free to mean what it means in
+    /// every other tracker.
+    /// </remarks>
+    public const string NoteOffDigit = "D1";
+
+    /// <summary>
+    /// Caps lock, which is where Renoise puts a note-off and where a hand coming from Renoise
+    /// will reach for it. Works from any column, as it does there.
+    /// </summary>
+    /// <remarks>
+    /// It goes on being caps lock as well: pressing it still turns the light on and off and
+    /// still shifts what the letter keys type, because that happens in the X server long
+    /// before anything here is told about it. Nothing can be done about that from this side,
+    /// and Renoise on the same machine behaves the same way.
+    /// </remarks>
+    public const string NoteOffCapsLock = "CapsLock";
+
+    /// <summary>True for the keys that write a note-off from any column.</summary>
+    public static bool IsNoteOff(string key) => key == NoteOffKey || key == NoteOffCapsLock;
+
+    /// <summary>True for any of them, for use when the cursor is on the note column.</summary>
+    public static bool IsNoteOffInNotes(string key) => IsNoteOff(key) || key == NoteOffDigit;
 
     /// <summary>
     /// The note this key plays at the given octave, or null if the key is not part of the
