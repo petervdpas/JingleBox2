@@ -28,6 +28,7 @@ public static class PluginHost
     /// down while this is true.
     /// </remarks>
     public static bool Isolated =>
+        !OperatingSystem.IsWindows() &&
         Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) != "1";
 
     /// <summary>Opens a plugin, whichever standard it speaks.</summary>
