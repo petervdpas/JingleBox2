@@ -16,7 +16,10 @@ public enum TrackerInstrumentKind
     Plugin = 2,
 
     /// <summary>Ouroboros: one oscillator, a filter that sweeps, and glide between notes.</summary>
-    Ouroboros = 3
+    Ouroboros = 3,
+
+    /// <summary>BongaBong: a kit, one recording to a key, none of them transposed.</summary>
+    BongaBong = 4
 }
 
 /// <summary>
@@ -96,6 +99,20 @@ public sealed class TrackerInstrument
     /// </remarks>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Synth.OuroborosPatch? Ouroboros { get; set; }
+
+    /// <summary>
+    /// What BongaBong plays: sixteen pads, each with a recording and a key of its own.
+    /// </summary>
+    /// <remarks>
+    /// Its own field for the same reason Ouroboros has one: two machines with different panels
+    /// and different parameters do not share a shape, and a single patch with everything on it
+    /// would fit neither. Left out of the file on every other machine.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DrumKit? Kit { get; set; }
+
+    [JsonIgnore]
+    public bool IsBongaBong => Kind == TrackerInstrumentKind.BongaBong;
 
     [JsonIgnore]
     public bool IsOuroboros => Kind == TrackerInstrumentKind.Ouroboros;
@@ -180,6 +197,20 @@ public sealed class TrackerInstrument
     /// <summary>A synth instrument with the starting patch, ready to be edited.</summary>
     public static TrackerInstrument CreateSynth(string name) => CreateSynth(name, new SynthPatch());
 
+    /// <summary>A new kit on BongaBong: sixteen pads with nothing on them yet.</summary>
+    public static TrackerInstrument CreateBongaBong(string name)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.BongaBong,
+            Kit = DrumKit.Empty()
+        };
+
+        instrument.EnsureId();
+        return instrument;
+    }
+
     /// <summary>A new instrument on Ouroboros, with the machine's own patch ready to shape.</summary>
     public static TrackerInstrument CreateOuroboros(string name)
     {
@@ -198,6 +229,7 @@ public sealed class TrackerInstrument
     public static TrackerInstrument CreateOn(Machine machine, string name) => machine?.Kind switch
     {
         TrackerInstrumentKind.Ouroboros => CreateOuroboros(name),
+        TrackerInstrumentKind.BongaBong => CreateBongaBong(name),
         _ => CreateSynth(name)
     };
 
@@ -272,6 +304,7 @@ public sealed class TrackerInstrument
         Kind = other.Kind;
         Patch = other.Patch.Clone();
         Ouroboros = other.Ouroboros?.Clone();
+        Kit = other.Kit?.Clone();
         FilePath = other.FilePath;
         BaseNoteSemitone = other.BaseNoteSemitone;
         Volume = other.Volume;
@@ -314,6 +347,12 @@ public sealed class TrackerInstrument
                 Ouroboros.CopyFrom(other.Ouroboros ?? new Synth.OuroborosPatch());
                 break;
 
+            case TrackerInstrumentKind.BongaBong:
+                Kit ??= DrumKit.Empty();
+                Kit.CopyFrom(other.Kit ?? DrumKit.Empty());
+                Patch.CopyFrom(other.Patch);
+                break;
+
             case TrackerInstrumentKind.Sample:
                 FilePath = other.FilePath;
                 BaseNoteSemitone = other.BaseNoteSemitone;
@@ -339,6 +378,7 @@ public sealed class TrackerInstrument
         Kind = Kind,
         Patch = Patch.Clone(),
         Ouroboros = Ouroboros?.Clone(),
+        Kit = Kit?.Clone(),
         FilePath = FilePath,
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,

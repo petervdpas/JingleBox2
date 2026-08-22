@@ -89,6 +89,30 @@ public static class MachinePresets
         }
     }
 
+    /// <summary>
+    /// Turns a preset's relative recordings into real paths, against the folder it came from.
+    /// </summary>
+    /// <remarks>
+    /// A kit that names its recordings relatively carries them: put the files beside the preset
+    /// and the whole thing travels, to another machine or to somebody else. A kit that names an
+    /// absolute path is left alone and points wherever it points, which is fine for one you
+    /// built out of your own library and no good for one that ships.
+    /// </remarks>
+    private static void Locate(TrackerInstrument sound, string? folder)
+    {
+        if (folder == null || sound.Kit == null) return;
+
+        foreach (var pad in sound.Kit.Pads)
+        {
+            if (!pad.HasSound || Path.IsPathRooted(pad.FilePath)) continue;
+
+            pad.FilePath = Path.GetFullPath(Path.Combine(folder, pad.FilePath));
+        }
+
+        if (sound.FilePath.Length > 0 && !Path.IsPathRooted(sound.FilePath))
+            sound.FilePath = Path.GetFullPath(Path.Combine(folder, sound.FilePath));
+    }
+
     private static TrackerInstrument? Load(string path, Machine machine)
     {
         try
@@ -101,6 +125,9 @@ public static class MachinePresets
             sound.Kind = machine.Kind;
             sound.Patch.Clamp();
             sound.Ouroboros?.Clamp();
+            sound.Kit?.Clamp();
+
+            Locate(sound, Path.GetDirectoryName(path));
 
             if (string.IsNullOrWhiteSpace(sound.Name))
                 sound.Name = Path.GetFileNameWithoutExtension(path);

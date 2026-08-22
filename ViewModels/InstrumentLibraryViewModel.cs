@@ -224,6 +224,9 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         Presets = value == null
             ? null
             : new InstrumentPresets(value.Instrument, Reloaded);
+
+        // A kit lights its own pads, from the same set the keyboard reads.
+        Editor?.Kit?.Follow(Sounding);
     }
 
     /// <summary>A preset has landed on the instrument being edited: reread it and write it.</summary>

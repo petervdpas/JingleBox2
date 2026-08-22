@@ -57,6 +57,9 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         // The shelf is where a sound starts, and it does not stop being that once an instrument
         // is standing in a track: every other OddSkilla on it is somewhere this one can go.
         Presets = new InstrumentPresets(instrument, Reloaded);
+
+        // A kit lights its own pads, from the same set the keyboard reads.
+        Editor?.Kit?.Follow(Sounding);
     }
 
     /// <summary>Which track this is the instrument of, for a title that says so.</summary>

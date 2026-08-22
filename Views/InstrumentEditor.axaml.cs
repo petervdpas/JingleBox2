@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using Avalonia;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
@@ -77,6 +78,44 @@ public partial class InstrumentEditor : UserControl
         designer.Play(note, TrackerCell.NoVolume);
         e.Handled = true;
     }
+
+    /// <summary>
+    /// Puts one of your recordings on the pad in hand.
+    /// </summary>
+    /// <remarks>
+    /// The picker belongs to the window, so it is opened here and only the answer goes to the
+    /// view model, the same way the plugin folder is chosen in SETTINGS.
+    /// </remarks>
+    private async void LoadPadSample_Click(object? sender, RoutedEventArgs e)
+    {
+        var pad = Designer?.Editor?.Kit?.Selected;
+        if (pad == null) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage == null) return;
+
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "A recording for " + pad.CapText,
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Recordings")
+                {
+                    Patterns = new[] { "*.wav", "*.mp3", "*.ogg", "*.flac" }
+                }
+            }
+        });
+
+        if (picked.Count == 0) return;
+
+        string? path = picked[0].TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(path)) pad.Take(path);
+    }
+
+    /// <summary>Takes the recording off the pad in hand, leaving the pad where it is.</summary>
+    private void ClearPadSample_Click(object? sender, RoutedEventArgs e) =>
+        Designer?.Editor?.Kit?.Selected?.Take(null);
 
     /// <summary>The plugin instrument this stands for, opened in the same window a chain uses.</summary>
     private void OpenPluginWindow_Click(object? sender, RoutedEventArgs e)

@@ -27,6 +27,15 @@ public sealed class SampleVoice : IVoice
     private readonly double _drive;
     private readonly double _driveMakeup;
 
+    /// <summary>
+    /// Which choke group this voice belongs to, or nought for none.
+    /// </summary>
+    /// <remarks>
+    /// Only a kit uses it. Two pads in the same group cannot sound at once, which is what a
+    /// closed hihat does to an open one: the same piece of metal cannot be doing both.
+    /// </remarks>
+    public int Choke { get; init; }
+
     private double _position;
     private int _direction;
     private double _time;

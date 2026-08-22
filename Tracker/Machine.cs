@@ -75,6 +75,25 @@ public sealed record Machine(
         "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
         true);
 
+    /// <summary>
+    /// The kit machine: sixteen pads, one recording to a key, and none of them transposed.
+    /// </summary>
+    /// <remarks>
+    /// The recording machine with a map in front of it. A key here chooses which recording
+    /// sounds rather than how fast to read one, because a snare played four semitones up is
+    /// not a snare.
+    ///
+    /// It is also the one machine that does not take the tracker's one voice to a track. A
+    /// crash has to go on ringing under the snare that follows it, so its pads sound over each
+    /// other; the only thing that cuts a pad is another pad in its choke group, which is what
+    /// a closed hihat does to an open one.
+    /// </remarks>
+    public static readonly Machine BongaBong = new(
+        TrackerInstrumentKind.BongaBong,
+        "BongaBong",
+        "A kit. Sixteen pads, one recording to a key, sounding over each other.",
+        true);
+
     /// <summary>Somebody else's instrument, hosted: Serum, Vital, anything that takes notes.</summary>
     public static readonly Machine Plugin = new(
         TrackerInstrumentKind.Plugin,
@@ -83,7 +102,7 @@ public sealed record Machine(
         false);
 
     /// <summary>Every machine there is, in the order they are offered.</summary>
-    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Recording, Plugin };
+    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, BongaBong, Recording, Plugin };
 
     /// <summary>The ones that are ours to program, as opposed to a plugin we only host.</summary>
     public static IReadOnlyList<Machine> Ours { get; } = All.Where(m => m.IsOurs).ToList();

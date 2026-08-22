@@ -137,6 +137,77 @@
               </StackPanel>
             </WrapPanel>
 
+            <!-- BongaBong. Four rows of four, because that is the shape a hand knows: the
+                 pads are where they are on every drum machine ever made, and the key each one
+                 answers to runs across then down from C-4. A pad lights while it is sounding,
+                 and they light together, since a crash goes on ringing under the snare. -->
+            <StackPanel Spacing="12" IsVisible="{Binding Editor.IsBongaBong}">
+
+              <StackPanel Orientation="Horizontal" Spacing="18">
+                <ItemsControl ItemsSource="{Binding Editor.Kit.Pads}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="4" Rows="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DrumPadViewModel">
+                      <views:PushButton CapText="{Binding CapText}" Label="{Binding NoteText}"
+                                        CapWidth="86" CapHeight="42" FontSize="11"
+                                        Colour="#4A4E57" Margin="0,0,5,5"
+                                        HasLamp="True" LampBelow="False" Lit="{Binding IsLit}"
+                                        Command="{Binding TapCommand}"
+                                        ToolTip.Tip="Hits the pad. The key under it is the one that fires it in a pattern." />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- The pad in hand. One at a time, because sixteen pads with four controls
+                     apiece on screen at once is a spreadsheet, not a panel. -->
+                <StackPanel Spacing="8" IsVisible="{Binding Editor.Kit.HasPad}">
+                  <TextBlock Classes="section" Text="Pad" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <ComboBox Width="150"
+                              ItemsSource="{Binding Editor.Kit.Pads}"
+                              SelectedItem="{Binding Editor.Kit.Selected}"
+                              ToolTip.Tip="Which pad the settings below are about." />
+
+                    <Button Content="Load..." Click="LoadPadSample_Click"
+                            ToolTip.Tip="Puts one of your recordings on this pad." />
+
+                    <Button Content="Clear" Click="ClearPadSample_Click"
+                            ToolTip.Tip="Takes the recording off this pad." />
+                  </StackPanel>
+
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" Text="Name" />
+                    <TextBox Width="150" Text="{Binding Editor.Kit.Selected.Name}" />
+                  </StackPanel>
+
+                  <TextBlock Classes="cardHint" Text="{Binding Editor.Kit.Selected.FileText}"
+                             TextTrimming="CharacterEllipsis" MaxWidth="260" />
+
+                  <StackPanel Orientation="Horizontal" Spacing="14">
+                    <views:Knob Label="Level" LabelAbove="True" Format="0.00" DefaultValue="1"
+                                Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Kit.Selected.Volume}"
+                                ToolTip.Tip="How loud this pad is, under the track's own level." />
+
+                    <views:Knob Label="Pan" LabelAbove="True" Format="0.00" DefaultValue="0"
+                                Minimum="-1" Maximum="1" SmallStep="0.02" LargeStep="0.2"
+                                Value="{Binding Editor.Kit.Selected.Pan}"
+                                ToolTip.Tip="Where this pad stands on the kit. The track's own pan is added to it." />
+
+                    <views:Knob Label="Choke" LabelAbove="True" Format="0" DefaultValue="0"
+                                Minimum="0" Maximum="8" SmallStep="1" LargeStep="1"
+                                Value="{Binding Editor.Kit.Selected.Choke}"
+                                ToolTip.Tip="Pads sharing a number cut each other off, which is what a closed hihat does to an open one. Nought is no group, which is most of a kit." />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+
             <!-- OddSkilla. The same controls it has always had, stood on a grid instead of
                  scattered across boxes: a knob is three cells and the wave switch is four, so
                  the rows line up down the panel even though nothing in them is the same width.

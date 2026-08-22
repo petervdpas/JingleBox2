@@ -37,6 +37,14 @@ public sealed class SampleStore
     {
         foreach (var instrument in instruments)
         {
+            // A kit is sixteen recordings rather than one, and the first hit of each would be
+            // the one that stutters if they were left to be read as they were played.
+            if (instrument.Kit != null)
+            {
+                foreach (string path in instrument.Kit.Files) Load(path);
+                continue;
+            }
+
             if (!instrument.IsSynth) Load(instrument.FilePath);
         }
     }

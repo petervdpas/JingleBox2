@@ -52,6 +52,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             Ouroboros = new OuroborosPatchViewModel(instrument.Ouroboros, changed);
         }
 
+        if (instrument.IsBongaBong)
+        {
+            instrument.Kit ??= DrumKit.Empty();
+            instrument.Kit.Clamp();
+
+            Kit = new DrumKitViewModel(
+                instrument.Kit, changed,
+                note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
+        }
+
         Patch = new SynthPatchViewModel(instrument.Patch, changed);
 
         if (instrument.IsSynth) return;
@@ -70,6 +80,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>Ouroboros's own patch, when that is the machine. Null on every other.</summary>
     public OuroborosPatchViewModel? Ouroboros { get; }
 
+    /// <summary>BongaBong's kit, when that is the machine. Null on every other.</summary>
+    public DrumKitViewModel? Kit { get; }
+
+    public bool IsBongaBong => _instrument.IsBongaBong;
+
     /// <summary>
     /// A preset has landed on the instrument: everything the panel shows may have moved.
     /// </summary>
@@ -81,6 +96,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     {
         Patch?.RefreshAll();
         Ouroboros?.RefreshAll();
+        Kit?.Refresh();
 
         OnPropertyChanged(string.Empty);
 
@@ -114,7 +130,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     public bool IsPlugin => _instrument.IsPlugin;
 
-    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros;
+    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros && !IsBongaBong;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }

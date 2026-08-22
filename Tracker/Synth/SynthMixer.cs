@@ -565,6 +565,63 @@ public sealed class SynthMixer
         }
     }
 
+    /// <summary>
+    /// Fires one pad of a kit: its own recording, at its own pitch, over whatever else is
+    /// already sounding on the track.
+    /// </summary>
+    /// <remarks>
+    /// The one place in this engine where a track's last note is not cut. Everywhere else one
+    /// voice to a track is the rule and glide, legato and the tracker's own habits are built on
+    /// it; a kit is the exception, because a crash has to go on ringing under the snare that
+    /// follows it. The only thing that stops a pad is another pad in its choke group.
+    ///
+    /// The pad's own note is passed as the base note as well, so the ratio comes out at one and
+    /// nothing is resampled. That is the machine: a key chooses which recording sounds, not how
+    /// fast to read one.
+    /// </remarks>
+    public void NoteOn(int track, DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, float pan)
+    {
+        if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, patch, pad.Shape, note, note,
+            track, gain, pan, SampleRate)
+        {
+            Choke = pad.Choke
+        };
+
+        lock (_lock)
+        {
+            if (track >= 0 && pad.Choke > 0)
+            {
+                foreach (var playing in _voices)
+                {
+                    if (playing.Track == track && playing is SampleVoice other && other.Choke == pad.Choke)
+                        playing.Cut();
+                }
+            }
+
+            Add(voice);
+        }
+    }
+
+    /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
+    public void Preview(DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, double holdSeconds)
+    {
+        if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+
+        var voice = new SampleVoice(
+            sample, patch, pad.Shape, note, note,
+            SynthVoice.NoTrack, gain, 0f, SampleRate)
+        {
+            Choke = pad.Choke
+        };
+
+        voice.HoldFor(holdSeconds);
+
+        lock (_lock) Add(voice);
+    }
+
     /// <summary>A recording sounded once, for auditioning while editing.</summary>
     public void Preview(TrackerInstrument instrument, SampleData sample, Note note, float gain, double holdSeconds)
     {

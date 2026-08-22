@@ -264,6 +264,21 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
+        if (instrument.IsBongaBong)
+        {
+            var pad = instrument.Kit?.For(note);
+            var padSample = pad == null ? null : _samples.Load(pad.FilePath);
+
+            if (pad != null && padSample != null)
+            {
+                _synth.Mixer.Preview(
+                    pad, instrument.Patch, padSample, note,
+                    (float)(level * pad.Volume), PreviewHoldSeconds);
+            }
+
+            return;
+        }
+
         if (instrument.IsOuroboros)
         {
             _synth.Mixer.Preview(instrument.Ouroboros ?? new Synth.OuroborosPatch(),
@@ -749,6 +764,33 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
+        if (instrument.IsBongaBong)
+        {
+            var pad = instrument.Kit?.For(e.Note);
+
+            if (pad == null)
+            {
+                Where(e.Track, e.Instrument, instrument, song, "no pad on its kit answers to that note");
+                return;
+            }
+
+            var padSample = _samples.Load(pad.FilePath);
+
+            if (padSample == null)
+            {
+                Where(e.Track, e.Instrument, instrument, song, "its pad's recording would not load");
+                return;
+            }
+
+            Where(e.Track, e.Instrument, instrument, song, "played on BongaBong");
+
+            _synth.Mixer.NoteOn(
+                e.Track, pad, instrument.Patch, padSample, e.Note,
+                (float)(mixed * pad.Volume), Placed(placed, pad.Pan));
+
+            return;
+        }
+
         if (instrument.IsOuroboros)
         {
             Where(e.Track, e.Instrument, instrument, song, "played on Ouroboros");
@@ -845,6 +887,17 @@ public sealed class TrackerPlayer : IDisposable
         _synth.Mixer.SetLevels(e.Track, mixed, placed);
         _synth.Mixer.SetPluginLevels(e.Track, mixed, placed);
     }
+
+    /// <summary>
+    /// Where a pad sits, once the track's own placement has had its say.
+    /// </summary>
+    /// <remarks>
+    /// A pad's pan is where it stands on the kit, and the track's is where the kit stands in
+    /// the mix, so the two add rather than one replacing the other. Held inside the field, so
+    /// a kit panned hard right cannot push a pad past the wall.
+    /// </remarks>
+    private static float Placed(float? track, double pad) =>
+        (float)Math.Clamp((track ?? 0f) + pad, -1.0, 1.0);
 
     /// <summary>
     /// Puts a note's own level through the track's strip. The cell's pan effect wins when it

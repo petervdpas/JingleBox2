@@ -1,0 +1,328 @@
+{
+  "Id": "",
+  "Name": "Tribalcore Kicks",
+  "Kind": 4,
+  "Patch": {
+    "Wave": 1,
+    "Duty": 0.5,
+    "AttackMs": 0,
+    "DecayMs": 0,
+    "Sustain": 1,
+    "ReleaseMs": 20,
+    "TuneSemitones": 0,
+    "FineCents": 0,
+    "Drive": 1,
+    "VibratoRateHz": 0,
+    "VibratoDepthCents": 0,
+    "TremoloRateHz": 0,
+    "TremoloDepth": 0,
+    "PitchEnvSemitones": 0,
+    "PitchEnvMs": 60,
+    "FilterCutoffHz": 20000,
+    "FilterResonance": 0
+  },
+  "FilePath": "",
+  "BaseNoteSemitone": 48,
+  "Volume": 1,
+  "Loop": false,
+  "Shape": {
+    "Start": 0,
+    "End": 1,
+    "LoopMode": 0,
+    "LoopStart": 0,
+    "LoopEnd": 1,
+    "Reverse": false,
+    "IsLooping": false
+  },
+  "PluginPath": "",
+  "PluginId": "",
+  "PluginFormat": 0,
+  "PluginName": "",
+  "PluginState": "",
+  "Kit": {
+    "Pads": [
+      {
+        "Semitone": 48,
+        "Name": "Primal",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-primal.wav",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 49,
+        "Name": "Earth drum",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-earth-drum.wav",
+        "Volume": 1,
+        "Pan": 0.04999999999999995,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 50,
+        "Name": "Tribal thump",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-tribal-thump.wav",
+        "Volume": 1,
+        "Pan": 0.04999999999999989,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 51,
+        "Name": "Tribal drive",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-tribal-drive.wav",
+        "Volume": 1,
+        "Pan": 0.049999999999999836,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 52,
+        "Name": "Dust stomp",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-dust-stomp.wav",
+        "Volume": 1,
+        "Pan": 0.04999999999999978,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 53,
+        "Name": "Jungle pulse",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-jungle-pulse.wav",
+        "Volume": 1,
+        "Pan": 0.049999999999999725,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 54,
+        "Name": "Ritual",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-ritual.wav",
+        "Volume": 1,
+        "Pan": 0.04999999999999967,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 55,
+        "Name": "Shake",
+        "FilePath": "Tribalcore Kicks/tribe-techno-kick-shake-kick.wav",
+        "Volume": 1,
+        "Pan": 0.049999999999999614,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 1
+      },
+      {
+        "Semitone": 56,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 57,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 58,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 59,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 60,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 61,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 62,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 63,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      }
+    ],
+    "Files": [
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-primal.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-earth-drum.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-tribal-thump.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-tribal-drive.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-dust-stomp.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-jungle-pulse.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-ritual.wav",
+      "/home/peter/Downloads/Samples/Tribalcore Techno Kicks/tribe-techno-kick-shake-kick.wav"
+    ]
+  }
+}
