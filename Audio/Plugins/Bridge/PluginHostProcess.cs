@@ -3,7 +3,6 @@ using JingleBox2.Diagnostics;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -124,7 +123,7 @@ public static class PluginHostProcess
     {
         if (args.Length < 9) return 2;
 
-        int port = int.TryParse(args[1], out int p) ? p : 0;
+        string socketPath = args[1];
         string blockPath = args[2];
         bool isVst3 = args[3] == "vst3";
         string path = args[4];
@@ -139,8 +138,8 @@ public static class PluginHostProcess
 
         try
         {
-            control = Connect(port);
-            audio = Connect(port);
+            control = Connect(socketPath);
+            audio = Connect(socketPath);
         }
         catch (Exception error)
         {
@@ -216,10 +215,12 @@ public static class PluginHostProcess
         PluginRunLoop.DriveWith(round => { Errands.Enqueue(round); Knock.Set(); });
     }
 
-    private static Socket Connect(int port)
+    private static Socket Connect(string path)
     {
-        var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        socket.Connect(IPAddress.Loopback, port);
+        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+
+        socket.Connect(new UnixDomainSocketEndPoint(path));
+
         return socket;
     }
 

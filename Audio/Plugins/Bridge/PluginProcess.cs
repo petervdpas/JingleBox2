@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -122,26 +121,27 @@ internal sealed class PluginProcess : IDisposable
 
         maxFrames = Math.Max(64, maxFrames);
 
+        string socketPath = SocketPath();
         BridgeBlock? block = null;
-        TcpListener? listener = null;
+        Socket? listener = null;
         Process? child = null;
 
         try
         {
             block = BridgeBlock.Create(maxFrames, out string blockPath);
 
-            listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start(2);
+            listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            listener.Bind(new UnixDomainSocketEndPoint(socketPath));
+            listener.Listen(2);
 
-            var endpoint = (IPEndPoint)listener.LocalEndpoint;
-            int port = endpoint.Port;
-
-            child = Launch(plugin, port, blockPath, sampleRate, maxFrames, asInstrument);
+            child = Launch(plugin, socketPath, blockPath, sampleRate, maxFrames, asInstrument);
             if (child == null)
             {
                 block.Dispose();
                 return null;
             }
+
+            listener.ReceiveTimeout = PluginBridge.StartTimeoutMilliseconds;
 
             var controlSocket = Accept(listener, child);
             var audioSocket = Accept(listener, child);
@@ -175,7 +175,8 @@ internal sealed class PluginProcess : IDisposable
         }
         finally
         {
-            listener?.Stop();
+            listener?.Dispose();
+            try { if (File.Exists(socketPath)) File.Delete(socketPath); } catch (Exception) { }
         }
     }
 
@@ -205,20 +206,27 @@ internal sealed class PluginProcess : IDisposable
     /// <summary>Everything the plugin exposes, read once when it loaded.</summary>
     public PluginParameter[] Parameters { get; private set; } = Array.Empty<PluginParameter>();
 
-    private static Socket? Accept(TcpListener listener, Process child)
+    private static Socket? Accept(Socket listener, Process child)
     {
+        // Accept has no timeout of its own, so the wait is done on the poll and the child is
+        // checked while waiting: a plugin that dies on load should not cost thirty seconds.
         var end = DateTime.UtcNow.AddMilliseconds(PluginBridge.StartTimeoutMilliseconds);
 
         while (DateTime.UtcNow < end)
         {
-            if (listener.Pending()) return listener.AcceptSocket();
+            if (listener.Poll(200_000, SelectMode.SelectRead)) return listener.Accept();
 
             if (child.HasExited) return null;
-
-            System.Threading.Thread.Sleep(50);
         }
 
         return null;
+    }
+
+    private static string SocketPath()
+    {
+        string folder = Directory.Exists("/tmp") ? "/tmp" : Path.GetTempPath();
+
+        return Path.Combine(folder, "jb-plug-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".sock");
     }
 
     /// <summary>
@@ -230,7 +238,7 @@ internal sealed class PluginProcess : IDisposable
     /// program was started through the dotnet launcher there is no executable of our own to
     /// run, so the launcher is asked to run the same assembly again.
     /// </remarks>
-    private static Process? Launch(PluginInfo plugin, int port, string blockPath, int sampleRate, int maxFrames, bool asInstrument)
+    private static Process? Launch(PluginInfo plugin, string socketPath, string blockPath, int sampleRate, int maxFrames, bool asInstrument)
     {
         string? self = Environment.ProcessPath;
         if (string.IsNullOrEmpty(self)) return null;
@@ -253,7 +261,7 @@ internal sealed class PluginProcess : IDisposable
         }
 
         start.ArgumentList.Add(PluginBridge.HostArgument);
-        start.ArgumentList.Add(port.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        start.ArgumentList.Add(socketPath);
         start.ArgumentList.Add(blockPath);
         start.ArgumentList.Add(plugin.Format == PluginFormat.Vst3 ? "vst3" : "clap");
         start.ArgumentList.Add(plugin.Path);

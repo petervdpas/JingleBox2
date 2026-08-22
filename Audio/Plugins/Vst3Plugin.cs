@@ -71,7 +71,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     private float* _inputData;
     private float* _outputData;
     private ProcessData* _process;
-    private ProcessContext* _context;
 
     private int _maxFrames;
     private bool _active;
@@ -316,15 +315,12 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         Arrange();
         Allocate(_maxFrames);
 
-        double rate = sampleRate <= 0 ? 44100 : sampleRate;
-        _context->SampleRate = rate;
-
         var setup = new ProcessSetup
         {
             ProcessMode = Vst3Abi.RealtimeMode,
             SymbolicSampleSize = Vst3Abi.Sample32,
             MaxSamplesPerBlock = _maxFrames,
-            SampleRate = rate
+            SampleRate = sampleRate <= 0 ? 44100 : sampleRate
         };
 
         if (_processor->Vtbl->SetupProcessing(_processor, &setup) != Vst3Abi.ResultOk) return false;
@@ -437,25 +433,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _notes = new Vst3EventList(MaxNotesPerBlock);
         _played = new Vst3EventList(MaxNotesPerBlock);
 
-        _context = Alloc<ProcessContext>(1);
-        _context->State = 0;
-        _context->SampleRate = 44100;
-        _context->ProjectTimeSamples = 0;
-        _context->SystemTime = 0;
-        _context->ContinousTimeSamples = 0;
-        _context->ProjectTimeMusic = 0;
-        _context->BarPositionMusic = 0;
-        _context->CycleStartMusic = 0;
-        _context->CycleEndMusic = 0;
-        _context->Tempo = 120;
-        _context->TimeSigNumerator = 4;
-        _context->TimeSigDenominator = 4;
-        _context->Flags = 0;
-        _context->SmpteOffsetSubframes = 0;
-        _context->FrameRate = 0;
-        _context->ChaptersCount = 0;
-        _context->Chapters = null;
-
         _process = Alloc<ProcessData>(1);
         _process->ProcessMode = Vst3Abi.RealtimeMode;
         _process->SymbolicSampleSize = Vst3Abi.Sample32;
@@ -467,7 +444,7 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _process->OutputParameterChanges = _outgoing.Pointer;
         _process->InputEvents = _notes.Pointer;
         _process->OutputEvents = _played.Pointer;
-        _process->ProcessContext = _context;
+        _process->ProcessContext = null;
     }
 
     /// <summary>
@@ -532,12 +509,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
     private void ProcessBlock(float[] buffer, int offset, int frames)
     {
-        if (_context != null)
-        {
-            _context->ProjectTimeSamples += frames;
-            _context->ContinousTimeSamples += frames;
-        }
-
         int fed = 0;
 
         if (InputChannels == 1)
@@ -1054,7 +1025,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         Free(_inputBusses);
         Free(_outputBusses);
         Free(_process);
-        Free(_context);
 
         if (_handler != null) NativeMemory.Free(_handler);
 
