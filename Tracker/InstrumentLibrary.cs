@@ -84,9 +84,19 @@ public sealed class InstrumentLibrary : ISampleUsage
 
     /// <summary>
     /// Points a song's instruments back at the library. Each slot keeps its number, so the
-    /// pattern cells still refer to the same thing; only the sound is brought up to date.
+    /// pattern cells still refer to the same thing, and everything the library knows about the
+    /// instrument is brought up to date: its name, its recording, its synth patch.
     /// Slots whose instrument is no longer in the library keep the copy the song was saved with.
     /// </summary>
+    /// <remarks>
+    /// A plugin's own patch is the exception, and it stays with the song. A song is the
+    /// arrangement and the sounds it was written with, and a plugin patch is the sound: two
+    /// songs are entitled to use the same Serum on different presets, and opening one is not
+    /// an occasion to give it whichever preset another song happened to leave in the library.
+    ///
+    /// The song's patch wins only when it has one. A slot saved before it had a patch, or one
+    /// whose plugin was never opened, takes the library's rather than coming up empty.
+    /// </remarks>
     public int Rebind(Song song)
     {
         if (song is null) return 0;
@@ -100,7 +110,12 @@ public sealed class InstrumentLibrary : ISampleUsage
             var current = Load(slot.Id);
             if (current == null) continue;
 
+            string patch = slot.PluginState;
+
             slot.CopyFrom(current);
+
+            if (!string.IsNullOrWhiteSpace(patch)) slot.PluginState = patch;
+
             rebound++;
         }
 

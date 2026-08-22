@@ -1182,9 +1182,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             // the song was opened with.
             _player.CaptureChains(Song);
 
-            // And the same for the sound a plugin instrument is making: whatever was turned in
-            // its own window is read back onto the instrument before the song is written.
-            TrackEffect.Instrument?.SyncPatch();
+            // And the same for the sound every plugin instrument is making: whatever was
+            // turned in its own window is read back onto the instrument before the song is
+            // written. Every track, not the one the cursor is on: the effect slot follows the
+            // cursor, so asking it alone saved one track's plugin and quietly dropped what
+            // every other track's plugin was set to.
+            foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
 
             string path = _store.PathFor(name);
             _store.Save(Song, path);

@@ -833,7 +833,77 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         if (_component->Vtbl->GetState(_component, state.Pointer) != Vst3Abi.ResultOk) return Array.Empty<byte>();
         if (state.LooksEmpty) return Array.Empty<byte>();
 
-        return state.ToArray();
+        var sound = state.ToArray();
+
+        // The settings half keeps its own state, and it is not the same lump as the audio
+        // half's. What is in it is everything the plugin shows rather than everything it
+        // plays: which preset is on, what the browser is looking at, where the panels are.
+        // Saving only the audio half is a song that comes back sounding right and looking
+        // like nothing was ever loaded, which is what Serum saying "- Init -" over the patch
+        // you chose actually is.
+        if (_controller == null) return sound;
+
+        using var settings = new Vst3Stream();
+
+        if (_controller->Vtbl->GetState(_controller, settings.Pointer) != Vst3Abi.ResultOk)
+            return sound;
+
+        if (settings.LooksEmpty) return sound;
+
+        return Together(sound, settings.ToArray());
+    }
+
+    /// <summary>What marks a lump as holding both halves rather than only the audio one.</summary>
+    /// <remarks>
+    /// Songs saved before the settings half was kept hold the audio half on its own, and they
+    /// have to go on loading. So the two-part form is marked, and anything without the mark is
+    /// read the old way: all of it is the audio half. No plugin's own state can be mistaken
+    /// for the mark, because a plugin's state never has to start with these eight bytes and
+    /// the length that follows has to add up as well.
+    /// </remarks>
+    private static readonly byte[] BothHalves = "JB3STATE"u8.ToArray();
+
+    /// <summary>The two halves in one lump, marked so it can be told apart from the old form.</summary>
+    private static byte[] Together(byte[] sound, byte[] settings)
+    {
+        var lump = new byte[BothHalves.Length + 8 + sound.Length + settings.Length];
+
+        Buffer.BlockCopy(BothHalves, 0, lump, 0, BothHalves.Length);
+        BitConverter.TryWriteBytes(lump.AsSpan(BothHalves.Length, 4), sound.Length);
+        BitConverter.TryWriteBytes(lump.AsSpan(BothHalves.Length + 4, 4), settings.Length);
+
+        Buffer.BlockCopy(sound, 0, lump, BothHalves.Length + 8, sound.Length);
+        Buffer.BlockCopy(settings, 0, lump, BothHalves.Length + 8 + sound.Length, settings.Length);
+
+        return lump;
+    }
+
+    /// <summary>
+    /// Takes a lump apart into the audio half and the settings half. A lump saved before the
+    /// settings half was kept is all audio half, which is what the old songs are.
+    /// </summary>
+    private static (byte[] Sound, byte[] Settings) Apart(byte[] lump)
+    {
+        if (lump.Length < BothHalves.Length + 8) return (lump, Array.Empty<byte>());
+
+        for (int index = 0; index < BothHalves.Length; index++)
+        {
+            if (lump[index] != BothHalves[index]) return (lump, Array.Empty<byte>());
+        }
+
+        int sound = BitConverter.ToInt32(lump, BothHalves.Length);
+        int settings = BitConverter.ToInt32(lump, BothHalves.Length + 4);
+
+        if (sound < 0 || settings < 0) return (lump, Array.Empty<byte>());
+        if (BothHalves.Length + 8 + (long)sound + settings != lump.Length) return (lump, Array.Empty<byte>());
+
+        var one = new byte[sound];
+        var two = new byte[settings];
+
+        Buffer.BlockCopy(lump, BothHalves.Length + 8, one, 0, sound);
+        Buffer.BlockCopy(lump, BothHalves.Length + 8 + sound, two, 0, settings);
+
+        return (one, two);
     }
 
     /// <summary>
@@ -844,15 +914,29 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     {
         if (_disposed || _component == null || state == null || state.Length == 0) return;
 
+        var (sound, settings) = Apart(state);
+
         using var stream = new Vst3Stream();
-        stream.Fill(state);
+        stream.Fill(sound);
 
         if (_component->Vtbl->SetState(_component, stream.Pointer) != Vst3Abi.ResultOk) return;
 
         if (_controller == null) return;
 
+        // The audio half's state goes to the settings half as well, which is how the knobs
+        // come to agree with the sound.
         stream.Rewind();
         _controller->Vtbl->SetComponentState(_controller, stream.Pointer);
+
+        if (settings.Length == 0) return;
+
+        // And then the settings half's own, which is the part that says which preset this is.
+        // Last, because a plugin works out its display from the sound first and then puts back
+        // whatever it kept for itself on top.
+        using var mine = new Vst3Stream();
+        mine.Fill(settings);
+
+        _controller->Vtbl->SetState(_controller, mine.Pointer);
     }
 
     /// <summary>

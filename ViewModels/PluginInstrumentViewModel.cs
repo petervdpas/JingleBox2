@@ -24,7 +24,6 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     private readonly Action? _changed;
 
     private IPluginInstrument? _plugin;
-    private bool _patchStale;
 
     public PluginInstrumentViewModel(TrackerInstrument instrument, Func<IPluginInstrument?> live, Action? changed = null)
     {
@@ -73,7 +72,6 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// </summary>
     private void Moved()
     {
-        _patchStale = true;
         _changed?.Invoke();
     }
 
@@ -81,12 +79,25 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// Takes the sound back out of the plugin and onto the instrument, so that what is saved
     /// with the song is what is being heard.
     /// </summary>
+    /// <remarks>
+    /// Asked every time rather than only when something is known to have moved. The note that
+    /// a knob turned is made by the plugin telling us so, and a plugin that changes without
+    /// saying, or that says it before the panel exists to hear it, leaves the note unmade and
+    /// the song keeping a sound nobody is listening to. Reading a patch costs a plugin one
+    /// call and a couple of hundred kilobytes at worst, and this happens when a song is saved
+    /// or a window is closed, not while anything is being played.
+    /// </remarks>
     public void SyncPatch()
     {
-        if (!_patchStale || _plugin == null) return;
+        if (_plugin == null) return;
 
-        _patchStale = false;
-        _instrument.StateBytes = _plugin.SaveState();
+        var patch = _plugin.SaveState();
+
+        // A plugin that will not give its patch back keeps whatever the instrument already
+        // had. Writing nothing over something is how a saved sound gets lost.
+        if (patch == null || patch.Length == 0) return;
+
+        _instrument.StateBytes = patch;
     }
 
     /// <summary>Puts the plugin's window away. The plugin carries on playing.</summary>
