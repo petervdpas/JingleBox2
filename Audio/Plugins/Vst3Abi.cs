@@ -385,6 +385,28 @@ internal unsafe struct AudioBusBuffers
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ProcessContext
+{
+    public uint State;
+    public double SampleRate;
+    public long ProjectTimeSamples;
+    public long SystemTime;
+    public double ContinousTimeSamples;
+    public double ProjectTimeMusic;
+    public double BarPositionMusic;
+    public double CycleStartMusic;
+    public double CycleEndMusic;
+    public double Tempo;
+    public int TimeSigNumerator;
+    public int TimeSigDenominator;
+    public int Flags;
+    public int SmpteOffsetSubframes;
+    public int FrameRate;
+    public int ChaptersCount;
+    public void* Chapters;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct ProcessData
 {
     public int ProcessMode;
@@ -398,7 +420,7 @@ internal unsafe struct ProcessData
     public void* OutputParameterChanges;
     public void* InputEvents;
     public void* OutputEvents;
-    public void* ProcessContext;
+    public ProcessContext* ProcessContext;
 }
 
 /// <summary>The settings half of a plugin: what the knobs are and where they stand.</summary>

@@ -467,19 +467,13 @@ internal sealed unsafe class BridgeBlock : IDisposable
     {
         long size = PluginBridge.BlockBytes(maxFrames);
 
-        string folder = Directory.Exists("/dev/shm") ? "/dev/shm" : Path.GetTempPath();
+        string mapName = "jinglebox-plugin-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N");
+        path = mapName;
 
-        path = Path.Combine(folder, "jinglebox-plugin-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N") + ".block");
-
-        using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite))
-        {
-            stream.SetLength(size);
-        }
-
-        var file = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, size, MemoryMappedFileAccess.ReadWrite);
+        var file = MemoryMappedFile.CreateNew(mapName, size, MemoryMappedFileAccess.ReadWrite);
         var view = file.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
 
-        var block = new BridgeBlock(file, view, path, maxFrames);
+        var block = new BridgeBlock(file, view, null, maxFrames);
 
         *(int*)block._base = PluginBridge.Magic;
         *(int*)(block._base + 4) = maxFrames;
@@ -491,31 +485,35 @@ internal sealed unsafe class BridgeBlock : IDisposable
     }
 
     /// <summary>Opens a block somebody else made. The child does this.</summary>
-    public static BridgeBlock? Open(string path)
+    public static BridgeBlock? Open(string mapName)
     {
-        if (!File.Exists(path)) return null;
-
-        var info = new FileInfo(path);
-
-        var file = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, info.Length, MemoryMappedFileAccess.ReadWrite);
-        var view = file.CreateViewAccessor(0, info.Length, MemoryMappedFileAccess.ReadWrite);
-
-        byte* start = null;
-        view.SafeMemoryMappedViewHandle.AcquirePointer(ref start);
-
-        int magic = *(int*)start;
-        int frames = *(int*)(start + 4);
-
-        view.SafeMemoryMappedViewHandle.ReleasePointer();
-
-        if (magic != PluginBridge.Magic || frames <= 0)
+        try
         {
-            view.Dispose();
-            file.Dispose();
+#pragma warning disable CA1416
+            var file = MemoryMappedFile.OpenExisting(mapName, MemoryMappedFileRights.ReadWrite);
+#pragma warning restore CA1416
+
+            // Read header (first 16 bytes) to get frame count
+            var headerView = file.CreateViewAccessor(0, 16, MemoryMappedFileAccess.Read);
+            byte* start = null;
+            headerView.SafeMemoryMappedViewHandle.AcquirePointer(ref start);
+            int magic = *(int*)start;
+            int frames = *(int*)(start + 4);
+            headerView.SafeMemoryMappedViewHandle.ReleasePointer();
+            headerView.Dispose();
+
+            if (magic != PluginBridge.Magic || frames <= 0) return null;
+
+            // Now create full-size view
+            long size = PluginBridge.BlockBytes(frames);
+            var view = file.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
+
+            return new BridgeBlock(file, view, null, frames);
+        }
+        catch (Exception)
+        {
             return null;
         }
-
-        return new BridgeBlock(file, view, null, frames);
     }
 
     /// <summary>
