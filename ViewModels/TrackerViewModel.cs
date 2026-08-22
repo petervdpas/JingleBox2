@@ -810,7 +810,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Points a track at an instrument. Existing notes keep the instrument they were written
     /// with; this only decides what new notes on that track get.
     /// </summary>
-    public void AssignInstrumentToTrack(int track, int instrument)
+    public async Task AssignInstrumentToTrack(int track, int instrument)
     {
         if (track < 0 || track >= Song.TrackCount) return;
 
@@ -834,6 +834,74 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Status = $"Moved '{chosen.Name}' from track {previous + 1:00} to track {track + 1:00}";
         else
             Status = $"Track {track + 1:00} plays '{chosen.Name}'";
+
+        await OfferToPointNotesAt(track, instrument, chosen);
+    }
+
+    /// <summary>
+    /// Notes already written on a track keep the instrument they were typed with, so binding a
+    /// new one to the track leaves them addressed to the old. This is where that is offered to
+    /// be put right.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than done. Renumbering is the answer nearly every time, because a track
+    /// showing one instrument and playing another is not something anybody means; but a track
+    /// deliberately carrying two instruments turn and turn about is a real thing to write, and
+    /// rewriting that without being asked would be taking somebody's arrangement apart.
+    /// </remarks>
+    private async Task OfferToPointNotesAt(int track, int instrument, TrackerInstrument chosen)
+    {
+        int stranded = Song.NotesAddressedElsewhere(track, instrument);
+        if (stranded == 0) return;
+
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Point the notes at it",
+            $"Track {track + 1:00} has {stranded} note(s) still addressed to another instrument. "
+                + $"They will go on playing what they name, and '{chosen.Name}' will never sound. "
+                + "Point them at it? The notes, volumes and effects stay as they are.",
+            "Point them at it");
+
+        if (!confirmed)
+        {
+            Status = $"Track {track + 1:00} plays '{chosen.Name}', but its {stranded} note(s) still name another instrument.";
+            return;
+        }
+
+        int changed = Song.PointNotesAtTrackInstrument(track, instrument);
+
+        RefreshStrips();
+        MarkDirty();
+
+        Status = $"Pointed {changed} note(s) on track {track + 1:00} at '{chosen.Name}'";
+    }
+
+    /// <summary>
+    /// Moves a whole track to another position: its notes, its instrument, its effects and its
+    /// mixer strip, in the song and in what is playing.
+    /// </summary>
+    public void MoveTrack(int from, int to)
+    {
+        if (from == to) return;
+        if (from < 0 || from >= Song.TrackCount || to < 0 || to >= Song.TrackCount) return;
+
+        var moved = Song.InstrumentAt(Song.GetTrackInstrument(from));
+
+        if (!Song.MoveTrack(from, to)) return;
+
+        // The song and what is playing have to move together, or the notes arrive at the new
+        // track and the sound answers on the old one.
+        _player.MoveTrack(from, to);
+
+        SyncInstruments();
+        RefreshStrips();
+        MarkDirty();
+
+        // The cursor follows the track it was on, so a drag does not also move the caret.
+        Cursor = Cursor with { Track = Song.WhereTrackWent(Cursor.Track, from, to) };
+
+        Status = moved == null
+            ? $"Moved track {from + 1:00} to {to + 1:00}"
+            : $"Moved track {from + 1:00} to {to + 1:00}, '{moved.Name}' with it";
     }
 
     /// <summary>Clears a track's default so it falls back to the selected instrument.</summary>

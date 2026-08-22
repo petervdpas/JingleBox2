@@ -55,6 +55,21 @@ public sealed class PluginEditorHost : NativeControlHost
     /// <summary>True when a plugin is actually drawing in here.</summary>
     public bool IsShowing => _attached;
 
+    /// <summary>
+    /// Passes the window's own activation through to the plugin drawing inside it.
+    /// </summary>
+    /// <remarks>
+    /// The embedder owes the plugin this for as long as the window is up, not once when it is
+    /// handed over. See <see cref="XEmbed.Activated"/> for what a plugin does when it is never
+    /// told again.
+    /// </remarks>
+    public void WindowActivated(bool active)
+    {
+        if (!_attached || _handle == 0) return;
+
+        XEmbed.Activated(_handle, active);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);

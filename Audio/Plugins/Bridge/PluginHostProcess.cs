@@ -54,6 +54,10 @@ public static class PluginHostProcess
     /// <summary>How many blocks have gone through, so the log can say whether audio is running.</summary>
     private static long _blocks;
 
+    /// <summary>Blocks that came out with something in them, and the loudest sample among them.</summary>
+    private static long _sounded;
+    private static float _loudest;
+
     /// <summary>True when these arguments mean this process is meant to be a plugin's process.</summary>
     public static bool Claims(string[] args) =>
         args != null && args.Length > 0 &&
@@ -250,9 +254,17 @@ public static class PluginHostProcess
                 _rounds = 0;
                 _inLoop = 0;
 
+                long sounded = _sounded;
+                float loudest = _loudest;
+
+                _sounded = 0;
+                _loudest = 0;
+
                 Say("run loop: " + rounds + " rounds taking " + spent.ToString("0") + " ms in the plugin; " +
                     PluginRunLoop.Census() +
-                    "; " + (blocks - counted) + " blocks of audio in the last two seconds" +
+                    "; " + (blocks - counted) + " blocks of audio in the last two seconds, " +
+                    sounded + " of them with something in them, loudest " +
+                    loudest.ToString("F4", System.Globalization.CultureInfo.InvariantCulture) +
                     ((_plugin as ClapEffect)?.IsWaitingToSpeak == true ? "; the plugin is waiting to say something" : ""));
 
                 counted = blocks;
@@ -586,16 +598,25 @@ public static class PluginHostProcess
                 effect?.Process(buffer, frames);
             }
 
-            bool hasAudio = false;
-            for (int i = 0; i < Math.Min(samples, 100); i++)
+            // Counted rather than said. A line of the log is a file opened, written and closed
+            // under a lock, and this is the audio thread; saying it once a block was the same
+            // lock the thread driving the plugin's own window needs, taken eighty times a
+            // second. What came out is reported with the run loop's census below instead.
+            //
+            // The whole block rather than the first hundred samples: a block that starts
+            // quiet and ends loud is a note beginning, which is exactly the one worth seeing.
+            if (Log.IsOn)
             {
-                if (buffer[i] != 0)
+                float peak = 0;
+                for (int index = 0; index < samples; index++)
                 {
-                    hasAudio = true;
-                    break;
+                    float magnitude = Math.Abs(buffer[index]);
+                    if (magnitude > peak) peak = magnitude;
                 }
+
+                if (peak > 0.0001f) _sounded++;
+                if (peak > _loudest) _loudest = peak;
             }
-            if (hasAudio) Say("audio generated: buffer has signal");
 
             fixed (float* source = buffer)
             {

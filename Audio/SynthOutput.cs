@@ -149,20 +149,35 @@ public sealed class SynthOutput : IDisposable
         if (_mixer != null) _mixer.StopAll();
     }
 
-    /// <summary>The block size last written down, so it is said when it changes and not per block.</summary>
-    private int _said;
+    /// <summary>
+    /// The smallest and largest block asked for so far, so the size is written down when it is
+    /// something new and not once a block.
+    /// </summary>
+    /// <remarks>
+    /// A pair rather than the last size seen. On Linux the device asks for two sizes turn and
+    /// turn about, so "say it when it changes" was every block, which is the audio thread
+    /// opening and closing a file eighty times a second and a log too full to read.
+    /// </remarks>
+    private int _smallest;
+    private int _largest;
 
     private int Fill(int handle, IntPtr buffer, int length, IntPtr user)
     {
         int samples = length / sizeof(float);
         if (samples <= 0) return 0;
 
-        if (Diagnostics.Log.IsOn && samples != _said)
+        if (Diagnostics.Log.IsOn && (samples < _smallest || samples > _largest || _largest == 0))
         {
-            _said = samples;
+            if (_smallest == 0 || samples < _smallest) _smallest = samples;
+            if (samples > _largest) _largest = samples;
+
+            int low = _smallest / Channels;
+            int high = _largest / Channels;
 
             Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
-                "the synth stream is asking for " + (samples / Channels) + " frames at a time");
+                low == high
+                    ? "the synth stream is asking for " + low + " frames at a time"
+                    : "the synth stream is asking for between " + low + " and " + high + " frames at a time");
         }
 
         if (_scratch.Length < samples) _scratch = new float[samples];

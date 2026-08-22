@@ -26,7 +26,7 @@ public partial class TrackerView : UserControl
         // has scrolled sideways and what character width the grid settled on.
         Header.TrackClicked += (_, track) => SelectTrack(track);
 
-        SetUpInstrumentDragAndDrop();
+        SetUpDragAndDrop();
         GridScroll.GetObservable(ScrollViewer.OffsetProperty)
             .Subscribe(new AnonymousObserver<Vector>(offset => Header.ScrollOffset = offset.X));
 
@@ -48,14 +48,26 @@ public partial class TrackerView : UserControl
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
 
     /// <summary>
-    /// Dragging an instrument onto a track header points that track at it. Existing notes keep
-    /// whatever instrument they were written with; only new notes on that track are affected.
+    /// The two things that can be dragged here.
     /// </summary>
-    private void SetUpInstrumentDragAndDrop()
+    /// <remarks>
+    /// An instrument dragged from the list onto a track points that track at it, and offers to
+    /// bring the notes already written there along. A track dragged by its own header moves the
+    /// whole track: its notes, its instrument, its effects and its mixer strip.
+    ///
+    /// Both land on the same two surfaces, so which one a drop means comes from the format the
+    /// drag carries rather than from where it was let go.
+    /// </remarks>
+    private void SetUpDragAndDrop()
     {
         // Bubble with handledEventsToo: the ListBox marks the press handled once it has
         // updated the selection, which is exactly the state the drag needs to read.
         InstrumentList.AddHandler(PointerPressedEvent, OnInstrumentPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+
+        // The header marks the press handled once it has selected the track, so this reads it
+        // the same way and for the same reason.
+        Header.AddHandler(PointerPressedEvent, OnHeaderPointerPressed,
             RoutingStrategies.Bubble, handledEventsToo: true);
 
         // The whole track column takes a drop, not just its header.
@@ -80,6 +92,20 @@ public partial class TrackerView : UserControl
         await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
     }
 
+    /// <summary>
+    /// Picks a track up. Releasing without moving ends the drag with no effect, so this does
+    /// not get in the way of clicking a header to select the track.
+    /// </summary>
+    private async void OnHeaderPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(Header).Properties.IsLeftButtonPressed) return;
+
+        int track = Header.TrackAtPoint(e.GetPosition(Header));
+        if (track < 0) return;
+
+        await DragDrop.DoDragDropAsync(e, TrackDragData.For(track), DragDropEffects.Move);
+    }
+
     private void OnHeaderDragOver(object? sender, DragEventArgs e) =>
         HandleDragOver(e, Header.TrackAtPoint(e.GetPosition(Header)));
 
@@ -94,25 +120,54 @@ public partial class TrackerView : UserControl
 
     private void HandleDragOver(DragEventArgs e, int track)
     {
+        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+
+        if (moving >= 0)
+        {
+            bool somewhere = track >= 0 && track != moving;
+
+            // Both surfaces light up together, so the header names the column being targeted.
+            ShowDropTarget(somewhere ? track : -1);
+
+            e.DragEffects = somewhere ? DragDropEffects.Move : DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
         int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
         bool valid = instrument >= 0 && track >= 0;
 
-        // Both surfaces light up together, so the header names the column being targeted.
         ShowDropTarget(valid ? track : -1);
 
         e.DragEffects = valid ? DragDropEffects.Link : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private void HandleDrop(DragEventArgs e, int track)
+    private async void HandleDrop(DragEventArgs e, int track)
     {
         ShowDropTarget(-1);
+
+        // A track being moved and an instrument being pointed at a track arrive the same way
+        // and mean different things, so which it is comes from the format it carries.
+        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+
+        if (moving >= 0)
+        {
+            e.Handled = true;
+            if (track >= 0) ViewModel?.MoveTrack(moving, track);
+            return;
+        }
 
         int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
         if (instrument < 0 || track < 0) return;
 
-        ViewModel?.AssignInstrumentToTrack(track, instrument);
         e.Handled = true;
+
+        // Awaited rather than left running: binding an instrument to a track asks whether the
+        // notes already on it should follow, and the dialog cannot be raised from inside the
+        // drop itself.
+        var model = ViewModel;
+        if (model != null) await model.AssignInstrumentToTrack(track, instrument);
     }
 
     private void OnDragLeave(object? sender, DragEventArgs e) => ShowDropTarget(-1);

@@ -177,6 +177,133 @@ public sealed class Song
         return true;
     }
 
+    /// <summary>
+    /// How many notes on a track are addressed to something other than the given instrument.
+    /// </summary>
+    /// <remarks>
+    /// Counted across every pattern, because a track's instrument belongs to the song and not
+    /// to one pattern. Cells with a blank instrument column are not counted: they already
+    /// follow whatever the track is pointed at.
+    /// </remarks>
+    public int NotesAddressedElsewhere(int track, int instrument)
+    {
+        int count = 0;
+
+        foreach (var pattern in Patterns)
+        {
+            if (track < 0 || track >= pattern.TrackCount) continue;
+
+            for (int line = 0; line < pattern.Lines; line++)
+            {
+                var cell = pattern[line, track];
+
+                if (cell.Instrument == TrackerCell.NoInstrument) continue;
+                if (cell.Instrument == instrument) continue;
+
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Points every note already written on a track at one instrument. Returns how many cells
+    /// were changed.
+    /// </summary>
+    /// <remarks>
+    /// A cell names its own instrument, and a track separately has one bound to it, so the two
+    /// can drift apart: binding an instrument to a track does not touch notes that were
+    /// already typed there. When they disagree the notes go where the cells say and the
+    /// track's own instrument is never played at all, which sounds like a plugin that has
+    /// stopped working rather than like a numbering mistake. This is how the cells are brought
+    /// back into line with the track.
+    ///
+    /// Only the instrument column moves. The notes, the volumes and the effects are what was
+    /// played and stay exactly as they were.
+    /// </remarks>
+    public int PointNotesAtTrackInstrument(int track, int instrument)
+    {
+        if (instrument < 0 || instrument >= Instruments.Count) return 0;
+
+        int changed = 0;
+
+        foreach (var pattern in Patterns)
+        {
+            if (track < 0 || track >= pattern.TrackCount) continue;
+
+            for (int line = 0; line < pattern.Lines; line++)
+            {
+                var cell = pattern[line, track];
+
+                if (cell.Instrument == TrackerCell.NoInstrument) continue;
+                if (cell.Instrument == instrument) continue;
+
+                pattern[line, track] = cell with { Instrument = instrument };
+                changed++;
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Moves a whole track to another position: its notes in every pattern, the instrument
+    /// bound to it, and its mixer strip.
+    /// </summary>
+    /// <remarks>
+    /// All three move together, because all three are what anybody means by "that track". A
+    /// reorder that took the notes and left the instrument behind would put every track's
+    /// sound on somebody else's notes, which is the same trap as a cell naming one instrument
+    /// while its track is bound to another.
+    /// </remarks>
+    public bool MoveTrack(int from, int to)
+    {
+        if (from == to) return false;
+        if (from < 0 || from >= TrackCount || to < 0 || to >= TrackCount) return false;
+
+        EnsureTrackInstruments();
+        EnsureMix();
+
+        foreach (var pattern in Patterns) pattern.MoveTrack(from, to);
+
+        Shift(TrackInstruments, from, to);
+        Shift(Mix, from, to);
+
+        // A side chain names the track that pushes it down, by number, and those numbers have
+        // just changed under it. Remapped rather than cleared: the strip is still keyed off
+        // the same track, and that track is still in the song, only somewhere else.
+        foreach (var strip in Mix)
+        {
+            if (strip.DuckFrom == TrackMix.NoKey) continue;
+
+            strip.DuckFrom = WhereTrackWent(strip.DuckFrom, from, to);
+        }
+
+        return true;
+    }
+
+    /// <summary>Where a track number ends up once one track has been moved to another place.</summary>
+    public static int WhereTrackWent(int track, int from, int to)
+    {
+        if (track == from) return to;
+
+        // Everything the moved track passed over slides one place the other way to fill in.
+        if (from < to) return track > from && track <= to ? track - 1 : track;
+
+        return track >= to && track < from ? track + 1 : track;
+    }
+
+    /// <summary>The same move, for the lists that run alongside the patterns.</summary>
+    private static void Shift<T>(List<T> list, int from, int to)
+    {
+        if (from < 0 || from >= list.Count || to < 0 || to >= list.Count) return;
+
+        var moved = list[from];
+        list.RemoveAt(from);
+        list.Insert(to, moved);
+    }
+
     /// <summary>Applies a new track count to the song and every pattern in it.</summary>
     public void SetTrackCount(int trackCount)
     {

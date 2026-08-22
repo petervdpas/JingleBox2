@@ -139,6 +139,86 @@ public sealed class SynthMixer
     /// <summary>When the mixer last said what it was holding, so it says it once, not per block.</summary>
     private long _said;
 
+    /// <summary>
+    /// What one track did over the last second, kept so the log can say it once rather than
+    /// once a block.
+    /// </summary>
+    /// <remarks>
+    /// The audio callback runs some eighty times a second and a line of the log is a file
+    /// opened, written and closed. Writing from inside a block is therefore the audio thread
+    /// waiting on a disk, which is a fault of its own and one that hides the fault being looked
+    /// for. Nothing here allocates or blocks: it is a handful of comparisons per block, and the
+    /// line is built once a second by whichever block happens to be the one that crosses it.
+    /// </remarks>
+    private struct TrackCensus
+    {
+        public int Blocks;
+        public float PlayedPeak;
+        public float BeforeInsert;
+        public float AfterInsert;
+        public int SilentBlocks;
+        public string? Fault;
+        public int Faults;
+        public string? Instrument;
+        public string? Insert;
+
+        public void Played(float peak, IPluginInstrument instrument)
+        {
+            Blocks++;
+            if (peak > PlayedPeak) PlayedPeak = peak;
+            if (peak <= Quiet) SilentBlocks++;
+            Instrument ??= instrument.GetType().Name;
+        }
+
+        public void Inserted(float before, float after, IAudioInsert insert)
+        {
+            if (before > BeforeInsert) BeforeInsert = before;
+            if (after > AfterInsert) AfterInsert = after;
+            Insert ??= insert.GetType().Name;
+        }
+
+        public void Note(string fault)
+        {
+            Faults++;
+            Fault = fault;
+        }
+
+        public bool Worth => Blocks > 0 || Insert != null || Faults > 0;
+
+        public void Clear()
+        {
+            Blocks = 0;
+            PlayedPeak = 0;
+            BeforeInsert = 0;
+            AfterInsert = 0;
+            SilentBlocks = 0;
+            Fault = null;
+            Faults = 0;
+            Instrument = null;
+            Insert = null;
+        }
+    }
+
+    /// <summary>Anything at or below this is silence as far as a meter is concerned.</summary>
+    private const float Quiet = 0.0001f;
+
+    private readonly TrackCensus[] _census = new TrackCensus[MaxTracks];
+
+    /// <summary>The loudest sample in a block, which is what every meter here is built on.</summary>
+    private static float Peak(float[] buffer, int samples)
+    {
+        float peak = 0;
+
+        int count = Math.Min(samples, buffer.Length);
+        for (int index = 0; index < count; index++)
+        {
+            float magnitude = Math.Abs(buffer[index]);
+            if (magnitude > peak) peak = magnitude;
+        }
+
+        return peak;
+    }
+
     public IAudioInsert? InsertOn(int track) =>
         track >= 0 && track < MaxTracks ? _inserts[track] : null;
 
@@ -173,6 +253,69 @@ public sealed class SynthMixer
         }
 
         leaving?.AllNotesOff();
+    }
+
+    /// <summary>
+    /// Moves everything a track is holding to another position: its plugin, its effects, its
+    /// side chain and the columns riding its bus.
+    /// </summary>
+    /// <remarks>
+    /// The song is reordered by the view; this is the live half of the same move. Without it
+    /// the notes would arrive at their new track and the plugin would still be answering on
+    /// the old one, so every track would play somebody else's sound.
+    ///
+    /// Voices are cut rather than carried across. A voice remembers the track it was started
+    /// on, and there is no sound reason to hear a note go on playing on a track that is no
+    /// longer where it was. A cut is a short fade, so this costs a note ending rather than a
+    /// click.
+    /// </remarks>
+    public void MoveTrack(int from, int to)
+    {
+        if (from == to) return;
+        if (from < 0 || from >= MaxTracks || to < 0 || to >= MaxTracks) return;
+
+        lock (_lock)
+        {
+            Shift(_instruments, from, to);
+            Shift(_inserts, from, to);
+            Shift(_instrumentGain, from, to);
+            Shift(_instrumentPan, from, to);
+            Shift(_heldUntil, from, to);
+            Shift(_ducking, from, to);
+            Shift(_trackLevels, from, to);
+
+            // A side chain names the track that keys it, and those numbers have just moved.
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                var setting = _ducking[track];
+                if (setting.Key < 0) continue;
+
+                _ducking[track] = setting with { Key = Song.WhereTrackWent(setting.Key, from, to) };
+            }
+
+            // The duckers hold a level worked out from the old arrangement, so they start again.
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                _duckGain[track] = 1f;
+                _duckers[track]?.Reset();
+            }
+
+            // Cut rather than released: a short fade, so a reorder mid-play does not click.
+            foreach (var voice in _voices) voice.Cut();
+
+            _snapshotStale = true;
+        }
+    }
+
+    /// <summary>One track's worth of per-track state, moved the way the song moves it.</summary>
+    private static void Shift<T>(T[] values, int from, int to)
+    {
+        var moved = values[from];
+
+        int step = from < to ? 1 : -1;
+        for (int track = from; track != to; track += step) values[track] = values[track + step];
+
+        values[to] = moved;
     }
 
     /// <summary>Puts a plugin in the audition slot, or takes one out with null.</summary>
@@ -451,7 +594,7 @@ public sealed class SynthMixer
 
         lock (_lock)
         {
-            if (Diagnostics.Log.IsOn && Environment.TickCount64 - _said > 2000)
+            if (Diagnostics.Log.IsOn && Environment.TickCount64 - _said > 1000)
             {
                 _said = Environment.TickCount64;
 
@@ -462,6 +605,8 @@ public sealed class SynthMixer
                 Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
                     "the mixer has " + voices + " voices, " + played + " plugin instruments and " +
                     inserts + " tracks with something inserted");
+
+                Census();
             }
 
             if (_voices.Count == 0 && _instrumentCount == 0 && _preview == null && _insertCount == 0)
@@ -631,35 +776,18 @@ public sealed class SynthMixer
 
             try
             {
-                if (Diagnostics.Log.IsOn)
-                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                        $"Track {track} instrument {instrument.GetType().Name} - rendering");
-
                 instrument.Render(bus, frames);
-
-                if (Diagnostics.Log.IsOn)
-                {
-                    bool hasAudio = false;
-                    for (int i = 0; i < samples; i++)
-                    {
-                        if (Math.Abs(bus[i]) > 0.0001f)
-                        {
-                            hasAudio = true;
-                            break;
-                        }
-                    }
-                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                        $"Track {track} instrument output: {(hasAudio ? "has audio" : "silent")}");
-                }
             }
-            catch (Exception ex)
+            catch (Exception error)
             {
                 // A managed fault in a plugin costs that block, not the audio thread.
-                if (Diagnostics.Log.IsOn)
-                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                        $"Track {track} instrument error: {ex.Message}");
+                _census[track].Note(error.Message);
                 Array.Clear(bus, 0, samples);
             }
+
+            // Only when somebody is reading. Scanning the block to see how loud it came out is
+            // a pass over every sample on the audio thread, and off it must cost nothing.
+            if (Diagnostics.Log.IsOn) _census[track].Played(Peak(bus, samples), instrument);
 
             Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
         }
@@ -706,48 +834,21 @@ public sealed class SynthMixer
             var bus = _busses[track];
             if (bus == null) continue;
 
-            bool hasSoundBefore = false;
-            if (Diagnostics.Log.IsOn)
-            {
-                int samples = frames * 2;
-                for (int i = 0; i < samples; i++)
-                {
-                    if (Math.Abs(bus[i]) > 0.0001f)
-                    {
-                        hasSoundBefore = true;
-                        break;
-                    }
-                }
-            }
+            bool watching = Diagnostics.Log.IsOn;
+            int samples = frames * 2;
+            float before = watching ? Peak(bus, samples) : 0f;
 
             try
             {
-                if (Diagnostics.Log.IsOn)
-                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                        $"Track {track} effect {insert.GetType().Name} - before: {(hasSoundBefore ? "has audio" : "silent")}");
-
                 insert.Process(bus, frames);
-
-                if (Diagnostics.Log.IsOn)
-                {
-                    bool hasSoundAfter = false;
-                    int samples = frames * 2;
-                    for (int i = 0; i < samples; i++)
-                    {
-                        if (Math.Abs(bus[i]) > 0.0001f)
-                        {
-                            hasSoundAfter = true;
-                            break;
-                        }
-                    }
-                    Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                        $"Track {track} effect {insert.GetType().Name} - after: {(hasSoundAfter ? "has audio" : "silent")}");
-                }
             }
-            catch (Exception)
+            catch (Exception error)
             {
                 // A managed fault in an insert costs that block, not the audio thread.
+                _census[track].Note(error.Message);
             }
+
+            if (watching) _census[track].Inserted(before, Peak(bus, samples), insert);
         }
     }
 
@@ -770,13 +871,6 @@ public sealed class SynthMixer
             }
         }
         _trackLevels[track] = peak;
-
-        if (Diagnostics.Log.IsOn && source != null)
-        {
-            bool hasAudio = peak > 0.0001f;
-            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
-                $"Mixing track {track}: {(hasAudio ? "has audio" : "silent")}");
-        }
 
         bool ducked = setting.Depth > 0
             && setting.Key >= 0
@@ -890,6 +984,44 @@ public sealed class SynthMixer
         }
 
         return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+    }
+
+    /// <summary>
+    /// One line a second per track that is doing anything, saying what came out of the plugin,
+    /// what went into the insert, what came out of it, and what the meter is being told.
+    /// </summary>
+    /// <remarks>
+    /// Everything a silent plugin could be is separable from this one line: a plugin that is
+    /// not being rendered has no blocks, one that is rendering silence has blocks and no peak,
+    /// one being turned down by the volume column has a peak and a level well below it, and one
+    /// whose insert is eating it has a peak going in and none coming out.
+    /// </remarks>
+    private void Census()
+    {
+        for (int track = 0; track < MaxTracks; track++)
+        {
+            if (!_census[track].Worth) continue;
+
+            var seen = _census[track];
+            _census[track].Clear();
+
+            int number = track;
+            float gain = _instrumentGain[number];
+            float pan = _instrumentPan[number];
+            float meter = _trackLevels[number];
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                "track " + number + ": " +
+                (seen.Instrument == null ? "no plugin playing it" :
+                    seen.Instrument + " played " + seen.Blocks + " blocks, peak " + seen.PlayedPeak.ToString("F4") +
+                    ", silent in " + seen.SilentBlocks + " of them") +
+                "; volume column " + gain.ToString("F2") + ", pan " + pan.ToString("F2") +
+                (seen.Insert == null ? "; nothing inserted" :
+                    "; " + seen.Insert + " was given " + seen.BeforeInsert.ToString("F4") +
+                    " and gave back " + seen.AfterInsert.ToString("F4")) +
+                "; the meter is being told " + meter.ToString("F4") +
+                (seen.Faults == 0 ? "" : "; " + seen.Faults + " faults, last was " + seen.Fault));
+        }
     }
 
     /// <summary>Drops finished voices. Called after rendering, off the note-on path.</summary>

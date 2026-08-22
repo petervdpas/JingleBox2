@@ -1,7 +1,9 @@
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace JingleBox2.Views;
 
@@ -21,6 +23,23 @@ public partial class PluginWindow : Window
     public PluginWindow()
     {
         InitializeComponent();
+
+        // XEMBED makes the embedder responsible for telling the plugin when its window is the
+        // one being used, every time, not once when it was handed over. Without these the
+        // plugin believes whatever it was told at attach, which after the first click on
+        // anything else is that it is not active: it carries on drawing from its own timers
+        // and ignores everything clicked on it.
+        Activated += (_, _) => TellPlugin(true);
+        Deactivated += (_, _) => TellPlugin(false);
+    }
+
+    /// <summary>Passes this window's activation to the plugin drawing inside it, if there is one.</summary>
+    private void TellPlugin(bool active)
+    {
+        foreach (var host in this.GetVisualDescendants().OfType<PluginEditorHost>())
+        {
+            host.WindowActivated(active);
+        }
     }
 
     /// <summary>Opens a device's window, or brings the one it already has to the front.</summary>

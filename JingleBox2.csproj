@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -78,4 +78,12 @@
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
   </Target>
+  <!-- The probe under scratchpad drives the internals directly, so it can be tested without
+       going through the whole application. Test-only; nothing ships against this. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>plugprobe</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

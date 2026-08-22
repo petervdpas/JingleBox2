@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.Audio.Plugins.Bridge;
 using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker;
@@ -57,7 +58,24 @@ public sealed class TrackerPlayer : IDisposable
     private float[] _noteGain = Array.Empty<float>();
     private float?[] _notePan = Array.Empty<float?>();
 
-    public TrackerPlayer(IAudioEngine audio) => _audio = audio;
+    public TrackerPlayer(IAudioEngine audio)
+    {
+        _audio = audio;
+
+        // A second is often enough to see a plugin come up, go busy or fall over, and slow
+        // enough that the watch costs nothing worth measuring. Its own timer, never the audio
+        // thread and never the drawing thread: writing a line of the log is a file opened and
+        // closed, and neither of those threads can afford to wait on a disk.
+        _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
+    }
+
+    /// <summary>How often the plugins are counted and their state written down.</summary>
+    private const int WatchMilliseconds = 1000;
+
+    private readonly System.Threading.Timer _watch;
+
+    /// <summary>What was said about each track last time, so a line is written when it changes.</summary>
+    private readonly Dictionary<int, string> _mustered = new();
 
     /// <summary>Raised from the clock thread. Marshal before touching UI.</summary>
     public event EventHandler<TrackerPosition>? PositionChanged;
@@ -345,6 +363,53 @@ public sealed class TrackerPlayer : IDisposable
     private readonly object _playerLock = new();
 
     /// <summary>
+    /// Moves a track to another position, live: the plugins loaded on it, the effects
+    /// inserted on it, and the levels its notes were last set to.
+    /// </summary>
+    /// <remarks>
+    /// The song has already been reordered by the time this is called. This is the running
+    /// half of the same move, and the two have to agree or the notes arrive at one track while
+    /// the sound answers on another.
+    /// </remarks>
+    public void MoveTrack(int from, int to)
+    {
+        if (from == to) return;
+        if (from < 0 || from >= _noteGain.Length || to < 0 || to >= _noteGain.Length) return;
+
+        lock (_playerLock)
+        {
+            // Rebuilt rather than edited in place: every key from the moved one onwards
+            // changes, so editing while walking it would trip over its own renumbering.
+            var moved = new Dictionary<int, (string Instrument, IPluginInstrument Plugin)>();
+
+            foreach (var (track, loaded) in _players)
+                moved[Song.WhereTrackWent(track, from, to)] = loaded;
+
+            _players.Clear();
+            foreach (var (track, loaded) in moved) _players[track] = loaded;
+        }
+
+        Shift(_noteGain, from, to);
+        Shift(_notePan, from, to);
+
+        _synth.Mixer.MoveTrack(from, to);
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+            "track " + from + " moved to " + to + ", with its plugin, its effects and its levels");
+    }
+
+    /// <summary>One track's worth of per-track state, moved the way the song moves it.</summary>
+    private static void Shift<T>(T[] values, int from, int to)
+    {
+        var moved = values[from];
+
+        int step = from < to ? 1 : -1;
+        for (int track = from; track != to; track += step) values[track] = values[track + step];
+
+        values[to] = moved;
+    }
+
+    /// <summary>
     /// Opens the audio engine if it is not already open. A plugin has to be built for the rate
     /// the engine settled on, and until the device is open there is no rate to build for.
     /// </summary>
@@ -624,7 +689,12 @@ public sealed class TrackerPlayer : IDisposable
     private void Trigger(TrackerEvent e, Song song)
     {
         var instrument = song.InstrumentAt(e.Instrument);
-        if (instrument == null) return;
+
+        if (instrument == null)
+        {
+            Where(e.Track, e.Instrument, null, song, "there is no such instrument in the song");
+            return;
+        }
 
         var (gain, pan) = LevelsFor(e, instrument);
 
@@ -643,7 +713,12 @@ public sealed class TrackerPlayer : IDisposable
 
             if (PlayerFor(e.Track, instrument) != null)
             {
+                Where(e.Track, e.Instrument, instrument, song, "sent to its plugin");
                 _synth.Mixer.PluginNoteOn(e.Track, e.Note, mixed, placed ?? 0f);
+            }
+            else
+            {
+                Where(e.Track, e.Instrument, instrument, song, "its plugin would not load, so nothing was played");
             }
 
             return;
@@ -651,6 +726,7 @@ public sealed class TrackerPlayer : IDisposable
 
         if (instrument.IsSynth)
         {
+            Where(e.Track, e.Instrument, instrument, song, "played as a synth voice");
             _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f);
             return;
         }
@@ -658,11 +734,69 @@ public sealed class TrackerPlayer : IDisposable
         var sample = _samples.Load(instrument.FilePath);
         if (sample == null)
         {
+            Where(e.Track, e.Instrument, instrument, song, "its recording would not load, so nothing was played");
             _synth.Mixer.NoteOff(e.Track);
             return;
         }
 
+        Where(e.Track, e.Instrument, instrument, song, "played as a recording");
         _synth.Mixer.NoteOn(e.Track, instrument, sample, e.Note, mixed, placed ?? 0f);
+    }
+
+    /// <summary>What the last note on each track was addressed to, so it is said once a second.</summary>
+    private readonly int[] _lastAddressed = new int[Song.MaxTrackCount];
+    private readonly string[] _lastWent = new string[Song.MaxTrackCount];
+    private readonly int[] _triggers = new int[Song.MaxTrackCount];
+    private long _toldWhere;
+
+    /// <summary>
+    /// Where a track's notes are actually going, and what that track's own instrument is.
+    /// </summary>
+    /// <remarks>
+    /// A cell names the instrument it wants, and a track separately has one bound to it. The
+    /// two can drift apart: putting an instrument on a track takes it off whatever track it
+    /// was on, and nothing rewrites the cells that were already typed. When they disagree the
+    /// notes go to the instrument the cells name and the track's own instrument is never
+    /// played, which sounds exactly like a plugin that has stopped working. So the line says
+    /// both, and says so plainly when they are not the same.
+    /// </remarks>
+    private void Where(int track, int addressed, TrackerInstrument? instrument, Song song, string went)
+    {
+        if (!Diagnostics.Log.IsOn || track < 0 || track >= _lastAddressed.Length) return;
+
+        _lastAddressed[track] = addressed;
+        _lastWent[track] = went;
+        _triggers[track]++;
+
+        long now = Environment.TickCount64;
+        if (now - _toldWhere < 1000) return;
+
+        _toldWhere = now;
+
+        for (int line = 0; line < _lastAddressed.Length; line++)
+        {
+            if (_triggers[line] == 0) continue;
+
+            int number = line;
+            int wanted = _lastAddressed[line];
+            string ending = _lastWent[line];
+            int count = _triggers[line];
+
+            _triggers[line] = 0;
+
+            int bound = song.TrackInstruments.Count > number ? song.TrackInstruments[number] : -1;
+            var boundTo = bound >= 0 ? song.InstrumentAt(bound) : null;
+            var wantedTo = number == track ? instrument : song.InstrumentAt(wanted);
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+                "track " + number + ": " + count + " notes in the last second, the last one asking for " +
+                "instrument " + wanted.ToString("00") + " (" + (wantedTo?.Name ?? "none") + "), " + ending +
+                "; this track's own instrument is " +
+                (bound < 0 ? "none" : bound.ToString("00") + " (" + (boundTo?.Name ?? "none") + ")") +
+                (bound >= 0 && bound != wanted
+                    ? "  <-- THE CELLS AND THE TRACK DISAGREE, so " + (boundTo?.Name ?? "it") + " is never played"
+                    : ""));
+        }
     }
 
     private void Adjust(TrackerEvent e, Song song)
@@ -744,8 +878,120 @@ public sealed class TrackerPlayer : IDisposable
 
     public void Dispose()
     {
+        _watch.Dispose();
+
         Stop();
         _samples.Clear();
         _synth.Dispose();
+    }
+
+    /// <summary>
+    /// Every track's plugins: which process each one really is, and whether it is still up.
+    /// </summary>
+    /// <remarks>
+    /// The point of a plugin having a process of its own is that nothing it does can reach
+    /// another track. That is a claim, and this is what checks it. Two tracks reporting the
+    /// same process are not isolated, whatever the design says, and a plugin that has stopped
+    /// is named here rather than being noticed later as a track that went quiet.
+    ///
+    /// Written only when something changes. A line a second per track is a log nobody reads;
+    /// a line when a plugin appears, stops or changes process is a log that says what happened
+    /// and when.
+    /// </remarks>
+    private void Muster()
+    {
+        if (!Diagnostics.Log.IsOn) return;
+
+        try
+        {
+            var processes = new Dictionary<int, string>();
+            var seen = new List<int>();
+
+            // Every track a song can have, not the length of the levels array: that one is
+            // empty until a song is loaded, and a plugin can be put on a track before then.
+            for (int track = 0; track < Song.MaxTrackCount; track++)
+            {
+                string account = Account(track, processes);
+                seen.Add(track);
+
+                if (_mustered.TryGetValue(track, out string? said) && said == account) continue;
+
+                _mustered[track] = account;
+
+                if (account.Length == 0) continue;
+
+                int number = track;
+                Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "track " + number + " holds " + account);
+            }
+
+            // Two tracks in one process would mean the isolation is not there at all.
+            foreach (var pair in processes)
+            {
+                if (!pair.Value.Contains(','.ToString())) continue;
+
+                var shared = pair;
+                Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                    "process " + shared.Key + " is serving " + shared.Value +
+                    "  <-- THESE ARE NOT ISOLATED FROM EACH OTHER");
+            }
+        }
+        catch (Exception)
+        {
+            // A watch that throws is not worth taking anything down for.
+        }
+    }
+
+    /// <summary>What one track is holding, in a line, or nothing when it holds no plugin.</summary>
+    private string Account(int track, Dictionary<int, string> processes)
+    {
+        IPluginInstrument? player;
+        lock (_playerLock) player = _players.TryGetValue(track, out var found) ? found.Plugin : null;
+
+        var chain = _synth.HasMixer ? _synth.Mixer.InsertOn(track) as PluginChain : null;
+
+        if (player == null && (chain == null || chain.Count == 0)) return "";
+
+        var line = new System.Text.StringBuilder();
+
+        if (player != null) line.Append(Describe(player, track, processes));
+
+        if (chain != null && chain.Count > 0)
+        {
+            if (line.Length > 0) line.Append("; ");
+
+            line.Append("chain of ").Append(chain.Count).Append(": ");
+
+            bool first = true;
+            foreach (var device in chain.Devices)
+            {
+                if (!first) line.Append(", ");
+                first = false;
+
+                line.Append(Describe(device.Insert, track, processes));
+                if (device.Bypassed) line.Append(" (bypassed)");
+            }
+        }
+
+        return line.ToString();
+    }
+
+    /// <summary>One plugin: what it is, which process it really is, and whether it is up.</summary>
+    private static string Describe(object plugin, int track, Dictionary<int, string> processes)
+    {
+        if (plugin is not BridgedPlugin bridged)
+            return plugin.GetType().Name + " in this process";
+
+        int id = bridged.ProcessId;
+
+        if (id > 0)
+        {
+            processes[id] = processes.TryGetValue(id, out string? already)
+                ? already + ", track " + track
+                : "track " + track;
+        }
+
+        return bridged.Info.Name + " in process " + id +
+            (bridged.IsActive ? "" : ", STOPPED" +
+                (bridged.StoppedNote.Length == 0 ? "" : ": " + bridged.StoppedNote));
     }
 }

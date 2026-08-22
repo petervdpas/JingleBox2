@@ -73,6 +73,36 @@ public sealed class Pattern
             this[line, track] = TrackerCell.Empty;
     }
 
+    /// <summary>
+    /// Takes a track out of where it is and puts it back in at another position, sliding the
+    /// tracks it passes over to fill the gap.
+    /// </summary>
+    /// <remarks>
+    /// A move, not a swap. Dragging track four in front of track one should leave the others
+    /// in the order they were, one place along, which is what somebody dragging a column
+    /// expects and what a swap does not do.
+    /// </remarks>
+    public void MoveTrack(int from, int to)
+    {
+        if (from == to) return;
+        if (from < 0 || from >= TrackCount || to < 0 || to >= TrackCount) return;
+
+        var column = new TrackerCell[Lines];
+        for (int line = 0; line < Lines; line++) column[line] = _cells[line * TrackCount + from];
+
+        int step = from < to ? 1 : -1;
+
+        for (int track = from; track != to; track += step)
+        {
+            for (int line = 0; line < Lines; line++)
+                _cells[line * TrackCount + track] = _cells[line * TrackCount + track + step];
+        }
+
+        for (int line = 0; line < Lines; line++) _cells[line * TrackCount + to] = column[line];
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     /// <summary>The cells of one step, left to right. Used by the player, one call per line.</summary>
     public IEnumerable<TrackerCell> Row(int line)
     {

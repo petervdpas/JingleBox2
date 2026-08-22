@@ -92,7 +92,9 @@ internal static unsafe class XEmbed
 
     private const long EmbeddedNotify = 0;
     private const long WindowActivate = 1;
+    private const long WindowDeactivate = 2;
     private const long FocusIn = 4;
+    private const long FocusOut = 5;
 
     private const int FocusCurrent = 0;
 
@@ -216,6 +218,71 @@ internal static unsafe class XEmbed
         catch (Exception error)
         {
             return "could not reach the display: " + error.Message;
+        }
+        finally
+        {
+            if (display != 0)
+            {
+                try { XFlush(display); XCloseDisplay(display); } catch (Exception) { }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tells whatever is embedded in a window that the window has become active, or has
+    /// stopped being active.
+    /// </summary>
+    /// <remarks>
+    /// The handshake at attach says this once, and once is not enough. XEMBED puts the
+    /// embedder in charge of saying when the client is active and when it has the focus, and
+    /// expects it to keep saying so: told it is active, told when it is not, told again the
+    /// next time it is. A client that hears it once and never again believes what it heard
+    /// last, which after the first click on anything else is that it is not active. It goes on
+    /// drawing, because its own timers keep running, and it ignores what is clicked on it,
+    /// because as far as it knows the window it sits in is not the one being used. That is a
+    /// plugin whose interface has become a picture.
+    ///
+    /// The order is the protocol's. Going in, the window is active before anything inside it
+    /// has the focus; coming out, the focus goes before the window does.
+    /// </remarks>
+    public static void Activated(nint parent, bool active)
+    {
+        if (parent == 0 || !OperatingSystem.IsLinux()) return;
+
+        nint display = 0;
+
+        try
+        {
+            display = XOpenDisplay(0);
+            if (display == 0) return;
+
+            if (XQueryTree(display, parent, out _, out _, out nint* children, out uint count) == 0 || children == null)
+                return;
+
+            nint embed = XInternAtom(display, "_XEMBED", 0);
+
+            for (uint index = 0; index < count; index++)
+            {
+                nint child = children[index];
+
+                if (active)
+                {
+                    Tell(display, child, embed, WindowActivate, 0, 0, 0);
+                    Tell(display, child, embed, FocusIn, FocusCurrent, 0, 0);
+                }
+                else
+                {
+                    Tell(display, child, embed, FocusOut, 0, 0, 0);
+                    Tell(display, child, embed, WindowDeactivate, 0, 0, 0);
+                }
+            }
+
+            XFree(children);
+            XSync(display, 0);
+        }
+        catch (Exception)
+        {
+            // No X to talk to is not a reason to take a window down.
         }
         finally
         {
