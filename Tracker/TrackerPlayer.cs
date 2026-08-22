@@ -254,6 +254,13 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
+        if (instrument.IsOuroboros)
+        {
+            _synth.Mixer.Preview(instrument.Ouroboros ?? new Synth.OuroborosPatch(),
+                note, level, PreviewHoldSeconds);
+            return;
+        }
+
         if (instrument.IsSynth)
         {
             _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds);
@@ -721,6 +728,14 @@ public sealed class TrackerPlayer : IDisposable
                 Where(e.Track, e.Instrument, instrument, song, "its plugin would not load, so nothing was played");
             }
 
+            return;
+        }
+
+        if (instrument.IsOuroboros)
+        {
+            Where(e.Track, e.Instrument, instrument, song, "played on Ouroboros");
+            _synth.Mixer.NoteOn(e.Track, instrument.Ouroboros ?? new Synth.OuroborosPatch(),
+                e.Note, mixed, placed ?? 0f);
             return;
         }
 

@@ -22,15 +22,43 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     private readonly TrackerInstrument _instrument;
     private readonly Func<IPluginInstrument?> _live;
     private readonly Action? _changed;
+    private readonly Func<TrackInstrumentDesigner>? _designer;
 
     private IPluginInstrument? _plugin;
 
-    public PluginInstrumentViewModel(TrackerInstrument instrument, Func<IPluginInstrument?> live, Action? changed = null)
+    public PluginInstrumentViewModel(
+        TrackerInstrument instrument,
+        Func<IPluginInstrument?> live,
+        Action? changed = null,
+        Func<TrackInstrumentDesigner>? designer = null)
     {
         _instrument = instrument;
         _live = live;
         _changed = changed;
+        _designer = designer;
     }
+
+    /// <summary>
+    /// True when the sound is a plugin's, false when it is one of ours.
+    /// </summary>
+    /// <remarks>
+    /// The box in the strip is the same either way, because to a track they are the same thing:
+    /// the machine at the head of the row that makes the sound. Only what opens differs, the
+    /// plugin's own window or our designer.
+    /// </remarks>
+    public bool IsPlugin => _instrument.IsPlugin;
+
+    /// <summary>
+    /// The designer for an instrument of ours, built the first time somebody opens it.
+    /// </summary>
+    /// <remarks>
+    /// Kept rather than made afresh, so coming back to a track shows the panel as it was left
+    /// and does not build a second editor over the same instrument.
+    /// </remarks>
+    public TrackInstrumentDesigner? Designer =>
+        IsPlugin ? null : _built ??= _designer?.Invoke();
+
+    private TrackInstrumentDesigner? _built;
 
     public string Name => _instrument.Name;
 
@@ -98,6 +126,19 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         if (patch == null || patch.Length == 0) return;
 
         _instrument.StateBytes = patch;
+    }
+
+    /// <summary>
+    /// Lets go of this box for good, for a track that has been given a different instrument.
+    /// </summary>
+    /// <remarks>
+    /// Not the same as closing the window. A designer watches the tracker so it can show where
+    /// its track is, and a box nobody can reach any more must stop watching or it never stops.
+    /// </remarks>
+    public void Discard()
+    {
+        Close();
+        _built?.Close();
     }
 
     /// <summary>Puts the plugin's window away. The plugin carries on playing.</summary>

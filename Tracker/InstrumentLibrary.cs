@@ -2,19 +2,25 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Tracker.Synth;
 using System.Text.Json;
 
 namespace JingleBox2.Tracker;
 
 /// <summary>
-/// The instruments you own, kept outside any song so the same voice can play in all of them.
-/// One file per instrument, named by its id: renaming an instrument then costs nothing and
-/// breaks no song that uses it.
+/// The instruments you own, kept outside any song: where a sound starts. One file per
+/// instrument, named by its id, so renaming one costs nothing and breaks no song.
 /// </summary>
 /// <remarks>
-/// A song stores a copy of every instrument it uses, and rebinds those copies to the library
-/// by id when it opens. That way an edit here reaches every song, and a song handed to someone
-/// without your library still plays.
+/// Taking an instrument into a song copies it, and from then on the copy is the song's. Editing
+/// it there changes that song and nothing else, and editing the one here changes what the next
+/// song will start from. Two songs can therefore use the same kick sounding differently, which
+/// is what anyone who has built a kick for one track and not for another expects.
+///
+/// A synth or a plugin travels inside the song that way, patch and all. A recording does not:
+/// the instrument keeps the path it was made from and the audio stays where it is, so a song
+/// moved to another machine finds a sample instrument pointing at nothing. Making an instrument
+/// hold its own recordings is what would finish this, and it has not been done.
 /// </remarks>
 public sealed class InstrumentLibrary : ISampleUsage
 {
@@ -29,6 +35,93 @@ public sealed class InstrumentLibrary : ISampleUsage
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         InstrumentsDirectory = Path.Combine(baseDir, appName, "instruments");
         Directory.CreateDirectory(InstrumentsDirectory);
+
+        Seed();
+    }
+
+    /// <summary>
+    /// Puts a handful of sounds on the shelf the first time there is nothing on it.
+    /// </summary>
+    /// <remarks>
+    /// An empty library is a wall with no answer to "what do I start from". These are six
+    /// ordinary starting points, not presets: once one is in the library it is an instrument
+    /// like any other, to be renamed, rebuilt or thrown away. Only ever written when the shelf
+    /// is bare, so deleting one keeps it deleted.
+    /// </remarks>
+    private void Seed()
+    {
+        try
+        {
+            if (Directory.EnumerateFiles(InstrumentsDirectory, "*" + Extension).Any()) return;
+
+            foreach (var instrument in Starters()) Save(instrument);
+        }
+        catch (Exception)
+        {
+            // A shelf that could not be stocked is an empty shelf, not a failure to start.
+        }
+    }
+
+    /// <summary>
+    /// The sounds a fresh library is stocked with: a drum kit's worth and two to play.
+    /// </summary>
+    /// <remarks>
+    /// Written out as instruments rather than kept as a separate kind of thing. A sound you
+    /// start from and a sound you own turned out to be the same object once a song stopped
+    /// taking its instruments from here and started keeping its own.
+    /// </remarks>
+    public static IReadOnlyList<TrackerInstrument> Starters() => new List<TrackerInstrument>
+    {
+        Starter("Kick", new SynthPatch
+        {
+            Wave = SynthWave.Sine,
+            AttackMs = 0, DecayMs = 150, Sustain = 0, ReleaseMs = 40,
+            PitchEnvSemitones = 30, PitchEnvMs = 55
+        }),
+        Starter("Hihat", new SynthPatch
+        {
+            Wave = SynthWave.Noise,
+            AttackMs = 0, DecayMs = 35, Sustain = 0, ReleaseMs = 12
+        }),
+        Starter("Snare", new SynthPatch
+        {
+            Wave = SynthWave.Noise,
+            AttackMs = 0, DecayMs = 130, Sustain = 0, ReleaseMs = 20,
+            PitchEnvSemitones = 8, PitchEnvMs = 35
+        }),
+        Starter("Bass", new SynthPatch
+        {
+            Wave = SynthWave.Square,
+            AttackMs = 0, DecayMs = 160, Sustain = 0.82, ReleaseMs = 70,
+            PitchEnvSemitones = 5, PitchEnvMs = 30
+        }),
+        Starter("Lead", new SynthPatch
+        {
+            Wave = SynthWave.Pulse, Duty = 0.5,
+            AttackMs = 4, DecayMs = 70, Sustain = 0.55, ReleaseMs = 90,
+            VibratoRateHz = 5, VibratoDepthCents = 18
+        }),
+        Starter("Pad", new SynthPatch
+        {
+            Wave = SynthWave.Saw,
+            AttackMs = 220, DecayMs = 300, Sustain = 0.7, ReleaseMs = 450,
+            VibratoRateHz = 3, VibratoDepthCents = 8
+        })
+    };
+
+    private static TrackerInstrument Starter(string name, SynthPatch patch)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Synth,
+            Patch = patch
+        };
+
+        instrument.EnsureId();
+        instrument.EnsureShape();
+
+        return instrument;
     }
 
     public string PathFor(string id) => Path.Combine(InstrumentsDirectory, id + Extension);
@@ -82,46 +175,6 @@ public sealed class InstrumentLibrary : ISampleUsage
         return true;
     }
 
-    /// <summary>
-    /// Points a song's instruments back at the library. Each slot keeps its number, so the
-    /// pattern cells still refer to the same thing, and everything the library knows about the
-    /// instrument is brought up to date: its name, its recording, its synth patch.
-    /// Slots whose instrument is no longer in the library keep the copy the song was saved with.
-    /// </summary>
-    /// <remarks>
-    /// A plugin's own patch is the exception, and it stays with the song. A song is the
-    /// arrangement and the sounds it was written with, and a plugin patch is the sound: two
-    /// songs are entitled to use the same Serum on different presets, and opening one is not
-    /// an occasion to give it whichever preset another song happened to leave in the library.
-    ///
-    /// The song's patch wins only when it has one. A slot saved before it had a patch, or one
-    /// whose plugin was never opened, takes the library's rather than coming up empty.
-    /// </remarks>
-    public int Rebind(Song song)
-    {
-        if (song is null) return 0;
-
-        int rebound = 0;
-
-        foreach (var slot in song.Instruments)
-        {
-            if (string.IsNullOrWhiteSpace(slot.Id)) continue;
-
-            var current = Load(slot.Id);
-            if (current == null) continue;
-
-            string patch = slot.PluginState;
-
-            slot.CopyFrom(current);
-
-            if (!string.IsNullOrWhiteSpace(patch)) slot.PluginState = patch;
-
-            rebound++;
-        }
-
-        return rebound;
-    }
-
     private static TrackerInstrument? Read(string path)
     {
         try
@@ -132,7 +185,7 @@ public sealed class InstrumentLibrary : ISampleUsage
             if (instrument == null) return null;
 
             instrument.EnsureId();
-            instrument.Patch ??= new Synth.SynthPatch();
+            instrument.Patch ??= new SynthPatch();
             instrument.Patch.Clamp();
             instrument.EnsureShape();
 

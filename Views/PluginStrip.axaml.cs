@@ -46,6 +46,19 @@ public partial class PluginStrip : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
+        // An instrument of ours opens the designer; a plugin opens its own interface. The box
+        // is the same box either way, because to the track they are the same thing.
+        if (!instrument.IsPlugin)
+        {
+            var designer = instrument.Designer;
+            if (designer == null) return;
+
+            instrument.IsOpen = true;
+
+            InstrumentWindow.Show(instrument, designer, owner, () => instrument.IsOpen = false);
+            return;
+        }
+
         var panel = instrument.Prepare();
         if (panel == null) return;
 

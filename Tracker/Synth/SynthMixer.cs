@@ -464,15 +464,50 @@ public sealed class SynthMixer
 
         lock (_lock)
         {
+            Cut(track);
+            Add(voice);
+        }
+    }
+
+    /// <summary>
+    /// Starts a note on Ouroboros, sliding from whatever the track was sounding.
+    /// </summary>
+    /// <remarks>
+    /// The note before is what glide glides from, and this is the only place that knows what
+    /// it was. Read before the old voice is cut, because cutting it is what makes it stop
+    /// being the note before.
+    /// </remarks>
+    public void NoteOn(int track, OuroborosPatch patch, Note note, float gain, float pan)
+    {
+        if (patch is null || !note.IsPlayable) return;
+
+        lock (_lock)
+        {
+            double? from = null;
+
             if (track >= 0)
             {
                 foreach (var playing in _voices)
                 {
-                    if (playing.Track == track) playing.Cut();
+                    if (playing.Track == track && !playing.IsFinished && playing is OuroborosVoice last)
+                        from = last.Hz;
                 }
             }
 
-            Add(voice);
+            Cut(track);
+
+            Add(new OuroborosVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from));
+        }
+    }
+
+    /// <summary>Lets go of whatever a track was sounding. Held under the lock by its callers.</summary>
+    private void Cut(int track)
+    {
+        if (track < 0) return;
+
+        foreach (var playing in _voices)
+        {
+            if (playing.Track == track) playing.Cut();
         }
     }
 
@@ -482,6 +517,23 @@ public sealed class SynthMixer
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new SynthVoice(patch, note, SynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed());
+        voice.HoldFor(holdSeconds);
+
+        lock (_lock) Add(voice);
+    }
+
+    /// <summary>The same, on Ouroboros, for a note played while building the sound.</summary>
+    /// <remarks>
+    /// No glide: an audition has no note before it to slide from. It belongs to no track
+    /// either, so it piles up with the other auditions rather than cutting one.
+    /// </remarks>
+    public void Preview(OuroborosPatch patch, Note note, float gain, double holdSeconds)
+    {
+        if (patch is null || !note.IsPlayable) return;
+
+        var voice = new OuroborosVoice(
+            patch, note, OuroborosVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null);
+
         voice.HoldFor(holdSeconds);
 
         lock (_lock) Add(voice);

@@ -64,8 +64,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
-- `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Songs store a copy of each instrument they use and rebind it by id on load
-- `SynthPresetStore` (Tracker/Synth/): Preset bank in `%APPDATA%/JingleBox2/presets/`, with built-in starters. A preset is where a new instrument starts
+- `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Where a sound starts: taking one into a song copies it, and the copy is then the song's own. Editing it in the song changes that song alone. A synth or plugin patch travels inside the song; a recording does not, since the instrument keeps only the path to it
 - `Knob` / `Fader` / `NumberField` (Views/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field
 - `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
@@ -82,8 +81,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   generated at playback time (the parameter set mirrors MappoGraph's chiptune synth, plus a
   drive control). The
   tracker only ever loads instruments; whether one is a sample or a synth is its own business
-- Three places things are stored, on purpose: presets (a starting sound), instruments (a voice
-  you own, shared by every song), and songs (patterns plus the instruments they use)
+- Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
+  new one starts) and songs (patterns plus their own copies of the instruments they use). There
+  was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
+  you start from and a sound you own turned out to be the same object. A fresh library seeds
+  itself with six starters, and from then on they are ordinary instruments
 - The audio engine runs whenever a track has a chain, not only while something is playing. A
   plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
   and cannot tell the host what its own window did. `SynthMixer` therefore does not rest while

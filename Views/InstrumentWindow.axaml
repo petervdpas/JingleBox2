@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.Views.InstrumentWindow"
+        x:DataType="vm:TrackInstrumentDesigner"
+        Title="{Binding Title}"
+        SizeToContent="WidthAndHeight"
+        MinWidth="480"
+        MaxWidth="1100"
+        MaxHeight="820"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- The same panel the INSTRUMENTS tab shows, over this track's own instrument. A machine's
+       front panel, in the rack it is standing in. -->
+  <DockPanel Margin="14">
+    <Border DockPanel.Dock="Top" Classes="inset" Padding="8,5" Margin="0,0,0,12">
+      <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Title}" />
+    </Border>
+
+    <views:InstrumentEditor />
+  </DockPanel>
+</Window>

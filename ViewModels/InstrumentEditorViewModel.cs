@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
+using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
 using System;
 using System.Globalization;
@@ -43,6 +44,14 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         // Both kinds run through the same voice now, so both have a patch to edit: a sample
         // has an envelope, a filter and modulation exactly as a generated wave does. Only the
         // oscillator half of it is meaningless for a recording, and the page hides that.
+        // The machine decides which patch there is to edit. Ouroboros keeps its own; every
+        // other kind of ours plays from the older one.
+        if (instrument.IsOuroboros)
+        {
+            instrument.Ouroboros ??= new OuroborosPatch();
+            Ouroboros = new OuroborosPatchViewModel(instrument.Ouroboros, changed);
+        }
+
         Patch = new SynthPatchViewModel(instrument.Patch, changed);
 
         if (instrument.IsSynth) return;
@@ -58,11 +67,28 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>The voice settings, which both kinds of instrument have.</summary>
     public SynthPatchViewModel? Patch { get; }
 
+    /// <summary>Ouroboros's own patch, when that is the machine. Null on every other.</summary>
+    public OuroborosPatchViewModel? Ouroboros { get; }
+
+    /// <summary>What the machine is called, so the panel can say which one this is.</summary>
+    public string MachineName => _instrument.Machine.Name;
+
+    public bool IsOuroboros => _instrument.IsOuroboros;
+
+    /// <summary>
+    /// True for the machines that share the older voice: a recording and the older synth.
+    /// </summary>
+    /// <remarks>
+    /// A plugin does its own envelope and filter, and Ouroboros brings its own panel, so
+    /// neither shows the shared one. Without this both panels are drawn at once.
+    /// </remarks>
+    public bool HasCommonVoice => !IsPlugin && !IsOuroboros;
+
     public bool IsSynth => _instrument.IsSynth;
 
     public bool IsPlugin => _instrument.IsPlugin;
 
-    public bool IsSample => !IsSynth && !IsPlugin;
+    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }

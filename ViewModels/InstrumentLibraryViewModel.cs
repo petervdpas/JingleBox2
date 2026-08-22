@@ -22,13 +22,12 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class InstrumentLibraryViewModel : ObservableObject
+public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInstrumentDesigner
 {
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
 
     private readonly InstrumentLibrary _library;
-    private readonly SynthPresetStore _presets = new();
     private readonly IInstrumentAudition _audition;
     private readonly ObservableCollection<Recording> _recordings;
 
@@ -69,7 +68,6 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         _saveTimer.Tick += (_, _) => Flush();
 
         Refresh();
-        RefreshPresets();
     }
 
     /// <summary>Raised after an instrument's sound changes, so open songs can follow it.</summary>
@@ -80,18 +78,11 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
 
     public ObservableCollection<LibraryInstrument> Instruments { get; } = new();
 
-    public ObservableCollection<SynthPreset> Presets { get; } = new();
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasInstruments))]
     private LibraryInstrument? selected;
 
     [ObservableProperty] private InstrumentEditorViewModel? editor;
-
-    [ObservableProperty] private SynthPreset? selectedPreset;
-
-    /// <summary>The name Save as preset writes under. Typed, not taken from the instrument.</summary>
-    [ObservableProperty] private string presetName = "";
 
     [ObservableProperty] private int octave = 4;
 
@@ -120,15 +111,22 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
     /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
     public ObservableCollection<Recording> AvailableRecordings => _recordings;
 
-    public IRelayCommand NewFromPresetCommand => new RelayCommand(NewFromPreset);
+    public IRelayCommand NewSynthCommand => new RelayCommand(NewSynth);
     public IRelayCommand<Recording> NewFromRecordingCommand => new RelayCommand<Recording>(NewFromRecording);
     public IRelayCommand DuplicateCommand => new RelayCommand(Duplicate);
     public IAsyncRelayCommand DeleteCommand => new AsyncRelayCommand(Delete);
     public IRelayCommand TestCommand => new RelayCommand(Test);
-    public IRelayCommand ApplyPresetCommand => new RelayCommand(ApplyPreset);
-    public IRelayCommand SaveAsPresetCommand => new RelayCommand(SaveAsPreset);
-    public IAsyncRelayCommand DeletePresetCommand => new AsyncRelayCommand(DeletePreset);
-    public IRelayCommand ResetPresetsCommand => new RelayCommand(ResetPresets);
+
+    public IRelayCommand OctaveDownCommand => new RelayCommand(() => Octave = Math.Max(0, Octave - 1));
+
+    public IRelayCommand OctaveUpCommand => new RelayCommand(() => Octave = Math.Min(9, Octave + 1));
+
+    /// <summary>
+    /// Nothing is playing this instrument here, so the lamps are shown but have nothing to say.
+    /// </summary>
+    public TrackLocationViewModel? Location { get; } = new(null);
+
+    public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>Reads the library back off disk, keeping the selection where it can.</summary>
     public void Refresh()
@@ -203,8 +201,6 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         Editor = value == null
             ? null
             : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition);
-
-        if (value?.Instrument.IsSynth == true) PresetName = value.Name;
     }
 
     partial void OnIsEditingChanged(bool value)
@@ -228,14 +224,26 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
         _saveTimer.Start();
     }
 
-    private void NewFromPreset()
+    /// <summary>
+    /// A new instrument on the picked machine, ready to shape.
+    /// </summary>
+    /// <remarks>
+    /// Starting from a sound you already have is what Duplicate is for. There is no third kind
+    /// of thing to start from: the library is the shelf of starting points, and every sound on
+    /// it is an instrument like any other.
+    /// </remarks>
+    private void NewSynth()
     {
-        // No preset picked is a fair way to ask for a plain one.
-        var patch = SelectedPreset?.Patch ?? new SynthPatch();
-        string baseName = SelectedPreset?.Name ?? "synth";
+        var machine = SelectedMachine ?? Machine.Ouroboros;
 
-        Add(TrackerInstrument.CreateSynth(UniqueName(baseName), patch));
+        Add(TrackerInstrument.CreateOn(machine, UniqueName(machine.Name)));
     }
+
+    /// <summary>The machines a new instrument can be built on. A plugin is picked separately.</summary>
+    public System.Collections.Generic.IReadOnlyList<Machine> Machines { get; } = Machine.Ours;
+
+    /// <summary>Which machine + New builds on.</summary>
+    [ObservableProperty] private Machine? selectedMachine = Machine.Ouroboros;
 
     /// <summary>
     /// The plugins that can be an instrument here: the ones that take notes, in a format this
@@ -362,130 +370,6 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject
 
         PlayNote(Note.FromOctave(0, Octave));
         Status = $"Testing '{instrument.Name}'";
-    }
-
-    private void RefreshPresets()
-    {
-        string? keep = SelectedPreset?.Name;
-
-        Presets.Clear();
-        foreach (var preset in _presets.List())
-            Presets.Add(preset);
-
-        SelectedPreset = Presets.FirstOrDefault(p => p.Name == keep);
-    }
-
-    /// <summary>Drops a preset's sound onto the instrument that is already open.</summary>
-    private void ApplyPreset()
-    {
-        var preset = SelectedPreset;
-        var instrument = Selected?.Instrument;
-
-        if (preset == null || instrument == null || !instrument.IsSynth)
-        {
-            Status = "Pick a synth instrument and a preset first.";
-            return;
-        }
-
-        instrument.Patch = preset.Patch.Clone();
-
-        // The editor holds a view model over the old patch object, so it is rebuilt.
-        OnSelectedChanged(Selected);
-        OnInstrumentEdited();
-
-        PresetName = preset.Name;
-        Status = $"'{instrument.Name}' now sounds like preset '{preset.Name}'";
-    }
-
-    private void SaveAsPreset()
-    {
-        var instrument = Selected?.Instrument;
-        if (instrument == null || !instrument.IsSynth)
-        {
-            Status = "Only a synth instrument can be saved as a preset.";
-            return;
-        }
-
-        string typed = PresetName?.Trim() ?? "";
-        if (typed.Length == 0)
-        {
-            Status = "Give the preset a name before saving it.";
-            return;
-        }
-
-        try
-        {
-            // Punctuation and spaces are cleaned up, so say which name it actually went under.
-            string name = SynthPresetStore.SafeName(typed);
-            bool replaced = _presets.Exists(name);
-
-            _presets.Save(name, instrument.Patch);
-
-            RefreshPresets();
-            SelectedPreset = Presets.FirstOrDefault(p => p.Name == name);
-            PresetName = name;
-
-            Status = replaced ? $"Replaced preset '{name}'" : $"Saved preset '{name}'";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Preset save failed: {ex.Message}";
-        }
-    }
-
-    private async Task DeletePreset()
-    {
-        var preset = SelectedPreset;
-        if (preset == null) return;
-
-        // A starter with no file of its own has nothing to delete, so there is nothing to ask.
-        if (!_presets.Exists(preset.Name))
-        {
-            Status = $"'{preset.Name}' is a starter preset and cannot be deleted.";
-            return;
-        }
-
-        bool confirmed = await ConfirmDialog.AskAsync(
-            "Delete preset",
-            $"Delete the preset '{preset.Name}'? Instruments already built from it are left alone. "
-                + "This cannot be undone.",
-            "Delete");
-
-        if (!confirmed) return;
-
-        try
-        {
-            bool removed = _presets.Delete(preset.Name);
-            RefreshPresets();
-
-            // A starter comes straight back after its file goes, so say what actually happened
-            // rather than claiming it is gone.
-            bool stillListed = Presets.Any(p => string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
-
-            Status = stillListed
-                ? removed
-                    ? $"'{preset.Name}' is a starter preset, so it went back to the built-in version."
-                    : $"'{preset.Name}' is a starter preset and cannot be deleted."
-                : $"Deleted preset '{preset.Name}'";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Preset delete failed: {ex.Message}";
-        }
-    }
-
-    private void ResetPresets()
-    {
-        try
-        {
-            _presets.ResetStarters();
-            RefreshPresets();
-            Status = "Starter presets restored";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Preset reset failed: {ex.Message}";
-        }
     }
 
     /// <summary>A name nothing else in the library has, so two instruments never look alike.</summary>

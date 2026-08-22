@@ -13,7 +13,10 @@ public enum TrackerInstrumentKind
     Synth = 1,
 
     /// <summary>A plugin doing the playing: Serum, Vital, anything that takes notes.</summary>
-    Plugin = 2
+    Plugin = 2,
+
+    /// <summary>Ouroboros: one oscillator, a filter that sweeps, and glide between notes.</summary>
+    Ouroboros = 3
 }
 
 /// <summary>
@@ -81,6 +84,25 @@ public sealed class TrackerInstrument
     /// a song with the right knobs on the wrong sound.
     /// </remarks>
     public string PluginState { get; set; } = "";
+
+    /// <summary>
+    /// What Ouroboros plays from. Null on every other machine, and left out of the file there.
+    /// </summary>
+    /// <remarks>
+    /// Its own field rather than a wider version of the older patch. The two machines have
+    /// different panels and different parameters, and a single patch with everything on it
+    /// would be a shape neither of them fits, growing another set of fields for every machine
+    /// added after.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Synth.OuroborosPatch? Ouroboros { get; set; }
+
+    [JsonIgnore]
+    public bool IsOuroboros => Kind == TrackerInstrumentKind.Ouroboros;
+
+    /// <summary>Which machine this instrument is on, by name and description.</summary>
+    [JsonIgnore]
+    public Machine Machine => Machine.For(Kind);
 
     [JsonIgnore]
     public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
@@ -157,6 +179,27 @@ public sealed class TrackerInstrument
 
     /// <summary>A synth instrument with the starting patch, ready to be edited.</summary>
     public static TrackerInstrument CreateSynth(string name) => CreateSynth(name, new SynthPatch());
+
+    /// <summary>A new instrument on Ouroboros, with the machine's own patch ready to shape.</summary>
+    public static TrackerInstrument CreateOuroboros(string name)
+    {
+        var instrument = new TrackerInstrument
+        {
+            Name = name,
+            Kind = TrackerInstrumentKind.Ouroboros,
+            Ouroboros = new Synth.OuroborosPatch()
+        };
+
+        instrument.EnsureId();
+        return instrument;
+    }
+
+    /// <summary>A new instrument on whichever machine was asked for.</summary>
+    public static TrackerInstrument CreateOn(Machine machine, string name) => machine?.Kind switch
+    {
+        TrackerInstrumentKind.Ouroboros => CreateOuroboros(name),
+        _ => CreateSynth(name)
+    };
 
     /// <summary>A synth instrument built from a patch, which is how a preset starts a new one.</summary>
     public static TrackerInstrument CreateSynth(string name, SynthPatch patch)

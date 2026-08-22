@@ -14,9 +14,38 @@ namespace JingleBox2.Views;
 /// </remarks>
 public abstract class ThemedControl : Control
 {
+    /// <summary>
+    /// How much of itself a control shows when it cannot be used.
+    /// </summary>
+    /// <remarks>
+    /// Faint enough to read as out of reach, solid enough to still be read. A control that has
+    /// nothing to do right now is greyed rather than taken away, because a panel that grows
+    /// and shrinks depending on what is running is a different panel each time you look at it.
+    /// </remarks>
+    private const double DisabledOpacity = 0.32;
+
+    /// <summary>
+    /// Greys the control out when it, or anything it sits inside, has been disabled.
+    /// </summary>
+    /// <remarks>
+    /// A templated control gets this from its theme. One that paints itself in <c>Render</c>
+    /// draws exactly the same thing whether it is enabled or not, so it has to be dimmed here
+    /// or a dead knob looks like a live one.
+    /// </remarks>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == IsEffectivelyEnabledProperty)
+            Opacity = IsEffectivelyEnabled ? 1 : DisabledOpacity;
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+
+        // Whatever it is attached under may already be disabled, and nothing changed to say so.
+        Opacity = IsEffectivelyEnabled ? 1 : DisabledOpacity;
 
         ActualThemeVariantChanged += OnThemeChanged;
         ResourcesChanged += OnResourcesChanged;

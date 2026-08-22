@@ -1,0 +1,55 @@
+using CommunityToolkit.Mvvm.Input;
+
+namespace JingleBox2.ViewModels;
+
+/// <summary>
+/// What the instrument designer needs around it: the instrument being worked on, and the means
+/// to hear it while you work.
+/// </summary>
+/// <remarks>
+/// The designer is one control shown in two places: on the INSTRUMENTS tab against whatever the
+/// library has picked, and in a window of its own against the instrument a track plays. This is
+/// the small surface both of those have to offer, so neither has to be the other.
+///
+/// Hearing it is part of it. A wave you cannot play is a picture, so the octave to test at, the
+/// command that plays it, and the two numbers the scopes draw themselves from all live here
+/// rather than on whichever page happens to be hosting the panel.
+/// </remarks>
+public interface IInstrumentDesigner
+{
+    /// <summary>The instrument being worked on, or null when nothing is picked.</summary>
+    InstrumentEditorViewModel? Editor { get; }
+
+    /// <summary>Which octave the test note plays at.</summary>
+    int Octave { get; set; }
+
+    /// <summary>Bumped every time a note is played, so the scopes know to redraw.</summary>
+    int NoteTrigger { get; }
+
+    /// <summary>How many cycles of the wave the shape scope draws.</summary>
+    double ScopeCycles { get; set; }
+
+    /// <summary>How long a test note is held, so the envelope scope draws the right sustain.</summary>
+    double HoldSeconds { get; }
+
+    /// <summary>Plays the instrument, so what has just been changed can be heard.</summary>
+    IRelayCommand TestCommand { get; }
+
+    /// <summary>Down an octave, for the left arrow on the panel.</summary>
+    IRelayCommand OctaveDownCommand { get; }
+
+    /// <summary>Up an octave, for the right arrow on the panel.</summary>
+    IRelayCommand OctaveUpCommand { get; }
+
+    /// <summary>
+    /// Where the track playing this instrument has got to, or null when there is no track.
+    /// </summary>
+    /// <remarks>
+    /// The library page edits an instrument nothing is playing, so it has no location to show
+    /// and the lamps stay off the panel entirely rather than sitting there dark.
+    /// </remarks>
+    TrackLocationViewModel? Location { get; }
+
+    /// <summary>True when there is a location worth putting on the panel.</summary>
+    bool HasLocation { get; }
+}

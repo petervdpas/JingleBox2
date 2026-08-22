@@ -78,7 +78,10 @@ public class Knob : ThemedControl
 
     static Knob()
     {
+        AffectsMeasure<Knob>(LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty);
+
         AffectsRender<Knob>(
+            LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty,
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
             UnitProperty, FormatProperty, DisplayProperty, DialSizeProperty);
 
@@ -157,16 +160,96 @@ public class Knob : ThemedControl
         set => SetValue(DefaultValueProperty, value);
     }
 
+    /// <summary>
+    /// Puts the name above the dial rather than under it, with the reading still below.
+    /// </summary>
+    /// <remarks>
+    /// Which way round the name goes is what makes a row of these read as a panel or as a form.
+    /// A machine prints the name above the control it belongs to, so the eye runs along the
+    /// names and drops to whichever one it wants. Off by default: everywhere else in the
+    /// application the name sits under its dial, and this is not a reason to move all of them.
+    /// </remarks>
+    public static readonly StyledProperty<bool> LabelAboveProperty =
+        AvaloniaProperty.Register<Knob, bool>(nameof(LabelAbove));
+
+    /// <summary>
+    /// How many lines of room the name gets, used or not.
+    /// </summary>
+    /// <remarks>
+    /// A row of controls whose names are different lengths is a row whose dials sit at
+    /// different heights, because a name that folds onto two lines pushes its dial down and a
+    /// short one does not. Reserving the same room for every name in a row puts them all back
+    /// on one line. Two is enough for the names a panel uses.
+    /// </remarks>
+    public static readonly StyledProperty<int> LabelLinesProperty =
+        AvaloniaProperty.Register<Knob, int>(nameof(LabelLines), 1);
+
+    /// <summary>
+    /// How far down the dial starts, so it stands on the same line as the switches beside it.
+    /// Zero lets it follow its own name.
+    /// </summary>
+    /// <remarks>
+    /// A switch carries a word above its handle and a knob does not, so a row of both sits at
+    /// two heights unless something says otherwise. The switch cannot come up, since its word
+    /// has to go somewhere, so the knob goes down to meet it. That line is a panel's scribe
+    /// line and everything in the row stands on it.
+    /// </remarks>
+    public static readonly StyledProperty<double> HeadRoomProperty =
+        AvaloniaProperty.Register<Knob, double>(nameof(HeadRoom));
+
+    /// <summary>
+    /// How many marks are printed round the dial. None unless a panel asks for them.
+    /// </summary>
+    /// <remarks>
+    /// The ring of little lines a machine prints around a knob, which is what lets you read
+    /// roughly where it is set from across the room. Off by default because the same control
+    /// is used on pages that are lists of values rather than panels, and there a ring of marks
+    /// is noise.
+    /// </remarks>
+    public static readonly StyledProperty<int> TicksProperty =
+        AvaloniaProperty.Register<Knob, int>(nameof(Ticks));
+
+    public bool LabelAbove
+    {
+        get => GetValue(LabelAboveProperty);
+        set => SetValue(LabelAboveProperty, value);
+    }
+
+    public int LabelLines
+    {
+        get => GetValue(LabelLinesProperty);
+        set => SetValue(LabelLinesProperty, value);
+    }
+
+    public double HeadRoom
+    {
+        get => GetValue(HeadRoomProperty);
+        set => SetValue(HeadRoomProperty, value);
+    }
+
+    public int Ticks
+    {
+        get => GetValue(TicksProperty);
+        set => SetValue(TicksProperty, value);
+    }
+
+    /// <summary>The room the name is given, however much of it the name actually uses.</summary>
+    private double LabelRoom(FormattedText label) =>
+        Math.Max(HeadRoom > 0 ? HeadRoom - TextGap : 0,
+                 Math.Max(label.Height, LabelFontSize * 1.35 * Math.Max(1, LabelLines)));
+
     public string ValueText =>
         string.IsNullOrEmpty(Display) ? NumericInput.Format(Value, Format) + Unit : Display;
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black);
+        _room = double.IsInfinity(availableSize.Width) ? double.PositiveInfinity : availableSize.Width;
+
+        var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black, _room);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double width = Math.Max(DialSize, Math.Max(label.Width, value.Width));
-        double height = DialSize + TextGap + label.Height + TextGap + value.Height;
+        double height = DialSize + TextGap + LabelRoom(label) + TextGap + value.Height;
 
         return new Size(width, height);
     }
@@ -177,15 +260,48 @@ public class Knob : ThemedControl
 
         double radius = Math.Max(4, DialSize / 2 - 1);
         double centerX = Bounds.Width / 2;
-        double centerY = radius + 1;
 
-        DrawDial(context, palette, centerX, centerY, radius);
-        DrawText(context, palette, centerY + radius + 1);
+        var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush, Bounds.Width);
+        var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, palette.TextBrush);
+
+        if (LabelAbove)
+        {
+            context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, 0));
+
+            double centerY = LabelRoom(label) + TextGap + radius + 1;
+
+            DrawDial(context, palette, centerX, centerY, radius);
+            context.DrawText(value, new Point((Bounds.Width - value.Width) / 2, centerY + radius + 1 + TextGap));
+
+            return;
+        }
+
+        double middle = radius + 1;
+
+        DrawDial(context, palette, centerX, middle, radius);
+        DrawText(context, palette, middle + radius + 1);
     }
 
     private void DrawDial(DrawingContext context, ThemePalette palette, double centerX, double centerY, double radius)
     {
         var center = new Point(centerX, centerY);
+
+        // The marks printed round the dial, so where it is set can be read at a glance.
+        if (Ticks > 1)
+        {
+            var ink = new SolidColorBrush(Lighten(palette.Muted, 0.1), 0.75);
+
+            for (int mark = 0; mark < Ticks; mark++)
+            {
+                double at = KnobMath.StartDegrees + KnobMath.SweepDegrees * mark / (Ticks - 1.0);
+                bool major = mark == 0 || mark == Ticks - 1 || mark * 2 == Ticks - 1;
+
+                var (ax, ay) = KnobMath.PointAt(centerX, centerY, radius + 3, at);
+                var (bx, by) = KnobMath.PointAt(centerX, centerY, radius + (major ? 8.5 : 6.5), at);
+
+                context.DrawLine(new Pen(ink, major ? 1.6 : 1), new Point(ax, ay), new Point(bx, by));
+            }
+        }
 
         // The face is lit from above, the way a real pot catches the light.
         var face = new LinearGradientBrush
@@ -202,9 +318,14 @@ public class Knob : ThemedControl
         var rim = IsFocused || _hovered ? palette.Accent : palette.Border;
         context.DrawEllipse(face, new Pen(new SolidColorBrush(rim), IsFocused ? 1.6 : 1), center, radius, radius);
 
-        // The travel the pointer sweeps, so the ends of the range are visible when it is not there.
-        DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees);
-        DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees + KnobMath.SweepDegrees);
+        // The travel the pointer sweeps, so the ends of the range are visible when the pointer
+        // is not there. A full ring of marks says the same thing better, so it replaces these
+        // rather than being drawn over them.
+        if (Ticks <= 1)
+        {
+            DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees);
+            DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees + KnobMath.SweepDegrees);
+        }
 
         double angle = KnobMath.AngleFor(Value, Minimum, Maximum);
         var (innerX, innerY) = KnobMath.PointAt(centerX, centerY, radius * 0.15, angle);
@@ -225,7 +346,7 @@ public class Knob : ThemedControl
 
     private void DrawText(DrawingContext context, ThemePalette palette, double top)
     {
-        var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush);
+        var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush, Bounds.Width);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, palette.TextBrush);
 
         double labelY = top + TextGap;
@@ -234,12 +355,34 @@ public class Knob : ThemedControl
     }
 
     private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush) =>
-        new(text ?? "",
+        BuildText(text, size, family, brush, double.PositiveInfinity);
+
+    /// <summary>
+    /// The same, folded to a width so a long name sits over its own dial instead of over its
+    /// neighbour's.
+    /// </summary>
+    /// <remarks>
+    /// A panel prints a long name on two short lines rather than one long one, because the
+    /// control it belongs to is only so wide and the one beside it needs its own room. Given a
+    /// width to work in, this does the same.
+    /// </remarks>
+    private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush, double maxWidth)
+    {
+        var built = new FormattedText(
+            text ?? "",
             CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
             new Typeface(family),
             size,
             brush);
+
+        if (!double.IsInfinity(maxWidth) && maxWidth > 1) built.MaxTextWidth = maxWidth;
+
+        return built;
+    }
+
+    /// <summary>How wide the name may be: what the layout offered, or the dial if it offered nothing.</summary>
+    private double _room = double.PositiveInfinity;
 
     protected override void OnPointerEntered(PointerEventArgs e)
     {

@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using System;
 using System.IO;
 
@@ -15,6 +15,13 @@ class Program
         if (Audio.Plugins.Bridge.PluginHostProcess.Claims(args))
         {
             Environment.Exit(Audio.Plugins.Bridge.PluginHostProcess.Run(args));
+            return;
+        }
+
+        // One machine's front panel, on its own, for looking at what it draws.
+        if (Views.PanelPreview.Claims(args))
+        {
+            Environment.Exit(Views.PanelPreview.Run(args));
             return;
         }
 

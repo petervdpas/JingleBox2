@@ -22,7 +22,7 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerLocation
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
@@ -36,7 +36,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private readonly AppConfig? _config;
 
     [ObservableProperty] private Song song;
-    [ObservableProperty] private Pattern? currentPattern;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PatternLines))]
+    private Pattern? currentPattern;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedTrack))]
     [NotifyPropertyChangedFor(nameof(CursorTrackLabel))]
@@ -45,6 +48,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     partial void OnCursorChanged(PatternCursor value) => FollowCursorTrack();
     [ObservableProperty] private int orderIndex;
     [ObservableProperty] private int playingLine = -1;
+
+    /// <summary>How many rows the pattern has, for a panel showing where its track is.</summary>
+    public int PatternLines => CurrentPattern?.Lines ?? 0;
 
     /// <summary>What plugins this machine has, for the picker on the mixer page.</summary>
     public PluginLibraryViewModel Plugins { get; }
@@ -85,9 +91,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
 
-        if (instrument == null || !instrument.IsPlugin)
+        // Every kind, not only plugins. What a track plays sits at the head of its strip
+        // whether the sound is Serum's or ours; they are the same thing to the track, and
+        // only what opens when you click differs.
+        if (instrument == null)
         {
-            _instrumentBoxes.Remove(track);
+            if (_instrumentBoxes.Remove(track, out var gone)) gone.Discard();
             return null;
         }
 
@@ -99,15 +108,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return existing;
         }
 
+        // A box for an instrument this track no longer plays is finished with: it is watching
+        // the tracker on behalf of a panel nobody can open any more.
+        if (existing != null) existing.Discard();
+
         var box = new PluginInstrumentViewModel(
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
-            MarkDirty);
+            MarkDirty,
+            () => new TrackInstrumentDesigner(track, instrument, this, MarkDirty, _waveforms, this));
 
         _instrumentBoxes[track] = box;
 
         return box;
     }
+
+    /// <summary>
+    /// Where a sample instrument's waveform is drawn from, for a designer opened on a track.
+    /// Null draws nothing rather than failing, which is a flat line instead of a crash.
+    /// </summary>
+    private readonly IWaveformService? _waveforms;
 
     /// <summary>One box per track, kept so that a track always shows the same one.</summary>
     private readonly System.Collections.Generic.Dictionary<int, PluginInstrumentViewModel> _instrumentBoxes = new();
@@ -186,8 +206,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         ObservableCollection<Recording> recordings,
         ConfigStore? configStore = null,
         AppConfig? config = null,
-        PluginLibraryViewModel? plugins = null)
+        PluginLibraryViewModel? plugins = null,
+        IWaveformService? waveforms = null)
     {
+        _waveforms = waveforms;
+
         _configStore = configStore;
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
@@ -1140,23 +1163,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// An instrument was edited in the library: bring this song's copy of it along, so what
-    /// you hear here is what you just built there.
+    /// An instrument was edited in the library. The picker follows it; the song does not.
     /// </summary>
+    /// <remarks>
+    /// The song's instruments are the song's, so an edit made in the library does not reach a
+    /// song that already has one. What it does have to reach is the list you pick from, which
+    /// holds its own objects read when the library was last listed, and would otherwise go on
+    /// offering a name and a sound that are no longer there.
+    /// </remarks>
     public void ApplyLibraryEdit(TrackerInstrument edited)
     {
         if (edited == null || string.IsNullOrEmpty(edited.Id)) return;
 
-        for (int i = 0; i < Song.Instruments.Count; i++)
-        {
-            if (Song.Instruments[i].Id != edited.Id) continue;
-
-            Song.Instruments[i].CopyFrom(edited);
-            if (i < Instruments.Count) Instruments[i].Refresh();
-        }
-
-        // The picker holds its own objects, listed when the library was last read, so they are
-        // brought up to date rather than merely told to redraw the name they already had.
         foreach (var row in LibraryInstruments)
         {
             if (row.Id != edited.Id) continue;
@@ -1164,8 +1182,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             row.Instrument.CopyFrom(edited);
             row.Refresh();
         }
-
-        RefreshStripNames();
     }
 
     private async Task RemoveSelectedInstrument()
@@ -1276,9 +1292,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         replacement.Normalize();
 
-        // The song stores a copy of every instrument it uses; the library is the master.
-        _library.Rebind(replacement);
-
+        // The song's instruments are the song's own. They are not fetched from the library on
+        // the way in: a song opens sounding exactly the way it was saved, and an instrument
+        // built here belongs to the work it was built for. The library is where a sound
+        // starts, not something that reaches back into a song already written.
         Song = replacement;
         SongName = name;
         Song.Name = name;
