@@ -85,6 +85,16 @@ public sealed class TrackerPlayer : IDisposable
 
     public event EventHandler? Stopped;
 
+    /// <summary>
+    /// Raised for every note that goes to a track, so a panel can show what its track plays.
+    /// </summary>
+    /// <remarks>
+    /// Raised from the clock thread, like the position. It carries the track and the note and
+    /// nothing else: what a listener does with it is its own business, and one that needs the
+    /// instrument can ask the song for it.
+    /// </remarks>
+    public event EventHandler<(int Track, Note Note)>? NotePlayed;
+
     public TrackerTransportState State { get; private set; } = TrackerTransportState.Stopped;
 
     public bool IsPlaying => State == TrackerTransportState.Playing;
@@ -680,6 +690,10 @@ public sealed class TrackerPlayer : IDisposable
                 case TrackerEventKind.Stop:
                     _synth.Mixer.NoteOff(e.Track);
                     _synth.Mixer.PluginNoteOff(e.Track);
+
+                    // An OFF row is a note this track played too, and the one it says is that
+                    // there is not one. A panel showing its keys puts them out on hearing it.
+                    NotePlayed?.Invoke(this, (e.Track, Note.Off));
                     break;
 
                 case TrackerEventKind.Trigger:
@@ -709,6 +723,10 @@ public sealed class TrackerPlayer : IDisposable
         _notePan[e.Track] = pan;
 
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
+
+        // Said once, before the kinds part company: a note played on a plugin is as much a
+        // note this track played as one played on Ouroboros.
+        NotePlayed?.Invoke(this, (e.Track, e.Note));
 
         // One voice per track, as a tracker has always worked: the mixer cuts whatever that
         // track was sounding, whichever kind of instrument it was.

@@ -87,6 +87,7 @@ public sealed class SongStore
         public string Name { get; set; } = "";
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
+        public int KeyboardOctave { get; set; } = 4;
         public int TrackCount { get; set; } = Song.DefaultTrackCount;
         public List<int> Order { get; set; } = new();
         public List<int> TrackInstruments { get; set; } = new();
@@ -99,6 +100,7 @@ public sealed class SongStore
             Name = song.Name,
             Bpm = song.Bpm,
             LinesPerBeat = song.LinesPerBeat,
+            KeyboardOctave = song.KeyboardOctave,
             TrackCount = song.TrackCount,
             Order = new List<int>(song.Order),
             TrackInstruments = new List<int>(song.TrackInstruments),
@@ -114,6 +116,7 @@ public sealed class SongStore
                 Name = Name,
                 Bpm = Bpm,
                 LinesPerBeat = LinesPerBeat,
+                KeyboardOctave = KeyboardOctave,
                 TrackCount = TrackCount,
                 Order = new List<int>(Order),
                 TrackInstruments = new List<int>(TrackInstruments),

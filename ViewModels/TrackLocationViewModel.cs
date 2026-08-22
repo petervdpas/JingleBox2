@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Tracker;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -24,7 +25,7 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// <summary>How many rows one page of lamps covers.</summary>
     public const int PageLines = 8;
 
-    private readonly ITrackerLocation _tracker;
+    private readonly ITrackerPanel _tracker;
 
     /// <summary>True while the shown page chases the playhead rather than being held.</summary>
     private bool _following = true;
@@ -37,7 +38,7 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// has nothing to report is dimmed rather than removed, so the panel is the same panel
     /// wherever it is opened and you learn where things are once.
     /// </remarks>
-    public TrackLocationViewModel(ITrackerLocation? tracker)
+    public TrackLocationViewModel(ITrackerPanel? tracker)
     {
         _tracker = tracker ?? new Still();
 
@@ -52,7 +53,7 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     public bool IsLive { get; private set; }
 
     /// <summary>A tracker that is not there: a pattern of the usual length, never playing.</summary>
-    private sealed class Still : ITrackerLocation
+    private sealed class Still : ITrackerPanel
     {
         public event PropertyChangedEventHandler? PropertyChanged
         {
@@ -63,6 +64,16 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
         public int PlayingLine => -1;
 
         public int PatternLines => Tracker.Pattern.DefaultLines;
+
+        public int Octave { get; set; } = 4;
+
+        public void FollowOctave(int octave) => Octave = octave;
+
+        public event EventHandler<(int Track, Note Note)>? NotePlayed
+        {
+            add { }
+            remove { }
+        }
     }
 
     /// <summary>One button per page of eight rows.</summary>
@@ -84,8 +95,8 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
 
     private void OnTrackerChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(ITrackerLocation.PlayingLine)
-            or nameof(ITrackerLocation.PatternLines)
+        if (e.PropertyName is nameof(ITrackerPanel.PlayingLine)
+            or nameof(ITrackerPanel.PatternLines)
             or null)
         {
             Update();

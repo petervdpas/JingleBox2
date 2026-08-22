@@ -22,6 +22,17 @@ public sealed class Song
 
     public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
     public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
+
+    /// <summary>
+    /// Which octave notes are typed and auditioned at, for this song.
+    /// </summary>
+    /// <remarks>
+    /// One octave for the whole song rather than one per instrument or one for the machine.
+    /// The pattern editor and every instrument's own panel read the same number, so moving the
+    /// octave anywhere moves it everywhere, and a song reopens where it was left. A bass part
+    /// written two octaves down is a property of the work, not of the bass.
+    /// </remarks>
+    public int KeyboardOctave { get; set; } = 4;
     public int TrackCount { get; set; } = DefaultTrackCount;
 
     public List<Pattern> Patterns { get; set; } = new();

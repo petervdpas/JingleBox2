@@ -22,7 +22,7 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerLocation
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
@@ -51,6 +51,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>How many rows the pattern has, for a panel showing where its track is.</summary>
     public int PatternLines => CurrentPattern?.Lines ?? 0;
+
+    /// <summary>
+    /// The player's notes, passed straight through to whatever panels are open.
+    /// </summary>
+    /// <remarks>
+    /// Passed through rather than repeated, so there is one list of listeners and a panel that
+    /// lets go really has let go. What the panels want is what the player already says.
+    /// </remarks>
+    public event EventHandler<(int Track, Note Note)>? NotePlayed
+    {
+        add => _player.NotePlayed += value;
+        remove => _player.NotePlayed -= value;
+    }
 
     /// <summary>What plugins this machine has, for the picker on the mixer page.</summary>
     public PluginLibraryViewModel Plugins { get; }
@@ -178,6 +191,42 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
     [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
     [ObservableProperty] private int octave = 4;
+
+    /// <summary>
+    /// The octave is the song's, not the view's: a song reopens where it was left, and every
+    /// instrument panel reads the same number rather than keeping one of its own.
+    /// </summary>
+    partial void OnOctaveChanged(int value)
+    {
+        if (Song.KeyboardOctave == value) return;
+
+        Song.KeyboardOctave = value;
+
+        if (!_followingOctave) MarkDirty();
+    }
+
+    /// <summary>True while the octave is chasing a note rather than being set by hand.</summary>
+    private bool _followingOctave;
+
+    /// <summary>
+    /// The octave moved because a panel's keyboard had to show a note. The song keeps the new
+    /// value, but it is not an edit, so it does not ask to be saved.
+    /// </summary>
+    public void FollowOctave(int octave)
+    {
+        if (Octave == octave) return;
+
+        _followingOctave = true;
+
+        try
+        {
+            Octave = octave;
+        }
+        finally
+        {
+            _followingOctave = false;
+        }
+    }
     [ObservableProperty] private int selectedInstrument;
     [ObservableProperty] private int editStep = 1;
     [ObservableProperty] private string status = "Ready";
@@ -1299,6 +1348,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song = replacement;
         SongName = name;
         Song.Name = name;
+
+        // The octave came with the song, so the pattern editor and every panel open on it.
+        Octave = Math.Clamp(Song.KeyboardOctave, 0, 9);
 
         SyncInstruments();
         RefreshStrips();

@@ -271,6 +271,7 @@ public sealed class TrackerInstrument
         Name = other.Name;
         Kind = other.Kind;
         Patch = other.Patch.Clone();
+        Ouroboros = other.Ouroboros?.Clone();
         FilePath = other.FilePath;
         BaseNoteSemitone = other.BaseNoteSemitone;
         Volume = other.Volume;
@@ -293,6 +294,7 @@ public sealed class TrackerInstrument
         Name = Name,
         Kind = Kind,
         Patch = Patch.Clone(),
+        Ouroboros = Ouroboros?.Clone(),
         FilePath = FilePath,
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,

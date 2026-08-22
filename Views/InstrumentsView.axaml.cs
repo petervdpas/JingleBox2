@@ -10,13 +10,14 @@ using JingleBox2.ViewModels;
 namespace JingleBox2.Views;
 
 /// <summary>
-/// The instrument library and its editor. Instruments live here rather than in a song, so the
-/// same voice plays in all of them.
+/// The instrument library and its editor: the shelf a sound starts from.
 /// </summary>
+/// <remarks>
+/// Taking an instrument into a song copies it, and the copy is then the song's own. Editing it
+/// here changes what new songs start from, not what an existing song sounds like.
+/// </remarks>
 public partial class InstrumentsView : UserControl
 {
-    private TopLevel? _keySource;
-
     public InstrumentsView()
     {
         InitializeComponent();
@@ -38,11 +39,9 @@ public partial class InstrumentsView : UserControl
         _onScreen = true;
         UpdateEditingFlag();
 
-        // The handler goes on the window, not on this control: a key press only tunnels through
-        // the controls between the root and whatever has focus, and after clicking a combo box
-        // or a knob that route does not have to come past here.
-        _keySource = TopLevel.GetTopLevel(this);
-        _keySource?.AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+        // The keys are the panel's own: it listens for them wherever it is opened, so this
+        // page does not have to hear them on its behalf. What is still this page's is the MIDI
+        // routing above, which is about which page is up rather than about which panel is on it.
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -52,8 +51,6 @@ public partial class InstrumentsView : UserControl
         _onScreen = false;
         UpdateEditingFlag();
 
-        _keySource?.RemoveHandler(KeyDownEvent, OnKeyDown);
-        _keySource = null;
     }
 
     /// <summary>
@@ -93,23 +90,4 @@ public partial class InstrumentsView : UserControl
             ViewModel.NewFromPluginCommand.Execute(plugin);
     }
 
-    /// <summary>
-    /// The tracker's piano layout, auditioning rather than writing: a knob is easier to judge
-    /// while you are playing than one Test button at a time.
-    /// </summary>
-    private void OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        var vm = ViewModel;
-        if (vm == null || !_onScreen) return;
-
-        // Typing a name is typing a name, not playing a tune.
-        if (e.Source is TextBox) return;
-        if (_keySource?.FocusManager?.GetFocusedElement() is TextBox) return;
-        if (e.KeyModifiers != KeyModifiers.None) return;
-
-        if (KeyboardNoteMap.NoteFor(e.Key.ToString(), vm.Octave) is not Note note) return;
-
-        vm.PlayNote(note);
-        e.Handled = true;
-    }
 }

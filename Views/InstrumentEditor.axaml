@@ -371,22 +371,6 @@
 
               <StackPanel Orientation="Horizontal" Spacing="34" VerticalAlignment="Bottom">
 
-                <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Top">
-                  <views:PushButton Shape="Triangle" Points="Left" CapWidth="22" CapHeight="18"
-                                    Colour="#B0B3B8"
-                                    Command="{Binding OctaveDownCommand}"
-                                    ToolTip.Tip="Down an octave. Test and the keys follow it." />
-
-                  <views:LedRow Caption="OCTAVE" Count="10" FirstNumber="0" Colour="#E5B339"
-                                Selected="{Binding Octave}"
-                                ToolTip.Tip="Which octave Test and the keys play at." />
-
-                  <views:PushButton Shape="Triangle" Points="Right" CapWidth="22" CapHeight="18"
-                                    Colour="#B0B3B8"
-                                    Command="{Binding OctaveUpCommand}"
-                                    ToolTip.Tip="Up an octave. Test and the keys follow it." />
-                </StackPanel>
-
                 <!-- Where the track playing this instrument has got to. The pages stand over
                      the lamps they choose, so the row reads downwards: pick eight rows, watch
                      them. It reports and does not sequence: the pattern belongs to the tracker,
@@ -420,17 +404,15 @@
                 </StackPanel>
               </StackPanel>
 
-              <!-- The one button on the panel you should be able to find without reading it,
-                   so it sits by itself at the foot where nothing else is competing with it.
-                   Only on the library page: an instrument standing in a track is played by the
-                   track, and a button that fires one note beside a pattern full of them is a
-                   button asking to be ignored. -->
-              <views:PushButton Label="Test" Shape="Round" CapHeight="46"
-                                Colour="#C62828" HasLamp="True"
-                                HorizontalAlignment="Left"
-                                IsVisible="{Binding !HasLocation}"
-                                Command="{Binding TestCommand}"
-                                ToolTip.Tip="Sounds the instrument as it is now, at the octave the lamps show." />
+              <!-- The keyboard, at the foot where a keyboard goes. It plays, it shows what is
+                   playing, and it carries its own octave: the lamps are not a setting beside
+                   the keys, they are where the keys are looking. There was a Test button here
+                   until the keyboard could do everything it did, and better. -->
+              <views:Clavier Octave="{Binding Octave}"
+                             HorizontalAlignment="Left"
+                             Lit="{Binding Sounding.Lit}"
+                             Command="{Binding KeyCommand}"
+                             ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its note is sounding, whether you played it or the pattern did. The arrows and the lamps move the three octaves on show, and it follows a note played outside them." />
             </StackPanel>
 
     </StackPanel>

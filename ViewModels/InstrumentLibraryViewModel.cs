@@ -117,10 +117,6 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     public IAsyncRelayCommand DeleteCommand => new AsyncRelayCommand(Delete);
     public IRelayCommand TestCommand => new RelayCommand(Test);
 
-    public IRelayCommand OctaveDownCommand => new RelayCommand(() => Octave = Math.Max(0, Octave - 1));
-
-    public IRelayCommand OctaveUpCommand => new RelayCommand(() => Octave = Math.Min(9, Octave + 1));
-
     /// <summary>
     /// Nothing is playing this instrument here, so the lamps are shown but have nothing to say.
     /// </summary>
@@ -144,6 +140,14 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => PlayNote(note, volume));
 
+    /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
+    public SoundingNotes Sounding { get; } = new();
+
+    /// <summary>One note from the panel's own keyboard.</summary>
+    public void Play(Note note, int volume) => PlayNote(note, volume);
+
+    public IRelayCommand<int> KeyCommand => new RelayCommand<int>(semitone => PlayNote(new Note(semitone)));
+
     /// <summary>A note played on the computer keyboard or a MIDI keyboard while editing.</summary>
     public void PlayNote(Note note, int volume = TrackerCell.NoVolume)
     {
@@ -156,6 +160,12 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         }
 
         _audition.Audition(instrument, note, volume);
+
+        Sounding.Struck(note, HoldSeconds);
+
+        // Nothing plays this page but you, so the keyboard only ever moves for a note typed
+        // above or below what it is showing.
+        Octave = PanelKeyboard.Reveal(note, Octave);
 
         NoteTrigger++;
 

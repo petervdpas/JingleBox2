@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Tracker;
 
 namespace JingleBox2.ViewModels;
 
@@ -35,11 +36,29 @@ public interface IInstrumentDesigner
     /// <summary>Plays the instrument, so what has just been changed can be heard.</summary>
     IRelayCommand TestCommand { get; }
 
-    /// <summary>Down an octave, for the left arrow on the panel.</summary>
-    IRelayCommand OctaveDownCommand { get; }
+    /// <summary>
+    /// Plays one note on the instrument, for the panel's own keyboard.
+    /// </summary>
+    /// <remarks>
+    /// The panel plays wherever it is opened. A knob is easier to judge while you are playing
+    /// than one test note at a time, and an instrument standing in a track has no test button
+    /// at all, so without this the window is silent until the pattern reaches that row.
+    /// </remarks>
+    void Play(Note note, int volume);
 
-    /// <summary>Up an octave, for the right arrow on the panel.</summary>
-    IRelayCommand OctaveUpCommand { get; }
+    /// <summary>
+    /// Which notes are sounding, for the panel's keyboard to light.
+    /// </summary>
+    /// <remarks>
+    /// Notes played by hand, and on a panel standing in a track, the notes the pattern plays
+    /// on that track as well. Between this and the LOCATION lamps a panel says where its track
+    /// is and what it is doing there.
+    /// </remarks>
+    SoundingNotes Sounding { get; }
+
+    /// <summary>Plays a key on the panel's keyboard, named by its absolute semitone.</summary>
+    IRelayCommand<int> KeyCommand { get; }
+
 
     /// <summary>
     /// Where the track playing this instrument has got to, or null when there is no track.

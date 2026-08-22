@@ -70,7 +70,7 @@ public static class PanelPreview
     /// A tracker that is not there, walking a playhead down a pattern so the LOCATION lamps
     /// have something to show. Nothing is playing; the lamps are the point.
     /// </summary>
-    private sealed class Marching : ITrackerLocation
+    private sealed class Marching : ITrackerPanel
     {
         private readonly System.Timers.Timer _clock = new(180) { AutoReset = true };
 
@@ -80,6 +80,9 @@ public static class PanelPreview
             {
                 PlayingLine = (PlayingLine + 1) % PatternLines;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PlayingLine)));
+
+                // A tune of sorts, so the keyboard has something to light while it is looked at.
+                NotePlayed?.Invoke(this, (0, new Note(Octave * 12 + Steps[PlayingLine % Steps.Length])));
             };
 
             _clock.Start();
@@ -90,6 +93,22 @@ public static class PanelPreview
         public int PlayingLine { get; private set; }
 
         public int PatternLines => 32;
+
+        public int Octave { get; set; } = 4;
+
+        public void FollowOctave(int octave)
+        {
+            Octave = octave;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Octave)));
+        }
+
+        public event EventHandler<(int Track, Note Note)>? NotePlayed;
+
+        /// <summary>
+        /// Somewhere for the keys to go: a line that wanders far enough out of the three
+        /// octaves on show that the keyboard has to move to keep up with it.
+        /// </summary>
+        private static readonly int[] Steps = { 0, 7, 3, 10, 5, 12, 3, 8, 40, 43, 38, -20, -13, -17, 24, 19 };
     }
 
     private sealed class PreviewApp : Application
