@@ -229,6 +229,9 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         var process = _process;
         if (process?.Alive != true) return;
 
+        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+            Info.Name + " note on " + semitone + " at " + velocity.ToString("0.##"));
+
         process.Block.Queue(BridgeEvent.NoteOn, (uint)Math.Clamp(semitone, 0, 127), velocity);
     }
 
@@ -244,6 +247,8 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     {
         var process = _process;
         if (process?.Alive != true) return;
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () => Info.Name + " all notes off");
 
         process.Block.Queue(BridgeEvent.AllNotesOff, 0, 0);
     }

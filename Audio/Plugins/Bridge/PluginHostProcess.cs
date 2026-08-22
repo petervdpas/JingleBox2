@@ -32,6 +32,9 @@ public static class PluginHostProcess
 
     /// <summary>Set when the plugin has loaded a whole new sound and the parent has not heard.</summary>
     private static volatile bool Reloads;
+
+    /// <summary>The moment the plugin's window opened, so what it asked for can go with it.</summary>
+    private static long _windowMark;
     private static readonly AutoResetEvent Knock = new(false);
 
     /// <summary>How often the audio thread looks up when nothing is being played through it.</summary>
@@ -401,6 +404,10 @@ public static class PluginHostProcess
 
         _editor = editor;
 
+        // Everything the plugin asks for from here belongs to this window, so it can be taken
+        // back when the window goes. See PluginRunLoop.DropSince.
+        _windowMark = PluginRunLoop.Mark();
+
         editor.ResizeRequested += (width, height) =>
             control.Send(BridgeCall.ResizeRequested, BridgeBody.Pair(width, height));
 
@@ -444,6 +451,11 @@ public static class PluginHostProcess
         Settle();
 
         try { editor.Dispose(); } catch (Exception error) { Say("closing the window: " + error.Message); }
+
+        // Whatever the window asked the host to hold for it goes with the window, whether the
+        // plugin remembered to give it back or not. Vital does not, and calling what it has
+        // freed is how its process dies.
+        PluginRunLoop.DropSince(_windowMark);
     }
 
     /// <summary>

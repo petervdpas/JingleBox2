@@ -212,10 +212,12 @@ public sealed class TrackerPlayer : IDisposable
             // sound the song was last saved with and leave you wondering what you changed.
             int playing = TrackPlaying(instrument.Id);
 
-            // Not loaded yet, and this is the instrument that track plays: load it there. A
-            // note played on a track should sound through that track's plugin whether or not
-            // anybody has opened its window, and through one copy of it rather than two.
-            if (playing < 0 && track >= 0 && OnTrack(track, instrument))
+            // Not loaded yet: load it on the track it was played on. A note played on a track
+            // should sound through that track's plugin whether or not anybody has opened its
+            // window, and through one copy of it rather than two. The caller worked this
+            // instrument out from that very track, so there is nothing further to check, and
+            // there is no song to check against anyway while the transport is stopped.
+            if (playing < 0 && track >= 0)
             {
                 EnsurePlayerOn(track, instrument);
                 playing = TrackPlaying(instrument.Id);
@@ -405,17 +407,6 @@ public sealed class TrackerPlayer : IDisposable
 
             return player;
         }
-    }
-
-    /// <summary>True when this instrument is the one the song has on this track.</summary>
-    private bool OnTrack(int track, TrackerInstrument instrument)
-    {
-        Song? song;
-        lock (_lock) song = _song;
-
-        if (song == null || instrument == null) return false;
-
-        return ReferenceEquals(song.InstrumentAt(song.GetTrackInstrument(track)), instrument);
     }
 
     /// <summary>The track already playing this instrument, or -1 when none is.</summary>

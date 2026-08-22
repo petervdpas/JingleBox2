@@ -39,6 +39,9 @@ internal static unsafe class PluginRunLoop
         public long Interval;
         public long Due;
 
+        /// <summary>When it was asked for, so what a window brought with it can go with it.</summary>
+        public long Asked;
+
         /// <summary>What to do when it is due, for a plugin that did not hand over an object.</summary>
         public Action? Fire;
     }
@@ -48,13 +51,32 @@ internal static unsafe class PluginRunLoop
         public nint Handler;
         public int File;
 
+        /// <summary>When it was asked for. See <see cref="DropSince"/>.</summary>
+        public long Asked;
+
         /// <summary>The same, for a file with something waiting on it.</summary>
         public Action<int>? Fire;
     }
 
+    /// <summary>
+    /// Held while a plugin's own timer or file handler is being called, and by nothing else
+    /// except taking one back.
+    /// </summary>
+    /// <remarks>
+    /// The handler is the plugin's object and the plugin frees it when it takes it back, so a
+    /// call that is halfway through when that happens is a read of freed memory. Waiting for
+    /// the call to finish is the fix, but it has to be this narrow: holding the registration
+    /// lock for the length of a repaint stalls every other thread the plugin has, which comes
+    /// out as a window that will not move and audio that stutters.
+    /// </remarks>
+    private static readonly object Calling = new();
+
     private static readonly List<Timer> Timers = new();
     private static readonly List<Watch> Watches = new();
     private static readonly object Gate = new();
+
+    /// <summary>Counts registrations, so a moment in time can be named and gone back to.</summary>
+    private static long _asked;
 
     private static long _rings;
     private static long _deliveries;
@@ -175,11 +197,6 @@ internal static unsafe class PluginRunLoop
     {
         long now = Environment.TickCount64;
 
-        // Held for the calls as well as for the copy. A timer or a watched file is a plugin's
-        // own object, and the plugin frees it when it takes it back; calling one that has been
-        // taken back in between is a read of freed memory, which is a dead plugin rather than
-        // a wrong answer. The lock is reentrant, so a plugin adding or removing a timer from
-        // inside one of its own is fine: that arrives on this same thread.
         Timer[] due;
 
         lock (Gate)
@@ -204,7 +221,7 @@ internal static unsafe class PluginRunLoop
             }
         }
 
-        lock (Gate)
+        lock (Calling)
         {
             foreach (var timer in due)
             {
@@ -254,7 +271,7 @@ internal static unsafe class PluginRunLoop
 
         // Held for the calls, for the same reason the timers are: the handler belongs to the
         // plugin and the plugin frees it when it takes it back.
-        lock (Gate)
+        lock (Calling)
         {
             for (int index = 0; index < watching.Length; index++)
             {
@@ -419,6 +436,59 @@ internal static unsafe class PluginRunLoop
     }
 
     /// <summary>
+    /// A note of this moment, to be handed to <see cref="DropSince"/> later.
+    /// </summary>
+    public static long Mark()
+    {
+        lock (Gate) return _asked;
+    }
+
+    /// <summary>
+    /// Forgets everything registered since a moment, without telling the plugin.
+    /// </summary>
+    /// <remarks>
+    /// For a window being taken down. A plugin is supposed to give back what it asked for when
+    /// its window goes, and Vital does not: it asks for two files to be watched when its window
+    /// is attached and never mentions them again. What it does do is free the handler behind
+    /// them, so the next time either file has something on it the host calls into memory that
+    /// is not there any more, and the plugin dies with a jump into nothing.
+    ///
+    /// So whatever a window brought with it goes when the window goes. Anything registered
+    /// before it opened is left alone: Serum asks for a timer the moment it loads, editor or
+    /// no editor, and it needs that one for as long as it is loaded.
+    /// </remarks>
+    public static void DropSince(long mark)
+    {
+        int timers = 0;
+        int watches = 0;
+
+        lock (Calling)
+        lock (Gate)
+        {
+            for (int index = Timers.Count - 1; index >= 0; index--)
+            {
+                if (Timers[index].Asked < mark) continue;
+
+                Timers.RemoveAt(index);
+                timers++;
+            }
+
+            for (int index = Watches.Count - 1; index >= 0; index--)
+            {
+                if (Watches[index].Asked < mark) continue;
+
+                Watches.RemoveAt(index);
+                watches++;
+            }
+        }
+
+        if (timers == 0 && watches == 0) return;
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the window took " + timers + " timers and " + watches + " watched files with it");
+    }
+
+    /// <summary>
     /// Takes a timer from a plugin that speaks in numbers rather than in objects.
     /// </summary>
     /// <remarks>
@@ -449,16 +519,18 @@ internal static unsafe class PluginRunLoop
                 Handler = key,
                 Interval = interval,
                 Due = Environment.TickCount64 + interval,
-                Fire = fire
+                Fire = fire,
+                Asked = _asked++
             });
         }
 
         Start();
     }
 
-    /// <summary>Gives a timer back.</summary>
+    /// <summary>Gives a timer back. Waits for a call in progress, so nothing is freed mid-call.</summary>
     public static void Drop(nint key)
     {
+        lock (Calling)
         lock (Gate)
         {
             for (int index = Timers.Count - 1; index >= 0; index--)
@@ -484,15 +556,16 @@ internal static unsafe class PluginRunLoop
                 return;
             }
 
-            Watches.Add(new Watch { Handler = key, File = file, Fire = fire });
+            Watches.Add(new Watch { Handler = key, File = file, Fire = fire, Asked = _asked++ });
         }
 
         Start();
     }
 
-    /// <summary>Gives a watched file back.</summary>
+    /// <summary>Gives a watched file back. Waits for a call in progress.</summary>
     public static void Unwatch(nint key)
     {
+        lock (Calling)
         lock (Gate)
         {
             for (int index = Watches.Count - 1; index >= 0; index--)
@@ -539,11 +612,15 @@ internal static unsafe class PluginRunLoop
                 return Vst3Abi.ResultOk;
             }
 
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                "the plugin asked for a timer every " + interval + "ms, handler " + ((nint)handler).ToString("X"));
+
             Timers.Add(new Timer
             {
                 Handler = (nint)handler,
                 Interval = interval,
-                Due = Environment.TickCount64 + interval
+                Due = Environment.TickCount64 + interval,
+                Asked = _asked++
             });
         }
 
@@ -553,6 +630,10 @@ internal static unsafe class PluginRunLoop
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterTimer(void* self, void* handler)
     {
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the plugin gave back timer " + ((nint)handler).ToString("X"));
+
+        lock (Calling)
         lock (Gate)
         {
             for (int index = Timers.Count - 1; index >= 0; index--)
@@ -573,7 +654,10 @@ internal static unsafe class PluginRunLoop
     {
         if (handler == null) return Vst3Abi.NoInterface;
 
-        lock (Gate) Watches.Add(new Watch { Handler = (nint)handler, File = file });
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the plugin asked to have file " + file + " watched, handler " + ((nint)handler).ToString("X"));
+
+        lock (Gate) Watches.Add(new Watch { Handler = (nint)handler, File = file, Asked = _asked++ });
 
         return Vst3Abi.ResultOk;
     }
@@ -581,6 +665,10 @@ internal static unsafe class PluginRunLoop
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterEventHandler(void* self, void* handler)
     {
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the plugin gave back the watch on handler " + ((nint)handler).ToString("X"));
+
+        lock (Calling)
         lock (Gate)
         {
             for (int index = Watches.Count - 1; index >= 0; index--)
