@@ -53,20 +53,47 @@ public static class PluginHost
     {
         if (plugin == null) return null;
 
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            $"Opening {plugin.Name} ({plugin.FormatName}), Isolated={Isolated}, InstrumentMode={asInstrument}");
+
         // The normal way: the plugin gets a process of its own and nothing it does can reach
         // this one. Nothing is written down beforehand because nothing here is at risk.
-        if (Isolated) return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
+        if (Isolated)
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using isolated (out-of-process) loading");
+            return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
+        }
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using in-process loading");
 
         // A plugin that killed the last run while loading does not get to load this one.
-        if (PluginCrashGuard.IsLoadBlocked(plugin)) return null;
+        if (PluginCrashGuard.IsLoadBlocked(plugin))
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => $"Plugin blocked by crash guard");
+            return null;
+        }
 
         PluginCrashGuard.Risky(plugin, PluginStage.Load);
 
         try
         {
-            return plugin.Format == PluginFormat.Vst3
-                ? Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames)
-                : ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                $"Loading {plugin.Format} plugin at {plugin.Path}");
+
+            object? result;
+            if (plugin.Format == PluginFormat.Vst3)
+            {
+                result = Vst3Plugin.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            }
+            else
+            {
+                result = ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
+            }
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                result != null ? $"Successfully loaded {plugin.Name}" : $"Failed to load {plugin.Name}");
+
+            return result;
         }
         finally
         {
