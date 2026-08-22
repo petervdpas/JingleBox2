@@ -114,8 +114,29 @@ public sealed class SynthMixer
     {
         if (track < 0 || track >= MaxTracks) return;
 
-        lock (_lock) _inserts[track] = insert;
+        lock (_lock)
+        {
+            if (_inserts[track] != null) _insertCount--;
+
+            _inserts[track] = insert;
+
+            if (insert != null) _insertCount++;
+        }
     }
+
+    /// <summary>
+    /// How many tracks have something inserted on them, so the mixer knows it cannot rest.
+    /// </summary>
+    /// <remarks>
+    /// An effect has to be given its audio whether or not anything is going through it. A
+    /// delay has a tail to finish after the last note, and a plugin only ever hands the host
+    /// what its own window did at the end of a block it was given, so a mixer that rests is a
+    /// plugin that has been switched off without being told.
+    /// </remarks>
+    private int _insertCount;
+
+    /// <summary>When the mixer last said what it was holding, so it says it once, not per block.</summary>
+    private long _said;
 
     public IAudioInsert? InsertOn(int track) =>
         track >= 0 && track < MaxTracks ? _inserts[track] : null;
@@ -385,7 +406,20 @@ public sealed class SynthMixer
 
         lock (_lock)
         {
-            if (_voices.Count == 0 && _instrumentCount == 0 && _preview == null)
+            if (Diagnostics.Log.IsOn && Environment.TickCount64 - _said > 2000)
+            {
+                _said = Environment.TickCount64;
+
+                int voices = _voices.Count;
+                int played = _instrumentCount;
+                int inserts = _insertCount;
+
+                Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+                    "the mixer has " + voices + " voices, " + played + " plugin instruments and " +
+                    inserts + " tracks with something inserted");
+            }
+
+            if (_voices.Count == 0 && _instrumentCount == 0 && _preview == null && _insertCount == 0)
             {
                 Rest();
                 return;
@@ -481,6 +515,20 @@ public sealed class SynthMixer
         for (int track = 0; track < MaxTracks; track++)
         {
             if (instruments[track] != null) _sounding[track] = true;
+        }
+
+        // And so does a track with something inserted on it, playing or not. An effect has to
+        // be given its audio whether or not anything is going through it: a delay has a tail
+        // to finish after the last note, and a plugin only ever hands the host what its own
+        // window did at the end of a block it was given. A track that goes quiet and stops
+        // being processed is a plugin switched off without being told, and a knob turned in
+        // its window then reaches nothing and nobody.
+        lock (_lock)
+        {
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                if (_inserts[track] != null) _sounding[track] = true;
+            }
         }
 
         Array.Clear(_loose, 0, samples);

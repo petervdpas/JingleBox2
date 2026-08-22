@@ -71,6 +71,40 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Whether the app and its plugin processes write down what they are doing.
+    /// </summary>
+    /// <remarks>
+    /// Off by default: a log nobody is reading is a file quietly growing on somebody's disk.
+    /// On, it takes effect at once, for everything already running as well as for the next
+    /// plugin process started. See <see cref="Diagnostics.Log"/>.
+    /// </remarks>
+    public bool WriteLog
+    {
+        get => _cfg.WriteLog;
+        set
+        {
+            if (_cfg.WriteLog == value) return;
+
+            _cfg.WriteLog = value;
+            _store.Save(_cfg);
+
+            if (value) Diagnostics.Log.Open(Config.AppFolder.Path(), true);
+            else Diagnostics.Log.Close();
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LogHint));
+        }
+    }
+
+    /// <summary>Where the file is, said out loud so it can be found without being hunted for.</summary>
+    public string LogHint =>
+        WriteLog
+            ? "Writing to " + System.IO.Path.Combine(Config.AppFolder.Path(), Diagnostics.Log.FileName) +
+              ". Plugin processes write to the same file. Started again from empty when it reaches a few megabytes."
+            : "Off. Nothing is written and nothing is slowed down. Turn this on before doing whatever went wrong, then look in " +
+              Config.AppFolder.Path() + ".";
+
     /// <summary>What is actually running, as against what has been asked for.</summary>
     public string EngineRateHint =>
         $"Running at {Tracker.EngineSampleRate} Hz. A change takes effect when the app is started again.";
@@ -194,7 +228,10 @@ public sealed partial class MainViewModel : ObservableObject
             ?? OutputDevices.FirstOrDefault();
 
         if (SelectedOutputDevice != null)
+        {
             _audio.SetOutputDevice(SelectedOutputDevice.Id);
+            Tracker.ReopenAudio();
+        }
 
         // Load matrix size from config
         Rows = _cfg.Rows;
@@ -360,7 +397,13 @@ public sealed partial class MainViewModel : ObservableObject
         if (e.PropertyName == nameof(SelectedOutputDevice))
         {
             if (SelectedOutputDevice != null)
+            {
                 _audio.SetOutputDevice(SelectedOutputDevice.Id);
+
+                // Changing the device closed the old one, which took the tracker's stream with
+                // it. Nothing else would notice until the next note.
+                Tracker.ReopenAudio();
+            }
 
             SaveNow();
         }

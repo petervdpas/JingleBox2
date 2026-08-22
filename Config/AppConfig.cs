@@ -59,6 +59,10 @@ public sealed class AppConfig
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";
 
+    // Off by default. On, the app and every plugin process write what they are doing to
+    // jinglebox.log next to this file. See JingleBox2.Diagnostics.Log.
+    public bool WriteLog { get; set; }
+
     // 0 means never resized, so fall back to sizing from the pad matrix.
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

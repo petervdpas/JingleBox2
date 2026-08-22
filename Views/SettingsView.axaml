@@ -115,6 +115,21 @@
         </StackPanel>
       </Border>
 
+      <!-- Off by default and free when off. On when something has gone wrong and somebody
+           wants to know what, including inside the processes plugins run in. -->
+      <Border Classes="card">
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Classes="cardTitle" Text="Log" />
+            <views:HelpBadge Topic="settings.log" />
+          </StackPanel>
+
+          <CheckBox Content="Write down what the app is doing" IsChecked="{Binding WriteLog}" />
+
+          <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding LogHint}" />
+        </StackPanel>
+      </Border>
+
       <Border Classes="card">
         <StackPanel Classes="cardBody">
           <StackPanel Orientation="Horizontal" Spacing="8">

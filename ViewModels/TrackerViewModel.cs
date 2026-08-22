@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Config;
+using JingleBox2.Diagnostics;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
@@ -566,8 +567,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 
+    /// <summary>
+    /// Opens the audio again after the output device has been changed underneath it.
+    /// </summary>
+    /// <remarks>
+    /// The tracker's stream belongs to whichever device was open when it was made, and
+    /// changing devices closes that one. Without this the stream is gone and nothing notices
+    /// until the next note, which means a track's effects stop being given anything at all.
+    /// </remarks>
+    public void ReopenAudio()
+    {
+        try
+        {
+            _player.EnsureEngine();
+        }
+        catch (Exception)
+        {
+            // No audio device is a quiet app, not a broken one.
+        }
+    }
+
     /// <summary>Something about the song changed and the file on disk no longer matches.</summary>
-    private void MarkDirty() => IsDirty = true;
+    private void MarkDirty()
+    {
+        // Once, when it changes: one turn of a plugin's knob is eighty of these.
+        if (!IsDirty) Log.Write(LogArea.Tracker, "the song has something unsaved in it now");
+
+        IsDirty = true;
+    }
 
     partial void OnIsRecordingChanged(bool value) =>
         Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";

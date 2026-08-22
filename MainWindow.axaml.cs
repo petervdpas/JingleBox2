@@ -47,6 +47,13 @@ public partial class MainWindow : Window
         _routing = AudioRouting.Create(_recording);
 
         var cfg = _store.LoadOrCreateDefault();
+
+        // Before anything else that might have something to say. Off unless the setting says
+        // otherwise, and free when off. See JingleBox2.Diagnostics.Log.
+        Diagnostics.Log.Open(Config.AppFolder.Path(), cfg.WriteLog);
+        Diagnostics.Log.Write(Diagnostics.LogArea.App, () =>
+            "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
+
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
 
         async Task<string?> PickFileAsync()

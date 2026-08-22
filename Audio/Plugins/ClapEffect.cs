@@ -589,18 +589,140 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     }
 
     /// <summary>
-    /// Asks an idle plugin whether it has changed anything itself. Called on the thread the
-    /// plugin's window lives on, every so often, for as long as it is loaded.
+    /// Asks the plugin what its own knobs are set to, and says so if any of them have moved.
     /// </summary>
     /// <remarks>
-    /// Only while idle. A plugin being played hands the same things back at the end of each
-    /// block, and CLAP is clear that a flush and a block are not to be in the plugin at once.
+    /// The only way to know, for a plugin nobody is playing. A CLAP plugin hands a knob back
+    /// through the events at the end of a block, and a plugin on a stopped track never gets a
+    /// block. Flushing does not help: measured against ZamComp, the last thing it says arrives
+    /// ten milliseconds before the audio stops and nothing after, though the flush is called
+    /// thirty times a second all the while.
+    ///
+    /// So the values are read instead. Only the ones somebody can set: a compressor's gain
+    /// reduction moves on its own and is not news. Called on the thread the plugin's window
+    /// lives on, and only while it has one, since that is the only time a knob can be turned.
     /// </remarks>
     public void Poll()
     {
-        if (_disposed || !IsIdle) return;
+        if (_disposed) return;
+
+        Ask();
+    }
+
+    /// <summary>
+    /// Gives the plugin the chance to take in what its own window has done, from the thread
+    /// CLAP says that has to happen on.
+    /// </summary>
+    /// <remarks>
+    /// This is the piece that was missing, and the specification is explicit about it: while a
+    /// plugin is switched on, its flush belongs to the audio thread. A plugin on a stopped
+    /// track is still switched on, so calling its flush from the thread its window is on is
+    /// not a small liberty, it is the wrong thread, and a knob turned in the plugin's own
+    /// window never reaches the part of the plugin that holds the value.
+    ///
+    /// So a plugin nobody is playing gets an empty block's worth of attention on the right
+    /// thread instead, often enough that a knob never feels late.
+    /// </remarks>
+    public void Idle()
+    {
+        if (_disposed) return;
+
+        // Being played: the blocks are already carrying everything both ways.
+        if (!IsIdle)
+        {
+            _wantsFlush = false;
+            return;
+        }
+
+        _wantsFlush = false;
 
         FlushParameters();
+    }
+
+    private volatile bool _wantsFlush;
+
+    /// <summary>The plugin asking to be given the chance to hand something over.</summary>
+    public void WantsFlush() => _wantsFlush = true;
+
+    /// <summary>True when the plugin has asked and has not been given it yet.</summary>
+    public bool IsWaitingToSpeak => _wantsFlush;
+
+    /// <summary>How many parameters are worth reading every time round. Past this it is not a panel.</summary>
+    private const int MaxWatched = 512;
+
+    private uint[]? _watched;
+    private double[]? _seen;
+
+    private void Ask()
+    {
+        if (_params == null || _params->GetValue == null) return;
+
+        if (_watched == null)
+        {
+            var ids = new List<uint>();
+
+            foreach (var parameter in Parameters())
+            {
+                if (parameter.IsReadOnly || parameter.IsBypass) continue;
+
+                ids.Add(parameter.Id);
+
+                if (ids.Count >= MaxWatched) break;
+            }
+
+            _watched = ids.ToArray();
+            _seen = new double[_watched.Length];
+
+            for (int index = 0; index < _watched.Length; index++) _seen[index] = ValueOf(_watched[index]);
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                "watching " + _watched!.Length + " knobs on " + Info.Name + ", which read " + Reading());
+
+            return;
+        }
+
+        for (int index = 0; index < _watched.Length; index++)
+        {
+            double now = ValueOf(_watched[index]);
+
+            if (Math.Abs(now - _seen![index]) < 0.000001) continue;
+
+            _seen[index] = now;
+
+            Moved(_watched[index], now);
+        }
+    }
+
+    /// <summary>
+    /// Every knob and what the plugin says it is set to, for a log line that settles whether
+    /// the plugin is telling the host the truth about itself.
+    /// </summary>
+    public string Reading()
+    {
+        if (_watched == null) return "nothing being watched yet";
+
+        var report = new System.Text.StringBuilder();
+
+        foreach (uint id in _watched)
+        {
+            report.Append(id).Append('=').Append(ValueOf(id).ToString("0.###")).Append(' ');
+        }
+
+        return report.ToString();
+    }
+
+    /// <summary>Remembers a value the host set, so it does not come back as something the plugin did.</summary>
+    private void Remember(uint id, double value)
+    {
+        if (_watched == null || _seen == null) return;
+
+        for (int index = 0; index < _watched.Length; index++)
+        {
+            if (_watched[index] != id) continue;
+
+            _seen[index] = value;
+            return;
+        }
     }
 
     /// <summary>How long since a block went through, for telling a running plugin from an idle one.</summary>
@@ -675,6 +797,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         if (_disposed) return;
 
         lock (_lock) _pending[id] = value;
+
+        // Written down as already known, so that reading the values back does not report the
+        // host's own change as something the plugin did.
+        Remember(id, value);
 
         // A plugin that is not playing anything will never take the queue itself: a pad sitting
         // idle, or a track between takes. Without this the value waits, the plugin still

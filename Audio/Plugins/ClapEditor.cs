@@ -264,11 +264,51 @@ internal static unsafe class ClapHostExtensions
 
         string? name = Marshal.PtrToStringUTF8((nint)id);
 
+        if (name == ClapAbi.ParamsExtension) return Params();
         if (name == ClapAbi.GuiExtension) return Gui();
         if (name == ClapAbi.TimerExtension) return Timers();
         if (name == ClapAbi.PosixFdExtension) return Files();
 
         return null;
+    }
+
+    private static ClapHostParams* _parameters;
+
+    private static void* Params()
+    {
+        lock (Gate)
+        {
+            if (_parameters != null) return _parameters;
+
+            _parameters = (ClapHostParams*)NativeMemory.AllocZeroed(1, (nuint)sizeof(ClapHostParams));
+
+            _parameters->Rescan = &Rescan;
+            _parameters->Clear = &Clear;
+            _parameters->RequestFlush = &RequestFlush;
+
+            return _parameters;
+        }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void Rescan(ClapHost* host, uint flags) { }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void Clear(ClapHost* host, uint id, uint flags) { }
+
+    /// <summary>
+    /// The plugin saying it has something for the host and asking to be given the chance to
+    /// hand it over.
+    /// </summary>
+    /// <remarks>
+    /// Which is what a knob turned in the plugin's own window looks like from this side. It is
+    /// written down rather than acted on: the handing over has to happen on the audio thread,
+    /// and this is not it.
+    /// </remarks>
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void RequestFlush(ClapHost* host)
+    {
+        Find(host)?.Effect?.WantsFlush();
     }
 
     private static void* Gui()

@@ -22,6 +22,7 @@ public static class HelpText
     public const string SettingsRecordingInput = "settings.recording-input";
     public const string SettingsMidiInput = "settings.midi-input";
     public const string SettingsEngine = "settings.engine";
+    public const string SettingsLog = "settings.log";
     public const string SettingsPlugins = "settings.plugins";
     public const string SettingsPadMatrix = "settings.pad-matrix";
     public const string TrackerInstruments = "tracker.song-instruments";
@@ -73,6 +74,21 @@ public static class HelpText
             A rate cannot change while the app is running. Voices, envelopes, filters and every
             loaded plugin work their timings out from it once, so a change takes effect the next
             time the app starts.
+            """),
+
+        [SettingsLog] = new(
+            SettingsLog,
+            "Log",
+            "What the app writes down about itself when asked.",
+            """
+            Off, nothing is written and nothing is slowed down. On, the app writes what it is
+            doing to jinglebox.log, next to the settings, and so does every process a plugin
+            runs in. Each line carries the time, what it is about, and which process it came
+            from, so a plugin falling over is next to what the app was doing at the time.
+
+            The way to use it is to turn it on, do the thing that goes wrong, turn it off, and
+            read the file. Leaving it on is not harmful: the file starts again from empty when
+            it reaches a few megabytes, and the one before it is kept alongside.
             """),
 
         [SettingsPlugins] = new(

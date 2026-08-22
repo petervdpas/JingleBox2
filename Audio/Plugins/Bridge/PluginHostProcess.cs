@@ -1,4 +1,5 @@
 using System;
+using JingleBox2.Diagnostics;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -30,12 +31,18 @@ public static class PluginHostProcess
     private static readonly ConcurrentQueue<(uint Id, double Value)> Moves = new();
     private static readonly AutoResetEvent Knock = new(false);
 
+    /// <summary>How often the audio thread looks up when nothing is being played through it.</summary>
+    private const int IdleMilliseconds = 40;
+
     private static BridgeLink? _control;
     private static BridgeBlock? _block;
     private static IPluginParameters? _plugin;
     private static IPluginEditor? _editor;
     private static volatile bool _running = true;
     private static bool _trace;
+
+    /// <summary>How many blocks have gone through, so the log can say whether audio is running.</summary>
+    private static long _blocks;
 
     /// <summary>True when these arguments mean this process is meant to be a plugin's process.</summary>
     public static bool Claims(string[] args) =>
@@ -50,35 +57,20 @@ public static class PluginHostProcess
     {
         _trace = Environment.GetEnvironmentVariable(PluginBridge.TraceVariable) == "1";
 
+        // The same log the application writes, in the same folder, with this process's number
+        // on every line. A plugin falling over then leaves its account of it next to what the
+        // application was doing at the time.
+        string folder = Environment.GetEnvironmentVariable(PluginBridge.LogFolderVariable) ?? "";
+
+        Log.Open(folder.Length > 0 ? folder : Config.AppFolder.Path(), _trace, LogArea.Plugins);
+
         return args[0] == PluginBridge.ScanArgument ? Scan(args) : Serve(args);
     }
 
-    /// <summary>
-    /// Writes a line about what the child is doing, when somebody asked for that.
-    /// </summary>
-    /// <remarks>
-    /// To a file rather than to the error output, because a plugin is entitled to do whatever
-    /// it likes with the handles it inherited and some of them close or redirect the lot. A
-    /// trace that stops the moment the interesting part starts is worse than no trace.
-    /// </remarks>
+    /// <summary>Writes a line about what this plugin's process is doing.</summary>
     private static void Say(string message)
     {
-        if (!_trace) return;
-
-        // The file first and the error output second, each on its own. A plugin that has
-        // closed the handles it inherited makes the second one throw, and a trace that gives
-        // up because nobody was listening on one of two channels is no trace at all.
-        try
-        {
-            File.AppendAllText(
-                Path.Combine(Path.GetTempPath(), "jinglebox-plugin-" + Environment.ProcessId + ".log"),
-                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + message + Environment.NewLine);
-        }
-        catch (Exception)
-        {
-        }
-
-        try { Console.Error.WriteLine("[plugin host] " + message); } catch (Exception) { }
+        Log.Write(LogArea.Plugins, message);
     }
 
     /// <summary>
@@ -215,15 +207,22 @@ public static class PluginHostProcess
 
         long census = Environment.TickCount64;
         long asked = census;
+        long counted = 0;
 
         while (_running)
         {
             Knock.WaitOne(5);
 
-            if (_trace && Environment.TickCount64 - census > 2000)
+            if (Log.IsOn && Environment.TickCount64 - census > 2000)
             {
                 census = Environment.TickCount64;
-                Say("run loop: " + PluginRunLoop.Census());
+                long blocks = _blocks;
+
+                Say("run loop: " + PluginRunLoop.Census() +
+                    "; " + (blocks - counted) + " blocks of audio in the last two seconds" +
+                    ((_plugin as ClapEffect)?.IsWaitingToSpeak == true ? "; the plugin is waiting to say something" : ""));
+
+                counted = blocks;
             }
 
             while (Errands.TryDequeue(out var errand))
@@ -231,14 +230,16 @@ public static class PluginHostProcess
                 try { errand(); } catch (Exception error) { Say("run loop: " + error.Message); }
             }
 
-            // An idle plugin is asked now and then whether it has moved anything itself. CLAP
-            // hands a knob back during a block or a flush and at no other time, so a plugin
-            // nobody is playing needs to be asked or its own window is a secret.
-            if (Environment.TickCount64 - asked > 30)
+            // A CLAP plugin with a window open is asked now and then what its knobs are set to.
+            // It hands a knob back at the end of a block and at no other time, so a plugin on a
+            // track nobody is playing would otherwise keep its own window a secret. Only while
+            // there is a window, because that is the only time a knob can be turned.
+            if (_editor != null && Environment.TickCount64 - asked > 40)
             {
                 asked = Environment.TickCount64;
 
-                try { (_plugin as ClapEffect)?.Poll(); } catch (Exception) { }
+                try { (_plugin as ClapEffect)?.Poll(); }
+                catch (Exception error) { Say("asking the plugin about its knobs went wrong: " + error.Message); }
             }
 
             while (Moves.TryDequeue(out var move))
@@ -412,7 +413,34 @@ public static class PluginHostProcess
 
         if (editor == null) return;
 
+        // The last moment anybody can ask. Whatever was turned in that window is still worth
+        // knowing about, and after this there is nothing left to ask.
+        Settle();
+
         try { editor.Dispose(); } catch (Exception error) { Say("closing the window: " + error.Message); }
+    }
+
+    /// <summary>
+    /// Takes a last reading of the plugin's own knobs, for a window on its way out.
+    /// </summary>
+    /// <remarks>
+    /// The handing over belongs to the audio thread, so this asks for it and waits a moment
+    /// rather than doing it here. A fifth of a second is longer than the audio thread's own
+    /// round and short enough that closing a window still feels like closing a window.
+    /// </remarks>
+    private static void Settle()
+    {
+        if (_plugin is not ClapEffect clap) return;
+
+        clap.WantsFlush();
+
+        long end = Environment.TickCount64 + 200;
+
+        while (clap.IsWaitingToSpeak && Environment.TickCount64 < end) Thread.Sleep(5);
+
+        try { clap.Poll(); } catch (Exception) { }
+
+        Say("last reading of " + clap.Info.Name + " before its window closed: " + clap.Reading());
     }
 
     /// <summary>
@@ -439,6 +467,13 @@ public static class PluginHostProcess
 
         var effect = plugin as IPluginEffect;
         var instrument = plugin as IPluginInstrument;
+        var clap = plugin as ClapEffect;
+
+        // A plugin nobody is playing still needs a moment of this thread now and then. CLAP
+        // says a switched-on plugin's flush belongs to the audio thread, and the flush is the
+        // only way what its own window did reaches the rest of it. So the wait gives up every
+        // so often, does that, and goes back to waiting.
+        audio.ReceiveTimeout = IdleMilliseconds;
 
         while (_running)
         {
@@ -448,14 +483,33 @@ public static class PluginHostProcess
             {
                 int got;
 
-                try { got = audio.Receive(message, read, 8 - read, SocketFlags.None); }
-                catch (Exception) { return; }
+                try
+                {
+                    got = audio.Receive(message, read, 8 - read, SocketFlags.None);
+                }
+                catch (SocketException error) when (error.SocketErrorCode == SocketError.TimedOut)
+                {
+                    // Nothing to play. Only between messages: half a message is still a message.
+                    if (read == 0)
+                    {
+                        try { clap?.Idle(); } catch (Exception) { }
+                        continue;
+                    }
+
+                    continue;
+                }
+                catch (Exception)
+                {
+                    return;
+                }
 
                 if (got <= 0) return;
                 read += got;
             }
 
             if (message[0] != (byte)BridgeCall.Process) continue;
+
+            _blocks++;
 
             int frames = BitConverter.ToInt32(message, 4);
             if (frames <= 0 || frames > maxFrames) frames = Math.Min(Math.Max(frames, 0), maxFrames);

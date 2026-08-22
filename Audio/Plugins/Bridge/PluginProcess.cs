@@ -267,6 +267,17 @@ internal sealed class PluginProcess : IDisposable
         start.ArgumentList.Add(maxFrames.ToString(System.Globalization.CultureInfo.InvariantCulture));
         start.ArgumentList.Add(asInstrument ? "instrument" : "effect");
 
+        // A child logs when the application does. It cannot read the setting itself: it has no
+        // settings, on purpose.
+        if (Diagnostics.Log.IsOn)
+        {
+            start.Environment[PluginBridge.TraceVariable] = "1";
+            start.Environment[PluginBridge.LogFolderVariable] = System.IO.Path.GetDirectoryName(Diagnostics.Log.Path) ?? "";
+        }
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "starting a process for " + plugin.Name + " (" + plugin.FormatName + ") at " + plugin.Path);
+
         try
         {
             return Process.Start(start);
@@ -463,6 +474,9 @@ internal sealed class PluginProcess : IDisposable
         }
 
         try { _answered.Release(); } catch (SemaphoreFullException) { }
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            _stopping ? "a plugin process was closed on purpose" : "a plugin process " + _epitaph);
 
         if (!_stopping) Died?.Invoke();
     }

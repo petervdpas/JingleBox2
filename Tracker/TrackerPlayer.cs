@@ -265,6 +265,12 @@ public sealed class TrackerPlayer : IDisposable
     {
         if (_synth.Mixer.InsertOn(track) is PluginChain existing) return existing;
 
+        // The engine has to be running for an effect to be given anything at all. Until now it
+        // was opened by the first note, so a track with an effect on it and nothing playing was
+        // an effect that never saw a single block: it could not work on the audio, could not
+        // finish a delay's tail, and could not tell the host what its own window had done.
+        EnsureEngine();
+
         var chain = new PluginChain();
         _synth.Mixer.SetInsert(track, chain);
 

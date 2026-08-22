@@ -31,8 +31,14 @@ internal static class PluginBridge
     /// <summary>Set to 1 to load plugins in this process after all, for a bug that needs it.</summary>
     public const string InProcessVariable = "JB_PLUGINS_INPROCESS";
 
-    /// <summary>Set to 1 to have the child write what it is doing to its standard error.</summary>
+    /// <summary>Set to 1 to have the child write what it is doing to the log.</summary>
     public const string TraceVariable = "JB_PLUGIN_TRACE";
+
+    /// <summary>
+    /// Where the child should write its log. Passed rather than worked out again, so the two
+    /// processes cannot disagree about where the log lives.
+    /// </summary>
+    public const string LogFolderVariable = "JB_LOG_DIR";
 
     /// <summary>Written at the top of the shared block, so a stale file is spotted rather than played.</summary>
     public const int Magic = 0x4A424147;

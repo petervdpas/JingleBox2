@@ -72,12 +72,30 @@ public sealed class SynthOutput : IDisposable
 
     public bool IsRunning => _handle != 0;
 
-    /// <summary>Opens the stream on first use. Safe to call before every note.</summary>
+    /// <summary>
+    /// Opens the stream on first use, and opens it again if it has gone. Safe to call before
+    /// every note.
+    /// </summary>
+    /// <remarks>
+    /// Changing the output device closes BASS and opens it again, which takes this stream with
+    /// it without telling anybody. So the handle is not taken as proof: the stream has to still
+    /// be running, or it is made again.
+    /// </remarks>
     public void EnsureStarted(IAudioEngine audio)
     {
         lock (_lock)
         {
-            if (_disposed || _handle != 0) return;
+            if (_disposed) return;
+
+            if (_handle != 0)
+            {
+                if (Bass.ChannelIsActive(_handle) == PlaybackState.Playing) return;
+
+                Diagnostics.Log.Write(Diagnostics.LogArea.Audio, "the synth stream had gone; opening another");
+
+                _handle = 0;
+                _procedure = null;
+            }
 
             audio.EnsureInitialized();
 
@@ -94,6 +112,12 @@ public sealed class SynthOutput : IDisposable
 
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+                _handle == 0
+                    ? "the synth stream would not open: " + Bass.LastError
+                    : "the synth stream is open at " + SampleRate + " Hz");
+
             if (_handle == 0)
             {
                 _procedure = null;
@@ -125,10 +149,21 @@ public sealed class SynthOutput : IDisposable
         if (_mixer != null) _mixer.StopAll();
     }
 
+    /// <summary>The block size last written down, so it is said when it changes and not per block.</summary>
+    private int _said;
+
     private int Fill(int handle, IntPtr buffer, int length, IntPtr user)
     {
         int samples = length / sizeof(float);
         if (samples <= 0) return 0;
+
+        if (Diagnostics.Log.IsOn && samples != _said)
+        {
+            _said = samples;
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+                "the synth stream is asking for " + (samples / Channels) + " frames at a time");
+        }
 
         if (_scratch.Length < samples) _scratch = new float[samples];
 

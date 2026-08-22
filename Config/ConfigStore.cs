@@ -19,10 +19,9 @@ public sealed class ConfigStore
 
     public string ConfigPath { get; }
 
-    public ConfigStore(string appName = "JingleBox2")
+    public ConfigStore(string appName = AppFolder.Name)
     {
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var dir = Path.Combine(baseDir, appName);
+        var dir = AppFolder.Path(appName);
         Directory.CreateDirectory(dir);
 
         ConfigPath = Path.Combine(dir, "config.json");

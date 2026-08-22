@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.Diagnostics;
 using System;
 using System.Collections.ObjectModel;
 
@@ -195,7 +196,13 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public event System.Action? Changed;
 
     /// <summary>Says something changed here. Called by the devices as well as by this class.</summary>
-    public void NotifyChanged() => Changed?.Invoke();
+    public void NotifyChanged()
+    {
+        Log.Write(LogArea.Plugins, () =>
+            "the chain on " + Label + " changed, " + (Changed?.GetInvocationList().Length ?? 0) + " listening");
+
+        Changed?.Invoke();
+    }
 
     private void Rebuild()
     {

@@ -292,6 +292,21 @@ internal unsafe struct ClapHostGui
     public delegate* unmanaged[Cdecl]<ClapHost*, byte, void> Closed;
 }
 
+/// <summary>
+/// What the host offers a plugin about its parameters.
+/// </summary>
+/// <remarks>
+/// The one that matters here is the last: a plugin whose own window has changed something says
+/// so by asking for a flush, and a host that does not offer this has nowhere for that to go.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapHostParams
+{
+    public delegate* unmanaged[Cdecl]<ClapHost*, uint, void> Rescan;
+    public delegate* unmanaged[Cdecl]<ClapHost*, uint, uint, void> Clear;
+    public delegate* unmanaged[Cdecl]<ClapHost*, void> RequestFlush;
+}
+
 /// <summary>What the host offers a plugin about timers.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct ClapHostTimerSupport

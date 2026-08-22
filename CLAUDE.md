@@ -30,6 +30,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Audio/Plugins/` - CLAP and VST3 hosting: scanning, loading, parameters, chains, plugin windows
 - `Audio/Plugins/Bridge/` - Runs each plugin in a process of its own and talks to it
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
+- `Diagnostics/` - The log: one file for the app and every plugin process, off by default
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
 - `Tracker/` - Song model, sequencing, playback, JSON song files, and the instrument library
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
@@ -48,6 +49,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 ### Key Classes
 
 - `BassAudioEngine` (Audio/): Manages pad audio playback, device selection, file/stream sources, dynamic resize
+- `Log` (Diagnostics/): What the app writes down about itself, switched on in SETTINGS or with `JB_LOG=1`. Off costs one comparison and does not even build the message. Areas (App, Audio, Plugins, Tracker, Midi) so a log can be read without reading all of it
+- `AppFolder` (Config/): Where everything the app keeps lives. Knows nothing, so a plugin's own process can find the same folder without loading the settings
 - `PluginHost` (Audio/Plugins/): The one place that knows both plugin standards. Everything above it deals in `PluginInfo` and `IPluginEffect`
 - `BridgedPlugin` / `PluginProcess` (Audio/Plugins/Bridge/): A plugin running in another process, wearing the same face as one that is not. Socket for messages, shared memory for audio
 - `PluginHostProcess` (Audio/Plugins/Bridge/): This same executable started again with `--plugin-host`, being one plugin and nothing else
@@ -81,6 +84,17 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   tracker only ever loads instruments; whether one is a sample or a synth is its own business
 - Three places things are stored, on purpose: presets (a starting sound), instruments (a voice
   you own, shared by every song), and songs (patterns plus the instruments they use)
+- The audio engine runs whenever a track has a chain, not only while something is playing. A
+  plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
+  and cannot tell the host what its own window did. `SynthMixer` therefore does not rest while
+  any track has an insert, and does not skip a silent track that has one
+- Changing the output device calls `Bass.Free()`, which takes the tracker's stream with it.
+  `SynthOutput.EnsureStarted` checks the stream is really still running rather than trusting its
+  handle, and `TrackerViewModel.ReopenAudio` is called after a device change
+- A knob turned in a plugin's own window reaches the host differently per standard: VST3 reports
+  it at once through `IComponentHandler::performEdit`, CLAP only hands it back at the end of a
+  block, so a CLAP plugin with its window open is also read forty times a second. Read-only
+  parameters (a compressor's gain reduction) are excluded, or a song could never be saved
 - Plugins run out of process, one process per plugin, and so does the scan. A plugin that
   crashes stops on its own: an effect passes its audio through, an instrument goes quiet, and
   the panel offers to start it again. Set `JB_PLUGINS_INPROCESS=1` to load them in this process

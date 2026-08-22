@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge;
+using JingleBox2.Diagnostics;
 using System;
 using System.Collections.ObjectModel;
 
@@ -65,6 +66,11 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     private void Moved(uint id, double value)
     {
         if (_rows.TryGetValue(id, out var row)) row.Adopt(value);
+
+        Log.Write(LogArea.Plugins, () =>
+            Plugin.Info.Name + " moved its own " + id + " to " + value.ToString("0.####") +
+            (Reads(id) ? ", a reading, ignored" : "") +
+            (_changed == null ? ", AND NOBODY IS LISTENING" : ", telling whatever holds it"));
 
         if (Reads(id)) return;
 
