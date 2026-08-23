@@ -149,6 +149,19 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     /// </remarks>
     [ObservableProperty] private InstrumentPresets? presets;
 
+    /// <summary>Where the sound has got to, for the chop editor's cursor.</summary>
+    private void MovePlayhead()
+    {
+        var slices = Editor?.Slices;
+
+        if (slices == null) return;
+
+        // Nothing lit is nothing sounding, and this is the last beat of the clock before it
+        // stops. Asking the engine here would catch a voice still letting go of its release and
+        // leave the line standing in the middle of the picture with nothing playing.
+        slices.Playhead = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(0);
+    }
+
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
     public SoundingNotes Sounding { get; } = new();
 
@@ -227,6 +240,10 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
+
+        // And the chop editor's cursor runs on the same clock, which is running exactly while
+        // something is sounding.
+        Sounding.Ticked += MovePlayhead;
     }
 
     /// <summary>A preset has landed on the instrument being edited: reread it and write it.</summary>

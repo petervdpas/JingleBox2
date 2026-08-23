@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.SliceEditor"
+             x:DataType="vm:SliceEditorViewModel"
+             x:CompileBindings="True">
+
+  <StackPanel Name="Body" Spacing="6">
+
+    <StackPanel Orientation="Horizontal" Spacing="10">
+      <TextBlock Classes="section" Text="Chop" />
+      <TextBlock Classes="cardHint" VerticalAlignment="Center"
+                 Text="{Binding TakeText}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+      <TextBlock Classes="cardHint" VerticalAlignment="Center"
+                 Text="{Binding CountText}" IsVisible="{Binding IsOpen}" />
+    </StackPanel>
+
+    <!-- The whole take, with every boundary on it. Dragging one is truncating the two pieces
+         it lies between, which is why there is no separate place to set a piece's start. -->
+    <views:WaveformView Name="Picture" Height="90"
+                        Peaks="{Binding Peaks}"
+                        SlicePoints="{Binding Points}"
+                        SelectedSlice="{Binding SelectedSlice, Mode=TwoWay}"
+                        MaxSlices="{Binding MaxSlices}"
+                        ShowLoop="{Binding Looping}"
+                        Playhead="{Binding Playhead}"
+                        LoopStart="{Binding LoopStart, Mode=TwoWay}"
+                        LoopEnd="{Binding LoopEnd, Mode=TwoWay}"
+                        Placeholder="Put a recording on this machine to chop it."
+                        ToolTip.Tip="Drag a boundary to move it. Double-click the wave to add one, double-click a boundary to take it away. Click a piece to work on it." />
+
+    <!-- Plain controls, because this row stands next to the panel's other plain rows. The
+         panel-style switches belong on the machine itself, where a control is a thing you
+         reach for while playing rather than a thing you set once. -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Classes="field" Text="Pieces" />
+
+      <views:NumberField Width="62" Format="0" VerticalAlignment="Center"
+                         Minimum="2" Maximum="{Binding MaxSlices}"
+                         SmallStep="1" LargeStep="4"
+                         Value="{Binding Pieces, Mode=TwoWay}"
+                         ToolTip.Tip="How many pieces to aim for. Fewer come back when the take has fewer attacks than that." />
+
+      <TextBlock Classes="field" Text="Cut at" Margin="6,0,0,0" />
+
+      <ComboBox Width="80" VerticalAlignment="Center"
+                ItemsSource="{Binding CutOptions}"
+                SelectedItem="{Binding CutBy, Mode=TwoWay}"
+                ToolTip.Tip="Hits looks for attacks and cuts just before each one: right for drums. Gaps looks for the silences between things and cuts where the next one starts: right for speech and for played phrases. Even divides the take into equal pieces." />
+
+      <Button Content="Chop" Command="{Binding SliceCommand}"
+              IsEnabled="{Binding IsOpen}"
+              ToolTip.Tip="Cuts the recording on this machine into pieces, throwing away where it is cut now." />
+
+      <TextBlock Classes="field" Text="Loop piece" Margin="10,0,0,0" />
+
+      <ComboBox Width="82" VerticalAlignment="Center"
+                ItemsSource="{Binding LoopNames}"
+                SelectedItem="{Binding LoopName, Mode=TwoWay}"
+                ToolTip.Tip="Whether the piece in hand repeats. The dashed handles on the picture say where, and stay inside the piece they belong to." />
+    </StackPanel>
+
+    <TextBlock Classes="cardHint" Text="{Binding Status}" IsVisible="{Binding Status.Length}" />
+
+  </StackPanel>
+</UserControl>

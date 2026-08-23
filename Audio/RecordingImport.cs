@@ -22,7 +22,13 @@ namespace JingleBox2.Audio;
 public static class RecordingImport
 {
     /// <summary>What can be brought in.</summary>
-    public static readonly string[] Kinds = { ".wav", ".mp3", ".ogg", ".flac" };
+    /// <remarks>
+    /// WAV and nothing else, because WAV is what a machine can play. A pad goes through BASS
+    /// and will happily take an mp3; an instrument is read into memory by <c>SampleStore</c>,
+    /// which decodes WAV alone. Offering the others here would let one be picked, copied in and
+    /// put on a zone, where it would then sit silently with nothing to say why.
+    /// </remarks>
+    public static readonly string[] Kinds = { ".wav" };
 
     /// <summary>Where JingleBox keeps its recordings.</summary>
     public static string Directory =>

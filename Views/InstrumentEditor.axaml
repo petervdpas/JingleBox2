@@ -161,6 +161,8 @@
                 </StackPanel>
               </StackPanel>
 
+              <views:SliceEditor Slices="{Binding Editor.Slices}" />
+
               <StackPanel Orientation="Horizontal" Spacing="24">
 
                 <!-- The zone in hand. -->
@@ -182,6 +184,7 @@
                     <TextBlock Classes="field" Text="Take" />
                     <ComboBox Name="ZoneRecordingPicker" Width="196"
                               ItemsSource="{Binding Editor.Recordings}"
+                              DisplayMemberBinding="{Binding Name}"
                               SelectionChanged="ZoneRecording_Changed"
                               PlaceholderText="Pick a recording..."
                               ToolTip.Tip="One of your recordings, put straight on this zone. Anything from elsewhere is imported on the RECORD tab first." />
@@ -191,8 +194,6 @@
                     <Button Content="Load samples..." Click="ImportZones_Click"
                             ToolTip.Tip="Pick any number of samples from anywhere. They are copied into JingleBox and laid across the keyboard, one zone apiece." />
 
-                    <Button Content="Map from recordings" Click="FillZonesFromTakes_Click"
-                            ToolTip.Tip="Builds the whole map from the recordings JingleBox already holds. Replaces what is there." />
                   </StackPanel>
 
                   <StackPanel Orientation="Horizontal" Spacing="8">
@@ -344,6 +345,7 @@
                     <TextBlock Classes="field" Text="Take" />
                     <ComboBox Name="PadRecordingPicker" Width="196"
                               ItemsSource="{Binding Editor.Recordings}"
+                              DisplayMemberBinding="{Binding Name}"
                               SelectionChanged="PadRecording_Changed"
                               PlaceholderText="Pick a recording..."
                               ToolTip.Tip="One of your recordings, put straight on this pad. Anything from elsewhere is imported on the RECORD tab first." />
@@ -353,8 +355,6 @@
                     <Button Content="Load samples..." Click="ImportPads_Click"
                             ToolTip.Tip="Pick any number of samples from anywhere. They are copied into JingleBox and put on the pads in order, so the kit no longer depends on where they came from." />
 
-                    <Button Content="Fill from recordings" Click="FillPadsFromTakes_Click"
-                            ToolTip.Tip="Fills the pads from the recordings JingleBox already holds. Pads past the end of the list are left alone." />
                   </StackPanel>
 
                   <StackPanel Orientation="Horizontal" Spacing="8">
@@ -383,6 +383,9 @@
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
+
+              <views:SliceEditor Slices="{Binding Editor.Slices}" />
+
             </StackPanel>
 
             <!-- OddSkilla. The same controls it has always had, stood on a grid instead of

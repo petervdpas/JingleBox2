@@ -58,10 +58,57 @@ public static class PanelPreview
         return 0;
     }
 
+    /// <summary>The recordings on the shelf, so the take pickers on a panel have something in them.</summary>
+    private static System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording> Takes()
+    {
+        var takes = new System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>();
+
+        try
+        {
+            string home = JingleBox2.Audio.RecordingImport.Directory;
+
+            if (!System.IO.Directory.Exists(home)) return takes;
+
+            foreach (string path in System.IO.Directory.EnumerateFiles(home).OrderBy(p => p))
+            {
+                if (!JingleBox2.Audio.RecordingImport.Playable(path)) continue;
+
+                takes.Add(new JingleBox2.Models.Recording
+                {
+                    Id = System.IO.Path.GetFileNameWithoutExtension(path),
+                    FilePath = path,
+                    Name = System.IO.Path.GetFileNameWithoutExtension(path)
+                });
+            }
+        }
+        catch (Exception)
+        {
+            // No shelf, or one that will not be read: an empty picker, not a crash.
+        }
+
+        return takes;
+    }
+
     /// <summary>An audition that plays nothing, since a panel being looked at makes no sound.</summary>
     private sealed class Silent : IInstrumentAudition
     {
         public void Audition(TrackerInstrument instrument, Note note, int volume) { }
+
+        /// <summary>
+        /// A cursor walking across the recording, the way Marching walks a playhead down a
+        /// pattern. Nothing is sounding; the line is the point.
+        /// </summary>
+        public double SamplePosition(int track)
+        {
+            _step = (_step + 1) % Steps;
+
+            return _step / (double)Steps;
+        }
+
+        /// <summary>Two seconds at the panel's forty milliseconds.</summary>
+        private const int Steps = 50;
+
+        private int _step;
 
         public IPluginInstrument? PluginFor(TrackerInstrument instrument) => null;
     }
@@ -145,8 +192,32 @@ public static class PanelPreview
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var instrument = TrackerInstrument.CreateOn(Wanted, Wanted.Name);
+
+                // The machines that cut a recording into pieces have a picture of one on their
+                // panel, and a panel with no picture on it cannot be judged. So the preview
+                // reads takes the way the application does. It only ever reads them.
+                var shelf = Takes();
+
                 var designer = new TrackInstrumentDesigner(
-                    0, instrument, new Silent(), () => { }, null, Playing ? new Marching() : null);
+                    0, instrument, new Silent(), () => { },
+                    new JingleBox2.Audio.WaveformService(),
+                    Playing ? new Marching() : null,
+                    null,
+                    shelf);
+
+                // A machine that cuts recordings up, looked at with nothing on it, is a panel
+                // with a blank rectangle in the middle of it. So the first take on the shelf is
+                // put on it and chopped, the way Marching plays a tune so the lamps have
+                // something to show. Put on the machine, not handed to the chop editor: that is
+                // the only way in, here as anywhere else.
+                if (shelf.Count > 0)
+                {
+                    string take = shelf[0].FilePath;
+
+                    designer.Editor?.Zones?.Selected?.Take(take);
+                    designer.Editor?.Kit?.Selected?.Take(take);
+                    designer.Editor?.Slices?.SliceCommand.Execute(null);
+                }
 
                 desktop.MainWindow = new Window
                 {

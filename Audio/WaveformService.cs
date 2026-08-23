@@ -131,13 +131,25 @@ public sealed class WaveformService : IWaveformService
     {
         if (samples.Length == 0) return Array.Empty<float>();
 
-        int framesPerPixel = Math.Max(1, samples.Length / channels / pixelWidth);
+        long frames = samples.Length / channels;
         var peaks = new List<float>(pixelWidth);
 
         for (int pixel = 0; pixel < pixelWidth; pixel++)
         {
-            int start = pixel * framesPerPixel * channels;
-            int end = Math.Min(start + framesPerPixel * channels, samples.Length);
+            // Worked out from the pixel rather than by stepping a fixed number of frames, so
+            // the columns cover the whole recording and the last one really is the end of it.
+            // A fixed step throws away whatever the division left over, which puts every
+            // position read off the picture out by that much, worst at the end where the
+            // error has had the whole file to build up.
+            long from = frames * pixel / pixelWidth;
+            long to = frames * (pixel + 1) / pixelWidth;
+
+            // A recording shorter than the picture is wide: every column still gets a frame,
+            // so a short take is drawn across the width instead of squeezed into the left.
+            if (to <= from) to = Math.Min(frames, from + 1);
+
+            int start = (int)(from * channels);
+            int end = (int)Math.Min(to * channels, samples.Length);
 
             float maxPeak = 0;
             for (int i = start; i < end; i++)

@@ -33,6 +33,9 @@ public sealed partial class DrumKitViewModel : ObservableObject
         Rebuild();
     }
 
+    /// <summary>The kit itself, for what needs to ask it rather than the pads.</summary>
+    public DrumKit Kit => _kit;
+
     /// <summary>The pads, in the order they are laid out: four rows of four.</summary>
     public ObservableCollection<DrumPadViewModel> Pads { get; } = new();
 
@@ -95,6 +98,20 @@ public sealed partial class DrumKitViewModel : ObservableObject
     }
 
     /// <summary>Reads the kit again, for a preset that has just landed on it.</summary>
+    /// <summary>
+    /// Reads the kit again after a slicing. A kit is always sixteen pads, so there is never a
+    /// list to rebuild: only what is on each of them changes.
+    /// </summary>
+    public void Resliced()
+    {
+        foreach (var pad in Pads) pad.Reread();
+
+        OnPropertyChanged(nameof(Pads));
+    }
+
+    /// <summary>Picks the pad at that place in the kit, for a piece chosen on the picture.</summary>
+    public void SelectAt(int index) => Selected = Pads.ElementAtOrDefault(index) ?? Selected;
+
     public void Refresh()
     {
         string? keep = Selected?.Pad.Semitone.ToString();
@@ -226,6 +243,9 @@ public sealed partial class DrumPadViewModel : ObservableObject
 
     /// <summary>Hits the pad, so what is on it can be heard.</summary>
     public IRelayCommand TapCommand => new RelayCommand(() => _tap(Pad.Note));
+
+    /// <summary>Says every value again, for a kit that has been laid out from underneath.</summary>
+    public void Reread() => OnPropertyChanged(string.Empty);
 
     public override string ToString() => CapText;
 

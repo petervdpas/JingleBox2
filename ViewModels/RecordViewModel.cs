@@ -161,6 +161,109 @@ public sealed partial class RecordViewModel : ObservableObject
     /// </summary>
     public event EventHandler<string>? RecordingChanged;
 
+    /// <summary>
+    /// Raised when a recording has moved, with where it was and where it is now, so anything
+    /// holding the old path can follow it.
+    /// </summary>
+    public event EventHandler<(string From, string To)>? RecordingRenamed;
+
+    /// <summary>The name in the edit dialog's box, which is what a rename would call it.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RenameError))]
+    private string editName = "";
+
+    partial void OnEditNameChanged(string value) => OnPropertyChanged(nameof(CanRename));
+
+    /// <summary>Why that name cannot be used, or null when it can.</summary>
+    public string? RenameError
+    {
+        get
+        {
+            var recording = SelectedRecordingForEdit;
+
+            if (recording == null) return null;
+
+            string wanted = (EditName ?? "").Trim();
+
+            if (string.Equals(wanted, recording.Name, StringComparison.Ordinal)) return null;
+
+            return RecordingNameValidator.Validate(
+                wanted,
+                Recordings.Where(r => !ReferenceEquals(r, recording)).Select(r => r.Name));
+        }
+    }
+
+    public bool CanRename => RenameError == null && SelectedRecordingForEdit != null;
+
+    /// <summary>
+    /// Gives the recording another name, which for a recording means another file name.
+    /// </summary>
+    /// <remarks>
+    /// The name shown is read off the file when the list is built, so there is nowhere else to
+    /// put it: renaming is moving. Which is why the instruments that play it are repointed in
+    /// the same breath, on the shelf and in whatever song is open, rather than being left to
+    /// find out at the next note.
+    /// </remarks>
+    public async Task<bool> RenameAsync(string? newName)
+    {
+        var recording = SelectedRecordingForEdit;
+
+        if (recording == null) return false;
+
+        string wanted = (newName ?? "").Trim();
+
+        if (string.Equals(wanted, recording.Name, StringComparison.Ordinal)) return true;
+
+        string? problem = RecordingNameValidator.Validate(
+            wanted, Recordings.Where(r => !ReferenceEquals(r, recording)).Select(r => r.Name));
+
+        if (problem != null)
+        {
+            Status = problem;
+            return false;
+        }
+
+        string from = recording.FilePath;
+        string? folder = Path.GetDirectoryName(from);
+
+        if (folder == null) return false;
+
+        string to = Path.Combine(folder, wanted + Path.GetExtension(from));
+
+        if (File.Exists(to))
+        {
+            Status = "There is already a file by that name.";
+            return false;
+        }
+
+        try
+        {
+            // A file being played is a file that is open, which on Windows is a file that will
+            // not move.
+            if (ReferenceEquals(_playing, recording)) StopPreview();
+
+            await Task.Run(() => File.Move(from, to));
+
+            recording.FilePath = to;
+            recording.Name = wanted;
+
+            int moved = _sampleUsage?.Repoint(from, to) ?? 0;
+
+            RecordingRenamed?.Invoke(this, (from, to));
+
+            Status = moved == 0
+                ? $"Renamed to '{wanted}'"
+                : $"Renamed to '{wanted}', and {moved} instrument{(moved == 1 ? "" : "s")} followed it";
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Rename failed: {ex.Message}";
+            return false;
+        }
+    }
+
     private void RefreshDevices()
     {
         string? previous = SelectedDevice ?? _cfg.RecordInputDevice;
@@ -244,6 +347,8 @@ public sealed partial class RecordViewModel : ObservableObject
         try
         {
             SelectedRecordingForEdit = recording;
+            EditName = recording.Name;
+
             var waveform = _waveformService.AnalyzeFile(recording.FilePath);
             CurrentWaveform = waveform;
 

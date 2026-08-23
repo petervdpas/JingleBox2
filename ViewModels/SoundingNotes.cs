@@ -44,6 +44,16 @@ public sealed class SoundingNotes
     /// <summary>The semitones lit now. The keyboard follows this as it changes.</summary>
     public ObservableCollection<int> Lit { get; } = new();
 
+    /// <summary>
+    /// Raised on every beat of the clock, and once the moment a note is struck.
+    /// </summary>
+    /// <remarks>
+    /// Something is sounding exactly while this clock is running, so anything else that has to
+    /// keep up with a sounding note can hang off it rather than starting a timer of its own and
+    /// leaving it ticking over an empty room.
+    /// </remarks>
+    public event Action? Ticked;
+
     /// <summary>A note has just been played, and should light for as long as it sounds.</summary>
     /// <param name="alone">
     /// True for a note from a track, which has one voice: it puts out whatever that track was
@@ -79,6 +89,9 @@ public sealed class SoundingNotes
         _left[note.Semitone] = ticks;
 
         if (!_clock.IsEnabled) _clock.Start();
+
+        // At once, so a cursor appears with the note rather than a fortieth of a second later.
+        Ticked?.Invoke();
     }
 
     /// <summary>Everything goes dark, for a transport that has stopped.</summary>
@@ -94,6 +107,8 @@ public sealed class SoundingNotes
         Lit.Clear();
         _alone = -1;
         _clock.Stop();
+
+        Ticked?.Invoke();
     }
 
     private void Tick()
@@ -116,5 +131,7 @@ public sealed class SoundingNotes
 
         // Nothing sounding is nothing to count down, so the timer stops rather than idling.
         if (_left.Count == 0) _clock.Stop();
+
+        Ticked?.Invoke();
     }
 }

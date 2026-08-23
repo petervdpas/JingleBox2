@@ -721,7 +721,29 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public int EngineSampleRate => _player.SampleRate;
 
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
+    public double SamplePosition(int track) => _player.SamplePosition(track);
+
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
+
+    /// <summary>
+    /// Follows a recording that has been renamed, for the song that is open.
+    /// </summary>
+    /// <remarks>
+    /// A song owns its instruments, so the shelf being repointed does nothing for the one being
+    /// worked on. Both are told, and neither knows about the other.
+    /// </remarks>
+    public void RenameSample(string from, string to)
+    {
+        bool moved = false;
+
+        foreach (var instrument in Song.Instruments)
+            if (SampleUsage.Repoint(instrument, from, to)) moved = true;
+
+        _player.ReloadInstrument(from);
+        _player.ReloadInstrument(to);
+
+        if (moved) MarkDirty();
+    }
 
     /// <summary>
     /// Opens the audio again after the output device has been changed underneath it.

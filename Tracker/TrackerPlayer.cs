@@ -634,6 +634,9 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>
     public void ReloadInstrument(string filePath) => _samples.Invalidate(filePath);
 
+    /// <summary>How far through its recording a sounding sample voice is, or -1 for none.</summary>
+    public double SamplePosition(int track) => _synth.Mixer.SamplePosition(track);
+
     private void RunClock(CancellationToken token, int generation)
     {
         Song song;

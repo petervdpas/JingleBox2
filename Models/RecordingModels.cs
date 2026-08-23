@@ -27,6 +27,16 @@ public sealed partial class Recording : ObservableObject
 
     /// <summary>True while this recording is the one being auditioned from the list.</summary>
     [ObservableProperty] private bool isPlaying;
+
+    /// <summary>
+    /// What a picker shows when it is given one of these and told nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Every other thing in this app that lands in a list says its own name this way, and this
+    /// was the one that did not, so a take picker offered four rows all reading
+    /// "JingleBox2.Models.Recording".
+    /// </remarks>
+    public override string ToString() => Name;
 }
 
 public class WaveformData

@@ -65,6 +65,14 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
 - `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Where a sound starts: taking one into a song copies it, and the copy is then the song's own. Editing it in the song changes that song alone. A synth or plugin patch travels inside the song; a recording does not, since the instrument keeps only the path to it
+- `SampleSlicer` (Tracker/): Where a recording gets cut into pieces. Finds the attacks off the
+  peak data by beating a decaying peak-hold, walks each cut back to where its sound began, and
+  falls back to an even division when there is nothing to find. Knows nothing about what takes
+  the pieces
+- `Slices` / `KeyRegions` (Tracker/): The parts a kit and a map do identically. Reading the cuts
+  back off the pieces, and sharing a stretch of keyboard out among them
+- `SliceEditorViewModel` / `SliceEditor` (ViewModels/, Views/): One take, its picture and its
+  boundaries, used by both machines that hold pieces
 - `Knob` / `Fader` / `NumberField` (Views/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field
 - `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
@@ -81,6 +89,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   generated at playback time (the parameter set mirrors MappoGraph's chiptune synth, plus a
   drive control). The
   tracker only ever loads instruments; whether one is a sample or a synth is its own business
+- Both Zampler and BongaBong can be filled from one recording rather than many: chopping. A
+  chopped instrument is one whose pieces all point at the same file with different windows, so
+  it needs no new storage and the take is decoded once for all of them. The cuts are not stored
+  separately; they are read back off the pieces. Put a different sample on one piece and it
+  stops being a chop, which is why `IsSliced` is asked rather than the `Sliced` flag
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound

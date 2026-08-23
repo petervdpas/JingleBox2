@@ -214,6 +214,7 @@ public sealed partial class MainViewModel : ObservableObject
         // Trimming a recording changes what its instruments sound like, and the player is
         // holding the old audio.
         Record.RecordingChanged += (_, path) => Tracker.ReloadSample(path);
+        Record.RecordingRenamed += (_, moved) => Tracker.RenameSample(moved.From, moved.To);
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

@@ -151,6 +151,25 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         return _map.Zones.Count(z => z.HasSound);
     }
 
+    /// <summary>
+    /// Reads the map again after a slicing, rebuilding only when the number of zones changed.
+    /// </summary>
+    /// <remarks>
+    /// A boundary being dragged fires this on every movement of the pointer, and a rebuild
+    /// throws away every zone's view model and with it whichever one was selected. So the
+    /// common case, the same zones with different windows, only says the values again.
+    /// </remarks>
+    public void Resliced()
+    {
+        if (Zones.Count != _map.Zones.Count) Rebuild();
+        else foreach (var zone in Zones) zone.Reread();
+
+        Say();
+    }
+
+    /// <summary>Picks the zone at that place in the map, for a piece chosen on the picture.</summary>
+    public void SelectAt(int index) => Selected = Zones.ElementAtOrDefault(index) ?? Selected;
+
     /// <summary>Reads the map again, for a preset that has just landed on it.</summary>
     public void Refresh()
     {

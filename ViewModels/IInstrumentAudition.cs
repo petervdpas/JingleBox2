@@ -12,6 +12,16 @@ public interface IInstrumentAudition
     void Audition(TrackerInstrument instrument, Note note, int volume);
 
     /// <summary>
+    /// How far through its recording the sample voice on that track is, as a fraction of the
+    /// whole file, or -1 when nothing is playing one.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than told, because the audio thread cannot be made to raise events forty
+    /// times a second and the panel is going to redraw on its own clock regardless.
+    /// </remarks>
+    double SamplePosition(int track);
+
+    /// <summary>
     /// The live plugin behind a plugin instrument, loaded if it is not already open. Null for
     /// any other kind, and for a plugin this host cannot play.
     /// </summary>

@@ -61,6 +61,10 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
+
+        // And the chop editor's cursor runs on the same clock, which is running exactly while
+        // something is sounding.
+        Sounding.Ticked += MovePlayhead;
     }
 
     /// <summary>Which track this is the instrument of, for a title that says so.</summary>
@@ -118,6 +122,19 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     {
         Editor?.Reloaded();
         _changed();
+    }
+
+    /// <summary>Where the sound has got to, for the chop editor's cursor.</summary>
+    private void MovePlayhead()
+    {
+        var slices = Editor?.Slices;
+
+        if (slices == null) return;
+
+        // Nothing lit is nothing sounding, and this is the last beat of the clock before it
+        // stops. Asking the engine here would catch a voice still letting go of its release and
+        // leave the line standing in the middle of the picture with nothing playing.
+        slices.Playhead = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(Track);
     }
 
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>

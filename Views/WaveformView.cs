@@ -4,6 +4,9 @@ using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Waveform;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 
 namespace JingleBox2.Views;
 
@@ -57,6 +60,36 @@ public class WaveformView : ThemedControl
         AvaloniaProperty.Register<WaveformView, double>(
             nameof(LoopEnd), 1, defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>
+    /// Where the recording is cut into pieces, as fractions of it. Null for a waveform that is
+    /// not sliced, which is every one that was here before this arrived.
+    /// </summary>
+    /// <remarks>
+    /// One more point than there are pieces: the first is where the sliced region begins, the
+    /// last is where it ends, and every point between is a boundary two pieces share. The
+    /// control edits this list in place, so whoever owns it hears about a drag, an added point
+    /// or a removed one through its own collection rather than through an event here.
+    /// </remarks>
+    public static readonly StyledProperty<ObservableCollection<double>?> SlicePointsProperty =
+        AvaloniaProperty.Register<WaveformView, ObservableCollection<double>?>(nameof(SlicePoints));
+
+    /// <summary>
+    /// Where the sound has got to in the recording, as a fraction of it, or -1 for silence.
+    /// </summary>
+    public static readonly StyledProperty<double> PlayheadProperty =
+        AvaloniaProperty.Register<WaveformView, double>(nameof(Playhead), -1);
+
+    /// <summary>Which piece is being worked on, or -1 for none.</summary>
+    public static readonly StyledProperty<int> SelectedSliceProperty =
+        AvaloniaProperty.Register<WaveformView, int>(
+            nameof(SelectedSlice), -1, defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>
+    /// How many pieces this waveform will let you cut. A kit holds sixteen, a map thirty-two.
+    /// </summary>
+    public static readonly StyledProperty<int> MaxSlicesProperty =
+        AvaloniaProperty.Register<WaveformView, int>(nameof(MaxSlices), 32);
+
     /// <summary>Which handle the pointer has hold of, or none.</summary>
     private enum Handle
     {
@@ -69,11 +102,18 @@ public class WaveformView : ThemedControl
 
     private Handle _dragging = Handle.None;
 
+    /// <summary>Which slice point the pointer has hold of, or -1.</summary>
+    private int _draggingPoint = -1;
+
+    /// <summary>The list being watched, so it can be let go of when another arrives.</summary>
+    private ObservableCollection<double>? _watching;
+
     static WaveformView()
     {
         AffectsRender<WaveformView>(
             PeaksProperty, PlaceholderProperty, ShowMarkersProperty, ShowLoopProperty,
-            StartProperty, EndProperty, LoopStartProperty, LoopEndProperty);
+            StartProperty, EndProperty, LoopStartProperty, LoopEndProperty,
+            SlicePointsProperty, SelectedSliceProperty, PlayheadProperty);
     }
 
     public float[]? Peaks
@@ -124,6 +164,53 @@ public class WaveformView : ThemedControl
         set => SetValue(LoopEndProperty, value);
     }
 
+    public ObservableCollection<double>? SlicePoints
+    {
+        get => GetValue(SlicePointsProperty);
+        set => SetValue(SlicePointsProperty, value);
+    }
+
+    public int SelectedSlice
+    {
+        get => GetValue(SelectedSliceProperty);
+        set => SetValue(SelectedSliceProperty, value);
+    }
+
+    public double Playhead
+    {
+        get => GetValue(PlayheadProperty);
+        set => SetValue(PlayheadProperty, value);
+    }
+
+    public int MaxSlices
+    {
+        get => GetValue(MaxSlicesProperty);
+        set => SetValue(MaxSlicesProperty, value);
+    }
+
+    /// <summary>True when there is a slicing to show. Two points is one piece, the least there is.</summary>
+    private bool Slicing => SlicePoints is { Count: >= 2 };
+
+    /// <summary>
+    /// A point moved, arrived or went. The list is the property, so a change to it is a change
+    /// to the picture and has to be repainted like any other.
+    /// </summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property != SlicePointsProperty) return;
+
+        if (_watching != null) _watching.CollectionChanged -= OnSlicePointsChanged;
+
+        _watching = SlicePoints;
+
+        if (_watching != null) _watching.CollectionChanged += OnSlicePointsChanged;
+    }
+
+    private void OnSlicePointsChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        InvalidateVisual();
+
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -153,7 +240,125 @@ public class WaveformView : ThemedControl
         var geometry = WaveformGeometry.Build(peaks, FullView, width, height);
         context.DrawGeometry(new SolidColorBrush(palette.Accent, 0.85), null, geometry);
 
-        if (ShowMarkers) DrawMarkers(context, palette, area);
+        if (Slicing) DrawSlices(context, palette, area);
+        else if (ShowMarkers) DrawMarkers(context, palette, area);
+
+        DrawPlayhead(context, palette, area);
+    }
+
+    /// <summary>
+    /// Where the sound has got to, drawn over everything else.
+    /// </summary>
+    /// <remarks>
+    /// Over the boundaries and the shading, because it is the one thing here that is moving and
+    /// a moving line half hidden behind a still one reads as a drawing fault. In the text
+    /// colour rather than the accent, so it cannot be mistaken for a boundary you could take
+    /// hold of: this one is telling you something, not offering anything.
+    /// </remarks>
+    private void DrawPlayhead(DrawingContext context, ThemePalette palette, Rect area)
+    {
+        double at = Playhead;
+
+        if (double.IsNaN(at) || at < 0 || at > 1) return;
+
+        double x = Math.Clamp(X(at, area.Width), area.X + 1, area.Right - 1);
+
+        context.DrawLine(
+            new Pen(new SolidColorBrush(palette.Text, 0.95), 1.5),
+            new Point(x, area.Y + 1),
+            new Point(x, area.Bottom - 1));
+    }
+
+    /// <summary>
+    /// The pieces, with the one being worked on picked out and the recording either side of
+    /// the sliced region dimmed.
+    /// </summary>
+    /// <remarks>
+    /// The boundaries are drawn last and over everything, because a boundary that a shading
+    /// rectangle has half covered is one you cannot tell you are allowed to take hold of.
+    /// </remarks>
+    private void DrawSlices(DrawingContext context, ThemePalette palette, Rect area)
+    {
+        var points = SlicePoints!;
+        double width = area.Width;
+        double head = X(points[0], width);
+        double tail = X(points[^1], width);
+
+        var shade = new SolidColorBrush(palette.Background, 0.72);
+
+        if (head > 1) context.FillRectangle(shade, new Rect(1, 1, head - 1, area.Height - 2));
+        if (tail < width - 1) context.FillRectangle(shade, new Rect(tail, 1, width - tail - 1, area.Height - 2));
+
+        int selected = SelectedSlice;
+        bool picked = selected >= 0 && selected < points.Count - 1;
+
+        if (picked)
+        {
+            double from = X(points[selected], width);
+            double to = X(points[selected + 1], width);
+
+            context.FillRectangle(
+                new SolidColorBrush(palette.Accent, 0.16),
+                new Rect(from, 1, Math.Max(1, to - from), area.Height - 2));
+        }
+
+        if (picked && ShowLoop)
+        {
+            double from = X(points[selected], width);
+            double to = X(points[selected + 1], width);
+            double loopStart = Math.Clamp(X(LoopStart, width), from, to);
+            double loopEnd = Math.Clamp(X(LoopEnd, width), from, to);
+
+            if (loopEnd > loopStart)
+            {
+                context.FillRectangle(
+                    new SolidColorBrush(palette.Accent, 0.20),
+                    new Rect(loopStart, 1, loopEnd - loopStart, area.Height - 2));
+            }
+
+            DrawHandle(context, palette.Accent, loopStart, area, dashed: true, atFoot: true);
+            DrawHandle(context, palette.Accent, loopEnd, area, dashed: true, atFoot: true);
+        }
+
+        DrawSliceNumbers(context, palette, area, points);
+
+        for (int i = 0; i < points.Count; i++)
+        {
+            bool edge = i == 0 || i == points.Count - 1;
+
+            DrawHandle(context, edge ? palette.Text : palette.Accent, X(points[i], width), area, dashed: false);
+        }
+    }
+
+    /// <summary>
+    /// Which piece is which, where there is room to say so. A number in a piece too narrow to
+    /// hold it would sit over its neighbour and read as belonging to the wrong one.
+    /// </summary>
+    private void DrawSliceNumbers(
+        DrawingContext context, ThemePalette palette, Rect area, IList<double> points)
+    {
+        const double Narrowest = 16;
+
+        double width = area.Width;
+        var brush = new SolidColorBrush(palette.Muted, 0.9);
+
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            double from = X(points[i], width);
+            double to = X(points[i + 1], width);
+
+            if (to - from < Narrowest) continue;
+
+            var text = new FormattedText(
+                (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                Typeface.Default,
+                10,
+                i == SelectedSlice ? new SolidColorBrush(palette.Text) : brush);
+
+            context.DrawText(text, new Point(from + 4, area.Bottom - text.Height - GripHeight - 3));
+        }
     }
 
     /// <summary>
@@ -191,7 +396,11 @@ public class WaveformView : ThemedControl
         DrawHandle(context, palette.Text, end, area, dashed: false);
     }
 
-    private static void DrawHandle(DrawingContext context, Color colour, double x, Rect area, bool dashed)
+    /// <summary>How tall the grip on a handle is, and how far up the picture it reaches.</summary>
+    private const double GripHeight = 7;
+
+    private static void DrawHandle(
+        DrawingContext context, Color colour, double x, Rect area, bool dashed, bool atFoot = false)
     {
         var pen = new Pen(new SolidColorBrush(colour, dashed ? 0.9 : 0.75), dashed ? 1 : 1.5)
         {
@@ -201,10 +410,12 @@ public class WaveformView : ThemedControl
         double clamped = Math.Clamp(x, area.X + 1, area.Right - 1);
         context.DrawLine(pen, new Point(clamped, area.Y + 1), new Point(clamped, area.Bottom - 1));
 
-        // A grip at the top, so it is clear the line can be taken hold of.
-        context.FillRectangle(
-            new SolidColorBrush(colour, 0.9),
-            new Rect(clamped - 3, area.Y + 1, 6, 5));
+        // A grip, so it is clear the line can be taken hold of. At the foot for a loop and at
+        // the head for a boundary, because on a looping piece the two lines can lie on the same
+        // pixel and something has to say which one a click meant.
+        double top = atFoot ? area.Bottom - 1 - GripHeight : area.Y + 1;
+
+        context.FillRectangle(new SolidColorBrush(colour, 0.9), new Rect(clamped - 3, top, 6, GripHeight));
     }
 
     private void DrawPlaceholder(DrawingContext context, ThemePalette palette, Rect area)
@@ -229,9 +440,18 @@ public class WaveformView : ThemedControl
     {
         base.OnPointerPressed(e);
 
-        if (!ShowMarkers || Peaks == null) return;
+        if (Peaks == null) return;
 
         double x = e.GetPosition(this).X;
+
+        if (Slicing)
+        {
+            PressedOnSlices(e, x);
+            return;
+        }
+
+        if (!ShowMarkers) return;
+
         _dragging = Nearest(x);
 
         if (_dragging == Handle.None) return;
@@ -241,19 +461,81 @@ public class WaveformView : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// A click on a sliced waveform: take hold of a boundary, or pick the piece under the
+    /// pointer. Twice adds a boundary where there was none and takes one away where there was.
+    /// </summary>
+    /// <remarks>
+    /// The same gesture both ways round on purpose. A cut and an uncut are the same kind of
+    /// thing to want, and asking for them differently, one on the picture and one on a button
+    /// somewhere else, makes the picture read as something you can only look at.
+    /// </remarks>
+    private void PressedOnSlices(PointerPressedEventArgs e, double x)
+    {
+        // A loop handle taken by its grip at the foot of the picture, before the boundaries are
+        // considered: on a looping piece the two lines can be the same line, and the grips are
+        // the only thing that tells them apart.
+        if (e.ClickCount < 2 && GrabbedLoop(e, x)) return;
+
+        int point = NearestPoint(x);
+
+        if (e.ClickCount >= 2)
+        {
+            if (point >= 0) RemovePoint(point);
+            else AddPoint(At(x));
+
+            e.Handled = true;
+            return;
+        }
+
+        if (point >= 0)
+        {
+            // The two ends and the boundaries drag the same way; only what they are next to
+            // differs, and MovePoint already knows that.
+            _draggingPoint = point;
+            e.Pointer.Capture(this);
+            MovePoint(point, At(x));
+            e.Handled = true;
+            return;
+        }
+
+        int slice = SliceAt(At(x));
+
+        if (slice >= 0) SelectedSlice = slice;
+
+        e.Handled = true;
+    }
+
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
 
+        if (_draggingPoint >= 0)
+        {
+            MovePoint(_draggingPoint, At(e.GetPosition(this).X));
+            e.Handled = true;
+            return;
+        }
+
         if (_dragging == Handle.None) return;
 
-        Move(e.GetPosition(this).X);
+        if (Slicing) MoveLoop(At(e.GetPosition(this).X));
+        else Move(e.GetPosition(this).X);
+
         e.Handled = true;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_draggingPoint >= 0)
+        {
+            _draggingPoint = -1;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
 
         if (_dragging == Handle.None) return;
 
@@ -325,6 +607,164 @@ public class WaveformView : ThemedControl
                 LoopEnd = Math.Clamp(at, Math.Min(End, LoopStart + MinGap), End);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Takes hold of a loop handle when the press was on one of their grips. False when it was
+    /// not, and the press goes on to mean whatever else it meant.
+    /// </summary>
+    private bool GrabbedLoop(PointerPressedEventArgs e, double x)
+    {
+        var points = SlicePoints;
+        int selected = SelectedSlice;
+
+        if (!ShowLoop || points == null) return false;
+        if (selected < 0 || selected >= points.Count - 1) return false;
+
+        // Only the foot of the picture, where the loop grips are drawn.
+        if (e.GetPosition(this).Y < Bounds.Height - GripHeight - GrabPixels / 2) return false;
+
+        double width = Bounds.Width;
+        if (width <= 0) return false;
+
+        double toStart = Math.Abs(X(LoopStart, width) - x);
+        double toEnd = Math.Abs(X(LoopEnd, width) - x);
+
+        if (Math.Min(toStart, toEnd) > GrabPixels) return false;
+
+        _dragging = toStart <= toEnd ? Handle.LoopStart : Handle.LoopEnd;
+
+        e.Pointer.Capture(this);
+        MoveLoop(At(x));
+        e.Handled = true;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Moves the held loop handle, kept inside the piece it belongs to rather than inside the
+    /// whole recording: a loop that wandered out of its piece would play the one next door.
+    /// </summary>
+    private void MoveLoop(double at)
+    {
+        var points = SlicePoints;
+        int selected = SelectedSlice;
+
+        if (points == null || selected < 0 || selected >= points.Count - 1) return;
+
+        double from = points[selected];
+        double to = points[selected + 1];
+
+        if (_dragging == Handle.LoopStart)
+            LoopStart = Math.Clamp(at, from, Math.Max(from, Math.Min(to, LoopEnd) - MinGap));
+        else if (_dragging == Handle.LoopEnd)
+            LoopEnd = Math.Clamp(at, Math.Min(to, Math.Max(from, LoopStart) + MinGap), to);
+    }
+
+    /// <summary>Where in the recording a click landed, as a fraction of it.</summary>
+    private double At(double x)
+    {
+        double width = Bounds.Width;
+
+        return width <= 0 ? 0 : Math.Clamp(x / width, 0, 1);
+    }
+
+    /// <summary>The slice point a click means, or -1 when the click is nowhere near one.</summary>
+    private int NearestPoint(double x)
+    {
+        var points = SlicePoints;
+        double width = Bounds.Width;
+
+        if (points == null || width <= 0) return -1;
+
+        int best = -1;
+        double closest = GrabPixels;
+
+        for (int i = 0; i < points.Count; i++)
+        {
+            double distance = Math.Abs(X(points[i], width) - x);
+
+            if (distance > closest) continue;
+
+            closest = distance;
+            best = i;
+        }
+
+        return best;
+    }
+
+    /// <summary>Which piece a position falls in, or -1 when it falls outside the sliced region.</summary>
+    private int SliceAt(double at)
+    {
+        var points = SlicePoints;
+
+        if (points == null) return -1;
+
+        for (int i = 0; i < points.Count - 1; i++)
+            if (at >= points[i] && at <= points[i + 1]) return i;
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Moves one boundary, stopping it next to its neighbours rather than through them. The
+    /// two ends are free to move out to the ends of the recording.
+    /// </summary>
+    private void MovePoint(int index, double at)
+    {
+        var points = SlicePoints;
+
+        if (points == null || index < 0 || index >= points.Count) return;
+
+        double lowest = index > 0 ? points[index - 1] + MinGap : 0;
+        double highest = index < points.Count - 1 ? points[index + 1] - MinGap : 1;
+
+        if (highest < lowest) return;
+
+        double moved = Math.Clamp(at, lowest, highest);
+
+        if (Math.Abs(moved - points[index]) < 1e-9) return;
+
+        points[index] = moved;
+    }
+
+    /// <summary>
+    /// Cuts a piece in two. Nothing happens outside the sliced region, where a boundary would
+    /// belong to no piece, or when there is no room left for another one.
+    /// </summary>
+    private void AddPoint(double at)
+    {
+        var points = SlicePoints;
+
+        if (points == null || points.Count < 2) return;
+        if (points.Count - 1 >= MaxSlices) return;
+        if (at <= points[0] || at >= points[^1]) return;
+
+        int index = 0;
+        while (index < points.Count && points[index] < at) index++;
+
+        if (index > 0 && at - points[index - 1] < MinGap) return;
+        if (index < points.Count && points[index] - at < MinGap) return;
+
+        points.Insert(index, at);
+
+        // The new boundary opened a piece before it; that is the one the click asked about.
+        SelectedSlice = index - 1;
+    }
+
+    /// <summary>
+    /// Takes a boundary away, so the two pieces either side of it become one. The ends of the
+    /// sliced region are not boundaries between pieces and do not go.
+    /// </summary>
+    private void RemovePoint(int index)
+    {
+        var points = SlicePoints;
+
+        if (points == null || index <= 0 || index >= points.Count - 1) return;
+
+        points.RemoveAt(index);
+
+        if (SelectedSlice >= points.Count - 1) SelectedSlice = points.Count - 2;
     }
 
     private static double X(double fraction, double width) =>

@@ -83,6 +83,29 @@ public sealed class InstrumentLibrary : ISampleUsage
     /// </summary>
     public IReadOnlyList<string> InstrumentsUsing(string filePath) => SampleUsage.By(List(), filePath);
 
+    /// <summary>
+    /// Follows a recording to its new place, for every instrument on the shelf that plays it.
+    /// </summary>
+    /// <remarks>
+    /// The shelf only. A song holds its own copies of the instruments it uses, so a song that
+    /// is open is repointed by whoever is holding it and a song on disc keeps the old path
+    /// until it is opened and its instrument taken from the shelf again.
+    /// </remarks>
+    public int Repoint(string from, string to)
+    {
+        int moved = 0;
+
+        foreach (var instrument in List())
+        {
+            if (!SampleUsage.Repoint(instrument, from, to)) continue;
+
+            Save(instrument);
+            moved++;
+        }
+
+        return moved;
+    }
+
     /// <summary>False when there was nothing to remove.</summary>
     public bool Delete(string id)
     {

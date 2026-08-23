@@ -168,6 +168,20 @@ public sealed class SampleVoice : IVoice
     /// <summary>Finished when the envelope closes, or when a one-shot runs off its end.</summary>
     public bool IsFinished => _ended || _envelope.IsFinished;
 
+    /// <summary>
+    /// Where the read head is, as a fraction of the whole recording, or -1 once it has stopped.
+    /// </summary>
+    /// <remarks>
+    /// Read from the drawing thread while the audio thread is writing it, and deliberately not
+    /// locked. A double is written whole on the runtimes this ships on, so the worst that can
+    /// happen is a cursor a fortieth of a second behind, which is what a cursor is anyway.
+    /// Locking the audio thread to draw a line would be the actual mistake.
+    /// </remarks>
+    public double Progress =>
+        IsFinished || _sample.FrameCount <= 0
+            ? -1
+            : Math.Clamp(_position / _sample.FrameCount, 0, 1);
+
     public void HoldFor(double seconds) => _holdSeconds = seconds;
 
     public void NoteOff()

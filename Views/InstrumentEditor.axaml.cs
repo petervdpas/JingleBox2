@@ -141,29 +141,6 @@ public partial class InstrumentEditor : UserControl
         editor.Zones.Fill(editor.Import(found));
     }
 
-    /// <summary>Fills the pads from the recordings JingleBox already holds.</summary>
-    private void FillPadsFromTakes_Click(object? sender, RoutedEventArgs e)
-    {
-        var editor = Designer?.Editor;
-
-        editor?.Kit?.Fill(Takes(editor));
-    }
-
-    /// <summary>Builds the whole map from the recordings JingleBox already holds.</summary>
-    private void FillZonesFromTakes_Click(object? sender, RoutedEventArgs e)
-    {
-        var editor = Designer?.Editor;
-
-        editor?.Zones?.Fill(Takes(editor));
-    }
-
-    /// <summary>The paths of your recordings, in the order the list holds them.</summary>
-    private static IReadOnlyList<string> Takes(InstrumentEditorViewModel editor) =>
-        editor.Recordings
-            .Where(r => r.FilePath.Length > 0)
-            .Select(r => r.FilePath)
-            .ToList();
-
     /// <summary>
     /// Asks for any number of samples, sorted by name.
     /// </summary>

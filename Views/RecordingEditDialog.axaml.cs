@@ -51,6 +51,9 @@ public partial class RecordingEditDialog : Window
     /// <summary>Guards against a second Apply landing while the file is being rewritten.</summary>
     private bool _applying;
 
+    /// <summary>The same, for a rename: the file is moving and cannot move twice.</summary>
+    private bool _renaming;
+
     private double CanvasWidth => _canvas?.Width ?? 0;
 
     public RecordingEditDialog()
@@ -351,6 +354,30 @@ public partial class RecordingEditDialog : Window
     }
 
     private void Cancel_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// Gives the recording another name. The dialog stays open: renaming is not finishing, and
+    /// the usual next thing is to trim what you have just named.
+    /// </summary>
+    private async void Rename_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm == null || _renaming) return;
+
+        // Playing from inside the dialog holds the file open, and a file that is open is one
+        // that will not move on Windows.
+        _player.Stop();
+
+        _renaming = true;
+
+        try
+        {
+            await _vm.RenameAsync(_vm.EditName);
+        }
+        finally
+        {
+            _renaming = false;
+        }
+    }
 
     private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

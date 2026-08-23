@@ -100,6 +100,33 @@ public sealed class SynthMixer
     /// Points one strip's side chain at another track. Depth of zero, or no key, is a strip
     /// that plays at its own level.
     /// </summary>
+    /// <summary>
+    /// How far through its recording the newest sounding sample voice is, or -1 for none.
+    /// </summary>
+    /// <remarks>
+    /// A track's own voice and a voice auditioned by hand both answer, because a panel showing
+    /// a cursor wants the piece that is playing and does not care which of the two started it.
+    /// Newest first: playing a second key while the first still rings should move the cursor to
+    /// what was just asked for.
+    /// </remarks>
+    public double SamplePosition(int track)
+    {
+        lock (_lock)
+        {
+            for (int i = _voices.Count - 1; i >= 0; i--)
+            {
+                if (_voices[i] is not SampleVoice voice) continue;
+                if (voice.Track != track && voice.Track != SynthVoice.NoTrack) continue;
+
+                double at = voice.Progress;
+
+                if (at >= 0) return at;
+            }
+        }
+
+        return -1;
+    }
+
     public void SetDucking(int track, double depth, int key, double releaseMs)
     {
         if (track < 0 || track >= MaxTracks) return;

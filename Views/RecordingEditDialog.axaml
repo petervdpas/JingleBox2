@@ -6,11 +6,26 @@
         x:DataType="vm:RecordViewModel"
         Title="Edit Recording"
         Width="840"
-        Height="400"
+        Height="460"
         WindowStartupLocation="CenterOwner">
 
   <StackPanel Spacing="12" Margin="16">
-    <TextBlock Text="{Binding SelectedRecordingForEdit.Name, StringFormat='Editing: {0}'}" FontWeight="Bold" FontSize="16" />
+    <!-- A recording's name is its file name, so this box moves the file. Every instrument
+         playing it is repointed at the same moment, on the shelf and in the song that is
+         open, which is why it can be an ordinary box and not a warning. -->
+    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <TextBlock Grid.Column="0" Text="Name" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+
+      <TextBox Grid.Column="1" Name="NameBox" FontSize="14"
+               Text="{Binding EditName, Mode=TwoWay}"
+               ToolTip.Tip="What the recording is called, which is also what its file is called." />
+
+      <Button Grid.Column="2" Name="RenameButton" Content="Rename" Click="Rename_Click"
+              MinWidth="90" IsEnabled="{Binding CanRename}" />
+    </Grid>
+
+    <TextBlock Text="{Binding RenameError}" Foreground="{DynamicResource DangerBrush}"
+               FontSize="12" IsVisible="{Binding RenameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <!-- Waveform Editor -->
     <Border Classes="card">

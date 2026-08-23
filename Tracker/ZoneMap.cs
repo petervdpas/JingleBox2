@@ -95,10 +95,13 @@ public sealed class SampleZone
 /// What Zampler plays: recordings laid across the keyboard, each transposed from its own root.
 /// </summary>
 /// <remarks>
-/// The same playback the recording machine does, with a map in front of it, exactly as
-/// BongaBong is. The two machines differ in one line: a pad passes the played note as its own
-/// root so nothing is resampled, and a zone passes the root it was recorded at so everything
-/// is. Neither needs a second way of getting audio out of a file.
+/// A key here is a pitch. It picks a zone and then says how fast to read it, relative to the
+/// note that zone was recorded at, so every key but one is resampled. Which is the first of
+/// several things that make this a different machine from a kit rather than the same one with
+/// ranges: a zone takes the track's one voice as any instrument does, and what comes out of it
+/// goes through a four-pole filter and two envelopes before it is heard.
+///
+/// What this shares with a kit is reading audio out of a file, and being cuttable into pieces.
 ///
 /// Zones are asked in order and the first that covers the key wins, so putting a narrow zone
 /// above a wide one is how you carve an exception out of it.
@@ -143,28 +146,112 @@ public sealed class ZoneMap
         var sounding = Zones.Where(z => z.HasSound).ToList();
         if (sounding.Count == 0) return;
 
-        low = Math.Clamp(low, 0, 119);
-        high = Math.Clamp(high, low, 119);
-
-        int span = high - low + 1;
+        var regions = KeyRegions.Split(low, high, sounding.Count);
 
         for (int i = 0; i < sounding.Count; i++)
         {
-            int from = low + span * i / sounding.Count;
-            int to = low + span * (i + 1) / sounding.Count - 1;
-
-            // The last zone takes whatever the division left over, so nothing above it is silent.
-            if (i == sounding.Count - 1) to = high;
-
-            sounding[i].Low = from;
-            sounding[i].High = Math.Max(from, to);
-            sounding[i].Root = (sounding[i].Low + sounding[i].High) / 2;
+            sounding[i].Low = regions[i].Low;
+            sounding[i].High = regions[i].High;
+            sounding[i].Root = KeyRegions.Middle(regions[i].Low, regions[i].High);
         }
+    }
+
+    /// <summary>
+    /// True when the zones here are pieces of one recording rather than separate recordings.
+    /// </summary>
+    /// <remarks>
+    /// Stored rather than worked out, because a map of one zone with one file looks exactly
+    /// like a map sliced into one piece and the panel has to know which of the two it is
+    /// holding. Where the cuts are is not stored: that is the zones' business, and asking them
+    /// is the only way to find out.
+    /// </remarks>
+    public bool Sliced { get; set; }
+
+    /// <summary>
+    /// True when this really is a slicing right now: marked as one, and the pieces still agree
+    /// on the recording they came from. Putting a different sample on one of them ends it, which
+    /// is why this is asked rather than <see cref="Sliced"/> everywhere but the flag's own setter.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsSliced => Sliced && SlicedFile.Length > 0;
+
+    /// <summary>The recording the slices come from, or empty when they do not agree on one.</summary>
+    [JsonIgnore]
+    public string SlicedFile => Slices.OneFile(Zones.Select(z => z.FilePath));
+
+    /// <summary>
+    /// Where the recording was cut, read back off the zones. One more point than there are
+    /// slices: the first is where the sliced region starts, the last where it ends.
+    /// </summary>
+    public IReadOnlyList<double> SlicePoints() =>
+        IsSliced ? Slices.PointsFrom(Zones.Select(z => z.Shape).ToList()) : Array.Empty<double>();
+
+    /// <summary>
+    /// One recording cut at those points and laid across the keyboard, a piece to each stretch
+    /// of keys.
+    /// </summary>
+    public static ZoneMap Slice(
+        string filePath,
+        IReadOnlyList<double> points,
+        int low = KeyRegions.PianoLow,
+        int high = KeyRegions.PianoHigh)
+    {
+        var map = new ZoneMap();
+
+        map.Reslice(filePath, points, low, high);
+
+        return map;
+    }
+
+    /// <summary>
+    /// Lays the slices out again after a point has moved, arrived or gone.
+    /// </summary>
+    /// <remarks>
+    /// Adding a point moves every key range, not only the two slices either side of it, because
+    /// the same stretch of keyboard is now being shared out among one more piece. So the ranges
+    /// and the roots are laid again every time. What was set on a zone by hand, its level, its
+    /// place in the stereo field, its tuning, is left where it was for as many zones as survive
+    /// the change.
+    /// </remarks>
+    public void Reslice(
+        string filePath,
+        IReadOnlyList<double> points,
+        int low = KeyRegions.PianoLow,
+        int high = KeyRegions.PianoHigh)
+    {
+        int slices = Slices.CountFor(points, MaxZones);
+
+        if (slices == 0) return;
+
+        while (Zones.Count > slices) Zones.RemoveAt(Zones.Count - 1);
+        while (Zones.Count < slices) Zones.Add(new SampleZone());
+
+        var regions = KeyRegions.Split(low, high, slices);
+
+        for (int i = 0; i < slices; i++)
+        {
+            var zone = Zones[i];
+
+            zone.FilePath = filePath;
+            zone.Name = Slices.NameFor(filePath, i);
+
+            zone.Shape ??= new SampleShape();
+            zone.Shape.Start = points[i];
+            zone.Shape.End = points[i + 1];
+
+            zone.Low = regions[i].Low;
+            zone.High = regions[i].High;
+            zone.Root = KeyRegions.Middle(regions[i].Low, regions[i].High);
+        }
+
+        Sliced = true;
+
+        Clamp();
     }
 
     public ZoneMap Clone()
     {
-        var map = new ZoneMap();
+        var map = new ZoneMap { Sliced = Sliced };
 
         foreach (var zone in Zones) map.Zones.Add(zone.Clone());
 
@@ -182,6 +269,8 @@ public sealed class ZoneMap
         Zones.Clear();
 
         foreach (var zone in other.Zones) Zones.Add(zone.Clone());
+
+        Sliced = other.Sliced;
 
         Clamp();
     }

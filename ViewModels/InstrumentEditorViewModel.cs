@@ -67,10 +67,22 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             instrument.Zampler.Clamp();
 
             Zones = new ZoneMapViewModel(
-                instrument.Zones, changed,
+                instrument.Zones, Sounded(changed),
                 note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
             Zampler = new ZamplerPatchViewModel(instrument.Zampler, changed);
+
+            Slices = Cutting(
+                waveforms, ZoneMap.MaxZones,
+                (path, points) =>
+                {
+                    instrument.Zones.Reslice(path, points);
+                    Zones.Resliced();
+                },
+                at => instrument.Zones.Zones.ElementAtOrDefault(at)?.Shape,
+                changed);
+
+            FollowSound();
         }
 
         if (instrument.IsBongaBong)
@@ -79,8 +91,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             instrument.Kit.Clamp();
 
             Kit = new DrumKitViewModel(
-                instrument.Kit, changed,
+                instrument.Kit, Sounded(changed),
                 note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
+
+            Slices = Cutting(
+                waveforms, DrumKit.PadCount,
+                (path, points) =>
+                {
+                    instrument.Kit.Reslice(path, points);
+                    Kit.Resliced();
+                },
+                at => instrument.Kit.Pads.ElementAtOrDefault(at)?.Shape,
+                changed);
+
+            FollowSound();
         }
 
         Patch = new SynthPatchViewModel(instrument.Patch, changed);
@@ -139,6 +163,106 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>Zampler's map, when that is the machine. Null on every other.</summary>
     public ZoneMapViewModel? Zones { get; }
 
+    /// <summary>
+    /// The take being cut into pieces, on the machines that hold pieces. Null on every other.
+    /// </summary>
+    /// <remarks>
+    /// Both machines get the same one. What differs is how many pieces it will cut and what
+    /// happens to them afterwards, and both of those are settled where it is made.
+    /// </remarks>
+    public SliceEditorViewModel? Slices { get; }
+
+    public bool IsSlicing => Slices != null;
+
+    /// <summary>
+    /// Wraps a machine's change callback so the chop editor hears about it too.
+    /// </summary>
+    /// <remarks>
+    /// A recording arrives on a machine in several ways: one take onto one zone, a folder of
+    /// them at once, a preset landing. All of them end in the same callback, so following it is
+    /// following all of them, and there is no list of entry points to keep up to date.
+    /// </remarks>
+    private Action Sounded(Action changed) => () =>
+    {
+        changed();
+        FollowSound();
+    };
+
+    /// <summary>
+    /// Points the chop editor at the recording the machine is holding, if it is holding one.
+    /// </summary>
+    /// <remarks>
+    /// One recording shared by every piece is what a chopped machine is, and it is also what a
+    /// machine with a single sample on it looks like before it has been chopped. Which is why
+    /// there is no second place to load a take: chopping divides what is already there.
+    ///
+    /// A real multisample, several different recordings across the keyboard, has no one
+    /// recording to show, so the editor puts itself away rather than picking one of them.
+    /// </remarks>
+    private void FollowSound()
+    {
+        if (Slices == null) return;
+
+        if (Zones != null) Slices.Follow(Zones.Map.SlicedFile, Points(Zones.Map.IsSliced, Zones.Map.SlicePoints()));
+        else if (Kit != null) Slices.Follow(Kit.Kit.SlicedFile, Points(Kit.Kit.IsSliced, Kit.Kit.SlicePoints()));
+    }
+
+    private static IReadOnlyList<double>? Points(bool sliced, IReadOnlyList<double> points) =>
+        sliced ? points : null;
+
+    /// <summary>
+    /// Makes the slice editor and keeps the picture and the settings pointing at the same
+    /// piece, whichever of the two was used to choose it.
+    /// </summary>
+    private SliceEditorViewModel Cutting(
+        IWaveformService? waveforms,
+        int maxSlices,
+        Action<string, IReadOnlyList<double>> apply,
+        Func<int, SampleShape?> windowFor,
+        Action changed)
+    {
+        var slices = new SliceEditorViewModel(waveforms, maxSlices, apply, windowFor, changed);
+
+        slices.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(SliceEditorViewModel.SelectedSlice)) return;
+            if (slices.SelectedSlice < 0) return;
+
+            Zones?.SelectAt(slices.SelectedSlice);
+            Kit?.SelectAt(slices.SelectedSlice);
+        };
+
+        // And the other way about. The map and the picture are two views of the same pieces,
+        // and two views that disagree about which piece is in hand are worse than one view.
+        if (Zones != null)
+        {
+            Zones.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(ZoneMapViewModel.Selected)) return;
+                if (Zones.Selected == null) return;
+
+                int at = Zones.Zones.IndexOf(Zones.Selected);
+
+                if (at >= 0) slices.SelectedSlice = at;
+            };
+        }
+
+        if (Kit != null)
+        {
+            Kit.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(DrumKitViewModel.Selected)) return;
+                if (Kit.Selected == null) return;
+
+                int at = Kit.Pads.IndexOf(Kit.Selected);
+
+                if (at >= 0) slices.SelectedSlice = at;
+            };
+        }
+
+        return slices;
+    }
+
     /// <summary>Zampler's filter and envelopes, when that is the machine.</summary>
     public ZamplerPatchViewModel? Zampler { get; }
 
@@ -158,6 +282,12 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         Kit?.Refresh();
         Zones?.Refresh();
         Zampler?.RefreshAll();
+
+        // The whole sound has been replaced, which is a different recording as surely as
+        // dropping one on a zone is. The change callbacks the machines carry do not fire for
+        // this, because nothing went through them: the instrument was written into from
+        // outside.
+        FollowSound();
 
         OnPropertyChanged(string.Empty);
 
