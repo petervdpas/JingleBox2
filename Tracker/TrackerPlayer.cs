@@ -348,6 +348,12 @@ public sealed class TrackerPlayer : IDisposable
     public void UseSampleRate(int rate) => _synth.UseSampleRate(rate);
 
     /// <summary>
+    /// How far ahead of the sound card to mix, in milliseconds. Heard when the stream is
+    /// opened, so it comes from settings when the tracker is built.
+    /// </summary>
+    public void UseRenderAhead(int milliseconds) => _synth.UseRenderAhead(milliseconds);
+
+    /// <summary>
     /// The chain of effects on a track, made and put into the mix the first time it is asked
     /// for. A track with nothing on it costs an empty chain, which does nothing per block.
     /// </summary>

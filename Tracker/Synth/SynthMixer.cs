@@ -81,7 +81,22 @@ public sealed class SynthMixer
     private readonly record struct DuckSetting(double Depth, int Key, double ReleaseMs);
 
     private IVoice[] _snapshot = Array.Empty<IVoice>();
+    private int _voiceCount;
     private bool _snapshotStale = true;
+
+    /// <summary>
+    /// What the block being rendered is working from: the voices, the plugins and the ducking
+    /// as they stood when the lock was taken.
+    /// </summary>
+    /// <remarks>
+    /// Filled rather than made afresh. Copying the two arrays out was two allocations per
+    /// block on the audio thread, forty thousand a second between them, all of it garbage
+    /// somebody has to collect while the next block is waiting. These are written only under
+    /// the lock and read only by the thread that wrote them.
+    /// </remarks>
+    private readonly IPluginInstrument?[] _live = new IPluginInstrument[MaxTracks];
+
+    private readonly DuckSetting[] _ducked = new DuckSetting[MaxTracks];
     private int _noiseSeed;
 
     public SynthMixer(int sampleRate)
@@ -823,6 +838,7 @@ public sealed class SynthMixer
         Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
 
         IVoice[] playing;
+        int sounding;
         DuckSetting[] ducking;
         IPluginInstrument?[] instruments;
         IPluginInstrument? preview;
@@ -859,12 +875,23 @@ public sealed class SynthMixer
 
             if (_snapshotStale)
             {
-                _snapshot = _voices.ToArray();
+                // Grown when it has to be and reused when it does not, so a run of notes
+                // does not leave an array behind for every one of them.
+                if (_snapshot.Length < _voices.Count) _snapshot = new IVoice[Math.Max(_voices.Count, 16)];
+
+                _voices.CopyTo(_snapshot);
+
+                // Nothing is cleared past the count: the tail is whatever the last, longer
+                // block held, and the count is what says where to stop.
+                _voiceCount = _voices.Count;
                 _snapshotStale = false;
             }
 
             playing = _snapshot;
-            instruments = (IPluginInstrument?[])_instruments.Clone();
+            sounding = _voiceCount;
+
+            Array.Copy(_instruments, _live, MaxTracks);
+            instruments = _live;
 
             preview = _preview;
             previewGain = _previewGain;
@@ -885,7 +912,8 @@ public sealed class SynthMixer
 
                 if (_instruments[track] != null) letting.Add(_instruments[track]!);
             }
-            ducking = (DuckSetting[])_ducking.Clone();
+            Array.Copy(_ducking, _ducked, MaxTracks);
+            ducking = _ducked;
         }
 
         // Each track is rendered on its own before anything is summed. Ducking needs one
@@ -897,7 +925,7 @@ public sealed class SynthMixer
 
         letting.Clear();
 
-        RenderBusses(playing, instruments, preview, previewGain, frames, samples);
+        RenderBusses(playing, sounding, instruments, preview, previewGain, frames, samples);
 
         // Inserts run on the bus, before the side chains: what keys a duck is the track as it
         // sounds, effects included, which is what anyone listening would call the track.
@@ -944,15 +972,17 @@ public sealed class SynthMixer
     }
 
     /// <summary>Puts every voice on its own track's bus, auditions aside.</summary>
-    private void RenderBusses(IVoice[] playing, IPluginInstrument?[] instruments, IPluginInstrument? preview, float previewGain, int frames, int samples)
+    private void RenderBusses(
+        IVoice[] playing, int sounding, IPluginInstrument?[] instruments,
+        IPluginInstrument? preview, float previewGain, int frames, int samples)
     {
         EnsureBusses(frames);
 
         Array.Clear(_sounding, 0, MaxTracks);
 
-        foreach (var voice in playing)
+        for (int index = 0; index < sounding; index++)
         {
-            int track = voice.Track;
+            int track = playing[index].Track;
             if (track >= 0 && track < MaxTracks) _sounding[track] = true;
         }
 
@@ -1034,8 +1064,9 @@ public sealed class SynthMixer
             Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
         }
 
-        foreach (var voice in playing)
+        for (int index = 0; index < sounding; index++)
         {
+            var voice = playing[index];
             int track = voice.Track;
 
             var target = track >= 0 && track < MaxTracks ? _busses[track] : _loose;

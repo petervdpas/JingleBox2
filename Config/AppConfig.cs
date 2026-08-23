@@ -64,6 +64,11 @@ public sealed class AppConfig
     // Stored by name, not index: device indexes shift when hardware is plugged in or out.
     public string RecordInputDevice { get; set; } = "";
 
+    // How far ahead of the sound card the tracker mixes, in milliseconds. Zero mixes in step,
+    // which is tightest and has no slack for a plugin that takes a moment longer than usual.
+    // See JingleBox2.Audio.SynthOutput.UseRenderAhead.
+    public int RenderAheadMs { get; set; }
+
     // Off by default. On, the app and every plugin process write what they are doing to
     // jinglebox.log next to this file. See JingleBox2.Diagnostics.Log.
     public bool WriteLog { get; set; }

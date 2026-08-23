@@ -20,255 +20,387 @@
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
     </Style>
+    <!-- The rail down the side: the page has grown past what one column of cards can be read
+         in, and a setting somebody is looking for is easier to find under a heading than by
+         scrolling past everything else. Vertical rather than across the top, because the
+         headings are words and words read better in a column. -->
+    <Style Selector="TabControl.rail > TabItem">
+      <Setter Property="Width" Value="150" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="12,9" />
+    </Style>
+
+    <!-- A hairline between the two, the same one the tracker's panels are divided by. -->
+    <Style Selector="TabControl.rail /template/ ContentPresenter#PART_SelectedContentHost">
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
+      </Setter>
+    </Style>
   </UserControl.Styles>
 
-  <ScrollViewer>
-    <StackPanel Classes="tabRoot">
+  <!-- One part at a time. Everything here used to be one column of cards taller than the
+       window, which is a page you scroll rather than a page you read. -->
+  <TabControl Classes="rail" TabStripPlacement="Left" Margin="16">
 
-      <Border Classes="card">
-        <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="Recording Input" />
-            <views:HelpBadge Topic="settings.recording-input" />
-          </StackPanel>
+    <TabItem Header="Audio">
+        <ScrollViewer>
+          <StackPanel Spacing="12" Margin="16,0,4,0">
 
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <TextBlock Grid.Column="0" Classes="label" Text="Input device:" />
-            <ComboBox Grid.Column="1"
-                      ItemsSource="{Binding Record.InputDevices}"
-                      SelectedItem="{Binding Record.SelectedDevice}"
-                      HorizontalAlignment="Stretch" />
-          </Grid>
+          <!-- Moved here from the top of the window. It belongs with the rest of what the
+               sound goes through rather than above every page in the app. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Output" />
 
-          <Button Content="Refresh Devices"
-                  HorizontalAlignment="Left"
-                  Command="{Binding Record.RefreshDevicesCommand}" />
-        </StackPanel>
-      </Border>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Output device:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding OutputDevices}"
+                          SelectedItem="{Binding SelectedOutputDevice}"
+                          DisplayMemberBinding="{Binding Name}"
+                          HorizontalAlignment="Left"
+                          MinWidth="320" />
+              </Grid>
 
-      <Border Classes="card">
-        <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="MIDI Input" />
-            <views:HelpBadge Topic="settings.midi-input" />
-          </StackPanel>
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Where everything comes out: the pads, the tracker and whatever the plugins are playing." />
+            </StackPanel>
+          </Border>
 
-          <ItemsControl ItemsSource="{Binding Midi.Devices}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
-                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="cardHint"
-                               Text="not connected"
-                               IsVisible="{Binding !IsConnected}" />
-                  </StackPanel>
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Engine" />
+                <views:HelpBadge Topic="settings.engine" />
+              </StackPanel>
 
-                  <CheckBox Grid.Column="1" Content="Pads"
-                            VerticalAlignment="Center"
-                            IsChecked="{Binding DrivesPads}" />
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Sample rate:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding EngineRateLabels}"
+                          SelectedItem="{Binding SelectedEngineRate}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
 
-                  <CheckBox Grid.Column="2" Content="Tracker"
-                            VerticalAlignment="Center"
-                            IsChecked="{Binding DrivesTracker}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+              <TextBlock Classes="cardHint" Text="{Binding EngineRateHint}" />
 
-          <TextBlock Classes="cardHint"
-                     Text="No MIDI devices found."
-                     IsVisible="{Binding !Midi.HasDevices}" />
+              <!-- The trade is written under it rather than left to be discovered: tighter is
+                   better until a plugin takes a moment longer than usual, and then it is worse. -->
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">
+                <TextBlock Grid.Column="0" Classes="label" Text="Plugin cushion:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding RenderAheadLabels}"
+                          SelectedItem="{Binding SelectedRenderAhead}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
 
-          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
-            <Button Content="Refresh Devices"
-                    Command="{Binding Midi.RefreshDevicesCommand}" />
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding RenderAheadHint}" />
+            </StackPanel>
+          </Border>
 
-            <Button Content="Pad Mapping..."
-                    IsEnabled="{Binding Midi.HasPadDevice}"
-                    Click="OnOpenPadMapping" />
-          </StackPanel>
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Recording Input" />
+                <views:HelpBadge Topic="settings.recording-input" />
+              </StackPanel>
 
-          <TextBlock Classes="cardHint"
-                     Text="{Binding Midi.Status}"
-                     IsVisible="{Binding Midi.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        </StackPanel>
-      </Border>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Input device:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding Record.InputDevices}"
+                          SelectedItem="{Binding Record.SelectedDevice}"
+                          HorizontalAlignment="Stretch" />
+              </Grid>
 
-      <Border Classes="card">
-        <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="Engine" />
-            <views:HelpBadge Topic="settings.engine" />
-          </StackPanel>
-
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <TextBlock Grid.Column="0" Classes="label" Text="Sample rate:" />
-            <ComboBox Grid.Column="1"
-                      ItemsSource="{Binding EngineRateLabels}"
-                      SelectedItem="{Binding SelectedEngineRate}"
+              <Button Content="Refresh Devices"
                       HorizontalAlignment="Left"
-                      MinWidth="220" />
-          </Grid>
+                      Command="{Binding Record.RefreshDevicesCommand}" />
+            </StackPanel>
+          </Border>
 
-          <TextBlock Classes="cardHint" Text="{Binding EngineRateHint}" />
-        </StackPanel>
-      </Border>
-
-      <!-- Off by default and free when off. On when something has gone wrong and somebody
-           wants to know what, including inside the processes plugins run in. -->
-      <Border Classes="card">
-        <StackPanel Spacing="8">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="Log" />
-            <views:HelpBadge Topic="settings.log" />
           </StackPanel>
+        </ScrollViewer>
+    </TabItem>
 
-          <CheckBox Content="Write down what the app is doing" IsChecked="{Binding WriteLog}" />
+    <TabItem Header="MIDI">
+        <ScrollViewer>
+          <StackPanel Spacing="12" Margin="16,0,4,0">
 
-          <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding LogHint}" />
-        </StackPanel>
-      </Border>
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="MIDI Input" />
+                <views:HelpBadge Topic="settings.midi-input" />
+              </StackPanel>
 
-      <Border Classes="card">
-        <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="Audio Plugins" />
-            <views:HelpBadge Topic="settings.plugins" />
-          </StackPanel>
-
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Scan for plugins" Command="{Binding Plugins.ScanCommand}" />
-            <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Plugins.Status}" />
-          </StackPanel>
-
-          <Border Classes="inset" IsVisible="{Binding Plugins.HasPlugins}">
-            <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-              <ItemsControl ItemsSource="{Binding Plugins.Plugins}">
+              <ItemsControl ItemsSource="{Binding Midi.Devices}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
-                      <StackPanel Grid.Column="0" Spacing="1">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
-                          <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding FormatName}" />
-                          <TextBlock Classes="cardHint" VerticalAlignment="Center"
-                                     Text="instrument" IsVisible="{Binding IsInstrument}" />
-                        </StackPanel>
-                        <TextBlock Classes="cardHint" Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+                      <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="cardHint"
+                                   Text="not connected"
+                                   IsVisible="{Binding !IsConnected}" />
                       </StackPanel>
-                      <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
-                                 Text="{Binding Vendor}" />
+
+                      <CheckBox Grid.Column="1" Content="Pads"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding DrivesPads}" />
+
+                      <CheckBox Grid.Column="2" Content="Tracker"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding DrivesTracker}" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </ScrollViewer>
+
+              <TextBlock Classes="cardHint"
+                         Text="No MIDI devices found."
+                         IsVisible="{Binding !Midi.HasDevices}" />
+
+              <Button Content="Refresh Devices"
+                      HorizontalAlignment="Left"
+                      Command="{Binding Midi.RefreshDevicesCommand}" />
+
+              <TextBlock Classes="cardHint"
+                         Text="{Binding Midi.Status}"
+                         IsVisible="{Binding Midi.Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
           </Border>
 
-          <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                     Text="Plugins run in a process of their own. One that falls over stops on its own and can be started again; it cannot take the app with it." />
+          <!-- How many pads there are, and what one does when it is hit. Both are about the
+               pads the mapping underneath is mapping, so they are read together. -->
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
 
-          <!-- Plugins that crashed the application while opening their own window. Kept out
-               of the way until there is one, because most of the time there is not. -->
-          <Border Classes="inset" IsVisible="{Binding Plugins.HasBlockedPlugins}">
-            <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="Not opening their own windows" />
+              <Border Grid.Column="0" Classes="card" VerticalAlignment="Top">
+                <StackPanel Classes="cardBody">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="cardTitle" Text="Pad Matrix Size" />
+                    <views:HelpBadge Topic="settings.pad-matrix" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="Auto,*"
+                        RowDefinitions="Auto,Auto,Auto,Auto"
+                        ColumnSpacing="10"
+                        RowSpacing="6">
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Rows:" />
+                    <views:NumberField Grid.Row="0" Grid.Column="1"
+                                       Minimum="1" Maximum="16"
+                                       Value="{Binding Rows}"
+                                       HorizontalAlignment="Left"
+                                       Width="62" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Columns:" />
+                    <views:NumberField Grid.Row="1" Grid.Column="1"
+                                       Minimum="1" Maximum="16"
+                                       Value="{Binding Columns}"
+                                       HorizontalAlignment="Left"
+                                       Width="62" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Total:" />
+                    <StackPanel Grid.Row="2" Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                      <TextBlock Classes="padCount" Text="{Binding PadCount}" />
+                      <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="pads" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                               Classes="error"
+                               Text="{Binding MatrixSizeError}"
+                               IsVisible="{Binding MatrixSizeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </Grid>
+
+                  <Button Content="Apply Matrix Size"
+                          HorizontalAlignment="Left"
+                          Command="{Binding ApplyMatrixSizeCommand}" />
+
+                </StackPanel>
+              </Border>
+
+            <Border Grid.Column="1" Classes="card" VerticalAlignment="Top">
+              <StackPanel Classes="cardBody">
+                <TextBlock Classes="cardTitle" Text="Pad behaviour" />
+
+                <CheckBox Content="Toggle mode (press again to stop)"
+                          IsChecked="{Binding Midi.ToggleMode}" />
+
+                <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                           Text="On, a pad keeps playing until it is hit again. Off, it plays for as long as the pad is held." />
+              </StackPanel>
+            </Border>
+
+          </Grid>
+
+          <!-- On the page rather than behind a button. It is about the devices listed above
+               it, and a dialog you have to open to see a mapping is one you have to close
+               again before you can look at anything else. -->
+          <views:MidiView DataContext="{Binding Midi}" />
+
+          </StackPanel>
+        </ScrollViewer>
+    </TabItem>
+
+    <TabItem Header="Plugins">
+        <ScrollViewer>
+          <StackPanel Spacing="12" Margin="16,0,4,0">
+
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Audio Plugins" />
+                <views:HelpBadge Topic="settings.plugins" />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Scan for plugins" Command="{Binding Plugins.ScanCommand}" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Plugins.Status}" />
+              </StackPanel>
+
+              <Border Classes="inset" IsVisible="{Binding Plugins.HasPlugins}">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding Plugins.Plugins}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding FormatName}" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center"
+                                         Text="instrument" IsVisible="{Binding IsInstrument}" />
+                            </StackPanel>
+                            <TextBlock Classes="cardHint" Text="{Binding Path}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                                     Text="{Binding Vendor}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Border>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="These brought the application down while opening their own interface, so they are shown with the host's knobs instead. They still play and still save." />
+                         Text="Plugins run in a process of their own. One that falls over stops on its own and can be started again; it cannot take the app with it." />
 
-              <ItemsControl ItemsSource="{Binding Plugins.BlockedPlugins}">
+              <!-- Plugins that crashed the application while opening their own window. Kept out
+                   of the way until there is one, because most of the time there is not. -->
+              <Border Classes="inset" IsVisible="{Binding Plugins.HasBlockedPlugins}">
+                <StackPanel Spacing="6">
+                  <TextBlock Classes="section" Text="Not opening their own windows" />
+
+                  <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                             Text="These brought the application down while opening their own interface, so they are shown with the host's knobs instead. They still play and still save." />
+
+                  <ItemsControl ItemsSource="{Binding Plugins.BlockedPlugins}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Classes="cardHint" Margin="0,2"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Name}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <Button Content="Let them try again"
+                          HorizontalAlignment="Left"
+                          Command="{Binding Plugins.AllowBlockedCommand}"
+                          ToolTip.Tip="Any that go down again go straight back on this list." />
+                </StackPanel>
+              </Border>
+
+              <TextBlock Classes="cardHint" Text="Looked for in:" />
+              <TextBlock Classes="cardHint" Text="{Binding Plugins.SearchPaths}" />
+
+              <!-- Folders of your own, on top of the standard ones. Kept with the settings. -->
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Add a folder..." Click="OnAddPluginFolder"
+                        ToolTip.Tip="Somewhere else to look, for plugins you keep outside the usual places." />
+              </StackPanel>
+
+              <ItemsControl ItemsSource="{Binding Plugins.Folders}"
+                            IsVisible="{Binding Plugins.HasFolders}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <TextBlock Classes="cardHint" Margin="0,2"
-                               TextTrimming="CharacterEllipsis"
-                               Text="{Binding Name}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,2">
+                      <TextBlock Grid.Column="0" Classes="cardHint" VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis" Text="{Binding .}" />
+                      <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
+                              Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).Plugins.RemoveFolderCommand}"
+                              CommandParameter="{Binding .}" />
+                    </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
 
-              <Button Content="Let them try again"
-                      HorizontalAlignment="Left"
-                      Command="{Binding Plugins.AllowBlockedCommand}"
-                      ToolTip.Tip="Any that go down again go straight back on this list." />
             </StackPanel>
           </Border>
 
-          <TextBlock Classes="cardHint" Text="Looked for in:" />
-          <TextBlock Classes="cardHint" Text="{Binding Plugins.SearchPaths}" />
-
-          <!-- Folders of your own, on top of the standard ones. Kept with the settings. -->
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Add a folder..." Click="OnAddPluginFolder"
-                    ToolTip.Tip="Somewhere else to look, for plugins you keep outside the usual places." />
           </StackPanel>
+        </ScrollViewer>
+    </TabItem>
 
-          <ItemsControl ItemsSource="{Binding Plugins.Folders}"
-                        IsVisible="{Binding Plugins.HasFolders}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,2">
-                  <TextBlock Grid.Column="0" Classes="cardHint" VerticalAlignment="Center"
-                             TextTrimming="CharacterEllipsis" Text="{Binding .}" />
-                  <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
-                          Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).Plugins.RemoveFolderCommand}"
-                          CommandParameter="{Binding .}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+    <TabItem Header="Looks">
+        <ScrollViewer>
+          <StackPanel Spacing="12" Margin="16,0,4,0">
 
-        </StackPanel>
-      </Border>
+          <!-- Moved here from the top of the window. What you change while you are working
+               is the output device; a theme is something you pick once. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Theme" />
 
-      <Border Classes="card">
-        <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="Pad Matrix Size" />
-            <views:HelpBadge Topic="settings.pad-matrix" />
-          </StackPanel>
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Theme:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding ThemeNames}"
+                          SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
 
-          <Grid ColumnDefinitions="Auto,*"
-                RowDefinitions="Auto,Auto,Auto,Auto"
-                ColumnSpacing="10"
-                RowSpacing="6">
-
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Rows:" />
-            <views:NumberField Grid.Row="0" Grid.Column="1"
-                               Minimum="1" Maximum="16"
-                               Value="{Binding Rows}"
-                               HorizontalAlignment="Left"
-                               Width="62" />
-
-            <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Columns:" />
-            <views:NumberField Grid.Row="1" Grid.Column="1"
-                               Minimum="1" Maximum="16"
-                               Value="{Binding Columns}"
-                               HorizontalAlignment="Left"
-                               Width="62" />
-
-            <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Total:" />
-            <StackPanel Grid.Row="2" Grid.Column="1"
-                        Orientation="Horizontal"
-                        Spacing="6">
-              <TextBlock Classes="padCount" Text="{Binding PadCount}" />
-              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="pads" />
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Changes everything at once, the knobs and meters included." />
             </StackPanel>
+          </Border>
 
-            <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
-                       Classes="error"
-                       Text="{Binding MatrixSizeError}"
-                       IsVisible="{Binding MatrixSizeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          </Grid>
+          </StackPanel>
+        </ScrollViewer>
+    </TabItem>
 
-          <Button Content="Apply Matrix Size"
-                  HorizontalAlignment="Left"
-                  Command="{Binding ApplyMatrixSizeCommand}" />
+    <TabItem Header="System">
+        <ScrollViewer>
+          <StackPanel Spacing="12" Margin="16,0,4,0">
 
-        </StackPanel>
-      </Border>
+          <!-- Off by default and free when off. On when something has gone wrong and somebody
+               wants to know what, including inside the processes plugins run in. -->
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Log" />
+                <views:HelpBadge Topic="settings.log" />
+              </StackPanel>
 
-    </StackPanel>
-  </ScrollViewer>
+              <CheckBox Content="Write down what the app is doing" IsChecked="{Binding WriteLog}" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding LogHint}" />
+            </StackPanel>
+          </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+    </TabItem>
+
+  </TabControl>
 </UserControl>

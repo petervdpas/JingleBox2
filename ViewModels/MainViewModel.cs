@@ -148,6 +148,63 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
+    /// How far ahead of the sound card the tracker mixes, offered as words rather than numbers.
+    /// </summary>
+    /// <remarks>
+    /// The names are what the choice actually does to you. In step is tightest and is what this
+    /// did before there was a choice; the rest buy a plugin room to be late in, and cost you
+    /// exactly what they say between playing a note and hearing it.
+    /// </remarks>
+    private static readonly (int Milliseconds, string Label)[] RenderAheads =
+    {
+        (0, "In step (tightest)"),
+        (10, "10 ms cushion"),
+        (20, "20 ms cushion"),
+        (40, "40 ms cushion")
+    };
+
+    public string[] RenderAheadLabels { get; } = RenderAheads.Select(a => a.Label).ToArray();
+
+    public string SelectedRenderAhead
+    {
+        get
+        {
+            foreach (var (milliseconds, label) in RenderAheads)
+            {
+                if (milliseconds == _cfg.RenderAheadMs) return label;
+            }
+
+            return RenderAheads[0].Label;
+        }
+        set
+        {
+            foreach (var (milliseconds, label) in RenderAheads)
+            {
+                if (label != value || _cfg.RenderAheadMs == milliseconds) continue;
+
+                _cfg.RenderAheadMs = milliseconds;
+                _store.Save(_cfg);
+
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(RenderAheadHint));
+                return;
+            }
+        }
+    }
+
+    /// <summary>What the choice means, said plainly enough to choose by.</summary>
+    public string RenderAheadHint =>
+        _cfg.RenderAheadMs <= 0
+            ? "Each block is mixed inside the call that asks for it, which is as tight as this gets. " +
+              "A plugin that takes a moment longer than usual has nowhere to take it from, and what " +
+              "comes out is a gap. Give it a cushion if the sound breaks up while plugins are playing. " +
+              "Takes effect when the app is started again."
+            : "The mixer works " + _cfg.RenderAheadMs + " ms ahead on a thread of its own, so a plugin " +
+              "being late eats into that instead of into the output. It also means what you hear was " +
+              "mixed " + _cfg.RenderAheadMs + " ms ago, which is what a key you press waits before it " +
+              "sounds. Takes effect when the app is started again.";
+
+    /// <summary>
     /// Whether the app and its plugin processes write down what they are doing.
     /// </summary>
     /// <remarks>

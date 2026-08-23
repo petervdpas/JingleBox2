@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -69,6 +70,36 @@ public static class Log
     private static LogArea _areas;
     private static string _folder = "";
     private static bool _started;
+    private static bool _hooked;
+
+    /// <summary>
+    /// Lines waiting to be written, and the thread that writes them.
+    /// </summary>
+    /// <remarks>
+    /// Whoever writes a line does not wait for a disc. Some of these lines come from the
+    /// thread filling the audio buffer, and opening a file, appending to it and closing it
+    /// again is not something that thread can be asked to do: it has a block to finish and a
+    /// few milliseconds to finish it in. So a line is formed where it happens, which is
+    /// nothing but a string, and handed over.
+    ///
+    /// One queue and one writer, so the file still reads in the order things happened.
+    /// </remarks>
+    private static readonly ConcurrentQueue<string> Waiting = new();
+
+    private static readonly AutoResetEvent Knock = new(false);
+
+    private static Thread? _writer;
+
+    /// <summary>
+    /// How many lines may be waiting before they start being dropped.
+    /// </summary>
+    /// <remarks>
+    /// A bound, not a target. Something writing faster than a disc can keep up must lose lines
+    /// rather than memory, and a log is worth less than the thing it is a log of.
+    /// </remarks>
+    private const int MostWaiting = 40000;
+
+    private static int _lost;
 
     /// <summary>Which areas are being written. None means the log is off.</summary>
     public static LogArea Areas => _areas;
@@ -101,6 +132,14 @@ public static class Log
         {
             _folder = folder ?? "";
             _areas = on || forced ? areas : LogArea.None;
+
+            // Whatever is still waiting when this stops is written before it does. A log that
+            // loses its last lines loses exactly the ones anybody wanted.
+            if (!_hooked)
+            {
+                _hooked = true;
+                AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush();
+            }
         }
 
         if (!IsOn) return;
@@ -108,10 +147,12 @@ public static class Log
         Announce();
     }
 
-    /// <summary>Turns it off without forgetting where it was.</summary>
+    /// <summary>Turns it off without forgetting where it was, and writes what is waiting.</summary>
     public static void Close()
     {
         lock (Gate) _areas = LogArea.None;
+
+        Flush();
     }
 
     private static void Announce()
@@ -180,20 +221,94 @@ public static class Log
             .Append(message)
             .Append('\n');
 
+        if (Waiting.Count >= MostWaiting)
+        {
+            Interlocked.Increment(ref _lost);
+            return;
+        }
+
+        Waiting.Enqueue(line.ToString());
+
+        Scribe();
+
+        Knock.Set();
+    }
+
+    /// <summary>The thread that does the writing, started the first time there is anything to write.</summary>
+    private static void Scribe()
+    {
+        if (_writer != null) return;
+
+        lock (Gate)
+        {
+            if (_writer != null) return;
+
+            _writer = new Thread(Writing)
+            {
+                IsBackground = true,
+                Name = "log"
+            };
+
+            _writer.Start();
+        }
+    }
+
+    private static void Writing()
+    {
+        while (true)
+        {
+            // Woken by a line, and looked at anyway now and then in case a wake-up was missed
+            // while the last batch was being written.
+            Knock.WaitOne(250);
+
+            Flush();
+        }
+    }
+
+    /// <summary>
+    /// Writes whatever is waiting, in one go.
+    /// </summary>
+    /// <remarks>
+    /// A batch rather than a line at a time: opening and closing the file is most of the cost
+    /// of writing to it, and a busy second produces hundreds of lines that all belong in the
+    /// same open.
+    /// </remarks>
+    public static void Flush()
+    {
+        if (Waiting.IsEmpty && _lost == 0) return;
+
+        string folder;
+
+        lock (Gate) folder = _folder;
+
+        if (folder.Length == 0) return;
+
+        var batch = new StringBuilder(4096);
+
+        while (Waiting.TryDequeue(out var line)) batch.Append(line);
+
+        int lost = Interlocked.Exchange(ref _lost, 0);
+
+        if (lost > 0)
+        {
+            batch.Append("(")
+                .Append(lost.ToString(CultureInfo.InvariantCulture))
+                .Append(" line(s) went unwritten: the log could not keep up)\n");
+        }
+
+        if (batch.Length == 0) return;
+
         try
         {
-            lock (Gate)
-            {
-                Directory.CreateDirectory(folder);
+            Directory.CreateDirectory(folder);
 
-                string path = System.IO.Path.Combine(folder, FileName);
+            string path = System.IO.Path.Combine(folder, FileName);
 
-                Roll(path);
+            Roll(path);
 
-                // Without the byte order mark: this is a file people open in a text editor and
-                // paste out of, not one anything parses.
-                File.AppendAllText(path, line.ToString(), Text);
-            }
+            // Without the byte order mark: this is a file people open in a text editor and
+            // paste out of, not one anything parses.
+            File.AppendAllText(path, batch.ToString(), Text);
         }
         catch (Exception)
         {

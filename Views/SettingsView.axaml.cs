@@ -13,18 +13,6 @@ public partial class SettingsView : UserControl
     }
 
     /// <summary>
-    /// Opening a window is a view job, so it happens here rather than through the view model.
-    /// </summary>
-    private async void OnOpenPadMapping(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm) return;
-        if (TopLevel.GetTopLevel(this) is not Window owner) return;
-
-        var dialog = new MidiMappingWindow { DataContext = vm.Midi };
-        await dialog.ShowDialog(owner);
-    }
-
-    /// <summary>
     /// Picks another folder to look for plugins in. The picker belongs to the window, so it
     /// is opened here and only the answer goes to the view model.
     /// </summary>

@@ -308,6 +308,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         // Before anything sounds: the rate cannot move once the engine is built.
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
+        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
         _store = new SongStore();
         _rack = rack;
         _recordings = recordings;
