@@ -20,11 +20,21 @@ public sealed class TrackerNoteAdapter : INoteTrigger
 
     public void TriggerNote(Note note, int volume)
     {
-        // A song with no instruments has nothing a note could mean, so it goes to the rack
-        // either way. That also keeps a note audible if the page flag is ever wrong.
-        if (_rack.IsEditing || !_tracker.HasInstruments) _rack.PlayMidiNote(note, volume);
+        if (Rack) _rack.PlayMidiNote(note, volume);
         else _tracker.PlayMidiNote(note, volume);
     }
+
+    /// <summary>Whether a key belongs to the machine being built rather than to the pattern.</summary>
+    /// <remarks>
+    /// Asked of the page that is up, not of the page that exists. The machines page lives
+    /// inside the tracker and is hidden rather than taken away when the pattern is in front,
+    /// so a flag set when it was put together stays set for the rest of the session and every
+    /// note goes to the rack.
+    ///
+    /// A song with no instruments has nothing a note could mean, so it goes to the rack either
+    /// way rather than sounding nothing.
+    /// </remarks>
+    private bool Rack => _tracker.ShowsMachines || !_tracker.HasInstruments;
 
     /// <summary>
     /// A key coming up. Only the pattern has anywhere to put one: the rack is auditioning a
@@ -32,7 +42,7 @@ public sealed class TrackerNoteAdapter : INoteTrigger
     /// </summary>
     public void ReleaseNote(Note note)
     {
-        if (_rack.IsEditing || !_tracker.HasInstruments) return;
+        if (Rack) return;
 
         _tracker.ReleaseMidiNote(note);
     }

@@ -1,6 +1,4 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
@@ -23,10 +21,10 @@ public partial class NameDialog : Window
     }
 
     /// <summary>
-    /// Shows the prompt over a window. Returns the trimmed name, or null for cancelled and for
-    /// a name with nothing in it.
+    /// Asks for a name. Gives back the trimmed name, or null when it is cancelled, left empty,
+    /// or there is no window to open it over.
     /// </summary>
-    public static async Task<string?> ShowAsync(Window owner, string title, string prompt, string current)
+    public static Task<string?> AskAsync(string title, string prompt, string current)
     {
         var dialog = new NameDialog { Title = title };
 
@@ -39,7 +37,7 @@ public partial class NameDialog : Window
         {
             box.Text = current;
 
-            // Opened with the old name selected, so typing replaces it and the arrow keys keep it.
+            // Opened with the old name selected, so typing replaces it and the arrows keep it.
             dialog.Opened += (_, _) =>
             {
                 box.Focus();
@@ -47,20 +45,7 @@ public partial class NameDialog : Window
             };
         }
 
-        return await dialog.ShowDialog<string?>(owner);
-    }
-
-    /// <summary>
-    /// The same prompt over the app's main window. Answers null when there is no window at all,
-    /// so a headless run renames nothing rather than throwing.
-    /// </summary>
-    public static Task<string?> AskAsync(string title, string prompt, string current)
-    {
-        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop
-            || desktop.MainWindow is null)
-            return Task.FromResult<string?>(null);
-
-        return ShowAsync(desktop.MainWindow, title, prompt, current);
+        return Dialog.ShowAsync<string?>(dialog, null);
     }
 
     private void Name_KeyDown(object? sender, KeyEventArgs e)

@@ -539,11 +539,15 @@ public sealed class SynthMixer
     }
 
     /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
-    public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds)
+    public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition)
     {
         if (patch is null || !note.IsPlayable) return;
 
-        var voice = new SynthVoice(patch, note, SynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed());
+        var voice = new SynthVoice(patch, note, SynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed())
+        {
+            Audition = audition
+        };
+
         voice.HoldFor(holdSeconds);
 
         lock (_lock) Add(voice);
@@ -554,12 +558,15 @@ public sealed class SynthMixer
     /// No glide: an audition has no note before it to slide from. It belongs to no track
     /// either, so it piles up with the other auditions rather than cutting one.
     /// </remarks>
-    public void Preview(OuroborosPatch patch, Note note, float gain, double holdSeconds)
+    public void Preview(OuroborosPatch patch, Note note, float gain, double holdSeconds, string audition)
     {
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new OuroborosVoice(
-            patch, note, OuroborosVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null);
+            patch, note, OuroborosVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null)
+        {
+            Audition = audition
+        };
 
         voice.HoldFor(holdSeconds);
 
@@ -659,48 +666,107 @@ public sealed class SynthMixer
     }
 
     /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
-    public void Preview(SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain, double holdSeconds)
+    /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    public double Preview(
+        SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain,
+        double holdSeconds, string audition)
     {
-        if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+        if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
-            SynthVoice.NoTrack, gain, 0f, SampleRate, patch);
+            SynthVoice.NoTrack, gain, 0f, SampleRate, patch)
+        {
+            Audition = audition
+        };
 
-        voice.HoldFor(holdSeconds);
+        double held = Held(voice, holdSeconds);
+
+        voice.HoldFor(held);
 
         lock (_lock) Add(voice);
+
+        return held;
     }
 
     /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
-    public void Preview(DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, double holdSeconds)
+    /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    public double Preview(
+        DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
+        double holdSeconds, string audition)
     {
-        if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+        if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, patch, pad.Shape, note, note,
             SynthVoice.NoTrack, gain, 0f, SampleRate)
         {
-            Choke = pad.Choke
+            Choke = pad.Choke,
+            Audition = audition
         };
 
-        voice.HoldFor(holdSeconds);
+        double held = Held(voice, holdSeconds);
+
+        voice.HoldFor(held);
 
         lock (_lock) Add(voice);
+
+        return held;
     }
 
     /// <summary>A recording sounded once, for auditioning while editing.</summary>
-    public void Preview(TrackerInstrument instrument, SampleData sample, Note note, float gain, double holdSeconds)
+    /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    public double Preview(
+        TrackerInstrument instrument, SampleData sample, Note note, float gain,
+        double holdSeconds, string audition)
     {
-        if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
+        if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
-            SynthVoice.NoTrack, gain, 0f, SampleRate);
+            SynthVoice.NoTrack, gain, 0f, SampleRate)
+        {
+            Audition = audition
+        };
 
-        voice.HoldFor(holdSeconds);
+        double held = Held(voice, holdSeconds);
+
+        voice.HoldFor(held);
 
         lock (_lock) Add(voice);
+
+        return held;
+    }
+
+    /// <summary>
+    /// How long an auditioned recording holds: long enough to be heard right through.
+    /// </summary>
+    /// <remarks>
+    /// The fixed hold is what a generated sound needs, since it would otherwise never stop. A
+    /// recording has an end of its own, and stopping short of it plays a different sound from
+    /// the one the instrument makes. A looping window has no end, so it keeps the fixed hold.
+    /// </remarks>
+    private static double Held(SampleVoice voice, double asked) =>
+        voice.WindowSeconds > 0 ? Math.Max(asked, voice.WindowSeconds) : asked;
+
+    /// <summary>
+    /// Stops what this instrument was sounding by hand, for one that plays one note at a time.
+    /// </summary>
+    /// <remarks>
+    /// A short fade rather than a release, the same as a track retriggering itself: the next
+    /// note starts now, and a full release would still be running underneath it.
+    /// </remarks>
+    public void CutAuditions(string audition)
+    {
+        if (string.IsNullOrEmpty(audition)) return;
+
+        lock (_lock)
+        {
+            foreach (var voice in _voices)
+            {
+                if (voice.Track == SynthVoice.NoTrack && voice.Audition == audition) voice.Cut();
+            }
+        }
     }
 
     public void NoteOff(int track)

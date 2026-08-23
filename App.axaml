@@ -121,6 +121,46 @@
 
         <!-- Transport glyphs need size and weight of their own: at the default button
              metrics they render as small, low-contrast marks. -->
+        <!-- The edge between two panels: a hairline to look at, eight pixels wide to grab.
+             The transparent surround is what the pointer catches, so the line itself can stay
+             as thin as it reads best. -->
+        <Style Selector="GridSplitter.handle">
+            <Setter Property="Cursor" Value="SizeWestEast" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <Rectangle x:Name="Line" Width="1" HorizontalAlignment="Center"
+                                   VerticalAlignment="Stretch">
+                            <Rectangle.Fill>
+                                <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.handle:pointerover /template/ Rectangle#Line">
+            <Setter Property="Width" Value="2" />
+            <Setter Property="Fill">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.55" />
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.handle:pressed /template/ Rectangle#Line">
+            <Setter Property="Width" Value="2" />
+            <Setter Property="Fill">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.9" />
+            </Setter>
+        </Style>
+
+        <!-- One step forwards or backwards through a list, beside the list itself. -->
+        <Style Selector="Button.step">
+            <Setter Property="MinWidth" Value="30" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+
         <!-- The tracker's page buttons. Not transport: they change what you are looking at
              rather than what the song is doing, so they read as words rather than symbols and
              sit apart from the run of them. -->

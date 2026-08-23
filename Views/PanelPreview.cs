@@ -92,7 +92,7 @@ public static class PanelPreview
     /// <summary>An audition that plays nothing, since a panel being looked at makes no sound.</summary>
     private sealed class Silent : IInstrumentAudition
     {
-        public void Audition(TrackerInstrument instrument, Note note, int volume) { }
+        public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
 
         /// <summary>
         /// A cursor walking across the recording, the way Marching walks a playhead down a
@@ -129,7 +129,7 @@ public static class PanelPreview
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PlayingLine)));
 
                 // A tune of sorts, so the keyboard has something to light while it is looked at.
-                NotePlayed?.Invoke(this, (0, new Note(Octave * 12 + Steps[PlayingLine % Steps.Length])));
+                NotePlayed?.Invoke(this, (0, new Note(Octave * 12 + Steps[PlayingLine % Steps.Length]), 0d));
             };
 
             _clock.Start();
@@ -149,7 +149,7 @@ public static class PanelPreview
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Octave)));
         }
 
-        public event EventHandler<(int Track, Note Note)>? NotePlayed;
+        public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 
         /// <summary>
         /// Somewhere for the keys to go: a line that wanders far enough out of the three

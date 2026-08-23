@@ -93,7 +93,7 @@ public sealed class TrackerPlayer : IDisposable
     /// nothing else: what a listener does with it is its own business, and one that needs the
     /// instrument can ask the song for it.
     /// </remarks>
-    public event EventHandler<(int Track, Note Note)>? NotePlayed;
+    public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 
     public TrackerTransportState State { get; private set; } = TrackerTransportState.Stopped;
 
@@ -224,14 +224,23 @@ public sealed class TrackerPlayer : IDisposable
     }
 
     /// <summary>Sounds a single note, for auditioning while editing. Independent of playback.</summary>
-    public void Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
+    /// <returns>
+    /// How long the note will sound, so a keyboard can light its key and a picture can run its
+    /// cursor for exactly that long. Zero when nothing sounded.
+    /// </returns>
+    public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
-        if (!note.IsPlayable) return;
+        if (!note.IsPlayable) return 0;
 
         _audio.EnsureInitialized();
         _synth.EnsureStarted(_audio);
 
         float level = gain * (float)instrument.Volume;
+
+        // One voice: what this instrument was sounding by hand stops, so a long recording
+        // played again does not lie underneath the one just asked for. A pattern's notes are
+        // untouched, since a track is already one voice.
+        if (instrument.OneVoice) _synth.Mixer.CutAuditions(instrument.Id);
 
         if (instrument.IsPlugin)
         {
@@ -254,14 +263,14 @@ public sealed class TrackerPlayer : IDisposable
             if (playing >= 0)
             {
                 _synth.Mixer.PreviewOnTrack(playing, note, level, PreviewHoldSeconds);
-                return;
+                return PreviewHoldSeconds;
             }
 
             var player = PreviewPlayerFor(instrument);
-            if (player == null) return;
+            if (player == null) return 0;
 
             _synth.Mixer.PreviewPlugin(note, level, PreviewHoldSeconds);
-            return;
+            return PreviewHoldSeconds;
         }
 
         if (instrument.IsZampler)
@@ -269,14 +278,11 @@ public sealed class TrackerPlayer : IDisposable
             var zone = instrument.Zones?.For(note);
             var zoneSample = zone == null ? null : _samples.Load(zone.FilePath);
 
-            if (zone != null && zoneSample != null)
-            {
-                _synth.Mixer.Preview(
-                    zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, note,
-                    (float)(level * zone.Volume), PreviewHoldSeconds);
-            }
+            if (zone == null || zoneSample == null) return 0;
 
-            return;
+            return _synth.Mixer.Preview(
+                zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, note,
+                (float)(level * zone.Volume), PreviewHoldSeconds, instrument.Id);
         }
 
         if (instrument.IsBongaBong)
@@ -284,33 +290,30 @@ public sealed class TrackerPlayer : IDisposable
             var pad = instrument.Kit?.For(note);
             var padSample = pad == null ? null : _samples.Load(pad.FilePath);
 
-            if (pad != null && padSample != null)
-            {
-                _synth.Mixer.Preview(
-                    pad, instrument.Patch, padSample, note,
-                    (float)(level * pad.Volume), PreviewHoldSeconds);
-            }
+            if (pad == null || padSample == null) return 0;
 
-            return;
+            return _synth.Mixer.Preview(
+                pad, instrument.Patch, padSample, note,
+                (float)(level * pad.Volume), PreviewHoldSeconds, instrument.Id);
         }
 
         if (instrument.IsOuroboros)
         {
             _synth.Mixer.Preview(instrument.Ouroboros ?? new Synth.OuroborosPatch(),
-                note, level, PreviewHoldSeconds);
-            return;
+                note, level, PreviewHoldSeconds, instrument.Id);
+            return PreviewHoldSeconds;
         }
 
         if (instrument.IsSynth)
         {
-            _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds);
-            return;
+            _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds, instrument.Id);
+            return PreviewHoldSeconds;
         }
 
         var sample = _samples.Load(instrument.FilePath);
-        if (sample == null) return;
+        if (sample == null) return 0;
 
-        _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds);
+        return _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds, instrument.Id);
     }
 
     /// <summary>
@@ -729,7 +732,7 @@ public sealed class TrackerPlayer : IDisposable
 
                     // An OFF row is a note this track played too, and the one it says is that
                     // there is not one. A panel showing its keys puts them out on hearing it.
-                    NotePlayed?.Invoke(this, (e.Track, Note.Off));
+                    NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
                     break;
 
                 case TrackerEventKind.Trigger:
@@ -762,7 +765,9 @@ public sealed class TrackerPlayer : IDisposable
 
         // Said once, before the kinds part company: a note played on a plugin is as much a
         // note this track played as one played on Ouroboros.
-        NotePlayed?.Invoke(this, (e.Track, e.Note));
+        // No length: a note in a pattern lasts until whatever the track plays next, which
+        // has not happened yet.
+        NotePlayed?.Invoke(this, (e.Track, e.Note, 0d));
 
         // One voice per track, as a tracker has always worked: the mixer cuts whatever that
         // track was sounding, whichever kind of instrument it was.

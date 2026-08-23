@@ -62,8 +62,51 @@ public sealed partial class DrumKitViewModel : ObservableObject
     {
         if (sounding == null) return;
 
-        sounding.Lit.CollectionChanged += (_, _) => Light(sounding);
+        // One kit watches at a time. The panel puts a new kit on this same set of notes every
+        // time the machine is changed, and a kit nobody can see any more should not still be
+        // listening.
+        Unfollow();
+
+        _watching = sounding;
+        _lighting = (_, _) => Light(sounding);
+
+        sounding.Lit.CollectionChanged += _lighting;
+
+        // And the pad that was hit is the pad the settings underneath are about. Playing a key
+        // and then hunting for its pad in the grid to change its level is two jobs where the
+        // machine already knows which one you meant.
+        sounding.Hit += Pick;
+
         Light(sounding);
+    }
+
+    /// <summary>Stops watching, for a kit the panel has moved on from.</summary>
+    public void Unfollow()
+    {
+        if (_watching == null) return;
+
+        if (_lighting != null) _watching.Lit.CollectionChanged -= _lighting;
+
+        _watching.Hit -= Pick;
+
+        _watching = null;
+        _lighting = null;
+    }
+
+    private SoundingNotes? _watching;
+
+    private System.Collections.Specialized.NotifyCollectionChangedEventHandler? _lighting;
+
+    /// <summary>Puts the settings on the pad that note belongs to, if any pad does.</summary>
+    private void Pick(Note note)
+    {
+        foreach (var pad in Pads)
+        {
+            if (pad.Semitone != note.Semitone) continue;
+
+            Selected = pad;
+            return;
+        }
     }
 
     private void Light(SoundingNotes sounding)

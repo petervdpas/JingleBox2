@@ -52,12 +52,14 @@
                    instrument, given a different sound to make. -->
               <StackPanel Classes="entry">
                 <TextBlock Classes="field" Text="{Binding Presets.Caption}" />
-                <ComboBox Width="170"
-                          IsEnabled="{Binding Presets.Any}"
-                          ItemsSource="{Binding Presets.Items}"
-                          SelectedItem="{Binding Presets.Selected}"
-                          PlaceholderText="Start from..."
-                          ToolTip.Tip="{Binding Presets.Hint}" />
+
+                <!-- One control, not three: the arrows, the name and how far through you are
+                     all say the same fact and have to move together. The arrows are how you
+                     hunt for a sound; pressing the name opens the whole list. -->
+                <views:Chooser ItemsSource="{Binding Presets.Items}"
+                               SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
+                               Placeholder="Start from..."
+                               ToolTip.Tip="{Binding Presets.Hint}" />
               </StackPanel>
 
             </WrapPanel>
@@ -116,26 +118,38 @@
                                       End="{Binding Editor.SampleEnd}"
                                       LoopStart="{Binding Editor.LoopStart}"
                                       LoopEnd="{Binding Editor.LoopEnd}"
+                                      Playhead="{Binding Editor.Playhead}"
                                       ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
 
                   <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
 
+                  <!-- One line: the switches are the tallest thing here and everything else
+                       stands level with their handles rather than on the floor of the row. -->
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="field" Text="Base note" />
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Base note" />
                     <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
-                                       Minimum="0" Maximum="119" Width="70"
+                                       Minimum="0" Maximum="119" Width="70" VerticalAlignment="Center"
                                        ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
-                    <TextBlock Classes="field" Text="{Binding Editor.BaseNoteText}" />
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="{Binding Editor.BaseNoteText}" />
 
-                    <TextBlock Classes="field" Text="Loop" Margin="10,0,0,0" />
-                    <ComboBox Width="110"
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Loop" Margin="10,0,0,0" />
+                    <ComboBox Width="110" VerticalAlignment="Center"
                               ItemsSource="{Binding Editor.LoopModes}"
                               SelectedItem="{Binding Editor.LoopMode}"
                               ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
 
-                    <CheckBox Content="Reverse" Margin="6,0,0,0"
-                              IsChecked="{Binding Editor.Reverse}"
-                              ToolTip.Tip="Plays the window from its end towards its start." />
+                    <!-- Switches rather than tick boxes: this is a machine's front panel, and
+                         the rest of it reads its settings off handles that show every position
+                         at once. -->
+                    <views:Switch Label="Direction" Margin="6,0,0,0"
+                                  OnLabel="Reverse" OffLabel="Forward"
+                                  IsChecked="{Binding Editor.Reverse}"
+                                  ToolTip.Tip="Plays the window from its end towards its start." />
+
+                    <views:Switch Label="Voices" Margin="6,0,0,0"
+                                  OnLabel="One" OffLabel="Many"
+                                  IsChecked="{Binding Editor.OneVoice}"
+                                  ToolTip.Tip="One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. A track is one voice either way." />
                   </StackPanel>
                 </StackPanel>
               </views:PanelGroup>
@@ -334,6 +348,7 @@
                                         CapWidth="86" CapHeight="42" FontSize="11"
                                         Colour="#4A4E57" Margin="0,0,5,5"
                                         HasLamp="True" LampBelow="False" Lit="{Binding IsLit}"
+                                        IsSelected="{Binding IsSelected}"
                                         Command="{Binding TapCommand}"
                                         ToolTip.Tip="Hits the pad. The key under it is the one that fires it in a pattern." />
                     </DataTemplate>

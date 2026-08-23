@@ -54,6 +54,15 @@ public sealed class SoundingNotes
     /// </remarks>
     public event Action? Ticked;
 
+    /// <summary>
+    /// A note has just been struck by hand, for anything that should follow what was played.
+    /// </summary>
+    /// <remarks>
+    /// Notes from a track are left out: a panel whose selection jumped about on its own while
+    /// a song played would be unusable, and what a track plays is already on the pattern.
+    /// </remarks>
+    public event Action<Note>? Hit;
+
     /// <summary>A note has just been played, and should light for as long as it sounds.</summary>
     /// <param name="alone">
     /// True for a note from a track, which has one voice: it puts out whatever that track was
@@ -92,6 +101,8 @@ public sealed class SoundingNotes
 
         // At once, so a cursor appears with the note rather than a fortieth of a second later.
         Ticked?.Invoke();
+
+        if (!alone) Hit?.Invoke(note);
     }
 
     /// <summary>Everything goes dark, for a transport that has stopped.</summary>

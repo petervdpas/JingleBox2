@@ -38,6 +38,16 @@ public class PushButton : ThemedControl
     public static readonly StyledProperty<bool> IsLatchingProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(IsLatching));
 
+    /// <summary>
+    /// Whether this is the one of its group being worked on, drawn as a ring round the cap.
+    /// </summary>
+    /// <remarks>
+    /// A grid of pads needs to say which one the settings underneath are about, and that is not
+    /// the same as which one is sounding: the lamp says that, and it goes out.
+    /// </remarks>
+    public static readonly StyledProperty<bool> IsSelectedProperty =
+        AvaloniaProperty.Register<PushButton, bool>(nameof(IsSelected));
+
     public static readonly StyledProperty<bool> IsCheckedProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(IsChecked), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
@@ -115,10 +125,13 @@ public class PushButton : ThemedControl
 
     private bool _down;
 
+    /// <summary>Whether the focus this holds arrived by tabbing rather than by being clicked.</summary>
+    private bool _byKeyboard;
+
     static PushButton()
     {
         AffectsRender<PushButton>(
-            LabelProperty, CapTextProperty, IsCheckedProperty, LitProperty, HasLampProperty,
+            LabelProperty, CapTextProperty, IsCheckedProperty, IsSelectedProperty, LitProperty, HasLampProperty,
             CapHeightProperty, CapWidthProperty, ShapeProperty, PointsProperty, ColourProperty,
             FontSizeProperty, LampSizeProperty, LampBelowProperty, LampColourProperty);
 
@@ -146,6 +159,12 @@ public class PushButton : ThemedControl
     {
         get => GetValue(IsLatchingProperty);
         set => SetValue(IsLatchingProperty, value);
+    }
+
+    public bool IsSelected
+    {
+        get => GetValue(IsSelectedProperty);
+        set => SetValue(IsSelectedProperty, value);
     }
 
     public bool IsChecked
@@ -301,9 +320,14 @@ public class PushButton : ThemedControl
                 }
         };
 
-        var edge = IsFocused ? palette.Accent : ThemePalette.Shade(seat, -0.35);
+        // A ring means this is the one being worked on. Focus draws one too, but only when the
+        // keyboard put it there: a button that keeps a ring because it was clicked once looks
+        // like a selection nobody made, and next to a real selection it reads as two.
+        bool ringed = IsSelected || (IsFocused && _byKeyboard);
 
-        var pen = new Pen(new SolidColorBrush(edge), IsFocused ? 1.5 : 1);
+        var edge = ringed ? palette.Accent : ThemePalette.Shade(seat, -0.35);
+
+        var pen = new Pen(new SolidColorBrush(edge), ringed ? 1.5 : 1);
 
         switch (Shape)
         {
@@ -342,6 +366,22 @@ public class PushButton : ThemedControl
             var text = Text(Label, palette.MutedBrush);
             context.DrawText(text, new Point(middle - text.Width / 2, under + LabelGap));
         }
+    }
+
+    protected override void OnGotFocus(FocusChangedEventArgs e)
+    {
+        base.OnGotFocus(e);
+
+        _byKeyboard = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
+        InvalidateVisual();
+    }
+
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+
+        _byKeyboard = false;
+        InvalidateVisual();
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)

@@ -48,7 +48,8 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
             tracker.NotePlayed += OnTrackerNote;
         }
 
-        Editor = new InstrumentEditorViewModel(track, instrument, changed, waveforms, audition, recordings);
+        Editor = new InstrumentEditorViewModel(
+            track, instrument, changed, waveforms, audition, recordings, note => Play(note));
 
         // A panel opened from a track can say where that track is. One opened without a tracker
         // still gets the lamps, with nothing behind them: they are greyed rather than removed,
@@ -124,17 +125,26 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         _changed();
     }
 
-    /// <summary>Where the sound has got to, for the chop editor's cursor.</summary>
+    /// <summary>Where the sound has got to, for the cursor over the picture.</summary>
+    /// <remarks>
+    /// Both pictures read the same number: the one whole recording a sampler shows, and the
+    /// pieces a chopped one shows. A machine has one or the other, never both, so this sets
+    /// whichever is there.
+    /// </remarks>
     private void MovePlayhead()
     {
-        var slices = Editor?.Slices;
+        var editor = Editor;
 
-        if (slices == null) return;
+        if (editor == null) return;
 
         // Nothing lit is nothing sounding, and this is the last beat of the clock before it
         // stops. Asking the engine here would catch a voice still letting go of its release and
         // leave the line standing in the middle of the picture with nothing playing.
-        slices.Playhead = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(Track);
+        double at = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(Track);
+
+        editor.Playhead = at;
+
+        if (editor.Slices != null) editor.Slices.Playhead = at;
     }
 
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
@@ -151,11 +161,12 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// away the ones belonging to somebody else. The note is struck alone, since a track has
     /// one voice: what it plays next puts out what it is playing now.
     /// </remarks>
-    private void OnTrackerNote(object? sender, (int Track, Note Note) e)
+    private void OnTrackerNote(object? sender, (int Track, Note Note, double Seconds) e)
     {
         if (e.Track != Track) return;
 
-        Sounding.Struck(e.Note, HoldSeconds, alone: true);
+        // As long as it will sound when that is known, and the usual moment when it is not.
+        Sounding.Struck(e.Note, e.Seconds > 0 ? e.Seconds : HoldSeconds, alone: true);
         Reveal(e.Note);
     }
 
@@ -200,9 +211,10 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     {
         if (!note.IsPlayable) return;
 
-        _audition.Audition(_instrument, note, volume);
+        double held = _audition.Audition(_instrument, note, volume);
 
-        Sounding.Struck(note, HoldSeconds);
+        // Lit for as long as it sounds, which for a recording is the recording's own length.
+        Sounding.Struck(note, held > 0 ? held : HoldSeconds);
         Reveal(note);
 
         // The scopes draw themselves from this, so they follow what was just played.

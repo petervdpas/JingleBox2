@@ -101,6 +101,13 @@ public sealed class SampleVoice : IVoice
 
         _root = baseNote.Semitone;
 
+        // How long one pass through the window takes at the speed this note reads it. The file's
+        // own rate and the note's ratio are the whole of it: a window of N frames read at ratio r
+        // out of a file recorded at R takes N / (R * r) seconds, whatever rate the engine runs at.
+        WindowSeconds = _window.IsLooping || sample.SampleRate <= 0 || _noteRatio <= 0
+            ? 0
+            : Math.Max(0, _window.End - _window.Start) / (sample.SampleRate * _noteRatio);
+
         if (zampler != null)
         {
             _zampler = zampler.Clone();
@@ -181,6 +188,19 @@ public sealed class SampleVoice : IVoice
         IsFinished || _sample.FrameCount <= 0
             ? -1
             : Math.Clamp(_position / _sample.FrameCount, 0, 1);
+
+    /// <summary>
+    /// How long this voice takes to read its window once, or zero when it loops and so never
+    /// finishes on its own.
+    /// </summary>
+    /// <remarks>
+    /// What an audition of a one-shot should hold for. A recording cut off part way through is
+    /// not the sound the instrument makes, and a fixed hold cuts every recording longer than it.
+    /// </remarks>
+    public double WindowSeconds { get; }
+
+    /// <summary>Which instrument auditioned this, for one that plays one note at a time.</summary>
+    public string Audition { get; init; } = "";
 
     public void HoldFor(double seconds) => _holdSeconds = seconds;
 

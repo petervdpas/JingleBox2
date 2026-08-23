@@ -64,6 +64,16 @@ public sealed class TrackerInstrument
     public bool Loop { get; set; }
 
     /// <summary>
+    /// Whether a note played by hand cuts the one before it, the way a track does.
+    /// </summary>
+    /// <remarks>
+    /// Only notes played by hand: in a pattern a track has one voice already, so this changes
+    /// nothing there. It is for a long recording, where holding the panel's keys down builds a
+    /// pile of takes all sounding over each other and there is no way to stop them.
+    /// </remarks>
+    public bool OneVoice { get; set; }
+
+    /// <summary>
     /// Which part of the recording plays, and how it repeats. Null on an instrument written
     /// before samples had a shape at all, which is the one reliable sign that its envelope
     /// was never heard: see <see cref="EnsureShape"/>.
@@ -355,6 +365,7 @@ public sealed class TrackerInstrument
         BaseNoteSemitone = other.BaseNoteSemitone;
         Volume = other.Volume;
         Loop = other.Loop;
+        OneVoice = other.OneVoice;
         Shape = other.Shape?.Clone();
 
         // What makes a plugin instrument a plugin instrument. Left out of here, an instrument
@@ -411,6 +422,7 @@ public sealed class TrackerInstrument
                 FilePath = other.FilePath;
                 BaseNoteSemitone = other.BaseNoteSemitone;
                 Loop = other.Loop;
+                OneVoice = other.OneVoice;
                 Shape = other.Shape?.Clone();
                 Patch.CopyFrom(other.Patch);
                 break;
@@ -439,6 +451,7 @@ public sealed class TrackerInstrument
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,
         Loop = Loop,
+        OneVoice = OneVoice,
         Shape = Shape?.Clone(),
         PluginPath = PluginPath,
         PluginId = PluginId,

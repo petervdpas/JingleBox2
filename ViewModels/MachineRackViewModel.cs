@@ -241,17 +241,26 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// </remarks>
     [ObservableProperty] private InstrumentPresets? presets;
 
-    /// <summary>Where the sound has got to, for the chop editor's cursor.</summary>
+    /// <summary>Where the sound has got to, for the cursor over the picture.</summary>
+    /// <remarks>
+    /// Both pictures read the same number: the one whole recording a sampler shows, and the
+    /// pieces a chopped one shows. A machine has one or the other, never both, so this sets
+    /// whichever is there.
+    /// </remarks>
     private void MovePlayhead()
     {
-        var slices = Editor?.Slices;
+        var editor = Editor;
 
-        if (slices == null) return;
+        if (editor == null) return;
 
         // Nothing lit is nothing sounding, and this is the last beat of the clock before it
         // stops. Asking the engine here would catch a voice still letting go of its release and
         // leave the line standing in the middle of the picture with nothing playing.
-        slices.Playhead = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(0);
+        double at = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(0);
+
+        editor.Playhead = at;
+
+        if (editor.Slices != null) editor.Slices.Playhead = at;
     }
 
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
@@ -273,9 +282,10 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             return;
         }
 
-        _audition.Audition(instrument, note, volume);
+        double held = _audition.Audition(instrument, note, volume);
 
-        Sounding.Struck(note, HoldSeconds);
+        // Lit for as long as it sounds, which for a recording is the recording's own length.
+        Sounding.Struck(note, held > 0 ? held : HoldSeconds);
 
         // Nothing plays this page but you, so the keyboard only ever moves for a note typed
         // above or below what it is showing.
@@ -325,9 +335,14 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         // window goes with it rather than being left behind on a page showing somebody else.
         Editor?.ClosePlugin();
 
+        // And its pads stop watching the keyboard, which is now somebody else's.
+        Editor?.Kit?.Unfollow();
+
         Editor = value == null
             ? null
-            : new InstrumentEditorViewModel(Machines.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition, _recordings);
+            : new InstrumentEditorViewModel(
+                Machines.IndexOf(value), value.Instrument, OnInstrumentEdited,
+                _waveforms, _audition, _recordings, note => PlayNote(note));
 
         Presets = value == null
             ? null

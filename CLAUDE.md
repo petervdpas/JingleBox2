@@ -109,6 +109,13 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
   you start from and a sound you own turned out to be the same object. A fresh library seeds
   itself with six starters, and from then on they are ordinary instruments
+- A note played by hand holds for a fixed moment on a generated sound, which would otherwise
+  never stop, and for its own length on a recording: a take cut off part way through is not the
+  sound the instrument makes. `SampleVoice.WindowSeconds` is that length, and the hold is passed
+  back up through `Audition` and `NotePlayed` so the key that lights and the cursor that runs
+  last exactly as long as the sound. Auditions pile up, as a keyboard does, unless the
+  instrument says `OneVoice`, which cuts what it was sounding first; in a pattern this changes
+  nothing, since a track is one voice already
 - The audio engine runs whenever a track has a chain, not only while something is playing. A
   plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
   and cannot tell the host what its own window did. `SynthMixer` therefore does not rest while

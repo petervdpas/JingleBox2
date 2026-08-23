@@ -59,7 +59,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Passed through rather than repeated, so there is one list of listeners and a panel that
     /// lets go really has let go. What the panels want is what the player already says.
     /// </remarks>
-    public event EventHandler<(int Track, Note Note)>? NotePlayed
+    public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed
     {
         add
         {
@@ -77,9 +77,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The half of <see cref="NotePlayed"/> the player knows nothing about: notes played by
     /// hand, from the computer keyboard, a panel's keys, or a MIDI keyboard.
     /// </summary>
-    private EventHandler<(int Track, Note Note)>? _played;
+    private EventHandler<(int Track, Note Note, double Seconds)>? _played;
 
-    private void Played(int track, Note note) => _played?.Invoke(this, (track, note));
+    private void Played(int track, Note note, double seconds) =>
+        _played?.Invoke(this, (track, note, seconds));
 
     /// <summary>What plugins this machine has, for the picker on the mixer page.</summary>
     public PluginLibraryViewModel Plugins { get; }
@@ -373,6 +374,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand LoadCommand => new RelayCommand(Load);
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
+
+    /// <summary>Throws away a saved song. The one you are working on stays where it is.</summary>
+    public IAsyncRelayCommand DeleteSongCommand => new AsyncRelayCommand(DeleteSong);
     public IAsyncRelayCommand RemoveInstrumentCommand => new AsyncRelayCommand(RemoveSelectedInstrument);
     public IRelayCommand AddInstrumentCommand => new RelayCommand(AddInstrument);
     public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshRack);
@@ -874,12 +878,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         // Played on the track the cursor is on, so a plugin instrument sounds through the copy
         // that track plays rather than through an audition copy of its own.
-        _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
+        double held = _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
 
         // And said out loud, so a panel's keyboard lights for a note played by hand the same as
         // for one the pattern played. Only the pattern used to say anything, which is why a MIDI
         // key sounded and nothing on screen moved.
-        Played(Cursor.Track, note);
+        Played(Cursor.Track, note, held);
     }
 
     public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
@@ -928,7 +932,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Sounds one note on any instrument, for the rack's auditioning. The engine lives
     /// here, so the rack borrows it rather than opening a second one.
     /// </summary>
-    public void Audition(TrackerInstrument instrument, Note note, int volume) =>
+    public double Audition(TrackerInstrument instrument, Note note, int volume) =>
         _player.Preview(instrument, note, GainFor(volume));
 
     /// <summary>
@@ -1528,6 +1532,55 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
 
         OnPropertyChanged(nameof(HasInstruments));
+    }
+
+    /// <summary>
+    /// Removes a saved song from disc.
+    /// </summary>
+    /// <remarks>
+    /// What is open stays open, even when it is the one that was deleted: what you are working
+    /// on is in memory and throwing away the file is not a reason to take it off you. It simply
+    /// has nowhere to go back to, which is what an untitled song is, so it is marked unsaved and
+    /// the picker forgets it.
+    /// </remarks>
+    private async Task DeleteSong()
+    {
+        var file = SelectedSongFile;
+
+        if (file == null)
+        {
+            Status = "Pick a song to delete first.";
+            return;
+        }
+
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Delete song",
+            "Delete '" + file.Name + "' from disc? The instruments it used are untouched. " +
+                "This cannot be undone.",
+            "Delete");
+
+        if (!confirmed) return;
+
+        try
+        {
+            bool wasOpen = string.Equals(SongName, file.Name, StringComparison.OrdinalIgnoreCase);
+
+            _store.Delete(file.Path);
+
+            SelectedSongFile = null;
+
+            RefreshSavedSongs();
+
+            if (wasOpen) MarkDirty();
+
+            Status = wasOpen
+                ? "Deleted '" + file.Name + "'. What is open is still here, but unsaved."
+                : "Deleted '" + file.Name + "'";
+        }
+        catch (Exception ex)
+        {
+            Status = "Could not delete '" + file.Name + "': " + ex.Message;
+        }
     }
 
     private void RefreshSavedSongs()

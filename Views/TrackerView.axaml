@@ -87,7 +87,7 @@
     <!-- The song: which one is open, what it is called, and saving it. -->
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Classes="field" Text="Open:" />
           <ComboBox Grid.Column="1"
                     ItemsSource="{Binding SavedSongs}"
@@ -97,6 +97,9 @@
           <Button Grid.Column="2" Content="Open" Command="{Binding LoadCommand}" />
           <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshSongsCommand}" />
           <Button Grid.Column="4" Content="New" Command="{Binding NewSongCommand}" />
+          <Button Grid.Column="5" Content="Delete" Classes="danger"
+                  Command="{Binding DeleteSongCommand}"
+                  ToolTip.Tip="Throws the picked song away. What is open stays open, and the machines it used are untouched." />
         </Grid>
 
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
@@ -110,7 +113,10 @@
 
     <Grid>
 
-    <Grid ColumnDefinitions="180,*,220" ColumnSpacing="12"
+    <!-- Three columns you can move the edges of. The pattern in the middle takes whatever the
+         other two leave, so widening the order list or the instruments narrows the pattern
+         rather than pushing anything off the end. -->
+    <Grid ColumnDefinitions="180,12,*,12,220"
           IsVisible="{Binding ShowsPattern}">
 
       <!-- Order list -->
@@ -129,8 +135,11 @@
         </DockPanel>
       </Border>
 
+      <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns"
+                    ToolTip.Tip="Drag to give the order list more or less room." />
+
       <!-- Pattern -->
-      <Border Grid.Column="1" Classes="card">
+      <Border Grid.Column="2" Classes="card">
         <DockPanel>
           <views:PatternHeader x:Name="Header"
                                DockPanel.Dock="Top"
@@ -238,7 +247,10 @@
       </Border>
 
       <!-- Instruments -->
-      <Border Grid.Column="2" Classes="card">
+      <GridSplitter Grid.Column="3" Classes="handle" ResizeDirection="Columns"
+                    ToolTip.Tip="Drag to give the song's instruments more or less room." />
+
+      <Border Grid.Column="4" Classes="card">
         <DockPanel>
           <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
             <TextBlock Classes="cardTitle" Text="Song instruments" />

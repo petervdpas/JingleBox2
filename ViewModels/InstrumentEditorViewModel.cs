@@ -27,17 +27,27 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     private WaveformData? _waveform;
     private float[]? _peaks;
 
+    /// <param name="play">
+    /// How the panel plays a note: through it, a pad or a zone tapped here is the same note as
+    /// one played on the keyboard, so the keyboard moves to it and lights it. Without one, a tap
+    /// still sounds, through the audition alone, and nothing on screen moves.
+    /// </param>
     public InstrumentEditorViewModel(
         int index,
         TrackerInstrument instrument,
         Action changed,
         IWaveformService? waveforms = null,
         IInstrumentAudition? audition = null,
-        ObservableCollection<Recording>? recordings = null)
+        ObservableCollection<Recording>? recordings = null,
+        Action<Note>? play = null)
     {
         Index = index;
         _instrument = instrument;
         _changed = changed;
+
+        // A tap on a pad or a zone is a note played on this panel, and the panel is what knows
+        // the keyboard is there.
+        Action<Note> tap = play ?? (note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
         Recordings = recordings ?? new ObservableCollection<Recording>();
 
@@ -66,9 +76,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             instrument.Zampler ??= new ZamplerPatch();
             instrument.Zampler.Clamp();
 
-            Zones = new ZoneMapViewModel(
-                instrument.Zones, Sounded(changed),
-                note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
+            Zones = new ZoneMapViewModel(instrument.Zones, Sounded(changed), tap);
 
             Zampler = new ZamplerPatchViewModel(instrument.Zampler, changed);
 
@@ -90,9 +98,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             instrument.Kit ??= DrumKit.Empty();
             instrument.Kit.Clamp();
 
-            Kit = new DrumKitViewModel(
-                instrument.Kit, Sounded(changed),
-                note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
+            Kit = new DrumKitViewModel(instrument.Kit, Sounded(changed), tap);
 
             Slices = Cutting(
                 waveforms, DrumKit.PadCount,
@@ -456,6 +462,25 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Where the sound has got to in the whole file, as a fraction of it, or -1 for nothing
+    /// playing. The same number the chop editor's cursor runs on, for the panel that shows one
+    /// picture rather than pieces.
+    /// </summary>
+    public double Playhead
+    {
+        get => _playhead;
+        set
+        {
+            if (_playhead.Equals(value)) return;
+
+            _playhead = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private double _playhead = -1;
+
     /// <summary>What the file turned out to be, for the line under the picture.</summary>
     public string SampleText
     {
@@ -664,6 +689,24 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             if (Shape.Reverse == value) return;
 
             Shape.Reverse = value;
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>
+    /// Whether a key played on this panel stops the note before it. Off, the notes pile up,
+    /// which is what a keyboard does; on, the machine plays one thing at a time, which is what
+    /// a long recording wants.
+    /// </summary>
+    public bool OneVoice
+    {
+        get => _instrument.OneVoice;
+        set
+        {
+            if (_instrument.OneVoice == value) return;
+
+            _instrument.OneVoice = value;
             OnPropertyChanged();
             _changed();
         }

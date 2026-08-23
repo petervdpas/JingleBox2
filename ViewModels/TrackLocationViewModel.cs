@@ -69,7 +69,7 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
 
         public void FollowOctave(int octave) => Octave = octave;
 
-        public event EventHandler<(int Track, Note Note)>? NotePlayed
+        public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed
         {
             add { }
             remove { }

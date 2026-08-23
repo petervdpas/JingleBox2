@@ -9,7 +9,12 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public interface IInstrumentAudition
 {
-    void Audition(TrackerInstrument instrument, Note note, int volume);
+    /// <returns>
+    /// How long the note will sound. A generated sound holds for a fixed moment; a recording
+    /// holds until it has been heard right through, which is what a keyboard needs to know to
+    /// light its key and a picture needs to run its cursor.
+    /// </returns>
+    double Audition(TrackerInstrument instrument, Note note, int volume);
 
     /// <summary>
     /// How far through its recording the sample voice on that track is, as a fraction of the

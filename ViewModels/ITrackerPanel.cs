@@ -49,5 +49,9 @@ public interface ITrackerPanel : INotifyPropertyChanged
     /// and a panel that filtered nothing would light for the whole song. It can arrive from the
     /// clock thread.
     /// </remarks>
-    event EventHandler<(int Track, Note Note)>? NotePlayed;
+    /// <param name="Seconds">
+    /// How long that note will sound, or zero when nobody knows: a pattern's note lasts until
+    /// the next one, an auditioned recording lasts exactly as long as the recording.
+    /// </param>
+    event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 }

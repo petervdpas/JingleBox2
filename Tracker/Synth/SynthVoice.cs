@@ -74,6 +74,9 @@ public sealed class SynthVoice : IVoice
     /// Releases on its own after this many seconds. Used for auditioning, where there is no
     /// key to let go of.
     /// </summary>
+    /// <summary>Which instrument auditioned this, for one that plays one note at a time.</summary>
+    public string Audition { get; init; } = "";
+
     public void HoldFor(double seconds) => _holdSeconds = seconds;
 
     public void NoteOff() => _envelope.NoteOff();

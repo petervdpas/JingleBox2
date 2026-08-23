@@ -33,7 +33,7 @@
 
   <DockPanel Margin="16">
 
-    <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
+    <Grid ColumnDefinitions="240,12,*">
 
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
@@ -71,7 +71,10 @@
         </DockPanel>
       </Border>
 
-      <Border Grid.Column="1" Classes="card">
+      <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns"
+                    ToolTip.Tip="Drag to give the machine list more or less room." />
+
+      <Border Grid.Column="2" Classes="card">
         <!-- The designer is its own control, so the same panel serves this tab and the
              window a track opens onto the instrument it plays. -->
         <views:InstrumentEditor />

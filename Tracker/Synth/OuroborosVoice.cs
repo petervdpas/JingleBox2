@@ -81,6 +81,9 @@ public sealed class OuroborosVoice : IVoice
     private double _holdUntil = -1;
     private double _time;
 
+    /// <summary>Which instrument auditioned this, for one that plays one note at a time.</summary>
+    public string Audition { get; init; } = "";
+
     public void HoldFor(double seconds) => _holdUntil = seconds;
 
     public void NoteOff() => _envelope.NoteOff();
