@@ -394,7 +394,7 @@ public static class PluginCrashGuard
         try
         {
             string path = System.IO.Path.Combine(Folder, name);
-            File.WriteAllText(path, JsonSerializer.Serialize(what, Indented));
+            JingleBox2.Config.SafeFile.Write(path, JsonSerializer.Serialize(what, Indented));
         }
         catch (Exception)
         {

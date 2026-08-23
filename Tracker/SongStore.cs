@@ -56,7 +56,7 @@ public sealed class SongStore
         song.Normalize();
 
         var document = SongDocument.From(song);
-        File.WriteAllText(filePath, JsonSerializer.Serialize(document, JsonOptions));
+        Config.SafeFile.Write(filePath, JsonSerializer.Serialize(document, JsonOptions));
     }
 
     /// <summary>Loads a song, or null when the file is missing or not a song.</summary>

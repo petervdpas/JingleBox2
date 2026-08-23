@@ -30,9 +30,11 @@ public static class PluginHost
     /// On Windows, the plugin window embedding architecture doesn't support out-of-process plugins.
     /// VST3 plugins need to run in-process for UI interaction to work properly.
     /// </remarks>
-    public static bool Isolated =>
-        !OperatingSystem.IsWindows() &&
-        Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) != "1";
+    public static bool Isolated => !OperatingSystem.IsWindows() && !InProcessAsked;
+
+    /// <summary>True when somebody has asked for plugins in this process, whatever the platform.</summary>
+    private static bool InProcessAsked =>
+        Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) == "1";
 
     /// <summary>Opens a plugin, whichever standard it speaks.</summary>
     public static IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
@@ -157,9 +159,17 @@ public static class PluginHost
     /// A bundle that will not open is skipped rather than stopping the scan: one bad plugin is
     /// not a machine with no plugins.
     /// </summary>
+    /// <remarks>
+    /// In a process of its own on every platform, Windows included, where plugins are otherwise
+    /// loaded into this one. Scanning is the one thing that needs nothing from the window
+    /// embedding that keeps Windows in-process: the child opens each bundle, asks what is in it,
+    /// writes a list and goes away. And it is the worst place to be running somebody else's code
+    /// unprotected, because a plugin that dies while being asked what it is would take the
+    /// application down every time it started, before anybody had chosen to use it.
+    /// </remarks>
     public static List<PluginInfo> Scan(IReadOnlyList<string> folders)
     {
-        return Isolated ? ScanElsewhere(folders) : ScanHere(folders);
+        return InProcessAsked ? ScanHere(folders) : ScanElsewhere(folders);
     }
 
     /// <summary>
@@ -183,6 +193,10 @@ public static class PluginHost
         {
             FileName = self,
             UseShellExecute = false,
+
+            // Nothing to show and nowhere to show it: the child writes a file and goes away.
+            // Without this, a console flashes up on Windows every time somebody scans.
+            CreateNoWindow = true,
             WorkingDirectory = AppContext.BaseDirectory
         };
 

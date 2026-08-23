@@ -386,14 +386,34 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <summary>
+    /// Asks the plugin something and waits for the answer.
+    /// </summary>
+    /// <remarks>
+    /// Two patiences, because the questions are not alike. A knob's value is asked from the
+    /// thread that draws and has to come back inside the time a window has before it is called
+    /// frozen; a patch being handed over is worth waiting properly for. See
+    /// <see cref="PluginBridge.QuickTimeoutMilliseconds"/>.
+    /// </remarks>
     private (BridgeCall Call, byte[] Payload) Ask(BridgeCall call, byte[]? payload)
     {
         var process = _process;
 
         return process?.Alive != true
             ? (BridgeCall.Fail, Array.Empty<byte>())
-            : process.Call(call, payload);
+            : process.Call(call, payload, Patience(call));
     }
+
+    /// <summary>How long this question is worth waiting for.</summary>
+    private static int Patience(BridgeCall call) => call switch
+    {
+        // A patch is hundreds of kilobytes for some plugins and is read and written whole.
+        BridgeCall.SaveState or BridgeCall.LoadState => PluginBridge.CallTimeoutMilliseconds,
+
+        // Everything else is a number or a short string, asked while somebody is looking at
+        // the window it is going into.
+        _ => PluginBridge.QuickTimeoutMilliseconds
+    };
 
     private void Send(BridgeCall call, byte[]? payload) => Ask(call, payload);
 

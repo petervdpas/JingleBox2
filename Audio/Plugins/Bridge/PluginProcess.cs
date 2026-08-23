@@ -247,6 +247,10 @@ internal sealed class PluginProcess : IDisposable
         {
             FileName = self,
             UseShellExecute = false,
+
+            // The console, not the plugin's own window: this stops a black box flashing up on
+            // Windows for every plugin opened, and has nothing to say about what the plugin draws.
+            CreateNoWindow = true,
             WorkingDirectory = AppContext.BaseDirectory
         };
 

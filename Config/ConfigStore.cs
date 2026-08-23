@@ -54,7 +54,7 @@ public sealed class ConfigStore
     {
         Normalize(cfg);
         var json = JsonSerializer.Serialize(cfg, JsonOptions);
-        File.WriteAllText(ConfigPath, json);
+        SafeFile.Write(ConfigPath, json);
     }
 
     private static void Normalize(AppConfig cfg)

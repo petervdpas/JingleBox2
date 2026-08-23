@@ -74,7 +74,7 @@ public sealed class MachineRack : ISampleUsage
         if (instrument is null) return;
 
         instrument.EnsureId();
-        File.WriteAllText(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
+        Config.SafeFile.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
     }
 
     /// <summary>

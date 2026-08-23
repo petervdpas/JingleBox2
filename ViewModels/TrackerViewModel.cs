@@ -28,6 +28,28 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private readonly SongStore _store;
     private readonly MachineRack _rack;
     private readonly DispatcherTimer _meters;
+
+    /// <summary>Writes the song down while it is unsaved, so a crash costs a minute, not a session.</summary>
+    private readonly DispatcherTimer _keeping;
+
+    /// <summary>How often unsaved work is written down.</summary>
+    private const int KeepSeconds = 20;
+
+    /// <summary>
+    /// What a kept song is called: the name you gave it with this on the end.
+    /// </summary>
+    /// <remarks>
+    /// Kept in the songs folder rather than somewhere of its own, so it turns up in the list of
+    /// songs like anything else. Nobody has to be told where to look, and getting rid of one is
+    /// the Delete button that is already there.
+    /// </remarks>
+    private const string RecoveredSuffix = " (recovered)";
+
+    /// <summary>The file this session is keeping its unsaved work in, if it has needed to.</summary>
+    private string _kept = "";
+
+    /// <summary>Something found on the way in that the last session never got to save.</summary>
+    public string Recovered { get; } = "";
     private readonly ObservableCollection<Recording> _recordings;
 
     /// <summary>Where the velocity preference is kept. Null in a test or a headless run.</summary>
@@ -320,6 +342,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // the UI dozens of times a second, and a meter that misses a frame costs nothing.
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => ReadMeters();
+
+        // Unsaved work, kept where it can be found again. See Keep.
+        _keeping = new DispatcherTimer { Interval = TimeSpan.FromSeconds(KeepSeconds) };
+        _keeping.Tick += (_, _) => Keep();
+        _keeping.Start();
+
+        Recovered = LookForRecovered();
 
         _player.PositionChanged += OnPositionChanged;
         _player.StateChanged += OnPlayerStateChanged;
@@ -873,6 +902,80 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// Writes the song down as it stands, if it has anything in it that is not saved.
+    /// </summary>
+    /// <remarks>
+    /// Not a save: it goes to a file of its own and the song is still unsaved afterwards. What
+    /// it is for is the twenty minutes of work between two saves, which is what a plugin taking
+    /// the application down costs today. Doing nothing while there is nothing to do, so a
+    /// tracker sitting idle writes no files.
+    /// </remarks>
+    private void Keep()
+    {
+        if (!IsDirty) return;
+
+        try
+        {
+            string name = SongName.Trim();
+            if (name.Length == 0) name = "untitled";
+
+            if (name.EndsWith(RecoveredSuffix, StringComparison.Ordinal)) return;
+            if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return;
+
+            // What the tracks are actually playing, the same as a real save reads back.
+            _player.CaptureChains(Song);
+            foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
+
+            string path = _store.PathFor(name + RecoveredSuffix);
+
+            _store.Save(Song, path);
+
+            if (!string.Equals(_kept, path, StringComparison.Ordinal))
+            {
+                Drop();
+                _kept = path;
+
+                Log.Write(LogArea.Tracker, () => "unsaved work is being kept in " + path);
+            }
+        }
+        catch (Exception error)
+        {
+            // A song that will not be written down is not a reason to stop the one being
+            // written. It will be tried again in twenty seconds.
+            Log.Fault(LogArea.Tracker, "keeping the unsaved song", error);
+        }
+    }
+
+    /// <summary>
+    /// Throws away what was being kept, for work that is now saved or deliberately abandoned.
+    /// </summary>
+    private void Drop()
+    {
+        if (_kept.Length == 0) return;
+
+        try { _store.Delete(_kept); } catch (Exception) { }
+
+        _kept = "";
+    }
+
+    /// <summary>
+    /// Anything the last session was keeping when it stopped, said out loud rather than left
+    /// lying in the songs list for somebody to notice.
+    /// </summary>
+    private string LookForRecovered()
+    {
+        foreach (var file in _store.ListSongs())
+        {
+            if (file.Name.EndsWith(RecoveredSuffix, StringComparison.Ordinal))
+            {
+                return "'" + file.Name + "' in the songs list is work the last session never saved.";
+            }
+        }
+
+        return "";
+    }
+
     /// <summary>Something about the song changed and the file on disk no longer matches.</summary>
     private void MarkDirty()
     {
@@ -1401,6 +1504,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == path);
 
             IsDirty = false;
+
+            // Saved for real, so what was being kept is no longer anybody's safety net.
+            Drop();
+
+            RefreshSavedSongs();
+
             Status = $"Saved '{name}'";
         }
         catch (Exception ex)
@@ -1486,6 +1595,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
         IsDirty = false;
+
+        // Whatever was being kept belonged to the song that has just been put down. Leaving it
+        // would offer somebody their old work back every time they opened anything.
+        Drop();
 
         // The tempo and track count live on the song, so the whole transport bar is stale.
         OnPropertyChanged(nameof(Bpm));

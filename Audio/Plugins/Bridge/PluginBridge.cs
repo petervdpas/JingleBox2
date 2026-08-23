@@ -68,6 +68,20 @@ internal static class PluginBridge
     public const int CallTimeoutMilliseconds = 20000;
 
     /// <summary>
+    /// How long an ordinary question waits: what a knob is set to, what it reads as, the list
+    /// of them.
+    /// </summary>
+    /// <remarks>
+    /// These are asked from the thread that draws, so the patience for them is the patience a
+    /// window has before somebody says it has frozen. A plugin that has not answered in three
+    /// seconds is not going to answer, and waiting twenty for it turns one sick plugin into an
+    /// application that will not repaint. What is kept from the long patience is loading and
+    /// handing over a patch, which are slow for honest reasons: Vital's state runs to hundreds
+    /// of kilobytes.
+    /// </remarks>
+    public const int QuickTimeoutMilliseconds = 3000;
+
+    /// <summary>
     /// The same, for anything to do with the plugin's own window.
     /// </summary>
     /// <remarks>

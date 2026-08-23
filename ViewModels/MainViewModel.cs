@@ -413,6 +413,8 @@ public sealed partial class MainViewModel : ObservableObject
         // the one thing worth saying out loud all session.
         if (Machines.Status.Length > 0) Bus.Warn(Machines.Status, "Machines");
 
+
+
         // The last run stopped without saying goodbye, and there is now a file saying what it
         // was in the middle of. Said out loud, because a report nobody knows about is a report
         // nobody sends.
@@ -421,6 +423,11 @@ public sealed partial class MainViewModel : ObservableObject
             Bus.Warn("JingleBox stopped unexpectedly last time. What it was doing is written in " +
                      Diagnostics.CrashReport.FromLastTime, "Crash");
         }
+
+        // And what there is to be done about it. Said after the crash rather than before, because
+        // this is the one worth leaving on the bar: the other is a file to send, this is work to
+        // get back.
+        if (Tracker.Recovered.Length > 0) Bus.Warn(Tracker.Recovered, "Tracker");
 
         StatusLine = new StatusViewModel(
             Bus,
