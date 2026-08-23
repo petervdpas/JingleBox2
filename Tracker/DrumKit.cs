@@ -116,6 +116,8 @@ public sealed class DrumKit
         note.IsPlayable ? Pads.FirstOrDefault(p => p.Semitone == note.Semitone && p.HasSound) : null;
 
     /// <summary>Every recording this kit uses, for preloading and for reporting what is missing.</summary>
+    /// <remarks>Worked out from the pieces, so writing it into the file would say it twice.</remarks>
+    [JsonIgnore]
     public IEnumerable<string> Files => Pads.Where(p => p.HasSound).Select(p => p.FilePath);
 
     /// <summary>

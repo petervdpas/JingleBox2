@@ -97,8 +97,61 @@ public static class RecordingImport
             at++;
         }
 
-        File.Copy(path, wanted);
+        Convert(path, wanted);
 
         return wanted;
+    }
+
+    /// <summary>
+    /// Puts one file on the shelf as the sixteen-bit WAV everything here works in, copying it
+    /// unchanged when that is already what it is.
+    /// </summary>
+    /// <remarks>
+    /// The shelf holds one format, and this is where that becomes true. A sample folder is full
+    /// of 24-bit and float files, and letting one through would mean the trim and the normalise
+    /// quietly rewriting it as sixteen bits later, at a moment nobody connected to importing it.
+    /// Converting here happens once, at the door, where it can be said out loud.
+    ///
+    /// Copied byte for byte when it is already ours, so importing a recording this app made
+    /// gives back the same file and not a re-encoding of it.
+    /// </remarks>
+    private static void Convert(string path, string wanted)
+    {
+        WavFile.Stored stored;
+
+        try
+        {
+            stored = WavFile.StoredAs(path);
+        }
+        catch (Exception)
+        {
+            // Not readable as a WAV at all: copied as it is, and it will report itself missing
+            // or unplayable later, which is a truer thing to say than a conversion failure here.
+            File.Copy(path, wanted);
+            return;
+        }
+
+        if (stored.IsOurs)
+        {
+            File.Copy(path, wanted);
+            return;
+        }
+
+        var (samples, info) = WavFile.Read(path);
+
+        WavFile.Write(wanted, samples, info.SampleRate, info.Channels);
+    }
+
+    /// <summary>How a file is written, for a panel that wants to say what it did with it.</summary>
+    public static string Describe(string path)
+    {
+        try
+        {
+            return WavFile.StoredAs(path).ToString();
+        }
+        catch (Exception)
+        {
+            return "unreadable";
+        }
     }
 }

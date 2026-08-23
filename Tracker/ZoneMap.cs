@@ -130,6 +130,8 @@ public sealed class ZoneMap
         note.IsPlayable ? Zones.FirstOrDefault(z => z.HasSound && z.Covers(note.Semitone)) : null;
 
     /// <summary>Every recording this map uses, for preloading and for reporting what is missing.</summary>
+    /// <remarks>Worked out from the pieces, so writing it into the file would say it twice.</remarks>
+    [JsonIgnore]
     public IEnumerable<string> Files => Zones.Where(z => z.HasSound).Select(z => z.FilePath);
 
     /// <summary>
