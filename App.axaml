@@ -38,7 +38,7 @@
 
         <!-- One set of tab metrics, so every tab breathes the same. -->
         <Style Selector="StackPanel.tabRoot">
-            <Setter Property="Margin" Value="16" />
+            <Setter Property="Margin" Value="12" />
             <Setter Property="Spacing" Value="12" />
         </Style>
         <Style Selector="Border.card.stacked">

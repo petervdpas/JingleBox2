@@ -14,7 +14,7 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel Margin="16">
+  <DockPanel Margin="6">
 
     <!-- Transport -->
     <Border DockPanel.Dock="Top" Classes="card stacked">
@@ -25,21 +25,12 @@
            window it kept its full width and the pinned buttons were drawn over the top of the
            last few fields. -->
       <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-        <views:Transport IsRecording="{Binding IsRecording}"
-                         IsPlaying="{Binding IsPlaying}"
-                         IsPaused="{Binding IsPaused}"
-                         CanPause="{Binding CanPause}"
-                         RecordCommand="{Binding ToggleRecordCommand}"
-                         PlayCommand="{Binding PlayCommand}"
-                         PauseCommand="{Binding PauseCommand}"
-                         StopCommand="{Binding StopCommand}"
-                         VerticalAlignment="Center" Margin="0,0,6,0"
-                         ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
-
+        <!-- The transport is at the top of the window, on the tab line, where it can be seen
+             and reached from every page. What is left on this bar is what only means anything
+             in front of a pattern. -->
         <ComboBox ItemsSource="{Binding PlayModes}"
                   SelectedItem="{Binding PlayMode}"
-                  MinWidth="104"
-                  Margin="6,0,0,0" />
+                  MinWidth="104" />
 
         <!-- Every label the same distance from the field before it and from its own, so the
              row reads as five settings rather than as one run of digits. -->

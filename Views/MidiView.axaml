@@ -22,7 +22,7 @@
         <TextBlock Classes="cardHint" Text="{Binding PadDeviceSummary}" />
 
         <!-- Header row -->
-        <Grid ColumnDefinitions="60,120,60,90,90"
+        <Grid ColumnDefinitions="36,52,56,76,Auto"
           ColumnSpacing="10"
           Margin="0,0,0,6"
           Opacity="0.85">
@@ -37,7 +37,7 @@
         <ItemsControl ItemsSource="{Binding Pads}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Grid ColumnDefinitions="60,120,60,90,90"
+              <Grid ColumnDefinitions="36,52,56,76,Auto"
                 ColumnSpacing="10"
                 Margin="0,4">
 

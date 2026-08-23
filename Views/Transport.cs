@@ -68,6 +68,21 @@ public class Transport : ThemedControl
     public static readonly StyledProperty<double> GapProperty =
         AvaloniaProperty.Register<Transport, double>(nameof(Gap), 6);
 
+    /// <summary>
+    /// Seats the caps on the page rather than on a panel, for a transport that is not standing
+    /// on one.
+    /// </summary>
+    /// <remarks>
+    /// The caps are drawn as a panel's caps are: a surface lit from above, which is right when
+    /// there is a panel under them and wrong when there is not. On the bare page the same caps
+    /// read as four bright blocks stuck to the top of the window, because they are lighter than
+    /// everything around them and nothing explains why. Quiet takes the seat down to the page's
+    /// own colour and flattens the moulding, so they read as part of the frame rather than as
+    /// something dropped on it.
+    /// </remarks>
+    public static readonly StyledProperty<bool> QuietProperty =
+        AvaloniaProperty.Register<Transport, bool>(nameof(Quiet));
+
     /// <summary>The red a record button is, everywhere.</summary>
     private static readonly Color Armed = Color.FromRgb(0xE5, 0x39, 0x35);
 
@@ -83,7 +98,7 @@ public class Transport : ThemedControl
     {
         AffectsRender<Transport>(
             IsRecordingProperty, IsPlayingProperty, IsPausedProperty, CanPauseProperty,
-            CapWidthProperty, CapHeightProperty, GapProperty);
+            CapWidthProperty, CapHeightProperty, GapProperty, QuietProperty);
 
         AffectsMeasure<Transport>(CapWidthProperty, CapHeightProperty, GapProperty);
     }
@@ -110,6 +125,12 @@ public class Transport : ThemedControl
     {
         get => GetValue(CanPauseProperty);
         set => SetValue(CanPauseProperty, value);
+    }
+
+    public bool Quiet
+    {
+        get => GetValue(QuietProperty);
+        set => SetValue(QuietProperty, value);
     }
 
     public ICommand? RecordCommand
@@ -173,7 +194,9 @@ public class Transport : ThemedControl
         bool down = _down == key;
         bool dead = key == Key.Pause && !CanPause;
 
-        var seat = palette.Surface;
+        // On a panel, the panel's own surface. On the bare page, a shade above the page, which
+        // is enough to be a cap and not enough to be a block of light.
+        var seat = Quiet ? ThemePalette.Shade(palette.Background, 0.05) : palette.Surface;
 
         // Hovering lifts the seat a little, so a cap says it can be pressed before it is.
         if (_over == key && !down && !dead) seat = ThemePalette.Shade(seat, 0.10);
@@ -188,17 +211,17 @@ public class Transport : ThemedControl
             GradientStops = down
                 ? new GradientStops
                 {
-                    new GradientStop(ThemePalette.Shade(seat, -0.10), 0),
-                    new GradientStop(ThemePalette.Shade(seat, 0.20), 1)
+                    new GradientStop(ThemePalette.Shade(seat, Quiet ? -0.06 : -0.10), 0),
+                    new GradientStop(ThemePalette.Shade(seat, Quiet ? 0.10 : 0.20), 1)
                 }
                 : new GradientStops
                 {
-                    new GradientStop(ThemePalette.Shade(seat, 0.38), 0),
-                    new GradientStop(ThemePalette.Shade(seat, 0.08), 1)
+                    new GradientStop(ThemePalette.Shade(seat, Quiet ? 0.08 : 0.38), 0),
+                    new GradientStop(ThemePalette.Shade(seat, Quiet ? 0.00 : 0.08), 1)
                 }
         };
 
-        var pen = new Pen(new SolidColorBrush(ThemePalette.Shade(seat, -0.35)), 1);
+        var pen = new Pen(new SolidColorBrush(ThemePalette.Shade(seat, Quiet ? -0.12 : -0.35)), 1);
 
         context.DrawRectangle(moulding, pen, cap, Corner, Corner);
 
@@ -211,13 +234,21 @@ public class Transport : ThemedControl
     /// What colour the symbol goes: red for record whatever it is doing, the accent for a
     /// transport that is running, and the ordinary text colour otherwise.
     /// </summary>
-    private Color Ink(ThemePalette palette, Key key) => key switch
+    private Color Ink(ThemePalette palette, Key key)
     {
-        Key.Record => Armed,
-        Key.Play => IsPlaying ? palette.Accent : palette.Text,
-        Key.Pause => IsPaused ? palette.Accent : palette.Text,
-        _ => palette.Text
-    };
+        // On the bare page the symbols keep company with the tab names beside them, which are
+        // muted until you are on one. White marks there read as four things shouting on a line
+        // that is otherwise quiet.
+        var idle = Quiet ? palette.Muted : palette.Text;
+
+        return key switch
+        {
+            Key.Record => Armed,
+            Key.Play => IsPlaying ? palette.Accent : idle,
+            Key.Pause => IsPaused ? palette.Accent : idle,
+            _ => idle
+        };
+    }
 
     private void DrawSymbol(DrawingContext context, Key key, Rect cap, IBrush ink, bool down)
     {

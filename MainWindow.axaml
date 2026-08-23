@@ -10,7 +10,7 @@
   Icon="/Assets/icon.ico"
   Background="{DynamicResource BgBrush}">
 
-  <DockPanel Margin="16">
+  <DockPanel Margin="12">
 
     <!-- Nothing across the top any more: the theme and the output device are settings, and
          they live in SETTINGS with the rest of them. What is left is the page you are on. -->
@@ -25,7 +25,37 @@
                      OutputLevel="{Binding StatusLine.OutputLevel}"
                      ToolTip.Tip="{Binding StatusLine.History}" />
 
+    <!-- The tabs, and the transport sitting on the same line at the other end of it.
+         The transport belongs to the whole window rather than to the tracker page: what it is
+         doing is worth seeing from the pads, and worth stopping from wherever you are. -->
+    <Grid>
+
+      <views:Transport HorizontalAlignment="Right"
+                       VerticalAlignment="Top"
+                       Margin="0,5,25,0"
+                       ZIndex="1"
+                       CapWidth="34" CapHeight="26" Gap="4" Quiet="True"
+                       IsRecording="{Binding Tracker.IsRecording}"
+                       IsPlaying="{Binding Tracker.IsPlaying}"
+                       IsPaused="{Binding Tracker.IsPaused}"
+                       CanPause="{Binding Tracker.CanPause}"
+                       RecordCommand="{Binding Tracker.ToggleRecordCommand}"
+                       PlayCommand="{Binding Tracker.PlayCommand}"
+                       PauseCommand="{Binding Tracker.PauseCommand}"
+                       StopCommand="{Binding Tracker.StopCommand}"
+                       ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
+
     <TabControl SelectedIndex="{Binding SelectedTab}">
+      <!-- Room kept on the tab line for the transport standing at the end of it. Narrow the
+           window and the tabs wrap; without this they wrap underneath the buttons and the two
+           are drawn over each other. Only the strip is held back, so what the page has to draw
+           in is untouched. -->
+      <TabControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel Margin="0,0,160,0" />
+        </ItemsPanelTemplate>
+      </TabControl.ItemsPanel>
+
       <TabItem Header="USE">
         <views:UseView />
       </TabItem>
@@ -51,6 +81,8 @@
       </TabItem>
 
     </TabControl>
+
+    </Grid>
 
   </DockPanel>
 </Window>

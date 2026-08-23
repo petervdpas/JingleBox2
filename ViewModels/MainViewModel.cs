@@ -250,6 +250,16 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
     public ObservableCollection<PadViewModel> Pads { get; } = new();
 
+    /// <summary>
+    /// The pad the PADS page is about.
+    /// </summary>
+    /// <remarks>
+    /// One editor and a grid to point it at, rather than every pad's settings stacked down a
+    /// page you scroll. The grid is the pads as they are laid out, so picking the one to work
+    /// on is the same movement as reaching for it while playing.
+    /// </remarks>
+    [ObservableProperty] private PadViewModel? selectedPad;
+
     // PADS header
     public ObservableCollection<string> ProfileNames { get; } = new();
 
@@ -275,7 +285,24 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty] private int rows = 4;
     [ObservableProperty] private int columns = 2;
 
-    public int PadCount => Rows * Columns;
+    /// <summary>
+    /// How many pads there actually are, as against how many the settings page is being typed
+    /// towards.
+    /// </summary>
+    /// <remarks>
+    /// From the settings file rather than from the two number fields. Those fields are what
+    /// somebody is in the middle of typing, and everything that builds pads, resizes the audio
+    /// engine or fills in a profile has to work from what is in force. Reading the fields
+    /// instead meant that typing 4 by 4 and not pressing the button left the app running nine
+    /// pads while every other part of it believed there were sixteen.
+    /// </remarks>
+    public int PadCount => Math.Max(1, _cfg.Rows) * Math.Max(1, _cfg.Columns);
+
+    /// <summary>How many columns the pads are laid out in, for the pages that show them.</summary>
+    public int PadColumns => Math.Max(1, _cfg.Columns);
+
+    /// <summary>What the settings page would give you, for the settings page to say so.</summary>
+    public int WantedPadCount => Rows * Columns;
 
     // Validation message for matrix size
     [ObservableProperty] private string matrixSizeError = "";
@@ -463,7 +490,7 @@ public sealed partial class MainViewModel : ObservableObject
         else
             MatrixSizeError = "";
 
-        OnPropertyChanged(nameof(PadCount));
+        OnPropertyChanged(nameof(WantedPadCount));
         OnPropertyChanged(nameof(IsMatrixSizeValid));
     }
 
@@ -492,6 +519,10 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Save
         _store.Save(_cfg);
+
+        // The pages that show the pads follow what is in force, not what is being typed.
+        OnPropertyChanged(nameof(PadCount));
+        OnPropertyChanged(nameof(PadColumns));
 
         // Notify window to resize for square pads
         MatrixSizeChanged?.Invoke(Rows, Columns);
@@ -702,6 +733,10 @@ public sealed partial class MainViewModel : ObservableObject
             pad.PropertyChanged += OnPadChanged;
             Pads.Add(pad);
         }
+
+        // The page always has something to show. Whatever was picked before belonged to the
+        // pads that have just been thrown away.
+        SelectedPad = Pads.Count > 0 ? Pads[0] : null;
     }
 
     private void ApplySelectedProfileToPads()

@@ -51,7 +51,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Border Background="{DynamicResource BgBrush}" Padding="24">
+  <Border Background="{DynamicResource BgBrush}" Padding="6">
     <Grid RowDefinitions="Auto,*"
           RowSpacing="14">
 
@@ -62,19 +62,22 @@
         </StackPanel>
       </Border>
 
+      <!-- Pulled out by what each pad puts between itself and the next, so the outside edge
+           of the grid lands on the same line as the bar above it rather than six pixels in. -->
       <ItemsControl Grid.Row="1"
+                    Margin="-6"
                     ItemsSource="{Binding Pads}"
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Stretch">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <UniformGrid Columns="{Binding Columns}"/>
+            <UniformGrid Columns="{Binding PadColumns}"/>
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
 
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PadViewModel">
-            <Border Margin="10">
+            <Border Margin="6">
               <ToggleButton Classes="pad"
                             IsChecked="{Binding IsPlaying, Mode=OneWay}"
                             Command="{Binding TogglePlayCommand}"

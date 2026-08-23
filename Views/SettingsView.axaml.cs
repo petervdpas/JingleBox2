@@ -1,5 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Reactive;
+using System;
 using Avalonia.Platform.Storage;
 using JingleBox2.ViewModels;
 
@@ -7,9 +10,35 @@ namespace JingleBox2.Views;
 
 public partial class SettingsView : UserControl
 {
+    /// <summary>
+    /// How narrow the page has to get before the sections move from the side to the top.
+    /// </summary>
+    /// <remarks>
+    /// The rail costs a hundred and fifty pixels whatever the window is doing, and on a narrow
+    /// one that is a third of the page spent on five words. Across the top it costs a line.
+    /// </remarks>
+    private const double RailNeeds = 620;
+
     public SettingsView()
     {
         InitializeComponent();
+
+        // Not a style: Avalonia has no way to ask a style how wide anything is, so the shape
+        // is chosen here and the look follows from the class.
+        this.GetObservable(BoundsProperty).Subscribe(new AnonymousObserver<Rect>(Shape));
+    }
+
+    /// <summary>Sections down the side while there is room, across the top when there is not.</summary>
+    private void Shape(Rect bounds)
+    {
+        bool rail = bounds.Width >= RailNeeds;
+
+        if (Sections.Classes.Contains("rail") == rail) return;
+
+        Sections.TabStripPlacement = rail ? Dock.Left : Dock.Top;
+
+        Sections.Classes.Set("rail", rail);
+        Sections.Classes.Set("strip", !rail);
     }
 
     /// <summary>
