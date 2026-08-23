@@ -32,6 +32,7 @@
 
       <views:Transport HorizontalAlignment="Right"
                        VerticalAlignment="Top"
+                       IsVisible="{Binding ShowsTransport}"
                        Margin="0,5,25,0"
                        ZIndex="1"
                        CapWidth="34" CapHeight="26" Gap="4" Quiet="True"
@@ -45,14 +46,27 @@
                        StopCommand="{Binding Tracker.StopCommand}"
                        ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
 
-    <TabControl SelectedIndex="{Binding SelectedTab}">
+    <TabControl Classes="pages" SelectedIndex="{Binding SelectedTab}">
+      <TabControl.Styles>
+        <!-- The pages' names, cut down to the height of the transport standing at the end of
+             the same line. Fluent draws a tab at a size meant to be the loudest thing on a
+             page, and these are a menu rather than a headline. Scoped by class so the sections
+             rail inside SETTINGS keeps its own size. -->
+        <Style Selector="TabControl.pages > TabItem">
+          <Setter Property="FontSize" Value="16" />
+          <Setter Property="MinHeight" Value="0" />
+          <Setter Property="Padding" Value="2,0,2,5" />
+          <Setter Property="Margin" Value="0,0,16,0" />
+        </Style>
+      </TabControl.Styles>
+
       <!-- Room kept on the tab line for the transport standing at the end of it. Narrow the
            window and the tabs wrap; without this they wrap underneath the buttons and the two
            are drawn over each other. Only the strip is held back, so what the page has to draw
            in is untouched. -->
       <TabControl.ItemsPanel>
         <ItemsPanelTemplate>
-          <WrapPanel Margin="0,0,160,0" />
+          <WrapPanel Margin="{Binding TabStripRoom}" />
         </ItemsPanelTemplate>
       </TabControl.ItemsPanel>
 

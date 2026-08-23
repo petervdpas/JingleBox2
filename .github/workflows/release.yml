@@ -83,6 +83,11 @@ jobs:
           $p2 = "out\${{ matrix.name }}\bass_aac.dll"
           if (!(Test-Path $p2)) { Write-Host "WARNING: bass_aac.dll missing (AAC streams won't work)" }
           else { Write-Host "OK: bass_aac.dll present" }
+          # RECORD's monitor entries come from this one. It is in native/win-x64, so its absence
+          # here is the copy having gone wrong rather than a build without the feature.
+          $p3 = "out\${{ matrix.name }}\basswasapi.dll"
+          if (!(Test-Path $p3)) { throw "basswasapi.dll missing at $p3 (RECORD would have no monitors)" }
+          Write-Host "OK: basswasapi.dll present"
 
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')
@@ -116,6 +121,36 @@ jobs:
           rm -f "$OUT/libcoreclrtraceptprovider.so"
 
           test -f "$OUT/${APP_NAME}"
+
+      - name: Verify presets are packaged (Linux)
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="out/${{ matrix.name }}"
+          bash .github/scripts/verify-presets.sh "$OUT"
+
+      - name: Verify presets are packaged (Windows)
+        if: startsWith(matrix.rid, 'win')
+        shell: pwsh
+        run: |
+          $out = "out\${{ matrix.name }}"
+          $expJson = @(Get-ChildItem -Recurse -File -Path "Presets" -Filter *.json).Count
+          $expWav  = @(Get-ChildItem -Recurse -File -Path "Presets" -Filter *.wav).Count
+          $actJson = 0
+          $actWav  = 0
+          if (Test-Path "$out\Presets") {
+            $actJson = @(Get-ChildItem -Recurse -File -Path "$out\Presets" -Filter *.json).Count
+            $actWav  = @(Get-ChildItem -Recurse -File -Path "$out\Presets" -Filter *.wav).Count
+          }
+          Write-Host "presets: $actJson/$expJson json, $actWav/$expWav wav"
+          if ($expJson -eq 0) { throw "No presets in the source tree; the check itself is broken" }
+          if ($actJson -ne $expJson -or $actWav -ne $expWav) {
+            Get-ChildItem -Recurse -File -Path "$out\Presets" -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty FullName
+            throw "Presets missing from $out\Presets"
+          }
+          Write-Host "OK: presets present"
 
       - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
@@ -220,6 +255,12 @@ jobs:
 
           test -f out/linux-x64/JingleBox2
 
+      - name: Verify presets are packaged
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/verify-presets.sh out/linux-x64
+
       - name: Prepare RPM sources (patch spec Version + create matching Source0)
         shell: bash
         run: |
@@ -272,6 +313,18 @@ jobs:
               echo "ERROR: Fedora 43 RPM still requires liblttng-ust.so.0"
               exit 1
             fi
+          fi
+
+      - name: Verify presets inside the RPM
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED="$(find Presets -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
+          ACTUAL="$(rpm -qpl /github/home/rpmbuild/RPMS/*/*.rpm | grep -c '^/opt/JingleBox2/Presets/.*\.\(json\|wav\)$' || true)"
+          echo "presets in RPM: $ACTUAL/$EXPECTED"
+          if [ "$ACTUAL" -ne "$EXPECTED" ]; then
+            echo "ERROR: the RPM does not carry every preset"
+            exit 1
           fi
 
       - name: Collect RPM
@@ -346,6 +399,12 @@ jobs:
 
           test -f "$OUT/${APP_NAME}"
 
+      - name: Verify presets are packaged
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/verify-presets.sh out/linux-x64
+
       - name: Build .deb
         shell: bash
         run: |
@@ -391,6 +450,18 @@ jobs:
           mkdir -p dist
           fakeroot dpkg-deb --build "$PKGDIR" "dist/${NAME}_${VER}_${ARCH}.deb"
           ls -la dist
+
+      - name: Verify presets inside the .deb
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED="$(find Presets -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
+          ACTUAL="$(dpkg-deb -c dist/*.deb | grep -c ' \./opt/JingleBox2/Presets/.*\.\(json\|wav\)$' || true)"
+          echo "presets in .deb: $ACTUAL/$EXPECTED"
+          if [ "$ACTUAL" -ne "$EXPECTED" ]; then
+            echo "ERROR: the .deb does not carry every preset"
+            exit 1
+          fi
 
       - name: Upload .deb artifact
         uses: actions/upload-artifact@v4

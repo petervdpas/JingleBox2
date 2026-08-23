@@ -43,7 +43,40 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Which tab is open, so the bar can say where you are rather than where you were.</summary>
     [ObservableProperty] private int selectedTab;
 
-    partial void OnSelectedTabChanged(int value) => Retell();
+    partial void OnSelectedTabChanged(int value)
+    {
+        Retell();
+
+        OnPropertyChanged(nameof(ShowsTransport));
+        OnPropertyChanged(nameof(TabStripRoom));
+    }
+
+    /// <summary>
+    /// Whether the transport is worth showing on the page you are on.
+    /// </summary>
+    /// <remarks>
+    /// The three pages you play on: the pads on USE, a recording on RECORD, the song on
+    /// TRACKER. PADS and SETTINGS are where things are set up rather than played, and a
+    /// transport standing over either is four buttons about something you are not doing.
+    ///
+    /// Written out rather than "not settings", so that adding a page makes somebody decide
+    /// which kind it is instead of quietly getting a transport it has no use for.
+    /// </remarks>
+    public bool ShowsTransport => SelectedTab is UseTab or RecordTab or TrackerTab;
+
+    /// <summary>
+    /// Room kept at the end of the tab strip for the transport, and none when it is away.
+    /// </summary>
+    /// <remarks>
+    /// Without this the tabs on SETTINGS wrap onto a second line to keep clear of buttons that
+    /// are not being drawn.
+    /// </remarks>
+    /// <remarks>
+    /// There is room under it as well. The transport is taller than the names beside it, so a
+    /// strip only as tall as the words leaves it hanging over whatever the page starts with.
+    /// </remarks>
+    public Avalonia.Thickness TabStripRoom =>
+        ShowsTransport ? new Avalonia.Thickness(0, 0, 160, 12) : new Avalonia.Thickness(0, 0, 0, 12);
 
     /// <summary>
     /// The pages, in the order the tab strip has them. Written out, because the context the bar
@@ -56,6 +89,9 @@ public sealed partial class MainViewModel : ObservableObject
     private const int RecordTab = 2;
 
     private const int TrackerTab = 3;
+
+    /// <summary>Named for the sake of the list, though nothing asks about it by name.</summary>
+    private const int SettingsTab = 4;
 
     /// <summary>
     /// Tells the bar where you are now.
@@ -263,16 +299,11 @@ public sealed partial class MainViewModel : ObservableObject
     // PADS header
     public ObservableCollection<string> ProfileNames { get; } = new();
 
-    // THEME picker
-    public ObservableCollection<string> ThemeNames { get; } = new()
-    {
-        "Dark",
-        "Neon",
-        "Industrial",
-        "Light"
-    };
+    // THEME picker. The themes there are is ThemeManager's to say, since it is the one that
+    // knows which file each is; a second list here could only drift from it.
+    public ObservableCollection<string> ThemeNames { get; } = new(ThemeManager.Names);
 
-    [ObservableProperty] private string selectedTheme = "Dark";
+    [ObservableProperty] private string selectedTheme = ThemeManager.Default;
 
     [ObservableProperty] private OutputDevice? selectedOutputDevice;
 
@@ -438,8 +469,7 @@ public sealed partial class MainViewModel : ObservableObject
             _cfg.SelectedProfile = resolved;
 
             // Theme: load from config, validate against known themes
-            var t = string.IsNullOrWhiteSpace(_cfg.SelectedTheme) ? "Dark" : _cfg.SelectedTheme.Trim();
-            SelectedTheme = ThemeNames.FirstOrDefault(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase)) ?? "Dark";
+            SelectedTheme = ThemeManager.Resolve(_cfg.SelectedTheme);
             _cfg.SelectedTheme = SelectedTheme;
         }
         finally
@@ -569,8 +599,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (_suspendSave) return;
 
-        var t = string.IsNullOrWhiteSpace(value) ? "Dark" : value.Trim();
-        var resolved = ThemeNames.FirstOrDefault(x => string.Equals(x, t, StringComparison.OrdinalIgnoreCase)) ?? "Dark";
+        var resolved = ThemeManager.Resolve(value);
 
         _cfg.SelectedTheme = resolved;
         ThemeManager.Apply(resolved);

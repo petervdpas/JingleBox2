@@ -125,7 +125,11 @@
                       <TextBlock Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" Opacity="0.7" FontSize="12" />
                       <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" Opacity="0.7" FontSize="12" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <!-- Down in the corner, under the three lines that say what the take is.
+                         Beside the name they read as part of it; here they read as what you can
+                         do to it. -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom">
                       <!-- Hearing a take is the first thing anyone does with this list, so it
                            is a button on the row rather than a trip through the editor. -->
                       <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"

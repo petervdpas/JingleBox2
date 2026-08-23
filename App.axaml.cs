@@ -15,7 +15,7 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
 
-        ThemeManager.Apply("Dark");
+        ThemeManager.Apply(ThemeManager.Default);
     }
 
     public override void OnFrameworkInitializationCompleted()

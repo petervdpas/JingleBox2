@@ -63,9 +63,11 @@
       </Border>
 
       <!-- Pulled out by what each pad puts between itself and the next, so the outside edge
-           of the grid lands on the same line as the bar above it rather than six pixels in. -->
+           of the grid lands on the same line as the bar above it rather than six pixels in.
+           Not at the foot: the bottom row wants room between it and the status bar, or the
+           pads look as though they have been cut off by it. -->
       <ItemsControl Grid.Row="1"
-                    Margin="-6"
+                    Margin="-6,-6,-6,0"
                     ItemsSource="{Binding Pads}"
                     HorizontalAlignment="Stretch"
                     VerticalAlignment="Stretch">

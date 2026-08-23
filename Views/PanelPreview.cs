@@ -171,13 +171,13 @@ public static class PanelPreview
 
             // The application's own resources, so the panel is drawn in the colours it would
             // be inside it. Looking at it in different colours would prove nothing.
-            foreach (var theme in new[] { "Base", "Industrial" })
+            foreach (var sheet in new[] { UI.ThemeManager.BaseSheet, UI.ThemeManager.SheetFor("Industrial") })
             {
                 try
                 {
                     Styles.Add(new StyleInclude(new Uri("avares://JingleBox2/"))
                     {
-                        Source = new Uri("avares://JingleBox2/Themes/" + theme + ".axaml")
+                        Source = new Uri(sheet)
                     });
                 }
                 catch (Exception)

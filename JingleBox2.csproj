@@ -83,8 +83,8 @@
        data, because they are part of it, and a kit that carries its own recordings is a kit
        that still works after the folder it was built from has moved. -->
   <ItemGroup>
-    <None Include="Presets\**\*.json" CopyToOutputDirectory="PreserveNewest" LinkBase="Presets" />
-    <None Include="Presets\**\*.wav" CopyToOutputDirectory="PreserveNewest" LinkBase="Presets" />
+    <None Include="Presets\**\*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="Presets" />
+    <None Include="Presets\**\*.wav" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="Presets" />
   </ItemGroup>
 
 </Project>
