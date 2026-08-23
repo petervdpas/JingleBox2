@@ -413,6 +413,15 @@ public sealed partial class MainViewModel : ObservableObject
         // the one thing worth saying out loud all session.
         if (Machines.Status.Length > 0) Bus.Warn(Machines.Status, "Machines");
 
+        // The last run stopped without saying goodbye, and there is now a file saying what it
+        // was in the middle of. Said out loud, because a report nobody knows about is a report
+        // nobody sends.
+        if (Diagnostics.CrashReport.FromLastTime.Length > 0)
+        {
+            Bus.Warn("JingleBox stopped unexpectedly last time. What it was doing is written in " +
+                     Diagnostics.CrashReport.FromLastTime, "Crash");
+        }
+
         StatusLine = new StatusViewModel(
             Bus,
             () => Record.Level,

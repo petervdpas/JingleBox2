@@ -259,8 +259,18 @@ public static class PluginCrashGuard
             });
 
             Write();
+
+            Diagnostics.CrashReport.Note("about to " + Word(stage) + " " + plugin.Name);
         }
     }
+
+    /// <summary>What a stage is called in a sentence.</summary>
+    private static string Word(PluginStage stage) => stage switch
+    {
+        PluginStage.Load => "load",
+        PluginStage.Window => "put up the window of",
+        _ => "do something with"
+    };
 
     /// <summary>
     /// That went well. The note comes off.
@@ -275,6 +285,17 @@ public static class PluginCrashGuard
 
             Write();
         }
+
+        Diagnostics.CrashReport.Note(plugin.Name + " came back");
+    }
+
+    /// <summary>
+    /// What is in the air right now, for a crash report to say what the application was in the
+    /// middle of when it stopped.
+    /// </summary>
+    public static IReadOnlyList<PluginCrash> InFlight
+    {
+        get { lock (Gate) return Marks.ToArray(); }
     }
 
     /// <summary>Writes down whatever is in the air, or rubs the note out when nothing is.</summary>

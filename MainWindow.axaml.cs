@@ -54,6 +54,11 @@ public partial class MainWindow : Window
         Diagnostics.Log.Write(Diagnostics.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
 
+        // Whether the log is on or off. A run that ends badly is nearly always a run nobody
+        // was logging, which is the whole reason this keeps its own short account.
+        Diagnostics.CrashReport.Watch(Config.AppFolder.Path());
+        Diagnostics.CrashReport.Note("started, " + cfg.Rows + " by " + cfg.Columns + " pads");
+
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
 
         async Task<string?> PickFileAsync()
