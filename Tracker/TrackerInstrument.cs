@@ -268,6 +268,12 @@ public sealed class TrackerInstrument
         TrackerInstrumentKind.Ouroboros => CreateOuroboros(name),
         TrackerInstrumentKind.BongaBong => CreateBongaBong(name),
         TrackerInstrumentKind.Zampler => CreateZampler(name),
+
+        // A recording with no recording on it yet, which is what the Recording machine is until
+        // you put a take on it. Without this it fell through and came back an OddSkilla wearing
+        // the wrong name.
+        TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
+
         _ => CreateSynth(name)
     };
 

@@ -31,10 +31,6 @@
 
   <DockPanel Margin="16">
 
-    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
-      <TextBlock Classes="cardHint" Text="{Binding Status}" />
-    </Border>
-
     <Border Classes="card">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">

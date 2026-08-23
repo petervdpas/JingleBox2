@@ -121,30 +121,25 @@
 
         <!-- Transport glyphs need size and weight of their own: at the default button
              metrics they render as small, low-contrast marks. -->
-        <Style Selector="Button.transport">
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="MinWidth" Value="46" />
+        <!-- The tracker's page buttons. Not transport: they change what you are looking at
+             rather than what the song is doing, so they read as words rather than symbols and
+             sit apart from the run of them. -->
+        <Style Selector="Button.page">
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="Height" Value="34" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="12,0" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Foreground">
-                <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" />
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" />
             </Setter>
         </Style>
-        <Style Selector="Button.transport.record">
-            <Setter Property="Foreground">
-                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
-            </Setter>
-        </Style>
-        <Style Selector="Button.transport.active">
+        <Style Selector="Button.page.active">
             <Setter Property="Foreground">
                 <SolidColorBrush Color="{DynamicResource Color.Accent}" />
             </Setter>
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
-        <Style Selector="Button.transport:disabled">
-            <Setter Property="Opacity" Value="0.45" />
-        </Style>
+
         <Style Selector="Button.armed">
             <Setter Property="Background">
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />

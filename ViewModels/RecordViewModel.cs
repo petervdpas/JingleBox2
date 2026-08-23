@@ -70,6 +70,19 @@ public sealed partial class RecordViewModel : ObservableObject
     public ObservableCollection<Recording> Recordings { get; } = new();
 
     [ObservableProperty] private string? selectedDevice;
+
+    /// <summary>Where you are, for the bar along the bottom: what it is listening to, and how many takes.</summary>
+    public string Context
+    {
+        get
+        {
+            string input = string.IsNullOrWhiteSpace(SelectedDevice) ? "no input" : SelectedDevice!;
+            int held = Recordings.Count;
+
+            return input + "  ·  " + held + (held == 1 ? " recording" : " recordings") +
+                   (IsRecording ? "  ·  recording" : "");
+        }
+    }
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     private bool isRecording;

@@ -137,7 +137,7 @@ public class ZoneStrip : ThemedControl
         if (width <= 1) return;
 
         // The board the zones lie on, so a gap in the map reads as a gap rather than as panel.
-        var bed = new SolidColorBrush(Shade(palette.Surface, -0.30));
+        var bed = new SolidColorBrush(ThemePalette.Shade(palette.Surface, -0.30));
 
         var laid = Laid();
         int lanes = laid.Count == 0 ? 1 : laid.Max(l => l.Lane) + 1;
@@ -160,7 +160,7 @@ public class ZoneStrip : ThemedControl
             bool empty = !zone.HasSound;
             var seat = zone.IsSelected
                 ? palette.Accent
-                : empty ? Shade(palette.Surface, -0.05) : Shade(palette.Surface, 0.22);
+                : empty ? ThemePalette.Shade(palette.Surface, -0.05) : ThemePalette.Shade(palette.Surface, 0.22);
 
             var face = new LinearGradientBrush
             {
@@ -168,14 +168,14 @@ public class ZoneStrip : ThemedControl
                 EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
                 GradientStops =
                 {
-                    new GradientStop(Shade(seat, 0.18), 0),
-                    new GradientStop(Shade(seat, -0.14), 1)
+                    new GradientStop(ThemePalette.Shade(seat, 0.18), 0),
+                    new GradientStop(ThemePalette.Shade(seat, -0.14), 1)
                 }
             };
 
             context.DrawRectangle(
                 face,
-                new Pen(new SolidColorBrush(Shade(seat, -0.45)), zone.IsSelected ? 1.5 : 1),
+                new Pen(new SolidColorBrush(ThemePalette.Shade(seat, -0.45)), zone.IsSelected ? 1.5 : 1),
                 block, 2, 2);
 
             // The root: the one key in the zone where the recording plays untouched.
@@ -205,7 +205,7 @@ public class ZoneStrip : ThemedControl
             double at = At(octave * 12, width);
 
             context.DrawLine(
-                new Pen(new SolidColorBrush(Shade(palette.Surface, 0.25)), 1),
+                new Pen(new SolidColorBrush(ThemePalette.Shade(palette.Surface, 0.25)), 1),
                 new Point(at, 0), new Point(at, labels - LabelGap));
 
             var mark = Text("C" + octave.ToString(CultureInfo.CurrentCulture), palette.MutedBrush);
@@ -362,12 +362,4 @@ public class ZoneStrip : ThemedControl
         new(text ?? "", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default), FontSize, brush);
 
-    private static Color Shade(Color colour, double amount)
-    {
-        double Mix(byte channel) => amount >= 0
-            ? channel + (255 - channel) * amount
-            : channel * (1 + amount);
-
-        return Color.FromRgb((byte)Mix(colour.R), (byte)Mix(colour.G), (byte)Mix(colour.B));
-    }
 }

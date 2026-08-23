@@ -33,10 +33,6 @@
 
   <DockPanel Margin="16">
 
-    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
-      <TextBlock Classes="cardHint" Text="{Binding Status}" />
-    </Border>
-
     <Grid ColumnDefinitions="240,*" ColumnSpacing="12">
 
       <Border Grid.Column="0" Classes="card">
@@ -44,18 +40,9 @@
           <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Library" />
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
-            <TextBlock Classes="cardHint" Text="New instrument on a machine:" />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-              <ComboBox Grid.Column="0"
-                        ItemsSource="{Binding Machines}"
-                        SelectedItem="{Binding SelectedMachine}"
-                        DisplayMemberBinding="{Binding Name}"
-                        HorizontalAlignment="Stretch" />
-              <Button Grid.Column="1" Content="+ New" Command="{Binding NewSynthCommand}"
-                      ToolTip.Tip="A new instrument on the picked machine. To start from a sound you already have, pick it and press Duplicate." />
-            </Grid>
-
-            <TextBlock Classes="cardHint" Text="Or from a plugin:" Margin="0,6,0,0"
+            <!-- The machines are always here, one each, under their own names. The only thing
+                 you add is a plugin; a variant of a machine is a Duplicate of it. -->
+            <TextBlock Classes="cardHint" Text="Add a plugin:"
                        IsVisible="{Binding HasAvailablePlugins}" />
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasAvailablePlugins}">
               <ComboBox Grid.Column="0" x:Name="PluginPicker"
@@ -63,26 +50,19 @@
                         DisplayMemberBinding="{Binding Name}"
                         HorizontalAlignment="Stretch"
                         PlaceholderText="Pick a plugin..." />
-              <Button Grid.Column="1" Content="+ New" Click="NewFromPlugin_Click" />
+              <Button Grid.Column="1" Content="+ New" Click="NewFromPlugin_Click"
+                      ToolTip.Tip="A VST3 or CLAP instrument. Scan for them on the SETTINGS page." />
             </Grid>
 
-            <TextBlock Classes="cardHint" Text="Or from one of your recordings:" Margin="0,6,0,0" />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-              <ComboBox Grid.Column="0" x:Name="RecordingPicker"
-                        ItemsSource="{Binding AvailableRecordings}"
-                        DisplayMemberBinding="{Binding Name}"
-                        HorizontalAlignment="Stretch" />
-              <Button Grid.Column="1" Content="+ New" Click="NewFromRecording_Click" />
-            </Grid>
+            <TextBlock Classes="cardHint" Margin="0,4,0,0"
+                       Text="No plugins scanned yet. SETTINGS has the scanner."
+                       IsVisible="{Binding !HasAvailablePlugins}" />
 
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,6,0,0">
-              <Button Grid.Column="0" Content="Duplicate" HorizontalAlignment="Stretch"
-                      IsEnabled="{Binding HasInstruments}"
-                      Command="{Binding DuplicateCommand}" />
-              <Button Grid.Column="1" Content="Delete" HorizontalAlignment="Stretch" Classes="danger"
-                      IsEnabled="{Binding HasInstruments}"
-                      Command="{Binding DeleteCommand}" />
-            </Grid>
+            <Button Content="Delete" HorizontalAlignment="Stretch" Classes="danger"
+                    Margin="0,6,0,0"
+                    IsEnabled="{Binding CanDelete}"
+                    Command="{Binding DeleteCommand}"
+                    ToolTip.Tip="Takes a plugin out of the rack. A machine cannot be taken out." />
           </StackPanel>
 
           <ListBox ItemsSource="{Binding Instruments}"

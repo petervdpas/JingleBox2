@@ -15,6 +15,21 @@ public sealed partial class LibraryInstrument : ObservableObject
     public string Name => Instrument.Name;
 
     /// <summary>
+    /// True for a machine's own slot: always there, called what the machine is called, and
+    /// neither renamed nor deleted.
+    /// </summary>
+    public bool IsSlot => Machine.IsSlot(Id);
+
+    /// <summary>False for a slot, which cannot be deleted. A plugin can.</summary>
+    public bool IsYours => !IsSlot;
+
+    /// <summary>
+    /// False for anything that is called what something else calls it: a machine's slot, and a
+    /// plugin, which takes its name from the VST3 or CLAP itself.
+    /// </summary>
+    public bool CanRename => !IsSlot && !Instrument.IsPlugin;
+
+    /// <summary>
     /// The second line: which machine this instrument is on, and one word about how it is set.
     /// </summary>
     /// <remarks>

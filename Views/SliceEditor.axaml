@@ -61,7 +61,6 @@
                 ToolTip.Tip="Whether the piece in hand repeats. The dashed handles on the picture say where, and stay inside the piece they belong to." />
     </StackPanel>
 
-    <TextBlock Classes="cardHint" Text="{Binding Status}" IsVisible="{Binding Status.Length}" />
 
   </StackPanel>
 </UserControl>

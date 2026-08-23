@@ -59,9 +59,6 @@
                      Foreground="#FF6B7280"
                      HorizontalAlignment="Center" />
 
-          <TextBlock Text="{Binding Status}"
-                     Opacity="0.7"
-                     FontSize="12" />
         </StackPanel>
 
         <!-- The gain and what it is doing, side by side, the way a channel strip has them. -->

@@ -75,4 +75,22 @@ public readonly record struct ThemePalette(
 
     public static Color Alpha(Color color, byte alpha) =>
         Color.FromArgb(alpha, color.R, color.G, color.B);
+
+    /// <summary>
+    /// A colour taken towards white or towards black, for the light and shade a moulded control
+    /// is drawn with.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in each control, because every drawn cap, slot and bar in the app needs
+    /// the same arithmetic and three of them had already written it out separately. A fourth
+    /// copy is where a fourth answer starts.
+    /// </remarks>
+    public static Color Shade(Color colour, double amount)
+    {
+        double Mix(byte channel) => amount >= 0
+            ? channel + (255 - channel) * amount
+            : channel * (1 + amount);
+
+        return Color.FromRgb((byte)Mix(colour.R), (byte)Mix(colour.G), (byte)Mix(colour.B));
+    }
 }

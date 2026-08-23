@@ -40,7 +40,9 @@
             <WrapPanel Orientation="Horizontal">
               <StackPanel Classes="entry">
                 <TextBlock Classes="field" Text="Name" />
-                <TextBox Text="{Binding Editor.Name}" Width="170" />
+                <TextBox Text="{Binding Editor.Name}" Width="170"
+                         IsReadOnly="{Binding !Editor.CanRename}"
+                         ToolTip.Tip="A machine keeps the machine's name. Duplicate it to have one of your own." />
               </StackPanel>
 
               <!-- The machine's presets, which are the other instruments you have made on it.

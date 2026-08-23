@@ -73,6 +73,26 @@ public sealed class SynthOutput : IDisposable
     public bool IsRunning => _handle != 0;
 
     /// <summary>
+    /// The loudest thing this stream is putting out, 0 to 1. The tracker's half of the main
+    /// output meter; the pads are the other half and are their own channels.
+    /// </summary>
+    public float Level
+    {
+        get
+        {
+            int handle = _handle;
+
+            if (handle == 0) return 0;
+
+            int raw = Bass.ChannelGetLevel(handle);
+
+            if (raw == -1) return 0;
+
+            return Math.Clamp(Math.Max((raw >> 16) & 0xFFFF, raw & 0xFFFF) / 32768f, 0f, 1f);
+        }
+    }
+
+    /// <summary>
     /// Opens the stream on first use, and opens it again if it has gone. Safe to call before
     /// every note.
     /// </summary>

@@ -74,12 +74,6 @@ public partial class InstrumentsView : UserControl
         if (current != null) current.IsEditing = _onScreen;
     }
 
-    private void NewFromRecording_Click(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel != null && RecordingPicker.SelectedItem is Recording recording)
-            ViewModel.NewFromRecordingCommand.Execute(recording);
-    }
-
     /// <summary>
     /// Opens the plugin's own interface for the instrument being edited, in a window of its
     /// own. It closes itself when the instrument is left.

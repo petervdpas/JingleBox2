@@ -597,6 +597,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>The track the cursor is on, named as the grid and the mixer name it.</summary>
     public string CursorTrackLabel => "Track " + (Cursor.Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Where you are, for the bar along the bottom: the song, the page, and what the cursor is on.
+    /// </summary>
+    /// <remarks>
+    /// True for as long as you are there rather than something that just happened, which is the
+    /// whole difference between the two halves of that bar.
+    /// </remarks>
+    public string Context
+    {
+        get
+        {
+            string song = SongName.Length > 0 ? SongName : "untitled";
+
+            if (ShowsMixer) return song + "  ·  mixer  ·  " + TrackCount + " tracks";
+
+            if (ShowsInstruments)
+                return song + "  ·  instruments  ·  " + Song.Instruments.Count + " in this song";
+
+            string line = "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture);
+            string track = CursorTrackLabel;
+
+            var playing = Song.Instruments.ElementAtOrDefault(SelectedInstrument);
+            string sound = playing == null ? "no instrument" : playing.Name;
+
+            return song + "  ·  " + line + "  ·  " + track + "  ·  " + sound;
+        }
+    }
+
     public IRelayCommand<string> QuantizeTrackCommand => new RelayCommand<string>(QuantizeTrack);
 
     public IRelayCommand ClearTrackCommand => new RelayCommand(ClearTrack);
@@ -721,7 +749,51 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public int EngineSampleRate => _player.SampleRate;
 
     /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
+    /// <summary>What the tracker's own stream is putting out, 0 to 1.</summary>
+    public double OutputLevel => _player.OutputLevel;
+
     public double SamplePosition(int track) => _player.SamplePosition(track);
+
+    /// <summary>
+    /// Which of the tracker's three pages is on show.
+    /// </summary>
+    /// <remarks>
+    /// The instruments and the mixer are the tracker's, not the application's. The mixer mixes
+    /// its tracks and nothing else's; the library exists so a song has something to play, and
+    /// the pads never touch either. As sibling tabs they looked like three separate parts of
+    /// the program rather than three ways of looking at one song.
+    ///
+    /// Written out rather than an enum with a converter, because these three strings are what
+    /// the buttons pass and what the bindings ask about, and a name that only exists inside a
+    /// format string is a name nothing can find.
+    /// </remarks>
+    private const string PatternPage = "Pattern";
+
+    private const string InstrumentsPage = "Instruments";
+
+    private const string MixerPage = "Mixer";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsPattern))]
+    [NotifyPropertyChangedFor(nameof(ShowsInstruments))]
+    [NotifyPropertyChangedFor(nameof(ShowsMixer))]
+    private string page = PatternPage;
+
+    public bool ShowsPattern => Page == PatternPage;
+
+    public bool ShowsInstruments => Page == InstrumentsPage;
+
+    public bool ShowsMixer => Page == MixerPage;
+
+    /// <summary>
+    /// Shows a page, or goes back to the pattern when the page asked for is already up.
+    /// </summary>
+    /// <remarks>
+    /// Two buttons rather than three, because the pattern is where you are: the other two are
+    /// somewhere you go and come back from, and pressing the lit button again is the way back.
+    /// </remarks>
+    public IRelayCommand<string> ShowCommand => new RelayCommand<string>(which =>
+        Page = which == Page || which is not (InstrumentsPage or MixerPage) ? PatternPage : which);
 
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 

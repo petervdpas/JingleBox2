@@ -106,6 +106,41 @@ public sealed class InstrumentLibrary : ISampleUsage
         return moved;
     }
 
+    /// <summary>Where instruments that are no longer on the rack are kept.</summary>
+    public string RetiredDirectory => Path.Combine(InstrumentsDirectory, "retired");
+
+    /// <summary>
+    /// Moves an instrument off the rack without destroying it.
+    /// </summary>
+    /// <remarks>
+    /// The rack holds the machines and the plugins and nothing else, so everything else has to
+    /// come off it. Moved rather than deleted, because what comes off is the only copy of work
+    /// somebody did, and a folder they can go and look in costs nothing.
+    /// </remarks>
+    public bool Retire(string id)
+    {
+        string path = PathFor(id);
+
+        if (!File.Exists(path)) return false;
+
+        Directory.CreateDirectory(RetiredDirectory);
+
+        string landed = Path.Combine(RetiredDirectory, Path.GetFileName(path));
+
+        // Never overwrites: two retired instruments can have been through here before.
+        int at = 2;
+
+        while (File.Exists(landed))
+        {
+            landed = Path.Combine(RetiredDirectory, id + " " + at + Extension);
+            at++;
+        }
+
+        File.Move(path, landed);
+
+        return true;
+    }
+
     /// <summary>False when there was nothing to remove.</summary>
     public bool Delete(string id)
     {

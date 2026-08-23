@@ -18,22 +18,23 @@
 
     <!-- Transport -->
     <Border DockPanel.Dock="Top" Classes="card stacked">
-      <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-        <Button Content="●" ToolTip.Tip="Record: typing writes into the pattern"
-                Classes="transport record"
-                Classes.armed="{Binding IsRecording}"
-                Command="{Binding ToggleRecordCommand}" />
-        <Button Content="▶" ToolTip.Tip="Play"
-                Classes="transport"
-                Classes.active="{Binding IsPlaying}"
-                Command="{Binding PlayCommand}" />
-        <Button Content="❚❚" ToolTip.Tip="Pause"
-                Classes="transport"
-                Classes.active="{Binding IsPaused}"
-                Command="{Binding PauseCommand}" IsEnabled="{Binding CanPause}" />
-        <Button Content="■" ToolTip.Tip="Stop"
-                Classes="transport"
-                Command="{Binding StopCommand}" />
+      <!-- The page buttons are pinned to the right rather than run on the end of the transport,
+           so a narrow window clips a number field rather than the way out of the pattern. -->
+      <Grid ColumnDefinitions="*,Auto">
+      <!-- Wraps rather than runs off the edge. A stack panel does not shrink, so on a narrow
+           window it kept its full width and the pinned buttons were drawn over the top of the
+           last few fields. -->
+      <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+        <views:Transport IsRecording="{Binding IsRecording}"
+                         IsPlaying="{Binding IsPlaying}"
+                         IsPaused="{Binding IsPaused}"
+                         CanPause="{Binding CanPause}"
+                         RecordCommand="{Binding ToggleRecordCommand}"
+                         PlayCommand="{Binding PlayCommand}"
+                         PauseCommand="{Binding PauseCommand}"
+                         StopCommand="{Binding StopCommand}"
+                         VerticalAlignment="Center" Margin="0,0,6,0"
+                         ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
 
         <ComboBox ItemsSource="{Binding PlayModes}"
                   SelectedItem="{Binding PlayMode}"
@@ -61,10 +62,29 @@
         <views:NumberField Value="{Binding TrackCount}"
                            Minimum="{Binding MinTrackCount}" Maximum="{Binding MaxTrackCount}"
                            Width="62" />
+
+      </WrapPanel>
+
+      <!-- Where the instruments and the mixer live now. They are the tracker's own, so they are
+           pages of it rather than tabs beside it: the mixer mixes its tracks and the library
+           exists so a song has something to play. Lit while you are on one, and pressing the
+           lit one is the way back to the pattern. -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                  VerticalAlignment="Top" Margin="12,0,0,0">
+        <Button Content="INSTRUMENTS" Classes="page"
+                Classes.active="{Binding ShowsInstruments}"
+                Command="{Binding ShowCommand}" CommandParameter="Instruments"
+                ToolTip.Tip="The instruments this song can play, and the shelf they come from." />
+
+        <Button Content="MIXER" Classes="page"
+                Classes.active="{Binding ShowsMixer}"
+                Command="{Binding ShowCommand}" CommandParameter="Mixer"
+                ToolTip.Tip="The levels, the panning and the inserts of this song's tracks." />
       </StackPanel>
+      </Grid>
     </Border>
 
-    <!-- Status -->
+    <!-- The song: which one is open, what it is called, and saving it. -->
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
       <StackPanel Spacing="8">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
@@ -85,12 +105,13 @@
           <Button Grid.Column="2" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"
                   ToolTip.Tip="A star means there are changes that are not on disk yet." />
         </Grid>
-
-        <TextBlock Classes="cardHint" Text="{Binding Status}" />
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="180,*,220" ColumnSpacing="12">
+    <Grid>
+
+    <Grid ColumnDefinitions="180,*,220" ColumnSpacing="12"
+          IsVisible="{Binding ShowsPattern}">
 
       <!-- Order list -->
       <Border Grid.Column="0" Classes="card">
@@ -264,6 +285,22 @@
           </ListBox>
         </DockPanel>
       </Border>
+    </Grid>
+
+    <!-- Held in a ContentControl so the visibility is asked of the tracker while the page
+         itself is given the library: a DataContext set on the same element would take the
+         binding beside it with it. -->
+    <ContentControl IsVisible="{Binding ShowsInstruments}"
+                    Content="{Binding $parent[views:TrackerView].Instruments}">
+      <ContentControl.ContentTemplate>
+        <DataTemplate>
+          <views:InstrumentsView />
+        </DataTemplate>
+      </ContentControl.ContentTemplate>
+    </ContentControl>
+
+    <views:MixerView IsVisible="{Binding ShowsMixer}" />
+
     </Grid>
   </DockPanel>
 </UserControl>

@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Diagnostics;
 using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
@@ -82,6 +83,28 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     [NotifyPropertyChangedFor(nameof(HasInstruments))]
     private LibraryInstrument? selected;
 
+    /// <summary>False while a machine's own slot is picked, which cannot be deleted.</summary>
+    public bool CanDelete => Selected is { IsYours: true };
+
+    /// <summary>False for a machine and for a plugin, both of which are named elsewhere.</summary>
+    public bool CanRename => Selected is { CanRename: true };
+
+    /// <summary>Where you are, for the bar along the bottom: which instrument, on which machine.</summary>
+    public string Context
+    {
+        get
+        {
+            int held = Instruments.Count;
+            string shelf = held + (held == 1 ? " instrument" : " instruments");
+
+            var open = Selected?.Instrument;
+
+            return open == null
+                ? "library  ·  " + shelf
+                : "library  ·  " + shelf + "  ·  " + open.Name + "  ·  " + open.Machine.Name;
+        }
+    }
+
     [ObservableProperty] private InstrumentEditorViewModel? editor;
 
     [ObservableProperty] private int octave = 4;
@@ -129,11 +152,82 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     {
         string? keep = Selected?.Id;
 
+        Rack();
+
+        var held = _library.List();
+
         Instruments.Clear();
-        foreach (var instrument in _library.List())
-            Instruments.Add(new LibraryInstrument(instrument));
+
+        // The machines first, in the order they are declared in, and the plugins after them.
+        foreach (var machine in Machine.Ours)
+        {
+            var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
+
+            if (slot != null) Instruments.Add(new LibraryInstrument(slot));
+        }
+
+        foreach (var plugin in held.Where(i => i.IsPlugin).OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase))
+            Instruments.Add(new LibraryInstrument(plugin));
 
         Selected = Instruments.FirstOrDefault(i => i.Id == keep) ?? Instruments.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Makes sure every machine of ours has its slot on the shelf.
+    /// </summary>
+    /// <remarks>
+    /// Written once, the first time the library is opened without them, and then they are
+    /// ordinary files that keep whatever you set on them. Not the same thing as stocking a
+    /// library with sounds to start from: those are presets and live beside the program. These
+    /// are the machines themselves, and a rack with no boxes in it is not a rack.
+    /// </remarks>
+    /// <summary>
+    /// Brings the shelf to what a rack is: the machines, then the plugins, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Anything else comes off. There is no way left to make one, since a machine cannot be
+    /// added and there is no duplicating, so what is there came from before the rack and is not
+    /// something the program can explain any more.
+    ///
+    /// Moved rather than deleted. What comes off is the only copy of work somebody did, and it
+    /// costs nothing to leave it in a folder beside the rest.
+    ///
+    /// Runs on every open and does nothing on all but the first, because afterwards the only
+    /// things left are the ones it keeps.
+    /// </remarks>
+    private void Rack()
+    {
+        int retired = 0;
+
+        foreach (var instrument in _library.List())
+        {
+            if (instrument.IsPlugin || Machine.IsSlot(instrument.Id)) continue;
+
+            string name = instrument.Name;
+
+            if (!_library.Retire(instrument.Id)) continue;
+
+            retired++;
+
+            Log.Write(LogArea.App, () => "retired '" + name + "' from the rack");
+        }
+
+        foreach (var machine in Machine.Ours)
+        {
+            if (_library.Load(machine.SlotId) != null) continue;
+
+            var made = TrackerInstrument.CreateOn(machine, machine.Name);
+
+            made.Id = machine.SlotId;
+
+            _library.Save(made);
+        }
+
+        if (retired > 0)
+        {
+            Status = retired + (retired == 1 ? " instrument" : " instruments") +
+                     " moved to instruments/retired. The rack holds the machines and your plugins.";
+        }
     }
 
     /// <summary>A note from a MIDI keyboard, which arrives on the MIDI thread.</summary>
@@ -223,6 +317,9 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
     partial void OnSelectedChanged(LibraryInstrument? value)
     {
+        OnPropertyChanged(nameof(CanDelete));
+        OnPropertyChanged(nameof(CanRename));
+
         // Switching away is a good moment to write: never leave an edit only in memory.
         Flush();
 
@@ -378,6 +475,14 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     {
         var row = Selected;
         if (row == null) return;
+
+        // A machine is not something you can be without. Duplicating one and deleting the copy
+        // is how you throw a sound away.
+        if (row.IsSlot)
+        {
+            Status = row.Name + " is a machine, not an instrument you made. It cannot be deleted.";
+            return;
+        }
 
         // The file goes for good, and other songs may be using it.
         bool confirmed = await ConfirmDialog.AskAsync(

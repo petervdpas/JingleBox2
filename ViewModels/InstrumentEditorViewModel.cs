@@ -175,6 +175,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     public bool IsSlicing => Slices != null;
 
     /// <summary>
+    /// False for a machine's own slot on the shelf, which keeps the machine's name.
+    /// </summary>
+    /// <remarks>
+    /// A rack's boxes are called what they are called. To have a Zampler called something else,
+    /// duplicate it: the copy is yours and is named by you.
+    ///
+    /// A plugin is the same, for a different reason: it is called whatever the VST3 or CLAP
+    /// says it is called. Naming it something else would mean two names for one plugin, and the
+    /// one that matters is the plugin's, since that is what has to be found again when a song is
+    /// opened on another machine.
+    /// </remarks>
+    public bool CanRename => !Machine.IsSlot(_instrument.Id) && !_instrument.IsPlugin;
+
+    /// <summary>
     /// Wraps a machine's change callback so the chop editor hears about it too.
     /// </summary>
     /// <remarks>

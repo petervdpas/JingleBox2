@@ -25,6 +25,12 @@ public interface IAudioEngine : IDisposable
 {
     int PadCount { get; }
 
+    /// <summary>
+    /// The loudest thing the pads are putting out, 0 to 1. Half of the main output meter; the
+    /// tracker's own stream is the other half.
+    /// </summary>
+    float GetOutputLevel();
+
     IEnumerable<OutputDevice> GetOutputDevices();
     void SetOutputDevice(int deviceId);
 

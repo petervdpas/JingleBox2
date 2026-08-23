@@ -358,13 +358,13 @@ public class Switch : ThemedControl
             EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Shade(palette.Surface, -0.45), 0),
-                new GradientStop(Shade(palette.Surface, -0.18), 0.5),
-                new GradientStop(Shade(palette.Surface, -0.45), 1)
+                new GradientStop(ThemePalette.Shade(palette.Surface, -0.45), 0),
+                new GradientStop(ThemePalette.Shade(palette.Surface, -0.18), 0.5),
+                new GradientStop(ThemePalette.Shade(palette.Surface, -0.45), 1)
             }
         };
 
-        context.DrawRectangle(well, new Pen(new SolidColorBrush(Shade(palette.Surface, -0.6)), 1),
+        context.DrawRectangle(well, new Pen(new SolidColorBrush(ThemePalette.Shade(palette.Surface, -0.6)), 1),
             slot, slot.Width / 2, slot.Width / 2);
     }
 
@@ -377,18 +377,18 @@ public class Switch : ThemedControl
             EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
             GradientStops =
             {
-                new GradientStop(Shade(palette.Surface, 0.30), 0),
-                new GradientStop(Shade(palette.Surface, 0.16), 1)
+                new GradientStop(ThemePalette.Shade(palette.Surface, 0.30), 0),
+                new GradientStop(ThemePalette.Shade(palette.Surface, 0.16), 1)
             }
         };
 
         context.DrawRectangle(metal,
-            new Pen(new SolidColorBrush(IsFocused ? palette.Accent : Shade(palette.Surface, -0.3)), IsFocused ? 1.4 : 1),
+            new Pen(new SolidColorBrush(IsFocused ? palette.Accent : ThemePalette.Shade(palette.Surface, -0.3)), IsFocused ? 1.4 : 1),
             handle, 3, 3);
 
         double grip = handle.Center.Y;
         context.DrawLine(
-            new Pen(new SolidColorBrush(Shade(palette.Surface, -0.25)), 1),
+            new Pen(new SolidColorBrush(ThemePalette.Shade(palette.Surface, -0.25)), 1),
             new Point(handle.Left + 3, grip), new Point(handle.Right - 3, grip));
     }
 
@@ -469,14 +469,6 @@ public class Switch : ThemedControl
     private double _room = double.PositiveInfinity;
 
     /// <summary>Lighter or darker than a colour, for the light falling on a moulded part.</summary>
-    private static Color Shade(Color colour, double amount)
-    {
-        double Mix(byte channel) => amount >= 0
-            ? channel + (255 - channel) * amount
-            : channel * (1 + amount);
-
-        return Color.FromRgb((byte)Mix(colour.R), (byte)Mix(colour.G), (byte)Mix(colour.B));
-    }
 }
 
 /// <summary>How a value's name is written on a panel.</summary>

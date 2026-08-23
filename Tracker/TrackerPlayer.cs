@@ -637,6 +637,9 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>How far through its recording a sounding sample voice is, or -1 for none.</summary>
     public double SamplePosition(int track) => _synth.Mixer.SamplePosition(track);
 
+    /// <summary>What this player's stream is putting out, 0 to 1.</summary>
+    public double OutputLevel => _synth.Level;
+
     private void RunClock(CancellationToken token, int generation)
     {
         Song song;

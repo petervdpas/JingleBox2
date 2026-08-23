@@ -33,6 +33,82 @@ public sealed partial class MainViewModel : ObservableObject
     public InstrumentLibraryViewModel Instruments { get; }
 
     /// <summary>
+    /// Where everything in the app says where you are and what it has just done.
+    /// </summary>
+    public StatusBus Bus { get; } = new();
+
+    /// <summary>What the bar along the bottom of the window shows.</summary>
+    public StatusViewModel StatusLine { get; }
+
+    /// <summary>Which tab is open, so the bar can say where you are rather than where you were.</summary>
+    [ObservableProperty] private int selectedTab;
+
+    partial void OnSelectedTabChanged(int value) => Retell();
+
+    /// <summary>
+    /// The pages, in the order the tab strip has them. Written out, because the context the bar
+    /// shows depends on which one is open and a number read off a control is not a name.
+    /// </summary>
+    private const int UseTab = 0;
+
+    private const int PadsTab = 1;
+
+    private const int RecordTab = 2;
+
+    private const int TrackerTab = 3;
+
+    /// <summary>
+    /// Tells the bar where you are now.
+    /// </summary>
+    /// <remarks>
+    /// Pulled from whichever page is open rather than pushed by all of them, because only one of
+    /// them is on screen and the others' idea of where you are is not true while you are not
+    /// there. SETTINGS says nothing: there is nowhere to be on it.
+    /// </remarks>
+    private void Retell() => Bus.Context = SelectedTab switch
+    {
+        UseTab or PadsTab => Pads.Count + (Pads.Count == 1 ? " pad" : " pads") +
+                             "  ·  profile " + (string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName),
+        RecordTab => Record.Context,
+        TrackerTab => Tracker.Context,
+        _ => ""
+    };
+
+    /// <summary>
+    /// Repeats whatever a page puts in its own status onto the bus.
+    /// </summary>
+    /// <remarks>
+    /// A bridge, not the design. The pages still keep a Status property because a good deal of
+    /// code writes to it, and this saves rewriting all of that at once; anything new should say
+    /// what it has to say on the bus directly.
+    /// </remarks>
+    /// <summary>Re-asks the open page where you are whenever anything about it changes.</summary>
+    /// <remarks>
+    /// Any property, not just a named one: where you are is made of the cursor, the selection,
+    /// the song's name and half a dozen other things, and listing them here would be a list to
+    /// keep up to date every time a page grew one more.
+    /// </remarks>
+    private void Follow(ObservableObject page) => page.PropertyChanged += (_, _) => Retell();
+
+    private void Watch(ObservableObject page, string from)
+    {
+        page.PropertyChanged += (sender, e) =>
+        {
+            if (e.PropertyName != "Status") return;
+
+            string said = sender switch
+            {
+                TrackerViewModel tracker => tracker.Status,
+                InstrumentLibraryViewModel instruments => instruments.Status,
+                RecordViewModel record => record.Status,
+                _ => ""
+            };
+
+            if (said.Length > 0) Bus.Say(said, from);
+        };
+    }
+
+    /// <summary>
     /// What the engine runs at. Zero follows the output device, which is what keeps the audio
     /// from being resampled on its way out and tells a plugin the rate it is really fed at.
     /// </summary>
@@ -215,6 +291,36 @@ public sealed partial class MainViewModel : ObservableObject
         // holding the old audio.
         Record.RecordingChanged += (_, path) => Tracker.ReloadSample(path);
         Record.RecordingRenamed += (_, moved) => Tracker.RenameSample(moved.From, moved.To);
+
+        // One status bar for the whole window rather than one line per page. Three pages had
+        // grown their own back when they were three tabs, and putting two of them inside the
+        // third meant looking at two at once, one of which was the other one's own property
+        // rendered a second time.
+        Watch(Tracker, "Tracker");
+        Watch(Instruments, "Instruments");
+        Watch(Record, "Record");
+
+        // The rack is brought into shape while the library is being built, which is before any
+        // of this exists. Moving somebody's instruments and saying nothing about it would be
+        // the one thing worth saying out loud all session.
+        if (Instruments.Status.Length > 0) Bus.Warn(Instruments.Status, "Instruments");
+
+        StatusLine = new StatusViewModel(
+            Bus,
+            () => Record.Level,
+            () => Math.Max(_audio.GetOutputLevel(), Tracker.OutputLevel));
+
+        // Where you are changes as you move about inside a page, not only as you change pages.
+        Follow(Tracker);
+        Follow(Instruments);
+        Follow(Record);
+
+        // And the pad page, which is this object: the profile and the matrix live here rather
+        // than on a page view model of their own.
+        Follow(this);
+        Pads.CollectionChanged += (_, _) => Retell();
+
+        Retell();
 
         AddProfileCommand = new RelayCommand(AddProfile);
         DeleteProfileCommand = new RelayCommand(DeleteProfile);

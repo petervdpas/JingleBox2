@@ -24,6 +24,36 @@ public sealed record Machine(
     bool IsOurs)
 {
     /// <summary>
+    /// The instrument id a machine's own slot in the library uses.
+    /// </summary>
+    /// <remarks>
+    /// Every machine of ours is always on the shelf, once, under its own name. You do not add
+    /// one and you cannot rename or delete one, the way a rack has the boxes it has. So each
+    /// needs an id that is the same on every machine and every run, rather than the fresh guid
+    /// an instrument you made gets.
+    ///
+    /// Written out one by one rather than made from the name, so the strings that end up in
+    /// people's instrument files can be found by looking for them.
+    /// </remarks>
+    public string SlotId => Kind switch
+    {
+        TrackerInstrumentKind.Synth => "machine.oddskilla",
+        TrackerInstrumentKind.Sample => "machine.recording",
+        TrackerInstrumentKind.Ouroboros => "machine.ouroboros",
+        TrackerInstrumentKind.BongaBong => "machine.bongabong",
+        TrackerInstrumentKind.Zampler => "machine.zampler",
+        _ => ""
+    };
+
+    /// <summary>True when that id is a machine's own slot rather than something you made.</summary>
+    public static bool IsSlot(string? id) =>
+        !string.IsNullOrEmpty(id) && Ours.Any(m => m.SlotId == id);
+
+    /// <summary>The machine whose slot that is, or null when the id is an ordinary instrument.</summary>
+    public static Machine? SlotFor(string? id) =>
+        string.IsNullOrEmpty(id) ? null : Ours.FirstOrDefault(m => m.SlotId == id);
+
+    /// <summary>
     /// The oscillator machine: a wave, an envelope, a filter, and the modulation to move them.
     /// </summary>
     /// <remarks>

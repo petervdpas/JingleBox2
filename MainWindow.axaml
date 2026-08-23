@@ -47,7 +47,17 @@
 
     </Grid>
 
-    <TabControl Margin="0,12,0,0">
+    <!-- One bar for the whole window. Where you are when nothing is happening, what just
+         happened when something is, and the main input and output beside it. -->
+    <views:StatusBar DockPanel.Dock="Bottom" Margin="0,10,0,0"
+                     ShowLevels="True"
+                     Text="{Binding StatusLine.Text}"
+                     Kind="{Binding StatusLine.Kind}"
+                     InputLevel="{Binding StatusLine.InputLevel}"
+                     OutputLevel="{Binding StatusLine.OutputLevel}"
+                     ToolTip.Tip="{Binding StatusLine.History}" />
+
+    <TabControl Margin="0,12,0,0" SelectedIndex="{Binding SelectedTab}">
       <TabItem Header="USE">
         <views:UseView />
       </TabItem>
@@ -60,16 +70,12 @@
         <views:RecordView DataContext="{Binding Record}" />
       </TabItem>
 
-      <TabItem Header="INSTRUMENTS">
-        <views:InstrumentsView DataContext="{Binding Instruments}" />
-      </TabItem>
-
+      <!-- The instruments and the mixer are pages of the tracker rather than tabs beside it:
+           the mixer mixes its tracks and the library exists so a song has something to play,
+           and nothing outside the tracker uses either. -->
       <TabItem Header="TRACKER">
-        <views:TrackerView DataContext="{Binding Tracker}" />
-      </TabItem>
-
-      <TabItem Header="MIXER">
-        <views:MixerView DataContext="{Binding Tracker}" />
+        <views:TrackerView DataContext="{Binding Tracker}"
+                           Instruments="{Binding $parent[TabItem].DataContext.Instruments}" />
       </TabItem>
 
       <TabItem Header="SETTINGS">

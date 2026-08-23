@@ -126,6 +126,43 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <summary>
+    /// The loudest thing the pads are putting out, 0 to 1, or nought when none of them is.
+    /// </summary>
+    /// <remarks>
+    /// Half of what the status bar's output meter shows. The other half is the tracker's own
+    /// stream, which is a different BASS channel and belongs to a different object; whoever
+    /// wants the main output takes the louder of the two.
+    /// </remarks>
+    public float GetOutputLevel()
+    {
+        lock (_lock)
+        {
+            float loudest = 0;
+
+            for (int pad = 0; pad < _padStreams.Length; pad++)
+            {
+                int handle = _padStreams[pad];
+
+                if (handle == 0) continue;
+
+                var state = Bass.ChannelIsActive(handle);
+
+                if (state != PlaybackState.Playing && state != PlaybackState.Stalled) continue;
+
+                int raw = Bass.ChannelGetLevel(handle);
+
+                if (raw == -1) continue;
+
+                float peak = Math.Max((raw >> 16) & 0xFFFF, raw & 0xFFFF) / 32768f;
+
+                if (peak > loudest) loudest = peak;
+            }
+
+            return Math.Clamp(loudest, 0f, 1f);
+        }
+    }
+
     public float GetPadChannelVolume(int padIndex)
     {
         lock (_lock)

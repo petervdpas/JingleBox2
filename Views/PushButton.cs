@@ -291,17 +291,17 @@ public class PushButton : ThemedControl
             GradientStops = Down
                 ? new GradientStops
                 {
-                    new GradientStop(Shade(seat, -0.10), 0),
-                    new GradientStop(Shade(seat, 0.20), 1)
+                    new GradientStop(ThemePalette.Shade(seat, -0.10), 0),
+                    new GradientStop(ThemePalette.Shade(seat, 0.20), 1)
                 }
                 : new GradientStops
                 {
-                    new GradientStop(Shade(seat, 0.38), 0),
-                    new GradientStop(Shade(seat, 0.08), 1)
+                    new GradientStop(ThemePalette.Shade(seat, 0.38), 0),
+                    new GradientStop(ThemePalette.Shade(seat, 0.08), 1)
                 }
         };
 
-        var edge = IsFocused ? palette.Accent : Shade(seat, -0.35);
+        var edge = IsFocused ? palette.Accent : ThemePalette.Shade(seat, -0.35);
 
         var pen = new Pen(new SolidColorBrush(edge), IsFocused ? 1.5 : 1);
 
@@ -442,14 +442,6 @@ public class PushButton : ThemedControl
         return geometry;
     }
 
-    private static Color Shade(Color colour, double amount)
-    {
-        double Mix(byte channel) => amount >= 0
-            ? channel + (255 - channel) * amount
-            : channel * (1 + amount);
-
-        return Color.FromRgb((byte)Mix(colour.R), (byte)Mix(colour.G), (byte)Mix(colour.B));
-    }
 }
 
 /// <summary>What a push button's cap is moulded as.</summary>
