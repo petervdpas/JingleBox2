@@ -19,14 +19,14 @@ public partial class TrackerView : UserControl
     /// The shelf of instruments, handed in from outside.
     /// </summary>
     /// <remarks>
-    /// A property rather than something the tracker's own view model holds, because the library
+    /// A property rather than something the tracker's own view model holds, because the rack
     /// is built with the tracker and would otherwise have to be handed back to it afterwards.
     /// The view needs it to show a page; the tracker itself does not need it at all.
     /// </remarks>
-    public static readonly Avalonia.StyledProperty<object?> InstrumentsProperty =
-        Avalonia.AvaloniaProperty.Register<TrackerView, object?>(nameof(Instruments));
+    public static readonly Avalonia.StyledProperty<MachineRackViewModel?> InstrumentsProperty =
+        Avalonia.AvaloniaProperty.Register<TrackerView, MachineRackViewModel?>(nameof(Instruments));
 
-    public object? Instruments
+    public MachineRackViewModel? Instruments
     {
         get => GetValue(InstrumentsProperty);
         set => SetValue(InstrumentsProperty, value);

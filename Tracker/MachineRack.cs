@@ -26,32 +26,32 @@ namespace JingleBox2.Tracker;
 /// moved to another machine finds a sample instrument pointing at nothing. Making an instrument
 /// hold its own recordings is what would finish this, and it has not been done.
 /// </remarks>
-public sealed class InstrumentLibrary : ISampleUsage
+public sealed class MachineRack : ISampleUsage
 {
     public const string Extension = ".json";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public string InstrumentsDirectory { get; }
+    public string Folder { get; }
 
-    public InstrumentLibrary(string appName = "JingleBox2")
+    public MachineRack(string appName = "JingleBox2")
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        InstrumentsDirectory = Path.Combine(baseDir, appName, "instruments");
-        Directory.CreateDirectory(InstrumentsDirectory);
+        Folder = Path.Combine(baseDir, appName, "instruments");
+        Directory.CreateDirectory(Folder);
 
     }
 
-    public string PathFor(string id) => Path.Combine(InstrumentsDirectory, id + Extension);
+    public string PathFor(string id) => Path.Combine(Folder, id + Extension);
 
-    /// <summary>Everything in the library, by name. Unreadable files are skipped, not fatal.</summary>
+    /// <summary>Everything in the rack, by name. Unreadable files are skipped, not fatal.</summary>
     public IReadOnlyList<TrackerInstrument> List()
     {
-        if (!Directory.Exists(InstrumentsDirectory)) return Array.Empty<TrackerInstrument>();
+        if (!Directory.Exists(Folder)) return Array.Empty<TrackerInstrument>();
 
         var instruments = new List<TrackerInstrument>();
 
-        foreach (var path in Directory.GetFiles(InstrumentsDirectory, "*" + Extension))
+        foreach (var path in Directory.GetFiles(Folder, "*" + Extension))
         {
             var instrument = Read(path);
             if (instrument != null) instruments.Add(instrument);
@@ -107,7 +107,7 @@ public sealed class InstrumentLibrary : ISampleUsage
     }
 
     /// <summary>Where instruments that are no longer on the rack are kept.</summary>
-    public string RetiredDirectory => Path.Combine(InstrumentsDirectory, "retired");
+    public string RetiredDirectory => Path.Combine(Folder, "retired");
 
     /// <summary>
     /// Moves an instrument off the rack without destroying it.

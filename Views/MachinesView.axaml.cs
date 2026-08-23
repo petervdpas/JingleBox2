@@ -16,17 +16,17 @@ namespace JingleBox2.Views;
 /// Taking an instrument into a song copies it, and the copy is then the song's own. Editing it
 /// here changes what new songs start from, not what an existing song sounds like.
 /// </remarks>
-public partial class InstrumentsView : UserControl
+public partial class MachinesView : UserControl
 {
-    public InstrumentsView()
+    public MachinesView()
     {
         InitializeComponent();
     }
 
     private bool _onScreen;
-    private InstrumentLibraryViewModel? _bound;
+    private MachineRackViewModel? _bound;
 
-    private InstrumentLibraryViewModel? ViewModel => DataContext as InstrumentLibraryViewModel;
+    private MachineRackViewModel? ViewModel => DataContext as MachineRackViewModel;
 
     /// <summary>
     /// While this page is up, notes from the MIDI keyboard audition the instrument being

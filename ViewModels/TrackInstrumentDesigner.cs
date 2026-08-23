@@ -11,7 +11,7 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 /// <remarks>
 /// The same panel the INSTRUMENTS tab shows, over a different instrument: the song's own copy
-/// rather than the library's. That is the whole point of it. A machine standing in this song's
+/// rather than the rack's. That is the whole point of it. A machine standing in this song's
 /// rack is edited here, and what is edited is this song's, so two songs can use the same kick
 /// sounding differently.
 /// </remarks>
@@ -31,7 +31,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         Action changed,
         IWaveformService? waveforms = null,
         ITrackerPanel? tracker = null,
-        InstrumentLibrary? library = null,
+        MachineRack? rack = null,
         System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null)
     {
         Track = track;
@@ -57,7 +57,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
         // The shelf is where a sound starts, and it does not stop being that once an instrument
         // is standing in a track: every other OddSkilla on it is somewhere this one can go.
-        Presets = new InstrumentPresets(instrument, Reloaded);
+        Presets = new InstrumentPresets(instrument, Reloaded, recordings);
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
@@ -80,7 +80,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// </summary>
     /// <remarks>
     /// The pattern editor's octave field and these lamps are two views of one number. Moving
-    /// it here moves it there, and the song remembers it. On the library page there is no song
+    /// it here moves it there, and the song remembers it. On the rack page there is no song
     /// to remember it, so the panel keeps its own until the page is left.
     /// </remarks>
     public int Octave
@@ -193,7 +193,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// Sounds the instrument as it is now, so a knob just turned can be heard.
     /// </summary>
     /// <remarks>
-    /// Through the same audition the library uses, which is the tracker's own engine. A second
+    /// Through the same audition the rack uses, which is the tracker's own engine. A second
     /// engine would be a second output device and a plugin loaded twice.
     /// </remarks>
     public void Play(Note note, int volume = TrackerCell.NoVolume)

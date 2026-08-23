@@ -2,8 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             x:Class="JingleBox2.Views.InstrumentsView"
-             x:DataType="vm:InstrumentLibraryViewModel">
+             x:Class="JingleBox2.Views.MachinesView"
+             x:DataType="vm:MachineRackViewModel">
 
   <UserControl.Styles>
     <Style Selector="TextBlock.field">
@@ -37,7 +37,7 @@
 
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Library" />
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Machines" />
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
             <!-- The machines are always here, one each, under their own names. The only thing
@@ -65,9 +65,9 @@
                     ToolTip.Tip="Takes a plugin out of the rack. A machine cannot be taken out." />
           </StackPanel>
 
-          <ListBox ItemsSource="{Binding Instruments}"
+          <ListBox ItemsSource="{Binding Machines}"
                    SelectedItem="{Binding Selected}"
-                   ItemTemplate="{StaticResource LibraryRow}" />
+                   ItemTemplate="{StaticResource RackRow}" />
         </DockPanel>
       </Border>
 

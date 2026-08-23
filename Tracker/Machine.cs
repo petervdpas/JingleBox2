@@ -24,7 +24,7 @@ public sealed record Machine(
     bool IsOurs)
 {
     /// <summary>
-    /// The instrument id a machine's own slot in the library uses.
+    /// The instrument id a machine's own slot in the rack uses.
     /// </summary>
     /// <remarks>
     /// Every machine of ours is always on the shelf, once, under its own name. You do not add

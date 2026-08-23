@@ -1,0 +1,22 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="JingleBox2.Views.NameDialog"
+        Title="Rename"
+        Width="380"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Spacing="16" Margin="20">
+    <TextBlock Name="PromptText" TextWrapping="Wrap" />
+
+    <TextBox Name="NameBox" KeyDown="Name_KeyDown" />
+
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Name="CancelButton" Content="Cancel" Click="Cancel_Click" MinWidth="88" IsCancel="True" />
+      <Button Name="ConfirmButton" Content="Rename" Click="Confirm_Click" MinWidth="88" IsDefault="True" />
+    </StackPanel>
+  </StackPanel>
+
+</Window>

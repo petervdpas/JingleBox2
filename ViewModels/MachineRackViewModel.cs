@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The instrument library: the voices you own, kept outside any song. A preset is where a new
+/// The instrument rack: the voices you own, kept outside any song. A preset is where a new
 /// one starts; after that the instrument is its own thing and every song can use it.
 /// </summary>
 /// <remarks>
@@ -23,12 +23,12 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInstrumentDesigner
+public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner
 {
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
 
-    private readonly InstrumentLibrary _library;
+    private readonly MachineRack _rack;
     private readonly IInstrumentAudition _audition;
     private readonly ObservableCollection<Recording> _recordings;
 
@@ -41,14 +41,14 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
     private TrackerInstrument? _pendingSave;
 
-    public InstrumentLibraryViewModel(
-        InstrumentLibrary library,
+    public MachineRackViewModel(
+        MachineRack rack,
         IInstrumentAudition audition,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null)
     {
-        _library = library;
+        _rack = rack;
         _audition = audition;
         _recordings = recordings;
         _waveforms = waveforms;
@@ -75,13 +75,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     public event EventHandler<TrackerInstrument>? InstrumentChanged;
 
     /// <summary>Raised when the set of instruments changes, so pickers elsewhere follow.</summary>
-    public event EventHandler? LibraryChanged;
+    public event EventHandler? RackChanged;
 
-    public ObservableCollection<LibraryInstrument> Instruments { get; } = new();
+    public ObservableCollection<RackMachine> Machines { get; } = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasInstruments))]
-    private LibraryInstrument? selected;
+    [NotifyPropertyChangedFor(nameof(HasMachines))]
+    private RackMachine? selected;
 
     /// <summary>False while a machine's own slot is picked, which cannot be deleted.</summary>
     public bool CanDelete => Selected is { IsYours: true };
@@ -89,19 +89,19 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     /// <summary>False for a machine and for a plugin, both of which are named elsewhere.</summary>
     public bool CanRename => Selected is { CanRename: true };
 
-    /// <summary>Where you are, for the bar along the bottom: which instrument, on which machine.</summary>
+    /// <summary>Where you are, for the bar along the bottom: which machine is open.</summary>
     public string Context
     {
         get
         {
-            int held = Instruments.Count;
-            string shelf = held + (held == 1 ? " instrument" : " instruments");
+            int held = Machines.Count;
+            string rack = held + (held == 1 ? " machine" : " machines");
 
             var open = Selected?.Instrument;
 
             return open == null
-                ? "library  ·  " + shelf
-                : "library  ·  " + shelf + "  ·  " + open.Name + "  ·  " + open.Machine.Name;
+                ? "rack  ·  " + rack
+                : "rack  ·  " + rack + "  ·  " + open.Name;
         }
     }
 
@@ -129,13 +129,11 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     /// <summary>True while this page is on screen, so MIDI notes come here instead of the pattern.</summary>
     [ObservableProperty] private bool isEditing;
 
-    public bool HasInstruments => Selected != null;
+    public bool HasMachines => Selected != null;
 
     /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
     public ObservableCollection<Recording> AvailableRecordings => _recordings;
 
-    public IRelayCommand NewSynthCommand => new RelayCommand(NewSynth);
-    public IRelayCommand<Recording> NewFromRecordingCommand => new RelayCommand<Recording>(NewFromRecording);
     public IRelayCommand DuplicateCommand => new RelayCommand(Duplicate);
     public IAsyncRelayCommand DeleteCommand => new AsyncRelayCommand(Delete);
     public IRelayCommand TestCommand => new RelayCommand(Test);
@@ -147,38 +145,38 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
     public bool HasLocation => Location?.IsLive == true;
 
-    /// <summary>Reads the library back off disk, keeping the selection where it can.</summary>
+    /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     public void Refresh()
     {
         string? keep = Selected?.Id;
 
         Rack();
 
-        var held = _library.List();
+        var held = _rack.List();
 
-        Instruments.Clear();
+        Machines.Clear();
 
         // The machines first, in the order they are declared in, and the plugins after them.
         foreach (var machine in Machine.Ours)
         {
             var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
 
-            if (slot != null) Instruments.Add(new LibraryInstrument(slot));
+            if (slot != null) Machines.Add(new RackMachine(slot));
         }
 
         foreach (var plugin in held.Where(i => i.IsPlugin).OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase))
-            Instruments.Add(new LibraryInstrument(plugin));
+            Machines.Add(new RackMachine(plugin));
 
-        Selected = Instruments.FirstOrDefault(i => i.Id == keep) ?? Instruments.FirstOrDefault();
+        Selected = Machines.FirstOrDefault(i => i.Id == keep) ?? Machines.FirstOrDefault();
     }
 
     /// <summary>
     /// Makes sure every machine of ours has its slot on the shelf.
     /// </summary>
     /// <remarks>
-    /// Written once, the first time the library is opened without them, and then they are
+    /// Written once, the first time the rack is opened without them, and then they are
     /// ordinary files that keep whatever you set on them. Not the same thing as stocking a
-    /// library with sounds to start from: those are presets and live beside the program. These
+    /// rack with sounds to start from: those are presets and live beside the program. These
     /// are the machines themselves, and a rack with no boxes in it is not a rack.
     /// </remarks>
     /// <summary>
@@ -199,13 +197,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     {
         int retired = 0;
 
-        foreach (var instrument in _library.List())
+        foreach (var instrument in _rack.List())
         {
             if (instrument.IsPlugin || Machine.IsSlot(instrument.Id)) continue;
 
             string name = instrument.Name;
 
-            if (!_library.Retire(instrument.Id)) continue;
+            if (!_rack.Retire(instrument.Id)) continue;
 
             retired++;
 
@@ -214,13 +212,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
         foreach (var machine in Machine.Ours)
         {
-            if (_library.Load(machine.SlotId) != null) continue;
+            if (_rack.Load(machine.SlotId) != null) continue;
 
             var made = TrackerInstrument.CreateOn(machine, machine.Name);
 
             made.Id = machine.SlotId;
 
-            _library.Save(made);
+            _rack.Save(made);
         }
 
         if (retired > 0)
@@ -271,7 +269,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         if (instrument == null)
         {
             // Silence with no explanation is the worst answer to a key press.
-            Status = "Nothing to play: add an instrument to the library first.";
+            Status = "Nothing to play: add an instrument to the rack first.";
             return;
         }
 
@@ -306,7 +304,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
         try
         {
-            _library.Save(instrument);
+            _rack.Save(instrument);
             Status = $"Saved '{instrument.Name}'";
         }
         catch (Exception ex)
@@ -315,7 +313,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         }
     }
 
-    partial void OnSelectedChanged(LibraryInstrument? value)
+    partial void OnSelectedChanged(RackMachine? value)
     {
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanRename));
@@ -329,11 +327,11 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
 
         Editor = value == null
             ? null
-            : new InstrumentEditorViewModel(Instruments.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition, _recordings);
+            : new InstrumentEditorViewModel(Machines.IndexOf(value), value.Instrument, OnInstrumentEdited, _waveforms, _audition, _recordings);
 
         Presets = value == null
             ? null
-            : new InstrumentPresets(value.Instrument, Reloaded);
+            : new InstrumentPresets(value.Instrument, Reloaded, _recordings);
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
@@ -376,21 +374,10 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     /// </summary>
     /// <remarks>
     /// Starting from a sound you already have is what Duplicate is for. There is no third kind
-    /// of thing to start from: the library is the shelf of starting points, and every sound on
+    /// of thing to start from: the rack is the shelf of starting points, and every sound on
     /// it is an instrument like any other.
     /// </remarks>
-    private void NewSynth()
-    {
-        var machine = SelectedMachine ?? Machine.Ouroboros;
 
-        Add(TrackerInstrument.CreateOn(machine, UniqueName(machine.Name)));
-    }
-
-    /// <summary>The machines a new instrument can be built on. A plugin is picked separately.</summary>
-    public System.Collections.Generic.IReadOnlyList<Machine> Machines { get; } = Machine.Ours;
-
-    /// <summary>Which machine + New builds on.</summary>
-    [ObservableProperty] private Machine? selectedMachine = Machine.Ouroboros;
 
     /// <summary>
     /// The plugins that can be an instrument here: the ones that take notes, in a format this
@@ -424,16 +411,6 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         Add(TrackerInstrument.CreatePlugin(UniqueName(plugin.Name), plugin));
     }
 
-    private void NewFromRecording(Recording? recording)
-    {
-        if (recording == null)
-        {
-            Status = "Pick a recording first.";
-            return;
-        }
-
-        Add(TrackerInstrument.CreateSample(UniqueName(recording.Name), recording.FilePath, Note.C4));
-    }
 
     private void Duplicate()
     {
@@ -456,13 +433,13 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
     {
         try
         {
-            _library.Save(instrument);
+            _rack.Save(instrument);
 
-            var row = new LibraryInstrument(instrument);
-            Instruments.Add(row);
+            var row = new RackMachine(instrument);
+            Machines.Add(row);
             Selected = row;
 
-            LibraryChanged?.Invoke(this, EventArgs.Empty);
+            RackChanged?.Invoke(this, EventArgs.Empty);
             Status = $"Added '{instrument.Name}'";
         }
         catch (Exception ex)
@@ -487,7 +464,7 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         // The file goes for good, and other songs may be using it.
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete instrument",
-            $"Delete '{row.Name}' from the library? Songs that already use it keep their own copy, "
+            $"Delete '{row.Name}' from the rack? Songs that already use it keep their own copy, "
                 + "but it will no longer be available to new songs. This cannot be undone.",
             "Delete");
 
@@ -498,14 +475,14 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
             _saveTimer.Stop();
             _pendingSave = null;
 
-            _library.Delete(row.Id);
+            _rack.Delete(row.Id);
 
-            int index = Instruments.IndexOf(row);
-            Instruments.Remove(row);
-            Selected = Instruments.ElementAtOrDefault(Math.Min(index, Instruments.Count - 1));
+            int index = Machines.IndexOf(row);
+            Machines.Remove(row);
+            Selected = Machines.ElementAtOrDefault(Math.Min(index, Machines.Count - 1));
 
             // Songs already using it keep their copy: removing it here must not silence a song.
-            LibraryChanged?.Invoke(this, EventArgs.Empty);
+            RackChanged?.Invoke(this, EventArgs.Empty);
             Status = $"Deleted '{row.Name}'. Songs that already use it keep their copy.";
         }
         catch (Exception ex)
@@ -527,17 +504,17 @@ public sealed partial class InstrumentLibraryViewModel : ObservableObject, IInst
         Status = $"Testing '{instrument.Name}'";
     }
 
-    /// <summary>A name nothing else in the library has, so two instruments never look alike.</summary>
+    /// <summary>A name nothing else in the rack has, so two instruments never look alike.</summary>
     private string UniqueName(string wanted)
     {
         string baseName = string.IsNullOrWhiteSpace(wanted) ? "instrument" : wanted.Trim();
-        if (!Instruments.Any(i => string.Equals(i.Name, baseName, StringComparison.OrdinalIgnoreCase)))
+        if (!Machines.Any(i => string.Equals(i.Name, baseName, StringComparison.OrdinalIgnoreCase)))
             return baseName;
 
         for (int number = 2; ; number++)
         {
             string candidate = $"{baseName} {number}";
-            if (!Instruments.Any(i => string.Equals(i.Name, candidate, StringComparison.OrdinalIgnoreCase)))
+            if (!Machines.Any(i => string.Equals(i.Name, candidate, StringComparison.OrdinalIgnoreCase)))
                 return candidate;
         }
     }

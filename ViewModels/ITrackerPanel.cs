@@ -10,7 +10,7 @@ namespace JingleBox2.ViewModels;
 /// <remarks>
 /// A panel opened from a track wants two things from the tracker and nothing else: where it
 /// has got to, and which octave the song is being played at. It asks for those rather than for
-/// the tracker itself, because the same panel opens on the library page where there is no
+/// the tracker itself, because the same panel opens on the rack page where there is no
 /// tracker at all, and a panel that knew about songs would not open there.
 /// </remarks>
 public interface ITrackerPanel : INotifyPropertyChanged

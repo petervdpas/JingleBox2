@@ -16,7 +16,7 @@ namespace JingleBox2.ViewModels;
 /// let go, which is exactly right for an audition and close enough for a pattern: a key that
 /// stayed lit after its note had died would be worse than one that goes out a moment early.
 ///
-/// Shared by both designers rather than written twice, since the library page and a track's
+/// Shared by both designers rather than written twice, since the rack page and a track's
 /// window light their keys the same way.
 /// </remarks>
 public sealed class SoundingNotes

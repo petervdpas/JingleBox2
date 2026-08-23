@@ -71,11 +71,11 @@
       </TabItem>
 
       <!-- The instruments and the mixer are pages of the tracker rather than tabs beside it:
-           the mixer mixes its tracks and the library exists so a song has something to play,
+           the mixer mixes its tracks and the rack is where a song takes its instruments from,
            and nothing outside the tracker uses either. -->
       <TabItem Header="TRACKER">
         <views:TrackerView DataContext="{Binding Tracker}"
-                           Instruments="{Binding $parent[TabItem].DataContext.Instruments}" />
+                           Instruments="{Binding $parent[TabItem].DataContext.Machines}" />
       </TabItem>
 
       <TabItem Header="SETTINGS">

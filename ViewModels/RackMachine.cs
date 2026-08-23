@@ -3,10 +3,10 @@ using JingleBox2.Tracker;
 
 namespace JingleBox2.ViewModels;
 
-/// <summary>One row in the instrument library. No number: a library has no cell to answer to.</summary>
-public sealed partial class LibraryInstrument : ObservableObject
+/// <summary>One row in the instrument rack. No number: a rack has no cell to answer to.</summary>
+public sealed partial class RackMachine : ObservableObject
 {
-    public LibraryInstrument(TrackerInstrument instrument) => Instrument = instrument;
+    public RackMachine(TrackerInstrument instrument) => Instrument = instrument;
 
     public TrackerInstrument Instrument { get; }
 

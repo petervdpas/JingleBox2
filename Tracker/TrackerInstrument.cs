@@ -371,7 +371,7 @@ public sealed class TrackerInstrument
     /// Takes on another instrument's sound, keeping its own name, its own id and its own level.
     /// </summary>
     /// <remarks>
-    /// What a preset is. The machines the library offers as presets are the instruments already
+    /// What a preset is. The machines the rack offers as presets are the instruments already
     /// on it, so loading one means copying what it plays from and nothing else: this is still
     /// the track's instrument, called what it is called, at the level it was set to.
     ///

@@ -34,7 +34,7 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// The lamps for a track, or an idle set of them when there is no track behind the panel.
     /// </summary>
     /// <remarks>
-    /// The library page has no tracker, but it still shows this row, greyed. A control that
+    /// The rack page has no tracker, but it still shows this row, greyed. A control that
     /// has nothing to report is dimmed rather than removed, so the panel is the same panel
     /// wherever it is opened and you learn where things are once.
     /// </remarks>

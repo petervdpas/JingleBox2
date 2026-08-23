@@ -66,15 +66,15 @@
       </WrapPanel>
 
       <!-- Where the instruments and the mixer live now. They are the tracker's own, so they are
-           pages of it rather than tabs beside it: the mixer mixes its tracks and the library
-           exists so a song has something to play. Lit while you are on one, and pressing the
+           pages of it rather than tabs beside it: the mixer mixes its tracks and the rack is
+           where a song takes its instruments from. Lit while you are on one, and pressing the
            lit one is the way back to the pattern. -->
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
                   VerticalAlignment="Top" Margin="12,0,0,0">
-        <Button Content="INSTRUMENTS" Classes="page"
-                Classes.active="{Binding ShowsInstruments}"
-                Command="{Binding ShowCommand}" CommandParameter="Instruments"
-                ToolTip.Tip="The instruments this song can play, and the shelf they come from." />
+        <Button Content="MACHINES" Classes="page"
+                Classes.active="{Binding ShowsMachines}"
+                Command="{Binding ShowCommand}" CommandParameter="Machines"
+                ToolTip.Tip="The machines you have, and the plugins you have added. A song\u0027s instruments come off them." />
 
         <Button Content="MIXER" Classes="page"
                 Classes.active="{Binding ShowsMixer}"
@@ -251,23 +251,23 @@
                  five lines of a narrow sidebar every time it was not being read. -->
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
               <ComboBox Grid.Column="0"
-                        ItemsSource="{Binding LibraryInstruments}"
-                        SelectedItem="{Binding SelectedLibraryInstrument}"
+                        ItemsSource="{Binding $parent[views:TrackerView].Instruments.Machines}"
+                        SelectedItem="{Binding PickedMachine}"
                         DisplayMemberBinding="{Binding Name}"
                         HorizontalAlignment="Stretch"
-                        PlaceholderText="Pick an instrument" />
-              <Button Grid.Column="1" Content="+ Add" Command="{Binding AddFromLibraryCommand}" />
+                        PlaceholderText="Pick a machine" />
+              <Button Grid.Column="1" Content="+ Add" Command="{Binding AddInstrumentCommand}" />
             </Grid>
 
-            <Button Content="Add to library" HorizontalAlignment="Stretch"
+            <Button Content="Rename..." HorizontalAlignment="Stretch"
                     IsEnabled="{Binding HasInstruments}"
-                    Command="{Binding PromoteToLibraryCommand}"
-                    ToolTip.Tip="Puts this song's instrument into the library, so other songs can use it and the INSTRUMENTS tab can edit it." />
+                    Command="{Binding RenameInstrumentCommand}"
+                    ToolTip.Tip="What this instrument is called in this song. The machine it came off keeps its own name." />
 
             <Button Content="Remove from song" HorizontalAlignment="Stretch" Classes="danger"
                     IsEnabled="{Binding HasInstruments}"
                     Command="{Binding RemoveInstrumentCommand}"
-                    ToolTip.Tip="Takes the slot out of this song. The instrument stays in the library." />
+                    ToolTip.Tip="Takes the instrument out of this song. The machine it came off is untouched." />
           </StackPanel>
 
           <ListBox x:Name="InstrumentList"
@@ -288,13 +288,13 @@
     </Grid>
 
     <!-- Held in a ContentControl so the visibility is asked of the tracker while the page
-         itself is given the library: a DataContext set on the same element would take the
+         itself is given the rack: a DataContext set on the same element would take the
          binding beside it with it. -->
-    <ContentControl IsVisible="{Binding ShowsInstruments}"
+    <ContentControl IsVisible="{Binding ShowsMachines}"
                     Content="{Binding $parent[views:TrackerView].Instruments}">
       <ContentControl.ContentTemplate>
         <DataTemplate>
-          <views:InstrumentsView />
+          <views:MachinesView />
         </DataTemplate>
       </ContentControl.ContentTemplate>
     </ContentControl>

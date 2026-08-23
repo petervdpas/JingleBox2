@@ -30,7 +30,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MidiViewModel Midi { get; }
     public RecordViewModel Record { get; }
     public TrackerViewModel Tracker { get; }
-    public InstrumentLibraryViewModel Instruments { get; }
+    public MachineRackViewModel Machines { get; }
 
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.
@@ -99,7 +99,7 @@ public sealed partial class MainViewModel : ObservableObject
             string said = sender switch
             {
                 TrackerViewModel tracker => tracker.Status,
-                InstrumentLibraryViewModel instruments => instruments.Status,
+                MachineRackViewModel instruments => instruments.Status,
                 RecordViewModel record => record.Status,
                 _ => ""
             };
@@ -254,38 +254,31 @@ public sealed partial class MainViewModel : ObservableObject
         Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
 
-        // Instruments are their own library, shared by every song, and built from recordings
-        // on the INSTRUMENTS tab. The tracker borrows the library to fill a song's slots.
-        var library = new InstrumentLibrary();
+        // The rack: the machines you have, and the plugins you have added. A song takes an
+        // instrument off a machine and keeps its own copy of it.
+        var rack = new MachineRack();
 
-        Tracker = new TrackerViewModel(audio, library, Record.Recordings, store, cfg, Plugins, waveformService);
-        Instruments = new InstrumentLibraryViewModel(library, Tracker, Record.Recordings, waveformService, Plugins);
+        Tracker = new TrackerViewModel(audio, rack, Record.Recordings, store, cfg, Plugins, waveformService);
+        Machines = new MachineRackViewModel(rack, Tracker, Record.Recordings, waveformService, Plugins);
 
-        Instruments.InstrumentChanged += (_, instrument) =>
+        Machines.InstrumentChanged += (_, instrument) =>
         {
-            Tracker.ApplyLibraryEdit(instrument);
+            Tracker.ApplyMachineEdit(instrument);
 
             // An instrument can be pointed at a different recording, which frees the old one
             // and claims the new one.
             Record.RefreshUsage();
         };
 
-        Instruments.LibraryChanged += (_, _) =>
+        Machines.RackChanged += (_, _) =>
         {
-            Tracker.RefreshLibrary();
-            Record.RefreshUsage();
-        };
-
-        // And the other way: a song can put one of its own instruments into the library.
-        Tracker.LibraryChanged += (_, _) =>
-        {
-            Instruments.Refresh();
+            Tracker.RefreshRack();
             Record.RefreshUsage();
         };
 
         // A recording that an instrument is built on cannot be thrown away, so the RECORD page
-        // asks the library before it deletes anything.
-        Record.SampleUsage = library;
+        // asks the rack before it deletes anything.
+        Record.SampleUsage = rack;
 
         // Trimming a recording changes what its instruments sound like, and the player is
         // holding the old audio.
@@ -297,13 +290,13 @@ public sealed partial class MainViewModel : ObservableObject
         // third meant looking at two at once, one of which was the other one's own property
         // rendered a second time.
         Watch(Tracker, "Tracker");
-        Watch(Instruments, "Instruments");
+        Watch(Machines, "Machines");
         Watch(Record, "Record");
 
-        // The rack is brought into shape while the library is being built, which is before any
+        // The rack is brought into shape while the rack is being built, which is before any
         // of this exists. Moving somebody's instruments and saying nothing about it would be
         // the one thing worth saying out loud all session.
-        if (Instruments.Status.Length > 0) Bus.Warn(Instruments.Status, "Instruments");
+        if (Machines.Status.Length > 0) Bus.Warn(Machines.Status, "Machines");
 
         StatusLine = new StatusViewModel(
             Bus,
@@ -312,7 +305,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Where you are changes as you move about inside a page, not only as you change pages.
         Follow(Tracker);
-        Follow(Instruments);
+        Follow(Machines);
         Follow(Record);
 
         // And the pad page, which is this object: the profile and the matrix live here rather
@@ -376,7 +369,7 @@ public sealed partial class MainViewModel : ObservableObject
         // MIDI routing: global, profile-independent mapping. Which controller reaches which
         // half of the app is decided by the roles in SETTINGS, not here.
         var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
-        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker, Instruments));
+        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker, Machines));
         var dispatcher = new MidiDispatcher(_cfg.Midi, padRouter.Handle, noteRouter.Handle);
 
         // NOTE: MidiViewModel already subscribes for learn/status.

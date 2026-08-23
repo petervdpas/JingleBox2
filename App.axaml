@@ -227,8 +227,8 @@
             </Grid>
         </DataTemplate>
 
-        <!-- A library instrument: no cell number to answer to, so just what it is. -->
-        <DataTemplate x:Key="LibraryRow" x:DataType="vm:LibraryInstrument">
+        <!-- A machine on the rack: no cell number to answer to, so just what it is. -->
+        <DataTemplate x:Key="RackRow" x:DataType="vm:RackMachine">
             <StackPanel>
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                 <TextBlock Classes="cardHint" Text="{Binding DetailText}" />

@@ -15,7 +15,7 @@ namespace JingleBox2.Tracker;
 /// editing and then has nothing more to do with it. What you keep afterwards is yours, called
 /// what you called it, and changing it changes nothing here.
 ///
-/// That is the difference the shelf could not express. An instrument seeded into the library
+/// That is the difference the shelf could not express. An instrument seeded into the rack
 /// is one more thing to scroll past, to rename by accident, and to wonder whether you made.
 /// </remarks>
 public sealed record MachinePreset(string Name, TrackerInstrument Sound)
@@ -28,7 +28,7 @@ public sealed record MachinePreset(string Name, TrackerInstrument Sound)
 /// </summary>
 /// <remarks>
 /// Files rather than code, so a preset can be added, edited or taken out without a build, and
-/// so an instrument saved from the library can be dropped straight in as one: a preset file is
+/// so an instrument saved off the rack can be dropped straight in as one: a preset file is
 /// an instrument file, the same shape, read by the same reader.
 ///
 /// The folder is named after the machine, beside the program. The number a filename starts with
@@ -72,7 +72,7 @@ public static class MachinePresets
             var presets = new List<MachinePreset>();
 
             foreach (string path in System.IO.Directory
-                         .EnumerateFiles(folder, "*" + InstrumentLibrary.Extension)
+                         .EnumerateFiles(folder, "*" + MachineRack.Extension)
                          .OrderBy(p => p, StringComparer.Ordinal))
             {
                 var sound = Load(path, machine);
@@ -96,7 +96,7 @@ public static class MachinePresets
     /// A kit that names its recordings relatively carries them: put the files beside the preset
     /// and the whole thing travels, to another machine or to somebody else. A kit that names an
     /// absolute path is left alone and points wherever it points, which is fine for one you
-    /// built out of your own library and no good for one that ships.
+    /// built out of your own rack and no good for one that ships.
     /// </remarks>
     private static void Locate(TrackerInstrument sound, string? folder)
     {

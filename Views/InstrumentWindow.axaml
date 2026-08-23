@@ -6,18 +6,15 @@
         x:DataType="vm:TrackInstrumentDesigner"
         Title="{Binding Title}"
         SizeToContent="WidthAndHeight"
-        MinWidth="480"
-        MaxWidth="1100"
-        MaxHeight="820"
+        MinWidth="680"
+        MaxWidth="1200"
+        MaxHeight="880"
         WindowStartupLocation="CenterOwner">
 
-  <!-- The same panel the INSTRUMENTS tab shows, over this track's own instrument. A machine's
-       front panel, in the rack it is standing in. -->
-  <DockPanel Margin="14">
-    <Border DockPanel.Dock="Top" Classes="inset" Padding="8,5" Margin="0,0,0,12">
-      <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding Title}" />
-    </Border>
+  <!-- The same panel the rack shows, over this track's own instrument. A machine's front panel,
+       in the rack it is standing in.
 
-    <views:InstrumentEditor />
-  </DockPanel>
+       No heading of its own: the window is called what the heading said, and a panel this full
+       has better uses for the room. -->
+  <views:InstrumentEditor Margin="18" />
 </Window>

@@ -30,7 +30,7 @@ public sealed partial class RecordViewModel : ObservableObject
     private System.Timers.Timer? _levelUpdateTimer;
     private readonly IAudioRouting _routing;
 
-    /// <summary>Who to ask whether a recording is spoken for. Null before the library exists.</summary>
+    /// <summary>Who to ask whether a recording is spoken for. Null before the rack exists.</summary>
     private ISampleUsage? _sampleUsage;
 
     /// <summary>
@@ -470,7 +470,7 @@ public sealed partial class RecordViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The instrument library, set once it has been built. Recordings are its raw material,
+    /// The rack, set once it has been built. Recordings are its raw material,
     /// so the page has to be able to ask what is still in use before it removes anything.
     /// </summary>
     public ISampleUsage? SampleUsage
@@ -484,7 +484,7 @@ public sealed partial class RecordViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Marks each recording with the instruments that play it. Called whenever the library
+    /// Marks each recording with the instruments that play it. Called whenever the rack
     /// changes, so a recording becomes free again the moment its last instrument goes.
     /// </summary>
     public void RefreshUsage()
@@ -504,7 +504,7 @@ public sealed partial class RecordViewModel : ObservableObject
         }
         catch (Exception)
         {
-            // An unreadable library is no reason to start deleting things, so this reads as
+            // An unreadable rack is no reason to start deleting things, so this reads as
             // "nothing known" and the delete still asks before it acts.
             return Array.Empty<string>();
         }
@@ -556,7 +556,7 @@ public sealed partial class RecordViewModel : ObservableObject
     {
         if (recording == null) return;
 
-        // Asked again here rather than trusting the stamp: the library may have gained an
+        // Asked again here rather than trusting the stamp: the rack may have gained an
         // instrument since the list was last marked up.
         var used = UsersOf(recording);
         recording.UsedBy = Tracker.SampleUsage.Describe(used);

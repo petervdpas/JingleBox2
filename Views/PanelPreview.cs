@@ -28,7 +28,7 @@ public static class PanelPreview
 {
     public const string Argument = "--panel";
 
-    /// <summary>Opens the panel as the library page shows it: nothing playing, lamps greyed.</summary>
+    /// <summary>Opens the panel as the rack page shows it: nothing playing, lamps greyed.</summary>
     public const string Idle = "--idle";
 
     /// <summary>True when these arguments ask for a panel rather than the application.</summary>
@@ -162,7 +162,7 @@ public static class PanelPreview
     {
         public static Machine Wanted { get; set; } = Machine.Ouroboros;
 
-        /// <summary>False to see the panel with no track behind it, the way the library shows it.</summary>
+        /// <summary>False to see the panel with no track behind it, the way the rack shows it.</summary>
         public static bool Playing { get; set; } = true;
 
         public override void Initialize()

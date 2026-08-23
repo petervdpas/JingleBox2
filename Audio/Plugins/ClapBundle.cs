@@ -168,7 +168,7 @@ public sealed unsafe class ClapBundle : IDisposable
     }
 
     /// <summary>
-    /// Gives back one reference. The library itself stays loaded for the life of the process.
+    /// Gives back one reference. The rack itself stays loaded for the life of the process.
     /// </summary>
     /// <remarks>
     /// Deliberately not unloaded. These libraries carry global state, thread-locals and exit

@@ -28,10 +28,31 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
 
-    /// <summary>The second line of the row: a synth says what it is, a sample says its pitch.</summary>
-    public string DetailText => Instrument.IsSynth
-        ? Instrument.Patch.Wave.ToString().ToLowerInvariant() + " synth"
-        : Instrument.BaseNote.ToString();
+    /// <summary>
+    /// The second line of the row: which machine it is on, and a word about how it is set.
+    /// </summary>
+    /// <remarks>
+    /// The machine comes first, the same as on the rack, because the machine is the organising
+    /// idea and because a name you chose says nothing about which panel you get when you open
+    /// it. It used to say "square synth", from before there were machines at all.
+    /// </remarks>
+    public string DetailText
+    {
+        get
+        {
+            if (Instrument.IsPlugin)
+                return Instrument.PluginName is { Length: > 0 } plugin ? plugin : "Plugin";
+
+            string machine = Instrument.Machine.Name;
+
+            return Instrument.Kind switch
+            {
+                TrackerInstrumentKind.Synth => machine + ", " + Instrument.Patch.Wave.ToString().ToLowerInvariant(),
+                TrackerInstrumentKind.Ouroboros => machine + ", " + (Instrument.Ouroboros?.Wave.ToString().ToLowerInvariant() ?? "saw"),
+                _ => machine + ", " + Instrument.BaseNote
+            };
+        }
+    }
 
     public bool HasTrack => Track >= 0;
 

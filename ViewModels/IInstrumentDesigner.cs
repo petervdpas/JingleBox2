@@ -9,7 +9,7 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 /// <remarks>
 /// The designer is one control shown in two places: on the INSTRUMENTS tab against whatever the
-/// library has picked, and in a window of its own against the instrument a track plays. This is
+/// rack has picked, and in a window of its own against the instrument a track plays. This is
 /// the small surface both of those have to offer, so neither has to be the other.
 ///
 /// Hearing it is part of it. A wave you cannot play is a picture, so the octave to test at, the
@@ -72,7 +72,7 @@ public interface IInstrumentDesigner
     /// Where the track playing this instrument has got to, or null when there is no track.
     /// </summary>
     /// <remarks>
-    /// The library page edits an instrument nothing is playing, so it has no location to show
+    /// The rack page edits an instrument nothing is playing, so it has no location to show
     /// and the lamps stay off the panel entirely rather than sitting there dark.
     /// </remarks>
     TrackLocationViewModel? Location { get; }

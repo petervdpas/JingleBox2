@@ -242,7 +242,7 @@ public static class PluginHost
 
             found.AddRange(bundle.Plugins());
 
-            // The reference goes back straight away. The library itself stays loaded, which is
+            // The reference goes back straight away. The rack itself stays loaded, which is
             // deliberate and explained where that is decided.
             bundle.Dispose();
         }

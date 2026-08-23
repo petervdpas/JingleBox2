@@ -11,7 +11,7 @@ namespace JingleBox2.Audio.Plugins;
 /// <remarks>
 /// Shared and counted for the same reason a CLAP bundle is: a module is woken and put back to
 /// sleep through its entry points, and doing the second while somebody is still using it is a
-/// crash inside the plugin's own code. See <see cref="ClapBundle"/> for why the library itself
+/// crash inside the plugin's own code. See <see cref="ClapBundle"/> for why the rack itself
 /// is never unloaded either.
 /// </remarks>
 public sealed unsafe class Vst3Module : IDisposable
@@ -71,7 +71,7 @@ public sealed unsafe class Vst3Module : IDisposable
     {
         if (string.IsNullOrWhiteSpace(path)) return null;
 
-        // Some builds ship the library itself named .vst3, with no bundle around it.
+        // Some builds ship the rack itself named .vst3, with no bundle around it.
         if (File.Exists(path)) return path;
         if (!Directory.Exists(path)) return null;
 
@@ -287,7 +287,7 @@ public sealed unsafe class Vst3Module : IDisposable
     }
 
     /// <summary>
-    /// Gives back one reference. The library stays loaded for the life of the process, for the
+    /// Gives back one reference. The rack stays loaded for the life of the process, for the
     /// reasons written out on <see cref="ClapBundle.Dispose"/>.
     /// </summary>
     public void Dispose()

@@ -900,7 +900,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         if (_host != null) NativeMemory.Free(_host);
 
-        // The library goes last: freeing it while the plugin is still in it is a crash with
+        // The rack goes last: freeing it while the plugin is still in it is a crash with
         // nothing to read in the stack.
         _bundle.Dispose();
     }

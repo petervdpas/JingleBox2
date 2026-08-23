@@ -150,11 +150,11 @@ public static class HelpText
             one track only: to use the same sound twice, add it twice.
 
             A song holds a copy of every instrument it uses, so it still plays on a machine
-            without your library. Opening a song rebinds those copies to the library by id, which
+            without your library. Opening a song rebinds those copies to the rack by id, which
             is why editing an instrument on the INSTRUMENTS tab reaches every song that uses it.
 
             "Add to library" pushes a song's instrument the other way, so other songs can use it.
-            "Remove from song" takes the slot out of this song and leaves the library alone.
+            "Remove from song" takes the slot out of this song and leaves the rack alone.
             """),
 
         [TrackerEffects] = new(

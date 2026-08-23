@@ -297,6 +297,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         Zones?.Refresh();
         Zampler?.RefreshAll();
 
+        // A take landing on the Recording machine is a different file, and the picture was read
+        // once when this was built. Without this it goes on saying the old one is missing.
+        Reread();
+
         // The whole sound has been replaced, which is a different recording as surely as
         // dropping one on a zone is. The change callbacks the machines carry do not fire for
         // this, because nothing went through them: the instrument was written into from
@@ -422,7 +426,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     /// <summary>
     /// Takes the sound back out of the plugin and onto the instrument, so it is what gets
-    /// written to the library file. Called before a save rather than on every move.
+    /// written to the rack file. Called before a save rather than on every move.
     /// </summary>
     public void SyncPluginState()
     {
@@ -476,11 +480,38 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// Reduces the file to peaks, off the UI thread: a long take takes a moment to read, and
     /// picking an instrument in the list should not wait for it.
     /// </summary>
+    /// <summary>The service that read the picture, kept so it can be read again.</summary>
+    private IWaveformService? _waveforms;
+
+    /// <summary>Reads the picture again when the file underneath has changed.</summary>
+    private void Reread()
+    {
+        if (_instrument.IsSynth || _instrument.IsPlugin) return;
+        if (_instrument.FilePath == _drawn) return;
+
+        _waveform = null;
+        _sampleProblem = null;
+
+        Peaks = null;
+
+        OnPropertyChanged(nameof(SampleText));
+        OnPropertyChanged(nameof(SourceText));
+
+        ReadWaveform(_waveforms);
+    }
+
+    /// <summary>Which file the picture on show was read from.</summary>
+    private string _drawn = "";
+
     private void ReadWaveform(IWaveformService? waveforms)
     {
+        _waveforms = waveforms;
+
         if (waveforms == null) return;
 
         string path = _instrument.FilePath;
+
+        _drawn = path;
 
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {

@@ -45,17 +45,19 @@
                          ToolTip.Tip="A machine keeps the machine's name. Duplicate it to have one of your own." />
               </StackPanel>
 
-              <!-- The machine's presets, which are the other instruments you have made on it.
-                   Picking one copies its settings in and leaves the name, the id and the level
-                   alone: this is still the same instrument, given a different sound to make. -->
+              <!-- Somewhere to start. On most machines that is one of the presets shipped in
+                   its own folder; on the Recording machine it is one of your takes, because a
+                   recording machine with no recording on it has no settings worth shipping.
+                   Either way the name, the id and the level stay: this is still the same
+                   instrument, given a different sound to make. -->
               <StackPanel Classes="entry">
-                <TextBlock Classes="field" Text="Preset" />
+                <TextBlock Classes="field" Text="{Binding Presets.Caption}" />
                 <ComboBox Width="170"
                           IsEnabled="{Binding Presets.Any}"
                           ItemsSource="{Binding Presets.Items}"
                           SelectedItem="{Binding Presets.Selected}"
                           PlaceholderText="Start from..."
-                          ToolTip.Tip="Loads the settings of another instrument you have made on this machine. Your name and level are kept; only the sound is replaced." />
+                          ToolTip.Tip="{Binding Presets.Hint}" />
               </StackPanel>
 
             </WrapPanel>
@@ -103,40 +105,40 @@
                  much as to a generated wave: the two are the same voice with a different
                  source, so only what is actually about the file lives here. -->
             <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.IsSample}">
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Sample" />
+              <views:PanelGroup Caption="Sample" VerticalAlignment="Top" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <views:WaveformView Width="340" Height="90"
+                                      Peaks="{Binding Editor.Peaks}"
+                                      Placeholder="{Binding Editor.SampleText}"
+                                      ShowMarkers="True"
+                                      ShowLoop="{Binding Editor.IsLooping}"
+                                      Start="{Binding Editor.SampleStart}"
+                                      End="{Binding Editor.SampleEnd}"
+                                      LoopStart="{Binding Editor.LoopStart}"
+                                      LoopEnd="{Binding Editor.LoopEnd}"
+                                      ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
 
-                <views:WaveformView Width="340" Height="90"
-                                    Peaks="{Binding Editor.Peaks}"
-                                    Placeholder="{Binding Editor.SampleText}"
-                                    ShowMarkers="True"
-                                    ShowLoop="{Binding Editor.IsLooping}"
-                                    Start="{Binding Editor.SampleStart}"
-                                    End="{Binding Editor.SampleEnd}"
-                                    LoopStart="{Binding Editor.LoopStart}"
-                                    LoopEnd="{Binding Editor.LoopEnd}"
-                                    ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
+                  <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
 
-                <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" Text="Base note" />
+                    <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
+                                       Minimum="0" Maximum="119" Width="70"
+                                       ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
+                    <TextBlock Classes="field" Text="{Binding Editor.BaseNoteText}" />
 
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Classes="field" Text="Base note" />
-                  <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
-                                     Minimum="0" Maximum="119" Width="70"
-                                     ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
-                  <TextBlock Classes="field" Text="{Binding Editor.BaseNoteText}" />
+                    <TextBlock Classes="field" Text="Loop" Margin="10,0,0,0" />
+                    <ComboBox Width="110"
+                              ItemsSource="{Binding Editor.LoopModes}"
+                              SelectedItem="{Binding Editor.LoopMode}"
+                              ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
 
-                  <TextBlock Classes="field" Text="Loop" Margin="10,0,0,0" />
-                  <ComboBox Width="110"
-                            ItemsSource="{Binding Editor.LoopModes}"
-                            SelectedItem="{Binding Editor.LoopMode}"
-                            ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
-
-                  <CheckBox Content="Reverse" Margin="6,0,0,0"
-                            IsChecked="{Binding Editor.Reverse}"
-                            ToolTip.Tip="Plays the window from its end towards its start." />
+                    <CheckBox Content="Reverse" Margin="6,0,0,0"
+                              IsChecked="{Binding Editor.Reverse}"
+                              ToolTip.Tip="Plays the window from its end towards its start." />
+                  </StackPanel>
                 </StackPanel>
-              </StackPanel>
+              </views:PanelGroup>
             </WrapPanel>
 
             <!-- Zampler. The map first, drawn rather than listed, because what you need to
@@ -696,197 +698,157 @@
                  its own above rather than sharing this one. -->
             <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.HasCommonVoice}">
 
-              <StackPanel Classes="group" IsVisible="{Binding Editor.IsSynth}">
-                <TextBlock Classes="section" Text="Shape" />
+              <views:PanelGroup Caption="Shape" VerticalAlignment="Top" IsVisible="{Binding Editor.IsSynth}" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <views:WaveScope Width="150" Height="58"
+                                   Patch="{Binding Editor.Patch.Patch}"
+                                   Revision="{Binding Editor.Patch.Revision}"
+                                   Cycles="{Binding ScopeCycles}"
+                                   Trigger="{Binding NoteTrigger}"
+                                   ToolTip.Tip="A window of time onto the wave, with duty and drive applied. Tuning fits more or fewer cycles into it, and a played note bends it as the pitch envelope and vibrato do." />
 
-                <views:WaveScope Width="150" Height="58"
-                                 Patch="{Binding Editor.Patch.Patch}"
-                                 Revision="{Binding Editor.Patch.Revision}"
-                                 Cycles="{Binding ScopeCycles}"
-                                 Trigger="{Binding NoteTrigger}"
-                                 ToolTip.Tip="A window of time onto the wave, with duty and drive applied. Tuning fits more or fewer cycles into it, and a played note bends it as the pitch envelope and vibrato do." />
-
-                <views:Knob Label="Cycles" Format="0" DefaultValue="2"
-                            Minimum="1" Maximum="8" SmallStep="1" LargeStep="2"
-                            HorizontalAlignment="Center"
-                            ToolTip.Tip="How much of the wave the view shows. A view setting: it is not part of the sound."
-                            Value="{Binding ScopeCycles}" />
-
-              </StackPanel>
-
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Envelope" />
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <views:EnvelopeScope Width="150" Height="58"
-                                       VerticalAlignment="Top"
-                                       Patch="{Binding Editor.Patch.Patch}"
-                                       Revision="{Binding Editor.Patch.Revision}"
-                                       HoldSeconds="{Binding HoldSeconds}"
-                                       Trigger="{Binding NoteTrigger}"
-                                       ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
-
-                  <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
-                               Minimum="0" Maximum="2000" SmallStep="1" LargeStep="25"
-                               TrackLength="96"
-                               Value="{Binding Editor.Patch.AttackMs}" />
-
-                  <views:Fader Label="Decay" Unit="ms" Format="0" DefaultValue="40"
-                               Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
-                               TrackLength="96"
-                               Value="{Binding Editor.Patch.DecayMs}" />
-
-                  <views:Fader Label="Sustain" Format="0.00" DefaultValue="0.6"
-                               Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
-                               TrackLength="96"
-                               Value="{Binding Editor.Patch.Sustain}" />
-
-                  <views:Fader Label="Release" Unit="ms" Format="0" DefaultValue="80"
-                               Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
-                               TrackLength="96"
-                               Value="{Binding Editor.Patch.ReleaseMs}" />
+                  <views:Knob Label="Cycles" Format="0" DefaultValue="2"
+                              Minimum="1" Maximum="8" SmallStep="1" LargeStep="2"
+                              HorizontalAlignment="Center"
+                              ToolTip.Tip="How much of the wave the view shows. A view setting: it is not part of the sound."
+                              Value="{Binding ScopeCycles}" />
                 </StackPanel>
-              </StackPanel>
+              </views:PanelGroup>
 
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Pitch and modulation" />
-                <UniformGrid Columns="4" Rows="2">
-                  <views:Knob Label="Tune" Unit="st" Format="0" DefaultValue="0"
-                              Minimum="-24" Maximum="24" SmallStep="1" LargeStep="12"
-                              Margin="0,0,10,8"
-                              ToolTip.Tip="Whole semitones added to every note this instrument plays."
-                              Value="{Binding Editor.Patch.TuneSemitones}" />
+              <views:PanelGroup Caption="Envelope" VerticalAlignment="Top" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:EnvelopeScope Width="150" Height="58"
+                                         VerticalAlignment="Top"
+                                         Patch="{Binding Editor.Patch.Patch}"
+                                         Revision="{Binding Editor.Patch.Revision}"
+                                         HoldSeconds="{Binding HoldSeconds}"
+                                         Trigger="{Binding NoteTrigger}"
+                                         ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
 
-                  <views:Knob Label="Fine" Unit="c" Format="0" DefaultValue="0"
-                              Minimum="-100" Maximum="100" SmallStep="1" LargeStep="10"
-                              Margin="0,0,10,8"
-                              ToolTip.Tip="Hundredths of a semitone, for sitting this voice against another."
-                              Value="{Binding Editor.Patch.FineCents}" />
+                    <views:Fader Label="Attack" Unit="ms" Format="0" DefaultValue="2"
+                                 Minimum="0" Maximum="2000" SmallStep="1" LargeStep="25"
+                                 TrackLength="96"
+                                 Value="{Binding Editor.Patch.AttackMs}" />
 
-                  <views:Knob Label="Vib rate" Unit="Hz" Format="0.0" DefaultValue="0"
-                              Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
-                              Margin="0,0,10,8"
-                              Value="{Binding Editor.Patch.VibratoRateHz}" />
+                    <views:Fader Label="Decay" Unit="ms" Format="0" DefaultValue="40"
+                                 Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
+                                 TrackLength="96"
+                                 Value="{Binding Editor.Patch.DecayMs}" />
 
-                  <views:Knob Label="Vib depth" Unit="c" Format="0" DefaultValue="0"
-                              Minimum="0" Maximum="200" SmallStep="1" LargeStep="10"
-                              Margin="0,0,0,8"
-                              Value="{Binding Editor.Patch.VibratoDepthCents}" />
+                    <views:Fader Label="Sustain" Format="0.00" DefaultValue="0.6"
+                                 Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                 TrackLength="96"
+                                 Value="{Binding Editor.Patch.Sustain}" />
 
-                  <views:Knob Label="Pitch env" Unit="st" Format="0" DefaultValue="0"
-                              Minimum="-24" Maximum="24" SmallStep="1" LargeStep="6"
-                              Margin="0,0,10,0"
-                              Value="{Binding Editor.Patch.PitchEnvSemitones}" />
-
-                  <views:Knob Label="Pitch time" Unit="ms" Format="0" DefaultValue="60"
-                              Minimum="0" Maximum="2000" SmallStep="5" LargeStep="50"
-                              Margin="0,0,10,0"
-                              Value="{Binding Editor.Patch.PitchEnvMs}" />
-
-                  <views:Knob Label="Trem rate" Unit="Hz" Format="0.0" DefaultValue="0"
-                              Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
-                              Margin="0,0,10,0"
-                              Value="{Binding Editor.Patch.TremoloRateHz}" />
-
-                  <views:Knob Label="Trem depth" Format="0.00" DefaultValue="0"
-                              Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
-                              Value="{Binding Editor.Patch.TremoloDepth}" />
-                </UniformGrid>
-              </StackPanel>
-
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Filter" />
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <views:Knob Label="Cutoff" Format="0.00" DefaultValue="1"
-                              Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.08"
-                              Display="{Binding Editor.Patch.FilterCutoffText}"
-                              ToolTip.Tip="A low pass. Wide open at the top, where it does nothing at all."
-                              Value="{Binding Editor.Patch.FilterCutoff}" />
-
-                  <views:Knob Label="Resonance" Format="0.00" DefaultValue="0"
-                              Minimum="0" Maximum="0.98" SmallStep="0.01" LargeStep="0.1"
-                              ToolTip.Tip="How much the filter rings at its cutoff."
-                              Value="{Binding Editor.Patch.FilterResonance}" />
-                </StackPanel>
-              </StackPanel>
-
-              <StackPanel Classes="group">
-                <TextBlock Classes="section" Text="Output" />
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
-                               Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
-                               TrackLength="96"
-                               Ticks="6,0,-12,-40"
-                               ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
-                               Value="{Binding Editor.VolumeDecibels}" />
-
-                  <StackPanel Spacing="8" VerticalAlignment="Top">
-                    <views:Knob Label="Drive" Format="0.0" DefaultValue="1"
-                                Minimum="1" Maximum="10" SmallStep="0.1" LargeStep="1"
-                                ToolTip.Tip="Rounds the wave off into itself: fuller and harder, at the same level."
-                                Value="{Binding Editor.Patch.Drive}" />
-
-                    <views:Knob Label="Duty" Format="0.00" DefaultValue="0.5"
-                                Minimum="0.05" Maximum="0.95" SmallStep="0.01" LargeStep="0.05"
-                                IsEnabled="{Binding Editor.Patch.IsPulse}"
-                                ToolTip.Tip="How far through the cycle a pulse turns over. Only a pulse has one, so it greys out on the other waves."
-                                Value="{Binding Editor.Patch.Duty}" />
+                    <views:Fader Label="Release" Unit="ms" Format="0" DefaultValue="80"
+                                 Minimum="0" Maximum="5000" SmallStep="5" LargeStep="50"
+                                 TrackLength="96"
+                                 Value="{Binding Editor.Patch.ReleaseMs}" />
                   </StackPanel>
                 </StackPanel>
-              </StackPanel>
+              </views:PanelGroup>
+
+              <views:PanelGroup Caption="Pitch and modulation" VerticalAlignment="Top" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <UniformGrid Columns="4" Rows="2">
+                    <views:Knob Label="Tune" Unit="st" Format="0" DefaultValue="0"
+                                Minimum="-24" Maximum="24" SmallStep="1" LargeStep="12"
+                                Margin="0,0,10,8"
+                                ToolTip.Tip="Whole semitones added to every note this instrument plays."
+                                Value="{Binding Editor.Patch.TuneSemitones}" />
+
+                    <views:Knob Label="Fine" Unit="c" Format="0" DefaultValue="0"
+                                Minimum="-100" Maximum="100" SmallStep="1" LargeStep="10"
+                                Margin="0,0,10,8"
+                                ToolTip.Tip="Hundredths of a semitone, for sitting this voice against another."
+                                Value="{Binding Editor.Patch.FineCents}" />
+
+                    <views:Knob Label="Vib rate" Unit="Hz" Format="0.0" DefaultValue="0"
+                                Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
+                                Margin="0,0,10,8"
+                                Value="{Binding Editor.Patch.VibratoRateHz}" />
+
+                    <views:Knob Label="Vib depth" Unit="c" Format="0" DefaultValue="0"
+                                Minimum="0" Maximum="200" SmallStep="1" LargeStep="10"
+                                Margin="0,0,0,8"
+                                Value="{Binding Editor.Patch.VibratoDepthCents}" />
+
+                    <views:Knob Label="Pitch env" Unit="st" Format="0" DefaultValue="0"
+                                Minimum="-24" Maximum="24" SmallStep="1" LargeStep="6"
+                                Margin="0,0,10,0"
+                                Value="{Binding Editor.Patch.PitchEnvSemitones}" />
+
+                    <views:Knob Label="Pitch time" Unit="ms" Format="0" DefaultValue="60"
+                                Minimum="0" Maximum="2000" SmallStep="5" LargeStep="50"
+                                Margin="0,0,10,0"
+                                Value="{Binding Editor.Patch.PitchEnvMs}" />
+
+                    <views:Knob Label="Trem rate" Unit="Hz" Format="0.0" DefaultValue="0"
+                                Minimum="0" Maximum="20" SmallStep="0.1" LargeStep="1"
+                                Margin="0,0,10,0"
+                                Value="{Binding Editor.Patch.TremoloRateHz}" />
+
+                    <views:Knob Label="Trem depth" Format="0.00" DefaultValue="0"
+                                Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
+                                Value="{Binding Editor.Patch.TremoloDepth}" />
+                  </UniformGrid>
+                </StackPanel>
+              </views:PanelGroup>
+
+              <views:PanelGroup Caption="Filter" VerticalAlignment="Top" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:Knob Label="Cutoff" Format="0.00" DefaultValue="1"
+                                Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.08"
+                                Display="{Binding Editor.Patch.FilterCutoffText}"
+                                ToolTip.Tip="A low pass. Wide open at the top, where it does nothing at all."
+                                Value="{Binding Editor.Patch.FilterCutoff}" />
+
+                    <views:Knob Label="Resonance" Format="0.00" DefaultValue="0"
+                                Minimum="0" Maximum="0.98" SmallStep="0.01" LargeStep="0.1"
+                                ToolTip.Tip="How much the filter rings at its cutoff."
+                                Value="{Binding Editor.Patch.FilterResonance}" />
+                  </StackPanel>
+                </StackPanel>
+              </views:PanelGroup>
+
+              <views:PanelGroup Caption="Output" VerticalAlignment="Top" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <StackPanel Orientation="Horizontal" Spacing="12">
+                    <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                                 Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
+                                 TrackLength="96"
+                                 Ticks="6,0,-12,-40"
+                                 ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
+                                 Value="{Binding Editor.VolumeDecibels}" />
+
+                    <StackPanel Spacing="8" VerticalAlignment="Top">
+                      <views:Knob Label="Drive" Format="0.0" DefaultValue="1"
+                                  Minimum="1" Maximum="10" SmallStep="0.1" LargeStep="1"
+                                  ToolTip.Tip="Rounds the wave off into itself: fuller and harder, at the same level."
+                                  Value="{Binding Editor.Patch.Drive}" />
+
+                      <views:Knob Label="Duty" Format="0.00" DefaultValue="0.5"
+                                  Minimum="0.05" Maximum="0.95" SmallStep="0.01" LargeStep="0.05"
+                                  IsEnabled="{Binding Editor.Patch.IsPulse}"
+                                  ToolTip.Tip="How far through the cycle a pulse turns over. Only a pulse has one, so it greys out on the other waves."
+                                  Value="{Binding Editor.Patch.Duty}" />
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </views:PanelGroup>
             </WrapPanel>
 
-            <!-- The bottom of the panel, laid out the way the Mother-32 lays its own out:
-                 two arrows either side of a row of lamps that counts which octave you are in,
-                 and beside it the pages over the lamps that count where the track has got to.
-                 Lamps are read without being read, which is the whole reason a panel spends
-                 eight of them on a number it could have printed. -->
-            <StackPanel Spacing="10" Margin="0,14,0,0">
-
-              <StackPanel Orientation="Horizontal" Spacing="34" VerticalAlignment="Bottom">
-
-                <!-- Where the track playing this instrument has got to. The pages stand over
-                     the lamps they choose, so the row reads downwards: pick eight rows, watch
-                     them. It reports and does not sequence: the pattern belongs to the tracker,
-                     and choosing which eight rows show is all these buttons do. -->
-                <StackPanel Spacing="6" VerticalAlignment="Top"
-                            IsVisible="{Binding HasLocation}"
-                            ToolTip.Tip="Where the track playing this instrument has got to.">
-
-                  <ItemsControl ItemsSource="{Binding Location.Pages}" HorizontalAlignment="Left">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel Orientation="Horizontal" MaxWidth="440" />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:LocationPage">
-                        <views:PushButton CapText="{Binding Text}" CapHeight="18" FontSize="9"
-                                          Colour="#B0B3B8" Margin="0,0,4,0"
-                                          HasLamp="True" LampBelow="True" Lit="{Binding IsShown}"
-                                          Command="{Binding PickCommand}"
-                                          ToolTip.Tip="Shows these rows. Press the one already lit to let the lamps chase the playhead again." />
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-
-                  <views:LedRow Caption="LOCATION" Count="8" Colour="#E5B339"
-                                HorizontalAlignment="Left"
-                                FirstNumber="{Binding Location.FirstNumber}"
-                                Selected="{Binding Location.Lamp}"
-                                ToolTip.Tip="Which row of the pattern this track is playing." />
-                </StackPanel>
-              </StackPanel>
-
-              <!-- The keyboard, at the foot where a keyboard goes. It plays, it shows what is
-                   playing, and it carries its own octave: the lamps are not a setting beside
-                   the keys, they are where the keys are looking. There was a Test button here
-                   until the keyboard could do everything it did, and better. -->
-              <views:Clavier Octave="{Binding Octave}"
-                             HorizontalAlignment="Left"
-                             Lit="{Binding Sounding.Lit}"
-                             Command="{Binding KeyCommand}"
-                             ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its note is sounding, whether you played it or the pattern did. The arrows and the lamps move the three octaves on show, and it follows a note played outside them." />
-            </StackPanel>
+            <!-- The keyboard, at the foot where a keyboard goes, and the same on every panel.
+                 It plays, it shows what is playing, and it carries its own octave: the lamps
+                 are not a setting beside the keys, they are where the keys are looking. -->
+            <views:Clavier Octave="{Binding Octave}"
+                           HorizontalAlignment="Left"
+                           Margin="0,14,0,0"
+                           Lit="{Binding Sounding.Lit}"
+                           Command="{Binding KeyCommand}"
+                           ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its note is sounding, whether you played it or the pattern did. The arrows and the lamps move the three octaves on show, and it follows a note played outside them." />
 
     </StackPanel>
   </ScrollViewer>

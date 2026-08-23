@@ -32,7 +32,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Diagnostics/` - The log: one file for the app and every plugin process, off by default
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
-- `Tracker/` - Song model, sequencing, playback, JSON song files, and the instrument library
+- `Tracker/` - Song model, sequencing, playback, JSON song files, and the machine rack
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
@@ -64,7 +64,17 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
 - `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
-- `InstrumentLibrary` (Tracker/): The instruments you own, in `%APPDATA%/JingleBox2/instruments/`, one file per instrument named by its id. Where a sound starts: taking one into a song copies it, and the copy is then the song's own. Editing it in the song changes that song alone. A synth or plugin patch travels inside the song; a recording does not, since the instrument keeps only the path to it
+- `MachineRack` (Tracker/): What you have, in `%APPDATA%/JingleBox2/instruments/`, one file
+  each. The machines, one apiece under their own names, and the plugins you have added. Nothing
+  else: anything that is neither is moved to `instruments/retired/` on the next open, since
+  there is no longer any way to make one. A machine cannot be renamed, deleted or duplicated; a
+  plugin can be deleted but takes its name from the VST3 or CLAP
+- **Machines and instruments are not the same word.** A machine is a fixture on the rack: one of
+  each, fixed name, always there. An instrument is what a machine becomes inside a song: your
+  name, your settings, its own id, stored with the song, and two of them can come off one
+  machine. `TrackerInstrument` is the data type for both, but the rack's types say machine
+  (`MachineRack`, `MachineRackViewModel`, `RackMachine`, `MachinesView`) and the tracker's say
+  instrument (`Song.Instruments`, `InstrumentSlot`, `AddInstrumentCommand`)
 - `SampleSlicer` (Tracker/): Where a recording gets cut into pieces. Finds the attacks off the
   peak data by beating a decaying peak-hold, walks each cut back to where its sound began, and
   falls back to an even division when there is nothing to find. Knows nothing about what takes

@@ -26,7 +26,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
-    private readonly InstrumentLibrary _library;
+    private readonly MachineRack _rack;
     private readonly DispatcherTimer _meters;
     private readonly ObservableCollection<Recording> _recordings;
 
@@ -61,9 +61,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public event EventHandler<(int Track, Note Note)>? NotePlayed
     {
-        add => _player.NotePlayed += value;
-        remove => _player.NotePlayed -= value;
+        add
+        {
+            _player.NotePlayed += value;
+            _played += value;
+        }
+        remove
+        {
+            _player.NotePlayed -= value;
+            _played -= value;
+        }
     }
+
+    /// <summary>
+    /// The half of <see cref="NotePlayed"/> the player knows nothing about: notes played by
+    /// hand, from the computer keyboard, a panel's keys, or a MIDI keyboard.
+    /// </summary>
+    private EventHandler<(int Track, Note Note)>? _played;
+
+    private void Played(int track, Note note) => _played?.Invoke(this, (track, note));
 
     /// <summary>What plugins this machine has, for the picker on the mixer page.</summary>
     public PluginLibraryViewModel Plugins { get; }
@@ -125,11 +141,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // the tracker on behalf of a panel nobody can open any more.
         if (existing != null) existing.Discard();
 
+        // InstrumentEdited rather than MarkDirty: what the panel changes is the song's own copy,
+        // so the row beside the pattern has to show it as well as the file having to be written.
         var box = new PluginInstrumentViewModel(
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
-            MarkDirty,
-            () => new TrackInstrumentDesigner(track, instrument, this, MarkDirty, _waveforms, this, _library, _recordings));
+            InstrumentEdited,
+            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings));
 
         _instrumentBoxes[track] = box;
 
@@ -237,13 +255,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>One channel strip per track, for the MIXER page.</summary>
     public ObservableCollection<TrackStripViewModel> Strips { get; } = new();
 
-    /// <summary>Raised when this song puts an instrument into the library, so the library page follows.</summary>
-    public event EventHandler? LibraryChanged;
+    /// <summary>The rack, for bringing an instrument into this song.</summary>
 
-    /// <summary>The library, for bringing an instrument into this song.</summary>
-    public ObservableCollection<LibraryInstrument> LibraryInstruments { get; } = new();
-
-    [ObservableProperty] private LibraryInstrument? selectedLibraryInstrument;
+    [ObservableProperty] private RackMachine? pickedMachine;
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
@@ -251,7 +265,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     public TrackerViewModel(
         IAudioEngine audio,
-        InstrumentLibrary library,
+        MachineRack rack,
         ObservableCollection<Recording> recordings,
         ConfigStore? configStore = null,
         AppConfig? config = null,
@@ -277,7 +291,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // Before anything sounds: the rate cannot move once the engine is built.
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
         _store = new SongStore();
-        _library = library;
+        _rack = rack;
         _recordings = recordings;
 
         song = Song.CreateDefault();
@@ -294,7 +308,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         RefreshOrder();
         RefreshSavedSongs();
-        RefreshLibrary();
+        RefreshRack();
         RefreshStrips();
 
         FollowCursorTrack();
@@ -360,9 +374,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
     public IAsyncRelayCommand RemoveInstrumentCommand => new AsyncRelayCommand(RemoveSelectedInstrument);
-    public IRelayCommand AddFromLibraryCommand => new RelayCommand(AddFromLibrary);
-    public IRelayCommand PromoteToLibraryCommand => new RelayCommand(PromoteToLibrary);
-    public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshLibrary);
+    public IRelayCommand AddInstrumentCommand => new RelayCommand(AddInstrument);
+    public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshRack);
 
     public bool HasInstruments => Instruments.Count > 0;
 
@@ -612,8 +625,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             if (ShowsMixer) return song + "  ·  mixer  ·  " + TrackCount + " tracks";
 
-            if (ShowsInstruments)
-                return song + "  ·  instruments  ·  " + Song.Instruments.Count + " in this song";
+            if (ShowsMachines)
+                return song + "  ·  machines  ·  " + Song.Instruments.Count +
+                       (Song.Instruments.Count == 1 ? " instrument in this song" : " instruments in this song");
 
             string line = "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture);
             string track = CursorTrackLabel;
@@ -759,7 +773,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     /// <remarks>
     /// The instruments and the mixer are the tracker's, not the application's. The mixer mixes
-    /// its tracks and nothing else's; the library exists so a song has something to play, and
+    /// its tracks and nothing else's; the rack exists so a song has something to play, and
     /// the pads never touch either. As sibling tabs they looked like three separate parts of
     /// the program rather than three ways of looking at one song.
     ///
@@ -769,19 +783,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private const string PatternPage = "Pattern";
 
-    private const string InstrumentsPage = "Instruments";
+    private const string MachinesPage = "Machines";
 
     private const string MixerPage = "Mixer";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPattern))]
-    [NotifyPropertyChangedFor(nameof(ShowsInstruments))]
+    [NotifyPropertyChangedFor(nameof(ShowsMachines))]
     [NotifyPropertyChangedFor(nameof(ShowsMixer))]
     private string page = PatternPage;
 
     public bool ShowsPattern => Page == PatternPage;
 
-    public bool ShowsInstruments => Page == InstrumentsPage;
+    public bool ShowsMachines => Page == MachinesPage;
 
     public bool ShowsMixer => Page == MixerPage;
 
@@ -793,7 +807,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// somewhere you go and come back from, and pressing the lit button again is the way back.
     /// </remarks>
     public IRelayCommand<string> ShowCommand => new RelayCommand<string>(which =>
-        Page = which == Page || which is not (InstrumentsPage or MixerPage) ? PatternPage : which);
+        Page = which == Page || which is not (MachinesPage or MixerPage) ? PatternPage : which);
 
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 
@@ -861,6 +875,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // Played on the track the cursor is on, so a plugin instrument sounds through the copy
         // that track plays rather than through an audition copy of its own.
         _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
+
+        // And said out loud, so a panel's keyboard lights for a note played by hand the same as
+        // for one the pattern played. Only the pattern used to say anything, which is why a MIDI
+        // key sounded and nothing on screen moved.
+        Played(Cursor.Track, note);
     }
 
     public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
@@ -906,8 +925,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// Sounds one note on any instrument, for the library's auditioning. The engine lives
-    /// here, so the library borrows it rather than opening a second one.
+    /// Sounds one note on any instrument, for the rack's auditioning. The engine lives
+    /// here, so the rack borrows it rather than opening a second one.
     /// </summary>
     public void Audition(TrackerInstrument instrument, Note note, int volume) =>
         _player.Preview(instrument, note, GainFor(volume));
@@ -1184,7 +1203,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// A strip is named after whatever plays through it, so a rename in the library shows up
+    /// A strip is named after whatever plays through it, so a rename in the rack shows up
     /// here. Updated in place rather than rebuilt: the mixer is full of controls you may be
     /// holding on to.
     /// </summary>
@@ -1229,42 +1248,48 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// The library, refreshed for the picker that brings an instrument into this song.
+    /// The rack, refreshed for the picker that brings an instrument into this song.
     /// </summary>
-    public void RefreshLibrary()
+    /// <summary>
+    /// The rack has changed under the picker.
+    /// </summary>
+    /// <remarks>
+    /// The picker is filled straight from the rack now rather than from a second reading of the
+    /// folder, so there is no list here to rebuild. There was, and it was read before the rack
+    /// had been brought into shape, which is how the picker came to be offering four machines
+    /// twice each. All that is left to do is let go of a choice that is no longer on it.
+    /// </remarks>
+    public void RefreshRack()
     {
-        string? keep = SelectedLibraryInstrument?.Id;
+        if (PickedMachine == null) return;
 
-        LibraryInstruments.Clear();
-        foreach (var instrument in _library.List())
-            LibraryInstruments.Add(new LibraryInstrument(instrument));
-
-        SelectedLibraryInstrument = LibraryInstruments.FirstOrDefault(i => i.Id == keep);
+        if (_rack.Load(PickedMachine.Id) == null) PickedMachine = null;
     }
 
     /// <summary>
-    /// Gives the song a slot for a library instrument, so its cells can name it. The slot holds
-    /// a copy: a song opened without the library still plays, and the copy is brought back up
-    /// to date whenever the library has the instrument.
+    /// Gives the song a slot for a rack instrument, so its cells can name it. The slot holds
+    /// a copy: a song opened without the rack still plays, and the copy is brought back up
+    /// to date whenever the rack has the instrument.
     /// </summary>
-    private void AddFromLibrary()
+    private void AddInstrument()
     {
-        var chosen = SelectedLibraryInstrument?.Instrument;
+        var chosen = PickedMachine?.Instrument;
         if (chosen == null)
         {
-            Status = "Pick an instrument from the library first.";
+            Status = "Pick an instrument from the rack first.";
             return;
         }
 
-        int existing = Song.Instruments.FindIndex(i => i.Id == chosen.Id && !string.IsNullOrEmpty(i.Id));
-        if (existing >= 0)
-        {
-            SelectedInstrument = existing;
-            Status = $"'{chosen.Name}' is already in this song as {existing:00}";
-            return;
-        }
+        // A copy with an id of its own, because it is the song's from here on: name it what you
+        // like, set it how you like, and take a second one off the same machine if you want one.
+        // Sharing the rack's id would have meant one Zampler to a song and a name you could not
+        // change, since a machine on the rack keeps the machine's name.
+        var taken = chosen.Clone();
 
-        Song.Instruments.Add(chosen.Clone());
+        taken.Id = "";
+        taken.EnsureId();
+
+        Song.Instruments.Add(taken);
         SyncInstruments();
         MarkDirty();
 
@@ -1272,59 +1297,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Added '{chosen.Name}' to the song as instrument {SelectedInstrument:00}";
     }
 
-    /// <summary>
-    /// Puts a song's own instrument into the library, which is how an instrument from before
-    /// the library existed gets there, and how a one-off you built for this song becomes
-    /// something the next song can use.
-    /// </summary>
-    private void PromoteToLibrary()
-    {
-        var instrument = Song.InstrumentAt(SelectedInstrument);
-        if (instrument == null)
-        {
-            Status = "Pick an instrument in the song first.";
-            return;
-        }
-
-        try
-        {
-            // The song's copy keeps the same id, so from here on the two are the same voice.
-            instrument.EnsureId();
-            _library.Save(instrument);
-
-            RefreshLibrary();
-            LibraryChanged?.Invoke(this, EventArgs.Empty);
-
-            // The slot now carries an id, and that is part of the song file.
-            MarkDirty();
-            Status = $"'{instrument.Name}' is in the library now, and this song follows it.";
-        }
-        catch (Exception ex)
-        {
-            Status = $"Could not add it to the library: {ex.Message}";
-        }
-    }
 
     /// <summary>
-    /// An instrument was edited in the library. The picker follows it; the song does not.
+    /// An instrument was edited in the rack. The picker follows it; the song does not.
     /// </summary>
     /// <remarks>
-    /// The song's instruments are the song's, so an edit made in the library does not reach a
-    /// song that already has one. What it does have to reach is the list you pick from, which
-    /// holds its own objects read when the library was last listed, and would otherwise go on
-    /// offering a name and a sound that are no longer there.
+    /// The song's instruments are the song's, so an edit made on the rack does not reach a song
+    /// that already has one. Nor is there anything to update in the picker any more: it is
+    /// filled from the rack's own rows, which the rack has already refreshed by the time this
+    /// is called. What is left is letting go of a choice that has gone.
     /// </remarks>
-    public void ApplyLibraryEdit(TrackerInstrument edited)
+    public void ApplyMachineEdit(TrackerInstrument edited)
     {
         if (edited == null || string.IsNullOrEmpty(edited.Id)) return;
 
-        foreach (var row in LibraryInstruments)
-        {
-            if (row.Id != edited.Id) continue;
-
-            row.Instrument.CopyFrom(edited);
-            row.Refresh();
-        }
+        RefreshRack();
     }
 
     private async Task RemoveSelectedInstrument()
@@ -1337,7 +1324,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         bool confirmed = await ConfirmDialog.AskAsync(
             "Remove from song",
             $"Take '{instrument.Name}' out of this song? Cells that used it lose their instrument, "
-                + "and the rest are renumbered. The instrument stays in the library.",
+                + "and the rest are renumbered. The instrument stays in the rack.",
             "Remove");
 
         if (!confirmed) return;
@@ -1348,7 +1335,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         SyncInstruments();
         MarkDirty();
         SelectedInstrument = Math.Clamp(index, 0, Math.Max(0, Song.Instruments.Count - 1));
-        Status = $"Removed '{instrument.Name}' from the song. It is still in the library.";
+        Status = $"Removed '{instrument.Name}' from the song. It is still in the rack.";
     }
 
     private void Save()
@@ -1435,9 +1422,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         replacement.Normalize();
 
-        // The song's instruments are the song's own. They are not fetched from the library on
+        // The song's instruments are the song's own. They are not fetched from the rack on
         // the way in: a song opens sounding exactly the way it was saved, and an instrument
-        // built here belongs to the work it was built for. The library is where a sound
+        // built here belongs to the work it was built for. The rack is where a sound
         // starts, not something that reaches back into a song already written.
         Song = replacement;
         SongName = name;
@@ -1483,6 +1470,52 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>Rebuilds the list so every row carries its current number.</summary>
+    /// <summary>
+    /// Gives the song's instrument a name of your choosing.
+    /// </summary>
+    /// <remarks>
+    /// A dialog rather than an editable row, because the row has to stay readable while you
+    /// pick through the list. This is the song's own copy, so the name is the song's: the
+    /// machine it came off the rack from keeps its own.
+    /// </remarks>
+    public IAsyncRelayCommand RenameInstrumentCommand => new AsyncRelayCommand(RenameInstrument);
+
+    private async Task RenameInstrument()
+    {
+        var slot = Instruments.ElementAtOrDefault(SelectedInstrument);
+
+        if (slot == null) return;
+
+        string? wanted = await NameDialog.AskAsync(
+            "Rename instrument",
+            "What this instrument is called in this song. The machine it came from keeps its own name.",
+            slot.Name);
+
+        if (wanted == null || wanted == slot.Name) return;
+
+        slot.Instrument.Name = wanted;
+        slot.Refresh();
+
+        MarkDirty();
+
+        Status = "Renamed instrument " + slot.Number + " to '" + wanted + "'";
+    }
+
+    /// <summary>
+    /// Says the rows again after the panel changed one of the song's instruments.
+    /// </summary>
+    /// <remarks>
+    /// The song holds its own copy of every instrument, so what a panel changes is changed in
+    /// the song: the row beside it has to show that rather than what the sound was when it was
+    /// taken off the rack.
+    /// </remarks>
+    public void InstrumentEdited()
+    {
+        foreach (var slot in Instruments) slot.Refresh();
+
+        MarkDirty();
+    }
+
     private void SyncInstruments()
     {
         int selected = SelectedInstrument;

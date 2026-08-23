@@ -21,7 +21,7 @@ namespace JingleBox2.Views;
 /// </summary>
 /// <remarks>
 /// Its own control rather than a column of the INSTRUMENTS tab, because the same designer is
-/// wanted in two places: on that tab, against whatever the library has picked, and in a window
+/// wanted in two places: on that tab, against whatever the rack has picked, and in a window
 /// of its own, against the instrument a track is playing. A machine's front panel does not care
 /// which rack it is standing in.
 /// </remarks>
