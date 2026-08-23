@@ -30,6 +30,7 @@ internal static unsafe class XEmbed
     [DllImport(Library)] private static extern int XFree(void* data);
     [DllImport(Library)] private static extern int XSendEvent(nint display, nint window, int propagate, nint mask, XEvent* send);
     [DllImport(Library)] private static extern int XGetWindowAttributes(nint display, nint window, out XWindowAttributes attributes);
+    [DllImport(Library)] private static extern int XGetInputFocus(nint display, out nint window, out int revertTo);
 
     [DllImport(Library)]
     private static extern int XGetWindowProperty(
@@ -144,6 +145,124 @@ internal static unsafe class XEmbed
             {
                 try { XCloseDisplay(display); } catch (Exception) { }
             }
+        }
+    }
+
+    /// <summary>The two answers XGetInputFocus gives that are not a window.</summary>
+    private const nint NoFocus = 0;
+    private const nint PointerRoot = 1;
+
+    /// <summary>
+    /// Watches whether the keyboard is inside a window, and says so when that changes.
+    /// </summary>
+    /// <remarks>
+    /// On a thread of its own, with one connection to X that it opens once and keeps. Asking
+    /// this from the thread that draws would be a round trip to the X server four times a
+    /// second, on the same thread a plugin repainting itself is already keeping busy.
+    ///
+    /// Only changes are reported, and the first answer counts as a change, so whoever is told
+    /// hears where things stand as soon as the watch starts.
+    /// </remarks>
+    public static IDisposable WatchFocus(nint window, Action<bool> changed)
+    {
+        var watch = new FocusWatch(window, changed);
+
+        watch.Start();
+
+        return watch;
+    }
+
+    private sealed class FocusWatch : IDisposable
+    {
+        private readonly nint _window;
+        private readonly Action<bool> _changed;
+        private readonly System.Threading.ManualResetEventSlim _stop = new(false);
+
+        private System.Threading.Thread? _thread;
+
+        public FocusWatch(nint window, Action<bool> changed)
+        {
+            _window = window;
+            _changed = changed;
+        }
+
+        public void Start()
+        {
+            if (_window == 0 || !OperatingSystem.IsLinux()) return;
+
+            _thread = new System.Threading.Thread(Run)
+            {
+                IsBackground = true,
+                Name = "plugin window focus"
+            };
+
+            _thread.Start();
+        }
+
+        private void Run()
+        {
+            nint display = 0;
+
+            try
+            {
+                display = XOpenDisplay(0);
+                if (display == 0) return;
+
+                bool? had = null;
+
+                while (!_stop.Wait(250))
+                {
+                    bool inside = Inside(display, _window);
+
+                    if (had == inside) continue;
+
+                    had = inside;
+
+                    try { _changed(inside); } catch (Exception) { }
+                }
+            }
+            catch (Exception)
+            {
+                // No X to ask, or a connection that has gone: the plugin keeps whatever it
+                // was last told, which is what it would have had without this at all.
+            }
+            finally
+            {
+                if (display != 0)
+                {
+                    try { XCloseDisplay(display); } catch (Exception) { }
+                }
+            }
+        }
+
+        /// <summary>Whoever has the keyboard, walked up its parents to see whether it is us.</summary>
+        private static bool Inside(nint display, nint window)
+        {
+            if (XGetInputFocus(display, out nint focused, out _) == 0) return false;
+            if (focused == NoFocus || focused == PointerRoot) return false;
+
+            // A handful of steps: a plugin's interface is a window or two inside ours.
+            for (int step = 0; step < 32 && focused != 0; step++)
+            {
+                if (focused == window) return true;
+
+                if (XQueryTree(display, focused, out nint root, out nint parent, out nint* children, out _) == 0)
+                    return false;
+
+                if (children != null) XFree(children);
+
+                if (parent == 0 || parent == root) return false;
+
+                focused = parent;
+            }
+
+            return false;
+        }
+
+        public void Dispose()
+        {
+            _stop.Set();
+            _thread = null;
         }
     }
 

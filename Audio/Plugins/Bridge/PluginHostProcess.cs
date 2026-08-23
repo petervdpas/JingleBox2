@@ -206,6 +206,8 @@ public static class PluginHostProcess
 
         Say("stopping");
 
+        DropEditor();
+
         try { (_plugin as IDisposable)?.Dispose(); } catch (Exception) { }
 
         return 0;
@@ -418,26 +420,43 @@ public static class PluginHostProcess
         }
     }
 
+    /// <summary>
+    /// The plugin's own interface, made the first time it is asked for and kept after that.
+    /// </summary>
+    /// <remarks>
+    /// Built once per plugin, not once per window. A second window gets the same interface put
+    /// into it, because building a second one does not work: what a plugin registers with the
+    /// host when it first draws (its connection to X, above all) belongs to the plugin rather
+    /// than to the window, and it registers it once and never mentions it again. Tear the
+    /// interface down and that registration is gone, or worse, pointing at memory the plugin
+    /// has freed, and the next window draws perfectly and hears nothing at all.
+    ///
+    /// So a window closing takes the interface out of it and leaves it standing. See
+    /// <see cref="CloseEditor"/>.
+    /// </remarks>
     private static void OpenEditor(BridgeLink control, IPluginParameters plugin)
     {
-        CloseEditor();
-
-        var editor = (plugin as IPluginWindowSource)?.OpenEditor();
+        var editor = _editor;
 
         if (editor == null)
         {
-            control.Send(BridgeCall.Fail, BridgeBody.Words("this plugin has no window of its own"));
-            return;
+            editor = (plugin as IPluginWindowSource)?.OpenEditor();
+
+            if (editor == null)
+            {
+                control.Send(BridgeCall.Fail, BridgeBody.Words("this plugin has no window of its own"));
+                return;
+            }
+
+            _editor = editor;
+
+            // Everything the plugin asks for from here belongs to the interface, and goes when
+            // the interface finally does. See PluginRunLoop.DropSince.
+            _windowMark = PluginRunLoop.Mark();
+
+            editor.ResizeRequested += (width, height) =>
+                control.Send(BridgeCall.ResizeRequested, BridgeBody.Pair(width, height));
         }
-
-        _editor = editor;
-
-        // Everything the plugin asks for from here belongs to this window, so it can be taken
-        // back when the window goes. See PluginRunLoop.DropSince.
-        _windowMark = PluginRunLoop.Mark();
-
-        editor.ResizeRequested += (width, height) =>
-            control.Send(BridgeCall.ResizeRequested, BridgeBody.Pair(width, height));
 
         control.Send(BridgeCall.Ok, BridgeBody.Three(editor.Size.Width, editor.Size.Height, editor.CanResize ? 1 : 0));
     }
@@ -467,22 +486,46 @@ public static class PluginHostProcess
         control.Send(BridgeCall.Ok, BridgeBody.Pair(editor.Size.Width, editor.Size.Height));
     }
 
+    /// <summary>
+    /// Takes the plugin's interface out of the window it was in, and leaves it standing.
+    /// </summary>
+    /// <remarks>
+    /// Not disposed. See <see cref="OpenEditor"/> for why: an interface built a second time is
+    /// one the host has stopped listening to. What the plugin holds costs a window's worth of
+    /// memory in a process that is this plugin and nothing else, and it goes when the process
+    /// does.
+    /// </remarks>
     private static void CloseEditor()
+    {
+        var editor = _editor;
+
+        if (editor == null) return;
+
+        // The last moment anybody can ask. Whatever was turned in that window is still worth
+        // knowing about, and after this nobody is looking at it.
+        Settle();
+
+        try { editor.Detach(); } catch (Exception error) { Say("taking the window back: " + error.Message); }
+    }
+
+    /// <summary>
+    /// Lets the interface go for good, for a process that is stopping.
+    /// </summary>
+    /// <remarks>
+    /// The one place a plugin's interface is destroyed, and the only place it is safe: nothing
+    /// is going to draw again. Whatever the plugin asked the host to hold goes with it, whether
+    /// the plugin remembered to give it back or not. Vital does not, and calling what it has
+    /// freed is how its process dies.
+    /// </remarks>
+    private static void DropEditor()
     {
         var editor = _editor;
         _editor = null;
 
         if (editor == null) return;
 
-        // The last moment anybody can ask. Whatever was turned in that window is still worth
-        // knowing about, and after this there is nothing left to ask.
-        Settle();
-
         try { editor.Dispose(); } catch (Exception error) { Say("closing the window: " + error.Message); }
 
-        // Whatever the window asked the host to hold for it goes with the window, whether the
-        // plugin remembered to give it back or not. Vital does not, and calling what it has
-        // freed is how its process dies.
         PluginRunLoop.DropSince(_windowMark);
     }
 

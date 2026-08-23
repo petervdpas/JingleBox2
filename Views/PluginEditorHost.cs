@@ -46,6 +46,14 @@ public sealed class PluginEditorHost : NativeControlHost
     private bool _attached;
     private DispatcherTimer? _settling;
 
+    /// <summary>
+    /// What the window last said about being active, kept for a plugin that was not in it yet.
+    /// </summary>
+    private bool _active;
+
+    /// <summary>Watches who has the keyboard while the plugin is in its window.</summary>
+    private IDisposable? _watching;
+
     public IPluginEditor? Editor
     {
         get => GetValue(EditorProperty);
@@ -65,9 +73,69 @@ public sealed class PluginEditorHost : NativeControlHost
     /// </remarks>
     public void WindowActivated(bool active)
     {
+        // Written down whether or not there is anybody to tell yet. The window is active long
+        // before the plugin is in it, and this is the only record of that.
+        _active = active;
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the window says " + (active ? "active" : "not active") +
+            "; the plugin is " + (_attached ? "in it" : "not in it yet"));
+
+        Tell(active);
+    }
+
+    /// <summary>
+    /// Tells the plugin whether the window it is in is the one being used.
+    /// </summary>
+    /// <remarks>
+    /// Said again every time rather than only when our own answer has changed. What we last
+    /// said is not what the plugin last believed: a toolkit works its own activation out from
+    /// what X tells its window, and quietly decides it has gone inactive without being told
+    /// anything by us. Only saying it when we think it has changed leaves that plugin dead
+    /// with the host convinced it has nothing to say.
+    /// </remarks>
+    private void Tell(bool active)
+    {
         if (!_attached || _handle == 0) return;
 
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "telling the plugin the window is " + (active ? "active" : "not active"));
+
         XEmbed.Activated(_handle, active);
+    }
+
+    /// <summary>
+    /// Keeps the plugin told, for as long as it is in the window.
+    /// </summary>
+    /// <remarks>
+    /// The window's own activation events are not enough on their own: a click on a plugin's
+    /// interface lands on the plugin's window rather than on ours, so the window manager can
+    /// hand the keyboard back without the window we own hearing a thing. Without this, a
+    /// plugin told it had gone inactive when the transport was clicked can never be told
+    /// otherwise however many times it is clicked on, which is a window that draws and answers
+    /// nothing with no way back.
+    ///
+    /// So the keyboard is followed rather than the window's events, and the plugin is told
+    /// again every time it comes back. See <see cref="XEmbed.WatchFocus"/>, which does the
+    /// asking on a thread of its own.
+    /// </remarks>
+    private void Watch()
+    {
+        _watching?.Dispose();
+        _watching = null;
+
+        if (!OperatingSystem.IsLinux() || _handle == 0) return;
+
+        nint watched = _handle;
+
+        _watching = XEmbed.WatchFocus(watched, inside => Dispatcher.UIThread.Post(() =>
+        {
+            // The window may have gone, or been given to a different plugin, between the
+            // asking and the answering.
+            if (!_attached || _handle != watched) return;
+
+            Tell(inside || (TopLevel.GetTopLevel(this) as Window)?.IsActive == true);
+        }));
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -81,6 +149,9 @@ public sealed class PluginEditorHost : NativeControlHost
         // Whatever was in the window is not in it any more. A plugin that has been started
         // again is a different plugin with the same name, and it has never seen this window.
         _attached = false;
+
+        _watching?.Dispose();
+        _watching = null;
 
         if (change.NewValue is not IPluginEditor arriving) return;
 
@@ -205,6 +276,26 @@ public sealed class PluginEditorHost : NativeControlHost
 
         if (!_attached) return;
 
+        // Told at once whether the window it has just been let into is the one being used.
+        //
+        // The window is up, and on a desktop that gives a new window the focus it is already
+        // active, well before this: the handover waits for the window to be really on screen
+        // at its full size. So the activation Avalonia raised when the window opened reached a
+        // host with nothing in it and went nowhere, and XEMBED never says anything twice. A
+        // plugin that misses it draws from its own timers and ignores everything clicked on
+        // it, which is a window that looks perfectly alive and answers nothing.
+        bool active = (TopLevel.GetTopLevel(this) as Window)?.IsActive == true || _active;
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            "the plugin is in its window, and the window is " +
+            (active ? "active" : "not active"));
+
+        // The watch reports where the keyboard is as soon as it starts, so a window that was
+        // not active a moment ago is put right without waiting for anything to change.
+        if (active) Tell(true);
+
+        Watch();
+
         // Told its size once it is in place. Some plugins lay themselves out here rather than
         // when they were attached, and stay blank until they are asked.
         var settled = editor.Size;
@@ -223,6 +314,9 @@ public sealed class PluginEditorHost : NativeControlHost
     {
         _settling?.Stop();
         _settling = null;
+
+        _watching?.Dispose();
+        _watching = null;
 
         _handle = 0;
 

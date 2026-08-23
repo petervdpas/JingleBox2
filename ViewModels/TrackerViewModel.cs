@@ -111,6 +111,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
+    /// Points the effect slot at the track the cursor is on again, whether or not the cursor
+    /// has moved.
+    /// </summary>
+    /// <remarks>
+    /// The slot follows the cursor, so it only rebuilds itself when the cursor changes track.
+    /// What a track plays can change while the cursor stays where it is, which is what
+    /// dropping an instrument on a track does, and the box at the head of the strip has to
+    /// follow that too: without this the instrument you just put on the track has no box
+    /// until you leave it and come back.
+    /// </remarks>
+    private void PointEffectSlot()
+    {
+        _effectTrack = -1;
+        FollowCursorTrack();
+    }
+
+    /// <summary>
     /// The box at the head of a track's strip: the plugin that track plays, when it plays one.
     /// </summary>
     /// <remarks>
@@ -1046,6 +1063,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.SetTrackInstrument(track, instrument);
         SyncInstruments();
         RefreshStrips();
+        PointEffectSlot();
         MarkDirty();
 
         // An instrument lives on one track, so say what moved and what was pushed off.
@@ -1117,6 +1135,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         SyncInstruments();
         RefreshStrips();
+        PointEffectSlot();
         MarkDirty();
 
         // The cursor follows the track it was on, so a drag does not also move the caret.
@@ -1133,6 +1152,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
         SyncInstruments();
         RefreshStrips();
+        PointEffectSlot();
         MarkDirty();
         Status = $"Track {track + 1:00} has no instrument";
     }
@@ -1452,8 +1472,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Status = "Missing plugin(s): " + string.Join(", ", missing);
 
         // The panel is about a track whose chain has just been rebuilt.
-        _effectTrack = -1;
-        FollowCursorTrack();
+        PointEffectSlot();
 
         // The order list is rebuilt before the slot is chosen, so a fresh song opens on its
         // first pattern rather than on nothing.
