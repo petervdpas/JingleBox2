@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Machines;
 
 namespace JingleBox2.Tracker;
 
@@ -22,10 +23,20 @@ public sealed record Machine(
     string Name,
     string Summary,
     bool IsOurs,
-    MachineTheme Theme)
+    MachineTheme Theme) : IMachine
 {
     /// <summary>The machine's own colour, which is where everything it is painted with starts.</summary>
     public string Colour => Theme.Accent;
+
+    /// <summary>
+    /// What this machine is called in files, which is the id the contract asks for.
+    /// </summary>
+    /// <remarks>
+    /// The same string a machine's own slot on the rack uses, because they are the same fact:
+    /// "machine.zampler" is what a Zampler is, whether it is the box on the shelf or the line
+    /// in a song saying which machine an instrument was made on.
+    /// </remarks>
+    string IMachine.Id => SlotId;
 
     /// <summary>
     /// The instrument id a machine's own slot in the rack uses.

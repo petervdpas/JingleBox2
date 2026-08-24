@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
 using System.Globalization;
+using JingleBox2.Machines;
 
 namespace JingleBox2.ViewModels;
 

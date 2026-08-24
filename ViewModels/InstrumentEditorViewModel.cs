@@ -12,6 +12,7 @@ using System.Linq;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
+using JingleBox2.Machines;
 
 namespace JingleBox2.ViewModels;
 

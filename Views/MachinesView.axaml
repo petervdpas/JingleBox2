@@ -40,7 +40,7 @@
 
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
-          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Machines" />
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Rack" />
 
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
             <!-- The machines are always here, one each, under their own names. The only thing
@@ -70,6 +70,7 @@
 
           <ListBox ItemsSource="{Binding Machines}"
                    SelectedItem="{Binding Selected}"
+                   DoubleTapped="OpenMachine"
                    ItemTemplate="{StaticResource RackRow}">
             <!-- Each row in its machine's colour, a wash for a row and more of it for the one
                  in hand. The rack reads as a rack of coloured boxes rather than as a list with
@@ -99,6 +100,7 @@
       <!-- No card around it. The machine paints its own plate, edge and corners, and a card
            behind that is a second frame around the first. -->
       <views:InstrumentEditor Grid.Column="2" />
+
     </Grid>
   </DockPanel>
 </UserControl>

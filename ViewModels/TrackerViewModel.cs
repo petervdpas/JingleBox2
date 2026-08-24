@@ -739,7 +739,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             if (ShowsMixer) return song + "  ·  mixer  ·  " + TrackCount + " tracks";
 
             if (ShowsMachines)
-                return song + "  ·  machines  ·  " + Song.Instruments.Count +
+                return song + "  ·  rack  ·  " + Song.Instruments.Count +
                        (Song.Instruments.Count == 1 ? " instrument in this song" : " instruments in this song");
 
             string line = "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture);

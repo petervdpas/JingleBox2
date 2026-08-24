@@ -23,6 +23,17 @@ public partial class MachinesView : UserControl
         InitializeComponent();
     }
 
+    /// <summary>
+    /// Opens the machine in hand, in its own window.
+    /// </summary>
+    /// <remarks>
+    /// The rack is a list of what you have; a machine is a panel full of knobs. Standing the
+    /// second inside the first left both cramped, so the panel opens in a window that can be
+    /// made as big as it wants and left up while you write a pattern.
+    /// </remarks>
+    private void OpenMachine(object? sender, RoutedEventArgs e) =>
+        MachineWindow.Show(ViewModel, TopLevel.GetTopLevel(this) as Window);
+
     private bool _onScreen;
     private MachineRackViewModel? _bound;
 

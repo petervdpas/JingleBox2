@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             x:Class="JingleBox2.Views.MachineEditorView"
+             x:DataType="vm:MainViewModel">
+
+  <!-- The machine editor. Empty on purpose: this is where a machine project is opened and
+       built, and it is not the rack. The rack is what is installed, and it lives in the
+       tracker; nothing of it belongs here. -->
+  <Panel />
+
+</UserControl>

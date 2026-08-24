@@ -1,4 +1,4 @@
-namespace JingleBox2.Tracker;
+namespace JingleBox2.Machines;
 
 /// <summary>
 /// A machine's own colours, which are nobody else's business.

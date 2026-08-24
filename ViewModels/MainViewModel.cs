@@ -591,6 +591,28 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Whether the machine editor has a page of its own in the menu along the top.
+    /// </summary>
+    /// <remarks>
+    /// The rack lives inside the tracker, which is right when you are writing a song and wrong
+    /// when the instrument is the work. Turning this on puts it in the menu beside the others,
+    /// where it is one click away from wherever you are.
+    /// </remarks>
+    public bool ShowMachineEditor
+    {
+        get => _cfg.ShowMachineEditor;
+        set
+        {
+            if (_cfg.ShowMachineEditor == value) return;
+
+            _cfg.ShowMachineEditor = value;
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>The most pads the settings page will let you ask for as things stand.</summary>
     public int MostPads => ExtendedPadMatrix ? PadMatrix.Most : PadMatrix.Usual;
 

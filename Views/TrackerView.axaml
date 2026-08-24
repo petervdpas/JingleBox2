@@ -63,10 +63,10 @@
            lit one is the way back to the pattern. -->
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
                   VerticalAlignment="Top" Margin="12,0,0,0">
-        <Button Content="MACHINES" Classes="page"
+        <Button Content="RACK" Classes="page"
                 Classes.active="{Binding ShowsMachines}"
                 Command="{Binding ShowCommand}" CommandParameter="Machines"
-                ToolTip.Tip="The machines you have, and the plugins you have added. A song\u0027s instruments come off them." />
+                ToolTip.Tip="What is installed: the machines this song can take an instrument off." />
 
         <Button Content="MIXER" Classes="page"
                 Classes.active="{Binding ShowsMixer}"

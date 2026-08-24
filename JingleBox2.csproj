@@ -17,6 +17,19 @@
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <!-- What a machine is written against. The host knows machines only through this. -->
+    <ProjectReference Include="Machines.Abstractions\JingleBox2.Machines.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The contract compiles itself. Without this the host's own globs would swallow its
+         sources and its build folder, and compile both twice. -->
+    <Compile Remove="Machines.Abstractions\**" />
+    <EmbeddedResource Remove="Machines.Abstractions\**" />
+    <None Remove="Machines.Abstractions\**" />
+    <AvaloniaResource Remove="Machines.Abstractions\**" />
+    <AvaloniaXaml Remove="Machines.Abstractions\**" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />

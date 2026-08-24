@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 using System;
+using JingleBox2.Machines;
 
 namespace JingleBox2.Views;
 
@@ -38,7 +39,7 @@ public static class MachineTint
     /// Puts the machine's shades on the panel, or takes them off again when there is no
     /// machine to show.
     /// </summary>
-    public static void Apply(Control panel, Tracker.MachineTheme? machine)
+    public static void Apply(Control panel, Machines.MachineTheme? machine)
     {
         // Off first, so what shows through is the application's own and not the last machine's.
         Clear(panel);

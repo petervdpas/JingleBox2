@@ -45,6 +45,16 @@ public sealed class AppConfig
     // one by holding an arrow key down in the settings.
     public bool ExtendedPadMatrix { get; set; }
 
+    /// <summary>
+    /// Whether the machine editor is a page of its own along the top.
+    /// </summary>
+    /// <remarks>
+    /// Off unless you are building instruments. Somebody who fires jingles has no use for a
+    /// designer in the way, and somebody who is building one wants it a click away rather than
+    /// three pages inside the tracker.
+    /// </remarks>
+    public bool ShowMachineEditor { get; set; }
+
     // The bracket between rows and columns in SETTINGS. Kept, because a lock you have to close
     // again every time you open the page is a lock nobody uses twice.
     public bool LinkPadMatrix { get; set; }

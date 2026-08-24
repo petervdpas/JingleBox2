@@ -95,6 +95,12 @@
                            Instruments="{Binding $parent[TabItem].DataContext.Machines}" />
       </TabItem>
 
+      <!-- Where machines are built, as opposed to the rack in the tracker, which is what is
+           installed. Switched on under Looks, since somebody firing jingles has no use for it. -->
+      <TabItem Header="MACHINES" IsVisible="{Binding ShowMachineEditor}">
+        <views:MachineEditorView />
+      </TabItem>
+
       <TabItem Header="SETTINGS">
         <views:SettingsView />
       </TabItem>
