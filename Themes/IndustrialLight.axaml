@@ -1,0 +1,26 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The same workshop with the lights on: concrete instead of gunmetal, the orange kept. -->
+  <Color x:Key="Color.Background">#E9ECEE</Color>
+  <Color x:Key="Color.Surface">#F7F8F9</Color>
+
+  <Color x:Key="Color.Border">#BEC5CB</Color>
+  <Color x:Key="Color.BorderMuted">#D7DBDF</Color>
+
+  <Color x:Key="Color.Pad">#DBE0E4</Color>
+  <Color x:Key="Color.PadHover">#C9D0D6</Color>
+  <Color x:Key="Color.PadChecked">#FFA726</Color>
+
+  <Color x:Key="Color.TextPrimary">#14181B</Color>
+  <Color x:Key="Color.TextMuted">#4C565E</Color>
+
+  <!-- Burnt rather than bright: the dark one's #FF9800 on a pale surface is a smear. -->
+  <Color x:Key="Color.Accent">#B05400</Color>
+  <Color x:Key="Color.Danger">#A32F2F</Color>
+
+  <Color x:Key="SystemAccentColor">#B05400</Color>
+  <Color x:Key="SystemAccentColorLight1">#E58A2E</Color>
+  <Color x:Key="SystemAccentColorDark1">#7D3B00</Color>
+
+</ResourceDictionary>

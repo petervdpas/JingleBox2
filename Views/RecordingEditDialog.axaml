@@ -47,7 +47,12 @@
           <Button Grid.Column="5" Content="🔍+" Click="ZoomIn_Click" Width="40" />
           <Button Grid.Column="6" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
         </Grid>
-        <Canvas Height="200" Width="760" Background="#1F2937" Name="EditWaveformCanvas" />
+        <Border Background="{DynamicResource BgBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="4">
+          <Canvas Height="200" Width="760" Name="EditWaveformCanvas" />
+        </Border>
         <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
       </StackPanel>
     </Border>

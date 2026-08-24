@@ -21,10 +21,17 @@ public partial class RecordingEditDialog : Window
     private const double TrimGrabTolerance = 10;
     private const double ClickSlop = 4; // a press moving less than this is a click, not a drag
 
-    private static readonly IBrush WaveformBrush = new SolidColorBrush(Color.Parse("#3B82F6"));
-    private static readonly IBrush CentreLineBrush = new SolidColorBrush(Color.Parse("#94A3B8"));
-    private static readonly IBrush TrimHandleBrush = new SolidColorBrush(Color.Parse("#EF4444"));
-    private static readonly IBrush PlayheadBrush = new SolidColorBrush(Color.Parse("#F1F5F9"));
+    /// <summary>
+    /// What the picture is painted with, read fresh on every redraw.
+    /// </summary>
+    /// <remarks>
+    /// The same four parts the slice editor draws and in the same colours: the outline in the
+    /// accent, the centre line in the muted text colour, the playhead in the text colour. The
+    /// handles are the one exception, taking the theme's danger colour, because they are the
+    /// only thing here that has to be found rather than looked at, and in a theme built out of
+    /// one hue the playhead and the handle would otherwise be the same line twice.
+    /// </remarks>
+    private ThemePalette Palette => ThemePalette.From(this);
     private static readonly Cursor PanCursor = new(StandardCursorType.Hand);
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
 
@@ -129,11 +136,13 @@ public partial class RecordingEditDialog : Window
 
         _canvas.Cursor = _viewport.CanPan ? PanCursor : Cursor.Default;
 
+        var palette = Palette;
+
         _canvas.Children.Add(new Path
         {
             Data = WaveformGeometry.Build(waveform.PeakData, _viewport, width, height),
-            Fill = WaveformBrush,
-            Opacity = 0.6
+            Fill = palette.AccentBrush,
+            Opacity = 0.85
         });
 
         // On top of the fill: the outline is mirrored around this exact row, so behind it
@@ -142,7 +151,7 @@ public partial class RecordingEditDialog : Window
         {
             StartPoint = new Point(0, height / 2),
             EndPoint = new Point(width, height / 2),
-            Stroke = CentreLineBrush,
+            Stroke = palette.MutedBrush,
             StrokeThickness = 1,
             Opacity = 0.5
         });
@@ -157,7 +166,7 @@ public partial class RecordingEditDialog : Window
         // Kept as a field so playback can move it without rebuilding the outline.
         _playheadMarker = new Rectangle
         {
-            Fill = PlayheadBrush,
+            Fill = palette.TextBrush,
             Width = 1.5,
             Height = height,
             Opacity = 0.9,
@@ -178,7 +187,7 @@ public partial class RecordingEditDialog : Window
 
         var selection = new Rectangle
         {
-            Fill = WaveformBrush,
+            Fill = Palette.AccentBrush,
             Width = right - left,
             Height = height,
             Opacity = 0.2
@@ -199,7 +208,7 @@ public partial class RecordingEditDialog : Window
 
         var handle = new Rectangle
         {
-            Fill = TrimHandleBrush,
+            Fill = Palette.DangerBrush,
             Width = TrimHandleWidth,
             Height = height,
             Opacity = 0.9,

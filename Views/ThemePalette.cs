@@ -19,7 +19,8 @@ public readonly record struct ThemePalette(
     Color Accent,
     Color Border,
     Color Background,
-    Color Surface)
+    Color Surface,
+    Color Danger)
 {
     // Declared, not built from a variable, so the keys stay greppable.
     private const string TextKey = "Color.TextPrimary";
@@ -28,6 +29,7 @@ public readonly record struct ThemePalette(
     private const string BorderKey = "Color.Border";
     private const string BackgroundKey = "Color.Background";
     private const string SurfaceKey = "Color.Surface";
+    private const string DangerKey = "Color.Danger";
 
     public static readonly ThemePalette Fallback = new(
         Colors.Gainsboro,
@@ -35,7 +37,8 @@ public readonly record struct ThemePalette(
         Color.FromRgb(0xFB, 0x8C, 0x00),
         Color.FromRgb(0x3A, 0x40, 0x46),
         Colors.Black,
-        Color.FromRgb(0x1E, 0x1E, 0x1E));
+        Color.FromRgb(0x1E, 0x1E, 0x1E),
+        Color.FromRgb(0xB6, 0x4A, 0x4A));
 
     public static ThemePalette From(StyledElement element) => new(
         Resolve(element, TextKey, Fallback.Text),
@@ -43,7 +46,8 @@ public readonly record struct ThemePalette(
         Resolve(element, AccentKey, Fallback.Accent),
         Resolve(element, BorderKey, Fallback.Border),
         Resolve(element, BackgroundKey, Fallback.Background),
-        Resolve(element, SurfaceKey, Fallback.Surface));
+        Resolve(element, SurfaceKey, Fallback.Surface),
+        Resolve(element, DangerKey, Fallback.Danger));
 
     private static Color Resolve(StyledElement element, string key, Color fallback)
     {
@@ -65,6 +69,12 @@ public readonly record struct ThemePalette(
     public IBrush AccentBrush => new SolidColorBrush(Accent);
     public IBrush BorderBrush => new SolidColorBrush(Border);
     public IBrush SurfaceBrush => new SolidColorBrush(Surface);
+
+    /// <summary>
+    /// The theme's alarm colour, for the few drawn things that have to be found rather than
+    /// looked at: a trim handle, a clip light.
+    /// </summary>
+    public IBrush DangerBrush => new SolidColorBrush(Danger);
 
     public IBrush AccentTint(byte alpha) => new SolidColorBrush(Alpha(Accent, alpha));
 

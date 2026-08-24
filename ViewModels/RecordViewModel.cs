@@ -382,6 +382,74 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Brings WAV files in from the disc onto the shelf, as the 16-bit files everything here
+    /// works in.
+    /// </summary>
+    /// <remarks>
+    /// Copied in rather than pointed at, for the same reason the machines' own importer does
+    /// it: a take that lives in somebody's downloads folder is a song waiting to go silent the
+    /// next time that folder is tidied.
+    ///
+    /// Anything wider than sixteen bits, or written as floats, is rewritten on the way in.
+    /// That happens at the door and is said out loud in the status line, rather than quietly
+    /// the first time the file is trimmed.
+    ///
+    /// One file at a time, so what came back can be matched to what went in and the line at
+    /// the end can count honestly.
+    /// </remarks>
+    public void Import(IReadOnlyList<string> paths)
+    {
+        if (paths == null || paths.Count == 0) return;
+
+        var landed = new List<Recording>();
+        int converted = 0, held = 0;
+
+        foreach (string path in paths)
+        {
+            // A file picked out of the recordings folder itself is already on the shelf, and
+            // Take would hand it straight back and give the list a second row for one file.
+            if (Recordings.Any(r => string.Equals(r.FilePath, path, StringComparison.OrdinalIgnoreCase)))
+            {
+                held++;
+                continue;
+            }
+
+            bool converts = RecordingImport.Converts(path);
+
+            foreach (var recording in RecordingImport.Take(new[] { path }))
+            {
+                recording.DurationMs = ReadDurationMs(recording.FilePath);
+
+                Recordings.Add(recording);
+                landed.Add(recording);
+
+                if (converts) converted++;
+            }
+        }
+
+        Status = ImportReport(landed, converted, held, paths.Count - landed.Count - held);
+    }
+
+    /// <summary>What the import did, in one line, without a tally nobody asked for.</summary>
+    private static string ImportReport(IReadOnlyList<Recording> landed, int converted, int held, int failed)
+    {
+        if (landed.Count == 0)
+            return held > 0 ? "Already on the shelf; nothing imported." : "Nothing imported.";
+
+        string said = landed.Count == 1
+            ? $"Imported '{landed[0].Name}'"
+            : $"Imported {landed.Count} recordings";
+
+        if (converted > 0)
+            said += converted == landed.Count ? ", converted to 16-bit" : $", {converted} converted to 16-bit";
+
+        if (held > 0) said += $", {held} already on the shelf";
+        if (failed > 0) said += failed == 1 ? ", one could not be read" : $", {failed} could not be read";
+
+        return said + ".";
+    }
+
     /// <summary>Duration in ms, or 0 for a file we cannot read.</summary>
     private long ReadDurationMs(string filePath)
     {

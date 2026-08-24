@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Neon lit: the tube colours kept, the room turned up. Magenta has to be taken down a
+       long way before it can be read on white, so the loud version of it lives on a firing
+       pad instead. -->
+  <Color x:Key="Color.Background">#FDF7FF</Color>
+  <Color x:Key="Color.Surface">#FFFFFF</Color>
+
+  <Color x:Key="Color.Border">#E2C2EE</Color>
+  <Color x:Key="Color.BorderMuted">#F2E1F8</Color>
+
+  <Color x:Key="Color.Pad">#F7E4FA</Color>
+  <Color x:Key="Color.PadHover">#EFD0F6</Color>
+  <Color x:Key="Color.PadChecked">#00E5BF</Color>
+
+  <Color x:Key="Color.TextPrimary">#1A031F</Color>
+  <Color x:Key="Color.TextMuted">#6B3D74</Color>
+
+  <Color x:Key="Color.Accent">#B800B8</Color>
+  <Color x:Key="Color.Danger">#C4194A</Color>
+
+  <Color x:Key="SystemAccentColor">#B800B8</Color>
+  <Color x:Key="SystemAccentColorLight1">#E14FE1</Color>
+  <Color x:Key="SystemAccentColorDark1">#800080</Color>
+
+</ResourceDictionary>

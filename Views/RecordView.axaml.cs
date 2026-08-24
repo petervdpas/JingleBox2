@@ -1,20 +1,26 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using JingleBox2.Audio;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
+using System.Linq;
 
 namespace JingleBox2.Views;
 
 public partial class RecordView : UserControl
 {
     private static readonly WaveformViewport FullView = new();
-    private static readonly IBrush WaveformBrush = new SolidColorBrush(Color.Parse("#3B82F6"));
+
+    /// <summary>How much of the accent the outline is painted with, as the slice editor does.</summary>
+    private const double WaveformOpacity = 0.85;
 
     private Canvas? _recordWaveformCanvas;
 
@@ -126,6 +132,43 @@ public partial class RecordView : UserControl
     }
 
     /// <summary>
+    /// Brings WAV files in from the disc onto the shelf of takes.
+    /// </summary>
+    /// <remarks>
+    /// The picker belongs to the window, so it is opened here and only the answer goes to the
+    /// view model, which is the same arrangement the instrument designer's importer uses.
+    /// </remarks>
+    private async void Import_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not RecordViewModel vm) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage == null) return;
+
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import recordings",
+            AllowMultiple = true,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("WAV files")
+                {
+                    Patterns = RecordingImport.Kinds.Select(k => "*" + k).ToArray()
+                }
+            }
+        });
+
+        // Sorted the way the folder reads, since a set of takes is nearly always named so that
+        // it sorts, and that order is the order they will be wanted in.
+        vm.Import(picked
+            .Select(f => f.TryGetLocalPath())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!)
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList());
+    }
+
+    /// <summary>
     /// Opening the list is the moment it has to be right: a program only appears in the graph
     /// while it is playing, so what was true a minute ago usually is not.
     /// </summary>
@@ -156,12 +199,16 @@ public partial class RecordView : UserControl
 
         if (peakData.Length == 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
 
+        // Read at draw time rather than held in a field: a theme swap has to reach this, and
+        // the colour keys are only right once the new sheet is the one being asked.
+        var palette = ThemePalette.From(this);
+
         // Same outline builder the editor uses, at the default viewport: no zoom, no scroll.
         var waveformPath = new Path
         {
             Data = WaveformGeometry.Build(peakData, FullView, canvasWidth, canvasHeight),
-            Fill = WaveformBrush,
-            Opacity = 0.6
+            Fill = palette.AccentBrush,
+            Opacity = WaveformOpacity
         };
         _recordWaveformCanvas.Children.Add(waveformPath);
     }

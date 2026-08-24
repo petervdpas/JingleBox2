@@ -1,0 +1,26 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Lemonade. The lemon is on the pads, where black text sits on it and it can be as bright
+       as it likes; the accent is a lime taken down far enough to be read on paper. -->
+  <Color x:Key="Color.Background">#FBFCEF</Color>
+  <Color x:Key="Color.Surface">#FFFFFF</Color>
+
+  <Color x:Key="Color.Border">#D3DCAC</Color>
+  <Color x:Key="Color.BorderMuted">#EAEFD2</Color>
+
+  <Color x:Key="Color.Pad">#EDF2CE</Color>
+  <Color x:Key="Color.PadHover">#E0E8B6</Color>
+  <Color x:Key="Color.PadChecked">#F2E63C</Color>
+
+  <Color x:Key="Color.TextPrimary">#1C2110</Color>
+  <Color x:Key="Color.TextMuted">#55632C</Color>
+
+  <Color x:Key="Color.Accent">#4B7A0C</Color>
+  <Color x:Key="Color.Danger">#B23A24</Color>
+
+  <Color x:Key="SystemAccentColor">#4B7A0C</Color>
+  <Color x:Key="SystemAccentColorLight1">#7CB02E</Color>
+  <Color x:Key="SystemAccentColorDark1">#365806</Color>
+
+</ResourceDictionary>

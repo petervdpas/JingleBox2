@@ -55,7 +55,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// Whether the transport is worth showing on the page you are on.
     /// </summary>
     /// <remarks>
-    /// The three pages you play on: the pads on USE, a recording on RECORD, the song on
+    /// The three pages you play on: the pads on FIRE, a recording on RECORD, the song on
     /// TRACKER. PADS and SETTINGS are where things are set up rather than played, and a
     /// transport standing over either is four buttons about something you are not doing.
     ///
@@ -82,11 +82,11 @@ public sealed partial class MainViewModel : ObservableObject
     /// The pages, in the order the tab strip has them. Written out, because the context the bar
     /// shows depends on which one is open and a number read off a control is not a name.
     /// </summary>
-    private const int UseTab = 0;
+    private const int RecordTab = 0;
 
     private const int PadsTab = 1;
 
-    private const int RecordTab = 2;
+    private const int UseTab = 2;
 
     private const int TrackerTab = 3;
 
@@ -307,7 +307,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty] private OutputDevice? selectedOutputDevice;
 
-    // Selected profile name (bind to ComboBox + also show in USE)
+    // Selected profile name (bind to ComboBox + also show in FIRE)
     [ObservableProperty] private string selectedProfileName = "default";
 
     [ObservableProperty] private string newProfileName = "";

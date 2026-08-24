@@ -171,7 +171,7 @@ public static class PanelPreview
 
             // The application's own resources, so the panel is drawn in the colours it would
             // be inside it. Looking at it in different colours would prove nothing.
-            foreach (var sheet in new[] { UI.ThemeManager.BaseSheet, UI.ThemeManager.SheetFor("Industrial") })
+            foreach (var sheet in new[] { UI.ThemeManager.BaseSheet, UI.ThemeManager.SheetFor("Industrial Dark") })
             {
                 try
                 {

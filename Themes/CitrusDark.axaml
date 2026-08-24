@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Dark olive, so a yellow this bright has somewhere to sit. On a neutral grey it glares. -->
+  <Color x:Key="Color.Background">#0E1206</Color>
+  <Color x:Key="Color.Surface">#161C0A</Color>
+
+  <Color x:Key="Color.Border">#33441A</Color>
+  <Color x:Key="Color.BorderMuted">#253312</Color>
+
+  <Color x:Key="Color.Pad">#1F2B0E</Color>
+  <Color x:Key="Color.PadHover">#2C3D14</Color>
+
+  <Color x:Key="Color.PadChecked">#EDE13B</Color>
+
+  <Color x:Key="Color.TextPrimary">#F4FFE3</Color>
+  <Color x:Key="Color.TextMuted">#9FC46B</Color>
+
+  <!-- Lime for the accent and lemon for a firing pad, that way round on purpose: the accent is
+       what the level meter paints its safe stretch with, and a lemon one would read as a
+       warning all the way up to the warning. -->
+  <Color x:Key="Color.Accent">#A4E533</Color>
+  <Color x:Key="Color.Danger">#E8563F</Color>
+
+  <Color x:Key="SystemAccentColor">#A4E533</Color>
+  <Color x:Key="SystemAccentColorLight1">#C4F26A</Color>
+  <Color x:Key="SystemAccentColorDark1">#6FA31D</Color>
+
+</ResourceDictionary>

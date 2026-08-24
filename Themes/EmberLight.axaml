@@ -1,0 +1,27 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Sunrise rather than coals, the same two colours the other way up. -->
+  <Color x:Key="Color.Background">#FFF6F1</Color>
+  <Color x:Key="Color.Surface">#FFFFFF</Color>
+
+  <Color x:Key="Color.Border">#EFD0BF</Color>
+  <Color x:Key="Color.BorderMuted">#F8E4DA</Color>
+
+  <Color x:Key="Color.Pad">#FCE0CE</Color>
+  <Color x:Key="Color.PadHover">#F6CDB2</Color>
+  <Color x:Key="Color.PadChecked">#FFA45C</Color>
+
+  <Color x:Key="Color.TextPrimary">#2A120C</Color>
+  <Color x:Key="Color.TextMuted">#7A4635</Color>
+
+  <Color x:Key="Color.Accent">#C2183C</Color>
+
+  <!-- Burnt, so Delete is not written in the same red as every heading around it. -->
+  <Color x:Key="Color.Danger">#8F2F12</Color>
+
+  <Color x:Key="SystemAccentColor">#C2183C</Color>
+  <Color x:Key="SystemAccentColorLight1">#E4506E</Color>
+  <Color x:Key="SystemAccentColorDark1">#8C0F2A</Color>
+
+</ResourceDictionary>

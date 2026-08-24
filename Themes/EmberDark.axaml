@@ -1,0 +1,30 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Banked coals: almost black, with the red still in it. -->
+  <Color x:Key="Color.Background">#140807</Color>
+  <Color x:Key="Color.Surface">#1F0D0B</Color>
+
+  <Color x:Key="Color.Border">#4A1E16</Color>
+  <Color x:Key="Color.BorderMuted">#35150F</Color>
+
+  <Color x:Key="Color.Pad">#2B120D</Color>
+  <Color x:Key="Color.PadHover">#3C1912</Color>
+
+  <!-- Orange for the pad that is firing, because crimson under black text cannot be read. -->
+  <Color x:Key="Color.PadChecked">#FF8A1F</Color>
+
+  <Color x:Key="Color.TextPrimary">#FFEDE6</Color>
+  <Color x:Key="Color.TextMuted">#D9917E</Color>
+
+  <Color x:Key="Color.Accent">#F03A52</Color>
+
+  <!-- Salmon rather than another red. Delete is written in this, and in a theme built out of
+       reds it has to be the one that is not the accent. -->
+  <Color x:Key="Color.Danger">#FF8A7A</Color>
+
+  <Color x:Key="SystemAccentColor">#F03A52</Color>
+  <Color x:Key="SystemAccentColorLight1">#FF7285</Color>
+  <Color x:Key="SystemAccentColorDark1">#B31E36</Color>
+
+</ResourceDictionary>

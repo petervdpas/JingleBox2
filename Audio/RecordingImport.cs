@@ -38,6 +38,24 @@ public static class RecordingImport
     public static bool Playable(string path) =>
         Kinds.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>True when a file will be rewritten on the way in rather than copied.</summary>
+    /// <remarks>
+    /// For a panel that wants to say what it did with a file. The answer is the same one
+    /// <see cref="Convert"/> acts on, asked without doing anything.
+    /// </remarks>
+    public static bool Converts(string path)
+    {
+        try
+        {
+            return !WavFile.StoredAs(path).IsOurs;
+        }
+        catch (Exception)
+        {
+            // Not readable as a WAV: copied as it is, so nothing is converted.
+            return false;
+        }
+    }
+
     /// <summary>
     /// Copies each file in and hands back what they became. Files already ours are left where
     /// they are and reported as themselves, so importing twice does not make two.

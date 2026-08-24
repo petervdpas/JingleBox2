@@ -70,16 +70,16 @@
         </ItemsPanelTemplate>
       </TabControl.ItemsPanel>
 
-      <TabItem Header="USE">
-        <views:UseView />
+      <TabItem Header="RECORD">
+        <views:RecordView DataContext="{Binding Record}" />
       </TabItem>
 
       <TabItem Header="PADS">
         <views:PadsView />
       </TabItem>
 
-      <TabItem Header="RECORD">
-        <views:RecordView DataContext="{Binding Record}" />
+      <TabItem Header="FIRE">
+        <views:UseView />
       </TabItem>
 
       <!-- The instruments and the mixer are pages of the tracker rather than tabs beside it:

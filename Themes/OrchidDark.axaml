@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Plum rather than black, so the purple is the room and not just the trim. Neon is the
+       loud one on the same side of the wheel; this one is meant to be looked at all day. -->
+  <Color x:Key="Color.Background">#140A1E</Color>
+  <Color x:Key="Color.Surface">#1E1030</Color>
+
+  <Color x:Key="Color.Border">#3B2258</Color>
+  <Color x:Key="Color.BorderMuted">#2A1740</Color>
+
+  <Color x:Key="Color.Pad">#2A1642</Color>
+  <Color x:Key="Color.PadHover">#3A1F58</Color>
+
+  <!-- A firing pad is drawn with black text, so this one is the pink and the accent is the
+       purple: the two are told apart across the room rather than by leaning in. -->
+  <Color x:Key="Color.PadChecked">#FF7AC8</Color>
+
+  <Color x:Key="Color.TextPrimary">#F5EBFF</Color>
+  <Color x:Key="Color.TextMuted">#B292D0</Color>
+
+  <Color x:Key="Color.Accent">#C77DFF</Color>
+  <Color x:Key="Color.Danger">#FF5C7A</Color>
+
+  <Color x:Key="SystemAccentColor">#C77DFF</Color>
+  <Color x:Key="SystemAccentColorLight1">#DCA8FF</Color>
+  <Color x:Key="SystemAccentColorDark1">#8F3FD0</Color>
+
+</ResourceDictionary>
