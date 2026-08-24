@@ -83,8 +83,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   back off the pieces, and sharing a stretch of keyboard out among them
 - `SliceEditorViewModel` / `SliceEditor` (ViewModels/, Views/): One take, its picture and its
   boundaries, used by both machines that hold pieces
-- `Knob` / `Fader` / `NumberField` (Views/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field
-- `ThemePalette` (Views/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
+- `Knob` / `Fader` / `NumberField` (Machines.Ui/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field. They live in the machine UI assembly because a machine bought from somebody else is built out of the same controls the app's own machines are
+- `WaveformView` (Machines.Ui/): A recording's shape, with the window and the loop draggable on the picture
+- `MachinePanelView` (Machines.Ui/): A machine's face, built from what the machine says it looks like. Designing, every element can be picked and none can be turned; off, it is an ordinary panel
+- `MachinePartSample` (Machines.Ui/): One entry of the designer's library, drawn as the real control it adds
+- `ThemePalette` (Machines.Ui/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 

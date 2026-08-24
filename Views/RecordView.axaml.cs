@@ -6,13 +6,12 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
+using JingleBox2.Machines.Ui;
 using JingleBox2.Models;
 using JingleBox2.ViewModels;
-using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

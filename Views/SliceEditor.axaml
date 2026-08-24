@@ -19,7 +19,7 @@
 
     <!-- The whole take, with every boundary on it. Dragging one is truncating the two pieces
          it lies between, which is why there is no separate place to set a piece's start. -->
-    <views:WaveformView Name="Picture" Height="90"
+    <ui:WaveformView Name="Picture" Height="90"
                         Peaks="{Binding Peaks}"
                         SlicePoints="{Binding Points}"
                         SelectedSlice="{Binding SelectedSlice, Mode=TwoWay}"

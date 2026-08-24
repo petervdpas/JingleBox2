@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:machines="clr-namespace:JingleBox2.Machines;assembly=JingleBox2.Machines.Abstractions"
@@ -9,12 +10,42 @@
 
   <!-- Where a machine is built. The rack, in the tracker, is what is installed; this is the
        workshop, and what it holds is a project on disc: a folder with the machine in it, which
-       is the thing that gets installed and, one day, sold. -->
+       is the thing that gets installed and, one day, sold.
+
+       Four columns, left to right in the order the work goes: the parts you can put on a panel,
+       the panel itself with its parameters under it, and what the thing you have picked is set
+       to. -->
+  <UserControl.Styles>
+    <!-- A part in the library, which looks like a button and is not one. -->
+    <Style Selector="Border.part">
+      <Setter Property="Background" Value="{DynamicResource PadBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="4,4" />
+      <Setter Property="Margin" Value="0,0,6,6" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- Every example gets the same box whatever it is a picture of, so the library reads as a
+         row of parts rather than as a row of different sized pictures. -->
+    <Style Selector="Border.sample">
+      <Setter Property="Width" Value="86" />
+      <Setter Property="Height" Value="50" />
+      <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Border.part:pointerover">
+      <Setter Property="Background" Value="{DynamicResource PadHoverBrush}" />
+    </Style>
+  </UserControl.Styles>
+
   <DockPanel Classes="tabRoot">
 
     <Border DockPanel.Dock="Top" Classes="card">
       <StackPanel Classes="cardBody">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
                      Text="{Binding MachineEditor.Title}" />
 
@@ -23,13 +54,22 @@
                      TextTrimming="CharacterEllipsis"
                      Text="{Binding MachineEditor.Project.Folder}" />
 
-          <Button Grid.Column="2" Content="New" Command="{Binding MachineEditor.NewCommand}"
+          <CheckBox Grid.Column="2" Content="Design" VerticalAlignment="Center"
+                    IsChecked="{Binding MachineEditor.Designing}"
+                    IsVisible="{Binding MachineEditor.HasProject}"
+                    ToolTip.Tip="On, a click picks a control up to be worked on. Off, the panel is the panel and a click turns it." />
+
+          <Button Grid.Column="3" Content="New" Command="{Binding MachineEditor.NewCommand}"
                   ToolTip.Tip="A machine nobody has made yet. It gets its id now and keeps it forever." />
 
-          <Button Grid.Column="3" Content="Open..." Click="Open_Click" />
+          <Button Grid.Column="4" Content="Open..." Click="Open_Click" />
 
-          <Button Grid.Column="4" Content="Save" Click="Save_Click"
+          <Button Grid.Column="5" Content="Save" Click="Save_Click"
                   IsEnabled="{Binding MachineEditor.HasProject}" />
+
+          <Button Grid.Column="6" Content="Install" Click="Install_Click"
+                  IsEnabled="{Binding MachineEditor.CanInstall}"
+                  ToolTip.Tip="Copies the machine into the app's own machines folder, where it is read at startup. The project stays where you keep it." />
         </Grid>
 
         <TextBlock Classes="cardHint" Text="{Binding MachineEditor.Status}"
@@ -37,143 +77,293 @@
       </StackPanel>
     </Border>
 
-    <Grid Margin="0,12,0,0">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="700" MinWidth="360" />
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="*" MinWidth="240" />
-      </Grid.ColumnDefinitions>
-      <Grid.RowDefinitions>
-        <RowDefinition Height="250" MinHeight="120" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" MinHeight="120" />
-      </Grid.RowDefinitions>
+    <Grid Margin="0,12,0,0" IsVisible="{Binding MachineEditor.HasProject}"
+          ColumnDefinitions="230,Auto,*,Auto,330">
 
-    <!-- What a machine is, before anything about how it sounds: its name, its id, who made it,
-         and the colour it wears wherever it is shown. -->
-    <Border Grid.Row="0" Grid.Column="0" Classes="card"
-            IsVisible="{Binding MachineEditor.HasProject}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Classes="cardBody" MaxWidth="520" HorizontalAlignment="Left">
-        <TextBlock Classes="cardTitle" Text="The machine" />
+      <!-- What a panel can be made of. Drag one onto the panel to put it inside whatever it
+           lands on, or click it to put it inside whatever is picked. -->
+      <Grid Grid.Column="0" RowDefinitions="2*,Auto,*">
 
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-              ColumnSpacing="10" RowSpacing="8">
-          <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
-          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}" />
+        <Border Grid.Row="0" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Parts" />
 
-          <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="What it is:" />
-          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MachineEditor.Project.Summary}"
-                   PlaceholderText="One line, for somebody choosing between machines" />
+            <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                       Margin="0,6,0,0"
+                       Text="A grid, a group, a row, a column and a strip hold other things. The rest are what you see." />
 
-          <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Made by:" />
-          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}" />
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding MachineEditor.Library}" Margin="0,6,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
 
-          <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Version:" />
-          <TextBox Grid.Row="3" Grid.Column="1" Width="120" HorizontalAlignment="Left"
-                   Text="{Binding MachineEditor.Project.Version}" />
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="sys:String">
+                  <!-- Not a button. A button takes the press for itself, and a part has to feel
+                       the press to be picked up and dragged.
 
-          <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Id:" />
-          <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
-                     Text="{Binding MachineEditor.Project.Id}"
-                     ToolTip.Tip="What songs write down. Made once, and never changed." />
-        </Grid>
-      </StackPanel>
-      </ScrollViewer>
-    </Border>
+                       The example is the real control, small and dead to the pointer, because a
+                       panel is chosen by eye: knowing which of a knob and a fader you want is
+                       looking at them, not reading the two words. -->
+                  <Border Classes="part" Tag="{Binding}" PointerPressed="Part_PointerPressed"
+                          ToolTip.Tip="{Binding}">
+                    <StackPanel Spacing="1">
+                      <Border Classes="sample">
+                        <ui:MachinePartSample Kind="{Binding}" />
+                      </Border>
 
-    <!-- What the machine can be set to. This is most of what a machine is: the panel is these
-         drawn, the patch is these stored, and an instrument in a song is these with values in
-         them. -->
-    <!-- Drag to give the list more room, or the machine's own details more. -->
-    <GridSplitter Grid.Row="1" Grid.Column="0" Classes="handle rows" ResizeDirection="Rows"
-                  Height="10" HorizontalAlignment="Stretch"
-                  IsVisible="{Binding MachineEditor.HasProject}"
-                  ToolTip.Tip="Drag to share the room between what the machine is and what it can be set to." />
+                      <TextBlock Text="{Binding}" HorizontalAlignment="Center" FontSize="10" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
 
-    <Border Grid.Row="2" Grid.Column="0" Classes="card"
-            IsVisible="{Binding MachineEditor.HasProject}">
-      <DockPanel>
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center" Text="Parameters" />
+        <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
+                      Height="10" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Drag to share the room between the parts and the panel." />
 
-          <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center" Margin="8,0,0,0"
-                     Text="Key is what files use and never changes. Name is what the panel says." />
+        <!-- The same panel as a list. Some things are easier to hit here than on the panel:
+             an empty row, or a group with something on top of it. -->
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Panel" />
 
-          <Button Grid.Column="2" Content="+ Parameter"
-                  Command="{Binding MachineEditor.AddParameterCommand}" />
-        </Grid>
+            <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6"
+                  Margin="0,8,0,0">
+              <Button Grid.Column="0" Content="Remove" Classes="danger"
+                      HorizontalAlignment="Stretch"
+                      IsEnabled="{Binding MachineEditor.HasSelection}"
+                      Command="{Binding MachineEditor.RemoveElementCommand}" />
 
-        <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}" Margin="0,10,0,0">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:MachineParameterViewModel">
-              <Grid ColumnDefinitions="120,160,70,80,80,80,80,Auto" ColumnSpacing="6" Margin="0,0,0,6">
-                <TextBox Grid.Column="0" Text="{Binding Key}" ToolTip.Tip="What this is stored under, forever." />
-                <TextBox Grid.Column="1" Text="{Binding Name}" ToolTip.Tip="What the panel calls it." />
-                <TextBox Grid.Column="2" Text="{Binding Unit}" Watermark="unit" />
-                <TextBox Grid.Column="3" Text="{Binding Min}" ToolTip.Tip="Lowest it goes." />
-                <TextBox Grid.Column="4" Text="{Binding Max}" ToolTip.Tip="Highest it goes." />
-                <TextBox Grid.Column="5" Text="{Binding Default}" ToolTip.Tip="Where it sits before anybody touches it." />
-                <TextBox Grid.Column="6" Text="{Binding Step}" ToolTip.Tip="How far one notch moves it." />
+              <Button Grid.Column="1" Content="↑"
+                      IsEnabled="{Binding MachineEditor.HasSelection}"
+                      Command="{Binding MachineEditor.MoveUpCommand}"
+                      ToolTip.Tip="Earlier among the things beside it, which is further left or further up." />
 
-                <Button Grid.Column="7" Content="✕" Classes="danger"
-                        Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).MachineEditor.RemoveParameterCommand}"
-                        CommandParameter="{Binding}"
-                        ToolTip.Tip="Takes it off the machine." />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        </ScrollViewer>
-      </DockPanel>
-    </Border>
+              <Button Grid.Column="2" Content="↓"
+                      IsEnabled="{Binding MachineEditor.HasSelection}"
+                      Command="{Binding MachineEditor.MoveDownCommand}" />
+            </Grid>
 
-    <!-- The machine, drawn. Every parameter is a knob, in the machine's own colours, out of
-         the same controls a panel in the app is built from. Turning one here changes nothing
-         but the knob: a value belongs to an instrument in a song, not to the machine. -->
-    <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Classes="handle"
-                  ResizeDirection="Columns" Width="10"
-                  IsVisible="{Binding MachineEditor.HasProject}"
-                  ToolTip.Tip="Drag to give the panel more room, or the fields beside it." />
+            <!-- A part can be dropped on a line here as well as on the panel. Some containers
+                 have nothing in them yet and so nothing on screen to aim at. -->
+            <TreeView x:Name="PanelTree"
+                      ItemsSource="{Binding MachineEditor.Elements}"
+                      SelectedItem="{Binding MachineEditor.SelectedElement, Mode=TwoWay}"
+                      DragDrop.AllowDrop="True"
+                      DragDrop.DragOver="Tree_DragOver"
+                      DragDrop.Drop="Tree_Drop"
+                      Margin="0,8,0,0">
+              <TreeView.ItemTemplate>
+                <TreeDataTemplate x:DataType="vm:MachineElementViewModel" ItemsSource="{Binding Children}">
+                  <TextBlock Text="{Binding Display}" />
+                </TreeDataTemplate>
+              </TreeView.ItemTemplate>
+            </TreeView>
+          </DockPanel>
+        </Border>
+      </Grid>
 
-    <Border x:Name="PanelPreview" Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Classes="card"
-            IsVisible="{Binding MachineEditor.HasProject}">
-      <StackPanel Classes="cardBody">
-        <TextBlock Classes="cardTitle" Text="{Binding MachineEditor.Title}" />
+      <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns" Width="10"
+                    ToolTip.Tip="Drag to give the parts and the panel list more room." />
 
-        <TextBlock Classes="cardHint"
-                   IsVisible="{Binding !MachineEditor.Parameters.Count}"
-                   Text="Nothing to show yet. Add a parameter and it appears here as a knob." />
+      <Grid Grid.Column="2" RowDefinitions="*,Auto,220">
 
-        <ui:PanelGroup Caption="Panel" IsVisible="{Binding MachineEditor.Parameters.Count}"
-                       HorizontalAlignment="Left">
-          <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel Orientation="Horizontal" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
+        <!-- The machine, drawn from its own description, in its own colours. Turning a knob here
+             changes nothing but the knob: a value belongs to an instrument in a song, not to the
+             machine. -->
+        <Border x:Name="PanelPreview" Grid.Row="0" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="{Binding MachineEditor.Title}" />
 
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:MachineParameterViewModel">
-                <ui:Knob Label="{Binding Name}"
-                         Unit="{Binding Unit}"
-                         Minimum="{Binding Min}"
-                         Maximum="{Binding Max}"
-                         DefaultValue="{Binding Default}"
-                         SmallStep="{Binding Step}"
-                         LargeStep="{Binding Step}"
-                         Value="{Binding Value, Mode=TwoWay}"
-                         LabelAbove="True"
-                         DialSize="44"
-                         Margin="0,0,14,10" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ui:PanelGroup>
-      </StackPanel>
-    </Border>
+            <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                       Margin="0,8,0,0"
+                       Text="Drop a part onto whatever should hold it. Click a part of the panel to work on it. A grid puts what it holds where the row and column say." />
+
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" Margin="0,8,0,0">
+              <!-- Stretched, not sized to what is on it. What is drawn stays at the top left
+                   either way, and a panel only as big as its knobs would leave a new machine
+                   with nowhere to drop the first one. -->
+              <ui:MachinePanelView x:Name="PanelCanvas"
+                                   DragDrop.DragOver="Canvas_DragOver"
+                                   DragDrop.Drop="Canvas_Drop"
+                                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                   MinHeight="200"
+                                   DragDrop.AllowDrop="True"
+                                   Panel="{Binding MachineEditor.Shown}"
+                                   Parameters="{Binding MachineEditor.Shape}"
+                                   Values="{Binding MachineEditor.Values}"
+                                   Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
+                                   Designing="{Binding MachineEditor.Designing}" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
+                      Height="10" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Drag to share the room between the panel and its parameters." />
+
+        <!-- What the machine can be set to. This is most of what a machine is: the panel is these
+             drawn, the patch is these stored, and an instrument in a song is these with values in
+             them. -->
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+              <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center" Text="Parameters" />
+
+              <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center" Margin="8,0,0,0"
+                         TextTrimming="CharacterEllipsis"
+                         Text="Key is what files use and never changes. Name is what the panel says." />
+
+              <Button Grid.Column="2" Content="+ Parameter"
+                      Command="{Binding MachineEditor.AddParameterCommand}" />
+            </Grid>
+
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}" Margin="0,10,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MachineParameterViewModel">
+                    <Grid ColumnDefinitions="120,160,70,80,80,80,80,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+                      <TextBox Grid.Column="0" Text="{Binding Key}" ToolTip.Tip="What this is stored under, forever." />
+                      <TextBox Grid.Column="1" Text="{Binding Name}" ToolTip.Tip="What the panel calls it." />
+                      <TextBox Grid.Column="2" Text="{Binding Unit}" PlaceholderText="unit" />
+                      <TextBox Grid.Column="3" Text="{Binding Min}" ToolTip.Tip="Lowest it goes." />
+                      <TextBox Grid.Column="4" Text="{Binding Max}" ToolTip.Tip="Highest it goes." />
+                      <TextBox Grid.Column="5" Text="{Binding Default}" ToolTip.Tip="Where it sits before anybody touches it." />
+                      <TextBox Grid.Column="6" Text="{Binding Step}" ToolTip.Tip="How far one notch moves it." />
+
+                      <Button Grid.Column="7" Content="✕" Classes="danger"
+                              Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).MachineEditor.RemoveParameterCommand}"
+                              CommandParameter="{Binding}"
+                              ToolTip.Tip="Takes it off the machine." />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <GridSplitter Grid.Column="3" Classes="handle" ResizeDirection="Columns" Width="10"
+                    ToolTip.Tip="Drag to give the panel more room, or the fields beside it." />
+
+      <Grid Grid.Column="4" RowDefinitions="Auto,Auto,*">
+
+        <!-- What a machine is, before anything about how it sounds: its name, its id, who made
+             it, and the colour it wears wherever it is shown. -->
+        <Border Grid.Row="0" Classes="card">
+          <StackPanel Classes="cardBody">
+            <TextBlock Classes="cardTitle" Text="The machine" />
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  ColumnSpacing="10" RowSpacing="8">
+              <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}" />
+
+              <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="What it is:" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MachineEditor.Project.Summary}"
+                       PlaceholderText="One line, for somebody choosing between machines" />
+
+              <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Made by:" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}" />
+
+              <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Version:" />
+              <TextBox Grid.Row="3" Grid.Column="1" Width="120" HorizontalAlignment="Left"
+                       Text="{Binding MachineEditor.Project.Version}" />
+
+              <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Id:" />
+              <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding MachineEditor.Project.Id}"
+                         ToolTip.Tip="What songs write down. Made once, and never changed." />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
+                      Height="10" HorizontalAlignment="Stretch"
+                      ToolTip.Tip="Drag to share the room between what the machine is and what you are working on." />
+
+        <!-- The one thing that is picked, and everything about it. A control is a kind, the
+             parameter it turns, and whatever else that kind understands. -->
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="What is picked" />
+
+            <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
+                       IsVisible="{Binding !MachineEditor.HasSelection}"
+                       Text="Nothing yet. Click something on the panel, or a line in the list." />
+
+            <ContentControl Content="{Binding MachineEditor.SelectedElement}" Margin="0,8,0,0">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:MachineElementViewModel">
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="8">
+
+                      <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                            ColumnSpacing="10" RowSpacing="8">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Is a:" />
+                        <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                                  ItemsSource="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.Library}"
+                                  SelectedItem="{Binding Kind}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Turns:" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Parameter}"
+                                 PlaceholderText="a parameter's key"
+                                 ToolTip.Tip="Which parameter this control is on. Empty for anything that turns nothing." />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Pick one:" />
+                        <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                                  PlaceholderText="from the parameters..."
+                                  SelectionChanged="Parameter_SelectionChanged"
+                                  ItemsSource="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.ParameterKeys}" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Says:" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Label}"
+                                 PlaceholderText="what is written on it"
+                                 ToolTip.Tip="Empty leaves it to the parameter's own name." />
+                      </Grid>
+
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center" Text="Set to" />
+
+                        <Button Grid.Column="2" Content="+ Property" Command="{Binding AddPropertyCommand}" />
+                      </Grid>
+
+                      <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                                 Text="A grid takes rows and columns, and anything in one takes row, column and span. A group takes a caption, a spacer takes width and height." />
+
+                      <ItemsControl ItemsSource="{Binding Properties}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MachineElementPropertyViewModel">
+                            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+                              <TextBox Grid.Column="0" Text="{Binding Key}" />
+                              <TextBox Grid.Column="1" Text="{Binding Value}" />
+
+                              <Button Grid.Column="2" Content="✕" Classes="danger"
+                                      Command="{Binding $parent[ItemsControl].((vm:MachineElementViewModel)DataContext).RemovePropertyCommand}"
+                                      CommandParameter="{Binding}" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+
+                    </StackPanel>
+                  </ScrollViewer>
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+          </DockPanel>
+        </Border>
+      </Grid>
 
     </Grid>
 

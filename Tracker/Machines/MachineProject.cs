@@ -85,6 +85,16 @@ public sealed class MachineProject
     /// </remarks>
     public List<MachineParameter> Parameters { get; set; } = new();
 
+    /// <summary>
+    /// How those parameters are arranged on the machine's face.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside the parameters and not instead of them: the list is what the machine can be
+    /// set to, this is only how it is shown. A project that has not been arranged yet has an
+    /// empty panel, which is the state a machine is in the moment its parameters are made.
+    /// </remarks>
+    public MachinePanel Panel { get; set; } = new();
+
     [JsonIgnore]
     public bool IsSaved => Folder.Length > 0;
 

@@ -1,3 +1,4 @@
+using JingleBox2.Machines.Ui;
 using System;
 
 namespace JingleBox2.Waveform;

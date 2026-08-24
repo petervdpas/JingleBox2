@@ -702,7 +702,7 @@
 
               <ui:PanelGroup Caption="Sample" IsVisible="{Binding Editor.IsSample}" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
-  <views:WaveformView Width="340" Height="90"
+  <ui:WaveformView Width="340" Height="90"
                                       Peaks="{Binding Editor.Peaks}"
                                       Placeholder="{Binding Editor.SampleText}"
                                       ShowMarkers="True"

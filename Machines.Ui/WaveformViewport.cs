@@ -1,6 +1,6 @@
 using System;
 
-namespace JingleBox2.Waveform;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// The window of a recording currently on screen: how far in it starts and how much of the

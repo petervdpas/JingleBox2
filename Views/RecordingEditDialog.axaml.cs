@@ -14,7 +14,8 @@ namespace JingleBox2.Views;
 
 /// <summary>
 /// Wiring only: pointer and button events in, redraws out. The viewport maths, the trim
-/// rules, the outline building and the playback lifecycle all live in JingleBox2.Waveform.
+/// rules and the playback lifecycle live in JingleBox2.Waveform, and the outline building in
+/// JingleBox2.Machines.Ui, where the panel's own picture of a recording needs it too.
 /// </summary>
 public partial class RecordingEditDialog : Window
 {

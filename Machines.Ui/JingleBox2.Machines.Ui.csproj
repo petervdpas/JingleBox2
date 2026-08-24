@@ -4,12 +4,15 @@
     The parts a machine's front panel is made of.
 
     The second half of the contract: the first says what a machine is, this says what it is
-    drawn with. A knob, a fader, a switch, a group frame, a keyboard, and the palette they all
-    read their colours from. A machine written by somebody else builds its panel out of these,
-    which is why they live here rather than in the application.
+    drawn with. A knob, a fader, a switch, a group frame, a keyboard, a recording's picture, and
+    the palette they all read their colours from. A machine written by somebody else builds its
+    panel out of these, which is why they live here rather than in the application.
 
     Avalonia, and nothing else. No BASS, no view models, no tracker: a panel is a picture of a
-    machine's settings and has no business knowing what a song is.
+    machine's settings and has no business knowing what a song is. That is where the line was
+    drawn through the waveform: the viewport maths and the outline building came here because a
+    panel has to draw a recording, and the player that sounds one stayed behind because it is
+    BASS.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

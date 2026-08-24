@@ -2,14 +2,12 @@ using Avalonia;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.Waveform;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A recording's shape, with the part an instrument plays marked on it. The window and the

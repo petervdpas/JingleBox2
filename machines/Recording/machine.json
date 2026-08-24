@@ -1,5 +1,4 @@
 {
-  "Folder": "machines/Recording",
   "Id": "machine.recording",
   "Name": "Recording",
   "Summary": "One of your recordings, pitched by resampling.",
@@ -16,5 +15,370 @@
     "RowOver": 0.3,
     "RowPicked": 0.58
   },
-  "IsSaved": true
+  "Parameters": [
+    {
+      "Key": "base_note",
+      "Name": "Base note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 119,
+      "Default": 48,
+      "Step": 1
+    },
+    {
+      "Key": "reverse",
+      "Name": "Direction",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "one_voice",
+      "Name": "Voices",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "attack",
+      "Name": "Attack",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 2000,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "decay",
+      "Name": "Decay",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5000,
+      "Default": 0,
+      "Step": 5
+    },
+    {
+      "Key": "sustain",
+      "Name": "Sustain",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    },
+    {
+      "Key": "release",
+      "Name": "Release",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5000,
+      "Default": 20,
+      "Step": 5
+    },
+    {
+      "Key": "tune",
+      "Name": "Tune",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "fine",
+      "Name": "Fine",
+      "Unit": "c",
+      "Min": -100,
+      "Max": 100,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "vibrato_rate",
+      "Name": "Vib rate",
+      "Unit": "Hz",
+      "Min": 0,
+      "Max": 20,
+      "Default": 0,
+      "Step": 0.1
+    },
+    {
+      "Key": "vibrato_depth",
+      "Name": "Vib depth",
+      "Unit": "c",
+      "Min": 0,
+      "Max": 200,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "pitch_env",
+      "Name": "Pitch env",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "pitch_time",
+      "Name": "Pitch time",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 2000,
+      "Default": 60,
+      "Step": 5
+    },
+    {
+      "Key": "tremolo_rate",
+      "Name": "Trem rate",
+      "Unit": "Hz",
+      "Min": 0,
+      "Max": 20,
+      "Default": 0,
+      "Step": 0.1
+    },
+    {
+      "Key": "tremolo_depth",
+      "Name": "Trem depth",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "cutoff",
+      "Name": "Cutoff",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    },
+    {
+      "Key": "resonance",
+      "Name": "Resonance",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.98,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": " dB",
+      "Min": -60,
+      "Max": 6,
+      "Default": 0,
+      "Step": 0.5
+    },
+    {
+      "Key": "drive",
+      "Name": "Drive",
+      "Unit": "",
+      "Min": 1,
+      "Max": 10,
+      "Default": 1,
+      "Step": 0.1
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Row",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {},
+      "Children": [
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Sample"
+          },
+          "Children": [
+            {
+              "Element": "Number",
+              "Parameter": "base_note",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Switch",
+              "Parameter": "reverse",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Switch",
+              "Parameter": "one_voice",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Envelope"
+          },
+          "Children": [
+            {
+              "Element": "Fader",
+              "Parameter": "attack",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Fader",
+              "Parameter": "decay",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Fader",
+              "Parameter": "sustain",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Fader",
+              "Parameter": "release",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Pitch and modulation"
+          },
+          "Children": [
+            {
+              "Element": "Knob",
+              "Parameter": "tune",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "fine",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "vibrato_rate",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "vibrato_depth",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "pitch_env",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "pitch_time",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "tremolo_rate",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "tremolo_depth",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Filter"
+          },
+          "Children": [
+            {
+              "Element": "Knob",
+              "Parameter": "cutoff",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "resonance",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Output"
+          },
+          "Children": [
+            {
+              "Element": "Fader",
+              "Parameter": "level",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "drive",
+              "Label": "",
+              "Properties": {},
+              "Children": []
+            }
+          ]
+        }
+      ]
+    }
+  }
 }

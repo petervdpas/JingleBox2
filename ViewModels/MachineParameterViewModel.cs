@@ -69,5 +69,20 @@ public sealed partial class MachineParameterViewModel : ObservableObject
     }
 
     /// <summary>Where the preview's knob is standing. Not the machine's, and not saved.</summary>
-    [ObservableProperty] private double value;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(On))]
+    private double value;
+
+    /// <summary>
+    /// The same value, for a control that has two positions rather than a range.
+    /// </summary>
+    /// <remarks>
+    /// A switch is a parameter like any other: it is stored as a number so that a machine's
+    /// settings are one kind of thing, and anything above the middle of its range counts as on.
+    /// </remarks>
+    public bool On
+    {
+        get => Value > (Min + Max) / 2;
+        set => Value = value ? Max : Min;
+    }
 }

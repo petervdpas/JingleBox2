@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Media;
 using System;
 
-namespace JingleBox2.Waveform;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// Turns peak data into the mirrored filled outline both the record tab and the editor draw.
