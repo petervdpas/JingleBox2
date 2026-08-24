@@ -51,6 +51,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         Recordings = recordings ?? new ObservableCollection<Recording>();
 
+        // In front of every picker that offers a take: with a shelf of a hundred, the useful
+        // question is which of the beds, not which of the hundred.
+        Takes = new TakeFilter(Recordings);
+
         if (instrument.IsPlugin)
         {
             OpenPlugin(audition);
@@ -90,6 +94,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject
                 at => instrument.Zones.Zones.ElementAtOrDefault(at)?.Shape,
                 changed);
 
+            // Picking another zone is not a change to the machine, so it does not come through
+            // the change callback, and without this the picture would stay on the zone before.
+            Zones.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) FollowSound();
+            };
+
             FollowSound();
         }
 
@@ -109,6 +120,12 @@ public sealed class InstrumentEditorViewModel : ObservableObject
                 },
                 at => instrument.Kit.Pads.ElementAtOrDefault(at)?.Shape,
                 changed);
+
+            // The same for the pad in hand.
+            Kit.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(DrumKitViewModel.Selected)) FollowSound();
+            };
 
             FollowSound();
         }
@@ -148,6 +165,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// without anything being refreshed.
     /// </remarks>
     public ObservableCollection<Recording> Recordings { get; }
+
+    /// <summary>The same shelf, narrowed to a category. What the take pickers actually show.</summary>
+    public TakeFilter Takes { get; }
 
     /// <summary>
     /// Brings recordings in from the disc and puts them on the shelf of takes.
@@ -209,22 +229,41 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     };
 
     /// <summary>
-    /// Points the chop editor at the recording the machine is holding, if it is holding one.
+    /// Points the chop editor at the recording the machine is holding, or failing that at the
+    /// one on the piece in hand.
     /// </summary>
     /// <remarks>
     /// One recording shared by every piece is what a chopped machine is, and it is also what a
     /// machine with a single sample on it looks like before it has been chopped. Which is why
     /// there is no second place to load a take: chopping divides what is already there.
     ///
-    /// A real multisample, several different recordings across the keyboard, has no one
-    /// recording to show, so the editor puts itself away rather than picking one of them.
+    /// When the pieces do not agree on one recording there is nothing whole to read cuts back
+    /// off, but there is still something to chop: whatever is on the zone or pad you have
+    /// picked. Showing that is the difference between a machine that says "put a recording on
+    /// me" at somebody who has just put a recording on it, and one that shows them the
+    /// recording they put there. The cuts stay hidden until the machine really is one file cut
+    /// up, since a map of different recordings has no cuts to read.
     /// </remarks>
     private void FollowSound()
     {
         if (Slices == null) return;
 
-        if (Zones != null) Slices.Follow(Zones.Map.SlicedFile, Points(Zones.Map.IsSliced, Zones.Map.SlicePoints()));
-        else if (Kit != null) Slices.Follow(Kit.Kit.SlicedFile, Points(Kit.Kit.IsSliced, Kit.Kit.SlicePoints()));
+        if (Zones != null)
+        {
+            string whole = Zones.Map.SlicedFile;
+
+            Slices.Follow(
+                whole.Length > 0 ? whole : Zones.Selected?.Zone.FilePath ?? "",
+                Points(Zones.Map.IsSliced, Zones.Map.SlicePoints()));
+        }
+        else if (Kit != null)
+        {
+            string whole = Kit.Kit.SlicedFile;
+
+            Slices.Follow(
+                whole.Length > 0 ? whole : Kit.Selected?.Pad.FilePath ?? "",
+                Points(Kit.Kit.IsSliced, Kit.Kit.SlicePoints()));
+        }
     }
 
     private static IReadOnlyList<double>? Points(bool sliced, IReadOnlyList<double> points) =>

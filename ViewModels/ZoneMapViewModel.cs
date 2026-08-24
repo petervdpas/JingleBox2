@@ -308,9 +308,15 @@ public sealed partial class SampleZoneViewModel : ObservableObject
     /// <summary>Puts a recording on this zone, or takes one off when given nothing.</summary>
     public void Take(string? path)
     {
+        // What it was called after, so a name nobody chose can be told from one somebody did.
+        string was = Path.GetFileNameWithoutExtension(Zone.FilePath);
+
         Zone.FilePath = path ?? "";
 
-        if (Zone.Name.Length == 0 && Zone.HasSound)
+        // The name follows the take unless the zone has a name of its own. A zone still called
+        // after the recording it used to hold is a zone nobody has named, and leaving that name
+        // on it after another take lands makes the map say the old recording is still there.
+        if (Zone.HasSound && Slices.Auto(Zone.Name, was))
             Zone.Name = Path.GetFileNameWithoutExtension(Zone.FilePath);
 
         Say(nameof(FileText), nameof(HasSound), nameof(Title), nameof(Name));

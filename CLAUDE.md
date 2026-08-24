@@ -94,7 +94,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - Minimum: 4 pads total (e.g., 2x2, 1x4, 4x1)
   - Maximum: 16 pads total (e.g., 4x4, 2x8, 8x2)
   - Default: 4 rows x 2 columns = 8 pads (backward compatible)
-- Two source types per pad: local files (WAV/MP3/OGG/FLAC) or HTTP streams
+- Two source types per pad: a recording off the shelf (picked from RECORD's takes, so the
+  app owns every file a pad depends on) or an HTTP stream. A pad still plays a path
+  underneath; what changed is where the path can come from
 - Tracker instruments come in two kinds: a recording pitched by resampling, or a synth patch
   generated at playback time (the parameter set mirrors MappoGraph's chiptune synth, plus a
   drive control). The

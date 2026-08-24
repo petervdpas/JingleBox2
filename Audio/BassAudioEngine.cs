@@ -95,7 +95,7 @@ public sealed class BassAudioEngine : IAudioEngine
         lock (_lock)
         {
             if (!InRange(padIndex)) return 0;
-            if (_padKinds[padIndex] == PadSourceKind.StreamUrl) return 0;
+            if (_padKinds[padIndex] == PadSourceKind.Stream) return 0;
             var handle = _padStreams[padIndex];
             if (handle == 0) return 0;
             var len = Bass.ChannelGetLength(handle);
@@ -280,7 +280,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
             EnsureInitLocked();
 
-            _padKinds[padIndex] = PadSourceKind.File;
+            _padKinds[padIndex] = PadSourceKind.Recording;
 
             if (!string.Equals(_padSources[padIndex], filePath, StringComparison.OrdinalIgnoreCase))
             {
@@ -354,7 +354,7 @@ public sealed class BassAudioEngine : IAudioEngine
                 !uri.Host.Contains("audiocdn.mixcloud.com", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Mixcloud page links are not direct audio streams.");
 
-            _padKinds[padIndex] = PadSourceKind.StreamUrl;
+            _padKinds[padIndex] = PadSourceKind.Stream;
 
             if (!string.Equals(_padSources[padIndex], url, StringComparison.OrdinalIgnoreCase))
             {
@@ -418,7 +418,7 @@ public sealed class BassAudioEngine : IAudioEngine
             var handle = _padStreams[padIndex];
             if (handle == 0) return;
 
-            var isStream = _padKinds[padIndex] == PadSourceKind.StreamUrl;
+            var isStream = _padKinds[padIndex] == PadSourceKind.Stream;
 
             var fadeOut = _padFadeOut[padIndex];
             if (fadeOut > 0 && Bass.ChannelIsActive(handle) == PlaybackState.Playing)

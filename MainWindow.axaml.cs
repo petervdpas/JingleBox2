@@ -76,25 +76,7 @@ public partial class MainWindow : Window
 
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
 
-        async Task<string?> PickFileAsync()
-        {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                AllowMultiple = false,
-                Title = "Select sample",
-                FileTypeFilter =
-                [
-                    new FilePickerFileType("Audio")
-                    {
-                        Patterns = ["*.wav", "*.mp3", "*.ogg", "*.flac"]
-                    }
-                ]
-            });
-
-            return files.Count == 1 ? files[0].Path.LocalPath : null;
-        }
-
-        var vm = new MainViewModel(_audio, PickFileAsync, _store, cfg, _midi, _recording, _waveform, _routing);
+        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing);
         DataContext = vm;
 
         var version = Assembly.GetExecutingAssembly()

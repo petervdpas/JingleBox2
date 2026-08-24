@@ -28,7 +28,7 @@ public class CategoryField : AutoCompleteBox
         // than remembered.
         MinimumPrefixLength = 0;
 
-        PlaceholderText = "Unfiled";
+        PlaceholderText = "Uncategorized";
 
         SelectionChanged += Picked;
         LostFocus += Left;

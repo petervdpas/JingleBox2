@@ -68,6 +68,11 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         _saveTimer = new DispatcherTimer { Interval = SaveDelay };
         _saveTimer.Tick += (_, _) => Flush();
 
+        // The chop editor's cursor runs on the same clock, which is running exactly while
+        // something is sounding. Subscribed once: this used to be done on every change of
+        // machine, so after ten switches the cursor was being moved ten times a tick.
+        Sounding.Ticked += MovePlayhead;
+
         Refresh();
     }
 
@@ -331,6 +336,15 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         // Switching away is a good moment to write: never leave an edit only in memory.
         Flush();
 
+        // What the machine being left was sounding stops with it. A note played on one panel
+        // going on under the next one's picture, with that picture's cursor running to it, is
+        // one machine wearing another's face.
+        if (Editor != null) _audition.Silence(Editor.Instrument);
+
+        // And nothing is lit or running any more, so the new panel starts dark and still
+        // rather than inheriting the last one's key and cursor.
+        Sounding.Silence();
+
         // The instrument being left may have had a plugin drawing its own interface. That
         // window goes with it rather than being left behind on a page showing somebody else.
         Editor?.ClosePlugin();
@@ -346,14 +360,52 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Presets = value == null
             ? null
-            : new InstrumentPresets(value.Instrument, Reloaded, _recordings);
+            : new InstrumentPresets(value.Instrument, Reloaded, Editor?.Takes.Shown);
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
 
-        // And the chop editor's cursor runs on the same clock, which is running exactly while
-        // something is sounding.
-        Sounding.Ticked += MovePlayhead;
+        // The keyboard shows the keys of the piece in hand, so playing it is playing that
+        // piece rather than whatever happens to live under the octave you were left on.
+        Reveal();
+        Follow(Editor);
+    }
+
+    /// <summary>
+    /// Keeps the keyboard on the piece that is picked.
+    /// </summary>
+    /// <remarks>
+    /// A zone answers to its own stretch of keys and a pad to one key. Picking one and then
+    /// pressing a key that belongs to another piece is the panel disagreeing with itself, so
+    /// the octave moves to where the piece answers.
+    /// </remarks>
+    private void Follow(InstrumentEditorViewModel? editor)
+    {
+        if (editor?.Zones != null)
+        {
+            editor.Zones.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) Reveal();
+            };
+        }
+
+        if (editor?.Kit != null)
+        {
+            editor.Kit.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(DrumKitViewModel.Selected)) Reveal();
+            };
+        }
+    }
+
+    /// <summary>Moves the keyboard to where the piece in hand answers, if there is one.</summary>
+    private void Reveal()
+    {
+        int? key = Editor?.Zones?.Selected?.Zone.Root ?? Editor?.Kit?.Selected?.Pad.Semitone;
+
+        if (key is not { } semitone) return;
+
+        Octave = PanelKeyboard.Reveal(new Note(semitone), Octave);
     }
 
     /// <summary>A preset has landed on the instrument being edited: reread it and write it.</summary>

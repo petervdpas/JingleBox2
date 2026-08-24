@@ -16,7 +16,6 @@ namespace JingleBox2.ViewModels;
 public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
     private readonly IAudioEngine _audio;
-    private readonly Func<Task<string?>> _pickFileAsync;
     private readonly DispatcherTimer _progressTimer;
     private readonly EventHandler<PadPlaybackChanged> _playbackHandler;
 
@@ -69,7 +68,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     }
 
     public static PadSourceKind[] SourceKinds { get; } =
-        new[] { PadSourceKind.File, PadSourceKind.StreamUrl };
+        new[] { PadSourceKind.Recording, PadSourceKind.Stream };
 
     public static readonly string[] PaletteColors =
     {
@@ -86,7 +85,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string name = "";
     [ObservableProperty] private string? filePath;
     [ObservableProperty] private float volume = 1.0f;
-    [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.File;
+    [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.Recording;
     [ObservableProperty] private bool loop = false;
     [ObservableProperty] private double fadeIn = 0;
     [ObservableProperty] private double fadeOut = 0;
@@ -97,8 +96,20 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     [ObservableProperty] private float currentVolume;
     [ObservableProperty] private float channelVolume;
 
-    public bool IsFile => SourceKind == PadSourceKind.File;
-    public bool IsWeb => SourceKind == PadSourceKind.StreamUrl;
+    public bool IsRecording => SourceKind == PadSourceKind.Recording;
+    public bool IsStream => SourceKind == PadSourceKind.Stream;
+
+    /// <summary>
+    /// What the pad plays, said as a name rather than as a path.
+    /// </summary>
+    /// <remarks>
+    /// The take's own name is what you called it on the RECORD tab, and it is the whole of
+    /// what is worth reading here. The path is still what is played and is on the tooltip, for
+    /// a pad built before the pads took their sound off the shelf and pointing somewhere else
+    /// entirely.
+    /// </remarks>
+    public string SourceText =>
+        string.IsNullOrWhiteSpace(FilePath) ? "" : System.IO.Path.GetFileNameWithoutExtension(FilePath);
     public bool HasFadeIn => FadeIn > 0;
     public bool HasFadeOut => FadeOut > 0;
     public bool HasSource => !string.IsNullOrWhiteSpace(FilePath);
@@ -140,17 +151,15 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
     public IRelayCommand PlayCommand { get; }
     public IRelayCommand StopCommand { get; }
-    public IAsyncRelayCommand AssignCommand { get; }
     public IRelayCommand TogglePlayCommand { get; }
     public IRelayCommand ClearCommand { get; }
     public IRelayCommand ClearColorCommand { get; }
     public IRelayCommand<string?> SetColorCommand { get; }
 
-    public PadViewModel(int index, IAudioEngine audio, Func<Task<string?>> pickFileAsync)
+    public PadViewModel(int index, IAudioEngine audio)
     {
         Index = index;
         _audio = audio;
-        _pickFileAsync = pickFileAsync;
 
         IsPlaying = _audio.IsPadPlaying(Index);
 
@@ -184,21 +193,6 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
             else TryStart();
         });
 
-        AssignCommand = new AsyncRelayCommand(async () =>
-        {
-            Status = "";
-
-            if (SourceKind != PadSourceKind.File)
-            {
-                Status = "Browse is only available for File.";
-                return;
-            }
-
-            var path = await _pickFileAsync();
-            if (!string.IsNullOrWhiteSpace(path))
-                FilePath = path;
-        });
-
         ClearCommand = new RelayCommand(() =>
         {
             Status = "";
@@ -207,7 +201,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
                 _audio.StopSample(Index);
                 Name = "";
                 FilePath = null;
-                SourceKind = PadSourceKind.File;
+                SourceKind = PadSourceKind.Recording;
                 Volume = 1.0f;
                 Loop = false;
                 FadeIn = 0;
@@ -259,7 +253,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            if (SourceKind == PadSourceKind.File)
+            if (SourceKind == PadSourceKind.Recording)
                 _audio.PlaySample(Index, FilePath, Volume);
             else
                 _audio.PlayStream(Index, FilePath, Volume);
@@ -288,6 +282,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     {
         _audio.SetPadSource(Index, SourceKind, value);
         OnPropertyChanged(nameof(HasSource));
+        OnPropertyChanged(nameof(SourceText));
     }
 
     partial void OnVolumeChanged(float value)
@@ -315,8 +310,9 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
     partial void OnSourceKindChanged(PadSourceKind value)
     {
-        OnPropertyChanged(nameof(IsFile));
-        OnPropertyChanged(nameof(IsWeb));
+        OnPropertyChanged(nameof(IsRecording));
+        OnPropertyChanged(nameof(IsStream));
+        OnPropertyChanged(nameof(SourceText));
         _audio.SetPadSource(Index, SourceKind, FilePath);
     }
 
@@ -344,9 +340,21 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PadBackground));
 
+    /// <summary>
+    /// What a stored kind means on the page.
+    /// </summary>
+    /// <remarks>
+    /// A pad with nothing on it is a pad waiting for a recording, so it is read as one rather
+    /// than as a pad of no kind at all: the picker is then in front of you instead of behind a
+    /// choice you have to make first. Nothing is written back, so a pad nobody has touched
+    /// stays untouched in the profile.
+    /// </remarks>
+    public static PadSourceKind KindFor(PadSourceKind stored) =>
+        stored == PadSourceKind.None ? PadSourceKind.Recording : stored;
+
     public void SetSourceFromConfig(PadSourceKind kind, string source)
     {
-        SourceKind = kind;
+        SourceKind = KindFor(kind);
         FilePath = string.IsNullOrWhiteSpace(source) ? null : source;
     }
 

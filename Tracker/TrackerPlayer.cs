@@ -228,6 +228,21 @@ public sealed class TrackerPlayer : IDisposable
     /// How long the note will sound, so a keyboard can light its key and a picture can run its
     /// cursor for exactly that long. Zero when nothing sounded.
     /// </returns>
+    /// <summary>
+    /// Stops what an instrument is sounding by hand.
+    /// </summary>
+    /// <remarks>
+    /// For leaving a machine's panel: what you played on it is its own, and hearing it go on
+    /// under the next machine's picture, with that picture's cursor running to it, is one
+    /// instrument wearing another's face. A pattern's notes are untouched.
+    /// </remarks>
+    public void CutPreview(TrackerInstrument? instrument)
+    {
+        if (instrument == null) return;
+
+        _synth.Mixer.CutAuditions(instrument.Id);
+    }
+
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return 0;

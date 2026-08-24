@@ -275,10 +275,16 @@ public sealed partial class DrumPadViewModel : ObservableObject
     /// <summary>Puts a recording on this pad, or takes one off when given nothing.</summary>
     public void Take(string? path)
     {
+        // What it was called after, so a name nobody chose can be told from one somebody did.
+        string was = Path.GetFileNameWithoutExtension(Pad.FilePath);
+
         Pad.FilePath = path ?? "";
 
-        // An unnamed pad takes the file's name, which is nearly always what it should be called.
-        if (Pad.Name.Length == 0 && Pad.HasSound)
+        // An unnamed pad takes the file's name, which is nearly always what it should be
+        // called, and so does one still called after the take it used to hold: a cap reading
+        // the old recording is a pad claiming to be something it no longer is. A name typed by
+        // hand is kept, since that is a pad you have named.
+        if (Pad.HasSound && Slices.Auto(Pad.Name, was))
             Pad.Name = Path.GetFileNameWithoutExtension(Pad.FilePath);
 
         Say(nameof(FileText), nameof(HasSound), nameof(CapText), nameof(Name));

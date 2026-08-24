@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:models="clr-namespace:JingleBox2.Models"
+        x:Class="JingleBox2.Views.TakeDialog"
+        x:DataType="vm:TakeFilter"
+        Title="Pick a recording"
+        Width="460"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Spacing="12" Margin="20">
+
+    <!-- The two ways of finding one, side by side: which sort of sound it is, and what it is
+         called. Neither is much use without the other on a shelf that has grown. -->
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+      <TextBox Grid.Column="0" Name="SearchBox"
+               Text="{Binding Search}"
+               PlaceholderText="Search by name..." />
+
+      <ComboBox Grid.Column="1" MinWidth="150"
+                ItemsSource="{Binding Filters}"
+                SelectedItem="{Binding Filter}"
+                ToolTip.Tip="Narrow to one category. They are set on the RECORD tab." />
+    </Grid>
+
+    <TextBlock Text="Nothing here. Try another category, or clear the search."
+               IsVisible="{Binding !Shown.Count}"
+               Opacity="0.7" />
+
+    <!-- Double click picks, as a list of files does everywhere else. -->
+    <ListBox Name="Takes"
+             Classes="cards"
+             MaxHeight="360"
+             IsVisible="{Binding Shown.Count}"
+             ItemsSource="{Binding Shown}"
+             DoubleTapped="Takes_DoubleTapped">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="models:Recording">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding DurationMs, StringFormat='{}{0}ms'}"
+                         Opacity="0.7" FontSize="12" />
+            </StackPanel>
+
+            <Border Grid.Column="1" Classes="badge filed" MaxWidth="180"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding HasCategory}">
+              <TextBlock Text="{Binding Category}" TextTrimming="CharacterEllipsis" />
+            </Border>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <Button Grid.Column="1" Content="Cancel" Click="Cancel_Click"
+              MinWidth="88" IsCancel="True" />
+      <Button Grid.Column="2" Name="PickButton" Content="Use it" Click="Pick_Click"
+              MinWidth="88" IsDefault="True" />
+    </Grid>
+
+  </StackPanel>
+
+</Window>

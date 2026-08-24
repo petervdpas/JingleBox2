@@ -17,6 +17,11 @@ public interface IInstrumentAudition
     double Audition(TrackerInstrument instrument, Note note, int volume);
 
     /// <summary>
+    /// Stops whatever that instrument is sounding by hand, leaving a pattern's notes alone.
+    /// </summary>
+    void Silence(TrackerInstrument instrument);
+
+    /// <summary>
     /// How far through its recording the sample voice on that track is, as a fraction of the
     /// whole file, or -1 when nothing is playing one.
     /// </summary>

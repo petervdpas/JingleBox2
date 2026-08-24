@@ -119,7 +119,7 @@
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
                                         Margin="0,4,6,0"
-                                        IsVisible="{Binding IsFile}" />
+                                        IsVisible="{Binding IsRecording}" />
 
                   <!-- Stream indicator: top-right (streams only) -->
                   <TextBlock Text="📡"
@@ -128,7 +128,7 @@
                              VerticalAlignment="Top"
                              Margin="0,4,6,0"
                              Opacity="0.8"
-                             IsVisible="{Binding IsWeb}" />
+                             IsVisible="{Binding IsStream}" />
                 </Grid>
               </ToggleButton>
             </Border>

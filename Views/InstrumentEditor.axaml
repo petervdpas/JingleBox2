@@ -56,10 +56,20 @@
                 <!-- One control, not three: the arrows, the name and how far through you are
                      all say the same fact and have to move together. The arrows are how you
                      hunt for a sound; pressing the name opens the whole list. -->
-                <views:Chooser ItemsSource="{Binding Presets.Items}"
-                               SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
-                               Placeholder="Start from..."
-                               ToolTip.Tip="{Binding Presets.Hint}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <!-- Only where the list is takes. A machine offering its own presets has
+                       nothing to narrow, and the picker keeps the whole width. -->
+                  <ComboBox Width="132" VerticalAlignment="Center"
+                            IsVisible="{Binding Presets.PicksTakes}"
+                            ItemsSource="{Binding Editor.Takes.Filters}"
+                            SelectedItem="{Binding Editor.Takes.Filter}"
+                            ToolTip.Tip="Narrow the takes to one category. They are filed on the RECORD tab." />
+
+                  <views:Chooser ItemsSource="{Binding Presets.Items}"
+                                 SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
+                                 Placeholder="Start from..."
+                                 ToolTip.Tip="{Binding Presets.Hint}" />
+                </StackPanel>
               </StackPanel>
 
             </WrapPanel>
@@ -193,9 +203,12 @@
                        two rows rather than four. The buttons stand together because they are
                        both about the recording on this zone. -->
                   <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- Named by the property rather than by what the zone prints itself as,
+                         so a zone that takes another recording is renamed in the list too. -->
                     <ComboBox Width="150"
                               ItemsSource="{Binding Editor.Zones.Zones}"
-                              SelectedItem="{Binding Editor.Zones.Selected}" />
+                              SelectedItem="{Binding Editor.Zones.Selected}"
+                              DisplayMemberBinding="{Binding Title}" />
 
                     <Button Content="Clear" Click="ClearZoneSample_Click" />
 
@@ -206,14 +219,13 @@
                   <!-- The only way onto a zone. On the machine this follows, sampling and
                        playing were one box and there was no step between them called finding
                        the file; here the RECORD tab is that box's input. -->
+                  <!-- One button, and the shelf opens in a dialog with room to hunt in. On
+                       the panel it costs the width of a button; the category, the search and
+                       the list of takes all live in the dialog, where there is room for them. -->
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="field" Text="Take" />
-                    <ComboBox Name="ZoneRecordingPicker" Width="164"
-                              ItemsSource="{Binding Editor.Recordings}"
-                              DisplayMemberBinding="{Binding Name}"
-                              SelectionChanged="ZoneRecording_Changed"
-                              PlaceholderText="Pick a recording..."
-                              ToolTip.Tip="One of your recordings, put straight on this zone. Anything from elsewhere is imported on the RECORD tab first." />
+                    <views:TakePicker Takes="{Binding Editor.Takes}"
+                                      Picked="ZoneRecording_Changed"
+                                      ToolTip.Tip="Fetches one of your recordings onto this zone: search it by name or narrow it to a category. Anything from elsewhere is imported on the RECORD tab first." />
 
                     <TextBlock Classes="field" Text="Name" Margin="6,0,0,0" />
                     <TextBox Width="130" Text="{Binding Editor.Zones.Selected.Name}" />
@@ -369,6 +381,7 @@
                     <ComboBox Width="150"
                               ItemsSource="{Binding Editor.Kit.Pads}"
                               SelectedItem="{Binding Editor.Kit.Selected}"
+                              DisplayMemberBinding="{Binding CapText}"
                               ToolTip.Tip="Which pad the settings below are about." />
 
                     <Button Content="Clear" Click="ClearPadSample_Click"
@@ -381,14 +394,13 @@
                   <!-- The only way onto a pad, and deliberately: everything a machine plays is
                        one of your recordings, which means JingleBox owns every file a song
                        depends on. Bring anything else in on the RECORD tab first. -->
+                  <!-- One button, and the shelf opens in a dialog with room to hunt in. On
+                       the panel it costs the width of a button; the category, the search and
+                       the list of takes all live in the dialog, where there is room for them. -->
                   <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="field" Text="Take" />
-                    <ComboBox Name="PadRecordingPicker" Width="164"
-                              ItemsSource="{Binding Editor.Recordings}"
-                              DisplayMemberBinding="{Binding Name}"
-                              SelectionChanged="PadRecording_Changed"
-                              PlaceholderText="Pick a recording..."
-                              ToolTip.Tip="One of your recordings, put straight on this pad. Anything from elsewhere is imported on the RECORD tab first." />
+                    <views:TakePicker Takes="{Binding Editor.Takes}"
+                                      Picked="PadRecording_Changed"
+                                      ToolTip.Tip="Fetches one of your recordings onto this pad: search it by name or narrow it to a category. Anything from elsewhere is imported on the RECORD tab first." />
 
                     <TextBlock Classes="field" Text="Name" Margin="6,0,0,0" />
                     <TextBox Width="130" Text="{Binding Editor.Kit.Selected.Name}" />

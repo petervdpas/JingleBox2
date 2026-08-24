@@ -153,23 +153,30 @@
                              Text="{Binding Name}" />
 
                     <ComboBox Grid.Column="1"
-                              Width="100"
+                              Width="124"
                               ItemsSource="{x:Static vm:PadViewModel.SourceKinds}"
                               SelectedItem="{Binding SourceKind}" />
                   </Grid>
 
+                  <!-- Off the shelf rather than off the disc. What a pad plays is still a
+                       file underneath, but it is one this app owns and can find again: a jingle
+                       pointing into somebody's downloads folder is silence waiting to happen.
+                       Anything from elsewhere comes in on the RECORD tab first. -->
                   <Grid ColumnDefinitions="*,Auto"
                         ColumnSpacing="10"
-                        IsVisible="{Binding IsFile}">
+                        IsVisible="{Binding IsRecording}">
                     <TextBox Grid.Column="0"
-                             PlaceholderText="Choose an audio file…"
-                             Text="{Binding FilePath}" />
-                    <Button Grid.Column="1"
-                            Content="Browse…"
-                            Command="{Binding AssignCommand}" />
+                             IsReadOnly="True"
+                             PlaceholderText="No recording on this pad yet"
+                             Text="{Binding SourceText}"
+                             ToolTip.Tip="{Binding FilePath}" />
+                    <views:TakePicker Grid.Column="1"
+                                      Takes="{Binding $parent[views:PadsView].((vm:MainViewModel)DataContext).Takes}"
+                                      Picked="PadTake_Picked"
+                                      ToolTip.Tip="Fetches one of your recordings onto this pad: search it by name or narrow it to a category." />
                   </Grid>
 
-                  <TextBox IsVisible="{Binding IsWeb}"
+                  <TextBox IsVisible="{Binding IsStream}"
                            PlaceholderText="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
 

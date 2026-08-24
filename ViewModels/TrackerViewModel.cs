@@ -1120,6 +1120,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public double Audition(TrackerInstrument instrument, Note note, int volume) =>
         _player.Preview(instrument, note, GainFor(volume));
 
+    /// <summary>Stops what that instrument was sounding by hand, for a panel being left.</summary>
+    public void Silence(TrackerInstrument instrument) => _player.CutPreview(instrument);
+
     /// <summary>
     /// The running plugin behind a plugin instrument, for the editor to show and to read a
     /// patch out of. Loading it here also means the first note played is not the one that

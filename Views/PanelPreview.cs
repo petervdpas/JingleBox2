@@ -94,6 +94,8 @@ public static class PanelPreview
     {
         public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
 
+        public void Silence(TrackerInstrument instrument) { }
+
         /// <summary>
         /// A cursor walking across the recording, the way Marching walks a playhead down a
         /// pattern. Nothing is sounding; the line is the point.

@@ -74,30 +74,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
     /// <summary>What a take is filed under, written down beside the takes.</summary>
     private readonly RecordingCategories _filing = new();
 
-    /// <summary>What the picker shows for a shelf with nothing hidden.</summary>
-    public const string AllTakes = "All takes";
-
-    /// <summary>And for the takes nobody has filed yet.</summary>
-    public const string Unfiled = "Unfiled";
-
     /// <summary>
-    /// The takes the list is showing: all of them, or the ones in one category.
+    /// The shelf as this page shows it, narrowed to a category or not.
     /// </summary>
     /// <remarks>
-    /// A second collection rather than a filtered view, because everything else that asks for
-    /// the recordings wants all of them: the name check, the take chooser on a machine, the
-    /// count in the bar along the bottom. Hiding a take from the page is not taking it off the
-    /// shelf.
+    /// The same kind of filter the machines put in front of their take pickers, so a category
+    /// made here is one they can hunt by. Everything else that asks this page for the
+    /// recordings still gets all of them: the name check, the count in the bar along the
+    /// bottom. Hiding a take from the list is not taking it off the shelf.
     /// </remarks>
-    public ObservableCollection<Recording> Shown { get; } = new();
-
-    /// <summary>The categories in use, in alphabetical order.</summary>
-    public ObservableCollection<string> Categories { get; } = new();
-
-    /// <summary>What the list can be narrowed to: everything, the unfiled, or one category.</summary>
-    public ObservableCollection<string> Filters { get; } = new();
-
-    [ObservableProperty] private string categoryFilter = AllTakes;
+    public TakeFilter Shelf { get; }
 
     /// <summary>What is in the category box, which is not yet what the take is filed under.</summary>
     /// <remarks>
@@ -193,15 +179,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
         _deviceLoaded = true;
 
         LoadRecordings();
-        Sort();
 
-        // Deleting a recording frees its name again, so the check has to follow the list, and
-        // so do the categories: the last take out of one is the end of it.
-        Recordings.CollectionChanged += (_, _) =>
-        {
-            ValidateName();
-            Sort();
-        };
+        // Built after the takes are read, so it starts stocked rather than filling itself a
+        // moment later.
+        Shelf = new TakeFilter(Recordings);
+
+        // Deleting a recording frees its name again, so the check has to follow the list.
+        Recordings.CollectionChanged += (_, _) => ValidateName();
 
         // Whether it ran out or was stopped, the row it was playing goes back to idle.
         _preview.Stopped += () =>
@@ -419,10 +403,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
     /// <remarks>
     /// A category is made by naming one: there is no list to add to first, and no list to tidy
     /// up afterwards either, since a category is only ever the takes filed under it. Empty the
-    /// box and the take is unfiled again.
+    /// box and the take is uncategorized again.
     ///
     /// A take filed into a category the list is not showing leaves the list, which is the
-    /// point of working through the unfiled ones.
+    /// point of working through the uncategorized ones.
     /// </remarks>
     public void FileTake() => FileUnder(SelectedRecording, TakeCategory);
 
@@ -460,76 +444,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
         _filing.Put(recording.Name, wanted);
 
         Status = wanted.Length == 0
-            ? $"'{recording.Name}' is filed under nothing"
+            ? $"'{recording.Name}' is uncategorized"
             : $"'{recording.Name}' filed under '{wanted}'";
-
-        Sort();
-    }
-
-    partial void OnCategoryFilterChanged(string value) => Restock();
-
-    /// <summary>The categories, the filters and the list, after any of them could have changed.</summary>
-    private void Sort()
-    {
-        RefreshCategories();
-        Restock();
-    }
-
-    private void RefreshCategories()
-    {
-        var found = Recordings
-            .Select(r => r.Category)
-            .Where(c => c.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
-
-        Sync(Categories, found);
-        Sync(Filters, new[] { AllTakes, Unfiled }.Concat(found).ToList());
-
-        // The last take out of a category takes the category with it, and the filter with it.
-        if (!Filters.Contains(CategoryFilter)) CategoryFilter = AllTakes;
-    }
-
-    /// <summary>
-    /// Puts the takes the filter allows in the list, and only those.
-    /// </summary>
-    /// <remarks>
-    /// A take that is in both lists is left where it is rather than being taken out and put
-    /// back, so the one you are looking at stays picked and its picture stays on the page.
-    /// </remarks>
-    private void Restock()
-    {
-        var wanted = Recordings.Where(Passes).ToList();
-
-        for (int i = Shown.Count - 1; i >= 0; i--)
-            if (!wanted.Contains(Shown[i])) Shown.RemoveAt(i);
-
-        for (int i = 0; i < wanted.Count; i++)
-            if (i >= Shown.Count || !ReferenceEquals(Shown[i], wanted[i])) Shown.Insert(i, wanted[i]);
-
-        OnPropertyChanged(nameof(Showing));
-    }
-
-    private bool Passes(Recording recording) => CategoryFilter switch
-    {
-        Unfiled => recording.Category.Length == 0,
-        AllTakes => true,
-        var category => string.Equals(recording.Category, category, StringComparison.Ordinal)
-    };
-
-    /// <summary>How many takes are being shown out of how many there are, while some are hidden.</summary>
-    public string Showing => Shown.Count == Recordings.Count ? "" : $"{Shown.Count} of {Recordings.Count}";
-
-    /// <summary>Brings a list of strings up to date without rebuilding it under a picker.</summary>
-    private static void Sync(ObservableCollection<string> list, IReadOnlyList<string> wanted)
-    {
-        for (int i = list.Count - 1; i >= 0; i--)
-            if (!wanted.Contains(list[i])) list.RemoveAt(i);
-
-        for (int i = 0; i < wanted.Count; i++)
-            if (i >= list.Count || !string.Equals(list[i], wanted[i], StringComparison.Ordinal))
-                list.Insert(i, wanted[i]);
     }
 
     /// <summary>

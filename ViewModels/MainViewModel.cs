@@ -23,12 +23,14 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IAudioEngine _audio;
     private readonly ConfigStore _store;
     private readonly AppConfig _cfg;
-    private readonly Func<Task<string?>> _pickFileAsync;
 
     private bool _suspendSave;
 
     public MidiViewModel Midi { get; }
     public RecordViewModel Record { get; }
+
+    /// <summary>The shelf of takes, for filling a pad from it.</summary>
+    public TakeFilter Takes { get; }
     public TrackerViewModel Tracker { get; }
     public MachineRackViewModel Machines { get; }
 
@@ -373,7 +375,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MainViewModel(
         IAudioEngine audio,
-        Func<Task<string?>> pickFileAsync,
         ConfigStore store,
         AppConfig cfg,
         IMidiService midiService,
@@ -382,7 +383,6 @@ public sealed partial class MainViewModel : ObservableObject
         IAudioRouting routing)
     {
         _audio = audio;
-        _pickFileAsync = pickFileAsync;
         _store = store;
         _cfg = cfg;
 
@@ -392,6 +392,11 @@ public sealed partial class MainViewModel : ObservableObject
         // of the settings.
         Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
+
+        // What a pad is filled from. The same shelf the machines fetch takes off, narrowed the
+        // same way: a pad plays a recording you own, not a file that happened to be on the disc
+        // the day you built the profile.
+        Takes = new TakeFilter(Record.Recordings);
 
         // The rack: the machines you have, and the plugins you have added. A song takes an
         // instrument off a machine and keeps its own copy of it.
@@ -848,12 +853,12 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var padCfg = profile.Pads[i];
 
-            var pad = new PadViewModel(i, _audio, _pickFileAsync)
+            var pad = new PadViewModel(i, _audio)
             {
                 Name = padCfg.Name,
                 FilePath = padCfg.Source,
                 Volume = (float)padCfg.Volume,
-                SourceKind = padCfg.Kind,
+                SourceKind = PadViewModel.KindFor(padCfg.Kind),
                 Loop = padCfg.Loop,
                 FadeIn = padCfg.FadeIn,
                 FadeOut = padCfg.FadeOut,
@@ -988,7 +993,7 @@ public sealed partial class MainViewModel : ObservableObject
             pr.Pads ??= new System.Collections.Generic.List<PadConfig>();
 
             while (pr.Pads.Count < padCount)
-                pr.Pads.Add(new PadConfig { Name = $"Pad {pr.Pads.Count + 1}", Kind = PadSourceKind.File, Source = "", Volume = 1.0 });
+                pr.Pads.Add(new PadConfig { Name = $"Pad {pr.Pads.Count + 1}", Kind = PadSourceKind.Recording, Source = "", Volume = 1.0 });
 
             while (pr.Pads.Count > padCount)
                 pr.Pads.RemoveAt(pr.Pads.Count - 1);
@@ -1043,7 +1048,7 @@ public sealed partial class MainViewModel : ObservableObject
             pads.Add(new PadConfig
             {
                 Name = $"Pad {i + 1}",
-                Kind = PadSourceKind.File,
+                Kind = PadSourceKind.Recording,
                 Source = "",
                 Volume = 1.0
             });

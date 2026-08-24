@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 
@@ -52,6 +53,28 @@ public static class Slices
     /// <summary>How many pieces those points describe, never more than there is room for.</summary>
     public static int CountFor(IReadOnlyList<double>? points, int room) =>
         points is null || points.Count < 2 ? 0 : Math.Min(points.Count - 1, room);
+
+    /// <summary>
+    /// True when that name is one the app gave the piece rather than one somebody typed.
+    /// </summary>
+    /// <remarks>
+    /// Either the recording's own name, or the recording's name and which piece of it this is,
+    /// which is what a chop calls its pieces. Both are the app talking to itself, and both
+    /// should be replaced when another take lands. Anything else is yours and is kept.
+    /// </remarks>
+    public static bool Auto(string name, string wasCalled)
+    {
+        if (name.Length == 0) return true;
+        if (wasCalled.Length == 0) return false;
+        if (string.Equals(name, wasCalled, StringComparison.Ordinal)) return true;
+
+        // "Countdown 3": the take's name, a space, and a number.
+        if (!name.StartsWith(wasCalled + " ", StringComparison.Ordinal)) return false;
+
+        string tail = name[(wasCalled.Length + 1)..];
+
+        return tail.Length > 0 && tail.All(char.IsDigit);
+    }
 
     /// <summary>What a piece is called: the recording's name and which piece of it this is.</summary>
     public static string NameFor(string filePath, int index)

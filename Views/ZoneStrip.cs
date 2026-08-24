@@ -188,10 +188,19 @@ public class ZoneStrip : ThemedControl
                     new Point(root, block.Top + 2), new Point(root, block.Bottom - 2));
             }
 
+            // Trimmed rather than dropped. A zone whose name did not fit said nothing at all,
+            // which reads as an empty zone: put a take called "Piano - Somebody like you" on
+            // one octave and the map looked exactly as it had before.
             var text = Text(zone.Title, empty ? palette.MutedBrush : Brushes.White);
 
-            if (text.Width + 8 < block.Width)
+            double room = block.Width - 8;
+
+            if (room >= MinLabel)
             {
+                text.MaxTextWidth = room;
+                text.MaxLineCount = 1;
+                text.Trimming = TextTrimming.CharacterEllipsis;
+
                 context.DrawText(text, new Point(
                     block.Left + 4, block.Top + (LaneHeight - text.Height) / 2));
             }
@@ -355,6 +364,9 @@ public class ZoneStrip : ThemedControl
 
     /// <summary>How near an edge counts as taking hold of it.</summary>
     private const double EdgeReach = 5;
+
+    /// <summary>Narrower than this and there is no room for a name worth reading.</summary>
+    private const double MinLabel = 22;
 
     private double LineHeight => Text("C0", Brushes.Black).Height;
 

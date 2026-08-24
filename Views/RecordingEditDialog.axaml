@@ -29,7 +29,7 @@
                  VerticalAlignment="Center" />
 
       <views:CategoryField Grid.Row="1" Grid.Column="1" FontSize="14"
-                           ItemsSource="{Binding Categories}"
+                           ItemsSource="{Binding Shelf.Categories}"
                            Text="{Binding TakeCategory}"
                            HorizontalAlignment="Stretch"
                            ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />

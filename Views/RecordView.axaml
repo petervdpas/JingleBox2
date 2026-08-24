@@ -116,7 +116,7 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
               <TextBlock Text="Category" Opacity="0.8" VerticalAlignment="Center" />
               <views:CategoryField Width="200"
-                                   ItemsSource="{Binding Categories}"
+                                   ItemsSource="{Binding Shelf.Categories}"
                                    Text="{Binding TakeCategory}"
                                    ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
             </StackPanel>
@@ -172,18 +172,18 @@
 
             <!-- Only while something is hidden, since "10 of 10" is a line about nothing. -->
             <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
-                       Text="{Binding Showing}" />
+                       Text="{Binding Shelf.Showing}" />
 
             <ComboBox Grid.Column="2" MinWidth="170"
-                      ItemsSource="{Binding Filters}"
-                      SelectedItem="{Binding CategoryFilter}"
-                      ToolTip.Tip="Narrow the shelf to one category, or to the takes nobody has filed yet." />
+                      ItemsSource="{Binding Shelf.Filters}"
+                      SelectedItem="{Binding Shelf.Filter}"
+                      ToolTip.Tip="Narrow the shelf to one category, or to the takes nobody has put in one yet." />
           </Grid>
 
           <!-- A list you pick from, rather than a stack of little control panels. What a row
                says is what the take is; what you do to it is under its picture above. -->
           <ListBox Classes="cards"
-                   ItemsSource="{Binding Shown}"
+                   ItemsSource="{Binding Shelf.Shown}"
                    SelectedItem="{Binding SelectedRecording}">
             <ListBox.ItemTemplate>
               <DataTemplate>

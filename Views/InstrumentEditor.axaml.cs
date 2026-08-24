@@ -92,24 +92,12 @@ public partial class InstrumentEditor : UserControl
     /// is on the pad is written under it, and a box still showing the last thing you put there
     /// would be claiming to be the pad's own.
     /// </remarks>
-    private void PadRecording_Changed(object? sender, SelectionChangedEventArgs e) =>
-        Took(sender, path => Designer?.Editor?.Kit?.Selected?.Take(path));
+    private void PadRecording_Changed(object? sender, TakePickedEventArgs e) =>
+        Designer?.Editor?.Kit?.Selected?.Take(e.Take.FilePath);
 
     /// <summary>One of your own takes, straight onto the zone in hand.</summary>
-    private void ZoneRecording_Changed(object? sender, SelectionChangedEventArgs e) =>
-        Took(sender, path => Designer?.Editor?.Zones?.Selected?.Take(path));
-
-    /// <summary>Hands a picked take's path on, then puts the picker back to empty.</summary>
-    private void Took(object? sender, Action<string> onto)
-    {
-        if (sender is not ComboBox picker) return;
-
-        if (picker.SelectedItem is Recording recording && recording.FilePath.Length > 0)
-            onto(recording.FilePath);
-
-        // Cleared without running this again: a null selection has nothing to put anywhere.
-        picker.SelectedItem = null;
-    }
+    private void ZoneRecording_Changed(object? sender, TakePickedEventArgs e) =>
+        Designer?.Editor?.Zones?.Selected?.Take(e.Take.FilePath);
 
     /// <summary>
     /// Brings samples in from the disc and fills the pads with them.

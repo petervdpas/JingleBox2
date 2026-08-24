@@ -52,14 +52,18 @@ public sealed partial class InstrumentPresets : ObservableObject
     }
 
     /// <summary>What the picker is called, since on one machine it is offering something else.</summary>
-    public string Caption => TakesAreThePresets ? "Take" : "Preset";
+    public string Caption => PicksTakes ? "Take" : "Preset";
 
-    public string Hint => TakesAreThePresets
+    public string Hint => PicksTakes
         ? "One of your recordings, put straight on this machine."
         : "Loads the settings of another sound on this machine. Your name and level are kept; only the sound is replaced.";
 
     /// <summary>True on the one machine whose starting points are your own recordings.</summary>
-    private bool TakesAreThePresets =>
+    /// <remarks>
+    /// Asked from outside as well, since the category filter in front of the picker is about
+    /// takes and there is nothing to narrow on a machine offering its own presets.
+    /// </remarks>
+    public bool PicksTakes =>
         _takes != null && _instrument.Kind == TrackerInstrumentKind.Sample;
 
     /// <summary>What this machine has to offer, in the order its folder lists them.</summary>
@@ -99,7 +103,7 @@ public sealed partial class InstrumentPresets : ObservableObject
         {
             Items.Clear();
 
-            if (TakesAreThePresets)
+            if (PicksTakes)
             {
                 foreach (var recording in _takes!)
                     if (recording.FilePath.Length > 0) Items.Add(Take(recording));
@@ -117,6 +121,7 @@ public sealed partial class InstrumentPresets : ObservableObject
 
             OnPropertyChanged(nameof(Any));
             OnPropertyChanged(nameof(Caption));
+            OnPropertyChanged(nameof(PicksTakes));
             OnPropertyChanged(nameof(Hint));
         }
     }
