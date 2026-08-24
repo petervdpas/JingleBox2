@@ -96,11 +96,9 @@
       <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns"
                     ToolTip.Tip="Drag to give the machine list more or less room." />
 
-      <Border Grid.Column="2" Classes="card">
-        <!-- The designer is its own control, so the same panel serves this tab and the
-             window a track opens onto the instrument it plays. -->
-        <views:InstrumentEditor />
-      </Border>
+      <!-- No card around it. The machine paints its own plate, edge and corners, and a card
+           behind that is a second frame around the first. -->
+      <views:InstrumentEditor Grid.Column="2" />
     </Grid>
   </DockPanel>
 </UserControl>

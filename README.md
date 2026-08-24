@@ -139,6 +139,8 @@ Actively developed, and in daily use. The pad launcher, recorder, tracker, plugi
 
 Licensed under the **GNU General Public License v2.0 (GPL-2.0-only)**, the same license the Linux kernel uses. See `LICENSE` for the full text.
 
+Instruments and effects are exempt. `LICENSE.EXCEPTION` grants permission to write a module against JingleBox2's plugin interfaces, the machine interface and the protocols it uses to talk to a plugin in its own process, and to distribute that module under whatever terms you like. Sounds, presets, recordings and songs are data and were never covered by the license at all.
+
 ---
 
 ## Author

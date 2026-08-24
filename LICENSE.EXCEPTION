@@ -1,0 +1,39 @@
+JingleBox2 plugin exception
+
+Copyright (C) 2025-2026 Peter van de Pas
+
+JingleBox2 is licensed under the GNU General Public License, version 2, as
+set out in LICENSE. As the copyright holder, I grant the following additional
+permission, which is part of the licence under which JingleBox2 is offered.
+
+
+  As a special exception, you may link or otherwise combine an independent
+  module with JingleBox2 through one of its plugin interfaces, and distribute
+  that module under terms of your choice, without the resulting combination
+  being covered by the GNU General Public License.
+
+  The plugin interfaces are:
+
+    * the public types of the JingleBox2 machine interface, being the
+      assembly named JingleBox2.Machines.Abstractions and any assembly that
+      replaces it in that role; and
+
+    * the protocols by which JingleBox2 talks to a program running in a
+      process of its own, including its VST3 and CLAP hosting and any
+      successor used for machines.
+
+  An independent module here means a module that contains no code copied
+  from, or derived from, any other part of JingleBox2.
+
+  This permission covers those interfaces and nothing else. Every other use
+  of JingleBox2's source code remains under the GNU General Public License,
+  version 2, and nothing in this exception weakens it. In particular, a
+  module that copies or adapts JingleBox2's own code, rather than calling it
+  through one of the interfaces above, is a work based on the Program and is
+  covered by that licence in full.
+
+
+Sounds, presets, recordings and songs are data rather than code. They are not
+covered by the GNU General Public License in the first place, whoever made
+them and whatever is charged for them, and this exception says nothing about
+them either way.

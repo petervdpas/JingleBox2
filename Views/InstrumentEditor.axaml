@@ -6,7 +6,7 @@
              x:Name="Root"
              x:DataType="vm:IInstrumentDesigner"
              Foreground="{DynamicResource TextPrimaryBrush}"
-             Padding="10">
+             Padding="2">
 
   <UserControl.Styles>
     <Style Selector="TextBlock.field">
@@ -124,58 +124,6 @@
               </Border>
             </StackPanel>
 
-            <!-- Sample instruments. Everything below this section applies to a recording as
-                 much as to a generated wave: the two are the same voice with a different
-                 source, so only what is actually about the file lives here. -->
-            <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.IsSample}">
-              <views:PanelGroup Caption="Sample" VerticalAlignment="Top" Margin="0,0,10,10">
-                <StackPanel Spacing="6">
-  <views:WaveformView Width="340" Height="90"
-                                      Peaks="{Binding Editor.Peaks}"
-                                      Placeholder="{Binding Editor.SampleText}"
-                                      ShowMarkers="True"
-                                      ShowLoop="{Binding Editor.IsLooping}"
-                                      Start="{Binding Editor.SampleStart}"
-                                      End="{Binding Editor.SampleEnd}"
-                                      LoopStart="{Binding Editor.LoopStart}"
-                                      LoopEnd="{Binding Editor.LoopEnd}"
-                                      Playhead="{Binding Editor.Playhead}"
-                                      ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
-
-                  <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
-
-                  <!-- One line: the switches are the tallest thing here and everything else
-                       stands level with their handles rather than on the floor of the row. -->
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Base note" />
-                    <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
-                                       Minimum="0" Maximum="119" Width="70" VerticalAlignment="Center"
-                                       ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
-                    <TextBlock Classes="field" VerticalAlignment="Center" Text="{Binding Editor.BaseNoteText}" />
-
-                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Loop" Margin="10,0,0,0" />
-                    <ComboBox Width="110" VerticalAlignment="Center"
-                              ItemsSource="{Binding Editor.LoopModes}"
-                              SelectedItem="{Binding Editor.LoopMode}"
-                              ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
-
-                    <!-- Switches rather than tick boxes: this is a machine's front panel, and
-                         the rest of it reads its settings off handles that show every position
-                         at once. -->
-                    <views:Switch Label="Direction" Margin="6,0,0,0"
-                                  OnLabel="Reverse" OffLabel="Forward"
-                                  IsChecked="{Binding Editor.Reverse}"
-                                  ToolTip.Tip="Plays the window from its end towards its start." />
-
-                    <views:Switch Label="Voices" Margin="6,0,0,0"
-                                  OnLabel="One" OffLabel="Many"
-                                  IsChecked="{Binding Editor.OneVoice}"
-                                  ToolTip.Tip="One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. A track is one voice either way." />
-                  </StackPanel>
-                </StackPanel>
-              </views:PanelGroup>
-            </WrapPanel>
-
             <!-- Zampler. The map first, drawn rather than listed, because what you need to
                  see is whether the keyboard is covered and a table of ranges will not tell you.
                  Then the zone in hand, then the filter and the two envelopes it lands in,
@@ -254,6 +202,9 @@
                     <TextBlock Classes="section" Text="{Binding Editor.Zones.Selected.RootText}" />
                   </StackPanel>
 
+                  <!-- Framed like the rest: three knobs standing loose under the fields read
+                       as leftovers rather than as the zone's own output. -->
+                  <views:PanelGroup Caption="Output">
                   <views:PanelStrip CellSize="26" Gap="4" Columns="3 3 3">
                     <views:Knob views:PanelStrip.Span="3" LabelAbove="True" LabelLines="2" HeadRoom="50" Ticks="11" DialSize="40" Label="Level"
                                 Format="0.00" DefaultValue="1" Minimum="0" Maximum="1" SmallStep="0.01" LargeStep="0.1"
@@ -268,6 +219,7 @@
                                 Value="{Binding Editor.Zones.Selected.FineCents}"
                                 ToolTip.Tip="Hundredths of a semitone, for sitting one zone against the next." />
                   </views:PanelStrip>
+                  </views:PanelGroup>
                 </StackPanel>
                 </views:PanelGroup>
 
@@ -747,7 +699,54 @@
                  its own above rather than sharing this one. -->
             <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.HasCommonVoice}">
 
-              <views:PanelGroup Caption="Shape" VerticalAlignment="Top" IsVisible="{Binding Editor.IsSynth}" Margin="0,0,10,10">
+              <views:PanelGroup Caption="Sample" IsVisible="{Binding Editor.IsSample}" Margin="0,0,10,10">
+                <StackPanel Spacing="6">
+  <views:WaveformView Width="340" Height="90"
+                                      Peaks="{Binding Editor.Peaks}"
+                                      Placeholder="{Binding Editor.SampleText}"
+                                      ShowMarkers="True"
+                                      ShowLoop="{Binding Editor.IsLooping}"
+                                      Start="{Binding Editor.SampleStart}"
+                                      End="{Binding Editor.SampleEnd}"
+                                      LoopStart="{Binding Editor.LoopStart}"
+                                      LoopEnd="{Binding Editor.LoopEnd}"
+                                      Playhead="{Binding Editor.Playhead}"
+                                      ToolTip.Tip="Drag the solid handles to set what plays, and the dashed ones to set the loop." />
+
+                  <TextBlock Classes="cardHint" Text="{Binding Editor.SampleText}" />
+
+                  <!-- One line: the switches are the tallest thing here and everything else
+                       stands level with their handles rather than on the floor of the row. -->
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Base note" />
+                    <views:NumberField Value="{Binding Editor.BaseNoteSemitone}"
+                                       Minimum="0" Maximum="119" Width="70" VerticalAlignment="Center"
+                                       ToolTip.Tip="The pitch the file sounds at. Every other note is read faster or slower than this one." />
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="{Binding Editor.BaseNoteText}" />
+
+                    <TextBlock Classes="field" VerticalAlignment="Center" Text="Loop" Margin="10,0,0,0" />
+                    <ComboBox Width="110" VerticalAlignment="Center"
+                              ItemsSource="{Binding Editor.LoopModes}"
+                              SelectedItem="{Binding Editor.LoopMode}"
+                              ToolTip.Tip="Forward jumps back to the loop start; ping-pong turns round at each end." />
+
+                    <!-- Switches rather than tick boxes: this is a machine's front panel, and
+                         the rest of it reads its settings off handles that show every position
+                         at once. -->
+                    <views:Switch Label="Direction" Margin="6,0,0,0"
+                                  OnLabel="Reverse" OffLabel="Forward"
+                                  IsChecked="{Binding Editor.Reverse}"
+                                  ToolTip.Tip="Plays the window from its end towards its start." />
+
+                    <views:Switch Label="Voices" Margin="6,0,0,0"
+                                  OnLabel="One" OffLabel="Many"
+                                  IsChecked="{Binding Editor.OneVoice}"
+                                  ToolTip.Tip="One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. A track is one voice either way." />
+                  </StackPanel>
+                </StackPanel>
+              </views:PanelGroup>
+
+              <views:PanelGroup Caption="Shape" IsVisible="{Binding Editor.IsSynth}" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <views:WaveScope Width="150" Height="58"
                                    Patch="{Binding Editor.Patch.Patch}"
@@ -764,7 +763,7 @@
                 </StackPanel>
               </views:PanelGroup>
 
-              <views:PanelGroup Caption="Envelope" VerticalAlignment="Top" Margin="0,0,10,10">
+              <views:PanelGroup Caption="Envelope" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <StackPanel Orientation="Horizontal" Spacing="12">
                     <views:EnvelopeScope Width="150" Height="58"
@@ -798,7 +797,7 @@
                 </StackPanel>
               </views:PanelGroup>
 
-              <views:PanelGroup Caption="Pitch and modulation" VerticalAlignment="Top" Margin="0,0,10,10">
+              <views:PanelGroup Caption="Pitch and modulation" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <UniformGrid Columns="4" Rows="2">
                     <views:Knob Label="Tune" Unit="st" Format="0" DefaultValue="0"
@@ -845,7 +844,7 @@
                 </StackPanel>
               </views:PanelGroup>
 
-              <views:PanelGroup Caption="Filter" VerticalAlignment="Top" Margin="0,0,10,10">
+              <views:PanelGroup Caption="Filter" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <StackPanel Orientation="Horizontal" Spacing="12">
                     <views:Knob Label="Cutoff" Format="0.00" DefaultValue="1"
@@ -862,7 +861,7 @@
                 </StackPanel>
               </views:PanelGroup>
 
-              <views:PanelGroup Caption="Output" VerticalAlignment="Top" Margin="0,0,10,10">
+              <views:PanelGroup Caption="Output" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <StackPanel Orientation="Horizontal" Spacing="12">
                     <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
