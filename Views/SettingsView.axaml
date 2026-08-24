@@ -36,7 +36,6 @@
     </Style>
 
     <Style Selector="TabControl.rail > TabItem">
-      <Setter Property="Width" Value="150" />
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontSize" Value="14" />
@@ -44,19 +43,89 @@
       <Setter Property="Padding" Value="12,9" />
     </Style>
 
-    <!-- A hairline between the two, the same one the tracker's panels are divided by. -->
-    <Style Selector="TabControl.rail /template/ ContentPresenter#PART_SelectedContentHost">
-      <Setter Property="Padding" Value="12,0,0,0" />
-      <Setter Property="BorderThickness" Value="1,0,0,0" />
-      <Setter Property="BorderBrush">
-        <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
+    <!-- Down the side, the sections are a column of words and every one of them is as wide
+         as the column: a heading you click has the whole width to be clicked on. Across the
+         top they are a row. -->
+    <Style Selector="TabControl.rail">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Vertical" />
+        </ItemsPanelTemplate>
       </Setter>
     </Style>
+
+    <Style Selector="TabControl.strip">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </Setter>
+    </Style>
+
+    <!-- Across the top, the sections sit above their settings and the handle has nothing to
+         divide. -->
+    <Style Selector="TabControl.strip /template/ ItemsPresenter#PART_ItemsPresenter">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="3" />
+      <Setter Property="Grid.RowSpan" Value="1" />
+    </Style>
+
+    <Style Selector="TabControl.strip /template/ GridSplitter#PART_Handle">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <Style Selector="TabControl.strip /template/ ContentPresenter#PART_SelectedContentHost">
+      <Setter Property="Grid.Row" Value="1" />
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="3" />
+      <Setter Property="Padding" Value="0,8,0,0" />
+    </Style>
+
   </UserControl.Styles>
 
   <!-- One part at a time. Everything here used to be one column of cards taller than the
        window, which is a page you scroll rather than a page you read. -->
   <TabControl x:Name="Sections" Classes="rail" TabStripPlacement="Left" Margin="0,6" Padding="0">
+
+    <!-- A shape of its own, so the line between the sections and their settings can be
+         dragged. A docked tab strip has nowhere to put a handle: it is as wide as it is and
+         there is no arguing with it. Three columns and two rows instead, holding the same
+         two parts a tab control always has, with the handle between them; which part sits
+         where is what the rail and strip styles above decide. The handle is the hairline
+         that used to be the settings' left border.
+
+         Set here rather than in a style, because a control that is handed a different
+         template while it is on screen puts its content into the new one before the old one
+         has let go, and Avalonia will not have the same thing in two places at once. -->
+    <TabControl.Template>
+      <ControlTemplate>
+        <Grid RowDefinitions="Auto,*">
+          <Grid.ColumnDefinitions>
+            <!-- Wide enough for the longest heading to start with. The stops are where the
+                 words stop being readable and where a column is all the page. -->
+            <ColumnDefinition Width="150" MinWidth="96" MaxWidth="340" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <ItemsPresenter Name="PART_ItemsPresenter"
+                          Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                          ItemsPanel="{TemplateBinding ItemsPanel}" />
+
+          <GridSplitter Name="PART_Handle" Classes="handle" ResizeDirection="Columns"
+                        Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                        ToolTip.Tip="Drag to give the section list more or less room." />
+
+          <ContentPresenter Name="PART_SelectedContentHost"
+                            Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"
+                            Padding="12,0,0,0"
+                            Content="{TemplateBinding SelectedContent}"
+                            ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+        </Grid>
+      </ControlTemplate>
+    </TabControl.Template>
 
     <TabItem Header="Audio">
         <ScrollViewer>

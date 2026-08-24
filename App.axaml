@@ -134,6 +134,24 @@
             </Setter>
         </Style>
 
+        <!-- The same chip said more quietly, for something every row has. A category in the
+             accent colour beside a usage badge in the accent colour is two alarms and no
+             information. -->
+        <Style Selector="Border.badge.filed">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.14" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.4" />
+            </Setter>
+        </Style>
+        <Style Selector="Border.badge.filed > TextBlock">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" />
+            </Setter>
+        </Style>
+
         <!-- Compact value fields: no spinner buttons, so the field is only as wide as the
              number it holds. Scroll or arrow to change it. -->
 

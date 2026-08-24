@@ -25,6 +25,20 @@ public sealed partial class Recording : ObservableObject
 
     public bool IsInUse => !string.IsNullOrEmpty(UsedBy);
 
+    /// <summary>
+    /// What this take is filed under, or empty when it is filed under nothing.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside the takes rather than in the file name, so a category can be changed
+    /// without the take becoming a different file. <see cref="Audio.RecordingCategories"/> is
+    /// where it is written down.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasCategory))]
+    private string category = "";
+
+    public bool HasCategory => Category.Length > 0;
+
     /// <summary>True while this recording is the one being auditioned from the list.</summary>
     [ObservableProperty] private bool isPlaying;
 

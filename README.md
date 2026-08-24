@@ -18,7 +18,7 @@ The pages you play on are kept apart from the pages you set things up on, so not
 
 ## The pages
 
-**RECORD** captures takes and keeps them on a shelf the rest of the app plays from. Pick an input, watch the meter and the clip light, set the gain, record. On Linux you can capture anything in the audio graph, including another program's output; on Windows you can capture what an output device is playing. Click a take to see its waveform, then play, trim, normalise or rename it. WAV files from anywhere on disc can be imported, and anything that is not already 16-bit is converted on the way in.
+**RECORD** captures takes and keeps them on a shelf the rest of the app plays from. Pick an input, watch the meter and the clip light, set the gain, record. On Linux you can capture anything in the audio graph, including another program's output; on Windows you can capture what an output device is playing. Click a take to see its waveform, then play, trim, normalise or rename it, and file it under a category of your own so the shelf can be narrowed to speech, beds or effects. WAV files from anywhere on disc can be imported, and anything that is not already 16-bit is converted on the way in.
 
 **PADS** is where a pad is set up: its name, the file or stream URL it plays, its colour, whether it loops, its fades and its level, plus an effect slot that takes the same plugins the tracker uses.
 

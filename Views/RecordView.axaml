@@ -102,11 +102,25 @@
       <!-- The take that is picked: its picture, and everything you can do to it. -->
       <Border Classes="card" IsVisible="{Binding SelectedRecording, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Classes="cardBody">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Classes="cardTitle" Text="{Binding SelectedRecording.Name}" />
-            <TextBlock Opacity="0.7" FontSize="12" VerticalAlignment="Center"
-                       Text="{Binding SelectedRecording.DurationMs, StringFormat='{}{0}ms'}" />
-          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+              <TextBlock Classes="cardTitle" Text="{Binding SelectedRecording.Name}" />
+              <TextBlock Opacity="0.7" FontSize="12" VerticalAlignment="Center"
+                         Text="{Binding SelectedRecording.DurationMs, StringFormat='{}{0}ms'}" />
+            </StackPanel>
+
+            <!-- What it is filed under, on the line that says what it is. Typed rather than
+                 picked from a list, because a category is made by naming one; what has been
+                 named already drops down as you type so the second saxophone goes where the
+                 first one went. Said out loud on Enter or on leaving the box. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <TextBlock Text="Category" Opacity="0.8" VerticalAlignment="Center" />
+              <views:CategoryField Width="200"
+                                   ItemsSource="{Binding Categories}"
+                                   Text="{Binding TakeCategory}"
+                                   ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
+            </StackPanel>
+          </Grid>
 
           <!-- The picture sits on the page's own colour rather than the card's, the way the
                slice editor's does, so it reads as a window cut into the card. -->
@@ -153,12 +167,23 @@
       <!-- Recordings Library -->
       <Border Classes="card" IsVisible="{Binding Recordings.Count}">
         <StackPanel Classes="cardBody">
-          <TextBlock Classes="cardTitle" Text="Recordings" />
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Classes="cardTitle" Text="Recordings" VerticalAlignment="Center" />
+
+            <!-- Only while something is hidden, since "10 of 10" is a line about nothing. -->
+            <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                       Text="{Binding Showing}" />
+
+            <ComboBox Grid.Column="2" MinWidth="170"
+                      ItemsSource="{Binding Filters}"
+                      SelectedItem="{Binding CategoryFilter}"
+                      ToolTip.Tip="Narrow the shelf to one category, or to the takes nobody has filed yet." />
+          </Grid>
 
           <!-- A list you pick from, rather than a stack of little control panels. What a row
                says is what the take is; what you do to it is under its picture above. -->
           <ListBox Classes="cards"
-                   ItemsSource="{Binding Recordings}"
+                   ItemsSource="{Binding Shown}"
                    SelectedItem="{Binding SelectedRecording}">
             <ListBox.ItemTemplate>
               <DataTemplate>
@@ -182,6 +207,15 @@
                              Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" />
                   <TextBlock Grid.Row="2" Grid.Column="0" Opacity="0.7" FontSize="12"
                              Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" />
+
+                  <!-- Down in the other corner from the usage badge: two things about the row,
+                       neither of them hanging off the name. -->
+                  <Border Grid.Row="2" Grid.Column="1"
+                          Classes="badge filed" MaxWidth="220"
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                          IsVisible="{Binding HasCategory}">
+                    <TextBlock Text="{Binding Category}" TextTrimming="CharacterEllipsis" />
+                  </Border>
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>

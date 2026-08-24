@@ -12,15 +12,27 @@
     <!-- A recording's name is its file name, so this box moves the file. Every instrument
          playing it is repointed at the same moment, on the shelf and in the song that is
          open, which is why it can be an ordinary box and not a warning. -->
-    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-      <TextBlock Grid.Column="0" Text="Name" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
 
-      <TextBox Grid.Column="1" Name="NameBox" FontSize="14"
+      <TextBox Grid.Row="0" Grid.Column="1" Name="NameBox" FontSize="14"
                Text="{Binding EditName, Mode=TwoWay}"
                ToolTip.Tip="What the recording is called, which is also what its file is called." />
 
-      <Button Grid.Column="2" Name="RenameButton" Content="Rename" Click="Rename_Click"
+      <Button Grid.Row="0" Grid.Column="2" Name="RenameButton" Content="Rename" Click="Rename_Click"
               MinWidth="90" IsEnabled="{Binding CanRename}" />
+
+      <!-- Under the name, because this is the other thing about a take that is a word rather
+           than a waveform, and because this is where it was looked for. The same box as the
+           one on the page: what is typed in either shows up in the other. -->
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="Category" FontWeight="Bold" FontSize="16"
+                 VerticalAlignment="Center" />
+
+      <views:CategoryField Grid.Row="1" Grid.Column="1" FontSize="14"
+                           ItemsSource="{Binding Categories}"
+                           Text="{Binding TakeCategory}"
+                           HorizontalAlignment="Stretch"
+                           ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
     </Grid>
 
     <TextBlock Text="{Binding RenameError}" Foreground="{DynamicResource DangerBrush}"

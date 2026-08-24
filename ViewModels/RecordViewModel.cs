@@ -67,7 +67,45 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
     private bool _deviceLoaded;
 
     public ObservableCollection<string> InputDevices { get; } = new();
+
+    /// <summary>Everything on the shelf, whatever the list is showing at the moment.</summary>
     public ObservableCollection<Recording> Recordings { get; } = new();
+
+    /// <summary>What a take is filed under, written down beside the takes.</summary>
+    private readonly RecordingCategories _filing = new();
+
+    /// <summary>What the picker shows for a shelf with nothing hidden.</summary>
+    public const string AllTakes = "All takes";
+
+    /// <summary>And for the takes nobody has filed yet.</summary>
+    public const string Unfiled = "Unfiled";
+
+    /// <summary>
+    /// The takes the list is showing: all of them, or the ones in one category.
+    /// </summary>
+    /// <remarks>
+    /// A second collection rather than a filtered view, because everything else that asks for
+    /// the recordings wants all of them: the name check, the take chooser on a machine, the
+    /// count in the bar along the bottom. Hiding a take from the page is not taking it off the
+    /// shelf.
+    /// </remarks>
+    public ObservableCollection<Recording> Shown { get; } = new();
+
+    /// <summary>The categories in use, in alphabetical order.</summary>
+    public ObservableCollection<string> Categories { get; } = new();
+
+    /// <summary>What the list can be narrowed to: everything, the unfiled, or one category.</summary>
+    public ObservableCollection<string> Filters { get; } = new();
+
+    [ObservableProperty] private string categoryFilter = AllTakes;
+
+    /// <summary>What is in the category box, which is not yet what the take is filed under.</summary>
+    /// <remarks>
+    /// Typed a letter at a time, and a category is made by typing one, so committing on every
+    /// keystroke would leave "S", "Sp" and "Spe" behind on the way to "Speaking". The box says
+    /// so when the field is left or Enter is pressed, and nothing before that.
+    /// </remarks>
+    [ObservableProperty] private string takeCategory = "";
 
     [ObservableProperty] private string? selectedDevice;
 
@@ -155,9 +193,15 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
         _deviceLoaded = true;
 
         LoadRecordings();
+        Sort();
 
-        // Deleting a recording frees its name again, so the check has to follow the list.
-        Recordings.CollectionChanged += (_, _) => ValidateName();
+        // Deleting a recording frees its name again, so the check has to follow the list, and
+        // so do the categories: the last take out of one is the end of it.
+        Recordings.CollectionChanged += (_, _) =>
+        {
+            ValidateName();
+            Sort();
+        };
 
         // Whether it ran out or was stopped, the row it was playing goes back to idle.
         _preview.Stopped += () =>
@@ -299,8 +343,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
 
             await Task.Run(() => File.Move(from, to));
 
+            string was = recording.Name;
+
             recording.FilePath = to;
             recording.Name = wanted;
+
+            // The filing is kept by name, so a take that is called something else now has to
+            // be written down again under it.
+            _filing.Renamed(was, wanted);
 
             int moved = _sampleUsage?.Repoint(from, to) ?? 0;
 
@@ -343,13 +393,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
             foreach (var file in Directory.GetFiles(recordingsDir, "*.wav"))
             {
                 var info = new FileInfo(file);
+                string name = Path.GetFileNameWithoutExtension(file);
+
                 var recording = new Recording
                 {
                     Id = Guid.NewGuid().ToString(),
-                    Name = Path.GetFileNameWithoutExtension(file),
+                    Name = name,
                     FilePath = file,
                     DurationMs = ReadDurationMs(file),
-                    CreatedAt = info.CreationTime
+                    CreatedAt = info.CreationTime,
+                    Category = _filing.Of(name)
                 };
                 Recordings.Add(recording);
             }
@@ -358,6 +411,125 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
         {
             Status = $"Failed to load recordings: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Files the take that is picked under whatever has been typed in the box.
+    /// </summary>
+    /// <remarks>
+    /// A category is made by naming one: there is no list to add to first, and no list to tidy
+    /// up afterwards either, since a category is only ever the takes filed under it. Empty the
+    /// box and the take is unfiled again.
+    ///
+    /// A take filed into a category the list is not showing leaves the list, which is the
+    /// point of working through the unfiled ones.
+    /// </remarks>
+    public void FileTake() => FileUnder(SelectedRecording, TakeCategory);
+
+    /// <summary>Files the take under a category that is already in use.</summary>
+    public void FileTakeUnder(string? category)
+    {
+        TakeCategory = category ?? "";
+
+        FileTake();
+    }
+
+    /// <summary>
+    /// Files one take under one category, whichever take the page is showing by now.
+    /// </summary>
+    /// <remarks>
+    /// Named rather than implied, because the box can be left by clicking on another take, and
+    /// what was typed belongs to the take it was typed for.
+    /// </remarks>
+    public void FileUnder(Recording? recording, string? category)
+    {
+        if (recording == null) return;
+
+        string wanted = (category ?? "").Trim();
+
+        // Only when it is the one on the page: the box shows the take that is picked.
+        if (ReferenceEquals(recording, SelectedRecording) &&
+            !string.Equals(TakeCategory, wanted, StringComparison.Ordinal))
+        {
+            TakeCategory = wanted;
+        }
+
+        if (string.Equals(recording.Category, wanted, StringComparison.Ordinal)) return;
+
+        recording.Category = wanted;
+        _filing.Put(recording.Name, wanted);
+
+        Status = wanted.Length == 0
+            ? $"'{recording.Name}' is filed under nothing"
+            : $"'{recording.Name}' filed under '{wanted}'";
+
+        Sort();
+    }
+
+    partial void OnCategoryFilterChanged(string value) => Restock();
+
+    /// <summary>The categories, the filters and the list, after any of them could have changed.</summary>
+    private void Sort()
+    {
+        RefreshCategories();
+        Restock();
+    }
+
+    private void RefreshCategories()
+    {
+        var found = Recordings
+            .Select(r => r.Category)
+            .Where(c => c.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(c => c, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        Sync(Categories, found);
+        Sync(Filters, new[] { AllTakes, Unfiled }.Concat(found).ToList());
+
+        // The last take out of a category takes the category with it, and the filter with it.
+        if (!Filters.Contains(CategoryFilter)) CategoryFilter = AllTakes;
+    }
+
+    /// <summary>
+    /// Puts the takes the filter allows in the list, and only those.
+    /// </summary>
+    /// <remarks>
+    /// A take that is in both lists is left where it is rather than being taken out and put
+    /// back, so the one you are looking at stays picked and its picture stays on the page.
+    /// </remarks>
+    private void Restock()
+    {
+        var wanted = Recordings.Where(Passes).ToList();
+
+        for (int i = Shown.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(Shown[i])) Shown.RemoveAt(i);
+
+        for (int i = 0; i < wanted.Count; i++)
+            if (i >= Shown.Count || !ReferenceEquals(Shown[i], wanted[i])) Shown.Insert(i, wanted[i]);
+
+        OnPropertyChanged(nameof(Showing));
+    }
+
+    private bool Passes(Recording recording) => CategoryFilter switch
+    {
+        Unfiled => recording.Category.Length == 0,
+        AllTakes => true,
+        var category => string.Equals(recording.Category, category, StringComparison.Ordinal)
+    };
+
+    /// <summary>How many takes are being shown out of how many there are, while some are hidden.</summary>
+    public string Showing => Shown.Count == Recordings.Count ? "" : $"{Shown.Count} of {Recordings.Count}";
+
+    /// <summary>Brings a list of strings up to date without rebuilding it under a picker.</summary>
+    private static void Sync(ObservableCollection<string> list, IReadOnlyList<string> wanted)
+    {
+        for (int i = list.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(list[i])) list.RemoveAt(i);
+
+        for (int i = 0; i < wanted.Count; i++)
+            if (i >= list.Count || !string.Equals(list[i], wanted[i], StringComparison.Ordinal))
+                list.Insert(i, wanted[i]);
     }
 
     /// <summary>
@@ -378,6 +550,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
 
         // The trim and the normalise work on this one, and so does the edit dialog.
         SelectedRecordingForEdit = value;
+
+        // The box belongs to whichever take is picked.
+        TakeCategory = value?.Category ?? "";
 
         if (value == null)
         {
@@ -500,6 +675,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
             foreach (var recording in RecordingImport.Take(new[] { path }))
             {
                 recording.DurationMs = ReadDurationMs(recording.FilePath);
+                recording.Category = _filing.Of(recording.Name);
 
                 Recordings.Add(recording);
                 landed.Add(recording);
@@ -745,6 +921,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
                 File.Delete(recording.FilePath);
 
             Recordings.Remove(recording);
+            _filing.Forget(recording.Name);
 
             if (ReferenceEquals(SelectedRecording, recording)) SelectedRecording = null;
 
