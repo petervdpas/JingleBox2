@@ -46,6 +46,24 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     private readonly bool _sharedController;
 
     private readonly object _lock = new();
+
+    /// <summary>
+    /// Held while a patch is going into the plugin, and tried for while a block is going
+    /// through it.
+    /// </summary>
+    /// <remarks>
+    /// A patch arrives on whichever thread asked for the preset and a block arrives on the one
+    /// filling the sound card, and the standard says these two may not happen at once: setting
+    /// state is a plugin rebuilding what it plays with, wavetables and voices included, and
+    /// doing that while another thread is halfway through reading them is undefined and, in a
+    /// synth of any size, a crash.
+    ///
+    /// Tried for rather than waited on, on the audio thread's side. A block that arrives while
+    /// a patch is going in comes out silent, which is what a plugin being reloaded sounds like
+    /// anyway, and the alternative is holding up the sound card while somebody else's code
+    /// reads twelve kilobytes of preset.
+    /// </remarks>
+    private readonly object _swapping = new();
     private readonly Dictionary<uint, double> _pending = new();
 
     private Vst3ParameterChanges? _changes;
@@ -495,15 +513,31 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         if (_disposed || !_active || buffer == null || frames <= 0) return;
         if (_outputBusChannels.Length == 0) return;
 
-        int offset = 0;
-
-        // BASS asks for its whole playback buffer the first time it fills one, which is far
-        // more than a plugin was activated for. The block is cut to what the plugin agreed to.
-        while (offset < frames)
+        // A patch is going in. See _swapping: this block is given up rather than waited for,
+        // and what comes out is silence, which is what the plugin has to give at that moment
+        // in any case.
+        if (!System.Threading.Monitor.TryEnter(_swapping))
         {
-            int chunk = Math.Min(_maxFrames, frames - offset);
-            ProcessBlock(buffer, offset, chunk);
-            offset += chunk;
+            Array.Clear(buffer, 0, Math.Min(buffer.Length, frames * 2));
+            return;
+        }
+
+        try
+        {
+            int offset = 0;
+
+            // BASS asks for its whole playback buffer the first time it fills one, which is far
+            // more than a plugin was activated for. The block is cut to what the plugin agreed to.
+            while (offset < frames)
+            {
+                int chunk = Math.Min(_maxFrames, frames - offset);
+                ProcessBlock(buffer, offset, chunk);
+                offset += chunk;
+            }
+        }
+        finally
+        {
+            System.Threading.Monitor.Exit(_swapping);
         }
     }
 
@@ -828,6 +862,17 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     {
         if (_disposed || _component == null) return Array.Empty<byte>();
 
+        // Reading what a plugin holds is the same kind of reach into it as writing it, and it
+        // happens while a song is being saved, which is a thing people do while something is
+        // playing.
+        lock (_swapping)
+        {
+            return SaveStateHere();
+        }
+    }
+
+    private byte[] SaveStateHere()
+    {
         using var state = new Vst3Stream();
 
         if (_component->Vtbl->GetState(_component, state.Pointer) != Vst3Abi.ResultOk) return Array.Empty<byte>();
@@ -914,6 +959,16 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     {
         if (_disposed || _component == null || state == null || state.Length == 0) return;
 
+        // The block that is in the plugin now is allowed to finish; the next one goes silent
+        // until this is done. See _swapping.
+        lock (_swapping)
+        {
+            LoadStateHere(state);
+        }
+    }
+
+    private void LoadStateHere(byte[] state)
+    {
         var (sound, settings) = Apart(state);
 
         using var stream = new Vst3Stream();
