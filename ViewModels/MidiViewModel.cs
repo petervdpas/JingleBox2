@@ -6,6 +6,7 @@ using JingleBox2.Midi;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.ViewModels;
 

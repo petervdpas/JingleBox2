@@ -1,6 +1,6 @@
 using Avalonia.Media;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// The face the pattern grid and its header both measure against. They must agree exactly,

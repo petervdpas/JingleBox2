@@ -3,9 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using JingleBox2.Tracker;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A compact numeric field: a value you can type, plus a pair of stacked step buttons that

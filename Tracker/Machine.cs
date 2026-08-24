@@ -170,15 +170,54 @@ public sealed record Machine(
         false,
         new MachineTheme("#7B838C")); // Grey, and deliberately: a plugin is somebody else's box on the rack.
 
-    /// <summary>Every machine there is, in the order they are offered.</summary>
-    public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Zampler, BongaBong, Recording, Plugin };
+    /// <summary>What a machine is when nothing has been imported over it.</summary>
+    private static readonly Machine[] Built = { OddSkilla, Ouroboros, Zampler, BongaBong, Recording, Plugin };
+
+    /// <summary>
+    /// Every machine there is, in the order they are offered.
+    /// </summary>
+    /// <remarks>
+    /// A list rather than a fixed array, because a machine is a project now: what it is called,
+    /// what it says it is and what colour it wears are read off the machine itself when the app
+    /// starts. The ones written out above are what the app falls back to when nothing has been
+    /// imported, which is also what makes a half-installed machines folder harmless.
+    /// </remarks>
+    public static IReadOnlyList<Machine> All => Registered;
+
+    private static List<Machine> Registered { get; } = Built.ToList();
 
     /// <summary>The ones that are ours to program, as opposed to a plugin we only host.</summary>
-    public static IReadOnlyList<Machine> Ours { get; } = All.Where(m => m.IsOurs).ToList();
+    public static IReadOnlyList<Machine> Ours => Registered.Where(m => m.IsOurs).ToList();
+
+    /// <summary>
+    /// Takes a machine as it was imported, replacing what the app knew about it.
+    /// </summary>
+    /// <remarks>
+    /// Matched by id, since that is what a machine is: two entries with the same id are the
+    /// same machine, and the imported one wins. An id nothing knows about is a machine the app
+    /// has no engine for yet, and is left alone rather than added as a box that cannot sound.
+    /// </remarks>
+    public static bool Register(string id, string name, string summary, MachineTheme theme)
+    {
+        int at = Registered.FindIndex(m => m.SlotId == id);
+
+        if (at < 0) return false;
+
+        var was = Registered[at];
+
+        Registered[at] = was with
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? was.Name : name,
+            Summary = string.IsNullOrWhiteSpace(summary) ? was.Summary : summary,
+            Theme = theme ?? was.Theme
+        };
+
+        return true;
+    }
 
     /// <summary>Which machine a kind is on. Never null: every kind has one.</summary>
     public static Machine For(TrackerInstrumentKind kind) =>
-        All.FirstOrDefault(m => m.Kind == kind) ?? OddSkilla;
+        Registered.FirstOrDefault(m => m.Kind == kind) ?? OddSkilla;
 
     public override string ToString() => Name;
 }

@@ -8,7 +8,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A panel switch: a metal handle that sits in one of two or three positions, with what each

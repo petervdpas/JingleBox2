@@ -5,7 +5,7 @@ using JingleBox2.UI;
 using System;
 using System.Diagnostics;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// How loud something is, right now. One bar for a mono signal, two for a stereo one, either

@@ -15,6 +15,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.ViewModels;
 
@@ -33,6 +34,9 @@ public sealed partial class MainViewModel : ObservableObject
     public TakeFilter Takes { get; }
     public TrackerViewModel Tracker { get; }
     public MachineRackViewModel Machines { get; }
+
+    /// <summary>Where a machine is built, as opposed to the rack, which is what is installed.</summary>
+    public MachineEditorViewModel MachineEditor { get; } = new();
 
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.

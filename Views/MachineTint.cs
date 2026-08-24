@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using System;
 using JingleBox2.Machines;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

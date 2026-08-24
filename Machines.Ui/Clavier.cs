@@ -9,7 +9,7 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows.Input;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// The keyboard on a front panel: the keys, and the octave they are showing.

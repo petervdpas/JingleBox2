@@ -4,7 +4,7 @@ using Avalonia.Layout;
 using System;
 using System.Linq;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A run of panel cells, across or down, that the things standing on it are placed against.

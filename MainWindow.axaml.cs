@@ -74,6 +74,13 @@ public partial class MainWindow : Window
         Diagnostics.CrashReport.Watch(Config.AppFolder.Path());
         Diagnostics.CrashReport.Note("started, " + cfg.Rows + " by " + cfg.Columns + " pads");
 
+        // The machines this installation has. Read before anything shows one, since what the
+        // rack is called and what colour it wears come off the machines themselves now.
+        var machines = Tracker.Machines.MachineRegistry.Load();
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.App,
+            () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
+
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
 
         var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing);

@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace JingleBox2.Tracker;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// The value logic behind a number field: stepping, clamping, and reading typed text.

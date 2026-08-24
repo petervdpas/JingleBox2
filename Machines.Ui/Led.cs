@@ -3,7 +3,7 @@ using Avalonia.Media;
 using System;
 using System.Globalization;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A lamp on the panel: lit, unlit, and dark enough when unlit to still look like a lamp.
@@ -110,7 +110,7 @@ public class Led : ThemedControl
     /// because then every lamp needs its own binding to work out whether it is the lit one;
     /// but a row still has to be made of the same lamp, or the panel has two kinds on it.
     /// </remarks>
-    internal static void DrawLamp(DrawingContext context, Point centre, double radius, Color colour, bool lit)
+    public static void DrawLamp(DrawingContext context, Point centre, double radius, Color colour, bool lit)
     {
         // Lit, it spills onto the panel around it. That halo is most of what makes a lamp read
         // as on rather than as a coloured dot.

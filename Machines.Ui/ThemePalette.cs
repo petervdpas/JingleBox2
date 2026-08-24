@@ -2,7 +2,7 @@ using Avalonia.Media;
 using Avalonia;
 using Avalonia.Controls;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// The theme colours a custom-drawn control paints with, resolved once per render.

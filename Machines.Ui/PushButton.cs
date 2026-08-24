@@ -7,7 +7,7 @@ using System;
 using System.Globalization;
 using System.Windows.Input;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A small panel button: a moulded cap you press, with what it does written under it and a

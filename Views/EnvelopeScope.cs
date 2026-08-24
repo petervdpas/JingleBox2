@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Media;
 using JingleBox2.Tracker.Synth;
 using System;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

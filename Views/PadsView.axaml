@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              x:Class="JingleBox2.Views.PadsView"
              x:DataType="vm:MainViewModel">
 
@@ -257,7 +258,7 @@
                        subject, and three controls loose on a card do not say so. No caption:
                        the three controls say what they are, and a word over them only
                        repeats them. -->
-                  <views:PanelGroup>
+                  <ui:PanelGroup>
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
 
                       <!-- A grid rather than two rows, so the label column is as wide as the
@@ -269,12 +270,12 @@
                             VerticalAlignment="Top">
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Fade In"
                                    VerticalAlignment="Center" />
-                        <views:NumberField Grid.Row="0" Grid.Column="1"
+                        <ui:NumberField Grid.Row="0" Grid.Column="1"
                                            Value="{Binding FadeIn}" Minimum="0" Maximum="4.9"
                                            SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76" />
                         <TextBlock Grid.Row="1" Grid.Column="0" Text="Fade Out"
                                    VerticalAlignment="Center" />
-                        <views:NumberField Grid.Row="1" Grid.Column="1"
+                        <ui:NumberField Grid.Row="1" Grid.Column="1"
                                            Value="{Binding FadeOut}" Minimum="0" Maximum="4.9"
                                            SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76" />
                       </Grid>
@@ -284,7 +285,7 @@
                            reads and writes its own label and value, so neither is spelled out
                            beside it. Unity is the top of the travel, since a pad plays a file
                            rather than amplifying one. -->
-                      <views:Fader Grid.Column="1"
+                      <ui:Fader Grid.Column="1"
                                    HorizontalAlignment="Right"
                                    Label="Volume" Unit=" dB" Format="0.0" DefaultValue="0"
                                    Minimum="-60" Maximum="0"
@@ -294,7 +295,7 @@
                                    ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
                                    Value="{Binding VolumeDecibels}" />
                     </Grid>
-                  </views:PanelGroup>
+                  </ui:PanelGroup>
 
                   <Grid>
                     <StackPanel Orientation="Horizontal"

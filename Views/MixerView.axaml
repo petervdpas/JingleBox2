@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              x:Class="JingleBox2.Views.MixerView"
              x:DataType="vm:TrackerViewModel">
 
@@ -65,7 +66,7 @@
                         <TextBlock Text="{Binding Label}" />
                       </Border>
 
-                      <views:Knob Label="Pan" Format="0.00" DefaultValue="0"
+                      <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
                                   Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                                   HorizontalAlignment="Center"
                                   Value="{Binding Pan}" />
@@ -91,13 +92,13 @@
                                 ToolTip.Tip="The track whose notes push this one down. Pick the kick to clear room for it." />
 
                       <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                        <views:Knob Label="Duck" Format="0.00" DefaultValue="0"
+                        <ui:Knob Label="Duck" Format="0.00" DefaultValue="0"
                                     Minimum="0" Maximum="1" SmallStep="0.02" LargeStep="0.1"
                                     DialSize="30"
                                     ToolTip.Tip="How far down this track goes while the key track is at full scale."
                                     Value="{Binding Duck}" />
 
-                        <views:Knob Label="Rel" Unit="ms" Format="0" DefaultValue="150"
+                        <ui:Knob Label="Rel" Unit="ms" Format="0" DefaultValue="150"
                                     Minimum="20" Maximum="1000" SmallStep="5" LargeStep="50"
                                     DialSize="30"
                                     ToolTip.Tip="How long this track takes to come back up once the key stops. The attack is always fast."
@@ -110,7 +111,7 @@
                          both take whatever height is left in the strip. -->
                     <StackPanel Orientation="Horizontal" Spacing="8"
                                 HorizontalAlignment="Center" Margin="0,10,0,0">
-                      <views:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                      <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
                                    Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                    TrackLength="0"
                                    Ticks="6,0,-6,-12,-24,-40,-60"
@@ -119,7 +120,7 @@
 
                       <!-- Inset to line the bar up with the fader's travel, which starts
                            below its label and ends above its reading. -->
-                      <views:LevelMeter Width="22"
+                      <ui:LevelMeter Width="22"
                                         VerticalAlignment="Stretch"
                                         Margin="0,23,0,24"
                                         Stereo="True"

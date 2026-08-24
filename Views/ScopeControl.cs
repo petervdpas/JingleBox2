@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Threading;
 using System;
 using System.Diagnostics;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

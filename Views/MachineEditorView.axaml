@@ -2,12 +2,181 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:machines="clr-namespace:JingleBox2.Machines;assembly=JingleBox2.Machines.Abstractions"
+             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              x:Class="JingleBox2.Views.MachineEditorView"
              x:DataType="vm:MainViewModel">
 
-  <!-- The machine editor. Empty on purpose: this is where a machine project is opened and
-       built, and it is not the rack. The rack is what is installed, and it lives in the
-       tracker; nothing of it belongs here. -->
-  <Panel />
+  <!-- Where a machine is built. The rack, in the tracker, is what is installed; this is the
+       workshop, and what it holds is a project on disc: a folder with the machine in it, which
+       is the thing that gets installed and, one day, sold. -->
+  <DockPanel Classes="tabRoot">
+
+    <Border DockPanel.Dock="Top" Classes="card">
+      <StackPanel Classes="cardBody">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
+                     Text="{Binding MachineEditor.Title}" />
+
+          <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                     Margin="8,0,0,0"
+                     TextTrimming="CharacterEllipsis"
+                     Text="{Binding MachineEditor.Project.Folder}" />
+
+          <Button Grid.Column="2" Content="New" Command="{Binding MachineEditor.NewCommand}"
+                  ToolTip.Tip="A machine nobody has made yet. It gets its id now and keeps it forever." />
+
+          <Button Grid.Column="3" Content="Open..." Click="Open_Click" />
+
+          <Button Grid.Column="4" Content="Save" Click="Save_Click"
+                  IsEnabled="{Binding MachineEditor.HasProject}" />
+        </Grid>
+
+        <TextBlock Classes="cardHint" Text="{Binding MachineEditor.Status}"
+                   IsVisible="{Binding MachineEditor.Status.Length}" />
+      </StackPanel>
+    </Border>
+
+    <Grid Margin="0,12,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="700" MinWidth="360" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" MinWidth="240" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="250" MinHeight="120" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" MinHeight="120" />
+      </Grid.RowDefinitions>
+
+    <!-- What a machine is, before anything about how it sounds: its name, its id, who made it,
+         and the colour it wears wherever it is shown. -->
+    <Border Grid.Row="0" Grid.Column="0" Classes="card"
+            IsVisible="{Binding MachineEditor.HasProject}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Classes="cardBody" MaxWidth="520" HorizontalAlignment="Left">
+        <TextBlock Classes="cardTitle" Text="The machine" />
+
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+              ColumnSpacing="10" RowSpacing="8">
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
+          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}" />
+
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="What it is:" />
+          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MachineEditor.Project.Summary}"
+                   PlaceholderText="One line, for somebody choosing between machines" />
+
+          <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Made by:" />
+          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}" />
+
+          <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Version:" />
+          <TextBox Grid.Row="3" Grid.Column="1" Width="120" HorizontalAlignment="Left"
+                   Text="{Binding MachineEditor.Project.Version}" />
+
+          <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Id:" />
+          <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                     Text="{Binding MachineEditor.Project.Id}"
+                     ToolTip.Tip="What songs write down. Made once, and never changed." />
+        </Grid>
+      </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <!-- What the machine can be set to. This is most of what a machine is: the panel is these
+         drawn, the patch is these stored, and an instrument in a song is these with values in
+         them. -->
+    <!-- Drag to give the list more room, or the machine's own details more. -->
+    <GridSplitter Grid.Row="1" Grid.Column="0" Classes="handle rows" ResizeDirection="Rows"
+                  Height="10" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding MachineEditor.HasProject}"
+                  ToolTip.Tip="Drag to share the room between what the machine is and what it can be set to." />
+
+    <Border Grid.Row="2" Grid.Column="0" Classes="card"
+            IsVisible="{Binding MachineEditor.HasProject}">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center" Text="Parameters" />
+
+          <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center" Margin="8,0,0,0"
+                     Text="Key is what files use and never changes. Name is what the panel says." />
+
+          <Button Grid.Column="2" Content="+ Parameter"
+                  Command="{Binding MachineEditor.AddParameterCommand}" />
+        </Grid>
+
+        <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}" Margin="0,10,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:MachineParameterViewModel">
+              <Grid ColumnDefinitions="120,160,70,80,80,80,80,Auto" ColumnSpacing="6" Margin="0,0,0,6">
+                <TextBox Grid.Column="0" Text="{Binding Key}" ToolTip.Tip="What this is stored under, forever." />
+                <TextBox Grid.Column="1" Text="{Binding Name}" ToolTip.Tip="What the panel calls it." />
+                <TextBox Grid.Column="2" Text="{Binding Unit}" Watermark="unit" />
+                <TextBox Grid.Column="3" Text="{Binding Min}" ToolTip.Tip="Lowest it goes." />
+                <TextBox Grid.Column="4" Text="{Binding Max}" ToolTip.Tip="Highest it goes." />
+                <TextBox Grid.Column="5" Text="{Binding Default}" ToolTip.Tip="Where it sits before anybody touches it." />
+                <TextBox Grid.Column="6" Text="{Binding Step}" ToolTip.Tip="How far one notch moves it." />
+
+                <Button Grid.Column="7" Content="✕" Classes="danger"
+                        Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).MachineEditor.RemoveParameterCommand}"
+                        CommandParameter="{Binding}"
+                        ToolTip.Tip="Takes it off the machine." />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <!-- The machine, drawn. Every parameter is a knob, in the machine's own colours, out of
+         the same controls a panel in the app is built from. Turning one here changes nothing
+         but the knob: a value belongs to an instrument in a song, not to the machine. -->
+    <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Classes="handle"
+                  ResizeDirection="Columns" Width="10"
+                  IsVisible="{Binding MachineEditor.HasProject}"
+                  ToolTip.Tip="Drag to give the panel more room, or the fields beside it." />
+
+    <Border x:Name="PanelPreview" Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Classes="card"
+            IsVisible="{Binding MachineEditor.HasProject}">
+      <StackPanel Classes="cardBody">
+        <TextBlock Classes="cardTitle" Text="{Binding MachineEditor.Title}" />
+
+        <TextBlock Classes="cardHint"
+                   IsVisible="{Binding !MachineEditor.Parameters.Count}"
+                   Text="Nothing to show yet. Add a parameter and it appears here as a knob." />
+
+        <ui:PanelGroup Caption="Panel" IsVisible="{Binding MachineEditor.Parameters.Count}"
+                       HorizontalAlignment="Left">
+          <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MachineParameterViewModel">
+                <ui:Knob Label="{Binding Name}"
+                         Unit="{Binding Unit}"
+                         Minimum="{Binding Min}"
+                         Maximum="{Binding Max}"
+                         DefaultValue="{Binding Default}"
+                         SmallStep="{Binding Step}"
+                         LargeStep="{Binding Step}"
+                         Value="{Binding Value, Mode=TwoWay}"
+                         LabelAbove="True"
+                         DialSize="44"
+                         Margin="0,0,14,10" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ui:PanelGroup>
+      </StackPanel>
+    </Border>
+
+    </Grid>
+
+  </DockPanel>
 
 </UserControl>

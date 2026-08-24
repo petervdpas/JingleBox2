@@ -4,7 +4,7 @@ using Avalonia.Media;
 using System;
 using System.Globalization;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A named part of a panel, framed, so several of them can stand side by side and still read

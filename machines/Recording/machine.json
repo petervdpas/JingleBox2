@@ -1,0 +1,20 @@
+{
+  "Folder": "machines/Recording",
+  "Id": "machine.recording",
+  "Name": "Recording",
+  "Summary": "One of your recordings, pitched by resampling.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "",
+  "Theme": {
+    "Accent": "#3FA6A0",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "IsSaved": true
+}

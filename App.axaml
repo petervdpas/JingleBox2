@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:conv="clr-namespace:JingleBox2.Converters"
              xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              x:Class="JingleBox2.App"
              RequestedThemeVariant="Default">
@@ -176,6 +177,36 @@
                 </ControlTemplate>
             </Setter>
         </Style>
+        <!-- The same handle laid on its side, for a split between rows. The line has to run
+             the other way or a horizontal handle draws a vertical hairline. -->
+        <Style Selector="GridSplitter.handle.rows">
+            <Setter Property="Cursor" Value="SizeNorthSouth" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <Rectangle x:Name="Line" Height="1" VerticalAlignment="Center"
+                                   HorizontalAlignment="Stretch">
+                            <Rectangle.Fill>
+                                <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
+                            </Rectangle.Fill>
+                        </Rectangle>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.handle.rows:pointerover /template/ Rectangle#Line">
+            <Setter Property="Height" Value="2" />
+            <Setter Property="Fill">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.55" />
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.handle.rows:pressed /template/ Rectangle#Line">
+            <Setter Property="Height" Value="2" />
+            <Setter Property="Fill">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.9" />
+            </Setter>
+        </Style>
+
         <Style Selector="GridSplitter.handle:pointerover /template/ Rectangle#Line">
             <Setter Property="Width" Value="2" />
             <Setter Property="Fill">
@@ -233,7 +264,7 @@
 
         <!-- A number field with its own compact stepper: two buttons stacked in the height of
              the input, rather than the full-size pair a NumericUpDown reserves room for. -->
-        <ControlTheme x:Key="{x:Type views:NumberField}" TargetType="views:NumberField">
+        <ControlTheme x:Key="{x:Type ui:NumberField}" TargetType="ui:NumberField">
             <Setter Property="Height" Value="30" />
             <Setter Property="FontSize" Value="13" />
 
@@ -275,7 +306,7 @@
                         VerticalAlignment="Stretch"
                         Background="{Binding Colour, Converter={StaticResource HexBrush}}" />
 
-                <views:LevelMeter Grid.Column="1" Grid.RowSpan="3"
+                <ui:LevelMeter Grid.Column="1" Grid.RowSpan="3"
                                  Left="{Binding Level}"
                                  Width="10"
                                  Height="42"

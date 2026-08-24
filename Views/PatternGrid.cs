@@ -6,6 +6,7 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Tracker;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

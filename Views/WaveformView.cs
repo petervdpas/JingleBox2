@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using System;
 using System.Windows.Input;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

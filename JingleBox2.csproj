@@ -19,15 +19,27 @@
   <ItemGroup>
     <!-- What a machine is written against. The host knows machines only through this. -->
     <ProjectReference Include="Machines.Abstractions\JingleBox2.Machines.Abstractions.csproj" />
+    <!-- And what a machine's panel is drawn with. -->
+    <ProjectReference Include="Machines.Ui\JingleBox2.Machines.Ui.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The machines that ship. A machine is a project on disc, so the ones we supply are
+         copied out beside the program and read at startup like any other. -->
+    <None Include="machines\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its
          sources and its build folder, and compile both twice. -->
     <Compile Remove="Machines.Abstractions\**" />
+    <Compile Remove="Machines.Ui\**" />
     <EmbeddedResource Remove="Machines.Abstractions\**" />
+    <EmbeddedResource Remove="Machines.Ui\**" />
     <None Remove="Machines.Abstractions\**" />
+    <None Remove="Machines.Ui\**" />
     <AvaloniaResource Remove="Machines.Abstractions\**" />
+    <AvaloniaResource Remove="Machines.Ui\**" />
     <AvaloniaXaml Remove="Machines.Abstractions\**" />
+    <AvaloniaXaml Remove="Machines.Ui\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />

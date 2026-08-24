@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using System;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A control that paints itself and has to be told when the theme moves under it.

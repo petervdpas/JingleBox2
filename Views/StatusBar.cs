@@ -3,6 +3,7 @@ using Avalonia.Media;
 using JingleBox2.UI;
 using System;
 using System.Globalization;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 

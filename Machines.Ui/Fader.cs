@@ -3,12 +3,11 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.Tracker;
 using JingleBox2.UI;
 using System;
 using System.Globalization;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A vertical fader, with its label above and its value below. The same shape as

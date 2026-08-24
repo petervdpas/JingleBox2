@@ -8,6 +8,7 @@ using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Views;
 
