@@ -145,5 +145,18 @@ public static class ThemeManager
         });
 
         CurrentTheme = resolved;
+
+        Changed?.Invoke();
     }
+
+    /// <summary>
+    /// The theme has been swapped.
+    /// </summary>
+    /// <remarks>
+    /// For anything holding a colour it worked out from the theme's own: a machine panel is
+    /// painted in its machine's shade of the theme's surface, and that has to be mixed again
+    /// against the new one. Avalonia's own resource change reaches everything bound to a
+    /// resource; this reaches the few things that read one and then did arithmetic on it.
+    /// </remarks>
+    public static event Action? Changed;
 }

@@ -30,7 +30,45 @@ public partial class InstrumentEditor : UserControl
     public InstrumentEditor()
     {
         InitializeComponent();
+
+        // The panel is painted in the machine's own shades, so it has to be repainted when the
+        // machine changes under it, and mixed again when the theme moves under both.
+        DataContextChanged += (_, _) => Watch();
+        UI.ThemeManager.Changed += Later;
+        DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
     }
+
+    /// <summary>The designer whose editor is being watched, so it is let go of again.</summary>
+    private System.ComponentModel.INotifyPropertyChanged? _watched;
+
+    private void Watch()
+    {
+        if (_watched != null) _watched.PropertyChanged -= OnDesignerChanged;
+
+        _watched = DataContext as System.ComponentModel.INotifyPropertyChanged;
+
+        if (_watched != null) _watched.PropertyChanged += OnDesignerChanged;
+
+        Retint();
+    }
+
+    private void OnDesignerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // The rack keeps the same designer and swaps the instrument inside it.
+        if (e.PropertyName == nameof(IInstrumentDesigner.Editor)) Retint();
+    }
+
+    /// <summary>
+    /// Repainted after the theme swap has settled rather than during it.
+    /// </summary>
+    /// <remarks>
+    /// The shades are mixed against the theme's own colours, and read in the middle of the
+    /// swap those are still the old theme's: the panel came out of a light theme still wearing
+    /// light cards on a dark page.
+    /// </remarks>
+    private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
+
+    private void Retint() => MachineTint.Apply(this, Editor?.Theme);
 
     private InstrumentEditorViewModel? Editor => (DataContext as IInstrumentDesigner)?.Editor;
 

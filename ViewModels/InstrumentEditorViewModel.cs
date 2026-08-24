@@ -142,8 +142,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     public TrackerInstrument Instrument => _instrument;
 
-    /// <summary>The machine's colour, for the band across the top of its panel.</summary>
-    public string Colour => Machine.For(_instrument.Kind).Colour;
+    /// <summary>The machine's own theme: its colour and how far it is carried.</summary>
+    public MachineTheme Theme => Machine.For(_instrument.Kind).Theme;
+
+    /// <summary>Its colour on its own, for the band across the top of the panel.</summary>
+    public string Colour => Theme.Accent;
 
     /// <summary>The voice settings, which both kinds of instrument have.</summary>
     public SynthPatchViewModel? Patch { get; }

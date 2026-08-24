@@ -306,6 +306,21 @@
                 <Setter Property="Padding" Value="8,2" />
                 <Setter Property="MinHeight" Value="0" />
               </Style>
+
+              <!-- In the machine's colour, as on the rack: these are the same machines seen
+                   from inside a song. -->
+              <Style Selector="ListBoxItem" x:DataType="vm:InstrumentSlot">
+                <Setter Property="Background"
+                        Value="{Binding Row}" />
+              </Style>
+              <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter" x:DataType="vm:InstrumentSlot">
+                <Setter Property="Background"
+                        Value="{Binding RowOver}" />
+              </Style>
+              <Style Selector="ListBoxItem:selected /template/ ContentPresenter" x:DataType="vm:InstrumentSlot">
+                <Setter Property="Background"
+                        Value="{Binding RowPicked}" />
+              </Style>
             </ListBox.Styles>
           </ListBox>
         </DockPanel>

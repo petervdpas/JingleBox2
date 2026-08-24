@@ -17,19 +17,28 @@ namespace JingleBox2.Converters;
 /// </remarks>
 public sealed class HexBrushConverter : IValueConverter
 {
+    /// <param name="parameter">
+    /// How much of it to use, 0 to 1, for the washes a list row is tinted with. Left out, the
+    /// colour is given whole.
+    /// </param>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not string hex || hex.Length == 0) return AvaloniaProperty.UnsetValue;
 
         try
         {
-            return new SolidColorBrush(Color.Parse(hex));
+            return new SolidColorBrush(Color.Parse(hex), Opacity(parameter));
         }
         catch (FormatException)
         {
             return AvaloniaProperty.UnsetValue;
         }
     }
+
+    private static double Opacity(object? parameter) =>
+        parameter is string text && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double amount)
+            ? Math.Clamp(amount, 0, 1)
+            : 1;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException("A brush is not turned back into the colour it was written as.");

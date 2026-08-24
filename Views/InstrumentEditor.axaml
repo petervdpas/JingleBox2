@@ -4,7 +4,9 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.InstrumentEditor"
              x:Name="Root"
-             x:DataType="vm:IInstrumentDesigner">
+             x:DataType="vm:IInstrumentDesigner"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             Padding="10">
 
   <UserControl.Styles>
     <Style Selector="TextBlock.field">
@@ -32,14 +34,18 @@
     </Style>
   </UserControl.Styles>
 
+  <!-- The machine itself: a plate in its own colours, standing inside whatever is holding it.
+       The gap around it is the control's padding, so a rack can leave room around the box and
+       a window of its own can give it every pixel it has. -->
+  <Border Background="{DynamicResource BgBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="6"
+          Padding="12">
+
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
     <StackPanel Spacing="8"
                 IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
-
-            <!-- The machine's colour across the top of its panel, so the panel says which
-                 machine you are looking at before you have read a word of it. -->
-            <Border Height="4" CornerRadius="2" Margin="0,0,0,4"
-                    Background="{Binding Editor.Colour, Converter={StaticResource HexBrush}}" />
 
             <!-- Everything that is a name or a choice, on as few lines as it takes -->
             <WrapPanel Orientation="Horizontal">
@@ -896,4 +902,6 @@
 
     </StackPanel>
   </ScrollViewer>
+  </Border>
+
 </UserControl>

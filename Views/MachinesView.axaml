@@ -70,7 +70,26 @@
 
           <ListBox ItemsSource="{Binding Machines}"
                    SelectedItem="{Binding Selected}"
-                   ItemTemplate="{StaticResource RackRow}" />
+                   ItemTemplate="{StaticResource RackRow}">
+            <!-- Each row in its machine's colour, a wash for a row and more of it for the one
+                 in hand. The rack reads as a rack of coloured boxes rather than as a list with
+                 a coloured edge, and the row you have picked is that machine's colour rather
+                 than the application's. -->
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem" x:DataType="vm:RackMachine">
+                <Setter Property="Background"
+                        Value="{Binding Row}" />
+              </Style>
+              <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter" x:DataType="vm:RackMachine">
+                <Setter Property="Background"
+                        Value="{Binding RowOver}" />
+              </Style>
+              <Style Selector="ListBoxItem:selected /template/ ContentPresenter" x:DataType="vm:RackMachine">
+                <Setter Property="Background"
+                        Value="{Binding RowPicked}" />
+              </Style>
+            </ListBox.Styles>
+          </ListBox>
         </DockPanel>
       </Border>
 

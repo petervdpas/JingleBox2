@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Avalonia.Media;
 using JingleBox2.Tracker;
 using System.Globalization;
 
@@ -28,8 +29,21 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
 
-    /// <summary>The colour of the machine it came off, the same one the rack shows.</summary>
-    public string Colour => Machine.For(Instrument.Kind).Colour;
+    /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
+    public MachineTheme Theme => Machine.For(Instrument.Kind).Theme;
+
+    /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
+    public string Colour => Theme.Accent;
+
+    /// <summary>The row's own wash, and the two it takes under the pointer and in hand.</summary>
+    public IBrush Row => Wash(Theme.Row);
+    public IBrush RowOver => Wash(Theme.RowOver);
+    public IBrush RowPicked => Wash(Theme.RowPicked);
+
+    private IBrush Wash(double amount) =>
+        Views.MachineTint.Hue(Theme.Accent, out var hue)
+            ? new SolidColorBrush(hue, amount)
+            : Brushes.Transparent;
 
     /// <summary>
     /// The second line of the row: which machine it is on, and a word about how it is set.

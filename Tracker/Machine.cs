@@ -22,8 +22,11 @@ public sealed record Machine(
     string Name,
     string Summary,
     bool IsOurs,
-    string Colour)
+    MachineTheme Theme)
 {
+    /// <summary>The machine's own colour, which is where everything it is painted with starts.</summary>
+    public string Colour => Theme.Accent;
+
     /// <summary>
     /// The instrument id a machine's own slot in the rack uses.
     /// </summary>
@@ -68,7 +71,7 @@ public sealed record Machine(
         "OddSkilla",
         "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
         true,
-        "#E2A03F"); // Amber. The oscillator machine, and the one everything else was built out of.
+        new MachineTheme("#E2A03F")); // Amber. The oscillator machine, and the one everything else was built out of.
 
     /// <summary>
     /// One of your recordings, played back at a pitch: the raw form of Zampler and BongaBong.
@@ -91,7 +94,7 @@ public sealed record Machine(
         "Recording",
         "One of your recordings, pitched by resampling.",
         true,
-        "#3FA6A0"); // Teal. What comes off the RECORD tab, played back at a pitch.
+        new MachineTheme("#3FA6A0")); // Teal. What comes off the RECORD tab, played back at a pitch.
 
     /// <summary>
     /// The Mother-32 machine: one oscillator blended with noise, a filter that sweeps, an
@@ -107,7 +110,7 @@ public sealed record Machine(
         "Ouroboros",
         "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
         true,
-        "#9B6DD6"); // Violet. The mono synth, and the odd one out of the family.
+        new MachineTheme("#9B6DD6")); // Violet. The mono synth, and the odd one out of the family.
 
     /// <summary>
     /// The kit machine: sixteen pads, one recording to a key, and none of them transposed.
@@ -127,7 +130,7 @@ public sealed record Machine(
         "BongaBong",
         "A kit. Sixteen pads, one recording to a key, sounding over each other.",
         true,
-        "#D2504A"); // Red, the colour every drum machine has been since Redrum.
+        new MachineTheme("#D2504A")); // Red, the colour every drum machine has been since Redrum.
 
     /// <summary>
     /// The sampling machine: recordings laid across the keyboard, each transposed from its root.
@@ -146,7 +149,7 @@ public sealed record Machine(
         "Zampler",
         "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
         true,
-        "#4E86D8"); // Blue. The keyboard machine: recordings laid across the keys.
+        new MachineTheme("#4E86D8")); // Blue. The keyboard machine: recordings laid across the keys.
 
     /// <summary>Somebody else's instrument, hosted: Serum, Vital, anything that takes notes.</summary>
     public static readonly Machine Plugin = new(
@@ -154,7 +157,7 @@ public sealed record Machine(
         "Plugin",
         "A VST3 or CLAP instrument, playing in a process of its own.",
         false,
-        "#7B838C"); // Grey, and deliberately: a plugin is somebody else's box on the rack.
+        new MachineTheme("#7B838C")); // Grey, and deliberately: a plugin is somebody else's box on the rack.
 
     /// <summary>Every machine there is, in the order they are offered.</summary>
     public static IReadOnlyList<Machine> All { get; } = new[] { OddSkilla, Ouroboros, Zampler, BongaBong, Recording, Plugin };
