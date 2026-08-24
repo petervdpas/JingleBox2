@@ -36,6 +36,11 @@
     <StackPanel Spacing="8"
                 IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
 
+            <!-- The machine's colour across the top of its panel, so the panel says which
+                 machine you are looking at before you have read a word of it. -->
+            <Border Height="4" CornerRadius="2" Margin="0,0,0,4"
+                    Background="{Binding Editor.Colour, Converter={StaticResource HexBrush}}" />
+
             <!-- Everything that is a name or a choice, on as few lines as it takes -->
             <WrapPanel Orientation="Horizontal">
               <StackPanel Classes="entry">

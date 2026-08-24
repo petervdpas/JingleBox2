@@ -14,6 +14,9 @@ public sealed partial class RackMachine : ObservableObject
 
     public string Name => Instrument.Name;
 
+    /// <summary>The machine's own colour, so a rack reads as a rack rather than as a list.</summary>
+    public string Colour => Machine.For(Instrument.Kind).Colour;
+
     /// <summary>
     /// True for a machine's own slot: always there, called what the machine is called, and
     /// neither renamed nor deleted.

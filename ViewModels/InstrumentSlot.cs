@@ -28,6 +28,9 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
     public string Name => Instrument.Name;
 
+    /// <summary>The colour of the machine it came off, the same one the rack shows.</summary>
+    public string Colour => Machine.For(Instrument.Kind).Colour;
+
     /// <summary>
     /// The second line of the row: which machine it is on, and a word about how it is set.
     /// </summary>

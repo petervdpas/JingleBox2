@@ -270,8 +270,12 @@
         <DataTemplate x:Key="InstrumentRow" x:DataType="vm:InstrumentSlot">
             <!-- Two lines, as close together as they read well: a song with eight instruments
                  should not need scrolling to see them. -->
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
-                <views:LevelMeter Grid.Column="0" Grid.RowSpan="3"
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="6">
+                <Border Grid.Column="0" Grid.RowSpan="3" Width="4" CornerRadius="2"
+                        VerticalAlignment="Stretch"
+                        Background="{Binding Colour, Converter={StaticResource HexBrush}}" />
+
+                <views:LevelMeter Grid.Column="1" Grid.RowSpan="3"
                                  Left="{Binding Level}"
                                  Width="10"
                                  Height="42"
@@ -279,23 +283,23 @@
                                  ShowPeak="False"
                                  VerticalAlignment="Center" />
 
-                <TextBlock Grid.Column="1" Grid.RowSpan="3"
+                <TextBlock Grid.Column="2" Grid.RowSpan="3"
                            Text="{Binding Number}"
                            FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
                            VerticalAlignment="Center"
                            Opacity="0.7" />
 
-                <TextBlock Grid.Column="2" Grid.Row="0"
+                <TextBlock Grid.Column="3" Grid.Row="0"
                            Text="{Binding Name}"
                            LineHeight="16"
                            TextTrimming="CharacterEllipsis" />
 
-                <TextBlock Grid.Column="2" Grid.Row="2"
+                <TextBlock Grid.Column="3" Grid.Row="2"
                            Classes="cardHint"
                            LineHeight="14"
                            Text="{Binding DetailText}" />
 
-                <Border Grid.Column="3" Grid.Row="0"
+                <Border Grid.Column="4" Grid.Row="0"
                         Classes="badge"
                         IsVisible="{Binding HasTrack}">
                     <TextBlock Text="{Binding TrackBadge}" />
@@ -303,14 +307,23 @@
             </Grid>
         </DataTemplate>
 
-        <!-- A machine on the rack: no cell number to answer to, so just what it is. -->
+        <!-- A machine on the rack: no cell number to answer to, so just what it is, and the
+             colour it is. Every machine of ours has one of its own, so a rack full of boxes is
+             read the way a rack is: by which box, not by reading each label. -->
         <DataTemplate x:Key="RackRow" x:DataType="vm:RackMachine">
-            <StackPanel>
-                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                <TextBlock Classes="cardHint" Text="{Binding DetailText}" />
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <Border Grid.Column="0" Width="4" CornerRadius="2"
+                        VerticalAlignment="Stretch"
+                        Background="{Binding Colour, Converter={StaticResource HexBrush}}" />
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="cardHint" Text="{Binding DetailText}" />
+                </StackPanel>
+            </Grid>
         </DataTemplate>
 
+        <conv:HexBrushConverter x:Key="HexBrush" />
         <conv:NullToUnsetConverter x:Key="NullToUnset" />
         <conv:IsSelectedColorConverter x:Key="IsSelectedColor" />
         <conv:SelectedSwatchSizeConverter x:Key="SelectedSwatchSize" />
