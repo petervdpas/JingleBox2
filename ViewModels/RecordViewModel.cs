@@ -106,6 +106,18 @@ public sealed partial class RecordViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasNameError))]
     private string? nameError;
     [ObservableProperty] private string status = "Ready";
+
+    /// <summary>
+    /// The take the page is pointed at: the one whose picture is up and whose buttons are the
+    /// ones under it.
+    /// </summary>
+    /// <remarks>
+    /// One take at a time, chosen by clicking its row. The buttons used to sit on every row,
+    /// four to a line, which made the list a wall of controls to read past when all anybody
+    /// wanted was to find a take by name.
+    /// </remarks>
+    [ObservableProperty] private Recording? selectedRecording;
+
     [ObservableProperty] private Recording? selectedRecordingForEdit;
     [ObservableProperty] private double recordGainDb;
     [ObservableProperty] private bool isClipping;
@@ -318,6 +330,40 @@ public sealed partial class RecordViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Puts the picture of whichever take was picked up on the page, and takes it down again
+    /// when nothing is picked.
+    /// </summary>
+    /// <remarks>
+    /// Whatever is sounding stops first: the picture and the play button now belong to the
+    /// take that is picked, and leaving the last one running underneath a different waveform
+    /// is a lie about what you are hearing.
+    /// </remarks>
+    partial void OnSelectedRecordingChanged(Recording? value)
+    {
+        StopPreview();
+
+        // The trim and the normalise work on this one, and so does the edit dialog.
+        SelectedRecordingForEdit = value;
+
+        if (value == null)
+        {
+            CurrentWaveform = null;
+            return;
+        }
+
+        try
+        {
+            CurrentWaveform = _waveformService.AnalyzeFile(value.FilePath);
+            Status = $"'{value.Name}', {TimeSpan.FromMilliseconds(value.DurationMs):mm\\:ss\\.fff}";
+        }
+        catch (Exception ex)
+        {
+            CurrentWaveform = null;
+            Status = $"'{value.Name}' could not be read: {ex.Message}";
+        }
+    }
+
     partial void OnRecordingNameChanged(string value) => ValidateName();
 
     private void ValidateName() =>
@@ -354,7 +400,7 @@ public sealed partial class RecordViewModel : ObservableObject
     {
         if (recording == null) return;
 
-        // The dialog has a player of its own, and the list's would go on underneath it.
+        // The dialog has a player of its own, and the page's would go on underneath it.
         StopPreview();
 
         try
@@ -362,8 +408,9 @@ public sealed partial class RecordViewModel : ObservableObject
             SelectedRecordingForEdit = recording;
             EditName = recording.Name;
 
-            var waveform = _waveformService.AnalyzeFile(recording.FilePath);
-            CurrentWaveform = waveform;
+            // Read again rather than trusting the page's, since the dialog is the one that
+            // rewrites the file and has to start from what is on disc now.
+            CurrentWaveform = _waveformService.AnalyzeFile(recording.FilePath);
 
             // Open edit dialog
             var dialog = new RecordingEditDialog
@@ -660,6 +707,8 @@ public sealed partial class RecordViewModel : ObservableObject
                 File.Delete(recording.FilePath);
 
             Recordings.Remove(recording);
+
+            if (ReferenceEquals(SelectedRecording, recording)) SelectedRecording = null;
 
             if (ReferenceEquals(SelectedRecordingForEdit, recording))
             {
@@ -961,18 +1010,6 @@ public sealed partial class RecordViewModel : ObservableObject
             string filePath = await _recordingService.SaveRecordingAsync(savedName);
             Status = "Saved recording";
 
-            try
-            {
-                Status = "Processing waveform...";
-                var waveform = await Task.Run(() => _waveformService.AnalyzeFile(filePath));
-                CurrentWaveform = waveform;
-                Status = "Ready";
-            }
-            catch (Exception wfEx)
-            {
-                Status = $"Waveform analysis failed: {wfEx.Message}";
-            }
-
             var recording = new Recording
             {
                 Id = Guid.NewGuid().ToString(),
@@ -983,6 +1020,10 @@ public sealed partial class RecordViewModel : ObservableObject
             };
 
             Recordings.Add(recording);
+
+            // Picked, so the take just made is the one whose picture is up and whose buttons
+            // are to hand. Reading it back is what puts the waveform on the page.
+            SelectedRecording = recording;
 
             if (clipped)
                 Status = "Saved, but the input clipped. Lower the input gain or the source level.";

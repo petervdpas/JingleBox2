@@ -31,7 +31,10 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel Margin="16">
+  <!-- No margin of its own. This page stands where the pattern grid stands, inside the
+       tracker's own margin, and a ring added here only pushes it away from the edges the
+       page beside it uses. -->
+  <DockPanel>
 
     <Grid ColumnDefinitions="240,12,*">
 

@@ -24,9 +24,17 @@ public partial class NameDialog : Window
     /// Asks for a name. Gives back the trimmed name, or null when it is cancelled, left empty,
     /// or there is no window to open it over.
     /// </summary>
-    public static Task<string?> AskAsync(string title, string prompt, string current)
+    /// <param name="confirm">
+    /// What the button that accepts the name says. Renaming is what this box is usually for,
+    /// so that is the default, but a box that asks what to call a song before saving it should
+    /// not have Rename written on it.
+    /// </param>
+    public static Task<string?> AskAsync(string title, string prompt, string current, string confirm = "Rename")
     {
         var dialog = new NameDialog { Title = title };
+
+        var confirmButton = dialog.FindControl<Button>("ConfirmButton");
+        if (confirmButton != null) confirmButton.Content = confirm;
 
         var promptText = dialog.FindControl<TextBlock>("PromptText");
         if (promptText != null) promptText.Text = prompt;

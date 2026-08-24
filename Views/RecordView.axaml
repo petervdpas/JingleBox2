@@ -99,10 +99,15 @@
         </Grid>
       </Border>
 
-      <!-- Waveform Display -->
-      <Border Classes="card" IsVisible="{Binding CurrentWaveform, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <!-- The take that is picked: its picture, and everything you can do to it. -->
+      <Border Classes="card" IsVisible="{Binding SelectedRecording, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Classes="cardBody">
-          <TextBlock Text="Waveform" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Classes="cardTitle" Text="{Binding SelectedRecording.Name}" />
+            <TextBlock Opacity="0.7" FontSize="12" VerticalAlignment="Center"
+                       Text="{Binding SelectedRecording.DurationMs, StringFormat='{}{0}ms'}" />
+          </StackPanel>
+
           <!-- The picture sits on the page's own colour rather than the card's, the way the
                slice editor's does, so it reads as a window cut into the card. -->
           <Border Background="{DynamicResource BgBrush}"
@@ -111,7 +116,37 @@
                   CornerRadius="4">
             <Canvas Height="120" Name="RecordWaveformCanvas" />
           </Border>
-          <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
+
+          <!-- Under the picture, where they act on the take you are looking at. On the rows
+               they were four buttons apiece to read past while looking for a name. -->
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0"
+                       VerticalAlignment="Center"
+                       Opacity="0.7" FontSize="12"
+                       Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" />
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+              <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
+                      IsEnabled="{Binding !SelectedRecording.IsPlaying}"
+                      Command="{Binding PlayRecordingCommand}"
+                      CommandParameter="{Binding SelectedRecording}"
+                      ToolTip.Tip="Play this recording" />
+              <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
+                      IsEnabled="{Binding SelectedRecording.IsPlaying}"
+                      Command="{Binding StopRecordingPlaybackCommand}"
+                      CommandParameter="{Binding SelectedRecording}"
+                      ToolTip.Tip="Stop playing" />
+
+              <Button Content="Edit" MinWidth="64" Padding="10,5"
+                      Command="{Binding EditRecordingCommand}"
+                      CommandParameter="{Binding SelectedRecording}" />
+              <Button Content="Delete" MinWidth="64" Padding="10,5" Classes="danger"
+                      IsEnabled="{Binding !SelectedRecording.IsInUse}"
+                      ToolTip.Tip="{Binding SelectedRecording.UsedBy, StringFormat='In use by {0}. Delete the instrument first.'}"
+                      Command="{Binding DeleteRecordingCommand}"
+                      CommandParameter="{Binding SelectedRecording}" />
+            </StackPanel>
+          </Grid>
         </StackPanel>
       </Border>
 
@@ -120,58 +155,37 @@
         <StackPanel Classes="cardBody">
           <TextBlock Classes="cardTitle" Text="Recordings" />
 
-          <ItemsControl ItemsSource="{Binding Recordings}">
-            <ItemsControl.ItemTemplate>
+          <!-- A list you pick from, rather than a stack of little control panels. What a row
+               says is what the take is; what you do to it is under its picture above. -->
+          <ListBox Classes="cards"
+                   ItemsSource="{Binding Recordings}"
+                   SelectedItem="{Binding SelectedRecording}">
+            <ListBox.ItemTemplate>
               <DataTemplate>
-                <Border BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Padding="8" CornerRadius="4" Margin="0,4">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <StackPanel Grid.Column="0" Spacing="2">
-                      <!-- A sample instrument plays this file itself, so a recording that is
-                           spoken for is tagged at the name, not explained further down. -->
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <Border Classes="badge" VerticalAlignment="Center" MaxWidth="220"
-                                IsVisible="{Binding IsInUse}"
-                                ToolTip.Tip="{Binding UsedBy, StringFormat='Used by {0}. Delete the instrument first.'}">
-                          <TextBlock Text="{Binding UsedBy, StringFormat='USED BY {0}'}"
-                                     TextTrimming="CharacterEllipsis" />
-                        </Border>
-                      </StackPanel>
-                      <TextBlock Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" Opacity="0.7" FontSize="12" />
-                      <TextBlock Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" Opacity="0.7" FontSize="12" />
-                    </StackPanel>
-                    <!-- Down in the corner, under the three lines that say what the take is.
-                         Beside the name they read as part of it; here they read as what you can
-                         do to it. -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
-                                HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                      <!-- Hearing a take is the first thing anyone does with this list, so it
-                           is a button on the row rather than a trip through the editor. -->
-                      <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
-                              IsEnabled="{Binding !IsPlaying}"
-                              Command="{Binding $parent[UserControl].DataContext.PlayRecordingCommand}"
-                              CommandParameter="{Binding .}"
-                              ToolTip.Tip="Play this recording" />
-                      <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
-                              IsEnabled="{Binding IsPlaying}"
-                              Command="{Binding $parent[UserControl].DataContext.StopRecordingPlaybackCommand}"
-                              CommandParameter="{Binding .}"
-                              ToolTip.Tip="Stop playing" />
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="2">
+                  <TextBlock Grid.Row="0" Grid.Column="0"
+                             Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
 
-                      <Button Content="Edit" MinWidth="64" Padding="10,5"
-                              Command="{Binding $parent[UserControl].DataContext.EditRecordingCommand}"
-                              CommandParameter="{Binding .}" />
-                      <Button Content="Delete" MinWidth="64" Padding="10,5" Classes="danger"
-                              IsEnabled="{Binding !IsInUse}"
-                              ToolTip.Tip="{Binding UsedBy, StringFormat='In use by {0}. Delete the instrument first.'}"
-                              Command="{Binding $parent[UserControl].DataContext.DeleteRecordingCommand}"
-                              CommandParameter="{Binding .}" />
-                    </StackPanel>
-                  </Grid>
-                </Border>
+                  <!-- A sample instrument plays this file itself, so a recording that is spoken
+                       for is tagged. Up in the corner rather than beside the name: it belongs
+                       to the whole row, and a name is not a place to hang a second thing off. -->
+                  <Border Grid.Row="0" Grid.Column="1"
+                          Classes="badge" MaxWidth="220"
+                          HorizontalAlignment="Right" VerticalAlignment="Top"
+                          IsVisible="{Binding IsInUse}"
+                          ToolTip.Tip="{Binding UsedBy, StringFormat='Used by {0}. Delete the instrument first.'}">
+                    <TextBlock Text="{Binding UsedBy, StringFormat='USED BY {0}'}"
+                               TextTrimming="CharacterEllipsis" />
+                  </Border>
+
+                  <TextBlock Grid.Row="1" Grid.Column="0" Opacity="0.7" FontSize="12"
+                             Text="{Binding CreatedAt, StringFormat='Created: {0:g}'}" />
+                  <TextBlock Grid.Row="2" Grid.Column="0" Opacity="0.7" FontSize="12"
+                             Text="{Binding DurationMs, StringFormat='Duration: {0}ms'}" />
+                </Grid>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </StackPanel>
       </Border>
 

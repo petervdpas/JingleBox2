@@ -294,6 +294,23 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     {
         Volume = Math.Clamp(value, 0f, 1f);
         _audio.SetPadVolume(Index, Volume);
+
+        OnPropertyChanged(nameof(VolumeDecibels));
+    }
+
+    /// <summary>
+    /// The same level as a fader reads it.
+    /// </summary>
+    /// <remarks>
+    /// A pad stores an amplitude, because that is what the engine multiplies by; a fader is
+    /// marked in decibels with unity at nought, the way the mixer's are. Unity is the top of
+    /// this one's travel rather than its middle: a pad plays a file, it does not amplify one,
+    /// which is why the amplitude is clamped to 1 above.
+    /// </remarks>
+    public double VolumeDecibels
+    {
+        get => UI.GainScale.ToDecibels(Volume);
+        set => Volume = (float)UI.GainScale.ToAmplitude(value);
     }
 
     partial void OnSourceKindChanged(PadSourceKind value)

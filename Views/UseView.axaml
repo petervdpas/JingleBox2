@@ -51,7 +51,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Border Background="{DynamicResource BgBrush}" Padding="6">
+  <Border Background="{DynamicResource BgBrush}" Padding="0,6">
     <Grid RowDefinitions="Auto,*"
           RowSpacing="14">
 

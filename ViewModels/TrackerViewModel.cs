@@ -45,6 +45,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private const string RecoveredSuffix = " (recovered)";
 
+    /// <summary>
+    /// What a song is called before it is called anything.
+    /// </summary>
+    /// <remarks>
+    /// A placeholder and never a file name. Saving under it would put a song called "untitled"
+    /// in the list, and the next unnamed song would either overwrite it or sit beside it as
+    /// "untitled 2", which is how a folder of songs stops being worth reading. Saving asks for
+    /// a real name instead.
+    /// </remarks>
+    public const string Unnamed = "untitled";
+
     /// <summary>The file this session is keeping its unsaved work in, if it has needed to.</summary>
     private string _kept = "";
 
@@ -288,7 +299,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty] private int selectedInstrument;
     [ObservableProperty] private int editStep = 1;
     [ObservableProperty] private string status = "Ready";
-    [ObservableProperty] private string songName = "untitled";
+    [ObservableProperty] private string songName = Unnamed;
 
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
 
@@ -417,13 +428,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand ToggleRecordCommand => new RelayCommand(() => IsRecording = !IsRecording);
     public IRelayCommand AddPatternCommand => new RelayCommand(AddPattern);
     public IRelayCommand RemoveOrderEntryCommand => new RelayCommand(RemoveOrderEntry);
-    public IRelayCommand SaveCommand => new RelayCommand(Save);
+    public IAsyncRelayCommand SaveCommand => new AsyncRelayCommand(SaveOrAsk);
+
+    /// <summary>Saves under a name you give it, whether or not it already has one.</summary>
+    public IAsyncRelayCommand SaveAsCommand => new AsyncRelayCommand(SaveAs);
+
+    /// <summary>Shows the songs there are and opens the one picked.</summary>
+    public IAsyncRelayCommand OpenSongCommand => new AsyncRelayCommand(OpenSong);
+
     public IRelayCommand LoadCommand => new RelayCommand(Load);
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
 
-    /// <summary>Throws away a saved song. The one you are working on stays where it is.</summary>
+    /// <summary>
+    /// Throws away the song that is open, as it stands on disc. What is on the screen stays
+    /// there, unsaved, so a delete by mistake costs a save rather than the work.
+    /// </summary>
     public IAsyncRelayCommand DeleteSongCommand => new AsyncRelayCommand(DeleteSong);
+
+    /// <summary>False for a song that has never been written down, which has nothing to delete.</summary>
+    public bool CanDeleteSong
+    {
+        get
+        {
+            string name = SongName.Trim();
+
+            return !Needs(name) && _store.Exists(name);
+        }
+    }
     public IAsyncRelayCommand RemoveInstrumentCommand => new AsyncRelayCommand(RemoveSelectedInstrument);
     public IRelayCommand AddInstrumentCommand => new RelayCommand(AddInstrument);
     public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshRack);
@@ -551,7 +583,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
 
-    partial void OnSongNameChanged(string value) => MarkDirty();
+    partial void OnSongNameChanged(string value)
+    {
+        MarkDirty();
+        OnPropertyChanged(nameof(CanDeleteSong));
+    }
 
     public bool HasSelection => !Selection.IsEmpty;
 
@@ -672,7 +708,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         get
         {
-            string song = SongName.Length > 0 ? SongName : "untitled";
+            string song = SongName.Length > 0 ? SongName : Unnamed;
 
             if (ShowsMixer) return song + "  ·  mixer  ·  " + TrackCount + " tracks";
 
@@ -917,8 +953,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         try
         {
+            // Never the placeholder: a rescue file is the one song on the shelf nobody
+            // named, and calling it "untitled" makes it look like one somebody saved.
             string name = SongName.Trim();
-            if (name.Length == 0) name = "untitled";
+            if (name.Length == 0 || Needs(name)) name = "unsaved song";
 
             if (name.EndsWith(RecoveredSuffix, StringComparison.Ordinal)) return;
             if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return;
@@ -1466,6 +1504,68 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Removed '{instrument.Name}' from the song. It is still in the rack.";
     }
 
+    /// <summary>
+    /// Shows the list of saved songs and opens whichever one is picked.
+    /// </summary>
+    /// <remarks>
+    /// The list is read again first: songs are files, and a folder somebody has copied one
+    /// into since the app started should not need the app restarting to notice.
+    /// </remarks>
+    private async Task OpenSong()
+    {
+        RefreshSavedSongs();
+
+        if (await Views.SongDialog.PickAsync(this)) Load();
+    }
+
+    /// <summary>
+    /// Asks what to call it and saves it under that.
+    /// </summary>
+    /// <remarks>
+    /// The name box used to stand on the page, which meant a song could be renamed by a stray
+    /// keystroke in a field nobody was looking at. Asking is a moment, and the moment is the
+    /// point: this is the one place a song changes its name.
+    /// </remarks>
+    private async Task SaveAs()
+    {
+        string? wanted = await Views.NameDialog.AskAsync(
+            "Save song",
+            "What should this song be called?",
+            SongName,
+            "Save");
+
+        if (wanted == null) return;
+
+        if (Needs(wanted))
+        {
+            Status = "'" + Unnamed + "' is not a name. Call it something you will know again.";
+            return;
+        }
+
+        SongName = wanted;
+        Save();
+    }
+
+    /// <summary>Saves it, asking for a name first when it has not got one.</summary>
+    private async Task SaveOrAsk()
+    {
+        if (Needs(SongName))
+        {
+            await SaveAs();
+            return;
+        }
+
+        Save();
+    }
+
+    /// <summary>True while what the song is called is not yet a name.</summary>
+    private static bool Needs(string name)
+    {
+        string wanted = name.Trim();
+
+        return wanted.Length == 0 || string.Equals(wanted, Unnamed, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void Save()
     {
         string name = SongName.Trim();
@@ -1510,6 +1610,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             RefreshSavedSongs();
 
+            OnPropertyChanged(nameof(CanDeleteSong));
+
             Status = $"Saved '{name}'";
         }
         catch (Exception ex)
@@ -1540,7 +1642,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private void NewSong()
     {
-        Adopt(Song.CreateDefault(), "untitled");
+        Adopt(Song.CreateDefault(), Unnamed);
         SelectedSongFile = null;
         Status = "New song";
     }
@@ -1678,17 +1780,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private async Task DeleteSong()
     {
-        var file = SelectedSongFile;
+        string name = SongName.Trim();
 
-        if (file == null)
+        if (!CanDeleteSong)
         {
-            Status = "Pick a song to delete first.";
+            Status = "'" + name + "' has never been saved, so there is nothing to delete.";
             return;
         }
 
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete song",
-            "Delete '" + file.Name + "' from disc? The instruments it used are untouched. " +
+            "Delete '" + name + "' from disc? The instruments it used are untouched. " +
                 "This cannot be undone.",
             "Delete");
 
@@ -1696,23 +1798,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         try
         {
-            bool wasOpen = string.Equals(SongName, file.Name, StringComparison.OrdinalIgnoreCase);
-
-            _store.Delete(file.Path);
+            _store.Delete(_store.PathFor(name));
 
             SelectedSongFile = null;
 
             RefreshSavedSongs();
 
-            if (wasOpen) MarkDirty();
+            // Still on the screen, and now the only copy of itself.
+            MarkDirty();
+            OnPropertyChanged(nameof(CanDeleteSong));
 
-            Status = wasOpen
-                ? "Deleted '" + file.Name + "'. What is open is still here, but unsaved."
-                : "Deleted '" + file.Name + "'";
+            Status = "Deleted '" + name + "'. What is open is still here, but unsaved.";
         }
         catch (Exception ex)
         {
-            Status = "Could not delete '" + file.Name + "': " + ex.Message;
+            Status = "Could not delete '" + name + "': " + ex.Message;
         }
     }
 

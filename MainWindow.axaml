@@ -46,7 +46,10 @@
                        StopCommand="{Binding Tracker.StopCommand}"
                        ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
 
-    <TabControl Classes="pages" SelectedIndex="{Binding SelectedTab}">
+    <!-- No padding of its own. A page runs to the same left and right edges as the tab
+         names above it and the status bar below it, and the only inset is the one each page
+         keeps at its top and foot. -->
+    <TabControl Classes="pages" Padding="0" SelectedIndex="{Binding SelectedTab}">
       <TabControl.Styles>
         <!-- The pages' names, cut down to the height of the transport standing at the end of
              the same line. Fluent draws a tab at a size meant to be the loudest thing on a

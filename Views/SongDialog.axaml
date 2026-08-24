@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        x:Class="JingleBox2.Views.SongDialog"
+        x:DataType="vm:TrackerViewModel"
+        Title="Open song"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Spacing="16" Margin="20">
+
+    <TextBlock Text="Nothing saved yet."
+               IsVisible="{Binding !SavedSongs.Count}"
+               Opacity="0.7" />
+
+    <!-- Double click opens, as a list of files does everywhere else. -->
+    <ListBox Name="Songs"
+             Classes="cards"
+             MaxHeight="320"
+             IsVisible="{Binding SavedSongs.Count}"
+             ItemsSource="{Binding SavedSongs}"
+             SelectedItem="{Binding SelectedSongFile}"
+             DoubleTapped="Songs_DoubleTapped" />
+
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <Button Grid.Column="1" Name="CancelButton" Content="Cancel" Click="Cancel_Click"
+              MinWidth="88" IsCancel="True" />
+      <Button Grid.Column="2" Name="OpenButton" Content="Open" Click="Open_Click"
+              MinWidth="88" IsDefault="True"
+              IsEnabled="{Binding SelectedSongFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </Grid>
+
+  </StackPanel>
+
+</Window>

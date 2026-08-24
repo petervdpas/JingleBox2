@@ -14,7 +14,7 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel Margin="6">
+  <DockPanel Margin="0,6">
 
     <!-- Transport -->
     <Border DockPanel.Dock="Top" Classes="card stacked">
@@ -77,31 +77,30 @@
       </Grid>
     </Border>
 
-    <!-- The song: which one is open, what it is called, and saving it. -->
+    <!-- The song: which one is open, and what can be done with it. The list of saved songs
+         and the name box were along here, taking a hand's depth of the window for the whole of
+         the time nobody was opening or renaming anything. Both are dialogs now. -->
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
-      <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="field" Text="Open:" />
-          <ComboBox Grid.Column="1"
-                    ItemsSource="{Binding SavedSongs}"
-                    SelectedItem="{Binding SelectedSongFile}"
-                    HorizontalAlignment="Stretch"
-                    PlaceholderText="No saved songs" />
-          <Button Grid.Column="2" Content="Open" Command="{Binding LoadCommand}" />
-          <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshSongsCommand}" />
-          <Button Grid.Column="4" Content="New" Command="{Binding NewSongCommand}" />
-          <Button Grid.Column="5" Content="Delete" Classes="danger"
-                  Command="{Binding DeleteSongCommand}"
-                  ToolTip.Tip="Throws the picked song away. What is open stays open, and the machines it used are untouched." />
-        </Grid>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Grid.Column="0" Classes="field" Text="Song:" />
+        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                   FontWeight="SemiBold"
+                   TextTrimming="CharacterEllipsis"
+                   Text="{Binding SongName}" />
 
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-          <TextBlock Grid.Column="0" Classes="field" Text="Save as:" />
-          <TextBox Grid.Column="1" Text="{Binding SongName}" />
-          <Button Grid.Column="2" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"
-                  ToolTip.Tip="A star means there are changes that are not on disk yet." />
-        </Grid>
-      </StackPanel>
+        <Button Grid.Column="2" Content="Open..." Command="{Binding OpenSongCommand}" />
+        <Button Grid.Column="3" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"
+                ToolTip.Tip="A star means there are changes that are not on disk yet." />
+        <Button Grid.Column="4" Content="Save as..." Command="{Binding SaveAsCommand}" />
+        <Button Grid.Column="5" Content="New" Command="{Binding NewSongCommand}" />
+
+        <!-- The song this bar is about, since that is the one you are looking at. What is on
+             the screen stays there afterwards, unsaved. -->
+        <Button Grid.Column="6" Content="Delete" Classes="danger"
+                IsEnabled="{Binding CanDeleteSong}"
+                Command="{Binding DeleteSongCommand}"
+                ToolTip.Tip="Deletes this song from disc. What is open stays open, and the machines it used are untouched." />
+      </Grid>
     </Border>
 
     <Grid>

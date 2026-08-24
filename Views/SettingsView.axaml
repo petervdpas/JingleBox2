@@ -56,7 +56,7 @@
 
   <!-- One part at a time. Everything here used to be one column of cards taller than the
        window, which is a page you scroll rather than a page you read. -->
-  <TabControl x:Name="Sections" Classes="rail" TabStripPlacement="Left" Margin="6" Padding="0">
+  <TabControl x:Name="Sections" Classes="rail" TabStripPlacement="Left" Margin="0,6" Padding="0">
 
     <TabItem Header="Audio">
         <ScrollViewer>

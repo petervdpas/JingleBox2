@@ -37,10 +37,28 @@
         </Style>
 
         <!-- One set of tab metrics, so every tab breathes the same. -->
+        <!-- Top and foot only. Left and right are the window's, so every page lines up with
+             the tab names above it and the status bar below it. -->
         <Style Selector="StackPanel.tabRoot">
-            <Setter Property="Margin" Value="12" />
+            <Setter Property="Margin" Value="0,12" />
             <Setter Property="Spacing" Value="12" />
         </Style>
+        <!-- A list whose rows are things rather than lines of text: a take, a song, anything
+             you pick one of. Every row keeps its own frame whether or not the pointer is over
+             it, because a list that draws a box only under the pointer reads as a page of text
+             until you touch it. -->
+        <Style Selector="ListBox.cards">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="ListBox.cards > ListBoxItem">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="Margin" Value="0,4" />
+        </Style>
+
         <Style Selector="Border.card.stacked">
             <Setter Property="Margin" Value="0,0,0,12" />
         </Style>

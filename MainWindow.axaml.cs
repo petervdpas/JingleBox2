@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
@@ -29,6 +31,9 @@ public partial class MainWindow : Window
 
     /// <summary>Set once the startup size has been applied, so layout does not trigger saves.</summary>
     private bool _windowRestored;
+
+    /// <summary>What is being held down, so a held key is one press. See <see cref="UI.HeldKeys"/>.</summary>
+    private readonly UI.HeldKeys _held = new();
 
     // Constants for window sizing
     private const double HeaderHeight = 140; // Theme, device, tabs
@@ -92,6 +97,15 @@ public partial class MainWindow : Window
             Title = $"JingleBox2 v{version}";
         }
 
+        // The space bar works the transport from wherever you are in the window, and is taken
+        // on the way down so that nothing else can spend it first.
+        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
+
+        // Keys held while the window loses focus are released somewhere else, and this window
+        // never hears about it.
+        Deactivated += (_, _) => _held.Forget();
+
         // Subscribe to matrix size changes to resize window
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
@@ -105,6 +119,60 @@ public partial class MainWindow : Window
             _audio.Dispose();
         };
     }
+
+    /// <summary>
+    /// Space starts the transport when it is stopped and stops it when it is running.
+    /// </summary>
+    /// <remarks>
+    /// Where every tracker and every desk puts it, and the reason the transport is on the
+    /// window rather than on a page: it is worth starting from wherever you happen to be.
+    ///
+    /// Taken on the way down, before the focused control sees it, because otherwise the last
+    /// button you pressed keeps the key: click Open and space opens the song again instead of
+    /// playing it, which is exactly what a space bar must never do. Space belongs to the
+    /// transport the way it does on a desk. Enter still works every button, so nothing that
+    /// could be reached by keyboard becomes unreachable.
+    ///
+    /// Two things are left alone: a text box, where a space is a space, and a combo box with
+    /// its list open, where it picks the row that is lit.
+    /// </remarks>
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        // Every key, so the record of what is down is the whole keyboard and the next shortcut
+        // added here is one press too.
+        bool first = _held.Pressed(e.Key);
+
+        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
+
+        switch (FocusManager?.GetFocusedElement())
+        {
+            // Somebody is typing, and a space is part of what they are typing.
+            case TextBox: return;
+
+            // The list is down and space is how a row is taken.
+            case ComboBox { IsDropDownOpen: true }: return;
+        }
+
+        // Held down, not pressed again. Swallowed rather than passed on, so a leant-on space
+        // does nothing at all rather than something else.
+        if (!first)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (DataContext is not MainViewModel vm) return;
+
+        var tracker = vm.Tracker;
+
+        if (tracker.IsPlaying) tracker.StopCommand.Execute(null);
+        else tracker.PlayCommand.Execute(null);
+
+        e.Handled = true;
+    }
+
+    /// <summary>The key is up, so the next time it goes down is a press again.</summary>
+    private void OnWindowKeyUp(object? sender, KeyEventArgs e) => _held.Released(e.Key);
 
     /// <summary>
     /// Uses the size the window was last left at, falling back to the pad matrix on first run.

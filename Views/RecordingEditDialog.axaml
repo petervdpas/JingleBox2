@@ -5,8 +5,7 @@
         x:Class="JingleBox2.Views.RecordingEditDialog"
         x:DataType="vm:RecordViewModel"
         Title="Edit Recording"
-        Width="840"
-        Height="460"
+        SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner">
 
   <StackPanel Spacing="12" Margin="16">

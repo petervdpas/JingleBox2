@@ -30,7 +30,7 @@
   </UserControl.Styles>
 
   <Border Background="{DynamicResource BgBrush}">
-    <DockPanel Margin="6">
+    <DockPanel Margin="0,6">
 
       <!-- The profile and the pads it holds, side by side: picking a profile and picking a
            pad out of it are one glance apart, and neither is worth the whole width. Narrow the
@@ -131,164 +131,186 @@
           <ContentControl Content="{Binding SelectedPad}">
             <ContentControl.ContentTemplate>
               <DataTemplate x:DataType="vm:PadViewModel">
-            <Border Classes="card stacked">
+            <!-- As tall as what is in it. Inside a scroller a card is stretched to the
+                 viewport by default, which left a hand's width of empty surface under the
+                 effects slot on every pad. -->
+            <Border Classes="card stacked" VerticalAlignment="Top">
               <StackPanel Spacing="12">
 
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                  <TextBox Grid.Column="0"
-                           PlaceholderText="Pad name"
-                           Text="{Binding Name}" />
+                <!-- Two halves. On the left what the pad is: its name, what it plays,
+                     its colour, whether it loops. On the right what it sounds like, which
+                     is the half you touch while something is on air.
 
-                  <ComboBox Grid.Column="1"
-                            Width="100"
-                            ItemsSource="{x:Static vm:PadViewModel.SourceKinds}"
-                            SelectedItem="{Binding SourceKind}" />
-                </Grid>
+                     Half each, and one under the other on a narrow window: below three hundred
+                     a side the name box and the path stop showing enough of themselves to be
+                     read, and two cramped halves are worse than two full-width ones. -->
+                <views:Beside Gap="16" Least="300" Even="True">
 
-                <Grid ColumnDefinitions="*,Auto"
-                      ColumnSpacing="10"
-                      IsVisible="{Binding IsFile}">
-                  <TextBox Grid.Column="0"
-                           PlaceholderText="Choose an audio file…"
+                  <StackPanel Spacing="12">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBox Grid.Column="0"
+                             PlaceholderText="Pad name"
+                             Text="{Binding Name}" />
+
+                    <ComboBox Grid.Column="1"
+                              Width="100"
+                              ItemsSource="{x:Static vm:PadViewModel.SourceKinds}"
+                              SelectedItem="{Binding SourceKind}" />
+                  </Grid>
+
+                  <Grid ColumnDefinitions="*,Auto"
+                        ColumnSpacing="10"
+                        IsVisible="{Binding IsFile}">
+                    <TextBox Grid.Column="0"
+                             PlaceholderText="Choose an audio file…"
+                             Text="{Binding FilePath}" />
+                    <Button Grid.Column="1"
+                            Content="Browse…"
+                            Command="{Binding AssignCommand}" />
+                  </Grid>
+
+                  <TextBox IsVisible="{Binding IsWeb}"
+                           PlaceholderText="Stream URL (https://...)"
                            Text="{Binding FilePath}" />
-                  <Button Grid.Column="1"
-                          Content="Browse…"
-                          Command="{Binding AssignCommand}" />
-                </Grid>
 
-                <TextBox IsVisible="{Binding IsWeb}"
-                         PlaceholderText="Stream URL (https://...)"
-                         Text="{Binding FilePath}" />
+                  <Grid ColumnDefinitions="Auto,*">
+                    <!-- Left: loop toggle -->
+                    <ToggleSwitch Grid.Column="0"
+                                  IsChecked="{Binding Loop}"
+                                  OnContent="Loop"
+                                  OffContent="Loop" />
 
-                <Grid ColumnDefinitions="Auto,*">
-                  <!-- Left: loop toggle -->
-                  <ToggleSwitch Grid.Column="0"
-                                IsChecked="{Binding Loop}"
-                                OnContent="Loop"
-                                OffContent="Loop" />
+                    <!-- Right: colour palette + preview + clear -->
+                    <WrapPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right">
 
-                  <!-- Right: colour palette + preview + clear -->
-                  <WrapPanel Grid.Column="1"
-                              Orientation="Horizontal"
-                              VerticalAlignment="Center"
-                              HorizontalAlignment="Right">
+                      <Button Classes="colorSwatch" Background="#E53935"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#E53935'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#E53935" />
+                      <Button Classes="colorSwatch" Background="#FB8C00"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FB8C00'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#FB8C00" />
+                      <Button Classes="colorSwatch" Background="#FDD835"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FDD835'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#FDD835" />
+                      <Button Classes="colorSwatch" Background="#43A047"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#43A047'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#43A047" />
+                      <Button Classes="colorSwatch" Background="#00ACC1"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#00ACC1'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#00ACC1" />
+                      <Button Classes="colorSwatch" Background="#1E88E5"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#1E88E5'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#1E88E5" />
+                      <Button Classes="colorSwatch" Background="#8E24AA"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#8E24AA'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#8E24AA" />
+                      <Button Classes="colorSwatch" Background="#F06292"
+                              Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
+                              Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
+                              BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#F06292'}"
+                              Command="{Binding SetColorCommand}" CommandParameter="#F06292" />
 
-                    <Button Classes="colorSwatch" Background="#E53935"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#E53935'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#E53935'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#E53935" />
-                    <Button Classes="colorSwatch" Background="#FB8C00"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FB8C00'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FB8C00'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#FB8C00" />
-                    <Button Classes="colorSwatch" Background="#FDD835"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#FDD835'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#FDD835'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#FDD835" />
-                    <Button Classes="colorSwatch" Background="#43A047"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#43A047'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#43A047'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#43A047" />
-                    <Button Classes="colorSwatch" Background="#00ACC1"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#00ACC1'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#00ACC1'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#00ACC1" />
-                    <Button Classes="colorSwatch" Background="#1E88E5"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#1E88E5'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#1E88E5'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#1E88E5" />
-                    <Button Classes="colorSwatch" Background="#8E24AA"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#8E24AA'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#8E24AA'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#8E24AA" />
-                    <Button Classes="colorSwatch" Background="#F06292"
-                            Width="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
-                            Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
-                            BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#F06292'}"
-                            Command="{Binding SetColorCommand}" CommandParameter="#F06292" />
-
-                    <!-- Clear: styled as a fixed-size "no colour" swatch with centred ✕ -->
-                    <Button Classes="colorSwatch"
-                            Width="22" Height="22"
-                            Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="2"
-                            Content="✕"
-                            FontSize="11"
-                            Foreground="{DynamicResource TextMutedBrush}"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
-                            ToolTip.Tip="Clear custom colour"
-                            Command="{Binding ClearColorCommand}" />
-                  </WrapPanel>
-                </Grid>
-
-                <WrapPanel Orientation="Horizontal" Margin="0,2,0,0">
-                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,4">
-                    <TextBlock Text="Fade In" VerticalAlignment="Center" />
-                    <views:NumberField Value="{Binding FadeIn}" Minimum="0" Maximum="4.9"
-                                       SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76"
-                                       VerticalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
-                    <TextBlock Text="Fade Out" VerticalAlignment="Center" />
-                    <views:NumberField Value="{Binding FadeOut}" Minimum="0" Maximum="4.9"
-                                       SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76"
-                                       VerticalAlignment="Center" />
-                  </StackPanel>
-                </WrapPanel>
-
-                <Grid ColumnDefinitions="*,Auto"
-                      RowDefinitions="Auto,Auto"
-                      ColumnSpacing="12"
-                      RowSpacing="6">
-
-                  <StackPanel Grid.Row="0"
-                              Grid.Column="0"
-                              Grid.ColumnSpan="2">
-                    <TextBlock Classes="muted"
-                               FontSize="12"
-                               Text="Volume" />
-                    <Slider Minimum="0"
-                            Maximum="1"
-                            Value="{Binding Volume}"
-                            LargeChange="0.1"
-                            SmallChange="0.01" />
+                      <!-- Clear: styled as a fixed-size "no colour" swatch with centred ✕ -->
+                      <Button Classes="colorSwatch"
+                              Width="22" Height="22"
+                              Background="{DynamicResource SurfaceBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}"
+                              BorderThickness="2"
+                              Content="✕"
+                              FontSize="11"
+                              Foreground="{DynamicResource TextMutedBrush}"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              ToolTip.Tip="Clear custom colour"
+                              Command="{Binding ClearColorCommand}" />
+                    </WrapPanel>
+                  </Grid>
                   </StackPanel>
 
-                  <TextBlock Grid.Row="1"
-                             Grid.Column="0"
-                             VerticalAlignment="Center"
-                             Classes="muted"
-                             Text="{Binding Volume, StringFormat={}{0:0.00}}" />
+                  <StackPanel Spacing="12" VerticalAlignment="Top">
+                  <!-- One framed part, the way a machine's panel frames its amplifier: how
+                       the level comes up, how it goes away, and how loud it is are one
+                       subject, and three controls loose on a card do not say so. No caption:
+                       the three controls say what they are, and a word over them only
+                       repeats them. -->
+                  <views:PanelGroup>
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
 
-                  <StackPanel Grid.Row="1"
-                              Grid.Column="1"
-                              Orientation="Horizontal"
-                              Spacing="8"
-                              HorizontalAlignment="Right">
-                    <!-- The same pair as the recordings list: the shape says play and stop
-                         without a word, and each is lit only when it is the one to press. -->
-                    <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
-                            IsEnabled="{Binding !IsPlaying}"
-                            Command="{Binding PlayCommand}"
-                            ToolTip.Tip="Play this pad" />
-                    <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
-                            IsEnabled="{Binding IsPlaying}"
-                            Command="{Binding StopCommand}"
-                            ToolTip.Tip="Stop playing" />
-                    <Button Content="Clear"
-                            Command="{Binding ClearCommand}"
-                            Classes="danger" />
+                      <!-- A grid rather than two rows, so the label column is as wide as the
+                           longer of the two words and the fields line up under each other. -->
+                      <Grid Grid.Column="0"
+                            ColumnDefinitions="Auto,Auto"
+                            RowDefinitions="Auto,Auto"
+                            ColumnSpacing="8" RowSpacing="8"
+                            VerticalAlignment="Top">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Fade In"
+                                   VerticalAlignment="Center" />
+                        <views:NumberField Grid.Row="0" Grid.Column="1"
+                                           Value="{Binding FadeIn}" Minimum="0" Maximum="4.9"
+                                           SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Fade Out"
+                                   VerticalAlignment="Center" />
+                        <views:NumberField Grid.Row="1" Grid.Column="1"
+                                           Value="{Binding FadeOut}" Minimum="0" Maximum="4.9"
+                                           SmallStep="0.1" LargeStep="0.5" Format="0.0" Width="76" />
+                      </Grid>
+
+                      <!-- The mixer's own fader, on the pad it belongs to: the same scale, the
+                           same wheel and arrow keys, the same double click back to unity. It
+                           reads and writes its own label and value, so neither is spelled out
+                           beside it. Unity is the top of the travel, since a pad plays a file
+                           rather than amplifying one. -->
+                      <views:Fader Grid.Column="1"
+                                   HorizontalAlignment="Right"
+                                   Label="Volume" Unit=" dB" Format="0.0" DefaultValue="0"
+                                   Minimum="-60" Maximum="0"
+                                   SmallStep="0.5" LargeStep="3"
+                                   TrackLength="90"
+                                   Ticks="0,-6,-12,-24,-40,-60"
+                                   ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
+                                   Value="{Binding VolumeDecibels}" />
+                    </Grid>
+                  </views:PanelGroup>
+
+                  <Grid>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom">
+                      <!-- The same pair as the recordings list: the shape says play and stop
+                           without a word, and each is lit only when it is the one to press. -->
+                      <Button Content="▶" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding !IsPlaying}"
+                              Command="{Binding PlayCommand}"
+                              ToolTip.Tip="Play this pad" />
+                      <Button Content="■" MinWidth="36" Padding="6,5" FontSize="12"
+                              IsEnabled="{Binding IsPlaying}"
+                              Command="{Binding StopCommand}"
+                              ToolTip.Tip="Stop playing" />
+                      <Button Content="Clear"
+                              Command="{Binding ClearCommand}"
+                              Classes="danger" />
+                    </StackPanel>
+                  </Grid>
                   </StackPanel>
-                </Grid>
+                </views:Beside>
 
                 <!-- The same slot the tracker uses, pointed at this pad. -->
                 <views:PluginStrip DataContext="{Binding Effect}" />
