@@ -37,6 +37,17 @@ public sealed class AppConfig
     public string SelectedTheme { get; set; } = "Dark";
     public int Rows { get; set; } = 4;
     public int Columns { get; set; } = 2;
+
+    // Off, the matrix goes up to sixteen pads, which is what fits comfortably on a laptop and
+    // what a hand can find without looking. On, it goes to thirty-two, for a desk with the
+    // screen to show them. A switch rather than simply raising the ceiling, because a grid of
+    // thirty-two is a different instrument from a grid of eight and nobody should arrive at
+    // one by holding an arrow key down in the settings.
+    public bool ExtendedPadMatrix { get; set; }
+
+    // The bracket between rows and columns in SETTINGS. Kept, because a lock you have to close
+    // again every time you open the page is a lock nobody uses twice.
+    public bool LinkPadMatrix { get; set; }
     public MidiConfig Midi { get; set; } = new();
     public double RecordGainDb { get; set; } = 0;
 

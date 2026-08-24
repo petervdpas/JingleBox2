@@ -35,6 +35,16 @@ public partial class MainWindow : Window
     /// <summary>What is being held down, so a held key is one press. See <see cref="UI.HeldKeys"/>.</summary>
     private readonly UI.HeldKeys _held = new();
 
+    /// <summary>
+    /// Set while the transport has the space bar, so the key coming up again is swallowed too.
+    /// </summary>
+    /// <remarks>
+    /// A button clicks on the space key coming up, and does not check that it ever saw the key
+    /// go down. Taking only the key-down therefore stops the button pressing and still lets it
+    /// click: open a song, press space, and the song plays and the picker opens behind it.
+    /// </remarks>
+    private bool _tookSpace;
+
     // Constants for window sizing
     private const double HeaderHeight = 140; // Theme, device, tabs
     private const double PadSize = 120;      // Target pad size in pixels
@@ -153,6 +163,9 @@ public partial class MainWindow : Window
             case ComboBox { IsDropDownOpen: true }: return;
         }
 
+        // Ours from here, both halves of it.
+        _tookSpace = true;
+
         // Held down, not pressed again. Swallowed rather than passed on, so a leant-on space
         // does nothing at all rather than something else.
         if (!first)
@@ -169,8 +182,23 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>The key is up, so the next time it goes down is a press again.</summary>
-    private void OnWindowKeyUp(object? sender, KeyEventArgs e) => _held.Released(e.Key);
+    /// <summary>
+    /// The key is up, so the next time it goes down is a press again.
+    /// </summary>
+    /// <remarks>
+    /// A space the transport took is swallowed on the way up as well. Buttons click on the
+    /// key coming up rather than going down, and do it whether or not they saw the press, so
+    /// half a space bar is enough to work the last button you clicked.
+    /// </remarks>
+    private void OnWindowKeyUp(object? sender, KeyEventArgs e)
+    {
+        _held.Released(e.Key);
+
+        if (e.Key != Key.Space || !_tookSpace) return;
+
+        _tookSpace = false;
+        e.Handled = true;
+    }
 
     /// <summary>
     /// Uses the size the window was last left at, falling back to the pad matrix on first run.
@@ -237,6 +265,16 @@ public partial class MainWindow : Window
     private void OnMatrixSizeChanged(int rows, int columns)
     {
         var (width, height) = MatrixSize(rows, columns);
+
+        // A row of pads asks for as much width as it likes, and a long thin matrix asks for
+        // more than any screen has. Grown past the screen the window is simply half off it.
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+
+        if (screen != null)
+        {
+            width = Math.Min(width, screen.WorkingArea.Width / screen.Scaling);
+            height = Math.Min(height, screen.WorkingArea.Height / screen.Scaling);
+        }
 
         // Only grow. A deliberate resize should survive a change of matrix, but the pads
         // must never end up clipped.

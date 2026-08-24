@@ -543,14 +543,73 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnRowsChanged(int value)
     {
+        // The other one follows. Setting it to what it already is does nothing, so the two
+        // hooks cannot chase each other.
+        if (LinkPadMatrix) Columns = value;
+
         ValidateMatrixSize();
         (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
     partial void OnColumnsChanged(int value)
     {
+        if (LinkPadMatrix) Rows = value;
+
         ValidateMatrixSize();
         (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Whether the matrix may go past the usual sixteen pads.
+    /// </summary>
+    /// <remarks>
+    /// Kept as a switch of its own rather than simply raising the ceiling: thirty-two pads is
+    /// a different instrument from eight, wants a screen to match, and is not somewhere to end
+    /// up by holding an arrow key down. Turning it off leaves a big matrix that is already in
+    /// force alone; it only refuses the next one.
+    /// </remarks>
+    public bool ExtendedPadMatrix
+    {
+        get => _cfg.ExtendedPadMatrix;
+        set
+        {
+            if (_cfg.ExtendedPadMatrix == value) return;
+
+            _cfg.ExtendedPadMatrix = value;
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(MostPads));
+
+            ValidateMatrixSize();
+            (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
+        }
+    }
+
+    /// <summary>The most pads the settings page will let you ask for as things stand.</summary>
+    public int MostPads => ExtendedPadMatrix ? PadMatrix.Most : PadMatrix.Usual;
+
+    /// <summary>
+    /// Whether rows and columns move together, as the bracket between them shows.
+    /// </summary>
+    /// <remarks>
+    /// A square grid is what most people want and the fiddliest to type, since it means
+    /// getting two numbers to agree. Closed, either field sets both. Nothing happens at the
+    /// moment it is closed: a drawing program does not resize the page when you close its
+    /// lock either, it waits until you type.
+    /// </remarks>
+    public bool LinkPadMatrix
+    {
+        get => _cfg.LinkPadMatrix;
+        set
+        {
+            if (_cfg.LinkPadMatrix == value) return;
+
+            _cfg.LinkPadMatrix = value;
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+        }
     }
 
     private void ValidateMatrixSize()
@@ -558,10 +617,12 @@ public sealed partial class MainViewModel : ObservableObject
         int total = Rows * Columns;
         if (Rows < 1 || Columns < 1)
             MatrixSizeError = "Rows and columns must be at least 1";
-        else if (total < 4)
-            MatrixSizeError = $"Minimum 4 pads required (current: {total})";
-        else if (total > 16)
-            MatrixSizeError = $"Maximum 16 pads allowed (current: {total})";
+        else if (total < PadMatrix.Least)
+            MatrixSizeError = $"Minimum {PadMatrix.Least} pads required (current: {total})";
+        else if (total > MostPads)
+            MatrixSizeError = ExtendedPadMatrix
+                ? $"Maximum {PadMatrix.Most} pads allowed (current: {total})"
+                : $"Maximum {PadMatrix.Usual} pads without the extended matrix (current: {total})";
         else
             MatrixSizeError = "";
 

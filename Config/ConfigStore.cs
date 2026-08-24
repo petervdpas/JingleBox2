@@ -62,20 +62,21 @@ public sealed class ConfigStore
         cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? "default" : cfg.SelectedProfile.Trim();
         cfg.SelectedTheme = string.IsNullOrWhiteSpace(cfg.SelectedTheme) ? "Dark" : cfg.SelectedTheme.Trim();
 
-        // Validate and clamp matrix dimensions
-        // Min per dimension: 1, Min total: 4, Max total: 16
-        cfg.Rows = Math.Clamp(cfg.Rows, 1, 16);
-        cfg.Columns = Math.Clamp(cfg.Columns, 1, 16);
+        // Rows by columns, with the total kept between four pads and the ceiling. The ceiling
+        // is the app's own, not the setting's: a config that says thirty-two pads keeps them
+        // even if the extended switch has since been turned off, since dropping half somebody's
+        // pads on the way in is not a thing a settings file should be able to do quietly. What
+        // the switch governs is what the SETTINGS page will let you ask for next.
+        cfg.Rows = Math.Clamp(cfg.Rows, 1, PadMatrix.Most);
+        cfg.Columns = Math.Clamp(cfg.Columns, 1, PadMatrix.Most);
 
-        // Ensure minimum 4 pads total
-        if (cfg.Rows * cfg.Columns < 4)
+        if (cfg.Rows * cfg.Columns < PadMatrix.Least)
         {
             cfg.Rows = 2;
             cfg.Columns = 2;
         }
 
-        // Ensure maximum 16 pads total
-        if (cfg.Rows * cfg.Columns > 16)
+        if (cfg.Rows * cfg.Columns > PadMatrix.Most)
         {
             cfg.Rows = 4;
             cfg.Columns = 4;

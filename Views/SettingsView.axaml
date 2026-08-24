@@ -201,24 +201,32 @@
                     <views:HelpBadge Topic="settings.pad-matrix" />
                   </StackPanel>
 
-                  <Grid ColumnDefinitions="Auto,*"
+                  <Grid ColumnDefinitions="Auto,Auto,Auto,*"
                         RowDefinitions="Auto,Auto,Auto,Auto"
                         ColumnSpacing="10"
                         RowSpacing="6">
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Rows:" />
                     <views:NumberField Grid.Row="0" Grid.Column="1"
-                                       Minimum="1" Maximum="16"
+                                       Minimum="1" Maximum="{Binding MostPads}"
                                        Value="{Binding Rows}"
                                        HorizontalAlignment="Left"
                                        Width="62" />
 
                     <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Columns:" />
                     <views:NumberField Grid.Row="1" Grid.Column="1"
-                                       Minimum="1" Maximum="16"
+                                       Minimum="1" Maximum="{Binding MostPads}"
                                        Value="{Binding Columns}"
                                        HorizontalAlignment="Left"
                                        Width="62" />
+
+                    <!-- Reaching from one field to the other, the way a drawing program's
+                         width and height are locked together. -->
+                    <views:Linker Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+                                  VerticalAlignment="Stretch"
+                                  Margin="0,4,0,4"
+                                  IsLinked="{Binding LinkPadMatrix}"
+                                  ToolTip.Tip="Keeps rows and columns the same. Type in either and the other follows." />
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Total:" />
                     <StackPanel Grid.Row="2" Grid.Column="1"
@@ -228,11 +236,18 @@
                       <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="pads" />
                     </StackPanel>
 
-                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4"
                                Classes="error"
                                Text="{Binding MatrixSizeError}"
                                IsVisible="{Binding MatrixSizeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                   </Grid>
+
+                  <!-- Sixteen is what fits on a laptop and what a hand finds without looking.
+                       Past that is a deliberate choice, so it is a switch and not just a
+                       larger number in the field above. -->
+                  <CheckBox Content="Use extended pad matrix"
+                            IsChecked="{Binding ExtendedPadMatrix}"
+                            ToolTip.Tip="Lets the matrix go up to 32 pads instead of 16. A grid that big wants the screen to match." />
 
                   <Button Content="Apply Matrix Size"
                           HorizontalAlignment="Left"

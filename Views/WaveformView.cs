@@ -21,8 +21,24 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class WaveformView : ThemedControl
 {
-    /// <summary>The whole file, always: zooming and panning belong to the editor dialog.</summary>
-    private static readonly WaveformViewport FullView = new();
+    /// <summary>
+    /// How much of the file is on screen. Its own, not a shared one: two pictures of the same
+    /// recording, on a panel and in a chop editor, are looked at separately.
+    /// </summary>
+    /// <remarks>
+    /// Everything here works in fractions of the file and goes through <see cref="X"/> and
+    /// <see cref="At"/>, so zooming is a matter of what those two do and nothing else in the
+    /// control has to know about it.
+    /// </remarks>
+    private readonly WaveformViewport _view = new();
+
+    /// <summary>How much one notch of the wheel changes the zoom by.</summary>
+    private const double ZoomStep = 1.25;
+
+    /// <summary>Where a pan started, in pixels, or NaN while nothing is being panned.</summary>
+    private double _panFrom = double.NaN;
+
+    private static readonly Cursor PanCursor = new(StandardCursorType.SizeWestEast);
 
     /// <summary>How close a click has to be to a handle to take hold of it.</summary>
     private const double GrabPixels = 12;
@@ -114,6 +130,11 @@ public class WaveformView : ThemedControl
             PeaksProperty, PlaceholderProperty, ShowMarkersProperty, ShowLoopProperty,
             StartProperty, EndProperty, LoopStartProperty, LoopEndProperty,
             SlicePointsProperty, SelectedSliceProperty, PlayheadProperty);
+
+        // Zoomed in, the parts of the file that are off screen are still drawn: a window that
+        // starts before the left edge is a rectangle beginning at a negative x. Clipped, so
+        // none of it lands on whatever the picture is standing next to.
+        ClipToBoundsProperty.OverrideDefaultValue<WaveformView>(true);
     }
 
     public float[]? Peaks
@@ -199,6 +220,10 @@ public class WaveformView : ThemedControl
     {
         base.OnPropertyChanged(change);
 
+        // A different recording is a different picture, and being dropped into it eight times
+        // magnified at somebody else's scroll position tells you nothing about it.
+        if (change.Property == PeaksProperty) _view.ZoomTo(WaveformViewport.MinZoom);
+
         if (change.Property != SlicePointsProperty) return;
 
         if (_watching != null) _watching.CollectionChanged -= OnSlicePointsChanged;
@@ -237,7 +262,7 @@ public class WaveformView : ThemedControl
         double centre = height / 2;
         context.FillRectangle(new SolidColorBrush(palette.Muted, 0.35), new Rect(1, centre, width - 2, 1));
 
-        var geometry = WaveformGeometry.Build(peaks, FullView, width, height);
+        var geometry = WaveformGeometry.Build(peaks, _view, width, height);
         context.DrawGeometry(new SolidColorBrush(palette.Accent, 0.85), null, geometry);
 
         if (Slicing) DrawSlices(context, palette, area);
@@ -402,6 +427,10 @@ public class WaveformView : ThemedControl
     private static void DrawHandle(
         DrawingContext context, Color colour, double x, Rect area, bool dashed, bool atFoot = false)
     {
+        // Scrolled out of the view. Left where it belongs in the file rather than pinned to the
+        // edge, where it would look like something to take hold of and point at the wrong sample.
+        if (x < area.X - 0.5 || x > area.Right + 0.5) return;
+
         var pen = new Pen(new SolidColorBrush(colour, dashed ? 0.9 : 0.75), dashed ? 1 : 1.5)
         {
             DashStyle = dashed ? new DashStyle(new double[] { 3, 3 }, 0) : null
@@ -436,6 +465,44 @@ public class WaveformView : ThemedControl
         context.DrawText(text, new Point(6, centre - text.Height - 4));
     }
 
+    /// <summary>
+    /// The wheel zooms, holding whatever is under the pointer still.
+    /// </summary>
+    /// <remarks>
+    /// The picture sits inside a panel that scrolls, so the wheel is only taken while there is
+    /// somewhere to zoom to. At the far end, zoomed right out and asked to zoom out further,
+    /// the wheel is left alone and the panel scrolls as it always did.
+    /// </remarks>
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        if (Peaks == null || Bounds.Width <= 0) return;
+
+        double wanted = e.Delta.Y > 0 ? _view.Zoom * ZoomStep : _view.Zoom / ZoomStep;
+
+        if (!_view.ZoomAt(wanted, e.GetPosition(this).X, Bounds.Width)) return;
+
+        InvalidateVisual();
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// True when a press means "move what is on screen" rather than "take hold of something":
+    /// the middle button, or shift with the left one.
+    /// </summary>
+    private bool MeansPan(PointerPressedEventArgs e) =>
+        e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed ||
+        e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+
+    private void StartPan(PointerPressedEventArgs e, double x)
+    {
+        _panFrom = x;
+        Cursor = PanCursor;
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -443,6 +510,12 @@ public class WaveformView : ThemedControl
         if (Peaks == null) return;
 
         double x = e.GetPosition(this).X;
+
+        if (_view.CanPan && MeansPan(e))
+        {
+            StartPan(e, x);
+            return;
+        }
 
         if (Slicing)
         {
@@ -453,6 +526,14 @@ public class WaveformView : ThemedControl
         if (!ShowMarkers) return;
 
         _dragging = Nearest(x);
+
+        // Nothing to take hold of here, so the drag moves the picture instead. Only while
+        // zoomed in: with the whole file on screen there is nowhere to move it to.
+        if (_dragging == Handle.None && _view.CanPan)
+        {
+            StartPan(e, x);
+            return;
+        }
 
         if (_dragging == Handle.None) return;
 
@@ -510,6 +591,18 @@ public class WaveformView : ThemedControl
     {
         base.OnPointerMoved(e);
 
+        if (!double.IsNaN(_panFrom))
+        {
+            double x = e.GetPosition(this).X;
+
+            _view.ScrollTo(_view.Scroll - _view.PanDistance(x - _panFrom, Bounds.Width));
+            _panFrom = x;
+
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+
         if (_draggingPoint >= 0)
         {
             MovePoint(_draggingPoint, At(e.GetPosition(this).X));
@@ -528,6 +621,15 @@ public class WaveformView : ThemedControl
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (!double.IsNaN(_panFrom))
+        {
+            _panFrom = double.NaN;
+            Cursor = Cursor.Default;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
 
         if (_draggingPoint >= 0)
         {
@@ -583,7 +685,7 @@ public class WaveformView : ThemedControl
         double width = Bounds.Width;
         if (width <= 0) return;
 
-        double at = Math.Clamp(x / width, 0, 1);
+        double at = At(x);
 
         switch (_dragging)
         {
@@ -666,7 +768,7 @@ public class WaveformView : ThemedControl
     {
         double width = Bounds.Width;
 
-        return width <= 0 ? 0 : Math.Clamp(x / width, 0, 1);
+        return width <= 0 ? 0 : Math.Clamp(_view.XToFraction(x, width), 0, 1);
     }
 
     /// <summary>The slice point a click means, or -1 when the click is nowhere near one.</summary>
@@ -767,6 +869,10 @@ public class WaveformView : ThemedControl
         if (SelectedSlice >= points.Count - 1) SelectedSlice = points.Count - 2;
     }
 
-    private static double X(double fraction, double width) =>
-        Math.Clamp(double.IsNaN(fraction) ? 0 : fraction, 0, 1) * width;
+    /// <summary>
+    /// A fraction of the file to where it is on screen. Outside the picture when the view is
+    /// zoomed in past it, which is what tells the drawing to leave it out.
+    /// </summary>
+    private double X(double fraction, double width) =>
+        _view.FractionToX(Math.Clamp(double.IsNaN(fraction) ? 0 : fraction, 0, 1), width);
 }
