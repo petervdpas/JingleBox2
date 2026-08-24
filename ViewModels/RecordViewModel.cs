@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 
 namespace JingleBox2.ViewModels;
 
-public sealed partial class RecordViewModel : ObservableObject
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
 {
     private readonly IRecordingService _recordingService;
     private readonly ILevelMeterService _levelMeter;
@@ -164,6 +164,7 @@ public sealed partial class RecordViewModel : ObservableObject
         {
             if (_playing != null) _playing.IsPlaying = false;
             _playing = null;
+            IsPreviewing = false;
         };
 
         RecordingName = NextRecordingName(RecordingNameValidator.DefaultBaseName);
@@ -175,6 +176,35 @@ public sealed partial class RecordViewModel : ObservableObject
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
     public IRelayCommand<Recording> EditRecordingCommand => new RelayCommand<Recording>(EditRecording);
     public IAsyncRelayCommand<Recording> DeleteRecordingCommand => new AsyncRelayCommand<Recording>(DeleteRecording);
+
+    /// <summary>True while a take is being auditioned from the list.</summary>
+    [ObservableProperty] private bool isPreviewing;
+
+    /// <summary>
+    /// This page, as the transport at the top of the window sees it: record takes a take,
+    /// play plays the one whose picture is up, stop stops whichever is happening.
+    /// </summary>
+    /// <remarks>
+    /// Pause is greyed. A take is either being made or it is not, and half a recording paused
+    /// in the middle is not a thing a tape machine ever offered either.
+    /// </remarks>
+    bool ITransportDeck.IsRunning => IsRecording || IsPreviewing;
+
+    bool ITransportDeck.IsPlaying => IsPreviewing;
+    bool ITransportDeck.IsPaused => false;
+
+    bool ITransportDeck.CanPlay => SelectedRecording != null && !IsPreviewing;
+    bool ITransportDeck.CanPause => false;
+
+    void ITransportDeck.Record() => StartRecordingCommand.Execute(null);
+    void ITransportDeck.Play() => PlayRecording(SelectedRecording);
+    void ITransportDeck.Pause() { }
+
+    void ITransportDeck.Stop()
+    {
+        if (IsRecording) StopRecordingCommand.Execute(null);
+        else StopPreview();
+    }
 
     public IRelayCommand<Recording> PlayRecordingCommand => new RelayCommand<Recording>(PlayRecording);
 
@@ -342,6 +372,9 @@ public sealed partial class RecordViewModel : ObservableObject
     partial void OnSelectedRecordingChanged(Recording? value)
     {
         StopPreview();
+
+        // The transport's play cap is lit by there being something picked to play.
+        OnPropertyChanged(nameof(ITransportDeck.CanPlay));
 
         // The trim and the normalise work on this one, and so does the edit dialog.
         SelectedRecordingForEdit = value;
@@ -660,12 +693,17 @@ public sealed partial class RecordViewModel : ObservableObject
 
         _playing = recording;
         recording.IsPlaying = true;
+        IsPreviewing = true;
 
         Status = $"Playing '{recording.Name}'";
     }
 
     /// <summary>Silence, whichever recording it was. Safe to call when nothing is playing.</summary>
-    public void StopPreview() => _preview.Stop();
+    public void StopPreview()
+    {
+        _preview.Stop();
+        IsPreviewing = false;
+    }
 
     private async Task DeleteRecording(Recording? recording)
     {

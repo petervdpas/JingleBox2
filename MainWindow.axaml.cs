@@ -163,10 +163,8 @@ public partial class MainWindow : Window
 
         if (DataContext is not MainViewModel vm) return;
 
-        var tracker = vm.Tracker;
-
-        if (tracker.IsPlaying) tracker.StopCommand.Execute(null);
-        else tracker.PlayCommand.Execute(null);
+        // Whatever the caps are working on this page. See TransportSwitch.
+        vm.Transport.Toggle();
 
         e.Handled = true;
     }

@@ -40,12 +40,36 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>What the bar along the bottom of the window shows.</summary>
     public StatusViewModel StatusLine { get; }
 
+    /// <summary>The pads, as the transport sees them: one cap, and it silences the lot.</summary>
+    private PadDeck? _padDeck;
+
+    /// <summary>What the four caps at the top of the window are working.</summary>
+    public TransportSwitch Transport { get; private set; } = null!;
+
+    /// <summary>
+    /// The deck of the page you are on.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than defaulting, so a page added later has to say what its transport
+    /// means. SETTINGS and PADS are not pages you play on, and they hand the caps the pads,
+    /// which can only stop: what is sounding while you are setting things up is a pad.
+    /// </remarks>
+    private ITransportDeck DeckForPage => SelectedTab switch
+    {
+        RecordTab => Record,
+        TrackerTab => Tracker,
+        _ => _padDeck!
+    };
+
     /// <summary>Which tab is open, so the bar can say where you are rather than where you were.</summary>
     [ObservableProperty] private int selectedTab;
 
     partial void OnSelectedTabChanged(int value)
     {
         Retell();
+
+        // The caps are patched to the page you are on, so moving pages moves them.
+        Transport?.Moved();
 
         OnPropertyChanged(nameof(ShowsTransport));
         OnPropertyChanged(nameof(TabStripRoom));
@@ -375,6 +399,11 @@ public sealed partial class MainViewModel : ObservableObject
 
         Tracker = new TrackerViewModel(audio, rack, Record.Recordings, store, cfg, Plugins, waveformService);
         Machines = new MachineRackViewModel(rack, Tracker, Record.Recordings, waveformService, Plugins);
+
+        // The four caps at the top belong to the page you are on. See TransportSwitch for
+        // which deck they are patched to and when.
+        _padDeck = new PadDeck(Pads);
+        Transport = new TransportSwitch(() => DeckForPage, Record, _padDeck, Tracker);
 
         Machines.InstrumentChanged += (_, instrument) =>
         {

@@ -83,10 +83,21 @@
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
         <TextBlock Grid.Column="0" Classes="field" Text="Song:" />
-        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                   FontWeight="SemiBold"
-                   TextTrimming="CharacterEllipsis"
-                   Text="{Binding SongName}" />
+        <!-- The name, and what the song says about itself beside it. The note is what tells
+             two songs apart months later, and reading it should not need the picker opening. -->
+        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="10">
+          <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                     FontWeight="SemiBold"
+                     TextTrimming="CharacterEllipsis"
+                     Text="{Binding SongName}" />
+
+          <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                     Opacity="0.7" FontSize="12"
+                     TextTrimming="CharacterEllipsis"
+                     IsVisible="{Binding SongDescription, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     Text="{Binding SongDescription}"
+                     ToolTip.Tip="{Binding SongDescription}" />
+        </Grid>
 
         <Button Grid.Column="2" Content="Open..." Command="{Binding OpenSongCommand}" />
         <Button Grid.Column="3" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"

@@ -47,6 +47,22 @@ public class Transport : ThemedControl
     public static readonly StyledProperty<bool> CanPauseProperty =
         AvaloniaProperty.Register<Transport, bool>(nameof(CanPause), true);
 
+    /// <summary>
+    /// False greys the record cap, for a page with nothing to arm or take.
+    /// </summary>
+    public static readonly StyledProperty<bool> CanRecordProperty =
+        AvaloniaProperty.Register<Transport, bool>(nameof(CanRecord), true);
+
+    /// <summary>
+    /// False greys the play cap, for a page with nothing the transport can start.
+    /// </summary>
+    /// <remarks>
+    /// FIRE is the one that needs it: pads are fired by pads, so the only cap there with
+    /// anything behind it is stop.
+    /// </remarks>
+    public static readonly StyledProperty<bool> CanPlayProperty =
+        AvaloniaProperty.Register<Transport, bool>(nameof(CanPlay), true);
+
     public static readonly StyledProperty<ICommand?> RecordCommandProperty =
         AvaloniaProperty.Register<Transport, ICommand?>(nameof(RecordCommand));
 
@@ -97,7 +113,8 @@ public class Transport : ThemedControl
     static Transport()
     {
         AffectsRender<Transport>(
-            IsRecordingProperty, IsPlayingProperty, IsPausedProperty, CanPauseProperty,
+            IsRecordingProperty, IsPlayingProperty, IsPausedProperty,
+            CanRecordProperty, CanPlayProperty, CanPauseProperty,
             CapWidthProperty, CapHeightProperty, GapProperty, QuietProperty);
 
         AffectsMeasure<Transport>(CapWidthProperty, CapHeightProperty, GapProperty);
@@ -126,6 +143,28 @@ public class Transport : ThemedControl
         get => GetValue(CanPauseProperty);
         set => SetValue(CanPauseProperty, value);
     }
+
+    public bool CanRecord
+    {
+        get => GetValue(CanRecordProperty);
+        set => SetValue(CanRecordProperty, value);
+    }
+
+    public bool CanPlay
+    {
+        get => GetValue(CanPlayProperty);
+        set => SetValue(CanPlayProperty, value);
+    }
+
+    /// <summary>Whether a cap has anything behind it here. A dead cap is drawn faint and
+    /// does not press.</summary>
+    private bool Dead(Key key) => key switch
+    {
+        Key.Record => !CanRecord,
+        Key.Play => !CanPlay,
+        Key.Pause => !CanPause,
+        _ => false
+    };
 
     public bool Quiet
     {
@@ -192,7 +231,7 @@ public class Transport : ThemedControl
         if (cap.Width <= 0 || cap.Height <= 0) return;
 
         bool down = _down == key;
-        bool dead = key == Key.Pause && !CanPause;
+        bool dead = Dead(key);
 
         // On a panel, the panel's own surface. On the bare page, a shade above the page, which
         // is enough to be a cap and not enough to be a block of light.
@@ -323,7 +362,7 @@ public class Transport : ThemedControl
 
         var key = At(e.GetPosition(this));
 
-        if (key == Key.None || (key == Key.Pause && !CanPause)) return;
+        if (key == Key.None || Dead(key)) return;
 
         _down = key;
 

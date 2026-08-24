@@ -20,6 +20,17 @@ public sealed class Song
 
     public string Name { get; set; } = "untitled";
 
+    /// <summary>
+    /// What this song is, in the writer's own words. Empty unless somebody says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// For picking one out of a list months later, which a file name written in a hurry is bad
+    /// at: "Gruber" says nothing about the bed being 30 seconds at 98bpm with the sting at the
+    /// end. It travels with the song rather than sitting in a settings file, because it is part
+    /// of the work and has to survive the song being copied to another machine.
+    /// </remarks>
+    public string Description { get; set; } = "";
+
     public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
     public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
 

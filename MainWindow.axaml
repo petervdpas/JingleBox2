@@ -36,15 +36,17 @@
                        Margin="0,5,25,0"
                        ZIndex="1"
                        CapWidth="34" CapHeight="26" Gap="4" Quiet="True"
-                       IsRecording="{Binding Tracker.IsRecording}"
-                       IsPlaying="{Binding Tracker.IsPlaying}"
-                       IsPaused="{Binding Tracker.IsPaused}"
-                       CanPause="{Binding Tracker.CanPause}"
-                       RecordCommand="{Binding Tracker.ToggleRecordCommand}"
-                       PlayCommand="{Binding Tracker.PlayCommand}"
-                       PauseCommand="{Binding Tracker.PauseCommand}"
-                       StopCommand="{Binding Tracker.StopCommand}"
-                       ToolTip.Tip="Record arms typing into the pattern. The rest are what they look like." />
+                       IsRecording="{Binding Transport.IsRecording}"
+                       IsPlaying="{Binding Transport.IsPlaying}"
+                       IsPaused="{Binding Transport.IsPaused}"
+                       CanRecord="{Binding Transport.CanRecord}"
+                       CanPlay="{Binding Transport.CanPlay}"
+                       CanPause="{Binding Transport.CanPause}"
+                       RecordCommand="{Binding Transport.RecordCommand}"
+                       PlayCommand="{Binding Transport.PlayCommand}"
+                       PauseCommand="{Binding Transport.PauseCommand}"
+                       StopCommand="{Binding Transport.StopCommand}"
+                       ToolTip.Tip="Works whatever this page plays: a take on RECORD, the pads on FIRE, the song on TRACKER. A cap that is faint has nothing to do here." />
 
     <!-- No padding of its own. A page runs to the same left and right edges as the tab
          names above it and the status bar below it, and the only inset is the one each page

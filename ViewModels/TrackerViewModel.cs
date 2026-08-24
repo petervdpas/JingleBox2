@@ -22,7 +22,7 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
@@ -422,6 +422,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>The two things the play button can walk through.</summary>
     public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Pattern, TrackerPlayMode.Song };
 
+    /// <summary>
+    /// The song, as the transport at the top of the window sees it. Running means sounding or
+    /// held at a line; armed for typing is not running, since nothing is being heard.
+    /// </summary>
+    bool ITransportDeck.IsRunning => Transport != TrackerTransportState.Stopped;
+
+    bool ITransportDeck.CanRecord => true;
+    bool ITransportDeck.CanPlay => true;
+
+    void ITransportDeck.Record() => IsRecording = !IsRecording;
+    void ITransportDeck.Play() => Play();
+    void ITransportDeck.Pause() => Pause();
+    void ITransportDeck.Stop() => Stop();
+
     public IRelayCommand PlayCommand => new RelayCommand(Play);
     public IRelayCommand PauseCommand => new RelayCommand(Pause);
     public IRelayCommand StopCommand => new RelayCommand(Stop);
@@ -445,6 +459,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// there, unsaved, so a delete by mistake costs a save rather than the work.
     /// </summary>
     public IAsyncRelayCommand DeleteSongCommand => new AsyncRelayCommand(DeleteSong);
+
+    /// <summary>
+    /// What the song says about itself, for the bar to show beside its name.
+    /// </summary>
+    /// <remarks>
+    /// Read through here rather than bound straight to the song, because a song is a plain
+    /// object and says nothing when one of its fields changes. This is the one that is told.
+    /// </remarks>
+    public string SongDescription => Song.Description;
 
     /// <summary>False for a song that has never been written down, which has nothing to delete.</summary>
     public bool CanDeleteSong
@@ -582,6 +605,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
+
+    /// <summary>A different song is a different description.</summary>
+    partial void OnSongChanged(Song value) => OnPropertyChanged(nameof(SongDescription));
 
     partial void OnSongNameChanged(string value)
     {
@@ -1524,25 +1550,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>
     /// The name box used to stand on the page, which meant a song could be renamed by a stray
     /// keystroke in a field nobody was looking at. Asking is a moment, and the moment is the
-    /// point: this is the one place a song changes its name.
+    /// point: this is the one place a song changes its name, and the one place it says what it
+    /// is. Save as on a song that already has a name is therefore also how the description is
+    /// changed later.
     /// </remarks>
     private async Task SaveAs()
     {
-        string? wanted = await Views.NameDialog.AskAsync(
-            "Save song",
-            "What should this song be called?",
-            SongName,
-            "Save");
+        var details = await Views.SongDetailsDialog.AskAsync(SongName, Song.Description);
 
-        if (wanted == null) return;
+        if (details == null) return;
 
-        if (Needs(wanted))
+        if (Needs(details.Name))
         {
             Status = "'" + Unnamed + "' is not a name. Call it something you will know again.";
             return;
         }
 
-        SongName = wanted;
+        SongName = details.Name;
+        Song.Description = details.Description;
+        OnPropertyChanged(nameof(SongDescription));
+
         Save();
     }
 

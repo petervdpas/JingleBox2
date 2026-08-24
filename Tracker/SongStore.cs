@@ -40,9 +40,37 @@ public sealed class SongStore
             ? Directory.GetFiles(SongsDirectory, "*" + Extension).OrderBy(p => p).ToArray()
             : Array.Empty<string>();
 
-    /// <summary>Saved songs as name and path, ready for a picker.</summary>
+    /// <summary>Saved songs as name, path and what they say about themselves, for a picker.</summary>
     public IReadOnlyList<SongFile> ListSongs() =>
-        List().Select(path => new SongFile(Path.GetFileNameWithoutExtension(path), path)).ToArray();
+        List()
+            .Select(path => new SongFile(Path.GetFileNameWithoutExtension(path), path, DescriptionIn(path)))
+            .ToArray();
+
+    /// <summary>
+    /// What one song says about itself, without loading the song.
+    /// </summary>
+    /// <remarks>
+    /// Read rather than remembered anywhere else, so the description a song carries is the one
+    /// the list shows even when the file was written by another machine or edited by hand.
+    /// A song that will not parse simply has nothing to say, since this is a list to read and
+    /// not the load that has to report a broken file.
+    /// </remarks>
+    private static string DescriptionIn(string path)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+
+            return document.RootElement.TryGetProperty(nameof(SongDocument.Description), out var said)
+                   && said.ValueKind == JsonValueKind.String
+                ? said.GetString() ?? ""
+                : "";
+        }
+        catch (Exception)
+        {
+            return "";
+        }
+    }
 
     public bool Exists(string songName) => File.Exists(PathFor(songName));
 
@@ -85,6 +113,7 @@ public sealed class SongStore
     {
         public int Version { get; set; } = 1;
         public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
         public int KeyboardOctave { get; set; } = 4;
@@ -98,6 +127,7 @@ public sealed class SongStore
         public static SongDocument From(Song song) => new()
         {
             Name = song.Name,
+            Description = song.Description,
             Bpm = song.Bpm,
             LinesPerBeat = song.LinesPerBeat,
             KeyboardOctave = song.KeyboardOctave,
@@ -114,6 +144,7 @@ public sealed class SongStore
             var song = new Song
             {
                 Name = Name,
+                Description = Description,
                 Bpm = Bpm,
                 LinesPerBeat = LinesPerBeat,
                 KeyboardOctave = KeyboardOctave,

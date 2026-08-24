@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:tracker="clr-namespace:JingleBox2.Tracker"
         x:Class="JingleBox2.Views.SongDialog"
         x:DataType="vm:TrackerViewModel"
         Title="Open song"
@@ -23,7 +24,23 @@
              IsVisible="{Binding SavedSongs.Count}"
              ItemsSource="{Binding SavedSongs}"
              SelectedItem="{Binding SelectedSongFile}"
-             DoubleTapped="Songs_DoubleTapped" />
+             DoubleTapped="Songs_DoubleTapped">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="tracker:SongFile">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+
+            <!-- Only when there is something to say, so a song without a note keeps a one
+                 line row rather than a blank second line under its name. -->
+            <TextBlock Text="{Binding Description}"
+                       IsVisible="{Binding HasDescription}"
+                       Opacity="0.7" FontSize="12"
+                       TextWrapping="Wrap" MaxLines="2"
+                       TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
 
     <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
       <Button Grid.Column="1" Name="CancelButton" Content="Cancel" Click="Cancel_Click"
