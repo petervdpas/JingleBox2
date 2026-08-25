@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace JingleBox2.Machines;
@@ -36,4 +37,22 @@ public interface IMachinePresets
 
     /// <summary>What this machine calls the list: "Preset", or "Take".</summary>
     string Caption { get; }
+
+    /// <summary>
+    /// The ways the list can be narrowed, or none when there is nothing to narrow.
+    /// </summary>
+    /// <remarks>
+    /// A shelf of your own recordings runs to hundreds and is filed under categories, and
+    /// hunting through it with two arrows is no way to find anything. A machine's own presets
+    /// are a handful shipped in a folder and have nothing to file, which is why this is allowed
+    /// to be empty and the picker keeps the whole width when it is.
+    ///
+    /// Given a body so that a shelf that has never heard of narrowing still compiles. What the
+    /// categories are, and whether one of them is "everything", is the shelf's own business:
+    /// the panel draws the words it is given and hands back the one that was picked.
+    /// </remarks>
+    IReadOnlyList<string> Filters => Array.Empty<string>();
+
+    /// <summary>Which of those is in force, by name.</summary>
+    string Filter { get => ""; set { } }
 }

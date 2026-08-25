@@ -328,6 +328,25 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
+    /// <summary>
+    /// Draws the machine in front of you again, because the machine itself has changed.
+    /// </summary>
+    /// <remarks>
+    /// A machine imported while the app is running is a new description of something that may be
+    /// on screen this moment. The panel is built when an instrument is picked, so the way to
+    /// draw the new one is to pick it again, which also puts down whatever the old panel was
+    /// holding: a sounding note, an open plugin window, a kit watching the keyboard.
+    /// </remarks>
+    public void Reopen()
+    {
+        var was = Selected;
+
+        if (was == null) return;
+
+        Selected = null;
+        Selected = was;
+    }
+
     partial void OnSelectedChanged(RackMachine? value)
     {
         OnPropertyChanged(nameof(CanDelete));
@@ -360,7 +379,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Presets = value == null
             ? null
-            : new InstrumentPresets(value.Instrument, Reloaded, Editor?.Takes.Shown);
+            : new InstrumentPresets(value.Instrument, Reloaded, Editor?.Takes.Shown, Editor?.Takes);
 
         // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);

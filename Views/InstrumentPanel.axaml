@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
-             x:Class="JingleBox2.Views.InstrumentEditor"
+             x:Class="JingleBox2.Views.InstrumentPanel"
              x:Name="Root"
              x:DataType="vm:IInstrumentDesigner"
              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -62,7 +62,7 @@
                    recording machine with no recording on it has no settings worth shipping.
                    Either way the name, the id and the level stay: this is still the same
                    instrument, given a different sound to make. -->
-              <StackPanel Classes="entry">
+              <StackPanel Classes="entry" IsVisible="{Binding !Editor.DescribesPreset}">
                 <TextBlock Classes="field" Text="{Binding Presets.Caption}" />
 
                 <!-- One control, not three: the arrows, the name and how far through you are
@@ -427,9 +427,11 @@
                 </ui:PanelGroup>
 
                 <ui:PanelGroup Caption="Envelope">
-                  <views:EnvelopeScope Width="176" Height="60"
-                                       Patch="{Binding Editor.Patch.Patch}"
-                                       Revision="{Binding Editor.Patch.Revision}"
+                  <ui:EnvelopeScope Width="176" Height="60"
+                                       AttackMs="{Binding Editor.Patch.AttackMs}"
+                                       DecayMs="{Binding Editor.Patch.DecayMs}"
+                                       Sustain="{Binding Editor.Patch.Sustain}"
+                                       ReleaseMs="{Binding Editor.Patch.ReleaseMs}"
                                        HoldSeconds="{Binding HoldSeconds}"
                                        Trigger="{Binding NoteTrigger}"
                                        ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />
@@ -694,11 +696,26 @@
 
             </StackPanel>
 
+            <!-- The machine's own face, drawn from what the machine says it looks like. Where
+                 there is one, it is the whole panel: the blocks written out below are the same
+                 controls said in XAML, and showing both would be the same instrument edited from
+                 two places. A machine that has not been converted has none, and the written
+                 blocks stand. -->
+            <ui:MachinePanelView IsVisible="{Binding Editor.IsDescribed}"
+                                 HorizontalAlignment="Left"
+                                 Face="{Binding Editor.Described}"
+                                 Values="{Binding Editor.Values}"
+                                 Takes="{Binding Editor.MachineTakes}"
+                                 Presets="{Binding Presets}"
+                                 Playhead="{Binding Editor.Playhead}"
+                                 Trigger="{Binding NoteTrigger}"
+                                 HoldSeconds="{Binding HoldSeconds}" />
+
             <!-- The voice: the same chain whether the source is a recording or a wave, so this
                  row is shown for both. A plugin has none of it, because the plugin does its own
                  envelope and its own everything else; and neither has Ouroboros, which brings
                  its own above rather than sharing this one. -->
-            <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.HasCommonVoice}">
+            <WrapPanel Orientation="Horizontal" IsVisible="{Binding Editor.ShowsWrittenVoice}">
 
               <ui:PanelGroup Caption="Sample" IsVisible="{Binding Editor.IsSample}" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
@@ -767,10 +784,12 @@
               <ui:PanelGroup Caption="Envelope" Margin="0,0,10,10">
                 <StackPanel Spacing="6">
   <StackPanel Orientation="Horizontal" Spacing="12">
-                    <views:EnvelopeScope Width="150" Height="58"
+                    <ui:EnvelopeScope Width="150" Height="58"
                                          VerticalAlignment="Top"
-                                         Patch="{Binding Editor.Patch.Patch}"
-                                         Revision="{Binding Editor.Patch.Revision}"
+                                         AttackMs="{Binding Editor.Patch.AttackMs}"
+                                         DecayMs="{Binding Editor.Patch.DecayMs}"
+                                         Sustain="{Binding Editor.Patch.Sustain}"
+                                         ReleaseMs="{Binding Editor.Patch.ReleaseMs}"
                                          HoldSeconds="{Binding HoldSeconds}"
                                          Trigger="{Binding NoteTrigger}"
                                          ToolTip.Tip="The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it." />

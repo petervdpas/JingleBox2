@@ -170,6 +170,43 @@ public static class MachineElementKinds
     public const string Wave = "Wave";
 
     /// <summary>
+    /// The envelope as a curve, with a playhead that runs along it while a note sounds.
+    /// </summary>
+    /// <remarks>
+    /// Properties: attack, decay, sustain and release, each naming the parameter that holds it,
+    /// and width and height. It turns nothing itself: the four faders beside it do that, and
+    /// this is the picture of what they add up to, which is a thing four faders cannot show.
+    ///
+    /// The four are named rather than assumed, because a machine is free to call its envelope
+    /// whatever it likes and some machines have two.
+    /// </remarks>
+    public const string Envelope = "Envelope";
+
+    /// <summary>
+    /// A picture the machine carries: a logo, a badge, a strip of trim.
+    /// </summary>
+    /// <remarks>
+    /// Properties: file, width, height, and fit. It turns no parameter and never will. A badge
+    /// is not a setting, nothing about it is worth writing into a song, and a machine that wants
+    /// its picture to change with what it is doing wants a control and not this.
+    ///
+    /// <c>file</c> names the picture inside the machine's own folder, and names nothing else. A
+    /// machine travels as that folder, so a picture in it arrives with it, and a name is the
+    /// only thing about a file that survives being copied, zipped and opened on somebody else's
+    /// disc. A host reading a name that climbs out of the folder draws nothing: the description
+    /// came from whoever built the machine, and where it may read from did not.
+    ///
+    /// It may be a drawing rather than a photograph: a file ending in .svg is drawn at whatever
+    /// size the panel gives it, so a logo stays sharp where a picture made of pixels is stretched
+    /// up from the size it was saved at. The name is what says which it is, and a host that
+    /// cannot read one draws the empty frame it draws for any file it cannot open.
+    ///
+    /// <c>fit</c> is how the picture takes the room it is given. "uniform", the default, keeps
+    /// its shape; "fill" stretches it to the corners; "none" draws it at the size it was made.
+    /// </remarks>
+    public const string Image = "Image";
+
+    /// <summary>
     /// Which recording the machine plays. Property: caption.
     /// </summary>
     /// <remarks>

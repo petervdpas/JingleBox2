@@ -137,6 +137,101 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         instrument.EnsureShape();
         ReadWaveform(waveforms);
+
+        Describe(waveforms);
+    }
+
+    /// <summary>
+    /// Finds the machine's own face, if this installation has it and this build can drive it.
+    /// </summary>
+    /// <remarks>
+    /// Two things have to be true. The machine has to be installed with a panel laid out, which
+    /// is what <see cref="MachineProjects.PanelFor"/> answers; and this build has to know how to
+    /// turn that machine's parameters into an instrument's settings, which is what the values
+    /// are. A machine with a face and nobody to read it draws knobs that turn nothing, so the
+    /// panel written by hand is shown instead and nothing is lost.
+    ///
+    /// The recording machine is the only one with an adapter today. The others keep the panel
+    /// they have always had until each one has been converted, which is the point of asking
+    /// rather than assuming: converting a machine is finished when its knobs move an instrument,
+    /// not when its file exists.
+    /// </remarks>
+    private void Describe(IWaveformService? waveforms)
+    {
+        string id = Machine.For(_instrument.Kind).SlotId;
+
+        if (Tracker.Machines.MachineProjects.PanelFor(id) is not { } face) return;
+
+        if (Tracker.Machines.MachineProjects.For(id) is not { } project) return;
+
+        if (!IsSample) return;
+
+        var shape = project.Parameters;
+
+        var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
+
+        var values = new Tracker.Machines.RecordingValues(_instrument, shelf)
+        {
+            // A knob on a described panel is a knob: it changes the instrument, the song is
+            // dirty, and whatever else is showing the same setting has to hear about it.
+            Changed = () =>
+            {
+                _changed();
+
+                Moved();
+            }
+        };
+
+        Described = new MachineFace(face, shape, project.Folder);
+
+        Values = values;
+        MachineTakes = shelf;
+    }
+
+    /// <summary>The machine's own face, or nothing when it is drawn by hand.</summary>
+    public MachineFace? Described { get; private set; }
+
+    /// <summary>Where that face reads and writes, which is this instrument.</summary>
+    public IMachineValues? Values { get; private set; }
+
+    /// <summary>Where it looks up the recording it names.</summary>
+    public IMachineTakes? MachineTakes { get; private set; }
+
+    /// <summary>True when the panel comes off the machine rather than out of this program.</summary>
+    public bool IsDescribed => Described != null;
+
+    /// <summary>
+    /// True when the machine describes its own picker, so the page should not add one.
+    /// </summary>
+    /// <remarks>
+    /// The page fills in what a machine does not say. Where the machine puts a picker on its own
+    /// panel, a second one in the header is the same control twice, showing the same list, one
+    /// of which is in the wrong place.
+    /// </remarks>
+    public bool DescribesPreset => Described?.Panel.Root is { } root && Holds(root, MachineElementKinds.Preset);
+
+    private static bool Holds(MachineElement element, string kind)
+    {
+        if (element.Element == kind) return true;
+
+        foreach (var child in element.Children)
+            if (Holds(child, kind)) return true;
+
+        return false;
+    }
+
+    /// <summary>Everything the page reads off the instrument, after a described panel moved one.</summary>
+    /// <remarks>
+    /// A described panel writes straight to the instrument, so the properties this class hands
+    /// out are all suspect at once and there is no telling which. The header alone reads four of
+    /// them, and the source line is the one somebody notices.
+    /// </remarks>
+    private void Moved()
+    {
+        OnPropertyChanged(nameof(SourceText));
+        OnPropertyChanged(nameof(SampleText));
+        OnPropertyChanged(nameof(BaseNoteText));
+        OnPropertyChanged(nameof(Playhead));
     }
 
     public int Index { get; }
@@ -386,6 +481,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// it keeps the shared editor until Zampler is built to replace it.
     /// </remarks>
     public bool HasCommonVoice => IsSample;
+
+    /// <summary>True when the voice is the one written out in XAML rather than the machine's own.</summary>
+    public bool ShowsWrittenVoice => HasCommonVoice && !IsDescribed;
 
     public bool IsSynth => _instrument.IsSynth;
 

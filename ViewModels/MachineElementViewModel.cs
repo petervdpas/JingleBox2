@@ -48,7 +48,18 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// is the one element with nothing above it, which is how the editor knows it cannot be
     /// removed.
     /// </remarks>
-    public MachineElementViewModel? Parent { get; set; }
+    public MachineElementViewModel? Parent
+    {
+        get => parent;
+        set
+        {
+            parent = value;
+
+            OnPropertyChanged(nameof(Display));
+        }
+    }
+
+    private MachineElementViewModel? parent;
 
     /// <summary>Which kind of thing this is, by the names in <see cref="MachineElementKinds"/>.</summary>
     /// <remarks>
@@ -93,6 +104,16 @@ public sealed partial class MachineElementViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// True while a part being dragged would land inside this one.
+    /// </summary>
+    /// <remarks>
+    /// On the row rather than on the list, because the list draws its rows from these and has
+    /// nowhere else to put it. Nothing is stored with the machine: it lasts as long as a hand
+    /// is over the line.
+    /// </remarks>
+    [ObservableProperty] private bool isDropTarget;
+
     /// <summary>What is inside it, wrapped, and in the order the element holds them.</summary>
     public ObservableCollection<MachineElementViewModel> Children { get; } = new();
 
@@ -113,16 +134,59 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// The kind first, since that is what the element is, then whichever of the label or the
     /// parameter says something. A group is known by what it is called and a control by what it
     /// turns, so one line covers both without the tree needing a column for each.
+    ///
+    /// The outermost one is called the machine. It is a Column or a Grid like any other and the
+    /// inspector still says so, but on the list it is the thing everything else is inside, and
+    /// that is what somebody looking for where a part will land is looking for. Reading it as
+    /// "Column" made the one row that is always a valid target the hardest one to find.
     /// </remarks>
     public string Display
     {
         get
         {
+            if (Parent == null) return "machine (" + Kind + ")";
+
             if (Element.Label.Length > 0) return Kind + " \"" + Element.Label + "\"";
 
             if (Element.Parameter.Length > 0) return Kind + " → " + Element.Parameter;
 
             return Kind;
+        }
+    }
+
+    /// <summary>
+    /// Reads the properties off the element again, for a change that did not come from a row.
+    /// </summary>
+    /// <remarks>
+    /// Sizing an element by dragging its handle writes width and height straight onto the
+    /// element, which is right: the panel owns the drag and the description is what it is
+    /// writing. The inspector is then a list of rows for the properties there used to be, so it
+    /// is told to look again rather than being rebuilt, which would throw away whatever row
+    /// somebody was in the middle of typing into.
+    /// </remarks>
+    public void Reread()
+    {
+        for (int at = Properties.Count - 1; at >= 0; at--)
+        {
+            if (!Element.Properties.ContainsKey(Properties[at].Key)) Properties.RemoveAt(at);
+        }
+
+        foreach (var pair in Element.Properties)
+        {
+            bool known = false;
+
+            foreach (var row in Properties)
+            {
+                if (row.Key != pair.Key) continue;
+
+                row.Refreshed();
+
+                known = true;
+
+                break;
+            }
+
+            if (!known) Properties.Add(new MachineElementPropertyViewModel(Element, pair.Key));
         }
     }
 
@@ -141,6 +205,34 @@ public sealed partial class MachineElementViewModel : ObservableObject
         Children.Add(wrapped);
 
         return wrapped;
+    }
+
+    /// <summary>
+    /// Puts an element inside this one at a given place, or at the end when there is none.
+    /// </summary>
+    /// <remarks>
+    /// The place is where somebody let go, counted among what is already here. Out of range
+    /// means the end rather than a refusal: a drop past the last thing is a drop after the last
+    /// thing, and that is what the hand meant.
+    /// </remarks>
+    public MachineElementViewModel Put(MachineElement child, int at)
+    {
+        var wrapped = new MachineElementViewModel(child, this);
+
+        Put(wrapped, at);
+
+        return wrapped;
+    }
+
+    /// <summary>The same, for a wrapper that already exists, which is what moving one is.</summary>
+    public void Put(MachineElementViewModel child, int at)
+    {
+        int place = at < 0 || at > Children.Count ? Children.Count : at;
+
+        Children.Insert(place, child);
+        Element.Children.Insert(place, child.Element);
+
+        child.Parent = this;
     }
 
     /// <summary>Takes one out, and returns whether it was in there to begin with.</summary>
@@ -264,6 +356,9 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
             OnPropertyChanged();
         }
     }
+
+    /// <summary>Says the value again, for one that was changed behind the row's back.</summary>
+    public void Refreshed() => OnPropertyChanged(nameof(Value));
 
     /// <summary>What the property is set to, as text, which is how the panel stores all of them.</summary>
     public string Value

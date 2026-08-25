@@ -235,7 +235,7 @@ public static class PanelPreview
                     Content = new ScrollViewer
                     {
                         Padding = new Thickness(18),
-                        Content = new InstrumentEditor { DataContext = designer }
+                        Content = new InstrumentPanel { DataContext = designer }
                     }
                 };
             }

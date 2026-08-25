@@ -24,6 +24,15 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />
+    <!--
+      A drawing reader, for the one element that shows a file: a machine's badge. Avalonia knows
+      how to decode a png and a jpg and nothing about an svg, and a logo is exactly the picture
+      that wants to be drawn rather than sampled, since a panel is laid out at whatever size the
+      person laying it out says. It belongs here and not in the abstractions: the abstractions
+      say a picture is a file with a name, and which of them can be read is a question about
+      whoever is doing the drawing.
+    -->
+    <PackageReference Include="Svg.Controls.Avalonia" Version="12.0.0.1" />
   </ItemGroup>
 
   <ItemGroup>

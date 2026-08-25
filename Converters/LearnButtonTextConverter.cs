@@ -8,7 +8,7 @@ public sealed class LearnButtonTextConverter : IValueConverter
     public static readonly LearnButtonTextConverter Instance = new();
 
     public object? Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
-        => value is bool b && b ? "Learning…" : "Learn";
+        => value is bool b && b ? "Learning..." : "Learn";
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture)
         => throw new NotSupportedException();

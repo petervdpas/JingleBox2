@@ -14,6 +14,6 @@
   <!-- The machine being worked on, in a window of its own: the same panel a track's instrument
        opens in, over the machine the rack has picked. A panel full of knobs wants a window it
        can be as big as it needs in, and it wants to stay up while you do something else. -->
-  <views:InstrumentEditor Padding="0" />
+  <views:InstrumentPanel Padding="0" />
 
 </Window>

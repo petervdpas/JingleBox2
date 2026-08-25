@@ -57,20 +57,12 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     private const string TremoloRateKey = "tremolo_rate";
     private const string TremoloDepthKey = "tremolo_depth";
     private const string CutoffKey = "cutoff";
+
+    /// <summary>What the cutoff knob writes under itself, since a position of 0.62 means nothing.</summary>
+    private const string CutoffTextKey = "cutoff_text";
     private const string ResonanceKey = "resonance";
     private const string LevelKey = "level";
     private const string DriveKey = "drive";
-
-    /// <summary>
-    /// The loudest a take can be set to: unity and the same again, which is makeup gain for a
-    /// quiet recording.
-    /// </summary>
-    /// <remarks>
-    /// The same ceiling the instrument editor's own level control has. Said here rather than
-    /// borrowed from a view model, because what a setting may be set to is the machine's
-    /// business and not a screen's.
-    /// </remarks>
-    public const double MaxLevel = 2.0;
 
     /// <summary>
     /// Told that something moved, if anybody is listening.
@@ -136,9 +128,13 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
         PitchTimeKey => Voice.PitchEnvMs,
         TremoloRateKey => Voice.TremoloRateHz,
         TremoloDepthKey => Voice.TremoloDepth,
-        CutoffKey => Voice.FilterCutoffHz,
+        // The last two are not the numbers the instrument keeps. A filter knob marked in hertz
+        // does nothing for three quarters of its travel, and a level fader is marked in decibels
+        // on every desk ever built, so the machine file declares the two the way they are read
+        // and the conversion happens here, where the instrument's own units are known.
+        CutoffKey => UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz),
         ResonanceKey => Voice.FilterResonance,
-        LevelKey => instrument.Volume,
+        LevelKey => UI.GainScale.ToDecibels(instrument.Volume),
         DriveKey => Voice.Drive,
         _ => 0
     };
@@ -178,9 +174,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
             case PitchTimeKey: Number(Voice.PitchEnvMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, v => Voice.PitchEnvMs = v); break;
             case TremoloRateKey: Number(Voice.TremoloRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.TremoloRateHz = v); break;
             case TremoloDepthKey: Number(Voice.TremoloDepth, value, SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, v => Voice.TremoloDepth = v); break;
-            case CutoffKey: Number(Voice.FilterCutoffHz, value, SynthPatch.MinCutoffHz, SynthPatch.MaxCutoffHz, v => Voice.FilterCutoffHz = v); break;
+            case CutoffKey: Number(UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz), value, 0, 1, v => Voice.FilterCutoffHz = UI.FrequencyScale.ToHz(v)); break;
             case ResonanceKey: Number(Voice.FilterResonance, value, SynthPatch.MinResonance, SynthPatch.MaxResonance, v => Voice.FilterResonance = v); break;
-            case LevelKey: Number(instrument.Volume, value, 0, MaxLevel, v => instrument.Volume = v); break;
+            case LevelKey: Number(UI.GainScale.ToDecibels(instrument.Volume), value, UI.GainScale.MinimumDecibels, UI.GainScale.MaximumDecibels, v => instrument.Volume = UI.GainScale.ToAmplitude(v)); break;
             case DriveKey: Number(Voice.Drive, value, SynthPatch.MinDrive, SynthPatch.MaxDrive, v => Voice.Drive = v); break;
         }
     }
@@ -224,6 +220,7 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     {
         TakeKey => instrument.FilePath ?? "",
         TakeDetailsKey => shelf?.Details(instrument.FilePath ?? "") ?? "",
+        CutoffTextKey => UI.FrequencyScale.Text(Voice.FilterCutoffHz),
         BaseNoteKey => instrument.BaseNote.ToString(),
         _ => ""
     };

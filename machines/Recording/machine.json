@@ -243,14 +243,33 @@
       },
       "Children": [
         {
-          "Element": "Preset",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
-          "Properties": {
-            "caption": "Start from",
-            "width": "258"
-          },
-          "Children": []
+          "Properties": {},
+          "Children": [
+            {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Start from",
+                "width": "258"
+              },
+              "Children": []
+            },
+            {
+              "Element": "Image",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "width": "359",
+                "height": "82",
+                "file": "images/image1.svg"
+              },
+              "Children": []
+            }
+          ]
         },
         {
           "Element": "Row",
@@ -282,7 +301,8 @@
                       "Parameter": "take",
                       "Label": "",
                       "Properties": {
-                        "caption": "Take"
+                        "caption": "Take",
+                        "tip": "One of your recordings, put straight on this machine."
                       },
                       "Children": []
                     },
@@ -299,7 +319,8 @@
                         "start": "start",
                         "end": "end",
                         "loopStart": "loop_start",
-                        "loopEnd": "loop_end"
+                        "loopEnd": "loop_end",
+                        "tip": "Drag the solid handles to set what plays, and the dashed ones to set the loop."
                       },
                       "Children": []
                     },
@@ -323,7 +344,8 @@
                           "Parameter": "base_note",
                           "Label": "",
                           "Properties": {
-                            "width": "70"
+                            "width": "70",
+                            "tip": "The pitch the file sounds at. Every other note is read faster or slower than this one."
                           },
                           "Children": []
                         },
@@ -340,7 +362,8 @@
                           "Label": "",
                           "Properties": {
                             "options": "None,Forward,Ping-pong",
-                            "width": "110"
+                            "width": "110",
+                            "tip": "Forward jumps back to the loop start; ping-pong turns round at each end."
                           },
                           "Children": []
                         },
@@ -350,7 +373,8 @@
                           "Label": "",
                           "Properties": {
                             "on": "Reverse",
-                            "off": "Forward"
+                            "off": "Forward",
+                            "tip": "Plays the window from its end towards its start."
                           },
                           "Children": []
                         },
@@ -360,7 +384,8 @@
                           "Label": "",
                           "Properties": {
                             "on": "One",
-                            "off": "Many"
+                            "off": "Many",
+                            "tip": "One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. A track is one voice either way."
                           },
                           "Children": []
                         }
@@ -386,6 +411,21 @@
                     "gap": "12"
                   },
                   "Children": [
+                    {
+                      "Element": "Envelope",
+                      "Parameter": "",
+                      "Label": "",
+                      "Properties": {
+                        "width": "150",
+                        "height": "58",
+                        "attack": "attack",
+                        "decay": "decay",
+                        "sustain": "sustain",
+                        "release": "release",
+                        "tip": "The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it."
+                      },
+                      "Children": []
+                    },
                     {
                       "Element": "Fader",
                       "Parameter": "attack",
@@ -461,7 +501,8 @@
                       "Properties": {
                         "row": "0",
                         "column": "0",
-                        "margin": "0,0,10,8"
+                        "margin": "0,0,10,8",
+                        "tip": "Whole semitones added to every note this instrument plays."
                       },
                       "Children": []
                     },
@@ -472,7 +513,8 @@
                       "Properties": {
                         "row": "0",
                         "column": "1",
-                        "margin": "0,0,10,8"
+                        "margin": "0,0,10,8",
+                        "tip": "Hundredths of a semitone, for sitting this voice against another."
                       },
                       "Children": []
                     },
@@ -565,14 +607,19 @@
                       "Element": "Knob",
                       "Parameter": "cutoff",
                       "Label": "",
-                      "Properties": {},
+                      "Properties": {
+                        "display": "cutoff_text",
+                        "tip": "A low pass. Wide open at the top, where it does nothing at all."
+                      },
                       "Children": []
                     },
                     {
                       "Element": "Knob",
                       "Parameter": "resonance",
                       "Label": "",
-                      "Properties": {},
+                      "Properties": {
+                        "tip": "How much the filter rings at its cutoff."
+                      },
                       "Children": []
                     }
                   ]
@@ -600,7 +647,9 @@
                       "Parameter": "level",
                       "Label": "",
                       "Properties": {
-                        "height": "96"
+                        "height": "96",
+                        "ticks": "6,0,-12,-40",
+                        "tip": "Unity is 0 dB, and above it is makeup gain."
                       },
                       "Children": []
                     },
@@ -608,7 +657,9 @@
                       "Element": "Knob",
                       "Parameter": "drive",
                       "Label": "",
-                      "Properties": {},
+                      "Properties": {
+                        "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
+                      },
                       "Children": []
                     }
                   ]

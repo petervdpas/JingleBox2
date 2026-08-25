@@ -38,6 +38,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Where a machine is built, as opposed to the rack, which is what is installed.</summary>
     public MachineEditorViewModel MachineEditor { get; } = new();
 
+    /// <summary>What machines are on the disc, for the settings page to list and add to.</summary>
+    public MachineShelfViewModel MachineShelf { get; }
+
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.
     /// </summary>
@@ -406,12 +409,27 @@ public sealed partial class MainViewModel : ObservableObject
         // else reads. A panel laid out against a picture that is not there is laid out wrong.
         MachineEditor.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
 
+        // And the shelf its picker offers, which is the same one again: a machine that plays a
+        // recording is started from a recording, so the list at the top of the panel is your
+        // takes and the categories they are filed under.
+        MachineEditor.Presets = new Tracker.Machines.TakeShelf(
+            Record.Recordings, take => MachineEditor.PutTake(take.FilePath));
+
         // The rack: the machines you have, and the plugins you have added. A song takes an
         // instrument off a machine and keeps its own copy of it.
         var rack = new MachineRack();
 
         Tracker = new TrackerViewModel(audio, rack, Record.Recordings, store, cfg, Plugins, waveformService);
         Machines = new MachineRackViewModel(rack, Tracker, Record.Recordings, waveformService, Plugins);
+
+        // The disc, not the rack: what is installed, including what has arrived since the app
+        // was started and is therefore not on the rack yet.
+        MachineShelf = new MachineShelfViewModel();
+
+        // A machine imported or removed while the app is running changes what is on the rack and
+        // what the panel in front of you is drawn from, so the rack draws it again rather than
+        // waiting for the next start.
+        MachineShelf.Changed += () => Machines.Reopen();
 
         // The four caps at the top belong to the page you are on. See TransportSwitch for
         // which deck they are patched to and when.

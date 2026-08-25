@@ -63,4 +63,31 @@ public partial class SettingsView : UserControl
         string? path = picked[0].TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(path)) vm.Plugins.AddFolder(path);
     }
+
+    /// <summary>
+    /// Brings a machine in from a zip. Same arrangement as the folder above: the picker belongs
+    /// to the window, and only the path goes to the view model.
+    /// </summary>
+    private async void OnImportMachine(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage == null) return;
+
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import a machine",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Machines") { Patterns = new[] { "*.zip" } }
+            }
+        });
+
+        if (picked.Count == 0) return;
+
+        string? path = picked[0].TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(path)) vm.MachineShelf.Import(path);
+    }
 }

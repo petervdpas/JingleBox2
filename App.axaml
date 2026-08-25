@@ -10,13 +10,16 @@
 
     <Application.Styles>
         <FluentTheme />
+        <!-- The brushes are named rather than built here out of a colour. A brush written inside
+             a setter is one object shared by every card, and the colour it is built from is
+             looked up once against the application, so a card standing on a machine's own panel
+             never sees the machine's shades: on a dark theme the two happen to look alike, and
+             on a light one the card stays white behind a machine that is teal. Naming the brush
+             instead leaves the lookup to each card, where anything painting one in its own
+             colours has put the answer. -->
         <Style Selector="Border.card">
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource Color.Surface}" />
-            </Setter>
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource Color.Border}" />
-            </Setter>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="12" />
@@ -26,12 +29,8 @@
              the card rather than stacked on it. Works either way round, since the background is
              darker than the surface in the dark themes and greyer than it in the light one. -->
         <Style Selector="Border.inset">
-            <Setter Property="Background">
-                <SolidColorBrush Color="{DynamicResource Color.Background}" />
-            </Setter>
-            <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource Color.Border}" />
-            </Setter>
+            <Setter Property="Background" Value="{DynamicResource BgBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="10" />

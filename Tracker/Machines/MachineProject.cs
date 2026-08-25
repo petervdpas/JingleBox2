@@ -30,6 +30,22 @@ public sealed class MachineProject
     /// <summary>Where the samples a machine ships with go.</summary>
     public const string SoundsFolder = "sounds";
 
+    /// <summary>Where the pictures on a machine's face go.</summary>
+    /// <remarks>
+    /// Beside the sounds and for the same reason. A machine is a folder and the zip is that
+    /// folder, so a logo put in here travels with the machine without anything being arranged:
+    /// the panel names the file, the folder carries it, and the two find each other again on
+    /// whatever disc they land on.
+    /// </remarks>
+    public const string ImagesFolder = "images";
+
+    /// <summary>What every picture in a machine is called, before its number.</summary>
+    /// <remarks>
+    /// Declared rather than written into the naming, so the one word every picture in every
+    /// machine is named after can be found by looking for it.
+    /// </remarks>
+    private const string ImageStem = "image";
+
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
 
     /// <summary>
@@ -134,7 +150,209 @@ public sealed class MachineProject
 
         Directory.CreateDirectory(Folder);
         Directory.CreateDirectory(Path.Combine(Folder, SoundsFolder));
+        Directory.CreateDirectory(Path.Combine(Folder, ImagesFolder));
 
         File.WriteAllText(Path.Combine(Folder, ManifestName), JsonSerializer.Serialize(this, Layout));
+    }
+
+    /// <summary>
+    /// Copies a picture into the machine's own folder, and hands back what the panel should
+    /// call it.
+    /// </summary>
+    /// <returns>The name to put on the panel, or null when the machine has nowhere to keep it.</returns>
+    /// <remarks>
+    /// A copy and not a reference, because a machine pointing at a picture somewhere else on
+    /// this disc would arrive on somebody else's with a hole in its face. Once it is in here it
+    /// is part of the machine, and the zip is the folder.
+    ///
+    /// It is renamed on the way in, and what it was called outside is forgotten at the door. The
+    /// pictures in a machine are image1, image2, image3, in the order they were brought in: a
+    /// file that arrived as "Screenshot from 2026-04-11 14-22-07.png" has a name that is about
+    /// somebody's desktop rather than about this machine, and a folder of them is unreadable.
+    /// The extension is kept, so anything that looks in the folder can still open what it finds.
+    ///
+    /// The number is the first one nothing in the folder is using, so a picture is never written
+    /// over. The same file brought in twice is two pictures under two numbers: whether a machine
+    /// wants the same artwork in two places is its business, and comparing files to save a few
+    /// kilobytes would be a surprise nobody asked for.
+    ///
+    /// Taking one out again is <see cref="RemoveImage"/>, which the designer calls when the last
+    /// element showing a picture goes.
+    /// </remarks>
+    public string? AddImage(string path)
+    {
+        if (Folder.Length == 0) return null;
+
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
+
+        string images = Path.Combine(Folder, ImagesFolder);
+
+        Directory.CreateDirectory(images);
+
+        string suffix = Path.GetExtension(path);
+
+        for (int at = 1; ; at++)
+        {
+            string stem = ImageStem + at;
+
+            // Whatever it is called, not just whatever it is called with this extension. A png
+            // and a jpg both landing on image3 would be two pictures nobody could tell apart in
+            // the folder, and one of them would be a surprise the next time either was replaced.
+            if (Directory.GetFiles(images, stem + ".*").Length > 0) continue;
+
+            File.Copy(path, Path.Combine(images, stem + suffix));
+
+            return ImagesFolder + "/" + stem + suffix;
+        }
+    }
+
+    /// <summary>
+    /// Deletes every picture the machine no longer names, and says how many went.
+    /// </summary>
+    /// <remarks>
+    /// The other half of keeping the folder honest. A picture can stop being used without any
+    /// element being removed: point one at a different file and the old one is nobody's. This is
+    /// asked at the moment the machine is written down, so what is saved and what is in the
+    /// folder are the same machine.
+    ///
+    /// Only files of ours are considered. Anything else somebody put in the folder is theirs.
+    /// </remarks>
+    public int SweepImages(ISet<string> kept)
+    {
+        if (Folder.Length == 0) return 0;
+
+        string images = Path.Combine(Folder, ImagesFolder);
+
+        if (!Directory.Exists(images)) return 0;
+
+        int gone = 0;
+
+        try
+        {
+            foreach (string file in Directory.GetFiles(images))
+            {
+                string stem = Path.GetFileNameWithoutExtension(file);
+
+                if (!stem.StartsWith(ImageStem, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!int.TryParse(stem[ImageStem.Length..], out _)) continue;
+
+                if (kept.Contains(ImagesFolder + "/" + Path.GetFileName(file))) continue;
+
+                File.Delete(file);
+
+                gone++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The pictures could not be swept in " + Folder, ex);
+        }
+
+        return gone;
+    }
+
+    /// <summary>
+    /// Closes the gaps in the picture numbers, and says what became what.
+    /// </summary>
+    /// <remarks>
+    /// A machine holding image2 and no image1 is a machine that has plainly lost something, and
+    /// the folder is the first place anybody looks when a picture does not draw. So after one
+    /// goes, the rest shuffle down: what is left is image1, image2 and so on with nothing
+    /// missing, and the panel is told what everything is called now.
+    ///
+    /// The order is the order the numbers were in, so the pictures keep their sequence and
+    /// nobody's second logo becomes their first. Renaming downwards can never land on a file
+    /// that has not been dealt with yet, since every new number is at or below the old one.
+    ///
+    /// Anything in the folder that is not one of ours is left alone. A machine is a folder
+    /// somebody can put things in, and renumbering is not a licence to rearrange it.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string> RenumberImages()
+    {
+        var moved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (Folder.Length == 0) return moved;
+
+        string images = Path.Combine(Folder, ImagesFolder);
+
+        if (!Directory.Exists(images)) return moved;
+
+        try
+        {
+            var ours = new List<(int At, string Path)>();
+
+            foreach (string file in Directory.GetFiles(images))
+            {
+                string stem = Path.GetFileNameWithoutExtension(file);
+
+                if (!stem.StartsWith(ImageStem, StringComparison.OrdinalIgnoreCase)) continue;
+
+                if (!int.TryParse(stem[ImageStem.Length..], out int at)) continue;
+
+                ours.Add((at, file));
+            }
+
+            ours.Sort((one, other) => one.At.CompareTo(other.At));
+
+            for (int i = 0; i < ours.Count; i++)
+            {
+                string was = ours[i].Path;
+                string suffix = Path.GetExtension(was);
+                string now = Path.Combine(images, ImageStem + (i + 1) + suffix);
+
+                if (string.Equals(was, now, StringComparison.Ordinal)) continue;
+
+                File.Move(was, now);
+
+                moved[ImagesFolder + "/" + Path.GetFileName(was)] = ImagesFolder + "/" + Path.GetFileName(now);
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The pictures could not be renumbered in " + Folder, ex);
+        }
+
+        return moved;
+    }
+
+    /// <summary>
+    /// Takes a picture out of the machine, file and all.
+    /// </summary>
+    /// <remarks>
+    /// Called when the last element naming it has gone. A machine is a folder that gets zipped
+    /// and handed to somebody, so a picture nothing shows is weight in the parcel and a puzzle
+    /// for whoever opens it. The original is still wherever it was picked from: what is deleted
+    /// here is this machine's copy of it.
+    ///
+    /// The name is checked before anything is deleted, the same way the importer checks a zip's:
+    /// it has to land inside this machine's own pictures folder. A name is a claim, and this one
+    /// arrives out of a file somebody else may have written.
+    /// </remarks>
+    public bool RemoveImage(string named)
+    {
+        if (Folder.Length == 0 || string.IsNullOrWhiteSpace(named)) return false;
+
+        try
+        {
+            string images = Path.GetFullPath(Path.Combine(Folder, ImagesFolder));
+            string wanted = Path.GetFullPath(Path.Combine(Folder, named));
+
+            if (!wanted.StartsWith(images + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return false;
+
+            if (!File.Exists(wanted)) return false;
+
+            File.Delete(wanted);
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "machine picture removed: " + wanted);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "A picture could not be removed from " + Folder, ex);
+
+            return false;
+        }
     }
 }

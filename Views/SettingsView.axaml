@@ -495,6 +495,54 @@
         <ScrollViewer>
           <StackPanel Spacing="12">
 
+          <!-- What this installation is made up of. Here rather than on the rack, because
+               adding and removing a machine is done to the installation and not to the song
+               that is open. A machine that ships can always be taken again, so the list shows
+               those it does not have beside those it does. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Machines" />
+
+              <WrapPanel Orientation="Horizontal">
+                <Button Content="Import a machine..." Click="OnImportMachine"
+                        Margin="0,0,8,4" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
+                           Text="{Binding MachineShelf.Status}" />
+              </WrapPanel>
+
+              <Border Classes="inset">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding MachineShelf.Machines}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
+                            </StackPanel>
+                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
+                                  IsVisible="{Binding IsInstalled}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.RemoveCommand}"
+                                  CommandParameter="{Binding .}" />
+                          <Button Grid.Column="1" Content="Add" Padding="8,3"
+                                  IsVisible="{Binding IsAvailable}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineShelf.AddCommand}"
+                                  CommandParameter="{Binding .}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Border>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding MachineShelf.Hint}" />
+            </StackPanel>
+          </Border>
+
           <!-- Off by default and free when off. On when something has gone wrong and somebody
                wants to know what, including inside the processes plugins run in. -->
           <Border Classes="card">

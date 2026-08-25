@@ -1,10 +1,8 @@
 using Avalonia;
 using Avalonia.Media;
-using JingleBox2.Tracker.Synth;
 using System;
-using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// Draws the envelope as a shape, and runs a playhead along it while a note sounds.
@@ -13,15 +11,26 @@ namespace JingleBox2.Views;
 /// The playhead is driven by a stopwatch rather than by counting frames, so it stays with the
 /// note even when the UI thread is busy. The curve itself comes from
 /// <see cref="EnvelopeShape"/>, which is the same arithmetic the voice's envelope follows.
+/// <para>
+/// It takes four numbers rather than a patch because it is drawn for whatever machine is in
+/// front of it, and a machine described by data has parameters, not a synth patch. Four
+/// bindings are all the view needs, and any machine with an attack and a release can supply
+/// them.
+/// </para>
 /// </remarks>
 public class EnvelopeScope : ScopeControl
 {
-    public static readonly StyledProperty<SynthPatch?> PatchProperty =
-        AvaloniaProperty.Register<EnvelopeScope, SynthPatch?>(nameof(Patch));
+    public static readonly StyledProperty<double> AttackMsProperty =
+        AvaloniaProperty.Register<EnvelopeScope, double>(nameof(AttackMs), 2);
 
-    /// <summary>Changes whenever the patch does, since a patch says nothing when it is edited.</summary>
-    public static readonly StyledProperty<int> RevisionProperty =
-        AvaloniaProperty.Register<EnvelopeScope, int>(nameof(Revision));
+    public static readonly StyledProperty<double> DecayMsProperty =
+        AvaloniaProperty.Register<EnvelopeScope, double>(nameof(DecayMs), 40);
+
+    public static readonly StyledProperty<double> SustainProperty =
+        AvaloniaProperty.Register<EnvelopeScope, double>(nameof(Sustain), 0.6);
+
+    public static readonly StyledProperty<double> ReleaseMsProperty =
+        AvaloniaProperty.Register<EnvelopeScope, double>(nameof(ReleaseMs), 80);
 
     /// <summary>How long the note is held before it is let go, matching what an audition does.</summary>
     public static readonly StyledProperty<double> HoldSecondsProperty =
@@ -29,19 +38,33 @@ public class EnvelopeScope : ScopeControl
 
     static EnvelopeScope()
     {
-        AffectsRender<EnvelopeScope>(PatchProperty, RevisionProperty, HoldSecondsProperty);
+        AffectsRender<EnvelopeScope>(
+            AttackMsProperty, DecayMsProperty, SustainProperty, ReleaseMsProperty, HoldSecondsProperty);
     }
 
-    public SynthPatch? Patch
+    public double AttackMs
     {
-        get => GetValue(PatchProperty);
-        set => SetValue(PatchProperty, value);
+        get => GetValue(AttackMsProperty);
+        set => SetValue(AttackMsProperty, value);
     }
 
-    public int Revision
+    public double DecayMs
     {
-        get => GetValue(RevisionProperty);
-        set => SetValue(RevisionProperty, value);
+        get => GetValue(DecayMsProperty);
+        set => SetValue(DecayMsProperty, value);
+    }
+
+    /// <summary>The level the note settles at, 0 to 1.</summary>
+    public double Sustain
+    {
+        get => GetValue(SustainProperty);
+        set => SetValue(SustainProperty, value);
+    }
+
+    public double ReleaseMs
+    {
+        get => GetValue(ReleaseMsProperty);
+        set => SetValue(ReleaseMsProperty, value);
     }
 
     public double HoldSeconds
@@ -51,9 +74,7 @@ public class EnvelopeScope : ScopeControl
     }
 
     private EnvelopeShape Shape =>
-        Patch == null
-            ? EnvelopeShape.FromMilliseconds(0, 0, 0, 0, HoldSeconds)
-            : EnvelopeShape.FromPatch(Patch, HoldSeconds);
+        EnvelopeShape.FromMilliseconds(AttackMs, DecayMs, Sustain, ReleaseMs, HoldSeconds);
 
     /// <summary>The playhead runs for exactly as long as the note it is drawing.</summary>
     protected override double AnimationSeconds => Shape.Length;
@@ -71,8 +92,6 @@ public class EnvelopeScope : ScopeControl
             new SolidColorBrush(palette.Background),
             new Pen(palette.BorderBrush, 1),
             new RoundedRect(face, 4));
-
-        if (Patch == null) return;
 
         var shape = Shape;
         double margin = 4;

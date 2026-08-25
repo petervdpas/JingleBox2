@@ -16,5 +16,5 @@
 
        No heading of its own: the window is called what the heading said, and a panel this full
        has better uses for the room. -->
-  <views:InstrumentEditor Padding="0" />
+  <views:InstrumentPanel Padding="0" />
 </Window>

@@ -78,6 +78,10 @@ public partial class MainWindow : Window
         // rack is called and what colour it wears come off the machines themselves now.
         var machines = Tracker.Machines.MachineRegistry.Load();
 
+        // Kept rather than counted and dropped: a panel drawn from a machine's own description
+        // asks for the machine, and this is the one moment the disc is read.
+        Tracker.Machines.MachineProjects.Keep(machines);
+
         Diagnostics.Log.Write(Diagnostics.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
 

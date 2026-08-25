@@ -25,9 +25,9 @@ namespace JingleBox2.Views;
 /// of its own, against the instrument a track is playing. A machine's front panel does not care
 /// which rack it is standing in.
 /// </remarks>
-public partial class InstrumentEditor : UserControl
+public partial class InstrumentPanel : UserControl
 {
-    public InstrumentEditor()
+    public InstrumentPanel()
     {
         InitializeComponent();
 

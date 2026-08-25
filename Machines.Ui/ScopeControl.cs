@@ -2,9 +2,8 @@ using Avalonia;
 using Avalonia.Threading;
 using System;
 using System.Diagnostics;
-using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A drawn view that comes alive while a note sounds. Holds the clock and the frame timer, so

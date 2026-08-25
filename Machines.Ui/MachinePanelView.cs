@@ -5,10 +5,14 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Svg;
 using Avalonia.VisualTree;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Linq;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -33,21 +37,16 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class MachinePanelView : Decorator
 {
-    /// <summary>What to draw. Nothing here means nothing on screen.</summary>
-    public static readonly StyledProperty<MachinePanel?> PanelProperty =
-        AvaloniaProperty.Register<MachinePanelView, MachinePanel?>(nameof(Panel));
-
     /// <summary>
-    /// The machine's parameters, which is how an element's <c>Parameter</c> becomes a range,
-    /// a default and a unit.
+    /// The machine being drawn: its panel, its parameters and where it is kept, as one thing.
     /// </summary>
     /// <remarks>
-    /// Passed in beside the panel rather than read out of it, because the panel says where the
-    /// knobs go and the parameter list says what they are worth. A panel that named a parameter
-    /// twice would otherwise have to describe it twice, and the two descriptions could differ.
+    /// One property rather than three, because they are one machine. Handing them over
+    /// separately meant every host had to remember all of them, and a host that passed the panel
+    /// and forgot the folder drew a machine whose pictures could not be found.
     /// </remarks>
-    public static readonly StyledProperty<IReadOnlyList<MachineParameter>?> ParametersProperty =
-        AvaloniaProperty.Register<MachinePanelView, IReadOnlyList<MachineParameter>?>(nameof(Parameters));
+    public static readonly StyledProperty<MachineFace?> FaceProperty =
+        AvaloniaProperty.Register<MachinePanelView, MachineFace?>(nameof(Face));
 
     /// <summary>Whose settings these controls stand for, read on the way in and written on every move.</summary>
     public static readonly StyledProperty<IMachineValues?> ValuesProperty =
@@ -78,6 +77,22 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, IMachinePresets?>(nameof(Presets));
 
     /// <summary>
+    /// The machine's own folder, which is what the pictures on its panel are named against.
+    /// </summary>
+    /// <remarks>
+    /// A machine travels as a folder, so a picture on its face is a file in that folder and the
+    /// description says no more than the name of it. Where the folder is is the host's to know
+    /// and nobody else's: the same machine sits somewhere different on every disc it is ever
+    /// copied to, and a path written into machine.json would be wrong for all of them.
+    ///
+    /// Nothing here means no pictures, which is the state a panel is in when whatever put it on
+    /// screen has no folder to offer. A picture then draws its frame and says so, rather than
+    /// going looking for a file relative to wherever the program happens to have been started.
+    /// </remarks>
+    public static readonly StyledProperty<string?> AssetsProperty =
+        AvaloniaProperty.Register<MachinePanelView, string?>(nameof(Assets));
+
+    /// <summary>
     /// The element the designer is working on, outlined on the panel.
     /// </summary>
     /// <remarks>
@@ -97,8 +112,44 @@ public class MachinePanelView : Decorator
     /// ordinary panel and nothing is selectable, so the same control can be dropped into a song
     /// without the risk of somebody selecting a knob when they meant to turn it.
     /// </remarks>
+    /// <summary>
+    /// What a part being dragged would go inside, outlined while the drag is over the panel.
+    /// </summary>
+    /// <remarks>
+    /// A drop lands somewhere whether or not anybody said so, and a designer that does not show
+    /// where is a designer you aim with by guessing. Told rather than worked out here, because
+    /// what a drop means is the editor's rule and not the drawing's: a part let go over a knob
+    /// goes in the knob's container, and this draws the answer rather than deciding it.
+    /// </remarks>
+    public static readonly StyledProperty<MachineElement?> MarkedProperty =
+        AvaloniaProperty.Register<MachinePanelView, MachineElement?>(nameof(Marked));
+
     public static readonly StyledProperty<bool> DesigningProperty =
         AvaloniaProperty.Register<MachinePanelView, bool>(nameof(Designing));
+
+    /// <summary>
+    /// How far through the recording the machine has got, or -1 while nothing is sounding.
+    /// </summary>
+    /// <remarks>
+    /// Not a setting, which is why it is here and not among the values: it is what the machine
+    /// is doing this instant, and a song saved in the middle of a note should not remember where
+    /// the note had got to. The panel passes it to whatever draws a recording, so a machine with
+    /// two pictures on it gets a playhead on both without describing one twice.
+    /// </remarks>
+    public static readonly StyledProperty<double> PlayheadProperty =
+        AvaloniaProperty.Register<MachinePanelView, double>(nameof(Playhead), -1);
+
+    /// <summary>Bumped every time a note is played, which is what starts the curves moving.</summary>
+    /// <remarks>
+    /// A count rather than an event, so the host can hand it over as a plain binding and the
+    /// panel needs nothing wiring up or taking down again.
+    /// </remarks>
+    public static readonly StyledProperty<int> TriggerProperty =
+        AvaloniaProperty.Register<MachinePanelView, int>(nameof(Trigger));
+
+    /// <summary>How long a note played by hand is held down for, which the envelope is drawn to.</summary>
+    public static readonly StyledProperty<double> HoldSecondsProperty =
+        AvaloniaProperty.Register<MachinePanelView, double>(nameof(HoldSeconds), 0.4);
 
     /// <summary>How far apart things sit inside a row, a column or a group.</summary>
     private const double Gap = 6;
@@ -111,6 +162,53 @@ public class MachinePanelView : Decorator
     /// Selection changes as fast as somebody can click, and rebuilding the tree for each one
     /// would throw away every control's state and blink the whole panel.
     /// </remarks>
+    /// <summary>
+    /// Who wants telling when a parameter moves, by the key of the parameter it is about.
+    /// </summary>
+    /// <remarks>
+    /// Thrown away with the rest of the panel when it is rebuilt, since what is in here points
+    /// at controls that no longer exist the moment it is.
+    /// </remarks>
+    private readonly Dictionary<string, List<Action>> _watchers = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The pictures already read off the disc, by the full path each came from.
+    /// </summary>
+    /// <remarks>
+    /// A panel showing the same badge in two places decodes it once, and one that could not be
+    /// read is remembered as one that could not, so a broken name does not send the panel back
+    /// to the disc every time it is drawn. Emptied with the rest of the panel when it is built
+    /// again, which is also how a picture replaced on disc becomes the new one.
+    ///
+    /// A picture and not a bitmap, because a drawing is neither decoded nor sampled and is still
+    /// something an element hangs on the panel. Past this point the two are the same thing, which
+    /// is the whole reason the difference is settled where the file is opened and nowhere else.
+    /// </remarks>
+    private readonly Dictionary<string, IImage?> _pictures = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The right press that has already been answered, so the frames around it leave it alone.
+    /// </summary>
+    /// <remarks>
+    /// The press itself, not a copy of it: one press is one object however many frames it
+    /// travels through, which is exactly the question being asked.
+    /// </remarks>
+    private object? _claimed;
+
+    /// <summary>
+    /// The handles on the element being worked on, drawn over the panel rather than in it.
+    /// </summary>
+    /// <remarks>
+    /// Over, because a handle that took part in the layout would change the size of the thing it
+    /// is measuring, and the panel would grow every time somebody picked something. It is deaf
+    /// to the pointer for the same reason the selection outline is: the press that grabs a
+    /// handle is caught on the way down, before the knob underneath ever sees it.
+    /// </remarks>
+    private readonly Handles _handles = new() { IsHitTestVisible = false };
+
+    /// <summary>What is being sized, or nothing when nobody is dragging a handle.</summary>
+    private Sizing? _sizing;
+
     private readonly Dictionary<MachineElement, Border> _frames = new();
 
     /// <summary>
@@ -124,7 +222,7 @@ public class MachinePanelView : Decorator
 
     static MachinePanelView()
     {
-        AffectsMeasure<MachinePanelView>(PanelProperty, ParametersProperty, DesigningProperty);
+        AffectsMeasure<MachinePanelView>(FaceProperty, DesigningProperty);
     }
 
     /// <summary>Raised whenever the selection lands somewhere, for code that would rather not bind.</summary>
@@ -144,17 +242,20 @@ public class MachinePanelView : Decorator
     /// </remarks>
     public event EventHandler<string>? TakeWanted;
 
-    public MachinePanel? Panel
+    public MachineFace? Face
     {
-        get => GetValue(PanelProperty);
-        set => SetValue(PanelProperty, value);
+        get => GetValue(FaceProperty);
+        set => SetValue(FaceProperty, value);
     }
 
-    public IReadOnlyList<MachineParameter>? Parameters
-    {
-        get => GetValue(ParametersProperty);
-        set => SetValue(ParametersProperty, value);
-    }
+    /// <summary>What the machine looks like, or nothing when there is no machine.</summary>
+    private MachinePanel? Panel => Face?.Panel;
+
+    /// <summary>What its controls stand for.</summary>
+    private IReadOnlyList<MachineParameter>? Parameters => Face?.Parameters;
+
+    /// <summary>Where it is kept, which is what its pictures are named against.</summary>
+    private string? Assets => Face?.Folder;
 
     public IMachineValues? Values
     {
@@ -174,6 +275,7 @@ public class MachinePanelView : Decorator
         set => SetValue(PresetsProperty, value);
     }
 
+    /// <summary>Where the machine keeps its own files, for the elements that name one.</summary>
     public MachineElement? Selected
     {
         get => GetValue(SelectedProperty);
@@ -187,6 +289,44 @@ public class MachinePanelView : Decorator
     }
 
     /// <summary>
+    /// Where the thing being carried would land, drawn as a line between two elements.
+    /// </summary>
+    /// <remarks>
+    /// Set by whoever is doing the carrying, from <see cref="Caret"/>, and cleared when the hand
+    /// lets go. The panel works out where the line goes and draws it; deciding what a drop means
+    /// stays with the editor, the same way the outline does.
+    /// </remarks>
+    public void Landing(Point? at) => _handles.At(at is { } point ? Caret(point)?.Where : null);
+
+    /// <summary>What would take the part that is being dragged over the panel.</summary>
+    public MachineElement? Marked
+    {
+        get => GetValue(MarkedProperty);
+        set => SetValue(MarkedProperty, value);
+    }
+
+    /// <summary>Where the sound has got to, for every picture on the panel.</summary>
+    public double Playhead
+    {
+        get => GetValue(PlayheadProperty);
+        set => SetValue(PlayheadProperty, value);
+    }
+
+    /// <summary>Bumped by whoever plays a note, for every curve that comes alive when one is played.</summary>
+    public int Trigger
+    {
+        get => GetValue(TriggerProperty);
+        set => SetValue(TriggerProperty, value);
+    }
+
+    /// <summary>How long that note is held.</summary>
+    public double HoldSeconds
+    {
+        get => GetValue(HoldSecondsProperty);
+        set => SetValue(HoldSecondsProperty, value);
+    }
+
+    /// <summary>
     /// Builds the panel again when what it is a picture of has changed, and moves the outline
     /// when only the selection has.
     /// </summary>
@@ -196,14 +336,18 @@ public class MachinePanelView : Decorator
 
         // Values is in here with the rest because the controls hold the object they write to.
         // Handed a different one, every control on the panel is still writing to the old one.
-        if (change.Property == PanelProperty ||
-            change.Property == ParametersProperty ||
+        if (change.Property == FaceProperty ||
             change.Property == ValuesProperty ||
             change.Property == TakesProperty ||
             change.Property == PresetsProperty ||
+            change.Property == AssetsProperty ||
             change.Property == DesigningProperty)
         {
             Rebuild();
+        }
+        else if (change.Property == MarkedProperty)
+        {
+            ShowSelection();
         }
         else if (change.Property == SelectedProperty)
         {
@@ -222,6 +366,20 @@ public class MachinePanelView : Decorator
         ActualThemeVariantChanged += OnThemeChanged;
     }
 
+    /// <summary>
+    /// Takes the press that grabs a handle before anything under it can.
+    /// </summary>
+    /// <remarks>
+    /// Tunnelling, which is the whole point: the handles lie over the machine, and a press that
+    /// reached the knob first would turn it instead of sizing what holds it.
+    /// </remarks>
+    public MachinePanelView()
+    {
+        AddHandler(PointerPressedEvent, Grabbed, RoutingStrategies.Tunnel);
+        AddHandler(PointerMovedEvent, Sizes, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, Sized, RoutingStrategies.Tunnel);
+    }
+
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -236,6 +394,8 @@ public class MachinePanelView : Decorator
     {
         _frames.Clear();
         _elements.Clear();
+        _watchers.Clear();
+        _pictures.Clear();
 
         var panel = Panel;
 
@@ -253,7 +413,17 @@ public class MachinePanelView : Decorator
                 parameters[parameter.Key] = parameter;
         }
 
-        Child = Build(panel.Root, parameters);
+        var built = Build(panel.Root, parameters);
+
+        // The layer outlives the panel it was over, so it has to be taken off the old one before
+        // it can go on the new one. A control has one parent, and putting it on a second throws.
+        if (_handles.Parent is Panel was) was.Children.Remove(_handles);
+
+        // The layer only exists while the panel is being laid out. Off, the panel measures to
+        // exactly what it draws, which is what a machine standing in a song has to do.
+        Child = Designing && built != null
+            ? new Panel { Children = { built, _handles } }
+            : built;
 
         ShowSelection();
     }
@@ -282,6 +452,8 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Choice => BuildChoice(element, parameters),
             MachineElementKinds.Keys => BuildKeys(element, parameters),
             MachineElementKinds.Wave => BuildWave(element, parameters),
+            MachineElementKinds.Envelope => BuildEnvelope(element, parameters),
+            MachineElementKinds.Image => BuildImage(element),
             MachineElementKinds.Take => BuildTake(element),
             MachineElementKinds.Preset => BuildPreset(element, parameters),
             MachineElementKinds.Label => BuildLabel(element),
@@ -289,9 +461,17 @@ public class MachinePanelView : Decorator
             _ => null,
         };
 
+        // A control that cannot be drawn yet. While the panel is being laid out that is an
+        // ordinary state and not a fault: a knob dropped on a machine names no parameter for as
+        // long as it takes to pick one, and a part that disappears the moment it lands is a part
+        // nobody can place. Off the bench it draws nothing, as it always has, because a machine
+        // in a song must not show its own loose ends.
+        built ??= Designing ? Waiting(element) : null;
+
         if (built is null) return null;
 
         Sized(element, built);
+        Tipped(element, built);
 
         return Apart(element, Skin(element, built, Holds(element.Element)));
     }
@@ -311,7 +491,14 @@ public class MachinePanelView : Decorator
         // stretches is centred in what is left over, which is Avalonia being helpful and is
         // never what a front panel wants: a picker 150 wide on a panel 1500 wide belongs at the
         // left hand end, where the machine's own panel puts it, not in the middle of the room.
-        if (Measurement(element, "width") is { } width)
+        // The preset picker is the one control whose width is not the width of the control. It
+        // spends what it is given on the name, because the arrows, the count and the category in
+        // front of it are fixed, and BuildPreset has already done that. Setting it here as well
+        // would be the same number said twice in two different senses, and the outer one wins:
+        // the picker would be drawn 258 wide inside a box 258 wide that also has to hold a
+        // category list, and what does not fit is drawn over whatever stands beside it.
+        if (element.Element != MachineElementKinds.Preset &&
+            Measurement(element, "width") is { } width)
         {
             control.Width = width;
             control.HorizontalAlignment = HorizontalAlignment.Left;
@@ -322,6 +509,61 @@ public class MachinePanelView : Decorator
             control.Height = height;
             control.VerticalAlignment = VerticalAlignment.Top;
         }
+    }
+
+    /// <summary>
+    /// A stand-in for a part that has nothing to draw yet, with what it is waiting for on it.
+    /// </summary>
+    /// <remarks>
+    /// The wording is the question: a knob with no parameter says so, and one naming a parameter
+    /// the machine has not got says that instead, which is the difference between not finished
+    /// and wrong. It takes the room the real control would take, so a panel laid out around it
+    /// does not jump when the parameter is picked.
+    /// </remarks>
+    private Control Waiting(MachineElement element)
+    {
+        var palette = ThemePalette.From(this);
+
+        string said = element.Parameter.Length > 0
+            ? element.Element + ": no " + element.Parameter
+            : element.Element + ": pick a parameter";
+
+        return new Border
+        {
+            BorderBrush = new SolidColorBrush(palette.Muted, 0.7),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Background = new SolidColorBrush(palette.Muted, 0.10),
+            Padding = new Thickness(8, 6),
+            MinWidth = 60,
+            MinHeight = 34,
+            Child = new TextBlock
+            {
+                Text = said,
+                FontSize = 10,
+                Foreground = new SolidColorBrush(palette.Muted),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+            },
+        };
+    }
+
+    /// <summary>
+    /// What the element says about itself when the pointer rests on it.
+    /// </summary>
+    /// <remarks>
+    /// Every kind takes one, since a machine explaining a control is a machine explaining a
+    /// control whatever the control turns out to be. It goes on the element rather than on the
+    /// skin, so that the wording follows the thing it is about when the panel is picked apart in
+    /// the designer.
+    ///
+    /// The wording is the machine's, not ours. A knob whose name says everything needs no help
+    /// text, and a machine that has thought about what its knob does can say so in one line
+    /// that nobody has to open a manual for.
+    /// </remarks>
+    private static void Tipped(MachineElement element, Control control)
+    {
+        if (Text(element, "tip") is { Length: > 0 } said) ToolTip.SetTip(control, said);
     }
 
     /// <summary>
@@ -524,6 +766,17 @@ public class MachinePanelView : Decorator
             if (e.Property == Knob.ValueProperty) Write(parameter.Key, knob.Value);
         };
 
+        // What the knob writes under itself, where the number it turns is not the number anybody
+        // wants to read. A filter's dial is the case: it turns a position and it says hertz, and
+        // only the machine knows how one becomes the other, so the machine is asked for the
+        // wording rather than the panel working it out.
+        if (Text(element, "display") is { Length: > 0 } readout)
+        {
+            knob.Display = Setting(readout);
+
+            Watch(parameter.Key, () => knob.Display = Setting(readout));
+        }
+
         return knob;
     }
 
@@ -541,6 +794,7 @@ public class MachinePanelView : Decorator
             LargeStep = parameter.Step * 10,
             DefaultValue = parameter.Default,
             Format = Format(parameter),
+            Ticks = Text(element, "ticks"),
             Value = Start(parameter),
         };
 
@@ -848,12 +1102,93 @@ public class MachinePanelView : Decorator
                 : Designing ? Demonstration() : null,
         };
 
+        // Where the sound has got to, which the panel is told and the description is not. Bound
+        // rather than set, because it moves forty times a second and the panel is built once.
+        wave.Bind(WaveformView.PlayheadProperty, this.GetObservable(PlayheadProperty));
+
         Handle(element, "start", parameters, wave, WaveformView.StartProperty);
         Handle(element, "end", parameters, wave, WaveformView.EndProperty);
         Handle(element, "loopStart", parameters, wave, WaveformView.LoopStartProperty);
         Handle(element, "loopEnd", parameters, wave, WaveformView.LoopEndProperty);
 
         return wave;
+    }
+
+    /// <summary>
+    /// The envelope drawn as the shape it is, from whichever four parameters hold it.
+    /// </summary>
+    /// <remarks>
+    /// It reads the four and never writes them. The faders beside it are what somebody moves,
+    /// and this is the picture of the result, so a machine with an envelope on it explains the
+    /// four numbers at once in the way four numbers on their own never do.
+    ///
+    /// The values are read once and then followed, because a curve that only changed when the
+    /// panel was rebuilt would sit still while somebody dragged a fader, which is exactly the
+    /// moment they are looking at it. Whoever supplies the settings tells the panel what the
+    /// parameter is worth; the panel does not poll them.
+    /// </remarks>
+    private Control BuildEnvelope(MachineElement element, Dictionary<string, MachineParameter> parameters)
+    {
+        var scope = new EnvelopeScope
+        {
+            Width = Measurement(element, "width") ?? 150,
+            Height = Measurement(element, "height") ?? 58,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+
+        Segment(element, "attack", parameters, scope, EnvelopeScope.AttackMsProperty);
+        Segment(element, "decay", parameters, scope, EnvelopeScope.DecayMsProperty);
+        Segment(element, "sustain", parameters, scope, EnvelopeScope.SustainProperty);
+        Segment(element, "release", parameters, scope, EnvelopeScope.ReleaseMsProperty);
+
+        // What the machine is doing rather than what it is set to, so it comes off the panel.
+        scope.Bind(EnvelopeScope.HoldSecondsProperty, this.GetObservable(HoldSecondsProperty));
+        scope.Bind(ScopeControl.TriggerProperty, this.GetObservable(TriggerProperty));
+
+        return scope;
+    }
+
+    /// <summary>
+    /// Points one part of the curve at the parameter that holds it, and keeps it pointed there.
+    /// </summary>
+    /// <remarks>
+    /// One way, unlike the handles on a picture of a recording: an envelope is drawn from the
+    /// faders and has nothing on it to take hold of. It is told when the value moves rather than
+    /// asking, so a curve on a panel costs nothing while nobody is touching the panel.
+    /// </remarks>
+    private void Segment(
+        MachineElement element,
+        string key,
+        Dictionary<string, MachineParameter> parameters,
+        EnvelopeScope scope,
+        StyledProperty<double> property)
+    {
+        if (Text(element, key) is not { Length: > 0 } named) return;
+        if (!parameters.TryGetValue(named, out var parameter)) return;
+
+        scope.SetValue(property, Start(parameter));
+
+        Watch(parameter.Key, () => scope.SetValue(property, Start(parameter)));
+    }
+
+    /// <summary>
+    /// Asks to be told when that parameter moves, for a control that shows one it does not turn.
+    /// </summary>
+    /// <remarks>
+    /// The panel is the only thing that hears about every move, since every control writes
+    /// through it, so this is where one control watching another belongs. A curve drawn from
+    /// four faders is the case it exists for, and it would be a poor panel that only redrew the
+    /// curve once you let go.
+    ///
+    /// It does not hear about a value written anywhere but here, a preset being loaded most of
+    /// all. That is the host's to say, by handing the panel its settings again, which draws
+    /// everything from the top.
+    /// </remarks>
+    private void Watch(string key, Action told)
+    {
+        if (!_watchers.TryGetValue(key, out var list)) _watchers[key] = list = new List<Action>();
+
+        list.Add(told);
     }
 
     /// <summary>
@@ -931,7 +1266,7 @@ public class MachinePanelView : Decorator
     /// then pick the first of them whichever was showing, which is why the number is carried
     /// rather than looked up again afterwards.
     /// </remarks>
-    private sealed class Offer(int at, string name)
+    private sealed class PresetOffer(int at, string name)
     {
         /// <summary>Where in the list it was offered.</summary>
         public int At { get; } = at;
@@ -977,18 +1312,9 @@ public class MachinePanelView : Decorator
 
         if (names is null) return null;
 
-        var offered = new List<Offer>(names.Count);
+        var chooser = new Chooser { Placeholder = "Start from..." };
 
-        for (int i = 0; i < names.Count; i++) offered.Add(new Offer(i, names[i]));
-
-        int picked = shelf?.Picked ?? 0;
-
-        var chooser = new Chooser
-        {
-            ItemsSource = offered,
-            Placeholder = "Start from...",
-            SelectedItem = picked >= 0 && picked < offered.Count ? offered[picked] : null,
-        };
+        Offer(chooser, names, shelf?.Picked ?? 0);
 
         // Worked back from the whole width rather than set straight, because the arrows and the
         // count are a fixed part of the control and only the name can give.
@@ -1001,11 +1327,57 @@ public class MachinePanelView : Decorator
             chooser.PropertyChanged += (_, e) =>
             {
                 if (e.Property == Chooser.SelectedItemProperty)
-                    shelf.Picked = chooser.SelectedItem is Offer one ? one.At : -1;
+                    shelf.Picked = chooser.SelectedItem is PresetOffer one ? one.At : -1;
             };
         }
 
-        return Captioned(Heading(element, shelf), chooser);
+        // Nothing to narrow on a machine that ships five presets, and everything to narrow on a
+        // shelf holding every recording you have ever made. So the categories are the shelf's to
+        // offer, and where it offers none this is one control wide, as it always was.
+        var narrowing = shelf?.Filters ?? Array.Empty<string>();
+
+        if (narrowing.Count == 0) return Captioned(Heading(element, shelf), chooser);
+
+        var filter = new ComboBox
+        {
+            ItemsSource = narrowing,
+            SelectedItem = shelf!.Filter is { Length: > 0 } held && narrowing.Contains(held)
+                ? held
+                : narrowing[0],
+            VerticalAlignment = VerticalAlignment.Center,
+            Width = 132,
+        };
+
+        // The list under the picker is a different list once a category is chosen, so the names
+        // are read again rather than filtered here. Which one is showing is read again with
+        // them: the shelf may well have moved to the first of the narrowed list, and if it has
+        // not, the picker should be showing nothing rather than the last one by its number.
+        filter.SelectionChanged += (_, _) =>
+        {
+            if (filter.SelectedItem is not string chosen) return;
+
+            shelf.Filter = chosen;
+
+            Offer(chooser, shelf.Names, shelf.Picked);
+        };
+
+        var side = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+
+        side.Children.Add(filter);
+        side.Children.Add(chooser);
+
+        return Captioned(Heading(element, shelf), side);
+    }
+
+    /// <summary>Fills the picker with what is on offer now, and shows whichever one is picked.</summary>
+    private static void Offer(Chooser chooser, IReadOnlyList<string> names, int picked)
+    {
+        var offered = new List<PresetOffer>(names.Count);
+
+        for (int i = 0; i < names.Count; i++) offered.Add(new PresetOffer(i, names[i]));
+
+        chooser.ItemsSource = offered;
+        chooser.SelectedItem = picked >= 0 && picked < offered.Count ? offered[picked] : null;
     }
 
     /// <summary>
@@ -1081,6 +1453,271 @@ public class MachinePanelView : Decorator
     }
 
     /// <summary>
+    /// A picture the machine carries, drawn in the room the panel gives it.
+    /// </summary>
+    /// <remarks>
+    /// The one element that shows nothing about the machine and turns nothing on it. A logo or a
+    /// badge is neither a setting nor a reading, and a machine that wants a picture to change
+    /// with what it is doing wants a control instead.
+    ///
+    /// What it names is a file inside the machine's own folder. That name arrived in a
+    /// description written by whoever built the machine, the same way a zip entry does, so it is
+    /// a claim and is checked as one before anything is opened. A name that will not resolve, a
+    /// file that will not open, and no folder to look in all end the same way: the frame, and a
+    /// word in it. Never an exception, because a bad file has to cost a picture rather than the
+    /// machine it is on.
+    ///
+    /// It can be a drawing as easily as a photograph, and everything below this line is written
+    /// as though it made no difference, because to the element it makes none. The width, the
+    /// height and the fit are the same question either way; all that changes is who opens the
+    /// file.
+    /// </remarks>
+    private Control BuildImage(MachineElement element)
+    {
+        double width = Measurement(element, "width") ?? 120;
+        double height = Measurement(element, "height") ?? 60;
+
+        var file = Text(element, "file");
+
+        if (Locate(file) is { } path && Decoded(path) is { } picture)
+        {
+            return new Image
+            {
+                Source = picture,
+                Stretch = Fitted(element),
+                Width = width,
+                Height = height,
+                // Drawn at its own size, a picture is as big as it was made and would otherwise
+                // spill over whatever stands beside it. What the panel says is how much room it
+                // has, whichever way it is fitted into that room.
+                ClipToBounds = true,
+            };
+        }
+
+        return new PicturePlaceholder
+        {
+            Word = Wanting(element, file),
+            Width = width,
+            Height = height,
+        };
+    }
+
+    /// <summary>
+    /// What the empty frame says.
+    /// </summary>
+    /// <remarks>
+    /// An element dragged onto a panel has no file yet, and that is the state every picture on
+    /// every panel starts in, so while one is being laid out the frame asks for a picture rather
+    /// than reporting one missing. Named and not found, it says the name: whoever typed it is
+    /// the only person who can tell what became of it, and the name is what they need to read.
+    /// </remarks>
+    private string Wanting(MachineElement element, string file)
+    {
+        if (file.Length > 0) return file;
+
+        if (Designing) return "Choose a picture...";
+
+        return element.Label;
+    }
+
+    /// <summary>
+    /// Where that name really is, when it is inside the machine's folder, and nowhere when it
+    /// is not.
+    /// </summary>
+    /// <remarks>
+    /// The same measuring an arriving zip gets, for the same reason. A file named in a
+    /// description is a claim about somebody else's disc made on this one, and "../../../etc/passwd"
+    /// is a machine asking to have a panel read a file that is none of its business. So the name
+    /// is resolved and then held against the folder, rather than being searched for the ways it
+    /// might climb out: those cannot all be listed, and the resolved path can.
+    /// </remarks>
+    private string? Locate(string file)
+    {
+        if (file.Length == 0) return null;
+
+        if (Assets is not { Length: > 0 } folder) return null;
+
+        try
+        {
+            string root = Path.GetFullPath(folder);
+
+            if (!root.EndsWith(Path.DirectorySeparatorChar)) root += Path.DirectorySeparatorChar;
+
+            string full = Path.GetFullPath(Path.Combine(root, file));
+
+            if (!full.StartsWith(root, StringComparison.Ordinal)) return null;
+
+            return File.Exists(full) ? full : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>That file as a picture, or nothing when it is not one.</summary>
+    /// <remarks>
+    /// A file that would not open is written down as one that would not, so the answer is the
+    /// same the second time it is asked for and the disc is not touched again for it. A drawing
+    /// that will not parse is a file that would not open, and lands in the same place: an empty
+    /// frame, never an exception thrown through the middle of a panel being built.
+    ///
+    /// Which reader by the name, since the name is what a picture format announces itself by
+    /// everywhere else a file is passed around, and reading the first few bytes to decide would
+    /// be a second answer to a question already answered. A machine that lies about which it has
+    /// gets an empty frame, which is what a machine that lies about a picture deserves.
+    /// </remarks>
+    private IImage? Decoded(string path)
+    {
+        if (_pictures.TryGetValue(path, out var held)) return held;
+
+        IImage? picture = null;
+
+        try
+        {
+            picture = Path.GetExtension(path).Equals(".svg", StringComparison.OrdinalIgnoreCase)
+                ? Drawing(path)
+                : new Bitmap(path);
+        }
+        catch (Exception)
+        {
+        }
+
+        _pictures[path] = picture;
+
+        return picture;
+    }
+
+    /// <summary>The drawing in that file, or nothing when there is nothing in it to draw.</summary>
+    /// <remarks>
+    /// Read as a stream rather than by its path, so the file is shut the moment it has been
+    /// parsed. A badge is read once and drawn for as long as the panel is open, and a machine's
+    /// folder somebody is still editing should not have a handle held open across all of it.
+    ///
+    /// What comes back is the shape and not a picture of the shape, which is the point of the
+    /// whole exercise: the element is given a width and a height by the panel, and the drawing
+    /// is laid down at that size instead of being stretched up from the size somebody saved it
+    /// at. Nothing here is cached; <see cref="Decoded"/> does that for both kinds at once.
+    /// </remarks>
+    private static IImage? Drawing(string path)
+    {
+        using var file = File.OpenRead(path);
+
+        return SvgSource.Load(file) is { } drawing ? new SvgImage { Source = drawing } : null;
+    }
+
+    /// <summary>How the picture takes the room it is given, its shape kept unless it says not.</summary>
+    private static Stretch Fitted(MachineElement element) =>
+        Text(element, "fit").ToLowerInvariant() switch
+        {
+            "fill" => Stretch.Fill,
+            "none" => Stretch.None,
+            _ => Stretch.Uniform,
+        };
+
+    /// <summary>
+    /// The frame a picture leaves behind when there is no picture.
+    /// </summary>
+    /// <remarks>
+    /// Drawn rather than built out of a border and a line of text so that it follows a theme
+    /// swap the moment one happens, which is what <see cref="ThemedControl"/> is for. The little
+    /// hill and sun are there because the word alone reads as an error: a panel being laid out
+    /// is full of empty frames, and this one has to say which of them is waiting for a picture.
+    /// </remarks>
+    private sealed class PicturePlaceholder : ThemedControl
+    {
+        /// <summary>What is written in the frame, or nothing, which leaves the frame empty.</summary>
+        /// <remarks>
+        /// A plain property and not a styled one. Nothing ever changes what an empty frame says:
+        /// the panel is thrown away and drawn again when the description under it moves.
+        /// </remarks>
+        public string Word { get; init; } = "";
+
+        public override void Render(DrawingContext context)
+        {
+            double width = Bounds.Width;
+            double height = Bounds.Height;
+
+            if (width <= 1 || height <= 1) return;
+
+            var palette = ThemePalette.From(this);
+            var area = new Rect(0, 0, width, height);
+
+            context.DrawRectangle(
+                new SolidColorBrush(palette.Background),
+                new Pen(new SolidColorBrush(palette.Border), 1),
+                new RoundedRect(area, 4));
+
+            var text = Wording(palette);
+
+            // The sketch takes what is left over the wording, and goes when there is not enough
+            // of that to draw anything anybody would recognise.
+            double spare = height - (text?.Height ?? 0) - 10;
+
+            if (spare > 14) Sketch(context, palette, area, spare);
+
+            if (text == null) return;
+
+            context.DrawText(text, new Point(
+                Math.Max(4, (width - text.Width) / 2),
+                Math.Max(2, height - text.Height - 5)));
+        }
+
+        /// <summary>The word, laid out once, since where it goes depends on how big it came out.</summary>
+        private FormattedText? Wording(ThemePalette palette)
+        {
+            if (Word.Length == 0) return null;
+
+            return new FormattedText(
+                Word,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                Typeface.Default,
+                11,
+                new SolidColorBrush(palette.Muted));
+        }
+
+        /// <summary>A hill, a smaller hill and a sun: what everybody draws when they mean picture.</summary>
+        private static void Sketch(DrawingContext context, ThemePalette palette, Rect area, double spare)
+        {
+            double size = Math.Min(Math.Min(area.Width - 12, spare), 46);
+
+            if (size < 14) return;
+
+            double left = area.X + (area.Width - size) / 2;
+            double top = area.Y + 5 + (spare - size) / 2;
+
+            var brush = new SolidColorBrush(palette.Muted, 0.55);
+
+            context.DrawEllipse(brush, null, new Point(left + size * 0.74, top + size * 0.26), size * 0.1, size * 0.1);
+
+            context.DrawGeometry(brush, null, Hill(left + size * 0.04, top + size * 0.92, size * 0.62));
+            context.DrawGeometry(brush, null, Hill(left + size * 0.5, top + size * 0.92, size * 0.46));
+
+            context.DrawRectangle(
+                null,
+                new Pen(new SolidColorBrush(palette.Muted, 0.55), 1),
+                new RoundedRect(new Rect(left, top, size, size * 0.94), 3));
+        }
+
+        /// <summary>One hill, standing on that point and as wide as it is asked to be.</summary>
+        private static Geometry Hill(double left, double bottom, double width)
+        {
+            var geometry = new StreamGeometry();
+
+            using (var draw = geometry.Open())
+            {
+                draw.BeginFigure(new Point(left, bottom), isFilled: true);
+                draw.LineTo(new Point(left + width / 2, bottom - width * 0.62));
+                draw.LineTo(new Point(left + width, bottom));
+                draw.EndFigure(isClosed: true);
+            }
+
+            return geometry;
+        }
+    }
+
+    /// <summary>
     /// Wraps a built element in the skin that makes it selectable, but only while designing.
     /// </summary>
     /// <remarks>
@@ -1110,6 +1747,22 @@ public class MachinePanelView : Decorator
 
         frame.PointerPressed += (_, e) =>
         {
+            // A right press picks the element up as a left one does, and then gets out of the
+            // way: the menu belongs to whoever put the panel on screen, and marking the press
+            // handled here would stop it opening. The innermost frame answers and the ones
+            // around it stand off, which the flag does in place of the handled flag, since the
+            // same press bubbles outwards through all of them.
+            if (e.GetCurrentPoint(frame).Properties.IsRightButtonPressed)
+            {
+                if (ReferenceEquals(_claimed, e)) return;
+
+                _claimed = e;
+
+                Selected = element;
+
+                return;
+            }
+
             Selected = element;
             e.Handled = true;
         };
@@ -1141,16 +1794,50 @@ public class MachinePanelView : Decorator
         return null;
     }
 
-    /// <summary>Outlines whatever is selected now and clears the outline off everything else.</summary>
+    /// <summary>
+    /// Outlines what is picked and what a drop would land in, and clears both off everything
+    /// else.
+    /// </summary>
+    /// <remarks>
+    /// Both in the machine's own accent, told apart by weight: what you are working on has a
+    /// thin line round it, and what a part would fall into has a thick one and a wash of the
+    /// same colour inside it. A second hue would mean a panel wearing an accent that is not the
+    /// machine's, and the wash is what makes a container read as open rather than merely outlined.
+    ///
+    /// The wash is barely there on purpose. It sits over the machine's own face while somebody
+    /// is dragging, and a drop target that hides what it is about to change is no help.
+    /// </remarks>
     private void ShowSelection()
     {
         if (_frames.Count == 0) return;
 
-        var accent = new SolidColorBrush(ThemePalette.From(this).Accent);
+        var colour = ThemePalette.From(this).Accent;
+
+        var accent = new SolidColorBrush(colour);
+        var wash = new SolidColorBrush(colour, 0.16);
+
         var selected = Selected;
+        var marked = Marked;
+
+        Rect? around = null;
 
         foreach (var (element, frame) in _frames)
-            frame.BorderBrush = ReferenceEquals(element, selected) ? accent : Brushes.Transparent;
+        {
+            bool wanted = marked != null && ReferenceEquals(element, marked);
+
+            if (ReferenceEquals(element, selected)) around = Bounds(frame);
+
+            frame.BorderBrush = wanted || ReferenceEquals(element, selected) ? accent : Brushes.Transparent;
+            frame.BorderThickness = new Thickness(wanted ? 2 : 1);
+
+            // Transparent rather than none, so a press in the gap between two controls still
+            // lands on the element that holds them.
+            frame.Background = wanted ? wash : Brushes.Transparent;
+        }
+
+        // Only what is being worked on gets handles, and only while it is being laid out. A
+        // machine in a song is a machine, and its knobs are for turning.
+        _handles.Around(Designing ? around : null, colour);
     }
 
     /// <summary>
@@ -1250,7 +1937,14 @@ public class MachinePanelView : Decorator
     private double Start(MachineParameter parameter) =>
         Values is { } values ? values.Get(parameter.Key) : parameter.Default;
 
-    private void Write(string key, double value) => Values?.Set(key, value);
+    private void Write(string key, double value)
+    {
+        Values?.Set(key, value);
+
+        if (!_watchers.TryGetValue(key, out var told)) return;
+
+        foreach (var one in told) one();
+    }
 
     /// <summary>
     /// What a text setting says, or nothing when it names none and nothing when there is nobody
@@ -1303,6 +1997,271 @@ public class MachinePanelView : Decorator
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
             : fallback;
+
+
+    /// <summary>How big a handle is, and how far from an edge a press still counts as one.</summary>
+    private const double HandleSize = 9;
+
+    /// <summary>Nothing may be sized smaller than this, or it cannot be got hold of again.</summary>
+    private const double SmallestSize = 12;
+
+    /// <summary>Which handle is being dragged, which is also which way the size may move.</summary>
+    private enum Grip
+    {
+        Right,
+        Bottom,
+        Corner,
+    }
+
+    /// <summary>A size being dragged out: what is being sized, from what, and by which handle.</summary>
+    private sealed record Sizing(MachineElement Element, Control Control, Grip Grip, Point From, Size Was);
+
+    /// <summary>
+    /// The handles, drawn over the panel on whatever is being worked on.
+    /// </summary>
+    /// <remarks>
+    /// A control of its own rather than a few rectangles drawn by the panel, because the panel
+    /// is a Decorator and what a Decorator draws goes under its child. Handles under the machine
+    /// would be handles nobody can see.
+    /// </remarks>
+    private sealed class Handles : Control
+    {
+        private Rect? _around;
+        private Rect? _caret;
+        private Color _colour = Colors.White;
+
+        /// <summary>Puts the handles round that rectangle, or takes them off the panel.</summary>
+        public void Around(Rect? area, Color colour)
+        {
+            _around = area;
+            _colour = colour;
+
+            InvalidateVisual();
+        }
+
+        /// <summary>Puts the line where the thing being carried would land, or takes it away.</summary>
+        public void At(Rect? line)
+        {
+            if (_caret == line) return;
+
+            _caret = line;
+
+            InvalidateVisual();
+        }
+
+        /// <summary>Where the three handles sit for a rectangle, in the order they are drawn.</summary>
+        public static IEnumerable<(Grip Grip, Rect Where)> For(Rect area)
+        {
+            double half = HandleSize / 2;
+
+            yield return (Grip.Right, new Rect(area.Right - half, area.Center.Y - half, HandleSize, HandleSize));
+            yield return (Grip.Bottom, new Rect(area.Center.X - half, area.Bottom - half, HandleSize, HandleSize));
+            yield return (Grip.Corner, new Rect(area.Right - half, area.Bottom - half, HandleSize, HandleSize));
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            var fill = new SolidColorBrush(_colour);
+
+            // The line first, so a handle sitting on top of it is still visible.
+            if (_caret is { } line) context.DrawRectangle(fill, null, line, 1, 1);
+
+            if (_around is not { } area) return;
+
+            var edge = new Pen(new SolidColorBrush(Colors.Black, 0.55), 1);
+
+            foreach (var (_, where) in For(area)) context.DrawRectangle(fill, edge, where, 2, 2);
+        }
+    }
+
+    /// <summary>
+    /// Catches a press on a handle before the machine underneath hears about it.
+    /// </summary>
+    /// <remarks>
+    /// On the way down rather than on the way up, because a handle sits over a knob and the knob
+    /// would otherwise take the press and start turning. The panel is not a control anybody
+    /// turns while it is being laid out, so taking the press here costs nothing.
+    /// </remarks>
+    private void Grabbed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!Designing || Selected is not { } element) return;
+
+        if (!_frames.TryGetValue(element, out var frame) || frame.Child is not { } control) return;
+
+        if (Bounds(frame) is not { } area) return;
+
+        var at = e.GetPosition(this);
+
+        foreach (var (grip, where) in Handles.For(area))
+        {
+            if (!where.Contains(at)) continue;
+
+            _sizing = new Sizing(element, control, grip, at, control.Bounds.Size);
+
+            e.Pointer.Capture(this);
+            e.Handled = true;
+
+            return;
+        }
+    }
+
+    /// <summary>
+    /// The size as the hand moves, put on the control and nowhere else yet.
+    /// </summary>
+    /// <remarks>
+    /// The description is written when the hand lets go. Writing it on every move would rebuild
+    /// the panel forty times a second, and the control being dragged would be thrown away and
+    /// made again under the pointer, which is how a drag turns into a fight.
+    /// </remarks>
+    private void Sizes(object? sender, PointerEventArgs e)
+    {
+        if (_sizing is not { } sizing) return;
+
+        var at = e.GetPosition(this);
+
+        double width = sizing.Was.Width + (at.X - sizing.From.X);
+        double height = sizing.Was.Height + (at.Y - sizing.From.Y);
+
+        if (sizing.Grip != Grip.Bottom) sizing.Control.Width = Math.Max(SmallestSize, Math.Round(width));
+        if (sizing.Grip != Grip.Right) sizing.Control.Height = Math.Max(SmallestSize, Math.Round(height));
+
+        // The handles follow the size while it is being dragged, or they would sit where the
+        // element used to end.
+        ShowSelection();
+    }
+
+    /// <summary>Writes the size the hand left it at into the machine's own description.</summary>
+    /// <remarks>
+    /// Only what was dragged: a handle pulled sideways writes a width and leaves the height
+    /// alone, so an element that was happy deciding its own height goes on deciding it.
+    /// </remarks>
+    private void Sized(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_sizing is not { } sizing) return;
+
+        _sizing = null;
+
+        e.Pointer.Capture(null);
+
+        if (sizing.Grip != Grip.Bottom) Written(sizing.Element, "width", sizing.Control.Width);
+        if (sizing.Grip != Grip.Right) Written(sizing.Element, "height", sizing.Control.Height);
+
+        Resized?.Invoke(this, sizing.Element);
+    }
+
+    private static void Written(MachineElement element, string key, double value)
+    {
+        if (double.IsNaN(value) || value <= 0) return;
+
+        element.Properties[key] = ((int)Math.Round(value)).ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Said when a handle has been let go and the element's size has changed with it.</summary>
+    /// <remarks>
+    /// For whoever is showing the panel, since the size is now part of the machine and the
+    /// project has something new to save. The panel has already drawn it.
+    /// </remarks>
+    public event EventHandler<MachineElement>? Resized;
+
+    /// <summary>
+    /// Where something let go at that point would go: inside what, and in which place.
+    /// </summary>
+    /// <remarks>
+    /// The place is the whole point. Dropping into a container has always put the thing at the
+    /// end, which is fine for the first part and no use at all for the fourth: putting a picture
+    /// after the picker means saying after, and the only way to say it is where the hand is.
+    ///
+    /// Over the first half of something, along the way its container runs, means before it; over
+    /// the second half means after it. Over a container itself, or over nothing in particular,
+    /// means the end of it, which is what dropping into open space has always meant.
+    /// </remarks>
+    public (MachineElement? Into, int At) Where(Point at)
+    {
+        var over = ElementAt(this.InputHitTest(at) as Visual);
+
+        if (over == null || Panel?.Root is not { } root) return (null, -1);
+
+        // A container is asked to hold the thing, not to stand aside for it.
+        if (Holds(over.Element)) return (over, -1);
+
+        var parent = Parent(root, over);
+
+        if (parent == null) return (over, -1);
+
+        int index = parent.Children.IndexOf(over);
+
+        if (index < 0) return (parent, -1);
+
+        if (!_frames.TryGetValue(over, out var frame) || Bounds(frame) is not { } area) return (parent, -1);
+
+        bool after = Down(parent)
+            ? at.Y > area.Center.Y
+            : at.X > area.Center.X;
+
+        return (parent, after ? index + 1 : index);
+    }
+
+    /// <summary>The line to draw where something would land, or nothing when it would go at the end.</summary>
+    /// <remarks>
+    /// A line between two things rather than a box round one, because what is being said is
+    /// "here", and here is a gap. It lies across the way the container runs: down the side of a
+    /// row, along the top of a column.
+    /// </remarks>
+    public (Rect Where, bool Down)? Caret(Point at)
+    {
+        var (into, index) = Where(at);
+
+        if (into == null || index < 0) return null;
+
+        bool down = Down(into);
+
+        var children = into.Children;
+
+        // The gap is drawn against whichever element is beside it: the one being pushed along,
+        // or the last one when the drop is at the end.
+        var beside = index < children.Count ? children[index] : children.Count > 0 ? children[^1] : null;
+
+        if (beside == null || !_frames.TryGetValue(beside, out var frame) || Bounds(frame) is not { } area)
+            return null;
+
+        bool before = index < children.Count;
+
+        const double Thickness = 3;
+
+        var line = down
+            ? new Rect(area.X, (before ? area.Top : area.Bottom) - Thickness / 2, area.Width, Thickness)
+            : new Rect((before ? area.Left : area.Right) - Thickness / 2, area.Y, Thickness, area.Height);
+
+        return (line, down);
+    }
+
+    /// <summary>Whether a container runs down the panel rather than across it.</summary>
+    private static bool Down(MachineElement container) =>
+        container.Element == MachineElementKinds.Column;
+
+    /// <summary>The same question asked of the kind alone.</summary>
+    private static bool DownKind(string kind) => kind == MachineElementKinds.Column;
+
+    /// <summary>What holds that element, or nothing when it is the outermost one.</summary>
+    private static MachineElement? Parent(MachineElement at, MachineElement wanted)
+    {
+        foreach (var child in at.Children)
+        {
+            if (ReferenceEquals(child, wanted)) return at;
+
+            if (Parent(child, wanted) is { } found) return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>Where an element's frame sits on this panel, or nothing when it is not on it.</summary>
+    private Rect? Bounds(Visual frame)
+    {
+        if (frame.TranslatePoint(new Point(0, 0), this) is not { } corner) return null;
+
+        return new Rect(corner, frame.Bounds.Size);
+    }
 
     /// <summary>A size in the description, or nothing when it says none, so the default stands.</summary>
     private static double? Measurement(MachineElement element, string key) =>

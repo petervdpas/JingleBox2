@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using JingleBox2.ViewModels;
+using System;
 using System.Linq;
 
 namespace JingleBox2.Views;
@@ -28,6 +29,15 @@ public partial class MachineEditorView : UserControl
         // A take is picked the way it is picked everywhere else in the app, by the dialog with
         // the categories and the search in it. The panel only says which setting wants one.
         PanelCanvas.TakeWanted += PickTake;
+
+        // A handle dragged on the panel writes the size onto the machine itself, so the rest of
+        // the page has to hear about it: the property rows are showing the size it used to be.
+        PanelCanvas.Resized += (_, element) => Editor?.Resized(element);
+
+        // The drag is ours from press to release, so the moving and the letting go are watched
+        // here rather than left to the system's own drag and drop.
+        AddHandler(PointerMovedEvent, Carrying_PointerMoved, RoutingStrategies.Tunnel);
+        AddHandler(PointerReleasedEvent, Carrying_PointerReleased, RoutingStrategies.Tunnel);
 
         // The preview is painted in the machine's own colours, so it is repainted whenever
         // another machine is opened, and mixed again when the theme moves under both.
@@ -86,58 +96,111 @@ public partial class MachineEditorView : UserControl
         if (folder != null) editor.Save(folder);
     }
 
-    private void Install_Click(object? sender, RoutedEventArgs e) => Editor?.Install();
-
     /// <summary>
-    /// Picks a part up off the library.
+    /// Writes the machine out where the pointer says.
     /// </summary>
     /// <remarks>
-    /// Releasing without moving ends the drag with no effect, so this does not get in the way
-    /// of clicking a part to put it inside whatever is picked. Both ways of adding one are
-    /// wanted: dragging says where it goes, clicking is quicker when that is already right.
+    /// A save picker rather than a folder one: what leaves here is a single file, and where it
+    /// goes is wherever you send machines from. The name is offered from the machine's own, so
+    /// the file is recognisable on a desktop full of zips.
     /// </remarks>
-    private async void Part_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control control || control.Tag is not string kind) return;
-
-        if (!e.GetCurrentPoint(control).Properties.IsLeftButtonPressed) return;
-
-        var landed = await DragDrop.DoDragDropAsync(e, MachinePartDragData.For(kind), DragDropEffects.Copy);
-
-        // Nowhere in particular, which is what pressing a part and letting go without moving
-        // looks like. Taken as a click, so a part can be added without aiming: it goes inside
-        // whatever is picked, the same as the panel would put it.
-        if (landed == DragDropEffects.None) Editor?.AddElementCommand.Execute(kind);
-    }
-
-    private void Canvas_DragOver(object? sender, DragEventArgs e)
-    {
-        e.DragEffects = MachinePartDragData.KindFrom(e.DataTransfer) == null
-            ? DragDropEffects.None
-            : DragDropEffects.Copy;
-
-        e.Handled = true;
-    }
-
     /// <summary>
-    /// A part let go over the panel, put where it was let go.
+    /// Picks the line that was pressed, whichever button did it.
     /// </summary>
     /// <remarks>
-    /// The canvas is asked what is under the pointer rather than the drop being read off the
-    /// control that took it, because what took it is a knob or a frame and what the panel is
-    /// made of is elements. Let go over nothing in particular, it goes to the outermost element,
-    /// which is the only place a first part can go anyway.
+    /// A left press on a line already picks it, through the tree's own selection. A right press
+    /// does not, and a menu about the line under the pointer that acts on a different line is
+    /// worse than no menu, so the pick is made here before the menu opens.
     /// </remarks>
-    private void Canvas_Drop(object? sender, DragEventArgs e)
+    private void Row_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control row || row.DataContext is not MachineElementViewModel element) return;
+
+        if (Editor is not { } editor) return;
+
+        editor.SelectedElement = element;
+
+        // The outermost one is what everything else is inside, so there is nowhere to carry it.
+        if (element.Parent == null) return;
+
+        if (!e.GetCurrentPoint(row).Properties.IsLeftButtonPressed) return;
+
+        Carry(new Carrying(null, element, e.GetPosition(this)), e);
+    }
+
+    private async void Export_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { CanExport: true } editor) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+
+        if (storage == null) return;
+
+        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export the machine",
+            SuggestedFileName = editor.ExportName,
+            DefaultExtension = "zip",
+            FileTypeChoices = new[] { MachinePack }
+        });
+
+        string? path = file?.TryGetLocalPath();
+
+        if (path != null) editor.Export(path);
+    }
+
+    /// <summary>What a machine looks like on disc once it has left here.</summary>
+    private static readonly FilePickerFileType MachinePack = new("Machine")
+    {
+        Patterns = new[] { "*.zip" }
+    };
+
+    /// <summary>
+    /// A picture put on the machine that is being laid out.
+    /// </summary>
+    /// <remarks>
+    /// Unlike a recording, which is only tried out on the panel, this one is kept: the file is
+    /// copied into the machine's own folder and the element is left naming it. A machine travels
+    /// as that folder, so a picture inside it arrives wherever the machine does, and a picture
+    /// left where it was found would be a hole in the machine's face on the next disc it reached.
+    ///
+    /// The picker belongs to the window, as every other one here does, so it is opened from the
+    /// code behind and only the answer goes to the view model.
+    /// </remarks>
+    private async void Picture_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { } editor) return;
 
-        if (MachinePartDragData.KindFrom(e.DataTransfer) is not { } kind) return;
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
 
-        editor.Drop(kind, PanelCanvas.ElementAt(e.Source));
+        if (storage == null) return;
 
-        e.Handled = true;
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Choose a picture",
+            AllowMultiple = false,
+            FileTypeFilter = new[] { Pictures }
+        });
+
+        if (picked.Count == 0) return;
+
+        if (picked[0].TryGetLocalPath() is { Length: > 0 } path) editor.PutPicture(path);
     }
+
+    /// <summary>What a machine will carry a picture as.</summary>
+    /// <remarks>
+    /// The ones everything can read. A machine's badge is drawn by whoever opens the machine, on
+    /// whatever they are running, so a format that needs the right decoder is a badge that is a
+    /// hole on somebody's screen.
+    ///
+    /// The drawing is the one worth choosing where there is a choice. A panel is laid out at
+    /// whatever size suits it and a logo made of lines is drawn at that size, while one made of
+    /// pixels is stretched to it.
+    /// </remarks>
+    private static readonly FilePickerFileType Pictures = new("Picture")
+    {
+        Patterns = new[] { "*.png", "*.jpg", "*.jpeg", "*.svg" }
+    };
 
     /// <summary>
     /// A recording put on the machine that is being laid out.
@@ -160,26 +223,250 @@ public partial class MachineEditorView : UserControl
         main.MachineEditor.Redraw();
     }
 
-    private void Tree_DragOver(object? sender, DragEventArgs e) => Canvas_DragOver(sender, e);
-
     /// <summary>
-    /// A part let go on a line of the panel list, put inside whatever that line stands for.
+    /// Picks a part up off the library.
     /// </summary>
     /// <remarks>
-    /// The list takes drops as well as the panel because a container with nothing in it is a
-    /// container with nothing on screen: an empty row is a few pixels of gap, and a grid nobody
-    /// has filled is the whole card. Aiming at the word is easier than aiming at the space.
+    /// Releasing without moving ends the drag with no effect, so this does not get in the way
+    /// of clicking a part to put it inside whatever is picked. Both ways of adding one are
+    /// wanted: dragging says where it goes, clicking is quicker when that is already right.
     /// </remarks>
-    private void Tree_Drop(object? sender, DragEventArgs e)
+    private void Part_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Editor is not { } editor) return;
+        if (sender is not Control control || control.Tag is not string kind) return;
 
-        if (MachinePartDragData.KindFrom(e.DataTransfer) is not { } kind) return;
+        if (!e.GetCurrentPoint(control).Properties.IsLeftButtonPressed) return;
 
-        editor.Drop(kind, Row(e.Source)?.Element);
+        Carry(new Carrying(kind, null, e.GetPosition(this)), e);
+    }
 
+    /// <summary>
+    /// What is in the hand: a kind out of the library, or something already on the machine.
+    /// </summary>
+    /// <remarks>
+    /// One or the other, never both. Where it started is kept so that a press that never really
+    /// moved can be told from a drag, since letting go without moving means something different
+    /// for both of them: a part is added where the selection is, and an element stays where it is.
+    /// </remarks>
+    private sealed record Carrying(string? Kind, MachineElementViewModel? Element, Point From)
+    {
+        public bool Moved { get; set; }
+    }
+
+    private Carrying? _carrying;
+
+    /// <summary>How far the hand has to move before it is carrying something rather than pressing it.</summary>
+    private const double Threshold = 4;
+
+    /// <summary>
+    /// Picks a thing up and follows the hand with it until it is let go.
+    /// </summary>
+    /// <remarks>
+    /// The pointer is captured and the whole drag is ours, rather than handed to the system's own
+    /// drag and drop. Three things come of that, and all three are the reason: what is being
+    /// carried can be drawn as the thing itself rather than as a cursor, the drag works the same
+    /// on every platform the app runs on, and it can be tested without a hand on a mouse.
+    /// </remarks>
+    private void Carry(Carrying carrying, PointerPressedEventArgs e)
+    {
+        _carrying = carrying;
+
+        e.Pointer.Capture(this);
         e.Handled = true;
     }
+
+    /// <summary>The ghost follows the hand, and whatever it is over is marked.</summary>
+    private void Carrying_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_carrying is not { } carrying) return;
+
+        var at = e.GetPosition(this);
+
+        if (!carrying.Moved)
+        {
+            // A press that has not really moved is a press. Starting the ghost on the first
+            // pixel would mean a click on a part flashing a picture of itself across the page.
+            if (Math.Abs(at.X - carrying.From.X) < Threshold &&
+                Math.Abs(at.Y - carrying.From.Y) < Threshold) return;
+
+            carrying.Moved = true;
+
+            ShowGhost(carrying);
+        }
+
+        MoveGhost(at);
+
+        var (onPanel, onList) = Under(at);
+
+        Mark(onPanel, onList);
+
+        // The line between two parts, which is the whole of how somebody says "after that one".
+        PanelCanvas.Landing(Within(this.InputHitTest(at) as Visual, PanelCanvas) ? Inside(at) : null);
+    }
+
+    /// <summary>Puts down what was being carried, wherever the hand let go.</summary>
+    private void Carrying_PointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_carrying is not { } carrying) return;
+
+        _carrying = null;
+
+        e.Pointer.Capture(null);
+
+        HideGhost();
+        Mark(null, null);
+
+        PanelCanvas.Landing(null);
+
+        if (Editor is not { } editor) return;
+
+        var at = e.GetPosition(this);
+        var (onPanel, onList) = Under(at);
+
+        // Let go without ever moving. A part out of the library is added where the selection is,
+        // which is how one gets added without aiming; something already on the machine stays
+        // exactly where it is, since the press was somebody picking it to work on.
+        if (!carrying.Moved)
+        {
+            if (carrying.Kind is { } picked) editor.AddElementCommand.Execute(picked);
+
+            return;
+        }
+
+        // On the panel the hand says where among the others, which is what the line was showing.
+        // On the list it says which container, and the part goes at the end of it.
+        var (into, place) = Within(this.InputHitTest(at) as Visual, PanelCanvas)
+            ? PanelCanvas.Where(Inside(at))
+            : (onList?.Element, -1);
+
+        into ??= onPanel;
+
+        if (carrying.Kind is { } kind) editor.Drop(kind, into, place);
+        else if (carrying.Element is { } moved) editor.MoveInto(moved.Element, into, place);
+    }
+
+    /// <summary>What the hand is over: an element on the panel, or a line of the list.</summary>
+    private (Machines.MachineElement?, ViewModels.MachineElementViewModel?) Under(Point at)
+    {
+        var hit = this.InputHitTest(at) as Visual;
+
+        if (hit == null) return (null, null);
+
+        if (Row(hit) is { } row) return (null, row);
+
+        // Over the panel but over nothing in particular means the machine itself, which is where
+        // a part let go over open space goes.
+        if (Within(hit, PanelCanvas)) return (PanelCanvas.ElementAt(hit) ?? Editor?.Project?.Panel.Root, null);
+
+        return (null, null);
+    }
+
+    private static bool Within(Visual? at, Visual holder)
+    {
+        for (; at != null; at = Avalonia.VisualTree.VisualExtensions.GetVisualParent(at))
+        {
+            if (ReferenceEquals(at, holder)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Draws what is being carried, as the thing itself.
+    /// </summary>
+    /// <remarks>
+    /// A part is drawn by the same control the library draws it with, so what is in the hand and
+    /// what was picked up are the same picture. Something already on the machine is drawn as its
+    /// kind with its name beside it, since the element itself is on the panel and cannot be in
+    /// two places at once.
+    /// </remarks>
+    private void ShowGhost(Carrying carrying)
+    {
+        Control inside;
+
+        if (carrying.Kind is { } kind)
+        {
+            inside = new Machines.Ui.MachinePartSample { Kind = kind, Width = 62, Height = 44 };
+        }
+        else
+        {
+            var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
+
+            row.Children.Add(new Machines.Ui.MachinePartSample
+            {
+                Kind = carrying.Element?.Kind ?? "",
+                Width = 44,
+                Height = 32,
+            });
+
+            row.Children.Add(new TextBlock
+            {
+                Text = carrying.Element?.Display ?? "",
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+            });
+
+            inside = row;
+        }
+
+        _ghost = new Border
+        {
+            Classes = { "card" },
+            Padding = new Thickness(6),
+            Opacity = 0.85,
+            Child = inside,
+        };
+
+        GhostLayer.Children.Add(_ghost);
+    }
+
+    private Border? _ghost;
+
+    /// <summary>Below and right of the hand, so what is being aimed at is not under the picture.</summary>
+    private void MoveGhost(Point at)
+    {
+        if (_ghost == null) return;
+
+        Canvas.SetLeft(_ghost, at.X + 12);
+        Canvas.SetTop(_ghost, at.Y + 12);
+    }
+
+    /// <summary>The same point, said in the panel's own coordinates.</summary>
+    /// <remarks>
+    /// The carry is followed in this page's coordinates, because that is where the ghost is
+    /// drawn, and the panel is somewhere inside the page with a card and a scroll around it.
+    /// Asking the panel about a point in the page's terms would be off by wherever it sits.
+    /// </remarks>
+    private Point Inside(Point at) =>
+        this.TranslatePoint(at, PanelCanvas) ?? at;
+
+    private void HideGhost()
+    {
+        if (_ghost == null) return;
+
+        GhostLayer.Children.Remove(_ghost);
+
+        _ghost = null;
+    }
+
+
+    /// <summary>Outlines what would take the part, on the panel and on the list at once.</summary>
+    /// <remarks>
+    /// Both, because a drag crosses from one to the other and whichever is left holding a mark
+    /// is showing something that is no longer true. Clearing is the same call with nothing in it.
+    /// </remarks>
+    private void Mark(Machines.MachineElement? onPanel, ViewModels.MachineElementViewModel? onList)
+    {
+        PanelCanvas.Marked = onPanel;
+
+        if (Editor is not { } editor) return;
+
+        foreach (var row in editor.Every()) row.IsDropTarget = ReferenceEquals(row, onList);
+    }
+
+    /// <summary>The outermost element, which is where a part let go over nothing goes.</summary>
+    private Machines.MachineElement? Root() => Editor?.Project?.Panel.Root;
+
+
 
     /// <summary>Which element a line of the list stands for, or nothing when it is not a line.</summary>
     private static ViewModels.MachineElementViewModel? Row(object? source)

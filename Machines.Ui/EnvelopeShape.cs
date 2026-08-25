@@ -1,6 +1,6 @@
 using System;
 
-namespace JingleBox2.Tracker.Synth;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// An ADSR as a curve over time, for drawing. The same segments the voice's envelope walks,
@@ -19,13 +19,6 @@ public readonly record struct EnvelopeShape(
 {
     /// <summary>Short enough to be a moment, long enough that a spike is still visible.</summary>
     public const double MinimumLength = 0.05;
-
-    public static EnvelopeShape FromPatch(SynthPatch patch, double holdSeconds) => new(
-        Math.Max(0, patch.AttackMs) / 1000.0,
-        Math.Max(0, patch.DecayMs) / 1000.0,
-        Math.Clamp(patch.Sustain, 0, 1),
-        Math.Max(0, patch.ReleaseMs) / 1000.0,
-        Math.Max(0, holdSeconds));
 
     public static EnvelopeShape FromMilliseconds(
         double attackMs, double decayMs, double sustain, double releaseMs, double holdSeconds) => new(

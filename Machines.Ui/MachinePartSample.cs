@@ -53,6 +53,8 @@ public sealed class MachinePartSample : Decorator
     private const string MeterKind = "Meter";
     private const string KeysKind = "Keys";
     private const string WaveKind = "Wave";
+    private const string EnvelopeKind = "Envelope";
+    private const string ImageKind = "Image";
     private const string ChoiceKind = "Choice";
     private const string TakeKind = "Take";
     private const string PresetKind = "Preset";
@@ -143,10 +145,29 @@ public sealed class MachinePartSample : Decorator
         MeterKind => BuildMeter(),
         KeysKind => BuildKeys(),
         WaveKind => new PartSketch(SketchShape.Wave) { Width = 74, Height = 34 },
+        EnvelopeKind => BuildEnvelope(),
+        ImageKind => new PartSketch(SketchShape.Picture) { Width = 60, Height = 40 },
         ChoiceKind => BuildChoice(),
         TakeKind => BuildTake(),
         PresetKind => BuildPreset(),
         _ => null,
+    };
+
+    /// <summary>
+    /// The real curve, drawn from an envelope somebody might plausibly dial in.
+    /// </summary>
+    /// <remarks>
+    /// A quick attack and a long release, so the sample shows both ends of the shape. A flat
+    /// envelope would draw a straight line and tell nobody what the part is.
+    /// </remarks>
+    private static Control BuildEnvelope() => new EnvelopeScope
+    {
+        Width = 74,
+        Height = 34,
+        AttackMs = 60,
+        DecayMs = 220,
+        Sustain = 0.55,
+        ReleaseMs = 400,
     };
 
     /// <summary>The real frame, with a blank box standing in for whatever would go inside it.</summary>
@@ -352,6 +373,9 @@ public sealed class MachinePartSample : Decorator
         /// <summary>A recording's peaks about their middle line.</summary>
         Wave,
 
+        /// <summary>A hill and a sun in a frame: the mark everybody draws for a picture.</summary>
+        Picture,
+
         /// <summary>One box, for standing inside a frame that has a face of its own.</summary>
         Blank,
     }
@@ -419,6 +443,7 @@ public sealed class MachinePartSample : Decorator
                 case SketchShape.Strip: DrawStrip(context, pen, fill, palette, width, height); break;
                 case SketchShape.Spacer: DrawSpacer(context, palette, width, height); break;
                 case SketchShape.Wave: DrawWave(context, palette, width, height); break;
+                case SketchShape.Picture: DrawPicture(context, pen, fill, palette, width, height); break;
                 case SketchShape.Blank: Box(context, pen, fill, new Rect(0.5, 0.5, width - 1, height - 1)); break;
             }
         }
@@ -528,6 +553,54 @@ public sealed class MachinePartSample : Decorator
                 new Pen(palette.AccentTint(90), 1),
                 new Point(0, middle + 0.5),
                 new Point(width, middle + 0.5));
+        }
+
+        /// <summary>
+        /// A frame with a hill and a sun in it.
+        /// </summary>
+        /// <remarks>
+        /// A drawing and not a picture off the disc, unlike every other chip in the library,
+        /// which holds the real control. There is no real one to hold: what the element draws is
+        /// whatever picture a machine happens to carry, and the library is showing the kind of
+        /// thing rather than one machine's badge. This is the mark that has meant picture since
+        /// before anybody had a screen to put one on.
+        /// </remarks>
+        private static void DrawPicture(
+            DrawingContext context, IPen pen, IBrush fill, ThemePalette palette, double width, double height)
+        {
+            var frame = new Rect(0.5, 0.5, width - 1, height - 1);
+
+            Box(context, pen, fill, frame);
+
+            var ink = palette.MutedBrush;
+
+            context.DrawEllipse(
+                palette.AccentBrush,
+                null,
+                new Point(frame.Right - width * 0.24, frame.Y + height * 0.28),
+                height * 0.1,
+                height * 0.1);
+
+            double bottom = frame.Bottom - 2;
+
+            context.DrawGeometry(ink, null, Hill(frame.X + 2, bottom, width * 0.62));
+            context.DrawGeometry(ink, null, Hill(frame.X + width * 0.42, bottom, width * 0.5));
+        }
+
+        /// <summary>One hill, standing on that point and as wide as it is asked to be.</summary>
+        private static Geometry Hill(double left, double bottom, double width)
+        {
+            var geometry = new StreamGeometry();
+
+            using (var draw = geometry.Open())
+            {
+                draw.BeginFigure(new Point(left, bottom), isFilled: true);
+                draw.LineTo(new Point(left + width / 2, bottom - width * 0.6));
+                draw.LineTo(new Point(left + width, bottom));
+                draw.EndFigure(isClosed: true);
+            }
+
+            return geometry;
         }
 
         private static void Box(DrawingContext context, IPen pen, IBrush? fill, Rect area)

@@ -2,7 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Tracker;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
+using JingleBox2.Machines;
 
 namespace JingleBox2.ViewModels;
 
@@ -19,7 +22,7 @@ namespace JingleBox2.ViewModels;
 /// the id and the level stay, because this is still the same instrument standing in the same
 /// track; it has just been given a different sound to make.
 /// </remarks>
-public sealed partial class InstrumentPresets : ObservableObject
+public sealed partial class InstrumentPresets : ObservableObject, IMachinePresets
 {
     private readonly TrackerInstrument _instrument;
     private readonly Action _applied;
@@ -37,14 +40,26 @@ public sealed partial class InstrumentPresets : ObservableObject
     /// <summary>True while the list is being rebuilt, so filling it does not load anything.</summary>
     private bool _filling;
 
+    /// <summary>
+    /// What the takes are being narrowed by, when the list is takes.
+    /// </summary>
+    /// <remarks>
+    /// Held so that a panel drawn from a machine's own description can offer the categories
+    /// itself. The hand written panel puts the category picker beside this one and works the
+    /// filter directly; a described panel has one control where those are two, and asks here.
+    /// </remarks>
+    private readonly TakeFilter? _narrowing;
+
     public InstrumentPresets(
         TrackerInstrument instrument,
         Action applied,
-        ObservableCollection<Models.Recording>? takes = null)
+        ObservableCollection<Models.Recording>? takes = null,
+        TakeFilter? narrowing = null)
     {
         _instrument = instrument;
         _applied = applied;
         _takes = takes;
+        _narrowing = narrowing;
 
         if (_takes != null) _takes.CollectionChanged += (_, _) => Refresh();
 
@@ -123,6 +138,43 @@ public sealed partial class InstrumentPresets : ObservableObject
             OnPropertyChanged(nameof(Caption));
             OnPropertyChanged(nameof(PicksTakes));
             OnPropertyChanged(nameof(Hint));
+            OnPropertyChanged(nameof(Items));
+        }
+    }
+
+    /// <summary>What is on offer, by name, for a panel that draws its own picker.</summary>
+    /// <remarks>
+    /// The same list the hand written picker shows, said as plain strings, because a machine
+    /// described in a file has no way of knowing what a preset object is. Which one is picked
+    /// travels back as a number for the same reason.
+    /// </remarks>
+    IReadOnlyList<string> IMachinePresets.Names => Items.Select(one => one.Name).ToList();
+
+    /// <summary>Which one is showing, or -1 for none. Setting it loads that one.</summary>
+    int IMachinePresets.Picked
+    {
+        get => Selected == null ? -1 : Items.IndexOf(Selected);
+        set
+        {
+            if (value < 0 || value >= Items.Count) return;
+
+            Selected = Items[value];
+        }
+    }
+
+    /// <summary>The categories the takes are filed under, or none on a machine offering presets.</summary>
+    IReadOnlyList<string> IMachinePresets.Filters =>
+        PicksTakes && _narrowing != null ? _narrowing.Filters.ToList() : Array.Empty<string>();
+
+    /// <summary>Which category is in force. Setting it narrows what is on offer.</summary>
+    string IMachinePresets.Filter
+    {
+        get => _narrowing?.Filter ?? "";
+        set
+        {
+            if (_narrowing == null || value.Length == 0) return;
+
+            _narrowing.Filter = value;
         }
     }
 }
