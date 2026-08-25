@@ -91,6 +91,31 @@ public partial class InstrumentPanel : UserControl
                 ImportPads_Click(this, new RoutedEventArgs());
 
                 break;
+
+            case Machines.MachineActions.ClearZone:
+                ClearZoneSample_Click(this, new RoutedEventArgs());
+
+                break;
+
+            case Machines.MachineActions.LoadZones:
+                ImportZones_Click(this, new RoutedEventArgs());
+
+                break;
+
+            case Machines.MachineActions.AddZone:
+                Designer?.Editor?.Zones?.AddCommand.Execute(null);
+
+                break;
+
+            case Machines.MachineActions.RemoveZone:
+                Designer?.Editor?.Zones?.RemoveCommand.Execute(null);
+
+                break;
+
+            case Machines.MachineActions.SpreadZones:
+                Designer?.Editor?.Zones?.SpreadCommand.Execute(null);
+
+                break;
         }
     }
 

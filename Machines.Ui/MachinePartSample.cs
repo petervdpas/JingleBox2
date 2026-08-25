@@ -61,6 +61,9 @@ public sealed class MachinePartSample : Decorator
     private const string PadsKind = "Pads";
     private const string PadKind = "Pad";
     private const string SlicesKind = "Slices";
+    private const string PadPickerKind = "PadPicker";
+    private const string ZonesKind = "Zones";
+    private const string ZonePickerKind = "ZonePicker";
     private const string TextKind = "Text";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
@@ -157,6 +160,9 @@ public sealed class MachinePartSample : Decorator
         PadsKind => BuildPads(),
         PadKind => new PushButton { CapWidth = 46, CapHeight = 26, FontSize = 9, HasLamp = true, LampBelow = false },
         SlicesKind => new PartSketch(SketchShape.Wave) { Width = 78, Height = 40 },
+        PadPickerKind => BuildSlotPicker("Kick", "Snare"),
+        ZonesKind => BuildZones(),
+        ZonePickerKind => BuildSlotPicker("Low", "High"),
         TextKind => BuildTextBox(),
         _ => null,
     };
@@ -394,6 +400,76 @@ public sealed class MachinePartSample : Decorator
     };
 
     /// <summary>The ordinary drop down, with something picked, since an empty one says nothing.</summary>
+    /// <summary>
+    /// The map, drawn as a map: three stretches of keyboard, one of them in hand.
+    /// </summary>
+    /// <remarks>
+    /// The real control against a stand-in, for the reason every sample here is the real control:
+    /// a chip that showed a rectangle would tell nobody that this element is the picture of a
+    /// keyboard shared out. Three zones rather than one, because the thing worth seeing is that
+    /// there is more than one of them and that they lie side by side.
+    /// </remarks>
+    private static Control BuildZones() => new ZoneMapView
+    {
+        Zones = new SampleMap(),
+        Width = 108,
+        Height = 34,
+        LaneHeight = 14,
+        FontSize = 7,
+    };
+
+    /// <summary>
+    /// Which one of a machine's things the controls beside it are about.
+    /// </summary>
+    /// <remarks>
+    /// The pads of a kit and the zones of a map are different things, and their pickers are the
+    /// same control showing a different list, which is all a chip in the library can show. So it
+    /// is one drawing given the two words, rather than two drawings that would have to be kept
+    /// looking alike by hand.
+    /// </remarks>
+    private static Control BuildSlotPicker(string first, string second) => new ComboBox
+    {
+        Width = 78,
+        FontSize = 11,
+        ItemsSource = new[] { first, second },
+        SelectedIndex = 0,
+    };
+
+    /// <summary>
+    /// A map for the chip to draw: three zones across the keyboard, playing nothing.
+    /// </summary>
+    /// <remarks>
+    /// The same reason the pads on a chip are real buttons. Nothing here can be edited: the chip
+    /// is not hit testable, so the drag that moves an edge never reaches it.
+    /// </remarks>
+    private sealed class SampleMap : IMachineZones
+    {
+        private static readonly (int Low, int High)[] Laid =
+        {
+            (0, 39), (40, 79), (80, 119),
+        };
+
+        public int Count => Laid.Length;
+
+        public string Cap(int at) => "";
+
+        public int Low(int at) => Laid[at].Low;
+
+        public int High(int at) => Laid[at].High;
+
+        public int Root(int at) => (Laid[at].Low + Laid[at].High) / 2;
+
+        public bool Filled(int at) => true;
+
+        /// <summary>The middle one, so the chip shows both a picked zone and an unpicked one.</summary>
+        public int Picked { get; set; } = 1;
+
+        public void Move(int at, int low, int high, int root) { }
+
+        /// <summary>Never raised: none of this moves.</summary>
+        public event EventHandler? Changed;
+    }
+
     private static Control BuildChoice() => new ComboBox
     {
         Width = 78,

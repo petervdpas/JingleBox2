@@ -87,6 +87,17 @@ public class MachinePanelView : Decorator
     public static readonly StyledProperty<IMachinePads?> PadsProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachinePads?>(nameof(Pads));
 
+    /// <summary>
+    /// The map behind the zones, for a machine that lays recordings across the keyboard.
+    /// </summary>
+    /// <remarks>
+    /// Beside the pads rather than instead of them, because a zone is not a pad. A kit's pads are
+    /// declared on the panel and never move; a map is as many stretches of keyboard as the
+    /// instrument turned out to need, and how many that is is not the machine's to say.
+    /// </remarks>
+    public static readonly StyledProperty<IMachineZones?> ZonesProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineZones?>(nameof(Zones));
+
     /// <summary>The recording being cut into pieces, for a machine that fills itself from one.</summary>
     public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachineSlices?>(nameof(Slices));
@@ -345,6 +356,12 @@ public class MachinePanelView : Decorator
         set => SetValue(PadsProperty, value);
     }
 
+    public IMachineZones? Zones
+    {
+        get => GetValue(ZonesProperty);
+        set => SetValue(ZonesProperty, value);
+    }
+
     public IMachineSlices? Slices
     {
         get => GetValue(SlicesProperty);
@@ -550,6 +567,8 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Text => BuildText(element),
             MachineElementKinds.Pads => BuildPads(element),
             MachineElementKinds.PadPicker => BuildPicker(element),
+            MachineElementKinds.Zones => BuildZones(element),
+            MachineElementKinds.ZonePicker => BuildZonePicker(element),
             MachineElementKinds.Slices => BuildSlices(element),
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
@@ -756,17 +775,45 @@ public class MachinePanelView : Decorator
         // machine says otherwise, which is what a rack looks like.
         var caption = Text(element, "caption");
 
+        // What it holds is clipped, and the group itself is not. Nothing inside a group draws
+        // outside it either way, but clipping the group clips the group's own frame: the rounded
+        // corners came off, so every box on a described panel had four square nicks in it that
+        // the same box written by hand did not.
+        var held = Inside(element, parameters);
+
+        held.ClipToBounds = true;
+
         var group = new PanelGroup
         {
             Caption = caption.Length > 0 ? caption : element.Label,
-            Child = Fill(
-                new StackPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
-            ClipToBounds = true,
+            Child = held,
         };
 
         if (Measurement(element, "inset") is { } inset) group.Inset = inset;
 
         return group;
+    }
+
+    /// <summary>
+    /// What a group holds: the one container it was given, or a row of the several things it was.
+    /// </summary>
+    /// <remarks>
+    /// A group holding a single row or column is the common way to write one, and putting that
+    /// column inside a row of its own costs it the group's width: a child of a row is as wide as
+    /// what is in it, so a box drawn inside the column came out narrower than the group around
+    /// it while the same panel written by hand had it reaching both sides.
+    ///
+    /// Only for a container. A group holding one knob is a group with a knob in it, and a knob
+    /// stretched across a group is not a knob anybody drew.
+    /// </remarks>
+    private Control Inside(MachineElement element, Dictionary<string, MachineParameter> parameters)
+    {
+        if (element.Children is [{ } only] && Holds(only.Element) && Build(only, parameters) is { } one)
+            return one;
+
+        return Fill(
+            new StackPanel { Orientation = Orientation.Horizontal },
+            element, parameters, Orientation.Horizontal);
     }
 
     /// <summary>
@@ -857,11 +904,20 @@ public class MachinePanelView : Decorator
 
             if (!Has(child, "margin"))
             {
-                // Down a column the last child needs no gap under it, since nothing follows it.
-                // Across a row it does, because a row wraps and what follows may be underneath.
+                // The gap goes between things and nowhere else, which is what a hand written
+                // panel gets from a container's own spacing. The last child needs none after it:
+                // a trailing gap makes a row wider and a column taller than what is in them, and
+                // a group drawn round that has air on one side and none on the other.
+                //
+                // A row had a gap under it as well, from when a row wrapped and what followed
+                // might be underneath. A row does not wrap: a machine is a front panel and is the
+                // size it is. So the gap under a row was space nobody asked for, and every row on
+                // every described panel was that much taller than the panel it was copied from.
+                bool last = i == built.Count - 1;
+
                 control.Margin = flow == Orientation.Horizontal
-                    ? new Thickness(0, 0, gap, gap)
-                    : new Thickness(0, 0, 0, i == built.Count - 1 ? 0 : gap);
+                    ? new Thickness(0, 0, last ? 0 : gap, 0)
+                    : new Thickness(0, 0, 0, last ? 0 : gap);
             }
 
             // Only across the line. Along it the container decides, and a child told where to
@@ -870,9 +926,16 @@ public class MachinePanelView : Decorator
             {
                 // A section takes the row's height and a control keeps its own, unless the row
                 // has said plainly where everything sits.
-                control.VerticalAlignment = across ?? (Holds(child.Element) && matched
-                    ? VerticalAlignment.Stretch
-                    : VerticalAlignment.Top);
+                //
+                // A control that has already said where it sits keeps that. The name beside a
+                // field is the case: it is written to sit on the middle line so that it lines up
+                // with the box it names, and a row that pushed it to the top would leave it
+                // riding half a line above the thing it is about.
+                if (across is { } said) control.VerticalAlignment = said;
+                else if (control.VerticalAlignment == VerticalAlignment.Stretch)
+                    control.VerticalAlignment = Holds(child.Element) && matched
+                        ? VerticalAlignment.Stretch
+                        : VerticalAlignment.Top;
 
                 container.Children.Add(control);
             }
@@ -966,6 +1029,15 @@ public class MachinePanelView : Decorator
 
         Reads(() => knob.Value = Start(parameter));
 
+        // How big the dial is, how many marks are round it, how much air is left over the label
+        // and how many lines that label may take. All four are what a knob looks like rather
+        // than what it does, and a machine that stands its knobs on a strip needs them: a row of
+        // dials the same size, with the same headroom, is what makes two strips line up.
+        if (Measurement(element, "dial") is { } dial) knob.DialSize = dial;
+        if (Number(element, "ticks", 0) is var marks and > 0) knob.Ticks = marks;
+        if (Measurement(element, "headroom") is { } air) knob.HeadRoom = air;
+        if (Number(element, "lines", 0) is var lines and > 0) knob.LabelLines = lines;
+
         // What the knob writes under itself, where the number it turns is not the number anybody
         // wants to read. A filter's dial is the case: it turns a position and it says hertz, and
         // only the machine knows how one becomes the other, so the machine is asked for the
@@ -1030,6 +1102,11 @@ public class MachinePanelView : Decorator
         // has nothing better to call the two ends is better off with those than with blanks.
         if (Text(element, "on") is { Length: > 0 } on) toggle.OnLabel = on;
         if (Text(element, "off") is { Length: > 0 } off) toggle.OffLabel = off;
+
+        // Its heading's height, so a switch standing in a row of knobs sits on the same line
+        // they do rather than half a name higher.
+        if (Number(element, "lines", 0) is var lines and > 0) toggle.TitleLines = lines;
+        if (Measurement(element, "headroom") is { } air) toggle.HeadRoom = air;
 
         toggle.PropertyChanged += (_, e) =>
         {
@@ -1817,9 +1894,60 @@ public class MachinePanelView : Decorator
 
         if (kit is null) return box;
 
-        // Filling the list changes what is selected, which the box reports as somebody having
-        // picked something. Without this the report writes the selection back, the kit says it
-        // moved, the list is filled again, and the panel goes round until the stack runs out.
+        Picking(
+            box,
+            () => kit.Count, at => kit.Cap(at),
+            () => kit.Picked, at => kit.Picked = at,
+            told => kit.Changed += told, told => kit.Changed -= told);
+
+        return box;
+    }
+
+    /// <summary>
+    /// Which zone the settings beside the map are about.
+    /// </summary>
+    /// <remarks>
+    /// The map says it too, and picking here is picking there, because there is one selection
+    /// and both of these are showing it. What the map cannot do is be stepped through in order,
+    /// which is how you go along a multisample checking each zone in turn.
+    /// </remarks>
+    private Control? BuildZonePicker(MachineElement element)
+    {
+        var map = Zones;
+
+        if (map is null && !Designing) return null;
+
+        var box = new ComboBox { VerticalAlignment = VerticalAlignment.Center };
+
+        if (map is null) return box;
+
+        Picking(
+            box,
+            () => map.Count, at => map.Cap(at),
+            () => map.Picked, at => map.Picked = at,
+            told => map.Changed += told, told => map.Changed -= told);
+
+        return box;
+    }
+
+    /// <summary>
+    /// Fills a box with whatever the host is holding, and keeps the two of them agreeing.
+    /// </summary>
+    /// <remarks>
+    /// The pads of a kit and the zones of a map are different things, and this is not an attempt
+    /// to say otherwise. It is the one bit of wiring that is the same either way: a list somebody
+    /// picks one out of, refilled when whoever owns it says it moved.
+    ///
+    /// Filling the list changes what is selected, which the box reports as somebody having
+    /// picked something. Without the guard the report writes the selection back, the host says it
+    /// moved, the list is filled again, and the panel goes round until the stack runs out.
+    /// </remarks>
+    private static void Picking(
+        ComboBox box,
+        Func<int> count, Func<int, string> cap,
+        Func<int> picked, Action<int> pick,
+        Action<EventHandler> listen, Action<EventHandler> forget)
+    {
         bool filling = false;
 
         void Restock()
@@ -1830,10 +1958,10 @@ public class MachinePanelView : Decorator
             {
                 var names = new List<string>();
 
-                for (int at = 0; at < kit.Count; at++) names.Add(kit.Cap(at));
+                for (int at = 0; at < count(); at++) names.Add(cap(at));
 
                 box.ItemsSource = names;
-                box.SelectedIndex = kit.Picked;
+                box.SelectedIndex = picked();
             }
             finally
             {
@@ -1843,20 +1971,36 @@ public class MachinePanelView : Decorator
 
         box.SelectionChanged += (_, _) =>
         {
-            if (filling || box.SelectedIndex < 0 || box.SelectedIndex == kit.Picked) return;
+            if (filling || box.SelectedIndex < 0 || box.SelectedIndex == picked()) return;
 
-            kit.Picked = box.SelectedIndex;
+            pick(box.SelectedIndex);
         };
 
         void Again(object? sender, EventArgs e) => Restock();
 
-        kit.Changed += Again;
+        listen(Again);
 
-        box.DetachedFromVisualTree += (_, _) => kit.Changed -= Again;
+        box.DetachedFromVisualTree += (_, _) => forget(Again);
 
         Restock();
+    }
 
-        return box;
+    /// <summary>
+    /// The map of a sampler: every zone drawn as the stretch of keyboard it answers to.
+    /// </summary>
+    private Control? BuildZones(MachineElement element)
+    {
+        var map = Zones;
+
+        if (map is null && !Designing) return null;
+
+        var strip = new ZoneMapView { Zones = map };
+
+        if (Measurement(element, "lane") is { } lane) strip.LaneHeight = lane;
+        if (Measurement(element, "gap") is { } gap) strip.LaneGap = gap;
+        if (Measurement(element, "font") is { } font) strip.FontSize = font;
+
+        return strip;
     }
 
     /// <summary>

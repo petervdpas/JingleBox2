@@ -257,6 +257,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
+                "source": "takes",
                 "caption": "Start from",
                 "width": "258"
               },

@@ -348,6 +348,7 @@
                                    Takes="{Binding MachineEditor.Takes}"
                                    Presets="{Binding MachineEditor.Presets}"
                                    Pads="{Binding MachineEditor.PreviewPads}"
+                                   Zones="{Binding MachineEditor.PreviewZones}"
                                    Slices="{Binding MachineEditor.PreviewSlices}"
                                    Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
                                    Designing="{Binding MachineEditor.Designing}">
@@ -533,6 +534,19 @@
                           <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Label}"
                                    PlaceholderText="what is written on it"
                                    ToolTip.Tip="Empty leaves it to the parameter's own name." />
+                        </Grid>
+
+                        <!-- The picker is two controls wearing one name: one offers the machine's
+                             own presets, the other offers your recordings and comes with a
+                             category list in front of it. Which of the two is a setting on the
+                             object rather than something to be worked out from the machine. -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10"
+                              IsVisible="{Binding IsPicker}">
+                          <TextBlock Grid.Column="0" Classes="label" Text="Browses:" />
+                          <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                    ItemsSource="{Binding Sources}"
+                                    SelectedItem="{Binding Source, Mode=TwoWay}"
+                                    ToolTip.Tip="Its own presets are a handful shipped with the machine. Your recordings run to hundreds, so that one gets a category list in front of it." />
                         </Grid>
 
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
@@ -734,7 +748,17 @@
                 <DataTemplate x:DataType="vm:PresetSection">
                   <StackPanel Spacing="2" Margin="0,0,0,10">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,2">
-                      <TextBlock Grid.Column="0" Classes="section" Text="{Binding Heading}" />
+                      <!-- The name, said the way the machine says it. Where the machine declares
+                           its things the name is the machine's and is read out; where it does not,
+                           the name is nowhere else and is typed here. -->
+                      <TextBlock Grid.Column="0" Classes="section"
+                                 IsVisible="{Binding !CanRename}"
+                                 Text="{Binding Heading}" />
+
+                      <TextBox Grid.Column="0" Width="180" FontWeight="SemiBold"
+                               IsVisible="{Binding CanRename}"
+                               Text="{Binding Heading, Mode=TwoWay}"
+                               ToolTip.Tip="What this one is called, in the preset and on the machine." />
 
                       <Button Grid.Column="2" Content="✕" Classes="danger"
                               Command="{Binding RemoveCommand}"

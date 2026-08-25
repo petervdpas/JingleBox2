@@ -126,6 +126,19 @@ public static class MachineElementKinds
     /// </remarks>
     public const string Strip = "Strip";
 
+    /// <summary>
+    /// A dial. Properties: dial, ticks, headroom, lines, display.
+    /// </summary>
+    /// <remarks>
+    /// The first four are what it looks like rather than what it does: how wide the dial is, how
+    /// many marks are set round it, how much air is left above the name and how many lines that
+    /// name may take. They are worth saying where a machine stands its knobs on a strip, because
+    /// a row of dials that are not the same size does not line up with the row under it.
+    ///
+    /// <c>display</c> names a text setting the knob writes under itself instead of its own
+    /// number, for the control that turns one thing and says another: a filter's dial turns a
+    /// position and reads out hertz, and only the machine knows how one becomes the other.
+    /// </remarks>
     public const string Knob = "Knob";
     /// <remarks>
     /// Properties: track, which is the length of the throw, and ticks, a comma separated list of
@@ -142,6 +155,9 @@ public static class MachineElementKinds
     /// The wording is the panel's, not the parameter's: what the two ends of a switch are called
     /// is a matter of what it does on this machine, and a switch nobody has worded says on and
     /// off, which is true of every switch ever made and useful on none of them.
+    ///
+    /// <c>lines</c> and <c>headroom</c> are the knob's, and here for the same reason: a switch
+    /// standing in a row of dials has to sit on the line they sit on.
     /// </remarks>
     public const string Switch = "Switch";
 
@@ -247,14 +263,26 @@ public static class MachineElementKinds
     public const string Take = "Take";
 
     /// <summary>
-    /// Where the machine is started from. Properties: caption, width.
+    /// Where the machine is started from. Properties: source, caption, width.
     /// </summary>
     /// <remarks>
-    /// The picker at the top of a panel: one of the machine's own presets, or on the Recording
-    /// machine one of your takes. It turns no parameter, since what a preset does is write the
-    /// lot of them at once, and it is not a Choice either: a Choice is a number the machine
+    /// The picker at the top of a panel. It turns no parameter, since what a preset does is write
+    /// the lot of them at once, and it is not a Choice either: a Choice is a number the machine
     /// keeps and this is not kept anywhere. The list comes from whoever is showing the panel,
-    /// through <see cref="IMachinePresets"/>, which also says what to call it.
+    /// through <see cref="IMachinePresets"/>.
+    ///
+    /// There are two of these and they are not the same control. <c>source</c> says which:
+    /// <see cref="MachineStarts.Presets"/> offers the machine's own presets, which are a handful
+    /// shipped in its folder and have nothing to file, so the picker is one control wide.
+    /// <see cref="MachineStarts.Takes"/> offers your recordings, which run to hundreds and are
+    /// filed under categories, so it comes with a category list in front of it and is a different
+    /// width and a different shape.
+    ///
+    /// On the object, because that is where it is true. It used to be a fact about the machine,
+    /// which meant a machine could not carry one of each and the answer had to be found by
+    /// reading the presets folder to see whether anything in it said so. A machine that says
+    /// nothing here still falls back to that, so every machine written before this reads as it
+    /// always did.
     /// </remarks>
     public const string Preset = "Preset";
 
@@ -331,6 +359,33 @@ public static class MachineElementKinds
     /// everything else: which recording answers which key is the whole of what a kit is.
     /// </remarks>
     public const string Pad = "Pad";
+
+    /// <summary>
+    /// The map of a sampler: every zone drawn as the stretch of keyboard it answers to.
+    /// Properties: lane, gap, font.
+    /// </summary>
+    /// <remarks>
+    /// Drawn and not listed, because a table of ranges says nothing about whether the keyboard
+    /// is covered and the gaps are the first thing you need to see. It is edited on the picture
+    /// too: an edge dragged resizes, the middle dragged slides the whole zone along, and the
+    /// white line says which key the recording was made at. Nobody dials a zone's edges.
+    ///
+    /// It turns no parameter and holds no children. How many zones there are is not the
+    /// machine's to say, unlike the pads of a kit: a zone is added and taken away while the
+    /// instrument is being built, so the map comes from the host through
+    /// <see cref="IMachineZones"/> and this draws what it is handed.
+    /// </remarks>
+    public const string Zones = "Zones";
+
+    /// <summary>
+    /// Which zone the settings beside the map are about, as a list to pick from.
+    /// </summary>
+    /// <remarks>
+    /// What <see cref="PadPicker"/> is to a kit. The map says it too, and both are wanted: the
+    /// map is how a hand picks a zone out of a picture, and this is how you read off which one
+    /// is in hand and step through them in order.
+    /// </remarks>
+    public const string ZonePicker = "ZonePicker";
 
     /// <summary>
     /// The recording the machine holds, cut into pieces: the picture, the boundaries, and what

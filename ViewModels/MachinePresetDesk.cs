@@ -522,7 +522,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     private IReadOnlyList<string> Words(Tracker.Machines.MachineProject? machine) =>
         machine == null
             ? Array.Empty<string>()
-            : new MachineProjectShape(machine.Panel, machine.Parameters).PadWords;
+            : new MachineProjectShape(machine.Panel, machine.Parameters).ThingWords;
 
     private bool IsTake(string key) =>
         _project() is { } machine && new MachineProjectShape(machine.Panel, machine.Parameters).IsTake(key);

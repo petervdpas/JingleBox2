@@ -204,10 +204,11 @@ public class PadGrid : Decorator
                 Colour = Colour,
                 HasLamp = true,
                 LampBelow = false,
-                Margin = new Thickness(
-                    0, 0,
-                    held % across == across - 1 ? 0 : Gap,
-                    held / across == down - 1 ? 0 : Gap),
+                // The gap goes on every pad, the last column and the last row included. It is
+                // what a kit written by hand puts on each of its buttons, and trimming the two
+                // outer edges made the grid narrower and shorter than the same grid drawn in
+                // XAML, so the box round it came out the wrong size.
+                Margin = new Thickness(0, 0, Gap, Gap),
             };
 
             // Pressed rather than commanded, because a pad does two things at once: it sounds,

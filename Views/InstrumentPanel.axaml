@@ -129,7 +129,7 @@
                  see is whether the keyboard is covered and a table of ranges will not tell you.
                  Then the zone in hand, then the filter and the two envelopes it lands in,
                  which on the machine this follows was the whole of the instrument. -->
-            <StackPanel Spacing="12" IsVisible="{Binding Editor.IsZampler}">
+            <StackPanel Spacing="12" IsVisible="{Binding Editor.ShowsWrittenZampler}">
 
               <StackPanel Spacing="6">
                 <TextBlock Classes="section" Text="Map" />
@@ -702,13 +702,18 @@
                  controls said in XAML, and showing both would be the same instrument edited from
                  two places. A machine that has not been converted has none, and the written
                  blocks stand. -->
+            <!-- Across the page, not pinned to the left. What a machine is drawn against is the
+                 room the page has, the same as the blocks written in XAML get: a machine's own
+                 description says which of its parts spread and which keep their size, and a panel
+                 held to its contents took that choice away. The picture of a recording is the one
+                 that showed it, at three quarters of the width the same control had by hand. -->
             <ui:MachinePanelView x:Name="MachineFace"
                                  IsVisible="{Binding Editor.IsDescribed}"
-                                 HorizontalAlignment="Left"
                                  Face="{Binding Editor.Described}"
                                  Values="{Binding Editor.Values}"
                                  Takes="{Binding Editor.MachineTakes}"
                                  Pads="{Binding Editor.MachinePads}"
+                                 Zones="{Binding Editor.MachineZones}"
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
                                  Presets="{Binding Presets}"

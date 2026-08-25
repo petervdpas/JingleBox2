@@ -325,6 +325,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     public IMachineSlices PreviewSlices { get; } = new MachinePreviewSlices();
 
+    /// <summary>And a map for the panel to draw, for the same reason there is a kit.</summary>
+    public IMachineZones PreviewZones { get; } = new MachinePreviewMap();
+
     /// <summary>
     /// The shelf the panel's picker offers, which on a machine holding a recording is yours.
     /// </summary>
@@ -603,6 +606,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Preset,
         MachineElementKinds.Pads,
         MachineElementKinds.Pad,
+        MachineElementKinds.PadPicker,
+        MachineElementKinds.Zones,
+        MachineElementKinds.ZonePicker,
         MachineElementKinds.Slices,
         MachineElementKinds.Label,
         MachineElementKinds.Text,
@@ -1158,8 +1164,32 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(ParameterKeys));
     }
 
+    /// <summary>The element the settings pane is showing, watched while it is showing.</summary>
+    private MachineElementViewModel? _picked;
+
+    private void Picked(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MachineElementViewModel.Source)) return;
+
+        // The list behind the picker is a different list, so the panel is drawn again against it.
+        OnPropertyChanged(nameof(Presets));
+
+        Redraw();
+
+        Status = "The picker now browses " + (_picked?.Source ?? "") + ". Save when you are happy with it.";
+    }
+
     partial void OnSelectedElementChanged(MachineElementViewModel? value)
     {
+        // What the picked thing says about itself, for the settings that change the panel rather
+        // than only the element. Which of the two browsers a picker is, is the one: flip it and
+        // the control beside it is a category list that was not there a moment ago.
+        if (_picked != null) _picked.PropertyChanged -= Picked;
+
+        _picked = value;
+
+        if (_picked != null) _picked.PropertyChanged += Picked;
+
         // Picked on the panel, it may be buried three branches deep in the list. Opening the
         // way down to it is what makes the two halves the same selection rather than two.
         value?.Reveal();

@@ -111,3 +111,65 @@ public sealed class MachinePreviewSlices : IMachineSlices
     /// <summary>Never raised: none of this moves.</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 }
+
+/// <summary>
+/// A map for the editor's panel to draw: three zones across the keyboard, playing nothing.
+/// </summary>
+/// <remarks>
+/// The same reason the kit is a real kit of sixteen. A map drawn against nothing is one lane of
+/// empty board, which is the wrong height, so a machine being laid out around it is laid out
+/// around a gap that will not be there once somebody puts an instrument on it.
+///
+/// Three rather than one, because what a map is for is telling you whether the keyboard is
+/// covered, and one zone across the whole of it never shows that. They can be dragged: the panel
+/// being laid out is a real panel, and a boundary moved here moves nothing but this.
+/// </remarks>
+public sealed class MachinePreviewMap : IMachineZones
+{
+    private readonly (int Low, int High, int Root)[] _zones =
+    {
+        (0, 39, 20),
+        (40, 79, 60),
+        (80, 119, 100),
+    };
+
+    private int _picked;
+
+    public int Count => _zones.Length;
+
+    /// <summary>Nothing. A zone on a machine being built has no recording to be called after.</summary>
+    public string Cap(int at) => "";
+
+    public int Low(int at) => _zones[at].Low;
+
+    public int High(int at) => _zones[at].High;
+
+    public int Root(int at) => _zones[at].Root;
+
+    /// <summary>Drawn as filled, so the chip shows a zone rather than a gap.</summary>
+    public bool Filled(int at) => true;
+
+    public int Picked
+    {
+        get => _picked;
+        set
+        {
+            if (value < 0 || value >= Count || value == _picked) return;
+
+            _picked = value;
+
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public void Move(int at, int low, int high, int root)
+    {
+        if (at < 0 || at >= Count) return;
+
+        _zones[at] = (low, high, root);
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public event EventHandler? Changed;
+}

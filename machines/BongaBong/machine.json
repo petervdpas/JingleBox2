@@ -68,6 +68,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
+                "source": "presets",
                 "caption": "Start from",
                 "width": "258"
               },
@@ -80,7 +81,8 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "12"
+            "gap": "12",
+            "heights": "own"
           },
           "Children": [
             {
@@ -257,7 +259,8 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "gap": "10"
+                "gap": "10",
+                "align": "stretch"
               },
               "Children": [
                 {
@@ -273,7 +276,8 @@
                       "Parameter": "",
                       "Label": "",
                       "Properties": {
-                        "gap": "8"
+                        "gap": "8",
+                        "align": "stretch"
                       },
                       "Children": [
                         {

@@ -1,4 +1,6 @@
 using JingleBox2.Machines;
+using JingleBox2.Tracker.Synth;
+using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -25,6 +27,13 @@ namespace JingleBox2.Tracker.Machines;
 /// The machine's id at the top is what says which shape a file is in. A file without one is the
 /// older kind and is read as an instrument, which is what every preset on the machines that have
 /// not been converted still is.
+///
+/// Three shapes of machine, and one shape of block. A machine may hold a grid of pads, a map of
+/// zones, or nothing but itself, and those are three different machines and are read and written
+/// as three. What they share is what a block of JSON is: a set of names the machine declared,
+/// with the values under them, written through the one adapter that knows what each name means.
+/// So <see cref="Block"/> and <see cref="Line"/> are the whole of the format and everything else
+/// is a question of which things there are.
 /// </remarks>
 public static class MachinePresetFile
 {
@@ -37,6 +46,17 @@ public static class MachinePresetFile
     /// <summary>The word that says the picker offers your own recordings instead of presets.</summary>
     public const string BrowseKey = "Browse";
 
+    /// <summary>
+    /// What the element holding a machine's things calls the settings that belong to one of them.
+    /// </summary>
+    /// <remarks>
+    /// A kit has nothing else: every knob on BongaBong is about the pad in hand, so it says
+    /// nothing and all of them are the pad's. A sampler has both halves at once, one filter and
+    /// as many zones as it turned out to need, and no reader could tell which key is which by
+    /// looking. So the machine says.
+    /// </remarks>
+    public const string SettingsProperty = "settings";
+
     /// <summary>True when that file is written the new way.</summary>
     public static bool Keyed(JsonNode? read) =>
         read is JsonObject held && held.ContainsKey(MachineKey);
@@ -47,8 +67,8 @@ public static class MachinePresetFile
     /// <remarks>
     /// The instrument is what the engine plays, so a preset has to become one before it can be
     /// heard. What this knows that nothing else does is which name goes where: a machine-wide
-    /// key is a setting on the instrument, and a name that matches a pad button is that pad's
-    /// block.
+    /// key is a setting on the instrument, and a name that stands for one of the machine's things
+    /// is that thing's block.
     /// </remarks>
     public static TrackerInstrument? Read(string path, MachineProject machine)
     {
@@ -65,10 +85,24 @@ public static class MachinePresetFile
 
             if (sound.Name.Length == 0) sound.Name = Path.GetFileNameWithoutExtension(path);
 
-            var buttons = Buttons(machine);
             string home = Path.GetDirectoryName(path) ?? "";
 
-            ViewModels.DrumKitViewModel? pads = null;
+            // The names of the blocks, in the order the file writes them. A machine whose things
+            // are declared looks each one up by name; a machine whose things are not declared
+            // has as many as there are blocks, and this is the list of them.
+            var blocks = Blocks(held);
+
+            var buttons = Buttons(machine);
+
+            var owned = Owned(machine);
+
+            // Which adapter answers a key outside a block, and which answers the keys inside
+            // one. Every machine has one of each, and which they are is the only thing about a
+            // preset that depends on what machine it is for.
+            IMachineValues? wide = null;
+            RecordingValues? loose = null;
+            Func<int, IMachineValues>? inside = null;
+            Func<string, int>? which = null;
 
             if (buttons.Count > 0)
             {
@@ -82,10 +116,48 @@ public static class MachinePresetFile
                 for (int at = 0; at < buttons.Count && at < sound.Kit.Pads.Count; at++)
                     if (buttons[at].Semitone >= 0) sound.Kit.Pads[at].Semitone = buttons[at].Semitone;
 
-                pads = new ViewModels.DrumKitViewModel(sound.Kit, () => { }, _ => { });
-            }
+                var pads = new DrumKitViewModel(sound.Kit, () => { }, _ => { });
 
-            var values = new RecordingValues(sound);
+                loose = new RecordingValues(sound);
+                inside = at => new KitValues(pads, () => pads.Pads[at]);
+
+                which = key =>
+                {
+                    // By the key the machine gave the button, as it wrote it. A name is taken
+                    // too, for a preset written before the keys were used and for a machine that
+                    // names its buttons and nothing else.
+                    int at = buttons.FindIndex(one => one.Key == key);
+
+                    if (at < 0) at = buttons.FindIndex(one => one.Name == key);
+
+                    return at < pads.Pads.Count ? at : -1;
+                };
+            }
+            else if (Map(machine) != null)
+            {
+                // One zone per block, in the order the file writes them, named by what names the
+                // block. Nothing declares how many zones a sampler has: a piano sampled every
+                // fourth key is thirteen of them and the same piano sampled once is one, so the
+                // preset is where that number comes from.
+                var made = new ZoneMap();
+
+                foreach (string named in blocks)
+                    made.Zones.Add(new SampleZone { Name = named, Shape = new SampleShape() });
+
+                sound.Zones = made.Zones.Count > 0 ? made : ZoneMap.Empty();
+                sound.Zampler ??= new ZamplerPatch();
+
+                var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
+                var patch = new ZamplerPatchViewModel(sound.Zampler, () => { });
+
+                wide = new SamplerValues(zones, patch);
+                inside = at => new SamplerValues(zones, patch, () => zones.Zones[at]);
+                which = blocks.IndexOf;
+            }
+            else
+            {
+                loose = new RecordingValues(sound);
+            }
 
             foreach (var (key, node) in held)
             {
@@ -93,31 +165,26 @@ public static class MachinePresetFile
 
                 if (node is JsonObject block)
                 {
-                    // By the key the pad answers to, which is what the button carries and what
-                    // fires it in a pattern. A name is taken too, for a preset written before
-                    // the keys were used and for a machine that names its buttons and nothing
-                    // else.
-                    // By the key the machine gave the button, as it wrote it. A name is taken
-                    // too, for a preset written before the keys were used.
-                    int at = buttons.FindIndex(one => one.Key == key);
+                    if (inside is null || which is null) continue;
 
-                    if (at < 0) at = buttons.FindIndex(one => one.Name == key);
+                    int at = which(key);
 
-                    if (at >= 0 && at < pads!.Pads.Count)
-                    {
-                        var held2 = pads.Pads[at];
-
-                        Pad(new KitValues(pads, () => held2), machine, block, home);
-                    }
+                    if (at >= 0) Apply(inside(at), owned, block, home);
 
                     continue;
                 }
 
-                Put(values, sound, key, node, home);
+                // The machine that plays one recording keeps its take at the top level, and
+                // whether a line is that take is a question about the line rather than about the
+                // machine, so it has a reader of its own.
+                if (loose != null) Put(loose, sound, key, node, home);
+                else if (wide != null) Line(wide, owned.Outside, owned.OutsideWords, key, node, home);
             }
 
             sound.Patch.Clamp();
             sound.Kit?.Clamp(buttons.Count);
+            sound.Zones?.Clamp();
+            sound.Zampler?.Clamp();
 
             return sound;
         }
@@ -148,14 +215,16 @@ public static class MachinePresetFile
         var buttons = Buttons(machine);
         string home = Path.Combine(machine.Folder, MachineProject.PresetsFolder);
 
+        var owned = Owned(machine);
+
         if (buttons.Count > 0)
         {
-            var kit = new ViewModels.DrumKitViewModel(
+            var kit = new DrumKitViewModel(
                 sound.Kit ??= DrumKit.Empty(buttons.Count), () => { }, _ => { });
 
             for (int at = 0; at < buttons.Count && at < kit.Pads.Count; at++)
             {
-                var held2 = kit.Pads[at];
+                var one = kit.Pads[at];
 
                 // The key the pad answers to is what names its block. It is the one fact about a
                 // pad that is true outside the machine as well: it is the note that fires it in a
@@ -163,13 +232,44 @@ public static class MachinePresetFile
                 // of names somebody invented.
                 string named = buttons[at].Key.Length > 0 ? buttons[at].Key : buttons[at].Name;
 
-                held[named] = Pad(new KitValues(kit, () => held2), machine, home);
+                held[named] = Block(new KitValues(kit, () => one), owned, home);
             }
 
             return held.ToJsonString(Layout);
         }
 
-        var settings = new RecordingValues(sound);
+        if (Map(machine) != null)
+        {
+            sound.Zones ??= ZoneMap.Empty();
+            sound.Zampler ??= new ZamplerPatch();
+
+            var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
+            var patch = new ZamplerPatchViewModel(sound.Zampler, () => { });
+
+            // The machine's own half first, so the file opens on the filter rather than on the
+            // eleventh piece of a chop.
+            var settings = new SamplerValues(zones, patch);
+
+            foreach (string key in owned.OutsideWords) held[key] = settings.GetText(key);
+            foreach (string key in owned.Outside) held[key] = JsonValue.Create(settings.Get(key));
+
+            // Then a block apiece. A zone is named rather than numbered for the reason a pad is:
+            // a preset that says what is on "Squeal" can be read, and one that says what is on
+            // the fourth thing in a list cannot.
+            var used = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var one in zones.Zones)
+            {
+                var zone = one;
+
+                held[Once(zone.Title, used)] =
+                    Block(new SamplerValues(zones, patch, () => zone), owned, home);
+            }
+
+            return held.ToJsonString(Layout);
+        }
+
+        var plain = new RecordingValues(sound);
 
         // The machine that holds one recording says where in its own words, so the panel's key is
         // what the file uses too.
@@ -177,7 +277,7 @@ public static class MachinePresetFile
             held[take] = Inside(sound.FilePath, home);
 
         foreach (var parameter in machine.Parameters)
-            held[parameter.Key] = JsonValue.Create(settings.Get(parameter.Key));
+            held[parameter.Key] = JsonValue.Create(plain.Get(parameter.Key));
 
         return held.ToJsonString(Layout);
     }
@@ -185,19 +285,19 @@ public static class MachinePresetFile
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
 
     /// <summary>
-    /// One pad, as the block of JSON its button stands for.
+    /// One of the machine's things, as the block of JSON it stands for.
     /// </summary>
     /// <remarks>
     /// Every line comes off what the machine declares and goes through the adapter that binds a
-    /// key to a thing on a pad. Nothing here is named: a machine that gave its pads a sixth
-    /// setting writes a sixth line without this being told about it, and there is one place in
-    /// the program that knows what "pad_pan" means.
+    /// key to a thing on it. Nothing here is named: a machine that gave its pads a sixth setting
+    /// writes a sixth line without this being told about it, and there is one place in the program
+    /// that knows what "pad_pan" means.
     /// </remarks>
-    private static JsonObject Pad(IMachineValues values, MachineProject machine, string home)
+    private static JsonObject Block(IMachineValues values, Settings owned, string home)
     {
         var block = new JsonObject();
 
-        foreach (string key in Words(machine))
+        foreach (string key in owned.Words)
         {
             string said = values.GetText(key);
 
@@ -206,31 +306,106 @@ public static class MachinePresetFile
                 : said;
         }
 
-        foreach (var parameter in machine.Parameters)
-            block[parameter.Key] = JsonValue.Create(values.Get(parameter.Key));
+        foreach (string key in owned.Numbers) block[key] = JsonValue.Create(values.Get(key));
 
         return block;
     }
 
-    /// <summary>Puts a pad's block onto the pad in that place, by what the machine calls each line.</summary>
-    private static void Pad(IMachineValues values, MachineProject machine, JsonObject block, string home)
+    /// <summary>Puts a block back on the thing it is about, by what the machine calls each line.</summary>
+    private static void Apply(IMachineValues values, Settings owned, JsonObject block, string home)
+    {
+        foreach (var (key, node) in block) Line(values, owned.Numbers, owned.Words, key, node, home);
+    }
+
+    /// <summary>
+    /// One line of a preset, put wherever the machine says that name lives.
+    /// </summary>
+    /// <remarks>
+    /// A name the machine does not declare is dropped rather than guessed at. A preset written by
+    /// a later version of a machine has lines this one has no control for, and a knob turned by a
+    /// name nobody recognises is worse than a knob left alone.
+    /// </remarks>
+    private static void Line(
+        IMachineValues values,
+        ICollection<string> numbers, ICollection<string> words,
+        string key, JsonNode? node, string home)
+    {
+        if (numbers.Contains(key))
+        {
+            values.Set(key, Number(node));
+
+            return;
+        }
+
+        if (!words.Contains(key)) return;
+
+        if (node is JsonValue said && said.TryGetValue(out string? spoken))
+            values.SetText(key, spoken.Length > 0 && spoken.Contains('/') ? Outside(spoken, home) : spoken);
+    }
+
+    /// <summary>
+    /// Which settings belong to one of the machine's things, and which to the machine itself.
+    /// </summary>
+    /// <remarks>
+    /// Split once and handed round, because every part of writing a preset asks the same question
+    /// and asking it three times is three chances to answer it differently.
+    /// </remarks>
+    /// <param name="Numbers">The values one of the machine's things holds.</param>
+    /// <param name="Words">And the words it holds.</param>
+    /// <param name="Outside">The values the machine itself holds, which no thing on it owns.</param>
+    /// <param name="OutsideWords">And the words. Empty on every machine written so far.</param>
+    private sealed record Settings(
+        List<string> Numbers, List<string> Words,
+        List<string> Outside, List<string> OutsideWords);
+
+    private static Settings Owned(MachineProject machine)
     {
         var words = Words(machine);
-        var numbers = machine.Parameters.Select(one => one.Key).ToHashSet(StringComparer.Ordinal);
+        var keys = machine.Parameters.Select(one => one.Key).ToList();
 
-        foreach (var (key, node) in block)
+        // A machine that says nothing means all of it, which is what a kit means: every knob on
+        // BongaBong is about the pad in hand and there is nothing else for one to be about.
+        if (Held(machine) is not { } holder ||
+            !holder.Properties.TryGetValue(SettingsProperty, out string? said) ||
+            said.Trim().Length == 0)
+            return new Settings(keys, words, new List<string>(), new List<string>());
+
+        var named = said
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return new Settings(
+            keys.Where(named.Contains).ToList(),
+            words.Where(named.Contains).ToList(),
+            keys.Where(one => !named.Contains(one)).ToList(),
+            words.Where(one => !named.Contains(one)).ToList());
+    }
+
+    /// <summary>The names of the blocks a file holds, in the order it writes them.</summary>
+    private static List<string> Blocks(JsonObject held) =>
+        held.Where(one => one.Value is JsonObject && one.Key is not (NameKey or MachineKey or BrowseKey))
+            .Select(one => one.Key)
+            .ToList();
+
+    /// <summary>
+    /// That name, or that name with a number after it where it has been used already.
+    /// </summary>
+    /// <remarks>
+    /// Two zones can be called the same thing, and two lines of one file cannot. The alternative
+    /// was to number them all, which would make every preset unreadable to save the one map where
+    /// somebody has two zones called Piano.
+    /// </remarks>
+    private static string Once(string named, ISet<string> used)
+    {
+        string want = named.Length > 0 ? named : "zone";
+
+        if (used.Add(want)) return want;
+
+        for (int at = 2; ; at++)
         {
-            if (numbers.Contains(key))
-            {
-                values.Set(key, Number(node));
+            string tried = want + " " + at.ToString(CultureInfo.InvariantCulture);
 
-                continue;
-            }
-
-            if (!words.Contains(key)) continue;
-
-            if (node is JsonValue said && said.TryGetValue(out string? words2))
-                values.SetText(key, words2.Length > 0 && words2.Contains('/') ? Outside(words2, home) : words2);
+            if (used.Add(tried)) return tried;
         }
     }
 
@@ -329,43 +504,54 @@ public static class MachinePresetFile
     {
         var found = new List<(string, string, int)>();
 
-        if (machine.Panel.Root is { } root) Walk(root, found);
+        if (Pads(machine) is not { } pads) return found;
+
+        foreach (var child in pads.Children)
+        {
+            if (child.Element != MachineElementKinds.Pad) continue;
+
+            string said = child.Properties.TryGetValue("key", out string? held) ? held : "";
+
+            found.Add((child.Parameter, said, MachineNotes.Semitone(said)));
+        }
 
         return found;
     }
 
-    private static void Walk(MachineElement element, List<(string, string, int)> found)
+    /// <summary>The grid of pads a machine draws, if it draws one.</summary>
+    private static MachineElement? Pads(MachineProject machine) =>
+        Find(machine, MachineElementKinds.Pads);
+
+    /// <summary>The map of zones a machine draws, if it draws one.</summary>
+    private static MachineElement? Map(MachineProject machine) =>
+        Find(machine, MachineElementKinds.Zones);
+
+    /// <summary>
+    /// Whichever of the two a machine has: the thing its things stand on.
+    /// </summary>
+    /// <remarks>
+    /// A machine has one or neither and never both. A grid of pads and a map of zones are two
+    /// ways of holding a set of recordings, and a machine that did both would be two machines
+    /// wearing one panel.
+    /// </remarks>
+    private static MachineElement? Held(MachineProject machine) => Pads(machine) ?? Map(machine);
+
+    private static MachineElement? Find(MachineProject machine, string kind)
     {
-        if (element.Element == MachineElementKinds.Pads)
+        return machine.Panel.Root is { } root ? Look(root, kind) : null;
+
+        static MachineElement? Look(MachineElement element, string kind)
         {
-            foreach (var child in element.Children)
-            {
-                if (child.Element != MachineElementKinds.Pad) continue;
-
-                string said = child.Properties.TryGetValue("key", out string? held) ? held : "";
-
-                found.Add((child.Parameter, said, MachineNotes.Semitone(said)));
-            }
-
-            return;
-        }
-
-        foreach (var child in element.Children) Walk(child, found);
-    }
-
-    /// <summary>What the machine calls the setting behind the first control of that kind.</summary>
-    private static string? Named(MachineProject machine, string kind)
-    {
-        return machine.Panel.Root is { } root ? Find(root, kind) : null;
-
-        static string? Find(MachineElement element, string kind)
-        {
-            if (element.Element == kind && element.Parameter.Length > 0) return element.Parameter;
+            if (element.Element == kind) return element;
 
             foreach (var child in element.Children)
-                if (Find(child, kind) is { } found) return found;
+                if (Look(child, kind) is { } found) return found;
 
             return null;
         }
     }
+
+    /// <summary>What the machine calls the setting behind the first control of that kind.</summary>
+    private static string? Named(MachineProject machine, string kind) =>
+        Find(machine, kind) is { Parameter.Length: > 0 } found ? found.Parameter : null;
 }

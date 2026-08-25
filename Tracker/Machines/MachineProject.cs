@@ -178,6 +178,24 @@ public sealed class MachineProject
         File.WriteAllText(Path.Combine(Folder, ManifestName), JsonSerializer.Serialize(this, Layout));
     }
 
+    /// <summary>What the picker on a panel calls the thing it browses.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the one word that decides which browser a machine has
+    /// can be found by looking for it, here and in every machine.json that names it.
+    /// </remarks>
+    public const string SourceProperty = "source";
+
+    /// <summary>The picker on this machine's panel, if it draws one.</summary>
+    private static MachineElement? Picker(MachineElement element)
+    {
+        if (element.Element == MachineElementKinds.Preset) return element;
+
+        foreach (var child in element.Children)
+            if (Picker(child) is { } found) return found;
+
+        return null;
+    }
+
     /// <summary>What a preset writes to say the picker offers your own recordings.</summary>
     /// <remarks>
     /// Written out rather than built, so the one word that decides which browser a machine has
@@ -198,6 +216,15 @@ public sealed class MachineProject
     /// </remarks>
     public bool? BrowsesTakes()
     {
+        // The picker itself, every time and never remembered. Which of the two browsers a machine
+        // has is a fact about the control that does the browsing, so the panel is where it is
+        // said, and while somebody is laying the machine out that answer changes under us.
+        if (Picker(Panel.Root) is { } picker
+            && picker.Properties.TryGetValue(SourceProperty, out string? said)
+            && said.Trim().Length > 0)
+            return string.Equals(said.Trim(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase);
+
+        // The older ways of saying it, which cost a folder read, so they are read once.
         if (_asked) return _browses;
 
         _browses = Asked();

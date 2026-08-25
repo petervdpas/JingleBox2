@@ -1,7 +1,6 @@
 using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System;
-using System.ComponentModel;
 using System.Linq;
 
 namespace JingleBox2.Tracker.Machines;
@@ -69,25 +68,11 @@ public sealed class KitPads(DrumKitViewModel kit) : IMachinePads
 
         _listening = true;
 
-        kit.PropertyChanged += Moved;
-
-        foreach (var pad in kit.Pads) pad.PropertyChanged += Moved;
-
-        // A kit refilled from a chop is a new set of pads, so the new ones are listened to and
-        // the old ones stop mattering along with the objects they were.
-        kit.Pads.CollectionChanged += (_, _) =>
-        {
-            foreach (var pad in kit.Pads)
-            {
-                pad.PropertyChanged -= Moved;
-                pad.PropertyChanged += Moved;
-            }
-
-            Moved(null, new PropertyChangedEventArgs(nameof(kit.Pads)));
-        };
+        // A kit refilled from a chop is a new set of pads, which is why the list is watched as
+        // well as the pads in it. See <see cref="MachineWatch"/>.
+        MachineWatch.Items<DrumPadViewModel>(
+            kit, kit.Pads, () => kit.Pads, () => _changed?.Invoke(this, EventArgs.Empty));
     }
-
-    private void Moved(object? sender, PropertyChangedEventArgs e) => _changed?.Invoke(this, EventArgs.Empty);
 
     private DrumPadViewModel? Pad(int at) => kit.Pads.ElementAtOrDefault(at);
 }

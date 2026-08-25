@@ -127,21 +127,78 @@ public sealed partial class PresetSection : ObservableObject
     private readonly Action _changed;
 
     public PresetSection(
-        JsonObject held, string key, string heading, IReadOnlyList<PresetLine> lines, Action changed)
+        JsonObject held, string key, string heading, IReadOnlyList<PresetLine> lines, Action changed,
+        bool canRename = false)
     {
         _held = held;
         _changed = changed;
 
         Key = key;
-        Heading = heading;
+        CanRename = canRename;
+
+        _heading = heading;
+
         Lines = new ObservableCollection<PresetLine>(lines);
     }
 
     /// <summary>What it is called in the file: a pad's key, or a setting's own key.</summary>
-    public string Key { get; }
+    public string Key { get; private set; }
 
-    /// <summary>What the page writes over it.</summary>
-    public string Heading { get; }
+    /// <summary>
+    /// True where the name is the builder's to choose rather than the machine's.
+    /// </summary>
+    /// <remarks>
+    /// A pad's block is headed by the key the machine gave that button, which is not a name
+    /// anybody here gets to change: change it and the block stops being about that pad. A zone's
+    /// name is nowhere else, so it is typed here or it is nothing.
+    /// </remarks>
+    public bool CanRename { get; }
+
+    /// <summary>What the page writes over it, and what the file calls it.</summary>
+    public string Heading
+    {
+        get => _heading;
+        set
+        {
+            string wanted = (value ?? "").Trim();
+
+            if (!CanRename || wanted.Length == 0 || wanted == _heading) return;
+
+            // Already taken, so the rename would swallow the other one. Refused rather than
+            // numbered: somebody typing a name that is already there meant that name, and a
+            // silently different one is worse than none.
+            if (_held.ContainsKey(wanted)) return;
+
+            Rename(wanted);
+
+            _heading = wanted;
+            Key = wanted;
+
+            OnPropertyChanged();
+
+            _changed();
+        }
+    }
+
+    private string _heading;
+
+    /// <summary>
+    /// Renames the block without moving it, by writing the whole file out again in order.
+    /// </summary>
+    /// <remarks>
+    /// Taking it out and putting it back would put it last, and where a block sits is not
+    /// nothing: a map asks its zones in order and the first that covers a key wins, so a zone
+    /// renamed would quietly change what the instrument plays.
+    /// </remarks>
+    private void Rename(string wanted)
+    {
+        var was = _held.ToList();
+
+        _held.Clear();
+
+        foreach (var (key, node) in was)
+            _held[key == Key ? wanted : key] = node?.DeepClone();
+    }
 
     public ObservableCollection<PresetLine> Lines { get; }
 
@@ -161,7 +218,12 @@ public sealed partial class PresetSection : ObservableObject
 /// Which sort of thing on the machine it is: a pad, a knob, a fader, a recording. The kind the
 /// machine's own description gave it, so the list can be narrowed to one sort at a time.
 /// </param>
-public sealed record PresetOffer(string Key, string Said, string Kind)
+/// <param name="Fresh">
+/// True for the offer that makes one more of something rather than filling in a named thing.
+/// A machine that does not declare its things has one of these and no list, since how many there
+/// are is what the preset decides.
+/// </param>
+public sealed record PresetOffer(string Key, string Said, string Kind, bool Fresh = false)
 {
     public override string ToString() => Said;
 }
@@ -224,20 +286,26 @@ public sealed partial class MachinePresetForm : ObservableObject
     {
         if (Offered is not { } offer) return;
 
+        // One more of something the machine does not name, which is the whole of what the offer
+        // is: the name is the builder's, so it starts at whatever is free and is typed over.
+        if (offer.Fresh)
+        {
+            _held[Spare(_machine.ThingCalled)] = Started();
+
+            _changed();
+
+            Rebuild();
+
+            return;
+        }
+
         // Already spoken about, so there is nothing to start. It cannot be reached from the list
         // any more, but a stale selection can still arrive here.
         if (_held.ContainsKey(offer.Key)) return;
 
-        if (_machine.PadKeys.Contains(offer.Key))
+        if (_machine.ThingKeys.Contains(offer.Key))
         {
-            var block = new JsonObject();
-
-            foreach (string word in _machine.PadWords) block[word] = "";
-
-            foreach (var parameter in _machine.PadParameters)
-                block[parameter.Key] = JsonValue.Create(parameter.Default);
-
-            _held[offer.Key] = block;
+            _held[offer.Key] = Started();
         }
         else if (_machine.Parameters.FirstOrDefault(one => one.Key == offer.Key) is { } setting)
         {
@@ -252,6 +320,45 @@ public sealed partial class MachinePresetForm : ObservableObject
 
         Rebuild();
     });
+
+    /// <summary>
+    /// What one of the machine's things starts as: its lines, and nothing in them.
+    /// </summary>
+    /// <remarks>
+    /// The least that can be said about the thing, which is what somebody who has just added it
+    /// wants to start from. Off the machine's own declaration, so a machine that gave its pads a
+    /// sixth setting starts a sixth line without this being told about it.
+    /// </remarks>
+    private JsonObject Started()
+    {
+        var block = new JsonObject();
+
+        foreach (string word in _machine.ThingWords) block[word] = "";
+
+        foreach (var parameter in _machine.ThingParameters)
+            block[parameter.Key] = JsonValue.Create(parameter.Default);
+
+        return block;
+    }
+
+    /// <summary>
+    /// That word, or that word with a number after it where the preset already uses it.
+    /// </summary>
+    /// <remarks>
+    /// A name to type over rather than a name to keep. Two blocks of one file cannot share a
+    /// name, and a new one that silently replaced the last is the one thing this must not do.
+    /// </remarks>
+    private string Spare(string word)
+    {
+        if (!_held.ContainsKey(word)) return word;
+
+        for (int at = 2; ; at++)
+        {
+            string tried = word + " " + at.ToString(CultureInfo.InvariantCulture);
+
+            if (!_held.ContainsKey(tried)) return tried;
+        }
+    }
 
     /// <summary>
     /// Reads the preset again: what it holds, and what it could still be given.
@@ -271,7 +378,8 @@ public sealed partial class MachinePresetForm : ObservableObject
 
             if (node is JsonObject block)
             {
-                Sections.Add(new PresetSection(_held, key, key, Pad(block), Told));
+                Sections.Add(new PresetSection(
+                    _held, key, key, Thing(block), Told, canRename: !_machine.NamesThings));
 
                 continue;
             }
@@ -285,19 +393,31 @@ public sealed partial class MachinePresetForm : ObservableObject
         // looked at it, and the one thing you wanted would have moved.
         var everything = new List<PresetOffer>();
 
-        foreach (string key in _machine.PadKeys)
-            everything.Add(new PresetOffer(key, key, MachineElementKinds.Pad));
+        // Either a list of the machine's things, or one offer that makes another. A grid says
+        // what its buttons are called and a preset says what is on each; a map does not and
+        // cannot, since how many zones an instrument is is what the preset decides.
+        if (_machine.NamesThings)
+        {
+            foreach (string key in _machine.ThingKeys)
+                everything.Add(new PresetOffer(key, key, _machine.ThingKind));
+        }
+        else if (_machine.HasThings)
+        {
+            everything.Add(new PresetOffer(
+                _machine.ThingCalled, "Another " + _machine.ThingCalled.ToLowerInvariant(),
+                _machine.ThingKind, Fresh: true));
+        }
 
         foreach (var parameter in _machine.Parameters)
         {
-            if (_machine.PadParameters.Any(one => one.Key == parameter.Key)) continue;
+            if (_machine.ThingParameters.Any(one => one.Key == parameter.Key)) continue;
 
             everything.Add(new PresetOffer(parameter.Key, parameter.Name, _machine.Drawn(parameter.Key)));
         }
 
         foreach (string word in _machine.Words)
         {
-            if (_machine.PadWords.Contains(word)) continue;
+            if (_machine.ThingWords.Contains(word)) continue;
 
             everything.Add(new PresetOffer(word, _machine.Called(word), _machine.Drawn(word)));
         }
@@ -354,7 +474,7 @@ public sealed partial class MachinePresetForm : ObservableObject
         Offers.Clear();
 
         foreach (var one in _everything)
-            if ((Kind == AnyKind || one.Kind == Kind) && !_held.ContainsKey(one.Key))
+            if ((Kind == AnyKind || one.Kind == Kind) && (one.Fresh || !_held.ContainsKey(one.Key)))
                 Offers.Add(one);
 
         Offered = Offers.FirstOrDefault();
@@ -369,14 +489,14 @@ public sealed partial class MachinePresetForm : ObservableObject
         Rebuild();
     }
 
-    /// <summary>The lines a pad has, which is what the machine puts beside its grid.</summary>
-    private IReadOnlyList<PresetLine> Pad(JsonObject block)
+    /// <summary>The lines one of the machine's things has, which is what it puts beside them.</summary>
+    private IReadOnlyList<PresetLine> Thing(JsonObject block)
     {
         var lines = new List<PresetLine>();
 
-        foreach (string word in _machine.PadWords) lines.Add(Line(block, word));
+        foreach (string word in _machine.ThingWords) lines.Add(Line(block, word));
 
-        foreach (var parameter in _machine.PadParameters) lines.Add(Line(block, parameter.Key));
+        foreach (var parameter in _machine.ThingParameters) lines.Add(Line(block, parameter.Key));
 
         // Anything the machine no longer has a control for is still shown, so a preset written
         // against a later version can be read here rather than quietly losing half of itself.
@@ -384,7 +504,7 @@ public sealed partial class MachinePresetForm : ObservableObject
         {
             if (lines.Any(one => one.Name == Called(key))) continue;
 
-            if (_machine.PadWords.Contains(key) || _machine.PadParameters.Any(one => one.Key == key)) continue;
+            if (_machine.ThingWords.Contains(key) || _machine.ThingParameters.Any(one => one.Key == key)) continue;
 
             lines.Add(Line(block, key));
         }
@@ -458,50 +578,107 @@ public sealed class MachineProjectShape
 
         Walk(root, keys, words);
 
-        PadKeys = keys;
+        ThingKeys = keys;
         Words = words;
 
-        HasPads = keys.Count > 0;
+        HasThings = _holder != null;
 
-        // A pad's own settings: the parameters the panel names anywhere under a pad's name. What
-        // a machine puts beside its grid is, by definition, what a pad is set by.
-        PadParameters = _underPad
-            .Select(key => parameters.FirstOrDefault(one => one.Key == key))
-            .Where(one => one != null)
-            .Select(one => one!)
+        // What one of the machine's things is set by: the settings its own element names, or all
+        // of them where it names none. A kit means all of them and says nothing, because every
+        // knob on it is about the pad in hand and there is nothing else for one to be about; a
+        // sampler has a filter as well as its zones, and no reader could tell which key is which
+        // by looking, so it says.
+        var named = Declared();
+
+        ThingParameters = parameters
+            .Where(one => named == null || named.Contains(one.Key))
             .ToList();
 
-        PadWords = words.Where(word => _underPad.Contains(word) || word.StartsWith(PadStem, StringComparison.Ordinal))
-            .ToList();
+        ThingWords = words.Where(word => named == null || named.Contains(word)).ToList();
+
+        if (!HasThings)
+        {
+            ThingParameters = Array.Empty<MachineParameter>();
+            ThingWords = Array.Empty<string>();
+        }
     }
 
-    /// <summary>What a pad's settings are called, before what they are.</summary>
-    private const string PadStem = "pad_";
+    /// <summary>
+    /// The settings the machine says belong to one of its things, or nothing where it says none.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is not the same as an empty list. A machine that has not spoken means all of them,
+    /// which is what every kit means; a machine that named none of them would have things with no
+    /// settings at all, which is not a machine anybody would draw.
+    /// </remarks>
+    private HashSet<string>? Declared()
+    {
+        if (_holder is not { } holder) return null;
 
-    private readonly List<string> _underPad = new();
+        if (!holder.Properties.TryGetValue(Tracker.Machines.MachinePresetFile.SettingsProperty, out string? said)
+            || said.Trim().Length == 0)
+            return null;
+
+        return said
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>The element the machine's things stand on: its grid of pads, or its map of zones.</summary>
+    private MachineElement? _holder;
 
     public IReadOnlyList<MachineParameter> Parameters { get; }
 
-    public IReadOnlyList<MachineParameter> PadParameters { get; private set; } = Array.Empty<MachineParameter>();
+    /// <summary>What one of the machine's things is set by.</summary>
+    public IReadOnlyList<MachineParameter> ThingParameters { get; private set; } = Array.Empty<MachineParameter>();
 
     /// <summary>
-    /// The keys the machine's pad buttons answer to, as the machine wrote them.
+    /// The names of the machine's things, as the machine wrote them.
     /// </summary>
     /// <remarks>
     /// Words rather than numbers, because a machine writes what its buttons answer to and this
     /// does not get to decide what that looks like. A preset is keyed by the same words, so what
     /// is on the page is what is in the file with nothing turned into anything.
+    ///
+    /// Empty on a machine whose things it does not declare. A map has as many zones as the
+    /// instrument turned out to need, so there is no list of them to write down and the names are
+    /// whoever is building the preset's to choose.
     /// </remarks>
-    public IReadOnlyList<string> PadKeys { get; private set; } = Array.Empty<string>();
+    public IReadOnlyList<string> ThingKeys { get; private set; } = Array.Empty<string>();
 
     /// <summary>Every setting the machine holds as words, by key.</summary>
     public IReadOnlyList<string> Words { get; private set; } = Array.Empty<string>();
 
-    /// <summary>Which of those belong to a pad.</summary>
-    public IReadOnlyList<string> PadWords { get; private set; } = Array.Empty<string>();
+    /// <summary>Which of those belong to one of its things.</summary>
+    public IReadOnlyList<string> ThingWords { get; private set; } = Array.Empty<string>();
 
-    /// <summary>True when the machine has a grid of pads, which makes its presets kits.</summary>
-    public bool HasPads { get; private set; }
+    /// <summary>True when the machine holds a set of things, which makes its presets blocks.</summary>
+    public bool HasThings { get; private set; }
+
+    /// <summary>
+    /// True when the machine says what its things are called, so the page can offer them by name.
+    /// </summary>
+    /// <remarks>
+    /// A pad grid does: the buttons are declared, and a preset says what is on "C-4". A map does
+    /// not, and cannot: how many zones an instrument is is what the preset decides, so the page
+    /// offers one more zone rather than a list of them and the name is typed.
+    /// </remarks>
+    public bool NamesThings => ThingKeys.Count > 0;
+
+    /// <summary>What sort of thing one of them is, for the dropdown that narrows the list.</summary>
+    public string ThingKind => _holder?.Element == MachineElementKinds.Zones
+        ? MachineElementKinds.Zones
+        : MachineElementKinds.Pad;
+
+    /// <summary>
+    /// And what one of them is called, in the singular.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than trimmed off the element's name, so the word on the page is a word
+    /// somebody chose. "Zones" without its s is a coincidence and not a rule: the next machine to
+    /// hold a set of things will not be so obliging.
+    /// </remarks>
+    public string ThingCalled => _holder?.Element == MachineElementKinds.Zones ? "Zone" : "Pad";
 
     /// <summary>True when that setting is a recording, which is picked rather than typed.</summary>
     public bool IsTake(string key) => _takes.Contains(key);
@@ -530,8 +707,13 @@ public sealed class MachineProjectShape
 
     private void Walk(MachineElement element, List<string> keys, List<string> words)
     {
-        if (element.Element == MachineElementKinds.Pads)
+        // The grid or the map, whichever the machine has. One or neither and never both: a
+        // machine that did both would be two machines wearing one panel.
+        if (_holder == null
+            && element.Element is MachineElementKinds.Pads or MachineElementKinds.Zones)
         {
+            _holder = element;
+
             foreach (var child in element.Children)
             {
                 if (child.Element != MachineElementKinds.Pad) continue;
@@ -554,10 +736,6 @@ public sealed class MachineProjectShape
 
             if (Parameters.Any(one => one.Key == said)) _drawn[said] = element.Element;
         }
-
-        if (element.Parameter.Length > 0 && element.Parameter.StartsWith(PadStem, StringComparison.Ordinal)
-            && !_underPad.Contains(element.Parameter))
-            _underPad.Add(element.Parameter);
 
         if (element.Element is MachineElementKinds.Take or MachineElementKinds.Text
             && element.Parameter.Length > 0

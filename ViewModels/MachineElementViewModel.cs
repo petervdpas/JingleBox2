@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Machines;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace JingleBox2.ViewModels;
@@ -60,7 +62,53 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// are set where they are acted on.
     /// </remarks>
     private static bool Owned(MachineElement element, string key) =>
-        element.Element == MachineElementKinds.Pads && key is RowsKey or ColumnsKey;
+        (element.Element == MachineElementKinds.Pads && key is RowsKey or ColumnsKey)
+        || (element.Element == MachineElementKinds.Preset && key == Tracker.Machines.MachineProject.SourceProperty);
+
+    /// <summary>True when the picked thing is the picker a machine is started from.</summary>
+    public bool IsPicker => Element.Element == MachineElementKinds.Preset;
+
+    /// <summary>
+    /// What the two browsers are called, in the order they are offered.
+    /// </summary>
+    /// <remarks>
+    /// Two of them, and they are not one control with a setting: a machine's own presets are a
+    /// handful shipped in its folder, and your recordings run to hundreds and are filed under
+    /// categories, so one is a picker and the other is a picker with a category list in front of
+    /// it. Which of the two this is has to be said somewhere, and the object is where it is true.
+    /// </remarks>
+    public IReadOnlyList<string> Sources { get; } = new[] { PresetsSaid, TakesSaid };
+
+    /// <summary>What each is called on the page, against the word the file uses.</summary>
+    /// <remarks>
+    /// Written out both ways round rather than one turned into the other, so the words in the
+    /// file can be found by searching for them and the words on the page can be changed without
+    /// changing what any machine.json says.
+    /// </remarks>
+    private const string PresetsSaid = "The machine's own presets";
+
+    private const string TakesSaid = "Your recordings";
+
+    /// <summary>Which of the two this picker browses.</summary>
+    public string Source
+    {
+        get => Element.Properties.TryGetValue(Tracker.Machines.MachineProject.SourceProperty, out string? said)
+            && string.Equals(said.Trim(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase)
+                ? TakesSaid
+                : PresetsSaid;
+        set
+        {
+            string want = value == TakesSaid ? MachineStarts.Takes : MachineStarts.Presets;
+
+            if (Element.Properties.TryGetValue(Tracker.Machines.MachineProject.SourceProperty, out string? was)
+                && was == want)
+                return;
+
+            Element.Properties[Tracker.Machines.MachineProject.SourceProperty] = want;
+
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>The element this stands for, which is the thing that gets written to the file.</summary>
     public MachineElement Element { get; }

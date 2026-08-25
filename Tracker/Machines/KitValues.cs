@@ -69,9 +69,9 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
 
         bool moved = key switch
         {
-            LevelKey => Moved(pad.Volume, value, () => pad.Volume = value),
-            PanKey => Moved(pad.Pan, value, () => pad.Pan = value),
-            ChokeKey => Moved(pad.Choke, Math.Round(value), () => pad.Choke = Math.Round(value)),
+            LevelKey => MachineSetting.Moved(pad.Volume, value, () => pad.Volume = value),
+            PanKey => MachineSetting.Moved(pad.Pan, value, () => pad.Pan = value),
+            ChokeKey => MachineSetting.Moved(pad.Choke, Math.Round(value), () => pad.Choke = Math.Round(value)),
             _ => false,
         };
 
@@ -116,20 +116,4 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
         Changed?.Invoke();
     }
 
-    /// <summary>
-    /// Writes it if it really is different, and says whether it was.
-    /// </summary>
-    /// <remarks>
-    /// A knob reports the value it already has on every mouse move that did not cross a step,
-    /// and a song marked dirty by that is a song that can never be closed without being asked
-    /// about.
-    /// </remarks>
-    private static bool Moved(double was, double now, Action write)
-    {
-        if (Math.Abs(was - now) < 1e-9) return false;
-
-        write();
-
-        return true;
-    }
 }

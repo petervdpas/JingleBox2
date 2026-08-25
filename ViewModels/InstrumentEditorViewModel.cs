@@ -203,6 +203,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject
                 if (e.PropertyName == nameof(DrumKitViewModel.Selected)) SayAgain();
             };
         }
+        else if (IsZampler && Zones is { } zones && Zampler is { } zampler)
+        {
+            Values = new Tracker.Machines.SamplerValues(zones, zampler) { Changed = Moved };
+
+            MachineZones = new Tracker.Machines.SamplerZones(zones);
+            MachineSlices = Slices;
+
+            // The same as the kit: half the panel is about the zone in hand, so picking another
+            // one moves all of it without anything on the panel being touched.
+            zones.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) SayAgain();
+            };
+        }
         else
         {
             return;
@@ -215,6 +229,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     /// <summary>The kit behind the pads, on a machine that has any.</summary>
     public IMachinePads? MachinePads { get; private set; }
+
+    /// <summary>The map behind the zones, on a machine that lays recordings across the keyboard.</summary>
+    public IMachineZones? MachineZones { get; private set; }
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
     public IMachineSlices? MachineSlices { get; private set; }
@@ -601,6 +618,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// machine is BongaBong is what keeps the two answers from drifting apart.
     /// </remarks>
     public bool ShowsWrittenKit => IsBongaBong && !IsDescribed;
+
+    /// <summary>
+    /// True when the map, the zone and the filter are the ones written in XAML.
+    /// </summary>
+    /// <remarks>
+    /// The same rule the kit goes by, and there for the same reason: a machine that this
+    /// installation has no project for still has to open, and what it opens as is the panel that
+    /// was written before it was a project.
+    /// </remarks>
+    public bool ShowsWrittenZampler => IsZampler && !IsDescribed;
 
     public bool IsSynth => _instrument.IsSynth;
 
