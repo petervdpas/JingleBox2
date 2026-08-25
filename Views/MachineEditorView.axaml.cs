@@ -25,6 +25,10 @@ public partial class MachineEditorView : UserControl
     {
         InitializeComponent();
 
+        // A take is picked the way it is picked everywhere else in the app, by the dialog with
+        // the categories and the search in it. The panel only says which setting wants one.
+        PanelCanvas.TakeWanted += PickTake;
+
         // The preview is painted in the machine's own colours, so it is repainted whenever
         // another machine is opened, and mixed again when the theme moves under both.
         DataContextChanged += (_, _) => Watch();
@@ -133,6 +137,27 @@ public partial class MachineEditorView : UserControl
         editor.Drop(kind, PanelCanvas.ElementAt(e.Source));
 
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// A recording put on the machine that is being laid out.
+    /// </summary>
+    /// <remarks>
+    /// Written into the panel's own settings, not into the project. Which take a machine plays
+    /// belongs to an instrument in a song, and the machine being built here has no instrument:
+    /// this is the same trying of the controls as turning one of the knobs, and it is thrown
+    /// away with the rest of the preview.
+    /// </remarks>
+    private async void PickTake(object? sender, string key)
+    {
+        if (DataContext is not MainViewModel main) return;
+
+        var take = await TakeDialog.PickAsync(main.Takes);
+
+        if (take == null || take.FilePath.Length == 0) return;
+
+        main.MachineEditor.Values.SetText(key, take.FilePath);
+        main.MachineEditor.Redraw();
     }
 
     private void Tree_DragOver(object? sender, DragEventArgs e) => Canvas_DragOver(sender, e);

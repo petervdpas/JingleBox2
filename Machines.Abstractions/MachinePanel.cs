@@ -74,19 +74,31 @@ public sealed class MachineElement
 /// <remarks>
 /// Written out as constants rather than an enum so a machine can name one this host has never
 /// heard of without the file failing to read. These are the ones the library draws today.
+///
+/// Three properties belong to every kind rather than to any of them: <c>width</c> and
+/// <c>height</c> in pixels, and <c>margin</c>, which is one number for all four sides or a list
+/// of them the way a Thickness is written. A container leaves a gap between the things it holds
+/// on its own, so a margin is for the one element that wants to stand apart from the rest.
 /// </remarks>
 public static class MachineElementKinds
 {
     /// <summary>Rows and columns. Properties: columns, rows, and per child column, row, span.</summary>
     public const string Grid = "Grid";
 
-    /// <summary>A framed group with a heading. Property: caption.</summary>
+    /// <summary>A framed group with a heading. Properties: caption, gap, equal, width, height.</summary>
+    /// <remarks>
+    /// Nothing inside it draws outside it. A group given a size smaller than what it holds is a
+    /// group somebody meant to be that size, and a heading with a knob hanging out from under it
+    /// reads as a mistake in the panel rather than a mistake in the description.
+    /// </remarks>
     public const string Group = "Group";
 
-    /// <summary>Things laid side by side, wrapping when they run out of room.</summary>
+    /// <summary>
+    /// Things laid side by side, wrapping when they run out of room. Properties: gap, equal.
+    /// </summary>
     public const string Row = "Row";
 
-    /// <summary>Things laid one under the other.</summary>
+    /// <summary>Things laid one under the other. Properties: gap, equal.</summary>
     public const string Column = "Column";
 
     /// <summary>
@@ -101,7 +113,17 @@ public static class MachineElementKinds
 
     public const string Knob = "Knob";
     public const string Fader = "Fader";
+
+    /// <summary>
+    /// One of two positions. Properties: on and off, the wording at each end.
+    /// </summary>
+    /// <remarks>
+    /// The wording is the panel's, not the parameter's: what the two ends of a switch are called
+    /// is a matter of what it does on this machine, and a switch nobody has worded says on and
+    /// off, which is true of every switch ever made and useful on none of them.
+    /// </remarks>
     public const string Switch = "Switch";
+
     public const string Number = "Number";
 
     /// <summary>
@@ -136,9 +158,27 @@ public static class MachineElementKinds
     public const string Keys = "Keys";
 
     /// <summary>
-    /// The recording's shape. Turns nothing. Properties: width, height, placeholder.
+    /// The recording's shape, with what plays of it marked on the picture.
     /// </summary>
+    /// <remarks>
+    /// The parameter is the text setting holding the take, so the picture is of whatever the
+    /// machine is set to play rather than of nothing. Properties: width, height, placeholder,
+    /// showMarkers, showLoop, and start, end, loopStart and loopEnd, each naming a parameter
+    /// holding a fraction of the file. Those four are the only part of this that is a value, and
+    /// they go both ways: dragging a handle on the picture writes the parameter it names.
+    /// </remarks>
     public const string Wave = "Wave";
+
+    /// <summary>
+    /// Which recording the machine plays. Property: caption.
+    /// </summary>
+    /// <remarks>
+    /// The parameter is the text setting the take is kept in, and pressing this asks whoever is
+    /// showing the panel for a new one. It has to be asked: the shelf the takes are kept on is
+    /// the host's and a panel drawn from a description has no way of reaching it, which is the
+    /// same reason the picture is handed its shape rather than fetching one.
+    /// </remarks>
+    public const string Take = "Take";
 
     /// <summary>
     /// One of a list, by number. Property: options, a comma separated list.
@@ -149,7 +189,14 @@ public static class MachineElementKinds
     /// </remarks>
     public const string Choice = "Choice";
 
-    /// <summary>A line of text, for a panel that wants to say something.</summary>
+    /// <summary>
+    /// A line of text, for a panel that wants to say something.
+    /// </summary>
+    /// <remarks>
+    /// Its own wording, unless it names a text setting, in which case it says what that setting
+    /// says. A machine that has just been pointed at a recording wants to write the name of it
+    /// somewhere, and a label is the thing on a panel whose whole job is words.
+    /// </remarks>
     public const string Label = "Label";
 
     /// <summary>Room left deliberately empty.</summary>

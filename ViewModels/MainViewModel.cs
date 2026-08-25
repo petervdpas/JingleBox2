@@ -402,6 +402,10 @@ public sealed partial class MainViewModel : ObservableObject
         // the day you built the profile.
         Takes = new TakeFilter(Record.Recordings);
 
+        // The machine editor draws real waveforms, so it is given the same shelf everything
+        // else reads. A panel laid out against a picture that is not there is laid out wrong.
+        MachineEditor.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
+
         // The rack: the machines you have, and the plugins you have added. A song takes an
         // instrument off a machine and keeps its own copy of it.
         var rack = new MachineRack();

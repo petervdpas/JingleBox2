@@ -78,7 +78,8 @@
     </Border>
 
     <Grid Margin="0,12,0,0" IsVisible="{Binding MachineEditor.HasProject}"
-          ColumnDefinitions="230,Auto,*,Auto,330">
+          ColumnDefinitions="230,Auto,*,Auto,330"
+          MinWidth="0">
 
       <!-- What a panel can be made of. Drag one onto the panel to put it inside whatever it
            lands on, or click it to put it inside whatever is picked. -->
@@ -200,6 +201,7 @@
                                    Panel="{Binding MachineEditor.Shown}"
                                    Parameters="{Binding MachineEditor.Shape}"
                                    Values="{Binding MachineEditor.Values}"
+                                   Takes="{Binding MachineEditor.Takes}"
                                    Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
                                    Designing="{Binding MachineEditor.Designing}" />
             </ScrollViewer>
@@ -226,7 +228,10 @@
                       Command="{Binding MachineEditor.AddParameterCommand}" />
             </Grid>
 
-            <ScrollViewer>
+            <!-- Across as well as down. A parameter's row is a fixed set of fields wider than
+                 this column can be made, and without this the row's width becomes the column's
+                 smallest width and pushes the machine's own details off the window. -->
+            <ScrollViewer HorizontalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:MachineParameterViewModel">

@@ -1,4 +1,5 @@
 using JingleBox2.Machines;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
@@ -24,6 +25,20 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
 
         if (parameter != null) parameter.Value = value;
     }
+
+    /// <summary>
+    /// The settings that are not numbers, which in the editor are whatever was last put there.
+    /// </summary>
+    /// <remarks>
+    /// A machine holds more than values: which recording it plays is a name. The editor has no
+    /// machine to hold one, so a dictionary stands in, and a take picked while laying out a
+    /// panel is remembered only for as long as the panel is being laid out.
+    /// </remarks>
+    private readonly Dictionary<string, string> texts = new();
+
+    public string GetText(string key) => texts.TryGetValue(key, out string? held) ? held : "";
+
+    public void SetText(string key, string value) => texts[key] = value;
 
     private MachineParameterViewModel? Find(string key) =>
         parameters.FirstOrDefault(p => p.Key == key);

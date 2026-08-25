@@ -226,6 +226,19 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public IMachineValues Values { get; }
 
     /// <summary>
+    /// Where a recording's picture comes from while a panel is being laid out.
+    /// </summary>
+    /// <remarks>
+    /// The real shelf, not a pretend one. A machine with a waveform on its face is laid out
+    /// against a real recording or it is laid out against nothing, and nothing is the wrong
+    /// size: the picture is 340 wide because somebody looked at one.
+    ///
+    /// Set by whoever builds the editor, since the shelf belongs to the application and the
+    /// editor is only borrowing it.
+    /// </remarks>
+    public IMachineTakes? Takes { get; set; }
+
+    /// <summary>
     /// True while the panel is being arranged rather than played with.
     /// </summary>
     /// <remarks>
@@ -280,6 +293,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Meter,
         MachineElementKinds.Keys,
         MachineElementKinds.Wave,
+        MachineElementKinds.Take,
         MachineElementKinds.Label,
         MachineElementKinds.Spacer
     };

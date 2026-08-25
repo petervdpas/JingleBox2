@@ -54,6 +54,18 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, IMachineValues?>(nameof(Values));
 
     /// <summary>
+    /// Where the recordings a machine names are looked up, for the controls that show one.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="Values"/> because it answers a different question. The settings
+    /// say which take, by name; this says what that name is worth: its shape and its wording.
+    /// Nothing here is a shelf of takes to choose from, since choosing is <see cref="TakeWanted"/>
+    /// and belongs to whoever put the panel on screen.
+    /// </remarks>
+    public static readonly StyledProperty<IMachineTakes?> TakesProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineTakes?>(nameof(Takes));
+
+    /// <summary>
     /// The element the designer is working on, outlined on the panel.
     /// </summary>
     /// <remarks>
@@ -110,6 +122,16 @@ public class MachinePanelView : Decorator
     /// </remarks>
     public event EventHandler<MachineElement>? SelectionChanged;
 
+    /// <summary>
+    /// Somebody pressed a take control, naming the text setting they want a recording put into.
+    /// </summary>
+    /// <remarks>
+    /// The key rather than the recording, because the panel has nothing to offer: picking one
+    /// means a list of what has been recorded, and that list is the host's. So the panel asks,
+    /// the host puts an answer in the settings, and the panel is drawn again with it.
+    /// </remarks>
+    public event EventHandler<string>? TakeWanted;
+
     public MachinePanel? Panel
     {
         get => GetValue(PanelProperty);
@@ -126,6 +148,12 @@ public class MachinePanelView : Decorator
     {
         get => GetValue(ValuesProperty);
         set => SetValue(ValuesProperty, value);
+    }
+
+    public IMachineTakes? Takes
+    {
+        get => GetValue(TakesProperty);
+        set => SetValue(TakesProperty, value);
     }
 
     public MachineElement? Selected
@@ -153,6 +181,7 @@ public class MachinePanelView : Decorator
         if (change.Property == PanelProperty ||
             change.Property == ParametersProperty ||
             change.Property == ValuesProperty ||
+            change.Property == TakesProperty ||
             change.Property == DesigningProperty)
         {
             Rebuild();
@@ -219,8 +248,10 @@ public class MachinePanelView : Decorator
         {
             MachineElementKinds.Grid => BuildGrid(element, parameters),
             MachineElementKinds.Group => BuildGroup(element, parameters),
-            MachineElementKinds.Row => Fill(new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters),
-            MachineElementKinds.Column => Fill(new StackPanel { Orientation = Orientation.Vertical, Spacing = Gap }, element, parameters),
+            MachineElementKinds.Row => Fill(
+                new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
+            MachineElementKinds.Column => Fill(
+                new StackPanel { Orientation = Orientation.Vertical }, element, parameters, Orientation.Vertical),
             MachineElementKinds.Strip => BuildStrip(element, parameters),
             MachineElementKinds.Knob => BuildKnob(element, parameters),
             MachineElementKinds.Fader => BuildFader(element, parameters),
@@ -231,13 +262,48 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Meter => BuildMeter(element, parameters),
             MachineElementKinds.Choice => BuildChoice(element, parameters),
             MachineElementKinds.Keys => BuildKeys(element, parameters),
-            MachineElementKinds.Wave => BuildWave(element),
+            MachineElementKinds.Wave => BuildWave(element, parameters),
+            MachineElementKinds.Take => BuildTake(element),
             MachineElementKinds.Label => BuildLabel(element),
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
         };
 
-        return built is null ? null : Skin(element, built, Holds(element.Element));
+        if (built is null) return null;
+
+        Sized(element, built);
+
+        return Apart(element, Skin(element, built, Holds(element.Element)));
+    }
+
+    /// <summary>
+    /// The size the description asks for, on the element itself rather than on the skin round it.
+    /// </summary>
+    /// <remarks>
+    /// Every kind takes these, since how much room a thing takes is a question about the panel
+    /// and not about what the thing is. The controls that already have a size of their own set
+    /// theirs first and this writes over it, which is the way round it wants to be: what the
+    /// panel says beats what the control would have chosen.
+    /// </remarks>
+    private static void Sized(MachineElement element, Control control)
+    {
+        if (Measurement(element, "width") is { } width) control.Width = width;
+        if (Measurement(element, "height") is { } height) control.Height = height;
+    }
+
+    /// <summary>
+    /// The margin the description asks for, or none, which leaves the container to space it.
+    /// </summary>
+    /// <remarks>
+    /// On the outside of the skin, so that while designing the outline hugs the element and the
+    /// margin is the gap between one outline and the next. Inside it, the outline would be drawn
+    /// round the empty space as well and two elements side by side would look joined.
+    /// </remarks>
+    private static Control Apart(MachineElement element, Control control)
+    {
+        if (Edges(element, "margin") is { } margin) control.Margin = margin;
+
+        return control;
     }
 
     /// <summary>
@@ -287,6 +353,15 @@ public class MachinePanelView : Decorator
         return grid;
     }
 
+    /// <summary>
+    /// A framed part of the panel, with what it holds laid out inside the frame.
+    /// </summary>
+    /// <remarks>
+    /// Clipped to itself. A group is a box drawn round a set of controls, and a control drawn
+    /// outside the box it is supposed to be in is worse than a control cut off by it: cut off,
+    /// the panel says the group is too small, which it is. That only happens to a group given a
+    /// size, since one left to itself is as big as what it holds.
+    /// </remarks>
     private Control BuildGroup(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
         var caption = Text(element, "caption");
@@ -294,7 +369,9 @@ public class MachinePanelView : Decorator
         return new PanelGroup
         {
             Caption = caption.Length > 0 ? caption : element.Label,
-            Child = Fill(new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters),
+            Child = Fill(
+                new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
+            ClipToBounds = true,
         };
     }
 
@@ -315,7 +392,11 @@ public class MachinePanelView : Decorator
         };
 
         if (Measurement(element, "cell") is { } cell) strip.CellSize = cell;
-        if (Measurement(element, "gap") is { } gap) strip.Gap = gap;
+
+        // A strip has a gap of its own, on top of the cells, so its children are spaced by the
+        // strip rather than by a margin apiece. The default is the panel's, so that a strip and
+        // a row put things the same distance apart unless somebody says otherwise.
+        strip.Gap = Measurement(element, "gap") ?? Gap;
 
         foreach (var child in element.Children)
         {
@@ -329,14 +410,55 @@ public class MachinePanelView : Decorator
         return strip;
     }
 
-    /// <summary>Puts an element's children into a container, skipping the ones that draw nothing.</summary>
-    private T Fill<T>(T container, MachineElement element, Dictionary<string, MachineParameter> parameters)
+    /// <summary>
+    /// Puts an element's children into a container, spaced out, skipping the ones that draw
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// The gap is a margin on each child rather than a spacing on the container, because the
+    /// container that wraps has no spacing to set and a panel where a row and a wrapping row put
+    /// things different distances apart is a panel laid out by accident. A child that names its
+    /// own margin keeps it: one element standing apart from the rest is the reason to write one.
+    ///
+    /// Whether the children are all as tall as the tallest is <c>equal</c>. Left to itself a
+    /// child is as tall as it needs to be and sits at the top of the line, which is what a knob
+    /// beside a fader should do. Set, they all take the height of the line, which is what a row
+    /// of framed sections should do: sections of different heights are a ragged edge across the
+    /// panel, and the frames are what the eye follows.
+    /// </remarks>
+    private T Fill<T>(
+        T container,
+        MachineElement element,
+        Dictionary<string, MachineParameter> parameters,
+        Orientation flow)
         where T : Panel
     {
+        double gap = Measurement(element, "gap") ?? Gap;
+        bool equal = Flag(element, "equal");
+
+        var built = new List<(Control Control, MachineElement Element)>();
+
         foreach (var child in element.Children)
         {
-            if (Build(child, parameters) is { } control)
-                container.Children.Add(control);
+            if (Build(child, parameters) is { } control) built.Add((control, child));
+        }
+
+        for (int i = 0; i < built.Count; i++)
+        {
+            var (control, child) = built[i];
+
+            if (!Has(child, "margin"))
+            {
+                // Down a column the last child needs no gap under it, since nothing follows it.
+                // Across a row it does, because a row wraps and what follows may be underneath.
+                control.Margin = flow == Orientation.Horizontal
+                    ? new Thickness(0, 0, gap, gap)
+                    : new Thickness(0, 0, 0, i == built.Count - 1 ? 0 : gap);
+            }
+
+            if (!equal) control.VerticalAlignment = VerticalAlignment.Top;
+
+            container.Children.Add(control);
         }
 
         return container;
@@ -411,6 +533,11 @@ public class MachinePanelView : Decorator
             Label = Caption(element, parameter),
             IsChecked = Start(parameter) > middle,
         };
+
+        // Only when the panel says so: the switch words itself on and off, and a machine that
+        // has nothing better to call the two ends is better off with those than with blanks.
+        if (Text(element, "on") is { Length: > 0 } on) toggle.OnLabel = on;
+        if (Text(element, "off") is { Length: > 0 } off) toggle.OffLabel = off;
 
         toggle.PropertyChanged += (_, e) =>
         {
@@ -652,29 +779,114 @@ public class MachinePanelView : Decorator
     }
 
     /// <summary>
-    /// The recording's picture, which is a window onto something the machine holds rather than
-    /// a control that turns anything.
+    /// The recording's picture, with what plays of it marked on the picture and draggable there.
     /// </summary>
     /// <remarks>
-    /// Nothing is put in it here. A panel is handed values and a recording is not one, so what
-    /// is drawn is whatever the machine later gives it, and today that is nothing.
+    /// The element's parameter is the text setting naming the take, not a value, so the picture
+    /// is of whatever the machine is set to play. The shape comes from <see cref="Takes"/>: a
+    /// panel is handed settings and a recording is not one, and where the recordings are kept is
+    /// the host's business rather than the drawing's.
     ///
-    /// Except while designing, when it is filled with a made up waveform. Somebody laying out a
-    /// panel is deciding how much room the picture takes and what it sits beside, and an empty
-    /// box tells them neither. The shape is worked out rather than random, so the panel looks
-    /// the same every time it is drawn.
+    /// The handles are values, and they are the only part of this that is. Each of the four names
+    /// a parameter holding a fraction of the file, wired both ways, so dragging a handle writes
+    /// the same setting a knob would have written and the two cannot disagree. A handle naming a
+    /// parameter the machine does not have is left where it started rather than being wired to
+    /// nothing.
+    ///
+    /// With no take, and only while designing, it is filled with a made up waveform. Somebody
+    /// laying out a panel is deciding how much room the picture takes and what it sits beside,
+    /// and an empty box tells them neither. The shape is worked out rather than random, so the
+    /// panel looks the same every time it is drawn.
     /// </remarks>
-    private Control BuildWave(MachineElement element)
+    private Control BuildWave(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
         var placeholder = Text(element, "placeholder");
+        var take = Setting(element.Parameter);
 
-        return new WaveformView
+        var wave = new WaveformView
         {
             Width = Measurement(element, "width") ?? 240,
             Height = Measurement(element, "height") ?? 90,
             Placeholder = placeholder.Length > 0 ? placeholder : element.Label,
-            Peaks = Designing ? Demonstration() : null,
+            ShowMarkers = Flag(element, "showMarkers"),
+            ShowLoop = Flag(element, "showLoop"),
+            Peaks = take.Length > 0
+                ? Takes?.Peaks(take)
+                : Designing ? Demonstration() : null,
         };
+
+        Handle(element, "start", parameters, wave, WaveformView.StartProperty);
+        Handle(element, "end", parameters, wave, WaveformView.EndProperty);
+        Handle(element, "loopStart", parameters, wave, WaveformView.LoopStartProperty);
+        Handle(element, "loopEnd", parameters, wave, WaveformView.LoopEndProperty);
+
+        return wave;
+    }
+
+    /// <summary>
+    /// Ties one handle on the picture to the parameter the description says it stands for.
+    /// </summary>
+    /// <remarks>
+    /// The property is passed in rather than switched on, because the four handles differ in
+    /// nothing but which property they are: a start and a loop start are the same fraction of
+    /// the same file read off the same drag.
+    /// </remarks>
+    private void Handle(
+        MachineElement element,
+        string key,
+        Dictionary<string, MachineParameter> parameters,
+        WaveformView wave,
+        StyledProperty<double> property)
+    {
+        if (Text(element, key) is not { Length: > 0 } named) return;
+        if (!parameters.TryGetValue(named, out var parameter)) return;
+
+        wave.SetValue(property, Math.Clamp(Start(parameter), parameter.Min, parameter.Max));
+
+        // Subscribed after the starting value is in, for the reason every other control here is.
+        wave.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == property) Write(parameter.Key, wave.GetValue(property));
+        };
+    }
+
+    /// <summary>
+    /// Which recording the machine plays, and the way of choosing another.
+    /// </summary>
+    /// <remarks>
+    /// What is written on it is what <see cref="Takes"/> makes of the name, since the name itself
+    /// is usually a file and reads as one. With nothing set it asks to be filled, because an
+    /// empty button on a panel otherwise looks like one that has failed.
+    ///
+    /// It names its setting when it asks, rather than being asked for a recording in general, so
+    /// a machine with two of them gets its answer put in the right one.
+    /// </remarks>
+    private Control BuildTake(MachineElement element)
+    {
+        var caption = Text(element, "caption");
+        var take = Setting(element.Parameter);
+
+        var button = new PushButton
+        {
+            Label = caption.Length > 0 ? caption : element.Label.Length > 0 ? element.Label : null,
+            CapText = Describe(take),
+        };
+
+        button.Pressed += (_, _) => TakeWanted?.Invoke(this, element.Parameter);
+
+        return button;
+    }
+
+    /// <summary>What to write on a control standing for that take, or the invitation to pick one.</summary>
+    /// <remarks>
+    /// The name itself when nothing will describe it, since a name badly shown is still better
+    /// than a blank: it is what the machine is playing, and somebody has to be able to tell.
+    /// </remarks>
+    private string Describe(string take)
+    {
+        if (take.Length == 0) return "Pick a recording...";
+
+        return Takes?.Describe(take) is { Length: > 0 } described ? described : take;
     }
 
     /// <summary>A waveform nobody recorded: four hits, each falling away from its attack.</summary>
@@ -701,14 +913,27 @@ public class MachinePanelView : Decorator
     }
 
     /// <summary>
-    /// A line of text on the panel.
+    /// A line of text on the panel: its own wording, or what a text setting says.
     /// </summary>
     /// <remarks>
+    /// Naming a setting is how a panel writes down something it was told rather than something
+    /// it was built with, which is a recording's name and little else today. Its own wording
+    /// when the setting is empty, so a label wired to a machine that has not been pointed at
+    /// anything yet still says what it is for.
+    ///
     /// No colour set on purpose. Foreground is inherited, so the text follows a theme swap
     /// without this control having to hear about one.
     /// </remarks>
-    private static Control BuildLabel(MachineElement element) =>
-        new TextBlock { Text = element.Label, VerticalAlignment = VerticalAlignment.Center };
+    private Control BuildLabel(MachineElement element)
+    {
+        var said = Setting(element.Parameter);
+
+        return new TextBlock
+        {
+            Text = said.Length > 0 ? said : element.Label,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+    }
 
     private static Control BuildSpacer(MachineElement element)
     {
@@ -893,6 +1118,19 @@ public class MachinePanelView : Decorator
     private void Write(string key, double value) => Values?.Set(key, value);
 
     /// <summary>
+    /// What a text setting says, or nothing when it names none and nothing when there is nobody
+    /// to ask.
+    /// </summary>
+    /// <remarks>
+    /// A text setting is not in the parameter list and cannot be: the list is ranges and steps,
+    /// and a name has neither. So an element naming one that is not there is not a mistake this
+    /// can see, and an empty answer is the same answer as never having been set, which is what a
+    /// panel showing an unfilled setting should look like either way.
+    /// </remarks>
+    private string Setting(string key) =>
+        key.Length > 0 && Values is { } values ? values.GetText(key) : "";
+
+    /// <summary>
     /// How many decimals to write the value with, taken from how far one notch moves it.
     /// </summary>
     /// <remarks>
@@ -905,6 +1143,25 @@ public class MachinePanelView : Decorator
 
     private static string Text(MachineElement element, string key) =>
         element.Properties.TryGetValue(key, out var value) ? value : "";
+
+    /// <summary>Whether the description says anything at all about that, blank not counting.</summary>
+    private static bool Has(MachineElement element, string key) => Text(element, key).Length > 0;
+
+    /// <summary>
+    /// A margin in the description: one number for all four sides, or two, or four.
+    /// </summary>
+    /// <remarks>
+    /// Whatever a Thickness can be written as, since that is what somebody typing a panel by
+    /// hand will already know. Nonsense is nothing rather than a crash, the same as every other
+    /// property here, because the description came off disk.
+    /// </remarks>
+    private static Thickness? Edges(MachineElement element, string key)
+    {
+        if (!Has(element, key)) return null;
+
+        try { return Thickness.Parse(Text(element, key)); }
+        catch (Exception) { return null; }
+    }
 
     private static int Number(MachineElement element, string key, int fallback) =>
         element.Properties.TryGetValue(key, out var value) &&

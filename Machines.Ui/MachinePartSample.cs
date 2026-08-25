@@ -54,6 +54,7 @@ public sealed class MachinePartSample : Decorator
     private const string KeysKind = "Keys";
     private const string WaveKind = "Wave";
     private const string ChoiceKind = "Choice";
+    private const string TakeKind = "Take";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
     /// <remarks>
@@ -142,6 +143,7 @@ public sealed class MachinePartSample : Decorator
         KeysKind => BuildKeys(),
         WaveKind => new PartSketch(SketchShape.Wave) { Width = 74, Height = 34 },
         ChoiceKind => BuildChoice(),
+        TakeKind => BuildTake(),
         _ => null,
     };
 
@@ -202,6 +204,22 @@ public sealed class MachinePartSample : Decorator
     };
 
     /// <summary>A latching button, held down, with its lamp lit to say so.</summary>
+    /// <summary>
+    /// The button that fetches a recording off the shelf.
+    /// </summary>
+    /// <remarks>
+    /// An ordinary button rather than the app's own take picker, which lives in the
+    /// application and cannot be reached from here. What the library has to show is the shape
+    /// of the thing on the panel, and on the panel it is a button with the take's name on it.
+    /// </remarks>
+    private static Control BuildTake() => new Button
+    {
+        Content = "kick.wav",
+        FontSize = 10,
+        Padding = new Thickness(8, 3),
+        IsHitTestVisible = false,
+    };
+
     private static Control BuildButton() => new PushButton
     {
         CapText = "RUN",
