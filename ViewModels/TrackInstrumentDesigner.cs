@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
+using JingleBox2.Machines;
 using JingleBox2.Tracker;
 using System;
 
@@ -149,6 +150,12 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
     public SoundingNotes Sounding { get; } = new();
+
+    /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
+    public IMachineKeys MachineKeys => _machineKeys ??= new DesignerKeys(this);
+
+    private IMachineKeys? _machineKeys;
+
 
     public IRelayCommand<int> KeyCommand =>
         new RelayCommand<int>(semitone => Play(new Note(semitone), TrackerCell.NoVolume));

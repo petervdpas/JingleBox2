@@ -1,0 +1,102 @@
+{
+  "Name": "Live Drums",
+  "Machine": "machine.bongabong",
+  "C-4": {
+    "pad_take": "Live Drums/live-tom-low-hit.wav",
+    "pad_name": "Kick",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "C#4": {
+    "pad_take": "Live Drums/live-snare-shot-sonor.wav",
+    "pad_name": "Snare",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999995,
+    "pad_choke": 0
+  },
+  "D-4": {
+    "pad_take": "Live Drums/live-hi-hat-quick-closed-hit.wav",
+    "pad_name": "Hihat",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999989,
+    "pad_choke": 1
+  },
+  "D#4": {
+    "pad_take": "Live Drums/live-crash-cymbal-decay.wav",
+    "pad_name": "Crash",
+    "pad_level": 1,
+    "pad_pan": 0.049999999999999836,
+    "pad_choke": 0
+  },
+  "E-4": {
+    "pad_take": "Live Drums/live-snare-shot-up.wav",
+    "pad_name": "Snare up",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999978,
+    "pad_choke": 0
+  },
+  "F-4": {
+    "pad_take": "Live Drums/live-snare-shot-down.wav",
+    "pad_name": "Snare down",
+    "pad_level": 1,
+    "pad_pan": 0.049999999999999725,
+    "pad_choke": 0
+  },
+  "F#4": {
+    "pad_take": "Live Drums/live-snare-shot-pic.wav",
+    "pad_name": "Snare pic",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999967,
+    "pad_choke": 0
+  },
+  "G-4": {
+    "pad_take": "Live Drums/snare-metal_C_minor.wav",
+    "pad_name": "Snare metal",
+    "pad_level": 1,
+    "pad_pan": 0.049999999999999614,
+    "pad_choke": 0
+  },
+  "G#4": {
+    "pad_take": "Live Drums/live-snare-shot-sonorus.wav",
+    "pad_name": "Sonorus",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999956,
+    "pad_choke": 0
+  },
+  "A-4": {
+    "pad_take": "Live Drums/live-tom-low-hit.wav",
+    "pad_name": "Tom low",
+    "pad_level": 1,
+    "pad_pan": 0.0499999999999995,
+    "pad_choke": 0
+  },
+  "A#4": {
+    "pad_take": "Live Drums/live-tom-loud.wav",
+    "pad_name": "Tom loud",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999945,
+    "pad_choke": 0
+  },
+  "B-4": {
+    "pad_take": "Live Drums/live-tom-noisy-bassy.wav",
+    "pad_name": "Tom bassy",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999939,
+    "pad_choke": 0
+  },
+  "C-5": {
+    "pad_take": "Live Drums/live-tom-bounce-shot.wav",
+    "pad_name": "Tom bounce",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999934,
+    "pad_choke": 0
+  },
+  "C#5": {
+    "pad_take": "Live Drums/live-tom-long-release.wav",
+    "pad_name": "Tom long",
+    "pad_level": 1,
+    "pad_pan": 0.04999999999999928,
+    "pad_choke": 0
+  }
+}

@@ -77,6 +77,29 @@ public class Clavier : ThemedControl
     public static readonly StyledProperty<IEnumerable?> LitProperty =
         AvaloniaProperty.Register<Clavier, IEnumerable?>(nameof(Lit));
 
+    /// <summary>
+    /// The semitones that have something on them, as absolute note numbers.
+    /// </summary>
+    /// <remarks>
+    /// A kit answers sixteen keys out of a hundred and twenty, and without this the keyboard
+    /// under it is a hundred and four keys that do nothing with no way of telling which. Marked
+    /// along the bottom of the key rather than by painting the key, because a key with a drum on
+    /// it is still an ordinary key: it is not sounding and it is not the one in hand.
+    /// </remarks>
+    public static readonly StyledProperty<IEnumerable?> FilledProperty =
+        AvaloniaProperty.Register<Clavier, IEnumerable?>(nameof(Filled));
+
+    /// <summary>
+    /// The one key the controls beside the keyboard are about, or -1 for none.
+    /// </summary>
+    /// <remarks>
+    /// What makes a pad and a key the same thing to look at. Pick the snare on the grid and its
+    /// key is outlined here, which is the question a kit's keyboard is there to answer: which
+    /// note fires this drum.
+    /// </remarks>
+    public static readonly StyledProperty<int> MarkedProperty =
+        AvaloniaProperty.Register<Clavier, int>(nameof(Marked), -1);
+
     /// <summary>Run with the pressed key's absolute semitone as its argument.</summary>
     public static readonly StyledProperty<ICommand?> CommandProperty =
         AvaloniaProperty.Register<Clavier, ICommand?>(nameof(Command));
@@ -141,6 +164,7 @@ public class Clavier : ThemedControl
     {
         AffectsRender<Clavier>(
             OctaveProperty, OctaveCountProperty, KeyCountProperty, LitProperty,
+            FilledProperty, MarkedProperty,
             KeyHeightProperty, KeyWidthProperty, LitColourProperty, LampColourProperty,
             LampSizeProperty, LampGapProperty, CaptionProperty, MarksOctavesProperty,
             FontSizeProperty);
@@ -175,6 +199,18 @@ public class Clavier : ThemedControl
     {
         get => GetValue(LitProperty);
         set => SetValue(LitProperty, value);
+    }
+
+    public IEnumerable? Filled
+    {
+        get => GetValue(FilledProperty);
+        set => SetValue(FilledProperty, value);
+    }
+
+    public int Marked
+    {
+        get => GetValue(MarkedProperty);
+        set => SetValue(MarkedProperty, value);
     }
 
     public ICommand? Command
@@ -385,6 +421,7 @@ public class Clavier : ThemedControl
 
         var laid = Keys();
         var sounding = Sounding();
+        var loaded = Loaded();
 
         // The white keys first, whole, then the raised ones over them. Drawn the other way
         // round a raised key would be sitting under its neighbours instead of on top.
@@ -395,7 +432,9 @@ public class Clavier : ThemedControl
 
             var key = new Rect(left, top, width, height);
 
-            Draw(context, key, raised: false, sounding.Contains(note), pressed: _pressed == i);
+            Draw(
+                context, key, raised: false, sounding.Contains(note), pressed: _pressed == i,
+                filled: loaded.Contains(note), marked: note == Marked);
 
             if (!MarksOctaves || Mod12(note) != 0) continue;
 
@@ -410,11 +449,15 @@ public class Clavier : ThemedControl
 
             var key = new Rect(left, top, width, height * RaisedHeight);
 
-            Draw(context, key, raised: true, sounding.Contains(note), pressed: _pressed == i);
+            Draw(
+                context, key, raised: true, sounding.Contains(note), pressed: _pressed == i,
+                filled: loaded.Contains(note), marked: note == Marked);
         }
     }
 
-    private void Draw(DrawingContext context, Rect key, bool raised, bool lit, bool pressed)
+    private void Draw(
+        DrawingContext context, Rect key, bool raised, bool lit, bool pressed,
+        bool filled = false, bool marked = false)
     {
         double round = raised ? 2 : 3;
 
@@ -431,7 +474,33 @@ public class Clavier : ThemedControl
 
         // A lit key spills onto the ones beside it, the same way a lamp does.
         if (lit) context.DrawRectangle(Halo(), null, key.Inflate(3), round, round);
+
+        // A key with something on it says so along its bottom edge, where nothing else is drawn
+        // and where the eye reads a whole row of them at once.
+        if (filled)
+        {
+            double inset = raised ? 2 : 3;
+            double band = raised ? 3 : 4;
+
+            context.DrawRectangle(
+                Marking(),
+                null,
+                new Rect(key.X + inset, key.Bottom - band - inset, key.Width - inset * 2, band),
+                1, 1);
+        }
+
+        // And the one in hand is outlined, the same way the pad it belongs to is.
+        if (marked) context.DrawRectangle(null, Outline(), key.Deflate(0.5), round, round);
     }
+
+    /// <summary>What a key with something on it is banded with, and what the one in hand is ringed with.</summary>
+    /// <remarks>
+    /// The machine's own colour, which is what the lamps and the lit keys already use. A kit
+    /// painted red should not have its keyboard marked in somebody else's amber.
+    /// </remarks>
+    private IBrush Marking() => new SolidColorBrush(LampColour, 0.75);
+
+    private IPen Outline() => new Pen(new SolidColorBrush(LitColour), 2);
 
     /// <summary>The sounding face, kept until the colour it is made from changes.</summary>
     private IBrush Burning(bool raised)
@@ -510,6 +579,19 @@ public class Clavier : ThemedControl
 
     private Rect RightArrow() =>
         new(KeysWidth / 2 + LampsWidth() / 2 + ArrowGap, HeadTop, ArrowWidth, ArrowHeight);
+
+    /// <summary>And the ones with something on them, read the same way and for the same reason.</summary>
+    private HashSet<int> Loaded()
+    {
+        var held = new HashSet<int>();
+
+        if (Filled == null) return held;
+
+        foreach (var item in Filled)
+            if (item is int semitone) held.Add(semitone);
+
+        return held;
+    }
 
     /// <summary>The semitones sounding, read once so the keys do not walk it apiece.</summary>
     private HashSet<int> Sounding()

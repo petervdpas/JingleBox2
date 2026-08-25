@@ -30,12 +30,70 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <summary>The project being worked on, or null when nothing is open.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasProject))]
+    [NotifyPropertyChangedFor(nameof(CanDesign))]
     [NotifyPropertyChangedFor(nameof(CanExport))]
     [NotifyPropertyChangedFor(nameof(Title))]
     [NotifyPropertyChangedFor(nameof(Folder))]
     private MachineProject? project;
 
-    public MachineEditorViewModel() => Values = new MachinePreviewValues(Parameters);
+    public MachineEditorViewModel()
+    {
+        Values = new MachinePreviewValues(Parameters);
+
+        PresetDesk = new MachinePresetDesk(() => Project);
+    }
+
+    /// <summary>
+    /// The presets this machine ships with, edited as the files they are.
+    /// </summary>
+    /// <remarks>
+    /// Its own page beside the panel, because it is its own job. Laying out a face and deciding
+    /// what the machine sounds like when somebody first meets it have nothing to say to each
+    /// other, and putting them on one screen means neither gets the room.
+    /// </remarks>
+    public MachinePresetDesk PresetDesk { get; }
+
+    /// <summary>
+    /// Which page is open: nought the screen, one the presets.
+    /// </summary>
+    /// <remarks>
+    /// A number rather than two flags, since exactly one is open and two flags can say
+    /// otherwise.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OnScreen))]
+    [NotifyPropertyChangedFor(nameof(OnPresets))]
+    [NotifyPropertyChangedFor(nameof(CanDesign))]
+    private int page;
+
+    /// <summary>True on the page where the panel is laid out.</summary>
+    /// <remarks>
+    /// What the Design switch hangs off. Turning the panel's design mode on and off from the
+    /// presets page would be a switch about something nobody can see.
+    /// </remarks>
+    public bool OnScreen => Page == 0;
+
+    /// <summary>True when the Design switch has anything to be about.</summary>
+    /// <remarks>
+    /// Both halves, because the switch is meaningless twice over otherwise: on the presets page
+    /// there is no panel on screen to design, and with no machine open there is no panel at all.
+    /// </remarks>
+    public bool CanDesign => HasProject && OnScreen;
+
+    public bool OnPresets => Page == 1;
+
+    /// <summary>
+    /// Reads the machine's presets folder when that tab is opened.
+    /// </summary>
+    /// <remarks>
+    /// On being opened rather than on every change, because the folder is a folder: somebody may
+    /// have put a file in it from outside, and asking the disc on the way in is the only moment
+    /// that could be noticed without watching it.
+    /// </remarks>
+    partial void OnPageChanged(int value)
+    {
+        if (OnPresets) PresetDesk.Reread();
+    }
 
     public bool HasProject => Project != null;
 
@@ -91,6 +149,12 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         Project = opened;
         Status = "Opened '" + opened.Name + "'";
+
+        // Read before the panel is told, or the picker on it is handed a list that has not been
+        // filled in yet and draws an empty one.
+        PresetDesk.Reread();
+
+        ShelfChanged();
     }
 
     /// <summary>Writes it where it lives, or where it is being put for the first time.</summary>
@@ -110,6 +174,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Folder));
+
+            // A machine saved for the first time has somewhere to keep presets for the first
+            // time, which is the moment that page stops being empty.
+            PresetDesk.Reread();
         }
         catch (Exception ex)
         {
@@ -241,6 +309,22 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public IMachineTakes? Takes { get; set; }
 
+    /// <summary>Said when the machine open has changed, since its picker offers a different list.</summary>
+    private void ShelfChanged() => OnPropertyChanged(nameof(Presets));
+
+    /// <summary>
+    /// A kit for the pads on the panel being laid out, and a recording for the chop control.
+    /// </summary>
+    /// <remarks>
+    /// Made here rather than handed in, unlike the takes and the presets, because neither is
+    /// anybody's: the takes are yours and the presets are the machine's, and these two are a
+    /// demonstration that exists so the controls have their real shape while a panel is being
+    /// laid out around them.
+    /// </remarks>
+    public IMachinePads PreviewPads { get; } = new MachinePreviewKit();
+
+    public IMachineSlices PreviewSlices { get; } = new MachinePreviewSlices();
+
     /// <summary>
     /// The shelf the panel's picker offers, which on a machine holding a recording is yours.
     /// </summary>
@@ -252,7 +336,22 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// Set by whoever builds the editor, for the same reason <see cref="Takes"/> is: the shelf
     /// is the application's and the editor is borrowing it.
     /// </remarks>
-    public IMachinePresets? Presets { get; set; }
+    /// <summary>
+    /// What the picker on the panel being laid out offers.
+    /// </summary>
+    /// <remarks>
+    /// Whatever the machine open right now would offer on the rack, and not always your takes.
+    /// A picker laid out against the wrong list is laid out against the wrong width: your shelf
+    /// carries a category dropdown in front of it and a machine's own presets do not, so a panel
+    /// designed against the wrong one is a panel with a control missing or a control too many.
+    /// </remarks>
+    public IMachinePresets? Presets =>
+        Project is { } project && project.BrowsesTakes() != true
+            ? new MachinePresetNames(PresetDesk)
+            : Shelf;
+
+    /// <summary>Your recordings, handed in by whoever built the editor.</summary>
+    public IMachinePresets? Shelf { get; set; }
 
     /// <summary>
     /// Puts a recording on the panel being designed, wherever the panel keeps one.
@@ -502,7 +601,11 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Image,
         MachineElementKinds.Take,
         MachineElementKinds.Preset,
+        MachineElementKinds.Pads,
+        MachineElementKinds.Pad,
+        MachineElementKinds.Slices,
         MachineElementKinds.Label,
+        MachineElementKinds.Text,
         MachineElementKinds.Spacer
     };
 
@@ -831,6 +934,33 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         // over a plain row. Started with a word to type over rather than an empty frame.
         if (kind == MachineElementKinds.Group) made.Properties["caption"] = "Group";
 
+        // Four across and the cap a hand can hit, which is the shape a drum machine's pads have
+        // had since they were made of rubber. Arriving as one pad in a column would be a grid
+        // nobody could recognise as pads.
+        if (kind == MachineElementKinds.Pads)
+        {
+            made.Properties["columns"] = "4";
+            made.Properties["cap"] = "86";
+            made.Properties["capHeight"] = "42";
+
+            // Sixteen buttons, keyed from C-4, because a grid that arrives with no buttons is a
+            // grid nobody can see. Laid out again from the boxes beside the panel the moment it
+            // is meant to be a different shape.
+            for (int at = 0; at < 16; at++)
+            {
+                made.Children.Add(new MachineElement
+                {
+                    Element = MachineElementKinds.Pad,
+                    Parameter = "pad" + (at + 1),
+                    Properties = { ["key"] = (48 + at).ToString(CultureInfo.InvariantCulture) },
+                });
+            }
+        }
+
+        // One button, for adding to a grid that is nearly right. Its name is what a preset writes
+        // its line against, so it arrives with one rather than empty.
+        if (kind == MachineElementKinds.Pad) made.Properties["key"] = "48";
+
         return made;
     }
 
@@ -1007,6 +1137,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         // from one kind of element into another, and the way of choosing a file has to come and
         // go with it.
         OnPropertyChanged(nameof(PicturePicked));
+        OnPropertyChanged(nameof(PadsPicked));
     }
 
     /// <summary>
@@ -1031,6 +1162,22 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedShape));
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(PicturePicked));
+        OnPropertyChanged(nameof(PadsPicked));
+
+        // The boxes for laying a grid out start at what the picked grid already is, so pressing
+        // it without changing anything lays out what is already there.
+        if (value?.Element is { } picked && picked.Element == MachineElementKinds.Pads)
+        {
+            PadCount = picked.Children.Count(child => child.Element == MachineElementKinds.Pad);
+
+            if (int.TryParse(picked.Properties.GetValueOrDefault("columns"), out int across) && across > 0)
+                PadColumns = across;
+
+            var first = picked.Children.FirstOrDefault(child => child.Element == MachineElementKinds.Pad);
+
+            if (first != null && int.TryParse(first.Properties.GetValueOrDefault("key"), out int key))
+                PadFirstKey = key;
+        }
     }
 
     /// <summary>What a picture element keeps the name of its file under.</summary>
@@ -1050,6 +1197,66 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// act on is what is picked.
     /// </remarks>
     public bool PicturePicked => SelectedElement?.Kind == MachineElementKinds.Image;
+
+    /// <summary>True when a grid of pads is picked, which is the one shape you lay out at once.</summary>
+    public bool PadsPicked => SelectedElement?.Kind == MachineElementKinds.Pads;
+
+    /// <summary>How many buttons the grid should have.</summary>
+    /// <remarks>
+    /// Sixteen to start with, which is what a drum machine's grid has been since they were made
+    /// of rubber. A machine wanting six rows of sixteen says ninety six here and sixteen across.
+    /// </remarks>
+    [ObservableProperty] private int padCount = 16;
+
+    /// <summary>How many stand side by side.</summary>
+    [ObservableProperty] private int padColumns = 4;
+
+    /// <summary>The key the first one answers to, the rest running up from it.</summary>
+    [ObservableProperty] private int padFirstKey = 48;
+
+    /// <summary>
+    /// Lays the picked grid out: that many buttons, that many across, keyed from there.
+    /// </summary>
+    /// <remarks>
+    /// The buttons are the truth and this is a tool that writes them, which is why it is here
+    /// and not a property the panel reads. Ninety six buttons dropped one at a time is not a
+    /// designer, and a count the drawing obeyed instead of the buttons would be a second place
+    /// the number lived.
+    ///
+    /// Names already in the grid are kept, in order, because renaming a pad is work somebody
+    /// did: laying the grid out again to add a row must not throw away the first sixteen names.
+    /// </remarks>
+    public IRelayCommand LayPadsCommand => new RelayCommand(() =>
+    {
+        if (SelectedElement?.Element is not { } pads) return;
+
+        if (pads.Element != MachineElementKinds.Pads) return;
+
+        int wanted = Math.Clamp(PadCount, 1, 512);
+
+        var kept = pads.Children
+            .Where(child => child.Element == MachineElementKinds.Pad)
+            .Select(child => child.Parameter)
+            .ToList();
+
+        pads.Children.Clear();
+
+        for (int at = 0; at < wanted; at++)
+        {
+            pads.Children.Add(new MachineElement
+            {
+                Element = MachineElementKinds.Pad,
+                Parameter = at < kept.Count && kept[at].Length > 0 ? kept[at] : "pad" + (at + 1),
+                Properties = { ["key"] = (PadFirstKey + at).ToString(CultureInfo.InvariantCulture) },
+            });
+        }
+
+        pads.Properties["columns"] = Math.Clamp(PadColumns, 1, 64).ToString(CultureInfo.InvariantCulture);
+
+        Redraw();
+
+        Status = wanted + " buttons, " + pads.Properties["columns"] + " across";
+    });
 
     /// <summary>
     /// Brings a picture into the machine and puts its name on the element that is picked.

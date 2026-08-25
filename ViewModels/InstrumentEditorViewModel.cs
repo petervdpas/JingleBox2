@@ -164,28 +164,79 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         if (Tracker.Machines.MachineProjects.For(id) is not { } project) return;
 
-        if (!IsSample) return;
+        // A knob on a described panel is a knob: it changes the instrument, the song is dirty,
+        // and whatever else is showing the same setting has to hear about it.
+        void Moved()
+        {
+            _changed();
 
-        var shape = project.Parameters;
+            SayAgain();
+        }
 
         var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
 
-        var values = new Tracker.Machines.RecordingValues(_instrument, shelf)
+        if (IsSample)
         {
-            // A knob on a described panel is a knob: it changes the instrument, the song is
-            // dirty, and whatever else is showing the same setting has to hear about it.
-            Changed = () =>
+            Values = new Tracker.Machines.RecordingValues(_instrument, shelf) { Changed = Moved };
+        }
+        else if (IsBongaBong && Kit is { } kit)
+        {
+            Values = new Tracker.Machines.KitValues(kit) { Changed = Moved };
+
+            MachinePads = new Tracker.Machines.KitPads(kit);
+            MachineSlices = Slices;
+
+            // Every setting the panel shows is about the pad in hand, so picking a different one
+            // moves all of them at once without anything on the panel being touched. The panel
+            // is told to read itself again rather than being rebuilt: rebuilding would answer
+            // this and would also throw away the pad grid the press just landed on.
+            kit.PropertyChanged += (_, e) =>
             {
-                _changed();
+                if (e.PropertyName == nameof(DrumKitViewModel.Selected)) SayAgain();
+            };
+        }
+        else
+        {
+            return;
+        }
 
-                Moved();
-            }
-        };
+        Described = new MachineFace(face, project.Parameters, project.Folder);
 
-        Described = new MachineFace(face, shape, project.Folder);
-
-        Values = values;
         MachineTakes = shelf;
+    }
+
+    /// <summary>The kit behind the pads, on a machine that has any.</summary>
+    public IMachinePads? MachinePads { get; private set; }
+
+    /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
+    public IMachineSlices? MachineSlices { get; private set; }
+
+    /// <summary>
+    /// Bumped when everything the described panel shows may have moved.
+    /// </summary>
+    /// <remarks>
+    /// A count rather than an event, because the panel takes it as a plain binding and there is
+    /// nothing to wire up or take down. What it means is "read yourself again", which is the
+    /// answer to a setting being written where the panel could not see it happen.
+    /// </remarks>
+    public int PanelReread { get; private set; }
+
+    /// <summary>
+    /// Everything the described panel shows may have moved, so it should read itself again.
+    /// </summary>
+    /// <remarks>
+    /// Public because the page can move a setting the panel could not: putting a recording on
+    /// the machine happens in a dialog, and the panel has no way of knowing the dialog closed.
+    /// </remarks>
+    public void SaidAgain() => SayAgain();
+
+    private void SayAgain()
+    {
+        PanelReread++;
+
+        OnPropertyChanged(nameof(PanelReread));
+
+        Moved();
     }
 
     /// <summary>The machine's own face, or nothing when it is drawn by hand.</summary>
@@ -214,6 +265,31 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// of which is in the wrong place.
     /// </remarks>
     public bool DescribesPreset => Described?.Panel.Root is { } root && Holds(root, MachineElementKinds.Preset);
+
+    /// <summary>
+    /// True when the machine draws its own keyboard, so the page should not add one.
+    /// </summary>
+    /// <remarks>
+    /// The keyboard used to be the same on every panel and stood at the foot of all of them. It
+    /// is not the same on a kit: which keys have drums on them and which one is in hand are
+    /// things only the machine's own keyboard can show, so where a machine draws one, the shared
+    /// keyboard would be a second keyboard saying less.
+    ///
+    /// Asked of the description rather than of which machine this is, so a machine somebody else
+    /// built gets the same answer for the same reason.
+    /// </remarks>
+    public bool DescribesKeys => Described?.Panel.Root is { } root && Holds(root, MachineElementKinds.Keys);
+
+    /// <summary>
+    /// True when the keyboard at the foot of the panel is the one to show.
+    /// </summary>
+    /// <remarks>
+    /// It is there unless something else already put a keyboard on the panel, and two things
+    /// can have: the machine's own description, or the hand written kit block, which puts one
+    /// beside its pads because hitting a key and watching its pad answer is one glance. Both
+    /// asked here, so there is one place that decides and no way for the two to disagree.
+    /// </remarks>
+    public bool ShowsSharedKeys => !DescribesKeys && !ShowsWrittenKit;
 
     private static bool Holds(MachineElement element, string kind)
     {
@@ -503,6 +579,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     /// <summary>True when the voice is the one written out in XAML rather than the machine's own.</summary>
     public bool ShowsWrittenVoice => HasCommonVoice && !IsDescribed;
+
+    /// <summary>And the same question about the kit, for a machine that has one.</summary>
+    /// <remarks>
+    /// The blocks written out in XAML are the same controls said twice. Where the machine draws
+    /// its own face, showing both would be one instrument edited from two places, with two pads
+    /// selected and two names in two boxes.
+    ///
+    /// It is also what the keyboard at the foot of every panel asks. That keyboard is hidden on
+    /// a hand written kit because the kit's own block puts one beside its pads, where it belongs:
+    /// hitting a key and watching its pad answer is one glance. A described kit has no keyboard
+    /// of its own, so the shared one comes back, and asking this rather than asking whether the
+    /// machine is BongaBong is what keeps the two answers from drifting apart.
+    /// </remarks>
+    public bool ShowsWrittenKit => IsBongaBong && !IsDescribed;
 
     public bool IsSynth => _instrument.IsSynth;
 

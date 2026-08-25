@@ -78,8 +78,30 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// Asked from outside as well, since the category filter in front of the picker is about
     /// takes and there is nothing to narrow on a machine offering its own presets.
     /// </remarks>
-    public bool PicksTakes =>
-        _takes != null && _instrument.Kind == TrackerInstrumentKind.Sample;
+    public bool PicksTakes => _takes != null && StartsFromTakes();
+
+    /// <summary>
+    /// Whether this machine says its picker offers your recordings rather than its own presets.
+    /// </summary>
+    /// <remarks>
+    /// The machine says so, in its own file. It used to be asked of the instrument's kind, which
+    /// is the app naming one of its own machines: a machine somebody else built would have had
+    /// no way of asking for the same treatment, however plainly it was nothing but the recording
+    /// on it.
+    ///
+    /// The kind is still the answer for a machine that has not been converted to a project yet,
+    /// which is the state the rack is in while they move over one at a time.
+    /// </remarks>
+    private bool StartsFromTakes()
+    {
+        string id = Machine.For(_instrument.Kind).SlotId;
+
+        if (Tracker.Machines.MachineProjects.For(id)?.BrowsesTakes() is { } said) return said;
+
+        // The machine says nothing, either because it is not installed as a project or because
+        // it was installed before it could say. The kind is what decided before this field.
+        return _instrument.Kind == TrackerInstrumentKind.Sample;
+    }
 
     /// <summary>What this machine has to offer, in the order its folder lists them.</summary>
     public ObservableCollection<MachinePreset> Items { get; } = new();

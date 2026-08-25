@@ -33,9 +33,65 @@ public partial class InstrumentPanel : UserControl
 
         // The panel is painted in the machine's own shades, so it has to be repainted when the
         // machine changes under it, and mixed again when the theme moves under both.
+        // What a described panel cannot do for itself. Everything on a machine is a setting
+        // except the few things that are not: taking a recording off a pad, and loading a folder
+        // of samples onto a kit. Those go to the same handlers the hand written panel uses, so
+        // there is one way of doing each and not two.
+        MachineFace.ActionWanted += Asked;
+
+        // The other thing a described panel cannot do for itself: the shelf of takes is the
+        // app's, and the control that asks for one is drawn from a description that knows
+        // nothing about where recordings are kept.
+        MachineFace.TakeWanted += PickTake;
+
         DataContextChanged += (_, _) => Watch();
         UI.ThemeManager.Changed += Later;
         DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
+    }
+
+    /// <summary>
+    /// Puts one of your recordings on whatever setting the panel named.
+    /// </summary>
+    /// <remarks>
+    /// The same shelf, in the same dialog, as the take picker on the hand written panels: one
+    /// place a recording comes from, however the panel that asked for it was drawn.
+    /// </remarks>
+    private async void PickTake(object? sender, string key)
+    {
+        if (Designer?.Editor is not { Values: { } values } editor) return;
+
+        var take = await TakeDialog.PickAsync(editor.Takes);
+
+        if (take == null || take.FilePath.Length == 0) return;
+
+        values.SetText(key, take.FilePath);
+
+        // Everything on the panel that was showing the old one has to hear about it, and so does
+        // whatever is drawing the recording underneath.
+        editor.SaidAgain();
+    }
+
+    /// <summary>Does what a button on a described panel asked for.</summary>
+    /// <remarks>
+    /// Matched against the names in <see cref="JingleBox2.Machines.MachineActions"/> rather than
+    /// against anything worked out from the string, so every action in the app can be found by
+    /// searching for the word that is in the machine's file. One this build has never heard of
+    /// does nothing, which is what lets a machine written against a later version still open.
+    /// </remarks>
+    private void Asked(object? sender, string action)
+    {
+        switch (action)
+        {
+            case Machines.MachineActions.ClearPad:
+                ClearPadSample_Click(this, new RoutedEventArgs());
+
+                break;
+
+            case Machines.MachineActions.LoadPads:
+                ImportPads_Click(this, new RoutedEventArgs());
+
+                break;
+        }
     }
 
     /// <summary>The designer whose editor is being watched, so it is let go of again.</summary>

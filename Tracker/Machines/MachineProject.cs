@@ -30,6 +30,17 @@ public sealed class MachineProject
     /// <summary>Where the samples a machine ships with go.</summary>
     public const string SoundsFolder = "sounds";
 
+    /// <summary>
+    /// Where the presets a machine ships with go, one instrument file to a preset.
+    /// </summary>
+    /// <remarks>
+    /// Inside the machine and not beside the program, which is where they used to be. A preset
+    /// is content the machine came with, the same as a picture on its face and the recordings a
+    /// kit is built out of, so it belongs in the folder that gets zipped and handed to somebody.
+    /// Kept outside, a machine exported here arrived there with an empty picker.
+    /// </remarks>
+    public const string PresetsFolder = "presets";
+
     /// <summary>Where the pictures on a machine's face go.</summary>
     /// <remarks>
     /// Beside the sounds and for the same reason. A machine is a folder and the zip is that
@@ -93,6 +104,18 @@ public sealed class MachineProject
     public MachineTheme Theme { get; set; } = new("#7B838C");
 
     /// <summary>
+    /// Where the picker at the top of its panel gets its list. See <see cref="MachineStarts"/>.
+    /// </summary>
+    /// <remarks>
+    /// Empty when the machine does not say, which is not the same as saying presets: a machine
+    /// written before this field existed is already installed on people's discs, and reading its
+    /// silence as "presets" would take the takes off the Recording machine's picker on every one
+    /// of them. Silence means whatever the app decided before, and only a machine that says
+    /// something overrules that.
+    /// </remarks>
+    public string StartsFrom { get; set; } = "";
+
+    /// <summary>
     /// What this machine can be set to.
     /// </summary>
     /// <remarks>
@@ -153,6 +176,74 @@ public sealed class MachineProject
         Directory.CreateDirectory(Path.Combine(Folder, ImagesFolder));
 
         File.WriteAllText(Path.Combine(Folder, ManifestName), JsonSerializer.Serialize(this, Layout));
+    }
+
+    /// <summary>What a preset writes to say the picker offers your own recordings.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the one word that decides which browser a machine has
+    /// can be found by looking for it.
+    /// </remarks>
+    private const string BrowseKey = "Browse";
+
+    /// <summary>
+    /// True when this machine's presets say the picker should offer your recordings.
+    /// </summary>
+    /// <remarks>
+    /// The machine says it in its own presets folder rather than in a flag, because that is
+    /// where it can be read and changed: a machine whose whole sound is a recording of yours
+    /// ships one preset saying so, and that preset is the thing you can open and see.
+    ///
+    /// Falls back to <see cref="StartsFrom"/> for a machine installed before the preset existed,
+    /// which is every copy already on somebody's disc.
+    /// </remarks>
+    public bool? BrowsesTakes()
+    {
+        if (_asked) return _browses;
+
+        _browses = Asked();
+        _asked = true;
+
+        return _browses;
+    }
+
+    private bool? _browses;
+
+    private bool _asked;
+
+    /// <summary>
+    /// What this machine says about its browser, or nothing when it says nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is a real answer and not a no. Every copy of a machine installed before the browse
+    /// preset existed says nothing, and reading that as "its own presets" takes the take shelf off
+    /// the Recording machine on every one of them.
+    /// </remarks>
+    private bool? Asked()
+    {
+        string folder = Path.Combine(Folder, PresetsFolder);
+
+        try
+        {
+            if (Directory.Exists(folder))
+            {
+                foreach (string path in Directory.EnumerateFiles(folder, "*.json"))
+                {
+                    using var read = JsonDocument.Parse(File.ReadAllText(path));
+
+                    if (read.RootElement.TryGetProperty(BrowseKey, out var browse) &&
+                        string.Equals(browse.GetString(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The presets could not be read from " + folder, ex);
+        }
+
+        if (StartsFrom.Length == 0) return null;
+
+        return string.Equals(StartsFrom, MachineStarts.Takes, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -93,17 +93,33 @@ public static class MachineRegistry
         }
     }
 
-    /// <summary>Gives a brand new installation the machines the program ships with.</summary>
+    /// <summary>What the file recording the offer is called.</summary>
     /// <remarks>
-    /// The absence of the folder is the whole test, and it has to be, because there is no other
-    /// mark on disc that says whether somebody has been here before. So the folder is made even
-    /// when there is nothing to put in it: what matters afterwards is that this never runs a
-    /// second time and never quietly puts back a machine that was thrown out on purpose.
+    /// Written out rather than built from the folder's name, so the one file this depends on can
+    /// be found by looking for it.
+    /// </remarks>
+    private const string OfferedName = "offered.txt";
+
+    /// <summary>
+    /// Gives the installation any machine the program ships that it has never been offered.
+    /// </summary>
+    /// <remarks>
+    /// It used to be the absence of the folder that decided, which was right while the set of
+    /// machines never changed and wrong the moment one was added: a machine written after the
+    /// folder was made could never arrive, because the folder was there. Every new machine then
+    /// cost a trip to SETTINGS before it could be seen at all, and the panel it draws stayed
+    /// hidden behind the hand written one with nothing saying why.
+    ///
+    /// So the offer is what is recorded, not the folder. A shipped machine this installation has
+    /// never been offered is put on the rack; one it has been offered is left alone whether or
+    /// not it is still there, which is what keeps a machine somebody threw out thrown out.
+    ///
+    /// An installation from before this file existed is taken to have been offered whatever it
+    /// currently holds. That is right for everything anybody kept and wrong once for anything
+    /// they had already removed: it comes back a single time, and stays gone after that.
     /// </remarks>
     private static void Seed()
     {
-        if (Directory.Exists(Installed)) return;
-
         try
         {
             Directory.CreateDirectory(Installed);
@@ -115,12 +131,60 @@ public static class MachineRegistry
             return;
         }
 
+        var offered = Offered();
+
+        bool moved = false;
+
         foreach (var project in In(Shipped))
         {
+            if (project.Id.Length == 0 || offered.Contains(project.Id)) continue;
+
+            // Recorded whether or not it went in. A machine that cannot be copied is a machine
+            // this installation has still been offered, and trying again on every start would
+            // only write the same fault into the log for ever.
+            offered.Add(project.Id);
+
+            moved = true;
+
             if (MachineArchive.Add(project) != null) continue;
 
             Diagnostics.Log.Write(Diagnostics.LogArea.App,
                 () => "machine " + project.Id + " could not be taken from " + project.Folder);
+        }
+
+        if (moved) Remember(offered);
+    }
+
+    /// <summary>Which shipped machines this installation has already been offered.</summary>
+    private static HashSet<string> Offered()
+    {
+        string file = Path.Combine(Installed, OfferedName);
+
+        try
+        {
+            if (File.Exists(file))
+                return new HashSet<string>(File.ReadAllLines(file).Where(id => id.Length > 0), StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The machines already offered could not be read", ex);
+        }
+
+        // No file, so this installation is either brand new or older than the file. Whatever it
+        // holds now is what it has been offered: nothing at all in the first case, which is what
+        // puts every shipped machine on a new rack.
+        return new HashSet<string>(In(Installed).Select(project => project.Id), StringComparer.Ordinal);
+    }
+
+    private static void Remember(IEnumerable<string> offered)
+    {
+        try
+        {
+            File.WriteAllLines(Path.Combine(Installed, OfferedName), offered);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The machines already offered could not be written", ex);
         }
     }
 }

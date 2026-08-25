@@ -77,6 +77,25 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, IMachinePresets?>(nameof(Presets));
 
     /// <summary>
+    /// The kit behind the pads, for a machine that has any.
+    /// </summary>
+    /// <remarks>
+    /// Beside the settings and not among them, the same way the takes are. What a pad is called
+    /// and what it plays are settings; which one is in hand and which are lit are the kit as a
+    /// thing on screen, and neither belongs in a song.
+    /// </remarks>
+    public static readonly StyledProperty<IMachinePads?> PadsProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachinePads?>(nameof(Pads));
+
+    /// <summary>The recording being cut into pieces, for a machine that fills itself from one.</summary>
+    public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineSlices?>(nameof(Slices));
+
+    /// <summary>What the keyboard on the machine's face plays and shows.</summary>
+    public static readonly StyledProperty<IMachineKeys?> KeyboardProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineKeys?>(nameof(Keyboard));
+
+    /// <summary>
     /// The machine's own folder, which is what the pictures on its panel are named against.
     /// </summary>
     /// <remarks>
@@ -147,6 +166,18 @@ public class MachinePanelView : Decorator
     public static readonly StyledProperty<int> TriggerProperty =
         AvaloniaProperty.Register<MachinePanelView, int>(nameof(Trigger));
 
+    /// <summary>
+    /// Bumped when every setting on the panel may have moved without the machine changing.
+    /// </summary>
+    /// <remarks>
+    /// A count and not an event, the same as <see cref="Trigger"/>, so a host can hand it over
+    /// as a plain binding with nothing to wire up or take down. What it means is "read yourself
+    /// again", and it is the answer to a control that shows a setting the panel cannot see being
+    /// written: the pad in hand on a kit, or a preset landing on the instrument.
+    /// </remarks>
+    public static readonly StyledProperty<int> RereadProperty =
+        AvaloniaProperty.Register<MachinePanelView, int>(nameof(Reread));
+
     /// <summary>How long a note played by hand is held down for, which the envelope is drawn to.</summary>
     public static readonly StyledProperty<double> HoldSecondsProperty =
         AvaloniaProperty.Register<MachinePanelView, double>(nameof(HoldSeconds), 0.4);
@@ -170,6 +201,32 @@ public class MachinePanelView : Decorator
     /// at controls that no longer exist the moment it is.
     /// </remarks>
     private readonly Dictionary<string, List<Action>> _watchers = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// How every control on the panel reads its setting again.
+    /// </summary>
+    /// <remarks>
+    /// A panel usually only has to be told about the one setting that moved, which is what the
+    /// watchers are for. Sometimes all of them moved at once and nothing on the panel was
+    /// touched: a preset lands, or, on a kit, a different pad is picked and the same three knobs
+    /// are now about a different drum. Rebuilding would answer that and would also throw away
+    /// the pad grid, the picture and everything else that was mid-anything.
+    ///
+    /// Thrown away with the rest of the panel when it is rebuilt, since these point at controls
+    /// that no longer exist the moment it is.
+    /// </remarks>
+    private readonly List<Action> _readers = new();
+
+    /// <summary>
+    /// True while the panel is telling its controls what they say, so nothing writes it back.
+    /// </summary>
+    /// <remarks>
+    /// Setting a control fires the same notification a hand on it fires, and there is no way for
+    /// the handler to tell them apart. Without this, reading the settings back would write every
+    /// one of them over itself, which marks a song dirty for having been looked at and, worse,
+    /// rounds every value through whatever the control could represent.
+    /// </remarks>
+    private bool _reading;
 
     /// <summary>
     /// The pictures already read off the disc, by the full path each came from.
@@ -232,6 +289,17 @@ public class MachinePanelView : Decorator
     /// </remarks>
     public event EventHandler<string>? TakeWanted;
 
+    /// <summary>
+    /// A button asked for something to be done, named by the machine.
+    /// </summary>
+    /// <remarks>
+    /// The other half of <see cref="TakeWanted"/>, and for the same reason: a panel drawn from a
+    /// description can write a machine's settings and nothing else. Clearing a pad and loading
+    /// samples onto a kit both reach past the settings, so the panel says what was asked for and
+    /// whoever put it on screen decides what that means. See <see cref="MachineActions"/>.
+    /// </remarks>
+    public event EventHandler<string>? ActionWanted;
+
     public MachineFace? Face
     {
         get => GetValue(FaceProperty);
@@ -263,6 +331,30 @@ public class MachinePanelView : Decorator
     {
         get => GetValue(PresetsProperty);
         set => SetValue(PresetsProperty, value);
+    }
+
+    public int Reread
+    {
+        get => GetValue(RereadProperty);
+        set => SetValue(RereadProperty, value);
+    }
+
+    public IMachinePads? Pads
+    {
+        get => GetValue(PadsProperty);
+        set => SetValue(PadsProperty, value);
+    }
+
+    public IMachineSlices? Slices
+    {
+        get => GetValue(SlicesProperty);
+        set => SetValue(SlicesProperty, value);
+    }
+
+    public IMachineKeys? Keyboard
+    {
+        get => GetValue(KeyboardProperty);
+        set => SetValue(KeyboardProperty, value);
     }
 
     /// <summary>Where the machine keeps its own files, for the elements that name one.</summary>
@@ -331,9 +423,16 @@ public class MachinePanelView : Decorator
             change.Property == TakesProperty ||
             change.Property == PresetsProperty ||
             change.Property == AssetsProperty ||
-            change.Property == DesigningProperty)
+            change.Property == DesigningProperty ||
+            change.Property == PadsProperty ||
+            change.Property == SlicesProperty ||
+            change.Property == KeyboardProperty)
         {
             Rebuild();
+        }
+        else if (change.Property == RereadProperty)
+        {
+            Said();
         }
         else if (change.Property == MarkedProperty)
         {
@@ -385,6 +484,7 @@ public class MachinePanelView : Decorator
         _frames.Clear();
         _elements.Clear();
         _watchers.Clear();
+        _readers.Clear();
         _pictures.Clear();
 
         var panel = Panel;
@@ -447,6 +547,10 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Take => BuildTake(element),
             MachineElementKinds.Preset => BuildPreset(element, parameters),
             MachineElementKinds.Label => BuildLabel(element),
+            MachineElementKinds.Text => BuildText(element),
+            MachineElementKinds.Pads => BuildPads(element),
+            MachineElementKinds.PadPicker => BuildPicker(element),
+            MachineElementKinds.Slices => BuildSlices(element),
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
         };
@@ -789,6 +893,36 @@ public class MachinePanelView : Decorator
         return container;
     }
 
+    /// <summary>An aside: smaller and dimmer, for what is loaded rather than what it is called.</summary>
+    private const string HintStyle = "cardHint";
+
+    /// <summary>The name of a field, standing beside the control it names.</summary>
+    private const string FieldStyle = "field";
+
+    /// <summary>The name of a part of the panel.</summary>
+    private const string SectionStyle = "section";
+
+    /// <summary>An ordinary button rather than a cap on a front panel.</summary>
+    private const string PlainStyle = "plain";
+
+    /// <summary>
+    /// Which of the handful of styles the machine asked for, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// A closed list, matched by name. A machine that could name any style at all would be a
+    /// machine that could look like anything, and a panel where every label was a different size
+    /// is worse than one where they are all the same.
+    /// </remarks>
+    private static string? Styled(MachineElement element) =>
+        Text(element, "style").ToLowerInvariant() switch
+        {
+            "hint" or "aside" => HintStyle,
+            "field" => FieldStyle,
+            "section" => SectionStyle,
+            "plain" => PlainStyle,
+            _ => null,
+        };
+
     /// <summary>Where a container's children sit across the way it runs.</summary>
     /// <remarks>
     /// Top unless the machine says otherwise, which is what everything written before this
@@ -821,15 +955,16 @@ public class MachinePanelView : Decorator
             // A machine prints a control's name above it, which is what Knob's own remarks say
             // this switch is for.
             LabelAbove = true,
-            Value = Start(parameter),
         };
 
-        // Subscribed after the starting value is in, or opening a panel would write every
-        // parameter back over itself.
+        // Subscribed before the starting value goes in, because reading a setting is not
+        // writing one: everything the panel tells its controls is said quietly.
         knob.PropertyChanged += (_, e) =>
         {
             if (e.Property == Knob.ValueProperty) Write(parameter.Key, knob.Value);
         };
+
+        Reads(() => knob.Value = Start(parameter));
 
         // What the knob writes under itself, where the number it turns is not the number anybody
         // wants to read. A filter's dial is the case: it turns a position and it says hertz, and
@@ -860,7 +995,6 @@ public class MachinePanelView : Decorator
             DefaultValue = parameter.Default,
             Format = Format(parameter),
             Ticks = Text(element, "ticks"),
-            Value = Start(parameter),
 
             // How long the throw is, which is not how tall the control is: a fader draws its
             // name above the track and its value under it, so a height meant as the throw makes
@@ -872,6 +1006,8 @@ public class MachinePanelView : Decorator
         {
             if (e.Property == Fader.ValueProperty) Write(parameter.Key, fader.Value);
         };
+
+        Reads(() => fader.Value = Start(parameter));
 
         return fader;
     }
@@ -888,7 +1024,6 @@ public class MachinePanelView : Decorator
         var toggle = new Switch
         {
             Label = Caption(element, parameter),
-            IsChecked = Start(parameter) > middle,
         };
 
         // Only when the panel says so: the switch words itself on and off, and a machine that
@@ -901,6 +1036,8 @@ public class MachinePanelView : Decorator
             if (e.Property == Switch.IsCheckedProperty)
                 Write(parameter.Key, toggle.IsChecked ? parameter.Max : parameter.Min);
         };
+
+        Reads(() => toggle.IsChecked = Start(parameter) > middle);
 
         return toggle;
     }
@@ -916,13 +1053,14 @@ public class MachinePanelView : Decorator
             SmallStep = parameter.Step,
             LargeStep = parameter.Step * 10,
             Format = Format(parameter),
-            Value = Start(parameter),
         };
 
         field.PropertyChanged += (_, e) =>
         {
             if (e.Property == NumberField.ValueProperty) Write(parameter.Key, field.Value);
         };
+
+        Reads(() => field.Value = Start(parameter));
 
         return Captioned(Caption(element, parameter), field);
     }
@@ -942,9 +1080,26 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private Control? BuildButton(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
-        if (Parameter(element, parameters) is not { } parameter) return null;
-
         var cap = Text(element, "cap");
+
+        // The other kind of button: it asks for something to be done rather than setting
+        // anything, so it names no parameter and there is nothing to read back off it. An
+        // ordinary button, because that is what it is: a plain press with a word on it, not a
+        // cap on a front panel that stays down while it is held.
+        if (Text(element, "action") is { Length: > 0 } action)
+        {
+            var doing = new Button
+            {
+                Content = cap.Length > 0 ? cap : element.Label,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            doing.Click += (_, _) => ActionWanted?.Invoke(this, action);
+
+            return doing;
+        }
+
+        if (Parameter(element, parameters) is not { } parameter) return null;
 
         var button = new PushButton
         {
@@ -1085,7 +1240,6 @@ public class MachinePanelView : Decorator
         var box = new ComboBox
         {
             ItemsSource = options,
-            SelectedIndex = Chosen(parameter, Start(parameter), options.Length),
         };
 
         box.SelectionChanged += (_, _) =>
@@ -1094,6 +1248,8 @@ public class MachinePanelView : Decorator
 
             Write(parameter.Key, Math.Clamp(box.SelectedIndex, parameter.Min, parameter.Max));
         };
+
+        Reads(() => box.SelectedIndex = Chosen(parameter, Start(parameter), options.Length));
 
         return Captioned(Caption(element, parameter), box);
     }
@@ -1119,18 +1275,67 @@ public class MachinePanelView : Decorator
 
         var keys = new Clavier();
 
+        // The machine's own colour, for the lit keys, the octave lamps and the bands under the
+        // keys that have something on them. Left alone they are the amber every one of these
+        // controls defaults to, which on a red machine is somebody else's keyboard.
+        var accent = ThemePalette.From(this).Accent;
+
+        keys.LitColour = accent;
+        keys.LampColour = accent;
+
         if (Number(element, "keys", 0) is var count and > 0) keys.KeyCount = count;
         if (Text(element, "caption") is { Length: > 0 } caption) keys.Caption = caption;
 
+        // A machine that keeps an octave of its own says so, and then it is a setting like any
+        // other. Where it names none, the octave is where the keyboard is looking and belongs to
+        // whoever is showing the panel, not to the song.
         if (Parameter(element, parameters) is { } parameter)
         {
-            keys.Octave = (int)Math.Round(Math.Clamp(Start(parameter), parameter.Min, parameter.Max));
-
             keys.PropertyChanged += (_, e) =>
             {
                 if (e.Property == Clavier.OctaveProperty) Write(parameter.Key, keys.Octave);
             };
+
+            Reads(() => keys.Octave =
+                (int)Math.Round(Math.Clamp(Start(parameter), parameter.Min, parameter.Max)));
         }
+
+        // What it plays and what it shows, from whoever is showing the panel. A keyboard with
+        // none of this is still a keyboard and still moves its octave: a machine being laid out
+        // has nothing to play, and a panel that drew nothing there would be laid out around a
+        // gap.
+        if (Keyboard is not { } keyboard) return keys;
+
+        keys.Lit = keyboard.Lit;
+        keys.Filled = keyboard.Filled;
+        keys.Marked = keyboard.Marked;
+        keys.Command = new Struck(keyboard.Play);
+
+        if (element.Parameter.Length == 0)
+        {
+            keys.Octave = keyboard.Octave;
+
+            keys.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Clavier.OctaveProperty) keyboard.Octave = keys.Octave;
+            };
+        }
+
+        // The pad in hand moves without the panel being touched, and so does the set of keys
+        // with something on them, so both are said again rather than being bound to.
+        void Again(object? sender, EventArgs e)
+        {
+            keys.Marked = keyboard.Marked;
+            keys.Filled = keyboard.Filled;
+
+            if (element.Parameter.Length == 0) keys.Octave = keyboard.Octave;
+
+            keys.InvalidateVisual();
+        }
+
+        keyboard.Changed += Again;
+
+        keys.DetachedFromVisualTree += (_, _) => keyboard.Changed -= Again;
 
         return keys;
     }
@@ -1254,6 +1459,44 @@ public class MachinePanelView : Decorator
     /// all. That is the host's to say, by handing the panel its settings again, which draws
     /// everything from the top.
     /// </remarks>
+    /// <summary>Has every control on the panel read its setting again.</summary>
+    private void Said()
+    {
+        foreach (var reader in _readers) Quietly(reader);
+    }
+
+    /// <summary>
+    /// Remembers how a control says itself again, and says it once now.
+    /// </summary>
+    /// <remarks>
+    /// The reading is written once and used twice, which is the point: a control that starts at
+    /// the setting and a control that goes back to the setting are the same act, and writing it
+    /// out twice is how the two drift apart.
+    /// </remarks>
+    private void Reads(Action read)
+    {
+        _readers.Add(read);
+
+        Quietly(read);
+    }
+
+    /// <summary>Does it without any of it counting as somebody working the panel.</summary>
+    private void Quietly(Action read)
+    {
+        bool was = _reading;
+
+        _reading = true;
+
+        try
+        {
+            read();
+        }
+        finally
+        {
+            _reading = was;
+        }
+    }
+
     private void Watch(string key, Action told)
     {
         if (!_watchers.TryGetValue(key, out var list)) _watchers[key] = list = new List<Action>();
@@ -1302,13 +1545,30 @@ public class MachinePanelView : Decorator
     private Control BuildTake(MachineElement element)
     {
         var caption = Text(element, "caption");
-        var take = Setting(element.Parameter);
+
+        // A plain button where the machine asks for one. On a machine holding one recording the
+        // cap is the recording, and that is the whole of what the control has to say; on a kit
+        // the recording is written on the line underneath, and a cap saying it again is the same
+        // fact twice on one panel.
+        if (Styled(element) == PlainStyle)
+        {
+            var plain = new Button
+            {
+                Content = caption.Length > 0 ? caption : "Pick a recording...",
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            plain.Click += (_, _) => TakeWanted?.Invoke(this, element.Parameter);
+
+            return plain;
+        }
 
         var button = new PushButton
         {
             Label = caption.Length > 0 ? caption : element.Label.Length > 0 ? element.Label : null,
-            CapText = Describe(take),
         };
+
+        Reads(() => button.CapText = Describe(Setting(element.Parameter)));
 
         button.Pressed += (_, _) => TakeWanted?.Invoke(this, element.Parameter);
 
@@ -1501,15 +1761,211 @@ public class MachinePanelView : Decorator
     /// No colour set on purpose. Foreground is inherited, so the text follows a theme swap
     /// without this control having to hear about one.
     /// </remarks>
-    private Control BuildLabel(MachineElement element)
+    /// <summary>
+    /// A line the panel can be typed into, holding one of the machine's text settings.
+    /// </summary>
+    /// <remarks>
+    /// Written on the way out of the box rather than on every keystroke. What a pad is called is
+    /// worth one entry in the song's history, not one per letter, and something reads the name
+    /// back on every change: a kit whose pad caption were rewritten mid-word would flicker under
+    /// the hand typing it.
+    /// </remarks>
+    private Control BuildText(MachineElement element)
     {
-        var said = Setting(element.Parameter);
-
-        return new TextBlock
+        var box = new TextBox
         {
-            Text = said.Length > 0 ? said : element.Label,
+            PlaceholderText = element.Label,
             VerticalAlignment = VerticalAlignment.Center,
         };
+
+        if (element.Parameter.Length == 0) return box;
+
+        box.LostFocus += (_, _) => WriteText(element.Parameter, box.Text ?? "");
+
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) WriteText(element.Parameter, box.Text ?? "");
+        };
+
+        // And read back when something else moved it: picking a pad changes which name this is
+        // showing, and nobody touched the box.
+        Reads(() =>
+        {
+            string said = Setting(element.Parameter);
+
+            if (!box.IsFocused && box.Text != said) box.Text = said;
+        });
+
+        return box;
+    }
+
+    /// <summary>
+    /// Which pad the controls beside the grid are about, as a list to pick from.
+    /// </summary>
+    /// <remarks>
+    /// Reading what the pads read. A pad renamed changes what this says, and picking one here is
+    /// picking it on the grid, because there is one selection and both of these are showing it.
+    /// </remarks>
+    private Control? BuildPicker(MachineElement element)
+    {
+        var kit = Pads;
+
+        if (kit is null && !Designing) return null;
+
+        var box = new ComboBox { VerticalAlignment = VerticalAlignment.Center };
+
+        if (kit is null) return box;
+
+        // Filling the list changes what is selected, which the box reports as somebody having
+        // picked something. Without this the report writes the selection back, the kit says it
+        // moved, the list is filled again, and the panel goes round until the stack runs out.
+        bool filling = false;
+
+        void Restock()
+        {
+            filling = true;
+
+            try
+            {
+                var names = new List<string>();
+
+                for (int at = 0; at < kit.Count; at++) names.Add(kit.Cap(at));
+
+                box.ItemsSource = names;
+                box.SelectedIndex = kit.Picked;
+            }
+            finally
+            {
+                filling = false;
+            }
+        }
+
+        box.SelectionChanged += (_, _) =>
+        {
+            if (filling || box.SelectedIndex < 0 || box.SelectedIndex == kit.Picked) return;
+
+            kit.Picked = box.SelectedIndex;
+        };
+
+        void Again(object? sender, EventArgs e) => Restock();
+
+        kit.Changed += Again;
+
+        box.DetachedFromVisualTree += (_, _) => kit.Changed -= Again;
+
+        Restock();
+
+        return box;
+    }
+
+    /// <summary>
+    /// The pads of a kit. The machine says how they are arranged; the host says what is on them.
+    /// </summary>
+    private Control? BuildPads(MachineElement element)
+    {
+        var kit = Pads;
+
+        if (kit is null && !Designing) return null;
+
+        var grid = new PadGrid { Pads = kit };
+
+        // The buttons the machine declares: how many there are, what each is called, and what it
+        // answers to. Declared rather than counted off the kit, so a machine of eight pads and
+        // one of twenty four are two descriptions and not two programs.
+        var cells = new List<PadCell>();
+
+        foreach (var child in element.Children)
+        {
+            if (child.Element != MachineElementKinds.Pad) continue;
+
+            cells.Add(new PadCell(child.Parameter, Note(child)));
+        }
+
+        if (cells.Count > 0) grid.Cells = cells;
+
+        if (Number(element, "columns", 0) is var across and > 0) grid.Columns = across;
+        if (Measurement(element, "cap") is { } wide) grid.CapWidth = wide;
+        if (Measurement(element, "capHeight") is { } tall) grid.CapHeight = tall;
+        if (Measurement(element, "gap") is { } gap) grid.Gap = gap;
+
+        // What the caps are painted, for a machine that wants its pads its own colour rather
+        // than the grey every drum machine's pads have been since they were made of rubber.
+        if (Colour(element, "colour") is { } paint) grid.Colour = paint;
+
+        // Each button answers for its own element, so it can be picked on its own while the
+        // panel is being laid out. Without this a press anywhere on the grid picks the grid, and
+        // a pad that has a name of its own has no way of being given one.
+        var buttons = element.Children.Where(child => child.Element == MachineElementKinds.Pad).ToList();
+        var caps = grid.Caps;
+
+        for (int at = 0; at < buttons.Count && at < caps.Count; at++)
+        {
+            _frames[buttons[at]] = caps[at];
+            _elements[caps[at]] = buttons[at];
+        }
+
+        return grid;
+    }
+
+    /// <summary>
+    /// What a pad button is written with: the key it answers to, said the way a note is said.
+    /// </summary>
+    /// <remarks>
+    /// The machine writes the semitone, because a number is what a file can hold; the button
+    /// shows it the way the rest of the app shows a note, because "C-4" is what somebody looking
+    /// for it on a keyboard is looking for.
+    /// </remarks>
+    private static string Note(MachineElement element)
+    {
+        if (Text(element, "key") is not { Length: > 0 } said) return "";
+
+        // Written as the note, and written on the button as it was written. A number is turned
+        // into one, for a machine written before the notes were spelled out.
+        return int.TryParse(said, out int semitone) ? MachineNotes.Name(semitone) : said;
+    }
+
+    /// <summary>The recording on the machine, cut into pieces.</summary>
+    private Control? BuildSlices(MachineElement element)
+    {
+        var slices = Slices;
+
+        if (slices is null && !Designing) return null;
+
+        var chop = new ChopEditor { Slices = slices };
+
+        if (Measurement(element, "picture") is { } tall) chop.PictureHeight = tall;
+
+        return chop;
+    }
+
+    private Control BuildLabel(MachineElement element)
+    {
+        var line = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+
+        // Which of the three kinds of line it is. A panel says three things in words: the name
+        // of a section, the name of a field, and an aside about what is loaded, and they are not
+        // the same size or the same weight. Named rather than styled by hand so a machine cannot
+        // invent a fourth and end up with words nothing else on the panel matches.
+        if (Styled(element) is { Length: > 0 } styled)
+        {
+            line.Classes.Add(styled);
+
+            if (styled == HintStyle)
+            {
+                line.TextTrimming = TextTrimming.CharacterEllipsis;
+
+                if (Measurement(element, "width") is { } room) line.MaxWidth = room;
+            }
+        }
+
+        Reads(() =>
+        {
+            string said = Setting(element.Parameter);
+
+            line.Text = said.Length > 0 ? said : element.Label;
+        });
+
+        return line;
     }
 
     private static Control BuildSpacer(MachineElement element)
@@ -1991,7 +2447,28 @@ public class MachinePanelView : Decorator
 
     private void Write(string key, double value)
     {
+        if (_reading) return;
+
         Values?.Set(key, value);
+
+        if (!_watchers.TryGetValue(key, out var told)) return;
+
+        foreach (var one in told) one();
+    }
+
+    /// <summary>
+    /// Writes a text setting, and tells whatever else on the panel was showing it.
+    /// </summary>
+    /// <remarks>
+    /// The same shape as <see cref="Write(string, double)"/> and for the same reason: a name is
+    /// shown in more than one place on a panel that has any names on it at all, and the box that
+    /// was typed into is never the only one of them.
+    /// </remarks>
+    private void WriteText(string key, string said)
+    {
+        if (key.Length == 0 || _reading) return;
+
+        Values?.SetText(key, said);
 
         if (!_watchers.TryGetValue(key, out var told)) return;
 

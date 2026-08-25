@@ -308,7 +308,7 @@
                  pads are where they are on every drum machine ever made, and the key each one
                  answers to runs across then down from C-4. A pad lights while it is sounding,
                  and they light together, since a crash goes on ringing under the snare. -->
-            <StackPanel Spacing="12" IsVisible="{Binding Editor.IsBongaBong}">
+            <StackPanel Spacing="12" IsVisible="{Binding Editor.ShowsWrittenKit}">
 
               <StackPanel Orientation="Horizontal" Spacing="12">
                 <ui:PanelGroup Caption="Pads" VerticalAlignment="Top">
@@ -701,12 +701,17 @@
                  controls said in XAML, and showing both would be the same instrument edited from
                  two places. A machine that has not been converted has none, and the written
                  blocks stand. -->
-            <ui:MachinePanelView IsVisible="{Binding Editor.IsDescribed}"
+            <ui:MachinePanelView x:Name="MachineFace"
+                                 IsVisible="{Binding Editor.IsDescribed}"
                                  HorizontalAlignment="Left"
                                  Face="{Binding Editor.Described}"
                                  Values="{Binding Editor.Values}"
                                  Takes="{Binding Editor.MachineTakes}"
+                                 Pads="{Binding Editor.MachinePads}"
+                                 Slices="{Binding Editor.MachineSlices}"
+                                 Keyboard="{Binding MachineKeys}"
                                  Presets="{Binding Presets}"
+                                 Reread="{Binding Editor.PanelReread}"
                                  Playhead="{Binding Editor.Playhead}"
                                  Trigger="{Binding NoteTrigger}"
                                  HoldSeconds="{Binding HoldSeconds}" />
@@ -914,7 +919,7 @@
             <ui:Clavier Octave="{Binding Octave}"
                            HorizontalAlignment="Left"
                            Margin="0,14,0,0"
-                           IsVisible="{Binding !Editor.IsBongaBong}"
+                           IsVisible="{Binding Editor.ShowsSharedKeys}"
                            Lit="{Binding Sounding.Lit}"
                            Command="{Binding KeyCommand}"
                            ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its note is sounding, whether you played it or the pattern did. The arrows and the lamps move the three octaves on show, and it follows a note played outside them." />

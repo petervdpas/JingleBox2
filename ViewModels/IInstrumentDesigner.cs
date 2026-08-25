@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Machines;
 using JingleBox2.Tracker;
 
 namespace JingleBox2.ViewModels;
@@ -58,6 +59,17 @@ public interface IInstrumentDesigner
 
     /// <summary>Plays a key on the panel's keyboard, named by its absolute semitone.</summary>
     IRelayCommand<int> KeyCommand { get; }
+
+    /// <summary>
+    /// The keyboard on a machine's own face, when the machine draws one.
+    /// </summary>
+    /// <remarks>
+    /// The same three things the keyboard at the foot of the panel was bound to, offered as one
+    /// object because a panel drawn from a description has nothing to bind with. It answers more
+    /// than that one did: which keys have something on them and which one is in hand, neither of
+    /// which the shared keyboard could say because it did not know what it was standing under.
+    /// </remarks>
+    IMachineKeys MachineKeys { get; }
 
     /// <summary>
     /// Somewhere to start: the instruments the shelf already holds on this same machine.

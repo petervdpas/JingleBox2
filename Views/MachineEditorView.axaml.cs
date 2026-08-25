@@ -71,6 +71,72 @@ public partial class MachineEditorView : UserControl
     private void Retint() =>
         MachineTint.Apply(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
 
+    /// <summary>
+    /// Puts one recording on the one line that asked for it.
+    /// </summary>
+    /// <remarks>
+    /// The other half of loading a folder of samples: this is how a single pad is filled, which
+    /// is what somebody fixing one drum in a kit wants. Brought into the machine on the way, so
+    /// what the preset names is a file that travels with it.
+    /// </remarks>
+    private async void PresetWave_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { } editor) return;
+
+        if (sender is not Control control || control.DataContext is not PresetLine line) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+
+        if (storage == null) return;
+
+        var found = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "A recording for " + line.Name,
+            AllowMultiple = false,
+            FileTypeFilter = new[] { new FilePickerFileType("Recordings") { Patterns = new[] { "*.wav" } } },
+        });
+
+        if (found.FirstOrDefault()?.TryGetLocalPath() is not { Length: > 0 } path) return;
+
+        if (editor.PresetDesk.Bring(path) is { Length: > 0 } named) line.Text = named;
+    }
+
+    /// <summary>
+    /// Brings recordings into the machine and puts them on this preset.
+    /// </summary>
+    /// <remarks>
+    /// The panel's own way of loading samples puts them on your shelf, which is right for an
+    /// instrument in a song and wrong for a preset: a preset has to travel, so what it plays is
+    /// copied into the machine's own folder and named from there.
+    /// </remarks>
+    private async void PresetWaves_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { } editor) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+
+        if (storage == null) return;
+
+        var found = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Recordings to put on this preset",
+            AllowMultiple = true,
+            FileTypeFilter = new[] { new FilePickerFileType("Recordings") { Patterns = new[] { "*.wav" } } },
+        });
+
+        var paths = found
+            .Select(file => file.TryGetLocalPath())
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(path => path!)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (paths.Count == 0) return;
+
+        editor.PresetDesk.Fill(paths);
+    }
+
+
     private MachineEditorViewModel? Editor => (DataContext as MainViewModel)?.MachineEditor;
 
     private async void Open_Click(object? sender, RoutedEventArgs e)

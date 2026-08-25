@@ -58,6 +58,10 @@ public sealed class MachinePartSample : Decorator
     private const string ChoiceKind = "Choice";
     private const string TakeKind = "Take";
     private const string PresetKind = "Preset";
+    private const string PadsKind = "Pads";
+    private const string PadKind = "Pad";
+    private const string SlicesKind = "Slices";
+    private const string TextKind = "Text";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
     /// <remarks>
@@ -150,6 +154,10 @@ public sealed class MachinePartSample : Decorator
         ChoiceKind => BuildChoice(),
         TakeKind => BuildTake(),
         PresetKind => BuildPreset(),
+        PadsKind => BuildPads(),
+        PadKind => new PushButton { CapWidth = 46, CapHeight = 26, FontSize = 9, HasLamp = true, LampBelow = false },
+        SlicesKind => new PartSketch(SketchShape.Wave) { Width = 78, Height = 40 },
+        TextKind => BuildTextBox(),
         _ => null,
     };
 
@@ -250,6 +258,48 @@ public sealed class MachinePartSample : Decorator
     /// application and cannot be reached from here. What the library has to show is the shape
     /// of the thing on the panel, and on the panel it is a button with the take's name on it.
     /// </remarks>
+    /// <summary>
+    /// Four pads, not sixteen: the chip is an inch across and what it has to say is "a grid of
+    /// pads", which four of them say as plainly as sixteen would and legibly at this size.
+    /// </summary>
+    private static Control BuildPads()
+    {
+        var grid = new Grid();
+
+        for (int at = 0; at < 2; at++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        }
+
+        for (int at = 0; at < 4; at++)
+        {
+            var cap = new PushButton
+            {
+                CapWidth = 34,
+                CapHeight = 20,
+                FontSize = 8,
+                HasLamp = true,
+                LampBelow = false,
+                Margin = new Thickness(0, 0, at % 2 == 0 ? 3 : 0, at < 2 ? 3 : 0),
+            };
+
+            Grid.SetColumn(cap, at % 2);
+            Grid.SetRow(cap, at / 2);
+
+            grid.Children.Add(cap);
+        }
+
+        return grid;
+    }
+
+    private static Control BuildTextBox() => new TextBox
+    {
+        Text = "Name",
+        Width = 66,
+        FontSize = 11,
+    };
+
     private static Control BuildTake() => new Button
     {
         Content = "kick.wav",

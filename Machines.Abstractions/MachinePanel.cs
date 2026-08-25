@@ -148,12 +148,17 @@ public static class MachineElementKinds
     public const string Number = "Number";
 
     /// <summary>
-    /// A button that is down while it is held. Properties: cap, lamp.
+    /// A button that is down while it is held. Properties: cap, lamp, action.
     /// </summary>
     /// <remarks>
     /// Held, the parameter reads its top; let go, its bottom. A machine that wants a thing to
     /// happen watches for the top rather than being handed an event, so a button is still just
     /// a number and a song saved while one was held is a song with a number in it.
+    ///
+    /// Unless it names an <c>action</c>, which is the other kind of button: one that asks the
+    /// host to do something rather than setting anything. Taking the recording off a pad and
+    /// loading a folder of samples onto a kit are neither of them settings, and there is no
+    /// number that could stand for either. See <see cref="MachineActions"/>.
     /// </remarks>
     public const string Button = "Button";
 
@@ -173,8 +178,11 @@ public static class MachineElementKinds
     /// The keyboard, and the octave it is showing. Properties: keys, caption.
     /// </summary>
     /// <remarks>
-    /// The parameter is the octave on show and nothing else. Which keys are sounding is not a
-    /// setting and cannot be one, so it is not described here.
+    /// The parameter is the octave on show and nothing else. Which keys are sounding, which have
+    /// something on them and which one is in hand are not settings and cannot be: they come from
+    /// whoever is showing the panel, through <see cref="IMachineKeys"/>, the same way the pads
+    /// do. On a kit they are the pads: the grid and the keyboard are two pictures of one thing,
+    /// which is why picking a pad outlines its key.
     /// </remarks>
     public const string Keys = "Keys";
 
@@ -268,6 +276,70 @@ public static class MachineElementKinds
     /// somewhere, and a label is the thing on a panel whose whole job is words.
     /// </remarks>
     public const string Label = "Label";
+
+    /// <summary>
+    /// A line the panel can be typed into. The parameter is a text setting.
+    /// </summary>
+    /// <remarks>
+    /// The other half of <see cref="Label"/>, which says what a text setting says and cannot
+    /// change it. What a pad on a kit is called is the player's word and not the machine's, so
+    /// somewhere on the panel it has to be typed.
+    /// </remarks>
+    public const string Text = "Text";
+
+    /// <summary>
+    /// Which pad the controls beside the grid are about, as a list to pick from.
+    /// </summary>
+    /// <remarks>
+    /// The grid says it too, and both are wanted: the grid is how a hand picks a pad, and this
+    /// is how you read off which one is in hand without counting squares. It shows what the pads
+    /// show, so a pad renamed is renamed here.
+    /// </remarks>
+    public const string PadPicker = "PadPicker";
+
+    /// <summary>
+    /// The pads of a kit: a grid of buttons. Properties: columns, cap, capHeight, gap, colour.
+    /// </summary>
+    /// <remarks>
+    /// It holds one <see cref="Pad"/> for each button, so how many pads a machine has is a thing
+    /// the machine says rather than a number built into the program. That is what makes a pad
+    /// reachable on its own: it has a name of its own, a key of its own, and a line of its own in
+    /// every preset.
+    ///
+    /// What is on a pad is still not described. Which recording it plays and what it is called
+    /// belong to the preset or the song; whether it is lit is what the machine is doing this
+    /// instant. Those come from the host through <see cref="IMachinePads"/>, by the same position
+    /// the buttons are declared in.
+    ///
+    /// A Pads holding no buttons falls back to however many the host has, which is what every
+    /// machine written before the buttons existed expects.
+    /// </remarks>
+    public const string Pads = "Pads";
+
+    /// <summary>
+    /// One button of a pad grid. The parameter is its name; the key is what it answers to.
+    /// </summary>
+    /// <remarks>
+    /// Named, and that is the point of it. A preset says what is on "kick" rather than what is
+    /// on the fourth thing in a list, so reordering the grid does not silently move every drum
+    /// along one, and a preset written for a machine is legible without counting.
+    ///
+    /// The key is the note that fires it in a pattern. Written on the button and left alone by
+    /// everything else: which recording answers which key is the whole of what a kit is.
+    /// </remarks>
+    public const string Pad = "Pad";
+
+    /// <summary>
+    /// The recording the machine holds, cut into pieces: the picture, the boundaries, and what
+    /// it takes to make more or fewer of them.
+    /// </summary>
+    /// <remarks>
+    /// A machine that fills itself from one recording rather than many puts this on its face. It
+    /// turns no parameter: where the cuts are is read back off the pieces, so the pieces are the
+    /// truth and this is the picture of them. Supplied through <see cref="IMachineSlices"/> by
+    /// whoever is showing the panel, for the same reason the pads are.
+    /// </remarks>
+    public const string Slices = "Slices";
 
     /// <summary>Room left deliberately empty.</summary>
     public const string Spacer = "Spacer";

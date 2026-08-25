@@ -37,7 +37,16 @@ public sealed record MachinePreset(string Name, TrackerInstrument Sound)
 /// </remarks>
 public static class MachinePresets
 {
-    /// <summary>Where the shipped presets live, beside the program rather than in your data.</summary>
+    /// <summary>
+    /// Where the presets of a machine that has not been converted yet live: beside the program,
+    /// under the machine's name.
+    /// </summary>
+    /// <remarks>
+    /// The old place, and on its way out. A machine is a folder now, and what it ships with
+    /// belongs inside that folder so it travels in the zip; a machine whose presets sat out here
+    /// arrived on somebody else's disc with an empty picker. Each machine moves as it is
+    /// converted, and this goes when the last one has.
+    /// </remarks>
     public static string Directory { get; } =
         Path.Combine(AppContext.BaseDirectory, "Presets");
 
@@ -63,7 +72,7 @@ public static class MachinePresets
 
     private static IReadOnlyList<MachinePreset> Read(Machine machine)
     {
-        string folder = Path.Combine(Directory, machine.Name);
+        string folder = Folder(machine);
 
         try
         {
@@ -87,6 +96,25 @@ public static class MachinePresets
             // the way to the panel.
             return Array.Empty<MachinePreset>();
         }
+    }
+
+    /// <summary>
+    /// Which folder holds that machine's presets.
+    /// </summary>
+    /// <remarks>
+    /// Inside the machine where the machine is a project on disc, which is where a converted one
+    /// keeps everything else it ships: the panel, the pictures, and the recordings a kit is
+    /// built out of. Beside the program for the machines still waiting their turn.
+    ///
+    /// By id and not by name, because the name is what the machine calls itself and can be
+    /// changed by whoever imports a new version of it. The id is what it is.
+    /// </remarks>
+    private static string Folder(Machine machine)
+    {
+        if (Machines.MachineProjects.For(machine.SlotId) is { Folder.Length: > 0 } project)
+            return Path.Combine(project.Folder, Machines.MachineProject.PresetsFolder);
+
+        return Path.Combine(Directory, machine.Name);
     }
 
     /// <summary>
@@ -124,6 +152,18 @@ public static class MachinePresets
     {
         try
         {
+            // Written the way the machine is drawn, if that machine has been converted: one small
+            // piece of JSON per control, keyed by what the control is called. The older shape is
+            // a whole instrument, which is what every unconverted machine's presets still are.
+            if (Machines.MachineProjects.For(machine.SlotId) is { } project
+                && Machines.MachinePresetFile.Read(path, project) is { } keyed)
+            {
+                if (string.IsNullOrWhiteSpace(keyed.Name))
+                    keyed.Name = Path.GetFileNameWithoutExtension(path);
+
+                return keyed;
+            }
+
             var sound = JsonSerializer.Deserialize<TrackerInstrument>(File.ReadAllText(path));
             if (sound == null) return null;
 

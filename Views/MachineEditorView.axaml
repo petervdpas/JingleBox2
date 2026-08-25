@@ -115,7 +115,7 @@
 
           <CheckBox Grid.Column="2" Content="Design" VerticalAlignment="Center"
                     IsChecked="{Binding MachineEditor.Designing}"
-                    IsVisible="{Binding MachineEditor.HasProject}"
+                    IsVisible="{Binding MachineEditor.CanDesign}"
                     ToolTip.Tip="On, a click picks a control up to be worked on. Off, the panel is the panel and a click turns it." />
 
           <Button Grid.Column="3" Content="New" Command="{Binding MachineEditor.NewCommand}"
@@ -141,7 +141,16 @@
          the panel in the middle gets the room. Written out line by line because a width that
          changes has to be bound, and the short form cannot be. Both ways, so that a width the
          handle beside it set is the width the column comes back to. -->
-    <Grid Margin="0,12,0,0" IsVisible="{Binding MachineEditor.HasProject}" MinWidth="0">
+    <!-- Two jobs, two tabs. What the machine looks like and what it sounds like when somebody
+         first meets it have nothing to say to each other, and on one screen neither gets the
+         room. The Design switch belongs to the first: on the other there is no panel being laid
+         out for it to be about. -->
+    <TabControl Margin="0,8,0,0" Padding="0"
+                IsVisible="{Binding MachineEditor.HasProject}"
+                SelectedIndex="{Binding MachineEditor.Page, Mode=TwoWay}">
+
+    <TabItem Header="Screen">
+    <Grid Margin="0,8,0,0" MinWidth="0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="{Binding MachineEditor.LeftWidth, Mode=TwoWay}" />
         <ColumnDefinition Width="Auto" />
@@ -320,6 +329,8 @@
                                    Values="{Binding MachineEditor.Values}"
                                    Takes="{Binding MachineEditor.Takes}"
                                    Presets="{Binding MachineEditor.Presets}"
+                                   Pads="{Binding MachineEditor.PreviewPads}"
+                                   Slices="{Binding MachineEditor.PreviewSlices}"
                                    Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
                                    Designing="{Binding MachineEditor.Designing}">
                 <!-- The same three things the buttons under the panel list do, where the hand
@@ -535,6 +546,33 @@
                              copying a file as well as naming it, and only the machine knows where
                              it goes. Everything else about a picture is typed above like any
                              other property, which is why this shows only while one is picked. -->
+                        <!-- The other thing no list of text boxes can do. A grid of pads is
+                             its buttons, and ninety six of them dropped one at a time is not a
+                             designer, so the shape is said once and the buttons are written. -->
+                        <StackPanel Spacing="6"
+                                    IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadsPicked}">
+                          <Grid ColumnDefinitions="Auto,70,Auto,70,Auto,70" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Classes="field" Text="Buttons" />
+                            <TextBox Grid.Column="1"
+                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadCount}"
+                                     ToolTip.Tip="How many pads the grid has. Six rows of sixteen is ninety six." />
+
+                            <TextBlock Grid.Column="2" Classes="field" Text="Across" />
+                            <TextBox Grid.Column="3"
+                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadColumns}"
+                                     ToolTip.Tip="How many stand side by side." />
+
+                            <TextBlock Grid.Column="4" Classes="field" Text="From key" />
+                            <TextBox Grid.Column="5"
+                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadFirstKey}"
+                                     ToolTip.Tip="The note the first pad answers to, as a semitone. 48 is C-4. The rest run up from it." />
+                          </Grid>
+
+                          <Button Content="Lay the grid out" HorizontalAlignment="Left"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.LayPadsCommand}"
+                                  ToolTip.Tip="Writes that many buttons, keyed from there. Names already in the grid are kept in order, so adding a row does not throw away the ones you named." />
+                        </StackPanel>
+
                         <Button Content="Choose a picture..."
                                 HorizontalAlignment="Left"
                                 Click="Picture_Click"
@@ -552,6 +590,174 @@
       </Grid>
 
     </Grid>
+    </TabItem>
+
+    <TabItem Header="Presets">
+    <!-- The presets page. A preset file is an instrument file, the same shape read by the same
+         reader, so what there is to edit is the file. That is not a shortcut: a preset holds a
+         pad pointing at a wave, a set of knobs, where a wave is cut, or nothing but a pointer at
+         the recordings you already have, and a form with a box for each of those would be four
+         forms, none of which could say the fifth thing somebody wants next. -->
+    <Grid Margin="0,8,0,0" ColumnDefinitions="260,12,*" MinWidth="0">
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Presets" />
+
+          <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
+                     Margin="0,4,0,8"
+                     Text="One preset to a file, in the machine's own folder, so they travel in the zip when it is exported." />
+
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,8,0,0">
+            <Button Grid.Column="0" Content="+ Preset" HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding MachineEditor.PresetDesk.NewCommand}"
+                    IsEnabled="{Binding MachineEditor.PresetDesk.Ready}"
+                    ToolTip.Tip="Writes a new file with the least a preset can be in it: a name, and a machine that plays your own recordings." />
+
+            <Button Grid.Column="1" Content="Remove" Classes="danger"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Command="{Binding MachineEditor.PresetDesk.DeleteCommand}"
+                    IsEnabled="{Binding MachineEditor.PresetDesk.HasPreset}"
+                    ToolTip.Tip="Deletes the file. What it pointed at is left alone." />
+          </Grid>
+
+          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                     Margin="0,8,0,0"
+                     IsVisible="{Binding !MachineEditor.PresetDesk.Ready}"
+                     Text="Save the machine first. A preset lives in the machine's folder, and this one has not got one yet." />
+
+          <ListBox ItemsSource="{Binding MachineEditor.PresetDesk.Presets}"
+                   SelectedItem="{Binding MachineEditor.PresetDesk.Picked, Mode=TwoWay}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:MachinePresetSlot">
+                <StackPanel Spacing="1" Margin="0,2">
+                  <TextBlock Text="{Binding Name}" />
+                  <TextBlock Classes="cardHint" Text="{Binding FileName}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
+                       Text="{Binding MachineEditor.PresetDesk.Picked.Name}" />
+
+            <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding MachineEditor.PresetDesk.Said}" />
+
+            <Button Grid.Column="2" Content="Add waves..."
+                    Click="PresetWaves_Click"
+                    IsEnabled="{Binding MachineEditor.PresetDesk.HasForm}"
+                    ToolTip.Tip="Brings recordings in from anywhere, copies them into the machine beside this preset, and writes them onto the pads in order. A preset plays files that live inside the machine, so that the machine can be handed to somebody." />
+
+            <Button Grid.Column="3" Content="Save preset"
+                    Command="{Binding MachineEditor.PresetDesk.SaveCommand}"
+                    IsEnabled="{Binding MachineEditor.PresetDesk.HasForm}"
+                    ToolTip.Tip="Writes the file back. Anything it plays from outside the machine is brought inside first, so the preset arrives whole on somebody else's disc." />
+          </Grid>
+
+          <!-- What is wrong with it, said where the mistake is rather than at the moment of
+               saving. -->
+          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                     Margin="0,8,0,0" Foreground="{DynamicResource DangerBrush}"
+                     IsVisible="{Binding MachineEditor.PresetDesk.HasProblem}"
+                     Text="{Binding MachineEditor.PresetDesk.Problem}" />
+
+          <!-- The preset, set out the way the machine's own description says. A parameter the
+               machine declares is a knob where the machine is played and a line here: one
+               declaration, drawn twice. No controls of the machine's own on this page, because
+               what a preset is worth is judged by playing it on the rack. -->
+          <!-- The one preset that is not settings. A machine whose whole sound is a recording
+               of yours has none worth shipping, so it ships this instead, and this is what the
+               picker on its panel reads to know it should offer your shelf. -->
+          <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
+                     Margin="0,10,0,0"
+                     IsVisible="{Binding MachineEditor.PresetDesk.Browses}"
+                     Text="This machine has no settings worth shipping: what it is, is the recording on it. So its picker offers your own takes, filed the way the RECORD tab files them, rather than a list of presets. Nothing here to fill in." />
+
+          <!-- What the builder can still assign a value to, and the button that does it. A
+               preset is what somebody put in it: a kit that sets four drums says four drums,
+               and the twelve empty pads are nobody's business. -->
+          <!-- What the builder can give a value to. Everything the machine has is in here,
+               narrowed by what sort of thing it is, because the thing you are looking for on a
+               machine with ninety six pads and thirty knobs is a pad or a knob before it is
+               anything else. Both lists come off the machine's own description. -->
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,150,220,Auto" ColumnSpacing="8"
+                Margin="0,10,0,0"
+                IsVisible="{Binding MachineEditor.PresetDesk.HasForm}">
+            <TextBlock Grid.Column="0" Classes="field" Text="Give a value to" />
+
+            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding MachineEditor.PresetDesk.Form.Kinds}"
+                      SelectedItem="{Binding MachineEditor.PresetDesk.Form.Kind, Mode=TwoWay}"
+                      ToolTip.Tip="What sort of thing: a pad, a knob, a fader, a recording. The sorts this machine actually has, read off its own panel." />
+
+            <ComboBox Grid.Column="2" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding MachineEditor.PresetDesk.Form.Offers}"
+                      SelectedItem="{Binding MachineEditor.PresetDesk.Form.Offered, Mode=TwoWay}"
+                      ToolTip.Tip="Which one. Pads are listed by the key each answers to." />
+
+            <Button Grid.Column="3" Content="+ Add"
+                    Command="{Binding MachineEditor.PresetDesk.Form.AddCommand}"
+                    IsEnabled="{Binding MachineEditor.PresetDesk.Form.HasOffers}"
+                    ToolTip.Tip="Starts saying something about it. A pad arrives with the lines a pad has and nothing in them. One the preset already speaks about is left alone." />
+          </Grid>
+
+          <ScrollViewer Margin="0,8,0,0"
+                        IsVisible="{Binding MachineEditor.PresetDesk.HasForm}">
+            <ItemsControl ItemsSource="{Binding MachineEditor.PresetDesk.Form.Sections}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PresetSection">
+                  <StackPanel Spacing="2" Margin="0,0,0,10">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,2">
+                      <TextBlock Grid.Column="0" Classes="section" Text="{Binding Heading}" />
+
+                      <Button Grid.Column="2" Content="✕" Classes="danger"
+                              Command="{Binding RemoveCommand}"
+                              ToolTip.Tip="Takes it out of the preset, so the preset says nothing about it again." />
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding Lines}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PresetLine">
+                          <!-- The line follows what kind of thing it is. A number and a name are
+                               typed; a recording is picked, because a wave has to be brought
+                               inside the machine before a preset can name it. -->
+                          <Grid ColumnDefinitions="140,260,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,3">
+                            <TextBlock Grid.Column="0" Classes="field" Text="{Binding Name}" />
+
+                            <TextBox Grid.Column="1" Text="{Binding Text, Mode=TwoWay}"
+                                     ToolTip.Tip="{Binding Text}" />
+
+                            <Button Grid.Column="2" Content="..."
+                                    IsVisible="{Binding IsWave}"
+                                    Click="PresetWave_Click"
+                                    ToolTip.Tip="Puts a recording on this one. It is copied into the machine, so the preset names a file that travels with it." />
+
+                            <TextBlock Grid.Column="3" Classes="cardHint" VerticalAlignment="Center"
+                                       Text="{Binding Unit}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+    </Grid>
+    </TabItem>
+
+    </TabControl>
 
   </DockPanel>
 

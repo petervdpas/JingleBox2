@@ -5,6 +5,7 @@
   "Author": "Peter van de Pas",
   "Version": "1.0",
   "Engine": "",
+  "StartsFrom": "takes",
   "Theme": {
     "Accent": "#3FA6A0",
     "Face": 0.68,

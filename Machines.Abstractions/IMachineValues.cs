@@ -36,4 +36,5 @@ public interface IMachineValues
 
     /// <summary>Sets it, because somebody picked something the machine names rather than counts.</summary>
     void SetText(string key, string value) { }
+
 }

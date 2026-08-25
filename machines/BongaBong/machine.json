@@ -1,0 +1,435 @@
+{
+  "Id": "machine.bongabong",
+  "Name": "BongaBong",
+  "Summary": "A kit. Sixteen pads, one recording to a key, sounding over each other.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "",
+  "Theme": {
+    "Accent": "#D2504A",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "StartsFrom": "presets",
+  "Parameters": [
+    {
+      "Key": "pad_level",
+      "Name": "Level",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    },
+    {
+      "Key": "pad_pan",
+      "Name": "Pan",
+      "Unit": "",
+      "Min": -1,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.02
+    },
+    {
+      "Key": "pad_choke",
+      "Name": "Choke",
+      "Unit": "",
+      "Min": 0,
+      "Max": 8,
+      "Default": 0,
+      "Step": 1
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "12",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "12"
+          },
+          "Children": [
+            {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Start from",
+                "width": "258"
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "12"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Pads"
+              },
+              "Children": [
+                {
+                  "Element": "Pads",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "columns": "4",
+                    "cap": "86",
+                    "capHeight": "42",
+                    "gap": "5",
+                    "tip": "Hits the pad. The key under it is the one that fires it in a pattern."
+                  },
+                  "Children": [
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad1",
+                      "Label": "",
+                      "Properties": {
+                        "key": "C-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad2",
+                      "Label": "",
+                      "Properties": {
+                        "key": "C#4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad3",
+                      "Label": "",
+                      "Properties": {
+                        "key": "D-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad4",
+                      "Label": "",
+                      "Properties": {
+                        "key": "D#4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad5",
+                      "Label": "",
+                      "Properties": {
+                        "key": "E-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad6",
+                      "Label": "",
+                      "Properties": {
+                        "key": "F-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad7",
+                      "Label": "",
+                      "Properties": {
+                        "key": "F#4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad8",
+                      "Label": "",
+                      "Properties": {
+                        "key": "G-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad9",
+                      "Label": "",
+                      "Properties": {
+                        "key": "G#4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad10",
+                      "Label": "",
+                      "Properties": {
+                        "key": "A-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad11",
+                      "Label": "",
+                      "Properties": {
+                        "key": "A#4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad12",
+                      "Label": "",
+                      "Properties": {
+                        "key": "B-4"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad13",
+                      "Label": "",
+                      "Properties": {
+                        "key": "C-5"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad14",
+                      "Label": "",
+                      "Properties": {
+                        "key": "C#5"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad15",
+                      "Label": "",
+                      "Properties": {
+                        "key": "D-5"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Pad",
+                      "Parameter": "pad16",
+                      "Label": "",
+                      "Properties": {
+                        "key": "D#5"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Column",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "gap": "10"
+              },
+              "Children": [
+                {
+                  "Element": "Group",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "caption": "Pad"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Column",
+                      "Parameter": "",
+                      "Label": "",
+                      "Properties": {
+                        "gap": "8"
+                      },
+                      "Children": [
+                        {
+                          "Element": "Row",
+                          "Parameter": "",
+                          "Label": "",
+                          "Properties": {
+                            "gap": "8"
+                          },
+                          "Children": [
+                            {
+                              "Element": "PadPicker",
+                              "Parameter": "",
+                              "Label": "",
+                              "Properties": {
+                                "width": "150",
+                                "tip": "Which pad the settings below are about."
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Button",
+                              "Parameter": "",
+                              "Label": "",
+                              "Properties": {
+                                "cap": "Clear",
+                                "action": "clear_pad",
+                                "tip": "Takes the recording off this pad."
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Button",
+                              "Parameter": "",
+                              "Label": "",
+                              "Properties": {
+                                "cap": "Load samples...",
+                                "action": "load_pads",
+                                "tip": "Pick any number of samples from anywhere. They are copied into JingleBox and put on the pads in order, so the kit no longer depends on where they came from."
+                              },
+                              "Children": []
+                            }
+                          ]
+                        },
+                        {
+                          "Element": "Row",
+                          "Parameter": "",
+                          "Label": "",
+                          "Properties": {
+                            "gap": "8"
+                          },
+                          "Children": [
+                            {
+                              "Element": "Take",
+                              "Parameter": "pad_take",
+                              "Label": "",
+                              "Properties": {
+                                "tip": "Fetches one of your recordings onto this pad: search it by name or narrow it to a category. Anything from elsewhere is imported on the RECORD tab first.",
+                                "style": "plain"
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Label",
+                              "Parameter": "",
+                              "Label": "Name",
+                              "Properties": {
+                                "margin": "6,0,8,0",
+                                "style": "field"
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Text",
+                              "Parameter": "pad_name",
+                              "Label": "",
+                              "Properties": {
+                                "width": "130"
+                              },
+                              "Children": []
+                            }
+                          ]
+                        },
+                        {
+                          "Element": "Label",
+                          "Parameter": "pad_details",
+                          "Label": "",
+                          "Properties": {
+                            "width": "260",
+                            "style": "hint"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Row",
+                          "Parameter": "",
+                          "Label": "",
+                          "Properties": {
+                            "gap": "14"
+                          },
+                          "Children": [
+                            {
+                              "Element": "Knob",
+                              "Parameter": "pad_level",
+                              "Label": "",
+                              "Properties": {
+                                "tip": "How loud this pad is, under the track\u0027s own level."
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Knob",
+                              "Parameter": "pad_pan",
+                              "Label": "",
+                              "Properties": {
+                                "tip": "Where this pad stands on the kit. The track\u0027s own pan is added to it."
+                              },
+                              "Children": []
+                            },
+                            {
+                              "Element": "Knob",
+                              "Parameter": "pad_choke",
+                              "Label": "",
+                              "Properties": {
+                                "tip": "Pads sharing a number cut each other off, which is what a closed hihat does to an open one. Nought is no group, which is most of a kit."
+                              },
+                              "Children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Element": "Keys",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while its pad is sounding, and the pad it belongs to is the one the settings above are about."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Slices",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "picture": "90"
+          },
+          "Children": []
+        }
+      ]
+    }
+  }
+}

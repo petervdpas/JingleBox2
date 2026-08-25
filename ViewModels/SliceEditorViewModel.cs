@@ -1,5 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using JingleBox2.Machines;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Tracker;
@@ -25,7 +26,7 @@ namespace JingleBox2.ViewModels;
 /// opens, and written back through the callback whenever they change, so the pieces stay the
 /// one place they live.
 /// </remarks>
-public sealed partial class SliceEditorViewModel : ObservableObject
+public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSlices
 {
     /// <summary>What a fresh slicing aims for when nothing says otherwise.</summary>
     public const int DefaultPieces = 8;
@@ -220,6 +221,14 @@ public sealed partial class SliceEditorViewModel : ObservableObject
 
     /// <summary>Cuts the recording up, throwing away wherever it was cut before.</summary>
     public IRelayCommand SliceCommand => new RelayCommand(Cut);
+
+    /// <summary>The same act, for a panel that presses a button rather than binding a command.</summary>
+    /// <remarks>
+    /// A machine drawn from its own description has no bindings: it is handed the thing it is
+    /// showing and calls it. So the act is offered plainly as well, and both go to the same
+    /// place.
+    /// </remarks>
+    public void Chop() => Cut();
 
     /// <summary>
     /// Follows whatever recording the machine is holding, and wherever it is already cut.

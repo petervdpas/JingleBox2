@@ -412,7 +412,7 @@ public sealed partial class MainViewModel : ObservableObject
         // And the shelf its picker offers, which is the same one again: a machine that plays a
         // recording is started from a recording, so the list at the top of the panel is your
         // takes and the categories they are filed under.
-        MachineEditor.Presets = new Tracker.Machines.TakeShelf(
+        MachineEditor.Shelf = new Tracker.Machines.TakeShelf(
             Record.Recordings, take => MachineEditor.PutTake(take.FilePath));
 
         // The rack: the machines you have, and the plugins you have added. A song takes an
