@@ -3,6 +3,7 @@ using JingleBox2.Tracker;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
@@ -41,8 +42,18 @@ public sealed class DesignerKeys : IMachineKeys
         _designer.Sounding.Lit.CollectionChanged += Moved;
     }
 
-    /// <summary>What is sounding this instant.</summary>
-    public IEnumerable Lit => _designer.Sounding.Lit;
+    /// <summary>
+    /// The keys a hand is on: what the keyboard lights.
+    /// </summary>
+    /// <remarks>
+    /// Not what is sounding, which is what the pads light and is a different question. A cymbal
+    /// rings on under the snare that follows it and both its pad stays lit; the key that started
+    /// it went up a tenth of a second after it went down. A keyboard lit by the sounding notes
+    /// lags behind every single thing you do on it.
+    /// </remarks>
+    public IEnumerable Lit => _held;
+
+    private readonly ObservableCollection<int> _held = new();
 
     /// <summary>
     /// The keys with something on them, which on anything but a kit is none of them.
@@ -88,8 +99,39 @@ public sealed class DesignerKeys : IMachineKeys
         }
     }
 
-    /// <summary>Plays it, through the same command the keyboard at the foot of the panel used.</summary>
-    public void Play(int semitone) => _designer.KeyCommand.Execute(semitone);
+    /// <summary>Plays it, and remembers that a hand is on it.</summary>
+    /// <remarks>
+    /// A key already down is not pressed again. Holding one on the computer keyboard repeats it
+    /// for as long as it is held, and a machine retriggered forty times a second is not what
+    /// anybody meant by leaning on a key.
+    /// </remarks>
+    public void Play(int semitone)
+    {
+        if (_held.Contains(semitone)) return;
+
+        _held.Add(semitone);
+
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        _designer.Play(new Note(semitone), TrackerCell.NoVolume);
+    }
+
+    /// <summary>Says it is up again, which is what puts its light out.</summary>
+    /// <remarks>
+    /// The light goes out and the note is let go, which is the same thing a pattern's OFF does
+    /// to a track: it goes into its release rather than stopping dead, so a sound with a long
+    /// tail keeps its tail.
+    /// </remarks>
+    public void Let(int semitone)
+    {
+        if (!_held.Remove(semitone)) return;
+
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        // And the note itself is let go, which is the same thing a pattern's OFF does to a
+        // track. A key coming up is not a stop button: what it started goes into its release.
+        _designer.Let(new Note(semitone));
+    }
 
     public event EventHandler? Changed;
 

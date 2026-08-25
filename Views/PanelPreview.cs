@@ -94,6 +94,8 @@ public static class PanelPreview
     {
         public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
 
+        public void Let(TrackerInstrument instrument, Note note) { }
+
         public void Silence(TrackerInstrument instrument) { }
 
         /// <summary>

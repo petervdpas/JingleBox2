@@ -34,11 +34,52 @@ public sealed partial class MachineElementViewModel : ObservableObject
         foreach (var child in element.Children) Children.Add(new MachineElementViewModel(child, this));
 
         foreach (var pair in element.Properties)
+        {
+            if (Owned(element, pair.Key)) continue;
+
             Properties.Add(new MachineElementPropertyViewModel(element, pair.Key));
+        }
     }
+
+    /// <summary>What a grid is: so many down by so many across.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the two properties the grid tool owns can be found by
+    /// looking for them.
+    /// </remarks>
+    private const string RowsKey = "rows";
+
+    private const string ColumnsKey = "columns";
+
+    /// <summary>
+    /// True when a property belongs to a tool of its own rather than to the list of rows.
+    /// </summary>
+    /// <remarks>
+    /// A grid's shape is its rows and its columns, and changing either means writing the buttons
+    /// again: six by sixteen is ninety six of them, each with a key of its own. A box you could
+    /// type four into would say the grid was four wide without making it so, which is why the two
+    /// are set where they are acted on.
+    /// </remarks>
+    private static bool Owned(MachineElement element, string key) =>
+        element.Element == MachineElementKinds.Pads && key is RowsKey or ColumnsKey;
 
     /// <summary>The element this stands for, which is the thing that gets written to the file.</summary>
     public MachineElement Element { get; }
+
+    /// <summary>
+    /// Whether this branch of the list is open.
+    /// </summary>
+    /// <remarks>
+    /// Two way, because it is set from both ends: by a hand on the chevron, and by picking
+    /// something on the panel, which has to open every branch above it or the thing you just
+    /// clicked is selected somewhere nobody can see.
+    /// </remarks>
+    [ObservableProperty] private bool isOpen;
+
+    /// <summary>Opens every branch above this one, so it can be seen.</summary>
+    public void Reveal()
+    {
+        for (var above = Parent; above != null; above = above.Parent) above.IsOpen = true;
+    }
 
     /// <summary>
     /// What holds this one, or null for the root.

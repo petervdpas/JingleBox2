@@ -54,6 +54,16 @@ public interface IMachineKeys
     /// <summary>Plays it, which is what clicking a key has always done.</summary>
     void Play(int semitone);
 
+    /// <summary>
+    /// Says it is up again.
+    /// </summary>
+    /// <remarks>
+    /// What lights a key is a hand on it, not the sound it started. A cymbal rings for four
+    /// seconds and the key was down for a tenth of one, so a keyboard lit by the sounding notes
+    /// is a keyboard that lags behind everything you do on it.
+    /// </remarks>
+    void Let(int semitone);
+
     /// <summary>Told when any of the above has moved.</summary>
     event EventHandler? Changed;
 }

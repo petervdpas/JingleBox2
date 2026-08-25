@@ -150,6 +150,7 @@ public partial class InstrumentPanel : UserControl
 
         _keySource = TopLevel.GetTopLevel(this);
         _keySource?.AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+        _keySource?.AddHandler(KeyUpEvent, OnKeyUp, RoutingStrategies.Tunnel);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -157,6 +158,7 @@ public partial class InstrumentPanel : UserControl
         base.OnDetachedFromVisualTree(e);
 
         _keySource?.RemoveHandler(KeyDownEvent, OnKeyDown);
+        _keySource?.RemoveHandler(KeyUpEvent, OnKeyUp);
         _keySource = null;
     }
 
@@ -174,8 +176,29 @@ public partial class InstrumentPanel : UserControl
 
         if (KeyboardNoteMap.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
 
-        designer.Play(note, TrackerCell.NoVolume);
+        // Through the keyboard's own set, so a key held down repeats nothing and the key on
+        // screen lights for exactly as long as the one under your finger is down.
+        designer.MachineKeys.Play(note.Semitone);
+
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// A typed key let go, which is what puts its light out.
+    /// </summary>
+    /// <remarks>
+    /// The other half of playing by typing. Without it a key lights until whatever it started
+    /// stops sounding, which on a cymbal is four seconds after the hand came off.
+    /// </remarks>
+    private void OnKeyUp(object? sender, KeyEventArgs e)
+    {
+        var designer = Designer;
+
+        if (designer?.Editor == null || !IsEffectivelyVisible) return;
+
+        if (KeyboardNoteMap.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
+
+        designer.MachineKeys.Let(note.Semitone);
     }
 
     /// <summary>

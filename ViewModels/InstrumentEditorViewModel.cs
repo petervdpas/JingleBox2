@@ -107,13 +107,21 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         if (instrument.IsBongaBong)
         {
-            instrument.Kit ??= DrumKit.Empty();
-            instrument.Kit.Clamp();
+            // How many pads there are is the machine's to say, declared as buttons on its panel.
+            // A machine that is not installed as a project says nothing, and the kit keeps
+            // whatever size it was read at.
+            int declared = Tracker.Machines.MachineProjects.For(Machine.For(instrument.Kind).SlotId)
+                is { } project
+                ? Tracker.Machines.MachinePresetFile.Buttons(project).Count
+                : 0;
+
+            instrument.Kit ??= DrumKit.Empty(declared > 0 ? declared : DrumKit.PadCount);
+            instrument.Kit.Clamp(declared);
 
             Kit = new DrumKitViewModel(instrument.Kit, Sounded(changed), tap);
 
             Slices = Cutting(
-                waveforms, DrumKit.PadCount,
+                waveforms, instrument.Kit.Pads.Count,
                 (path, points) =>
                 {
                     instrument.Kit.Reslice(path, points);

@@ -96,6 +96,7 @@
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
+                    "rows": "4",
                     "columns": "4",
                     "cap": "86",
                     "capHeight": "42",
@@ -379,7 +380,7 @@
                               "Parameter": "pad_level",
                               "Label": "",
                               "Properties": {
-                                "tip": "How loud this pad is, under the track\u0027s own level."
+                                "tip": "How loud this pad is, under the track's own level."
                               },
                               "Children": []
                             },
@@ -388,7 +389,7 @@
                               "Parameter": "pad_pan",
                               "Label": "",
                               "Properties": {
-                                "tip": "Where this pad stands on the kit. The track\u0027s own pan is added to it."
+                                "tip": "Where this pad stands on the kit. The track's own pan is added to it."
                               },
                               "Children": []
                             },
@@ -412,7 +413,7 @@
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while its pad is sounding, and the pad it belongs to is the one the settings above are about."
+                    "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down; the pad it fires stays lit for as long as it sounds. The pad in hand is the outlined key."
                   },
                   "Children": []
                 }

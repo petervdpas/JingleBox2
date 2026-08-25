@@ -72,8 +72,10 @@ public static class MachinePresetFile
 
             if (buttons.Count > 0)
             {
-                sound.Kit ??= DrumKit.Empty();
-                sound.Kit.Clamp();
+                // As many pads as the machine declares buttons, which is the only place that
+                // number is said.
+                sound.Kit ??= DrumKit.Empty(buttons.Count);
+                sound.Kit.Clamp(buttons.Count);
 
                 // The key each pad answers to is on the button, not in the preset. A preset that
                 // said it too would be a second place for it to be wrong.
@@ -115,7 +117,7 @@ public static class MachinePresetFile
             }
 
             sound.Patch.Clamp();
-            sound.Kit?.Clamp();
+            sound.Kit?.Clamp(buttons.Count);
 
             return sound;
         }
@@ -148,7 +150,8 @@ public static class MachinePresetFile
 
         if (buttons.Count > 0)
         {
-            var kit = new ViewModels.DrumKitViewModel(sound.Kit ??= DrumKit.Empty(), () => { }, _ => { });
+            var kit = new ViewModels.DrumKitViewModel(
+                sound.Kit ??= DrumKit.Empty(buttons.Count), () => { }, _ => { });
 
             for (int at = 0; at < buttons.Count && at < kit.Pads.Count; at++)
             {

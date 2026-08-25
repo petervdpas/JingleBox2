@@ -87,12 +87,21 @@ public sealed class DrumPad
 /// What this shares with a map is reading audio out of a file, and being cuttable into pieces.
 /// Nothing above that.
 ///
-/// Sixteen pads laid out four by four, starting at C-4, because that is what the hand expects
-/// and because sixteen is as many as a panel can show without becoming a list.
+/// As many pads as the machine says it has, which is sixteen on a machine that says nothing.
+/// Four by four starting at C-4 is what a hand expects, and it is what BongaBong declares; a
+/// machine wanting six rows of sixteen declares ninety six buttons and gets a kit of ninety six.
 /// </remarks>
 public sealed class DrumKit
 {
-    /// <summary>How many pads a kit has.</summary>
+    /// <summary>
+    /// How many pads a kit has when nothing says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// The fallback and no longer the rule. How many pads there are is a fact about the machine,
+    /// declared as buttons on its panel, and everything that knows which machine a kit is on
+    /// passes that number in. This is what is left for the places that do not: an instrument
+    /// read off an old file, a kit made before anybody said which machine it was for.
+    /// </remarks>
     public const int PadCount = 16;
 
     /// <summary>The key the first pad answers to: C-4, the note a fresh pattern starts on.</summary>
@@ -100,12 +109,13 @@ public sealed class DrumKit
 
     public List<DrumPad> Pads { get; set; } = new();
 
-    /// <summary>A kit with sixteen empty pads, laid out from C-4 upwards.</summary>
-    public static DrumKit Empty()
+    /// <summary>A kit with that many empty pads, laid out from C-4 upwards.</summary>
+    /// <param name="pads">How many, or none given for however many a machine that says nothing has.</param>
+    public static DrumKit Empty(int pads = PadCount)
     {
         var kit = new DrumKit();
 
-        for (int i = 0; i < PadCount; i++)
+        for (int i = 0; i < Math.Max(1, pads); i++)
             kit.Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
 
         return kit;
@@ -152,9 +162,9 @@ public sealed class DrumKit
     /// <summary>
     /// One recording cut at those points and laid over the pads, a piece to each key.
     /// </summary>
-    public static DrumKit Slice(string filePath, IReadOnlyList<double> points)
+    public static DrumKit Slice(string filePath, IReadOnlyList<double> points, int pads = PadCount)
     {
-        var kit = Empty();
+        var kit = Empty(pads);
 
         kit.Reslice(filePath, points);
 
@@ -171,13 +181,17 @@ public sealed class DrumKit
     /// </remarks>
     public void Reslice(string filePath, IReadOnlyList<double> points)
     {
-        int slices = Slices.CountFor(points, PadCount);
+        // However many pads this kit has, not however many a kit used to have. A chop fills the
+        // machine it is on.
+        int held = Math.Max(1, Pads.Count);
+
+        int slices = Slices.CountFor(points, held);
 
         if (slices == 0) return;
 
         Clamp();
 
-        for (int i = 0; i < PadCount; i++)
+        for (int i = 0; i < held && i < Pads.Count; i++)
         {
             var pad = Pads[i];
 
@@ -237,20 +251,39 @@ public sealed class DrumKit
     }
 
     /// <summary>
-    /// Brings a kit read off disk back into shape: sixteen pads, one to a key, in order.
+    /// Brings a kit read off disk back into shape: that many pads, one to a key, in order.
     /// </summary>
-    public void Clamp()
+    /// <param name="pads">
+    /// How many the machine has, or none given to leave the kit at whatever size it is.
+    /// </param>
+    /// <remarks>
+    /// Nothing given is the important case, and it is why this takes an argument at all. A kit
+    /// arrives here from three places: a machine that knows how many buttons it declared, an old
+    /// file that predates the question, and a copy of another kit. Only the first can answer, and
+    /// the other two must not be resized to a number this class made up.
+    /// </remarks>
+    public void Clamp(int pads = 0)
     {
         Pads ??= new List<DrumPad>();
 
         foreach (var pad in Pads) pad.Clamp();
 
-        // A file may hold fewer pads than the machine has, or none at all. The missing ones
-        // are added silently rather than the kit being refused.
-        for (int i = Pads.Count; i < PadCount; i++)
-            Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
+        if (pads > 0)
+        {
+            // A file may hold fewer pads than the machine has, or none at all. The missing ones
+            // are added silently rather than the kit being refused.
+            for (int i = Pads.Count; i < pads; i++)
+                Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
 
-        if (Pads.Count > PadCount) Pads.RemoveRange(PadCount, Pads.Count - PadCount);
+            if (Pads.Count > pads) Pads.RemoveRange(pads, Pads.Count - pads);
+        }
+        else if (Pads.Count == 0)
+        {
+            // Nothing said, and nothing there. A kit of no pads is a kit nothing can be put on,
+            // so it starts at the size a machine that says nothing has.
+            for (int i = 0; i < PadCount; i++)
+                Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
+        }
 
         // One key to a pad. Two pads on the same key means one of them can never sound.
         for (int i = 0; i < Pads.Count; i++)

@@ -1310,6 +1310,7 @@ public class MachinePanelView : Decorator
         keys.Filled = keyboard.Filled;
         keys.Marked = keyboard.Marked;
         keys.Command = new Struck(keyboard.Play);
+        keys.ReleaseCommand = new Struck(keyboard.Let);
 
         if (element.Parameter.Length == 0)
         {
@@ -1883,6 +1884,9 @@ public class MachinePanelView : Decorator
 
         if (cells.Count > 0) grid.Cells = cells;
 
+        // Across only. How many rows there are follows from how many buttons there are, so a
+        // grid whose last row is short still draws every button it declares rather than a
+        // rectangle with holes in it.
         if (Number(element, "columns", 0) is var across and > 0) grid.Columns = across;
         if (Measurement(element, "cap") is { } wide) grid.CapWidth = wide;
         if (Measurement(element, "capHeight") is { } tall) grid.CapHeight = tall;

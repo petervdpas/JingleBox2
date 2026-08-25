@@ -104,6 +104,17 @@ public class Clavier : ThemedControl
     public static readonly StyledProperty<ICommand?> CommandProperty =
         AvaloniaProperty.Register<Clavier, ICommand?>(nameof(Command));
 
+    /// <summary>
+    /// Run with that same semitone when the key is let go.
+    /// </summary>
+    /// <remarks>
+    /// A key is down while a hand is on it and up when the hand comes off, which is not the same
+    /// as how long what it started goes on sounding. A cymbal rings for four seconds; the key was
+    /// down for a tenth of one.
+    /// </remarks>
+    public static readonly StyledProperty<ICommand?> ReleaseCommandProperty =
+        AvaloniaProperty.Register<Clavier, ICommand?>(nameof(ReleaseCommand));
+
     public static readonly StyledProperty<double> KeyHeightProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(KeyHeight), 52.0);
 
@@ -211,6 +222,12 @@ public class Clavier : ThemedControl
     {
         get => GetValue(MarkedProperty);
         set => SetValue(MarkedProperty, value);
+    }
+
+    public ICommand? ReleaseCommand
+    {
+        get => GetValue(ReleaseCommandProperty);
+        set => SetValue(ReleaseCommandProperty, value);
     }
 
     public ICommand? Command
@@ -662,6 +679,9 @@ public class Clavier : ThemedControl
         int now = KeyAt(e.GetPosition(this));
         if (now < 0 || now == _pressed) return;
 
+        // Slid off one key onto the next: the first is up before the second is down.
+        Let(_pressed);
+
         _pressed = now;
         Play(now);
         InvalidateVisual();
@@ -672,6 +692,8 @@ public class Clavier : ThemedControl
         base.OnPointerReleased(e);
 
         if (_pressed < 0 && _arrow == 0) return;
+
+        Let(_pressed);
 
         _pressed = -1;
         _arrow = 0;
@@ -699,6 +721,16 @@ public class Clavier : ThemedControl
         int note = FirstNote + key;
 
         if (Command?.CanExecute(note) == true) Command.Execute(note);
+    }
+
+    /// <summary>Says that key is up again, if anybody asked to be told.</summary>
+    private void Let(int key)
+    {
+        if (key < 0) return;
+
+        int note = FirstNote + key;
+
+        if (ReleaseCommand?.CanExecute(note) == true) ReleaseCommand.Execute(note);
     }
 
     private int LampAt(Point point)

@@ -145,9 +145,20 @@
          first meets it have nothing to say to each other, and on one screen neither gets the
          room. The Design switch belongs to the first: on the other there is no panel being laid
          out for it to be about. -->
-    <TabControl Margin="0,8,0,0" Padding="0"
+    <TabControl Classes="jobs" Margin="0,8,0,0" Padding="0"
                 IsVisible="{Binding MachineEditor.HasProject}"
                 SelectedIndex="{Binding MachineEditor.Page, Mode=TwoWay}">
+      <TabControl.Styles>
+        <!-- The size the pages across the top are. Fluent's own is a headline and cutting it
+             down turned them into a footnote; these are the two halves of the screen and want
+             reading at a glance. -->
+        <Style Selector="TabControl.jobs > TabItem">
+          <Setter Property="FontSize" Value="16" />
+          <Setter Property="MinHeight" Value="0" />
+          <Setter Property="Padding" Value="2,0,2,5" />
+          <Setter Property="Margin" Value="0,0,16,0" />
+        </Style>
+      </TabControl.Styles>
 
     <TabItem Header="Screen">
     <Grid Margin="0,8,0,0" MinWidth="0">
@@ -262,6 +273,13 @@
                         ItemsSource="{Binding MachineEditor.Elements}"
                         SelectedItem="{Binding MachineEditor.SelectedElement, Mode=TwoWay}"
                         Margin="0,8,0,0">
+                <TreeView.Styles>
+                  <!-- The branch says whether it is open, so picking something on the panel can
+                       open the way down to it. -->
+                  <Style Selector="TreeViewItem" x:DataType="vm:MachineElementViewModel">
+                    <Setter Property="IsExpanded" Value="{Binding IsOpen, Mode=TwoWay}" />
+                  </Style>
+                </TreeView.Styles>
                 <TreeView.ItemTemplate>
                   <TreeDataTemplate x:DataType="vm:MachineElementViewModel" ItemsSource="{Binding Children}">
                     <!-- Written out again rather than shared: one menu is one control and can
@@ -551,21 +569,21 @@
                              designer, so the shape is said once and the buttons are written. -->
                         <StackPanel Spacing="6"
                                     IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadsPicked}">
-                          <Grid ColumnDefinitions="Auto,70,Auto,70,Auto,70" ColumnSpacing="6">
-                            <TextBlock Grid.Column="0" Classes="field" Text="Buttons" />
+                          <Grid ColumnDefinitions="Auto,56,Auto,56,Auto,70" ColumnSpacing="6">
+                            <TextBlock Grid.Column="0" Classes="field" Text="Grid" />
                             <TextBox Grid.Column="1"
-                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadCount}"
-                                     ToolTip.Tip="How many pads the grid has. Six rows of sixteen is ninety six." />
+                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadRows}"
+                                     ToolTip.Tip="How many rows of buttons." />
 
-                            <TextBlock Grid.Column="2" Classes="field" Text="Across" />
+                            <TextBlock Grid.Column="2" Classes="field" Text="by" />
                             <TextBox Grid.Column="3"
                                      Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadColumns}"
-                                     ToolTip.Tip="How many stand side by side." />
+                                     ToolTip.Tip="How many stand side by side. Six by sixteen is ninety six buttons." />
 
                             <TextBlock Grid.Column="4" Classes="field" Text="From key" />
                             <TextBox Grid.Column="5"
                                      Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadFirstKey}"
-                                     ToolTip.Tip="The note the first pad answers to, as a semitone. 48 is C-4. The rest run up from it." />
+                                     ToolTip.Tip="The note the first pad answers to, written as the machine writes it: C-4. The rest run up from there. A plain number is taken too." />
                           </Grid>
 
                           <Button Content="Lay the grid out" HorizontalAlignment="Left"

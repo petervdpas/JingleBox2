@@ -48,6 +48,16 @@ public interface IInstrumentDesigner
     void Play(Note note, int volume);
 
     /// <summary>
+    /// Lets go of one note played by hand: the same thing a pattern's OFF does to a track.
+    /// </summary>
+    /// <remarks>
+    /// A key is down while a hand is on it and up when the hand comes off. What it started goes
+    /// into its release then, rather than running to the end of the file, which is what makes a
+    /// keyboard on a panel behave like the keys in a pattern.
+    /// </remarks>
+    void Let(Note note);
+
+    /// <summary>
     /// Which notes are sounding, for the panel's keyboard to light.
     /// </summary>
     /// <remarks>
@@ -57,8 +67,22 @@ public interface IInstrumentDesigner
     /// </remarks>
     SoundingNotes Sounding { get; }
 
-    /// <summary>Plays a key on the panel's keyboard, named by its absolute semitone.</summary>
-    IRelayCommand<int> KeyCommand { get; }
+    /// <summary>
+    /// A key on a panel's keyboard going down, and coming up again.
+    /// </summary>
+    /// <remarks>
+    /// The only way a keyboard plays anything. Both go through <see cref="MachineKeys"/>, which
+    /// is the one place that knows which keys a hand is on: the held set, the guard against a
+    /// held key repeating, and the note-off all live there and exist once.
+    ///
+    /// There used to be a second way, a plain command that played a note and said nothing about
+    /// letting go. A keyboard wired to it lit from the sounding notes instead of from the hand,
+    /// so it lagged behind by however long the sound lasted, and the two keyboards on the same
+    /// page behaved differently.
+    /// </remarks>
+    IRelayCommand<int> KeyPressCommand => new RelayCommand<int>(MachineKeys.Play);
+
+    IRelayCommand<int> KeyLetCommand => new RelayCommand<int>(MachineKeys.Let);
 
     /// <summary>
     /// The keyboard on a machine's own face, when the machine draws one.

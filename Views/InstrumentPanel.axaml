@@ -394,9 +394,10 @@
 
                 <ui:Clavier Octave="{Binding Octave}"
                                HorizontalAlignment="Left"
-                               Lit="{Binding Sounding.Lit}"
-                               Command="{Binding KeyCommand}"
-                               ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its pad is sounding, and the pad it belongs to is the one the settings above are about." />
+                               Lit="{Binding MachineKeys.Lit}"
+                               Command="{Binding KeyPressCommand}"
+                               ReleaseCommand="{Binding KeyLetCommand}"
+                               ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down; the pad it fires stays lit for as long as it sounds." />
 
                 </StackPanel>
               </StackPanel>
@@ -920,9 +921,10 @@
                            HorizontalAlignment="Left"
                            Margin="0,14,0,0"
                            IsVisible="{Binding Editor.ShowsSharedKeys}"
-                           Lit="{Binding Sounding.Lit}"
-                           Command="{Binding KeyCommand}"
-                           ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while its note is sounding, whether you played it or the pattern did. The arrows and the lamps move the three octaves on show, and it follows a note played outside them." />
+                           Lit="{Binding MachineKeys.Lit}"
+                           Command="{Binding KeyPressCommand}"
+                           ReleaseCommand="{Binding KeyLetCommand}"
+                           ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show." />
 
     </StackPanel>
   </ScrollViewer>

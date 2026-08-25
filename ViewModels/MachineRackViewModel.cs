@@ -272,6 +272,12 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// <summary>Which notes are sounding, for the panel's keyboard to light.</summary>
     public SoundingNotes Sounding { get; } = new();
 
+    /// <summary>Lets go of one note played by hand, which is what a key coming up means.</summary>
+    public void Let(Note note)
+    {
+        if (Selected?.Instrument is { } instrument) _audition.Let(instrument, note);
+    }
+
     /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
     public IMachineKeys MachineKeys => _machineKeys ??= new DesignerKeys(this);
 
@@ -280,8 +286,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
     /// <summary>One note from the panel's own keyboard.</summary>
     public void Play(Note note, int volume) => PlayNote(note, volume);
-
-    public IRelayCommand<int> KeyCommand => new RelayCommand<int>(semitone => PlayNote(new Note(semitone)));
 
     /// <summary>A note played on the computer keyboard or a MIDI keyboard while editing.</summary>
     public void PlayNote(Note note, int volume = TrackerCell.NoVolume)

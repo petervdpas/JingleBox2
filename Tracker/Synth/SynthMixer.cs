@@ -784,6 +784,33 @@ public sealed class SynthMixer
         }
     }
 
+    /// <summary>
+    /// Lets go of one auditioned note, the way a pattern's OFF lets go of a track's.
+    /// </summary>
+    /// <remarks>
+    /// The release and not the cut, because a key coming up is not a stop button: what was
+    /// started goes into its release the way it does when a pattern reaches an OFF, so a sound
+    /// with a long tail keeps its tail.
+    ///
+    /// One note, not every note this instrument is sounding by hand. Two keys held on a kit are
+    /// two drums, and letting go of one must not silence the other.
+    /// </remarks>
+    public void LetAudition(string audition, int semitone)
+    {
+        if (string.IsNullOrEmpty(audition)) return;
+
+        lock (_lock)
+        {
+            foreach (var voice in _voices)
+            {
+                if (voice.Track == SynthVoice.NoTrack
+                    && voice.Audition == audition
+                    && voice.Note.Semitone == semitone)
+                    voice.NoteOff();
+            }
+        }
+    }
+
     public void NoteOff(int track)
     {
         if (track < 0) return;

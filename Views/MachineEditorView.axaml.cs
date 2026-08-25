@@ -393,9 +393,21 @@ public partial class MachineEditorView : UserControl
             return;
         }
 
+        var landed = this.InputHitTest(at) as Visual;
+
+        // Let go over neither the machine nor the list, so nothing was aimed at. The drop is off:
+        // a part that quietly went to the root because the hand was over the parameters would be
+        // a part somebody has to find and take out again.
+        if (!Within(landed, PanelCanvas) && !Within(landed, PanelTree))
+        {
+            editor.Status = "Dropped nowhere, so nothing moved.";
+
+            return;
+        }
+
         // On the panel the hand says where among the others, which is what the line was showing.
         // On the list it says which container, and the part goes at the end of it.
-        var (into, place) = Within(this.InputHitTest(at) as Visual, PanelCanvas)
+        var (into, place) = Within(landed, PanelCanvas)
             ? PanelCanvas.Where(Inside(at))
             : (onList?.Element, -1);
 

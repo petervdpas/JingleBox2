@@ -243,6 +243,21 @@ public sealed class TrackerPlayer : IDisposable
         _synth.Mixer.CutAuditions(instrument.Id);
     }
 
+    /// <summary>
+    /// Lets go of one note played by hand, which is what a key coming up means.
+    /// </summary>
+    /// <remarks>
+    /// The same thing a pattern's OFF does to a track, done to one auditioned note. A key is
+    /// down while a hand is on it and up when the hand comes off, and what it started releases
+    /// then rather than running to the end of the file.
+    /// </remarks>
+    public void LetPreview(TrackerInstrument? instrument, Note note)
+    {
+        if (instrument == null || !note.IsPlayable) return;
+
+        _synth.Mixer.LetAudition(instrument.Id, note.Semitone);
+    }
+
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return 0;

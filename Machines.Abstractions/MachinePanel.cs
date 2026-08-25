@@ -298,11 +298,14 @@ public static class MachineElementKinds
     public const string PadPicker = "PadPicker";
 
     /// <summary>
-    /// The pads of a kit: a grid of buttons. Properties: columns, cap, capHeight, gap, colour.
+    /// The pads of a kit: a grid of buttons. Properties: rows, columns, cap, capHeight, gap, colour.
     /// </summary>
     /// <remarks>
-    /// It holds one <see cref="Pad"/> for each button, so how many pads a machine has is a thing
-    /// the machine says rather than a number built into the program. That is what makes a pad
+    /// Rows and columns say what shape it is, because that is what a grid is and it cannot be
+    /// worked out from the buttons: sixteen of them is four by four, two by eight or sixteen by
+    /// one. It holds one <see cref="Pad"/> for each button, so how many pads a machine has, and
+    /// what each of them answers to, is a thing the machine says rather than a number built into
+    /// the program. That is what makes a pad
     /// reachable on its own: it has a name of its own, a key of its own, and a line of its own in
     /// every preset.
     ///

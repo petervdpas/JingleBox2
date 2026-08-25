@@ -1120,6 +1120,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public double Audition(TrackerInstrument instrument, Note note, int volume) =>
         _player.Preview(instrument, note, GainFor(volume));
 
+    /// <summary>Lets go of one note played by hand, which is what a key coming up means.</summary>
+    public void Let(TrackerInstrument instrument, Note note) => _player.LetPreview(instrument, note);
+
     /// <summary>Stops what that instrument was sounding by hand, for a panel being left.</summary>
     public void Silence(TrackerInstrument instrument) => _player.CutPreview(instrument);
 

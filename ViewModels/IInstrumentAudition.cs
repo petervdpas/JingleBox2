@@ -17,6 +17,16 @@ public interface IInstrumentAudition
     double Audition(TrackerInstrument instrument, Note note, int volume);
 
     /// <summary>
+    /// Lets go of one note played by hand: the same thing a pattern's OFF does to a track.
+    /// </summary>
+    /// <remarks>
+    /// One note and not the instrument, because two keys held down are two notes and letting go
+    /// of one must not silence the other. What was started goes into its release rather than
+    /// stopping dead, so a sound with a long tail keeps its tail.
+    /// </remarks>
+    void Let(TrackerInstrument instrument, Note note);
+
+    /// <summary>
     /// Stops whatever that instrument is sounding by hand, leaving a pattern's notes alone.
     /// </summary>
     void Silence(TrackerInstrument instrument);

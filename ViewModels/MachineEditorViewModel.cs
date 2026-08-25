@@ -939,6 +939,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         // nobody could recognise as pads.
         if (kind == MachineElementKinds.Pads)
         {
+            made.Properties["rows"] = "4";
             made.Properties["columns"] = "4";
             made.Properties["cap"] = "86";
             made.Properties["capHeight"] = "42";
@@ -1159,6 +1160,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     partial void OnSelectedElementChanged(MachineElementViewModel? value)
     {
+        // Picked on the panel, it may be buried three branches deep in the list. Opening the
+        // way down to it is what makes the two halves the same selection rather than two.
+        value?.Reveal();
+
         OnPropertyChanged(nameof(SelectedShape));
         OnPropertyChanged(nameof(HasSelection));
         OnPropertyChanged(nameof(PicturePicked));
@@ -1168,14 +1173,19 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         // it without changing anything lays out what is already there.
         if (value?.Element is { } picked && picked.Element == MachineElementKinds.Pads)
         {
-            PadCount = picked.Children.Count(child => child.Element == MachineElementKinds.Pad);
+            int held = picked.Children.Count(child => child.Element == MachineElementKinds.Pad);
 
             if (int.TryParse(picked.Properties.GetValueOrDefault("columns"), out int across) && across > 0)
                 PadColumns = across;
 
-            var first = picked.Children.FirstOrDefault(child => child.Element == MachineElementKinds.Pad);
+            // Said by the grid, or worked out from the buttons for one written before it said so.
+            PadRows = int.TryParse(picked.Properties.GetValueOrDefault("rows"), out int down) && down > 0
+                ? down
+                : Math.Max(1, (held + Math.Max(1, PadColumns) - 1) / Math.Max(1, PadColumns));
 
-            if (first != null && int.TryParse(first.Properties.GetValueOrDefault("key"), out int key))
+            var lowest = picked.Children.FirstOrDefault(child => child.Element == MachineElementKinds.Pad);
+
+            if (lowest != null && lowest.Properties.GetValueOrDefault("key") is { Length: > 0 } key)
                 PadFirstKey = key;
         }
     }
@@ -1201,18 +1211,26 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <summary>True when a grid of pads is picked, which is the one shape you lay out at once.</summary>
     public bool PadsPicked => SelectedElement?.Kind == MachineElementKinds.Pads;
 
-    /// <summary>How many buttons the grid should have.</summary>
+    /// <summary>
+    /// How many rows of buttons the grid has, and how many stand side by side.
+    /// </summary>
     /// <remarks>
-    /// Sixteen to start with, which is what a drum machine's grid has been since they were made
-    /// of rubber. A machine wanting six rows of sixteen says ninety six here and sixteen across.
+    /// A grid is said the way a grid is said: four by four, or six by sixteen. How many buttons
+    /// there are in total is those two multiplied, which is not a thing anybody should have to
+    /// work out in their head before typing it.
     /// </remarks>
-    [ObservableProperty] private int padCount = 16;
+    [ObservableProperty] private int padRows = 4;
 
-    /// <summary>How many stand side by side.</summary>
     [ObservableProperty] private int padColumns = 4;
 
-    /// <summary>The key the first one answers to, the rest running up from it.</summary>
-    [ObservableProperty] private int padFirstKey = 48;
+    /// <summary>
+    /// The key the first one answers to, the rest running up from it.
+    /// </summary>
+    /// <remarks>
+    /// A note, because that is what a machine writes on its buttons and what a preset is keyed
+    /// by. A plain number is taken as well, since somebody may reasonably type 48.
+    /// </remarks>
+    [ObservableProperty] private string padFirstKey = "C-4";
 
     /// <summary>
     /// Lays the picked grid out: that many buttons, that many across, keyed from there.
@@ -1232,7 +1250,16 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         if (pads.Element != MachineElementKinds.Pads) return;
 
-        int wanted = Math.Clamp(PadCount, 1, 512);
+        int across = Math.Clamp(PadColumns, 1, 64);
+        int down = Math.Clamp(PadRows, 1, 64);
+        int wanted = across * down;
+
+        // Written as notes, which is what the machine's buttons hold and what its presets are
+        // keyed by. A grid keyed in numbers would leave every preset naming a button that is not
+        // there.
+        int first = MachineNotes.Semitone(PadFirstKey);
+
+        if (first < 0) first = 48;
 
         var kept = pads.Children
             .Where(child => child.Element == MachineElementKinds.Pad)
@@ -1247,15 +1274,18 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             {
                 Element = MachineElementKinds.Pad,
                 Parameter = at < kept.Count && kept[at].Length > 0 ? kept[at] : "pad" + (at + 1),
-                Properties = { ["key"] = (PadFirstKey + at).ToString(CultureInfo.InvariantCulture) },
+                Properties = { ["key"] = MachineNotes.Name(first + at) },
             });
         }
 
-        pads.Properties["columns"] = Math.Clamp(PadColumns, 1, 64).ToString(CultureInfo.InvariantCulture);
+        // A grid is so many down by so many across, and it says both. Neither can be worked out
+        // from the buttons: sixteen of them is four by four, two by eight or sixteen by one.
+        pads.Properties["rows"] = down.ToString(CultureInfo.InvariantCulture);
+        pads.Properties["columns"] = across.ToString(CultureInfo.InvariantCulture);
 
         Redraw();
 
-        Status = wanted + " buttons, " + pads.Properties["columns"] + " across";
+        Status = down + " by " + across + ", " + wanted + " buttons";
     });
 
     /// <summary>
