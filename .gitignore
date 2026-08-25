@@ -13,3 +13,6 @@ obj/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Agent worktrees, which are not part of the project
+.claude/worktrees/
