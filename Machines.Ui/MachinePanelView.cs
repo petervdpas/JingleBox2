@@ -187,29 +187,19 @@ public class MachinePanelView : Decorator
     private readonly Dictionary<string, IImage?> _pictures = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// The right press that has already been answered, so the frames around it leave it alone.
+    /// What is drawn over the panel while it is being laid out: the outline round what is
+    /// picked, the line where a part would land, and the handles that size it.
     /// </summary>
     /// <remarks>
-    /// The press itself, not a copy of it: one press is one object however many frames it
-    /// travels through, which is exactly the question being asked.
-    /// </remarks>
-    private object? _claimed;
-
-    /// <summary>
-    /// The handles on the element being worked on, drawn over the panel rather than in it.
-    /// </summary>
-    /// <remarks>
-    /// Over, because a handle that took part in the layout would change the size of the thing it
-    /// is measuring, and the panel would grow every time somebody picked something. It is deaf
-    /// to the pointer for the same reason the selection outline is: the press that grabs a
-    /// handle is caught on the way down, before the knob underneath ever sees it.
+    /// Over, and never in. Anything in the panel to show what is picked would change what the
+    /// panel measures to, and the machine on the bench would not be the machine that ships.
     /// </remarks>
     private readonly Handles _handles = new() { IsHitTestVisible = false };
 
     /// <summary>What is being sized, or nothing when nobody is dragging a handle.</summary>
     private Sizing? _sizing;
 
-    private readonly Dictionary<MachineElement, Border> _frames = new();
+    private readonly Dictionary<MachineElement, Control> _frames = new();
 
     /// <summary>
     /// The same pairing the other way about, for asking what is under the pointer.
@@ -218,7 +208,7 @@ public class MachinePanelView : Decorator
     /// Kept rather than searched because dropping something asks this on every mouse move, and
     /// the frames are already being built anyway.
     /// </remarks>
-    private readonly Dictionary<Border, MachineElement> _elements = new();
+    private readonly Dictionary<Control, MachineElement> _elements = new();
 
     static MachinePanelView()
     {
@@ -438,7 +428,7 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Grid => BuildGrid(element, parameters),
             MachineElementKinds.Group => BuildGroup(element, parameters),
             MachineElementKinds.Row => Fill(
-                new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
+                new StackPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
             MachineElementKinds.Column => Fill(
                 new StackPanel { Orientation = Orientation.Vertical }, element, parameters, Orientation.Vertical),
             MachineElementKinds.Strip => BuildStrip(element, parameters),
@@ -504,7 +494,12 @@ public class MachinePanelView : Decorator
             control.HorizontalAlignment = HorizontalAlignment.Left;
         }
 
-        if (Measurement(element, "height") is { } height)
+        // A fader is the other one whose size is not the number the machine writes down. Its
+        // height is the throw plus the name above it and the value below it, so it is told the
+        // throw and works the rest out. Setting the height as well would be two numbers for one
+        // dimension, and whichever lost would be drawn over something.
+        if (element.Element != MachineElementKinds.Fader &&
+            Measurement(element, "height") is { } height)
         {
             control.Height = height;
             control.VerticalAlignment = VerticalAlignment.Top;
@@ -596,9 +591,23 @@ public class MachinePanelView : Decorator
              or MachineElementKinds.Column
              or MachineElementKinds.Strip;
 
+    /// <summary>
+    /// A grid of cells, with what it holds where each thing says.
+    /// </summary>
+    /// <remarks>
+    /// The gap is the grid's, as it is a row's and a column's, rather than a margin written onto
+    /// every knob. Eight knobs spaced by eight margins is eight chances to get one wrong, and
+    /// the first thing anybody does to a grid is change how far apart it stands.
+    /// </remarks>
     private Control BuildGrid(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
-        var grid = new Grid();
+        double gap = Measurement(element, "gap") ?? 0;
+
+        var grid = new Grid
+        {
+            ColumnSpacing = gap,
+            RowSpacing = gap,
+        };
 
         if (Text(element, "columns") is { Length: > 0 } columns)
         {
@@ -639,15 +648,21 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private Control BuildGroup(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
+        // Where its contents sit when the row makes it taller than they are. Middle unless the
+        // machine says otherwise, which is what a rack looks like.
         var caption = Text(element, "caption");
 
-        return new PanelGroup
+        var group = new PanelGroup
         {
             Caption = caption.Length > 0 ? caption : element.Label,
             Child = Fill(
-                new WrapPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
+                new StackPanel { Orientation = Orientation.Horizontal }, element, parameters, Orientation.Horizontal),
             ClipToBounds = true,
         };
+
+        if (Measurement(element, "inset") is { } inset) group.Inset = inset;
+
+        return group;
     }
 
     /// <summary>
@@ -690,16 +705,26 @@ public class MachinePanelView : Decorator
     /// nothing.
     /// </summary>
     /// <remarks>
-    /// The gap is a margin on each child rather than a spacing on the container, because the
-    /// container that wraps has no spacing to set and a panel where a row and a wrapping row put
-    /// things different distances apart is a panel laid out by accident. A child that names its
-    /// own margin keeps it: one element standing apart from the rest is the reason to write one.
+    /// A row does not wrap. A machine is a front panel and a front panel is the size it is: the
+    /// knobs do not move when the window is made narrower, and a section that dropped onto the
+    /// next line would be a different machine at every width. Too narrow to show it all is what
+    /// the scroll bars are for.
     ///
-    /// Whether the children are all as tall as the tallest is <c>equal</c>. Left to itself a
-    /// child is as tall as it needs to be and sits at the top of the line, which is what a knob
-    /// beside a fader should do. Set, they all take the height of the line, which is what a row
-    /// of framed sections should do: sections of different heights are a ragged edge across the
-    /// panel, and the frames are what the eye follows.
+    /// The gap is a margin on each child rather than a spacing on the container, so that a child
+    /// naming its own margin keeps it: one element standing apart from the rest is the reason to
+    /// write one.
+    ///
+    /// One question decides the heights, and the row answers it: <c>heights</c> is <c>match</c>,
+    /// which is the default, or <c>own</c>. Matched, every section in the row is as tall as the
+    /// tallest of them and the frames line up along the panel, which is what the eye follows;
+    /// their own, and each is exactly as tall as what is in it and the bottoms come out ragged.
+    ///
+    /// Either way the height comes from the contents and never from the window: a machine is a
+    /// front panel and is the size it is.
+    ///
+    /// Plain controls are not sections and are never stretched to a row's height: a knob beside
+    /// a fader is a knob. <c>align</c> is still read for the odd row that wants everything in it
+    /// sitting somewhere particular, and <c>equal</c> is the older way of saying matched.
     /// </remarks>
     private T Fill<T>(
         T container,
@@ -709,7 +734,11 @@ public class MachinePanelView : Decorator
         where T : Panel
     {
         double gap = Measurement(element, "gap") ?? Gap;
-        bool equal = Flag(element, "equal");
+
+        var across = Across(element);
+
+        // Matched unless the machine says the sections keep their own heights.
+        bool matched = !Text(element, "heights").Equals("own", StringComparison.OrdinalIgnoreCase);
 
         var built = new List<(Control Control, MachineElement Element)>();
 
@@ -731,13 +760,49 @@ public class MachinePanelView : Decorator
                     : new Thickness(0, 0, 0, i == built.Count - 1 ? 0 : gap);
             }
 
-            if (!equal) control.VerticalAlignment = VerticalAlignment.Top;
+            // Only across the line. Along it the container decides, and a child told where to
+            // sit along the flow would be a child pushed to one end of its own row.
+            if (flow == Orientation.Horizontal)
+            {
+                // A section takes the row's height and a control keeps its own, unless the row
+                // has said plainly where everything sits.
+                control.VerticalAlignment = across ?? (Holds(child.Element) && matched
+                    ? VerticalAlignment.Stretch
+                    : VerticalAlignment.Top);
 
-            container.Children.Add(control);
+                container.Children.Add(control);
+            }
+            else
+            {
+                control.HorizontalAlignment = across switch
+                {
+                    VerticalAlignment.Bottom => HorizontalAlignment.Right,
+                    VerticalAlignment.Center => HorizontalAlignment.Center,
+                    VerticalAlignment.Stretch => HorizontalAlignment.Stretch,
+                    _ => HorizontalAlignment.Left,
+                };
+
+                container.Children.Add(control);
+            }
         }
 
         return container;
     }
+
+    /// <summary>Where a container's children sit across the way it runs.</summary>
+    /// <remarks>
+    /// Top unless the machine says otherwise, which is what everything written before this
+    /// property existed expects.
+    /// </remarks>
+    private static VerticalAlignment? Across(MachineElement element) =>
+        Text(element, "align").ToLowerInvariant() switch
+        {
+            "bottom" or "floor" => VerticalAlignment.Bottom,
+            "middle" or "centre" or "center" => VerticalAlignment.Center,
+            "stretch" or "fill" => VerticalAlignment.Stretch,
+            "top" => VerticalAlignment.Top,
+            _ => Flag(element, "equal") ? VerticalAlignment.Stretch : null,
+        };
 
     private Control? BuildKnob(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
@@ -796,6 +861,11 @@ public class MachinePanelView : Decorator
             Format = Format(parameter),
             Ticks = Text(element, "ticks"),
             Value = Start(parameter),
+
+            // How long the throw is, which is not how tall the control is: a fader draws its
+            // name above the track and its value under it, so a height meant as the throw makes
+            // the whole thing too short and the value is drawn over whatever is below it.
+            TrackLength = Measurement(element, "track") ?? 0,
         };
 
         fader.PropertyChanged += (_, e) =>
@@ -1718,59 +1788,28 @@ public class MachinePanelView : Decorator
     }
 
     /// <summary>
-    /// Wraps a built element in the skin that makes it selectable, but only while designing.
+    /// Notes which element a control stands for, and stops a control being worked while the
+    /// panel is being laid out.
     /// </summary>
     /// <remarks>
-    /// The frame carries a transparent background so a press anywhere over the element lands on
-    /// it rather than falling through the gaps between controls, and a control with nothing
-    /// inside it is made deaf to the pointer so a click cannot turn what it is trying to pick
-    /// up. The press is marked handled on the way out, since a knob inside a group inside a grid
-    /// would otherwise select all three and the outermost would win.
+    /// Nothing is wrapped and nothing is added. A frame round every element, even one drawn with
+    /// no border, is another control in the tree, and the layout it produces is a few pixels
+    /// away from the layout without it: the panel on the bench would not be the panel that
+    /// ships. What is picked is found by asking which control the pointer is over, and drawn on
+    /// the layer above.
     ///
-    /// Nothing at all when not designing: an extra element around every control would change
-    /// what the panel measures to, and a panel that is a slightly different size depending on
-    /// which mode it is in is a panel the designer lies about.
+    /// A control that turns something is made deaf to the pointer while designing, or a press
+    /// meant to pick a knob up would turn it. Containers stay listening, since nothing about a
+    /// row responds to a press anyway and their children are drawn inside them.
     /// </remarks>
     private Control Skin(MachineElement element, Control built, bool holdsOthers)
     {
-        if (!Designing) return built;
+        _frames[element] = built;
+        _elements[built] = element;
 
-        if (!holdsOthers) built.IsHitTestVisible = false;
+        if (Designing && !holdsOthers) built.IsHitTestVisible = false;
 
-        var frame = new Border
-        {
-            Child = built,
-            Background = Brushes.Transparent,
-            BorderThickness = new Thickness(1),
-            BorderBrush = Brushes.Transparent,
-        };
-
-        frame.PointerPressed += (_, e) =>
-        {
-            // A right press picks the element up as a left one does, and then gets out of the
-            // way: the menu belongs to whoever put the panel on screen, and marking the press
-            // handled here would stop it opening. The innermost frame answers and the ones
-            // around it stand off, which the flag does in place of the handled flag, since the
-            // same press bubbles outwards through all of them.
-            if (e.GetCurrentPoint(frame).Properties.IsRightButtonPressed)
-            {
-                if (ReferenceEquals(_claimed, e)) return;
-
-                _claimed = e;
-
-                Selected = element;
-
-                return;
-            }
-
-            Selected = element;
-            e.Handled = true;
-        };
-
-        _frames[element] = frame;
-        _elements[frame] = element;
-
-        return frame;
+        return built;
     }
 
     /// <summary>
@@ -1788,10 +1827,39 @@ public class MachinePanelView : Decorator
     {
         for (var at = source as Visual; at != null; at = at.GetVisualParent())
         {
-            if (at is Border frame && _elements.TryGetValue(frame, out var element)) return element;
+            if (at is Control control && _elements.TryGetValue(control, out var element)) return element;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Which element is under that point, taking the innermost when several overlap.
+    /// </summary>
+    /// <remarks>
+    /// By where things ended up rather than by hit testing, because the controls that turn
+    /// something are deaf to the pointer while the panel is being laid out and a hit test would
+    /// walk straight past them to the row behind. Smallest wins, which is how a knob is picked
+    /// rather than the group it stands in.
+    /// </remarks>
+    public MachineElement? ElementUnder(Point at)
+    {
+        MachineElement? found = null;
+        double smallest = double.MaxValue;
+
+        foreach (var (element, control) in _frames)
+        {
+            if (Bounds(control) is not { } area || !area.Contains(at)) continue;
+
+            double size = area.Width * area.Height;
+
+            if (size > smallest) continue;
+
+            smallest = size;
+            found = element;
+        }
+
+        return found;
     }
 
     /// <summary>
@@ -1813,31 +1881,15 @@ public class MachinePanelView : Decorator
 
         var colour = ThemePalette.From(this).Accent;
 
-        var accent = new SolidColorBrush(colour);
-        var wash = new SolidColorBrush(colour, 0.16);
-
-        var selected = Selected;
-        var marked = Marked;
-
         Rect? around = null;
+        Rect? wanted = null;
 
-        foreach (var (element, frame) in _frames)
-        {
-            bool wanted = marked != null && ReferenceEquals(element, marked);
+        if (Selected is { } selected && _frames.TryGetValue(selected, out var picked)) around = Bounds(picked);
+        if (Marked is { } marked && _frames.TryGetValue(marked, out var over)) wanted = Bounds(over);
 
-            if (ReferenceEquals(element, selected)) around = Bounds(frame);
-
-            frame.BorderBrush = wanted || ReferenceEquals(element, selected) ? accent : Brushes.Transparent;
-            frame.BorderThickness = new Thickness(wanted ? 2 : 1);
-
-            // Transparent rather than none, so a press in the gap between two controls still
-            // lands on the element that holds them.
-            frame.Background = wanted ? wash : Brushes.Transparent;
-        }
-
-        // Only what is being worked on gets handles, and only while it is being laid out. A
-        // machine in a song is a machine, and its knobs are for turning.
-        _handles.Around(Designing ? around : null, colour);
+        // Only while it is being laid out. A machine in a song is a machine, and its knobs are
+        // for turning.
+        _handles.Showing(Designing ? around : null, Designing ? wanted : null, colour);
     }
 
     /// <summary>
@@ -2027,13 +2079,18 @@ public class MachinePanelView : Decorator
     private sealed class Handles : Control
     {
         private Rect? _around;
+        private Rect? _wanted;
         private Rect? _caret;
         private Color _colour = Colors.White;
 
-        /// <summary>Puts the handles round that rectangle, or takes them off the panel.</summary>
-        public void Around(Rect? area, Color colour)
+        /// <summary>
+        /// What to draw over the panel: what is picked, what a part would land in, and nothing
+        /// else.
+        /// </summary>
+        public void Showing(Rect? picked, Rect? landing, Color colour)
         {
-            _around = area;
+            _around = picked;
+            _wanted = landing;
             _colour = colour;
 
             InvalidateVisual();
@@ -2063,10 +2120,18 @@ public class MachinePanelView : Decorator
         {
             var fill = new SolidColorBrush(_colour);
 
-            // The line first, so a handle sitting on top of it is still visible.
+            // What a part would land in, washed and outlined, so the container reads as open.
+            if (_wanted is { } open)
+            {
+                context.DrawRectangle(new SolidColorBrush(_colour, 0.16), new Pen(fill, 2), open, 3, 3);
+            }
+
+            // The line where it would land, before the handles, so one on top of it still shows.
             if (_caret is { } line) context.DrawRectangle(fill, null, line, 1, 1);
 
             if (_around is not { } area) return;
+
+            context.DrawRectangle(null, new Pen(fill, 1), area, 2, 2);
 
             var edge = new Pen(new SolidColorBrush(Colors.Black, 0.55), 1);
 
@@ -2084,25 +2149,36 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private void Grabbed(object? sender, PointerPressedEventArgs e)
     {
-        if (!Designing || Selected is not { } element) return;
-
-        if (!_frames.TryGetValue(element, out var frame) || frame.Child is not { } control) return;
-
-        if (Bounds(frame) is not { } area) return;
+        if (!Designing) return;
 
         var at = e.GetPosition(this);
 
-        foreach (var (grip, where) in Handles.For(area))
+        // A handle first: it lies over whatever is being worked on, and grabbing one is not
+        // picking something else up.
+        if (Selected is { } element &&
+            _frames.TryGetValue(element, out var control) &&
+            Bounds(control) is { } area)
         {
-            if (!where.Contains(at)) continue;
+            foreach (var (grip, where) in Handles.For(area))
+            {
+                if (!where.Contains(at)) continue;
 
-            _sizing = new Sizing(element, control, grip, at, control.Bounds.Size);
+                _sizing = new Sizing(element, control, grip, at, control.Bounds.Size);
 
-            e.Pointer.Capture(this);
-            e.Handled = true;
+                e.Pointer.Capture(this);
+                e.Handled = true;
 
-            return;
+                return;
+            }
         }
+
+        if (ElementUnder(at) is not { } under) return;
+
+        Selected = under;
+
+        // A right press gets out of the way so the menu opens; a left one is handled, since
+        // nothing under it should act on a press while the panel is being laid out.
+        if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed) e.Handled = true;
     }
 
     /// <summary>
@@ -2123,7 +2199,16 @@ public class MachinePanelView : Decorator
         double height = sizing.Was.Height + (at.Y - sizing.From.Y);
 
         if (sizing.Grip != Grip.Bottom) sizing.Control.Width = Math.Max(SmallestSize, Math.Round(width));
-        if (sizing.Grip != Grip.Right) sizing.Control.Height = Math.Max(SmallestSize, Math.Round(height));
+
+        if (sizing.Grip != Grip.Right)
+        {
+            // The throw for a fader, the height for everything else. What is dragged is what the
+            // machine will be told, so the two cannot drift apart.
+            if (sizing.Control is Fader fader)
+                fader.TrackLength = Math.Max(SmallestSize, Math.Round(height - (sizing.Was.Height - fader.TrackLength)));
+            else
+                sizing.Control.Height = Math.Max(SmallestSize, Math.Round(height));
+        }
 
         // The handles follow the size while it is being dragged, or they would sit where the
         // element used to end.
@@ -2144,7 +2229,17 @@ public class MachinePanelView : Decorator
         e.Pointer.Capture(null);
 
         if (sizing.Grip != Grip.Bottom) Written(sizing.Element, "width", sizing.Control.Width);
-        if (sizing.Grip != Grip.Right) Written(sizing.Element, "height", sizing.Control.Height);
+
+        // What the machine writes down for a height depends on what it is sizing: a fader keeps
+        // its throw, everything else keeps its height. Dragging a fader taller and writing a
+        // height would leave the throw beside it saying something else.
+        if (sizing.Grip != Grip.Right)
+        {
+            if (sizing.Element.Element == MachineElementKinds.Fader && sizing.Control is Fader fader)
+                Written(sizing.Element, "track", fader.TrackLength);
+            else
+                Written(sizing.Element, "height", sizing.Control.Height);
+        }
 
         Resized?.Invoke(this, sizing.Element);
     }

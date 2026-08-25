@@ -246,7 +246,10 @@
           "Element": "Row",
           "Parameter": "",
           "Label": "",
-          "Properties": {},
+          "Properties": {
+            "gap": "10",
+            "height": "85"
+          },
           "Children": [
             {
               "Element": "Preset",
@@ -263,8 +266,8 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "width": "359",
-                "height": "82",
+                "width": "337",
+                "height": "78",
                 "file": "images/image1.svg"
               },
               "Children": []
@@ -276,8 +279,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "equal": "true"
+            "gap": "10"
           },
           "Children": [
             {
@@ -285,7 +287,8 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Sample"
+                "caption": "Sample",
+                "height": "284"
               },
               "Children": [
                 {
@@ -400,7 +403,8 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Envelope"
+                "caption": "Envelope",
+                "height": "284"
               },
               "Children": [
                 {
@@ -431,7 +435,7 @@
                       "Parameter": "attack",
                       "Label": "",
                       "Properties": {
-                        "height": "96"
+                        "track": "96"
                       },
                       "Children": []
                     },
@@ -440,7 +444,7 @@
                       "Parameter": "decay",
                       "Label": "",
                       "Properties": {
-                        "height": "96"
+                        "track": "96"
                       },
                       "Children": []
                     },
@@ -449,7 +453,7 @@
                       "Parameter": "sustain",
                       "Label": "",
                       "Properties": {
-                        "height": "96"
+                        "track": "96"
                       },
                       "Children": []
                     },
@@ -458,7 +462,7 @@
                       "Parameter": "release",
                       "Label": "",
                       "Properties": {
-                        "height": "96"
+                        "track": "96"
                       },
                       "Children": []
                     }
@@ -473,8 +477,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "equal": "true"
+            "gap": "10"
           },
           "Children": [
             {
@@ -491,7 +494,8 @@
                   "Label": "",
                   "Properties": {
                     "rows": "Auto,Auto",
-                    "columns": "Auto,Auto,Auto,Auto"
+                    "columns": "Auto,Auto,Auto,Auto",
+                    "gap": "10"
                   },
                   "Children": [
                     {
@@ -501,7 +505,6 @@
                       "Properties": {
                         "row": "0",
                         "column": "0",
-                        "margin": "0,0,10,8",
                         "tip": "Whole semitones added to every note this instrument plays."
                       },
                       "Children": []
@@ -513,7 +516,6 @@
                       "Properties": {
                         "row": "0",
                         "column": "1",
-                        "margin": "0,0,10,8",
                         "tip": "Hundredths of a semitone, for sitting this voice against another."
                       },
                       "Children": []
@@ -524,8 +526,7 @@
                       "Label": "",
                       "Properties": {
                         "row": "0",
-                        "column": "2",
-                        "margin": "0,0,10,8"
+                        "column": "2"
                       },
                       "Children": []
                     },
@@ -535,8 +536,7 @@
                       "Label": "",
                       "Properties": {
                         "row": "0",
-                        "column": "3",
-                        "margin": "0,0,0,8"
+                        "column": "3"
                       },
                       "Children": []
                     },
@@ -546,8 +546,7 @@
                       "Label": "",
                       "Properties": {
                         "row": "1",
-                        "column": "0",
-                        "margin": "0,0,10,0"
+                        "column": "0"
                       },
                       "Children": []
                     },
@@ -557,8 +556,7 @@
                       "Label": "",
                       "Properties": {
                         "row": "1",
-                        "column": "1",
-                        "margin": "0,0,10,0"
+                        "column": "1"
                       },
                       "Children": []
                     },
@@ -568,8 +566,7 @@
                       "Label": "",
                       "Properties": {
                         "row": "1",
-                        "column": "2",
-                        "margin": "0,0,10,0"
+                        "column": "2"
                       },
                       "Children": []
                     },
@@ -631,7 +628,8 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Output"
+                "caption": "Output",
+                "height": "185"
               },
               "Children": [
                 {
@@ -639,7 +637,8 @@
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "gap": "12"
+                    "gap": "12",
+                    "height": "150"
                   },
                   "Children": [
                     {
@@ -647,9 +646,9 @@
                       "Parameter": "level",
                       "Label": "",
                       "Properties": {
-                        "height": "96",
                         "ticks": "6,0,-12,-40",
-                        "tip": "Unity is 0 dB, and above it is makeup gain."
+                        "tip": "Unity is 0 dB, and above it is makeup gain.",
+                        "track": "96"
                       },
                       "Children": []
                     },

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Media;
 using System;
 using System.Globalization;
@@ -34,6 +35,25 @@ public class PanelGroup : Decorator
         AvaloniaProperty.Register<PanelGroup, double>(nameof(Inset), 8);
 
     /// <summary>Between the caption and what it names.</summary>
+    /// <summary>
+    /// Where what is inside sits when the section is taller than its contents.
+    /// </summary>
+    /// <remarks>
+    /// A section in a row is as tall as the tallest section beside it, so a short one has room
+    /// to spare and something has to decide where the spare room goes. That is the machine's
+    /// choice and not ours: knobs centred in their frame is the usual look on a rack, but a
+    /// section whose contents belong under its caption wants them at the top.
+    /// </remarks>
+    public static readonly StyledProperty<VerticalAlignment> ContentAlignmentProperty =
+        AvaloniaProperty.Register<PanelGroup, VerticalAlignment>(
+            nameof(ContentAlignment), VerticalAlignment.Center);
+
+    public VerticalAlignment ContentAlignment
+    {
+        get => GetValue(ContentAlignmentProperty);
+        set => SetValue(ContentAlignmentProperty, value);
+    }
+
     private const double CaptionGap = 5;
 
     private const double Corner = 4;
@@ -42,6 +62,7 @@ public class PanelGroup : Decorator
     {
         AffectsRender<PanelGroup>(CaptionProperty, CaptionSizeProperty);
         AffectsMeasure<PanelGroup>(CaptionProperty, CaptionSizeProperty, InsetProperty);
+        AffectsArrange<PanelGroup>(ContentAlignmentProperty);
     }
 
     public string Caption
@@ -92,11 +113,28 @@ public class PanelGroup : Decorator
         double inset = Math.Max(0, Inset);
         double head = Head;
 
+        double room = Math.Max(0, finalSize.Height - inset * 2 - head);
+
+        // Sections in a row are all as tall as the tallest of them, so a short one has room to
+        // spare, and where that room goes is the machine's to say.
+        double wanted = Math.Min(room, Child?.DesiredSize.Height ?? room);
+        double over = Math.Max(0, room - wanted);
+
+        double spare = ContentAlignment switch
+        {
+            VerticalAlignment.Top => 0,
+            VerticalAlignment.Bottom => over,
+            VerticalAlignment.Stretch => 0,
+            _ => over / 2,
+        };
+
+        if (ContentAlignment == VerticalAlignment.Stretch) wanted = room;
+
         Child?.Arrange(new Rect(
             inset,
-            inset + head,
+            inset + head + spare,
             Math.Max(0, finalSize.Width - inset * 2),
-            Math.Max(0, finalSize.Height - inset * 2 - head)));
+            wanted));
 
         return finalSize;
     }

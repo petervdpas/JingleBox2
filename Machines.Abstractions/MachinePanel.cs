@@ -83,6 +83,10 @@ public sealed class MachineElement
 public static class MachineElementKinds
 {
     /// <summary>Rows and columns. Properties: columns, rows, and per child column, row, span.</summary>
+    /// <remarks>
+    /// Properties: rows and columns, each a comma separated list of sizes, and gap. What it
+    /// holds says row, column and span.
+    /// </remarks>
     public const string Grid = "Grid";
 
     /// <summary>A framed group with a heading. Properties: caption, gap, equal, width, height.</summary>
@@ -91,11 +95,22 @@ public static class MachineElementKinds
     /// group somebody meant to be that size, and a heading with a knob hanging out from under it
     /// reads as a mistake in the panel rather than a mistake in the description.
     /// </remarks>
+    /// <remarks>
+    /// Properties: caption and inset, the air between the frame and what is in it. Where a
+    /// section sits in a row, and whether it shares the row's height, is the row's business.
+    /// Room left over inside a section is shared above and below its contents, which is what a
+    /// rack looks like and is not worth a knob of its own.
+    /// </remarks>
     public const string Group = "Group";
 
     /// <summary>
     /// Things laid side by side, wrapping when they run out of room. Properties: gap, equal.
     /// </summary>
+    /// <remarks>
+    /// Properties: gap, and heights, which is <c>match</c> (the default) or <c>own</c>. Matched,
+    /// every section in the row is as tall as the tallest of them; their own, each is as tall as
+    /// what is in it. Either way the height comes from the contents.
+    /// </remarks>
     public const string Row = "Row";
 
     /// <summary>Things laid one under the other. Properties: gap, equal.</summary>
@@ -112,6 +127,12 @@ public static class MachineElementKinds
     public const string Strip = "Strip";
 
     public const string Knob = "Knob";
+    /// <remarks>
+    /// Properties: track, which is the length of the throw, and ticks, a comma separated list of
+    /// values to mark on the scale. The throw is not the height: a fader also draws its name
+    /// above and its value below, so a machine asking for a throw of 96 wants a control taller
+    /// than that.
+    /// </remarks>
     public const string Fader = "Fader";
 
     /// <summary>

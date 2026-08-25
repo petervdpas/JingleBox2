@@ -16,18 +16,39 @@ namespace JingleBox2.Machines;
 /// Not the settings. Which recording is on it and where its knobs are standing belong to an
 /// instrument in a song, and two instruments made from one machine have different ones. The
 /// machine is what they have in common.
+///
+/// A class and not a record, which matters more than it looks. The panel redraws when it is
+/// handed a different machine, and "different" has to mean a different handing over rather than
+/// different contents: the ordinary case is the same machine with a new recording behind it,
+/// where every field is equal and the picture is stale. A record compares by value, so handing
+/// the same face over again would be no change at all and nothing would be redrawn.
 /// </remarks>
-/// <param name="Panel">What it looks like.</param>
-/// <param name="Parameters">What it can be set to, which is what the controls stand for.</param>
-/// <param name="Folder">
-/// Where it is kept, which is what a picture or a sound of its own is named relative to. Empty
-/// for a machine that is not on disc, which is a machine that can have neither.
-/// </param>
-public sealed record MachineFace(
-    MachinePanel Panel,
-    IReadOnlyList<MachineParameter> Parameters,
-    string Folder = "")
+public sealed class MachineFace
 {
+    public MachineFace(MachinePanel panel, IReadOnlyList<MachineParameter> parameters, string folder = "")
+    {
+        Panel = panel;
+        Parameters = parameters;
+        Folder = folder;
+    }
+
+    /// <summary>What it looks like.</summary>
+    public MachinePanel Panel { get; }
+
+    /// <summary>What it can be set to, which is what the controls stand for.</summary>
+    public IReadOnlyList<MachineParameter> Parameters { get; }
+
+    /// <summary>
+    /// Where it is kept, which is what a picture or a sound of its own is named relative to.
+    /// </summary>
+    /// <remarks>
+    /// Empty for a machine that is not on disc, which is a machine that can have neither.
+    /// </remarks>
+    public string Folder { get; }
+
+    /// <summary>The same machine, handed over again, for when what is behind it has changed.</summary>
+    public MachineFace Again() => new(Panel, Parameters, Folder);
+
     /// <summary>A machine with nothing on it, for a panel that has been handed none.</summary>
     public static readonly MachineFace None = new(new MachinePanel(), Array.Empty<MachineParameter>());
 }

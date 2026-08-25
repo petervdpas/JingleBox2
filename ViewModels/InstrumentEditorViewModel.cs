@@ -189,6 +189,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     }
 
     /// <summary>The machine's own face, or nothing when it is drawn by hand.</summary>
+    /// <remarks>
+    /// Replaced rather than edited when the sound underneath changes, since the panel redraws on
+    /// being handed a different machine and the machine itself has not changed: the same face,
+    /// with a different recording behind it.
+    /// </remarks>
     public MachineFace? Described { get; private set; }
 
     /// <summary>Where that face reads and writes, which is this instrument.</summary>
@@ -447,6 +452,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         // A take landing on the Recording machine is a different file, and the picture was read
         // once when this was built. Without this it goes on saying the old one is missing.
         Reread();
+
+        // And a panel drawn from the machine's own description was built from the settings as
+        // they were. Nothing about the machine has changed, so nothing tells it to draw again:
+        // the same face has to be handed over as a new one for the picture to catch up with the
+        // recording that has just landed on it.
+        if (Described is { } face)
+        {
+            Described = face.Again();
+
+            // Said by name as well as in the sweep below. A compiled binding is told which
+            // property to watch, and the panel is the one thing on this page that redraws from
+            // scratch: it has to hear it plainly rather than in a list of everything.
+            OnPropertyChanged(nameof(Described));
+        }
 
         // The whole sound has been replaced, which is a different recording as surely as
         // dropping one on a zone is. The change callbacks the machines carry do not fire for

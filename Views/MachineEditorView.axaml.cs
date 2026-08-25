@@ -46,6 +46,7 @@ public partial class MachineEditorView : UserControl
         DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
     }
 
+    /// <summary>What the tint is following, so it can stop following the machine before it.</summary>
     private System.ComponentModel.INotifyPropertyChanged? _watched;
 
     private void Watch()
@@ -66,7 +67,7 @@ public partial class MachineEditorView : UserControl
 
     private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
 
-    /// <summary>Puts the machine's colours on the preview, so it looks like the box it is.</summary>
+    /// <summary>Puts the machine's colours on the plate, so it looks like the box it is.</summary>
     private void Retint() =>
         MachineTint.Apply(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
 
@@ -104,30 +105,6 @@ public partial class MachineEditorView : UserControl
     /// goes is wherever you send machines from. The name is offered from the machine's own, so
     /// the file is recognisable on a desktop full of zips.
     /// </remarks>
-    /// <summary>
-    /// Picks the line that was pressed, whichever button did it.
-    /// </summary>
-    /// <remarks>
-    /// A left press on a line already picks it, through the tree's own selection. A right press
-    /// does not, and a menu about the line under the pointer that acts on a different line is
-    /// worse than no menu, so the pick is made here before the menu opens.
-    /// </remarks>
-    private void Row_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control row || row.DataContext is not MachineElementViewModel element) return;
-
-        if (Editor is not { } editor) return;
-
-        editor.SelectedElement = element;
-
-        // The outermost one is what everything else is inside, so there is nowhere to carry it.
-        if (element.Parent == null) return;
-
-        if (!e.GetCurrentPoint(row).Properties.IsLeftButtonPressed) return;
-
-        Carry(new Carrying(null, element, e.GetPosition(this)), e);
-    }
-
     private async void Export_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { CanExport: true } editor) return;
@@ -156,20 +133,16 @@ public partial class MachineEditorView : UserControl
     };
 
     /// <summary>
-    /// A picture put on the machine that is being laid out.
+    /// Puts a picture on the machine, on whichever picture element is being worked on.
     /// </summary>
     /// <remarks>
-    /// Unlike a recording, which is only tried out on the panel, this one is kept: the file is
-    /// copied into the machine's own folder and the element is left naming it. A machine travels
-    /// as that folder, so a picture inside it arrives wherever the machine does, and a picture
-    /// left where it was found would be a hole in the machine's face on the next disc it reached.
-    ///
-    /// The picker belongs to the window, as every other one here does, so it is opened from the
-    /// code behind and only the answer goes to the view model.
+    /// The file is copied into the machine and renamed there, so what is chosen here is a file
+    /// on somebody's disc and what the machine keeps is its own copy under its own name. Only
+    /// the path goes to the view model, which is where all of that happens.
     /// </remarks>
     private async void Picture_Click(object? sender, RoutedEventArgs e)
     {
-        if (Editor is not { } editor) return;
+        if (Editor is not { PicturePicked: true } editor) return;
 
         var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
 
@@ -182,17 +155,15 @@ public partial class MachineEditorView : UserControl
             FileTypeFilter = new[] { Pictures }
         });
 
-        if (picked.Count == 0) return;
+        string? path = picked.Count == 0 ? null : picked[0].TryGetLocalPath();
 
-        if (picked[0].TryGetLocalPath() is { Length: > 0 } path) editor.PutPicture(path);
+        if (path != null) editor.PutPicture(path);
     }
 
-    /// <summary>What a machine will carry a picture as.</summary>
+    /// <summary>
+    /// What a machine will take as a picture.
+    /// </summary>
     /// <remarks>
-    /// The ones everything can read. A machine's badge is drawn by whoever opens the machine, on
-    /// whatever they are running, so a format that needs the right decoder is a badge that is a
-    /// hole on somebody's screen.
-    ///
     /// The drawing is the one worth choosing where there is a choice. A panel is laid out at
     /// whatever size suits it and a logo made of lines is drawn at that size, while one made of
     /// pixels is stretched to it.
@@ -224,12 +195,11 @@ public partial class MachineEditorView : UserControl
     }
 
     /// <summary>
-    /// Picks a part up off the library.
+    /// Picks a part up off the library and carries it.
     /// </summary>
     /// <remarks>
-    /// Releasing without moving ends the drag with no effect, so this does not get in the way
-    /// of clicking a part to put it inside whatever is picked. Both ways of adding one are
-    /// wanted: dragging says where it goes, clicking is quicker when that is already right.
+    /// Letting go without moving is a press rather than a drag, and adds the part where the
+    /// selection is: dragging says where it goes, pressing is quicker when that is already right.
     /// </remarks>
     private void Part_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -238,6 +208,30 @@ public partial class MachineEditorView : UserControl
         if (!e.GetCurrentPoint(control).Properties.IsLeftButtonPressed) return;
 
         Carry(new Carrying(kind, null, e.GetPosition(this)), e);
+    }
+
+    /// <summary>
+    /// Picks the line that was pressed, and carries what it stands for.
+    /// </summary>
+    /// <remarks>
+    /// A left press on a line already picks it, through the tree's own selection. A right press
+    /// does not, and a menu about the line under the pointer that acts on a different line is
+    /// worse than no menu, so the pick is made here before anything else happens. The outermost
+    /// element is picked but not carried: it is what everything else is inside.
+    /// </remarks>
+    private void Row_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control row || row.DataContext is not MachineElementViewModel element) return;
+
+        if (Editor is not { } editor) return;
+
+        editor.SelectedElement = element;
+
+        if (element.Parent == null) return;
+
+        if (!e.GetCurrentPoint(row).Properties.IsLeftButtonPressed) return;
+
+        Carry(new Carrying(null, element, e.GetPosition(this)), e);
     }
 
     /// <summary>
