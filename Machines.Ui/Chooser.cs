@@ -10,9 +10,8 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
 using System.Linq;
-using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// One of a list, with the one before and the one after a press away.
@@ -128,6 +127,16 @@ public class Chooser : ThemedControl
         set => SetValue(ShowPositionProperty, value);
     }
 
+    /// <summary>
+    /// How much wider the whole control is than the name field.
+    /// </summary>
+    /// <remarks>
+    /// The arrows, the gaps between them and the count, none of which change with the list.
+    /// Asked from outside by anyone who has been told how wide the control is to be and has to
+    /// work back to how wide the name can be, which is the only part of it that can give.
+    /// </remarks>
+    public double Chrome => ArrowWidth * 2 + Gap * 3 + (ShowPosition ? CountWidth : 0);
+
     /// <summary>The items as a list, since a chooser has to count them and index them.</summary>
     private IReadOnlyList<object> Items =>
         ItemsSource?.Cast<object>().ToList() ?? (IReadOnlyList<object>)Array.Empty<object>();
@@ -150,8 +159,7 @@ public class Chooser : ThemedControl
 
     private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e) => InvalidateVisual();
 
-    protected override Size MeasureOverride(Size availableSize) =>
-        new(ArrowWidth * 2 + FieldWidth + Gap * 3 + (ShowPosition ? CountWidth : 0), BarHeight);
+    protected override Size MeasureOverride(Size availableSize) => new(FieldWidth + Chrome, BarHeight);
 
     public override void Render(DrawingContext context)
     {

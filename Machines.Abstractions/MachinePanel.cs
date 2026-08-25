@@ -181,6 +181,18 @@ public static class MachineElementKinds
     public const string Take = "Take";
 
     /// <summary>
+    /// Where the machine is started from. Properties: caption, width.
+    /// </summary>
+    /// <remarks>
+    /// The picker at the top of a panel: one of the machine's own presets, or on the Recording
+    /// machine one of your takes. It turns no parameter, since what a preset does is write the
+    /// lot of them at once, and it is not a Choice either: a Choice is a number the machine
+    /// keeps and this is not kept anywhere. The list comes from whoever is showing the panel,
+    /// through <see cref="IMachinePresets"/>, which also says what to call it.
+    /// </remarks>
+    public const string Preset = "Preset";
+
+    /// <summary>
     /// One of a list, by number. Property: options, a comma separated list.
     /// </summary>
     /// <remarks>

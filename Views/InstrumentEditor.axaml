@@ -77,10 +77,10 @@
                             SelectedItem="{Binding Editor.Takes.Filter}"
                             ToolTip.Tip="Narrow the takes to one category. They are filed on the RECORD tab." />
 
-                  <views:Chooser ItemsSource="{Binding Presets.Items}"
-                                 SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
-                                 Placeholder="Start from..."
-                                 ToolTip.Tip="{Binding Presets.Hint}" />
+                  <ui:Chooser ItemsSource="{Binding Presets.Items}"
+                              SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
+                              Placeholder="Start from..."
+                              ToolTip.Tip="{Binding Presets.Hint}" />
                 </StackPanel>
               </StackPanel>
 

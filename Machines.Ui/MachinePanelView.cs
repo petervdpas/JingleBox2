@@ -66,6 +66,18 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, IMachineTakes?>(nameof(Takes));
 
     /// <summary>
+    /// Where the machine can be started from, for the picker at the top of the panel.
+    /// </summary>
+    /// <remarks>
+    /// Beside the settings rather than in them, because a preset is not a setting: it is a way
+    /// of writing all of them at once, and what a machine offers to start from is the host's
+    /// shelf and not the machine's state. Which is why nothing here is read back on the way
+    /// out either. The panel writes which one was asked for and stops.
+    /// </remarks>
+    public static readonly StyledProperty<IMachinePresets?> PresetsProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachinePresets?>(nameof(Presets));
+
+    /// <summary>
     /// The element the designer is working on, outlined on the panel.
     /// </summary>
     /// <remarks>
@@ -156,6 +168,12 @@ public class MachinePanelView : Decorator
         set => SetValue(TakesProperty, value);
     }
 
+    public IMachinePresets? Presets
+    {
+        get => GetValue(PresetsProperty);
+        set => SetValue(PresetsProperty, value);
+    }
+
     public MachineElement? Selected
     {
         get => GetValue(SelectedProperty);
@@ -182,6 +200,7 @@ public class MachinePanelView : Decorator
             change.Property == ParametersProperty ||
             change.Property == ValuesProperty ||
             change.Property == TakesProperty ||
+            change.Property == PresetsProperty ||
             change.Property == DesigningProperty)
         {
             Rebuild();
@@ -264,6 +283,7 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Keys => BuildKeys(element, parameters),
             MachineElementKinds.Wave => BuildWave(element, parameters),
             MachineElementKinds.Take => BuildTake(element),
+            MachineElementKinds.Preset => BuildPreset(element, parameters),
             MachineElementKinds.Label => BuildLabel(element),
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
@@ -287,8 +307,21 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private static void Sized(MachineElement element, Control control)
     {
-        if (Measurement(element, "width") is { } width) control.Width = width;
-        if (Measurement(element, "height") is { } height) control.Height = height;
+        // Pushed to the corner as well as sized. A control given a width inside a container that
+        // stretches is centred in what is left over, which is Avalonia being helpful and is
+        // never what a front panel wants: a picker 150 wide on a panel 1500 wide belongs at the
+        // left hand end, where the machine's own panel puts it, not in the middle of the room.
+        if (Measurement(element, "width") is { } width)
+        {
+            control.Width = width;
+            control.HorizontalAlignment = HorizontalAlignment.Left;
+        }
+
+        if (Measurement(element, "height") is { } height)
+        {
+            control.Height = height;
+            control.VerticalAlignment = VerticalAlignment.Top;
+        }
     }
 
     /// <summary>
@@ -887,6 +920,108 @@ public class MachinePanelView : Decorator
         if (take.Length == 0) return "Pick a recording...";
 
         return Takes?.Describe(take) is { Length: > 0 } described ? described : take;
+    }
+
+    /// <summary>
+    /// One of what is on offer, kept with the place it came from in the list.
+    /// </summary>
+    /// <remarks>
+    /// The picker deals in items and the shelf deals in numbers, so something has to carry the
+    /// one to the other. Two presets can be called the same thing, and matching by name would
+    /// then pick the first of them whichever was showing, which is why the number is carried
+    /// rather than looked up again afterwards.
+    /// </remarks>
+    private sealed class Offer(int at, string name)
+    {
+        /// <summary>Where in the list it was offered.</summary>
+        public int At { get; } = at;
+
+        /// <summary>What the picker writes in the field, which is all it does with an item.</summary>
+        public override string ToString() => name;
+    }
+
+    /// <summary>
+    /// A shelf nobody filled, for laying a panel out before there is a host to fill it.
+    /// </summary>
+    /// <remarks>
+    /// Names of the length real ones are, and enough of them for the count beside the arrows to
+    /// read as a count. The same reason the picture draws a waveform nobody recorded: somebody
+    /// deciding what the picker sits beside needs to see how much room it takes, and an empty
+    /// box tells them nothing.
+    /// </remarks>
+    private static readonly string[] Imagined =
+        ["Init", "Bright Lead", "Deep Bass", "Slow Sweep", "Short Pluck"];
+
+    /// <summary>
+    /// Where the machine is started from: the presets it ships with, or your own recordings.
+    /// </summary>
+    /// <remarks>
+    /// The list is the host's, through <see cref="Presets"/>, and so is what happens when one is
+    /// chosen. All this does is show which is showing and write down that somebody asked for a
+    /// different one, which is a number, so unlike the recording picker there is nothing to go
+    /// and fetch and nothing to raise an event about.
+    ///
+    /// With no host and while designing it offers made up names, so a panel can be laid out
+    /// before it is attached to anything. With no host and not designing it draws nothing: a
+    /// picker offering a list that does not exist is worse than no picker.
+    ///
+    /// <c>width</c> is the width of the whole control, as it is on every other element, and is
+    /// spent on the name, since the arrows and the count do not change size.
+    /// </remarks>
+    private Control? BuildPreset(MachineElement element, Dictionary<string, MachineParameter> parameters)
+    {
+        if (Missing(element, parameters)) return null;
+
+        var shelf = Presets;
+        var names = shelf?.Names ?? (Designing ? Imagined : null);
+
+        if (names is null) return null;
+
+        var offered = new List<Offer>(names.Count);
+
+        for (int i = 0; i < names.Count; i++) offered.Add(new Offer(i, names[i]));
+
+        int picked = shelf?.Picked ?? 0;
+
+        var chooser = new Chooser
+        {
+            ItemsSource = offered,
+            Placeholder = "Start from...",
+            SelectedItem = picked >= 0 && picked < offered.Count ? offered[picked] : null,
+        };
+
+        // Worked back from the whole width rather than set straight, because the arrows and the
+        // count are a fixed part of the control and only the name can give.
+        if (Measurement(element, "width") is { } width)
+            chooser.FieldWidth = Math.Max(40, width - chooser.Chrome);
+
+        // Subscribed after the starting one is in, for the reason every other control here is.
+        if (shelf is not null)
+        {
+            chooser.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Chooser.SelectedItemProperty)
+                    shelf.Picked = chooser.SelectedItem is Offer one ? one.At : -1;
+            };
+        }
+
+        return Captioned(Heading(element, shelf), chooser);
+    }
+
+    /// <summary>
+    /// What the picker is called: the panel's word for it, or the machine's own.
+    /// </summary>
+    /// <remarks>
+    /// The panel wins, since a machine offering presets that are really something else is
+    /// exactly the case the property is there for. Failing both, "Preset", which is what the
+    /// list is on every machine but one.
+    /// </remarks>
+    private static string Heading(MachineElement element, IMachinePresets? shelf)
+    {
+        if (Text(element, "caption") is { Length: > 0 } said) return said;
+        if (element.Label.Length > 0) return element.Label;
+
+        return shelf?.Caption is { Length: > 0 } called ? called : "Preset";
     }
 
     /// <summary>A waveform nobody recorded: four hits, each falling away from its attack.</summary>

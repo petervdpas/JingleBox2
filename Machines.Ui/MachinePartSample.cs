@@ -55,6 +55,7 @@ public sealed class MachinePartSample : Decorator
     private const string WaveKind = "Wave";
     private const string ChoiceKind = "Choice";
     private const string TakeKind = "Take";
+    private const string PresetKind = "Preset";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
     /// <remarks>
@@ -144,6 +145,7 @@ public sealed class MachinePartSample : Decorator
         WaveKind => new PartSketch(SketchShape.Wave) { Width = 74, Height = 34 },
         ChoiceKind => BuildChoice(),
         TakeKind => BuildTake(),
+        PresetKind => BuildPreset(),
         _ => null,
     };
 
@@ -204,6 +206,21 @@ public sealed class MachinePartSample : Decorator
     };
 
     /// <summary>A latching button, held down, with its lamp lit to say so.</summary>
+    /// <summary>
+    /// Where a machine is started from: the arrows, the name, and how far through the list you are.
+    /// </summary>
+    /// <remarks>
+    /// The real control, narrowed to fit a chip. Its count is left on, since a picker that says
+    /// how long the list is, is half of what makes it that picker rather than a dropdown.
+    /// </remarks>
+    private static Control BuildPreset() => new Chooser
+    {
+        ItemsSource = new[] { "Kick", "Snare", "Hat" },
+        SelectedItem = "Snare",
+        FieldWidth = 54,
+        FontSize = 9,
+    };
+
     /// <summary>
     /// The button that fetches a recording off the shelf.
     /// </summary>

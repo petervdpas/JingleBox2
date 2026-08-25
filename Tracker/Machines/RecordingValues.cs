@@ -30,11 +30,12 @@ namespace JingleBox2.Tracker.Machines;
 /// simply does not go anywhere. The alternative is a crash on a file somebody has already
 /// shipped.
 /// </remarks>
-public sealed class RecordingValues(TrackerInstrument instrument) : IMachineValues
+public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : IMachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can
     // be found by searching for the string that is in the file.
     private const string TakeKey = "take";
+    private const string TakeDetailsKey = "take_details";
     private const string BaseNoteKey = "base_note";
     private const string StartKey = "start";
     private const string EndKey = "end";
@@ -210,6 +211,11 @@ public sealed class RecordingValues(TrackerInstrument instrument) : IMachineValu
     /// beside the base note.
     /// </summary>
     /// <remarks>
+    /// Three of them, and all but the take are read only. How long the take is and what rate it
+    /// was recorded at is read off the file rather than held anywhere, so there is nothing to
+    /// write back, and it is answered only when this was given a shelf to ask: an instrument on
+    /// its own knows the path and nothing about what is in the file.
+    ///
     /// The note name is read only on purpose. It is the base note said in the other language a
     /// musician has for it, C-4 rather than 48, and there is nothing to write back: setting it
     /// is setting the number the panel already has a field for.
@@ -217,6 +223,7 @@ public sealed class RecordingValues(TrackerInstrument instrument) : IMachineValu
     public string GetText(string key) => key switch
     {
         TakeKey => instrument.FilePath ?? "",
+        TakeDetailsKey => shelf?.Details(instrument.FilePath ?? "") ?? "",
         BaseNoteKey => instrument.BaseNote.ToString(),
         _ => ""
     };

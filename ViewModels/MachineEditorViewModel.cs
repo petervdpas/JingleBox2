@@ -294,6 +294,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Keys,
         MachineElementKinds.Wave,
         MachineElementKinds.Take,
+        MachineElementKinds.Preset,
         MachineElementKinds.Label,
         MachineElementKinds.Spacer
     };

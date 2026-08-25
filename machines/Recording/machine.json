@@ -235,107 +235,190 @@
   ],
   "Panel": {
     "Root": {
-      "Element": "Row",
+      "Element": "Column",
       "Parameter": "",
       "Label": "",
       "Properties": {
-        "gap": "10",
-        "equal": "true"
+        "gap": "10"
       },
       "Children": [
         {
-          "Element": "Group",
+          "Element": "Preset",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Sample"
+            "caption": "Start from",
+            "width": "258"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "equal": "true"
           },
           "Children": [
             {
-              "Element": "Column",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "gap": "6"
+                "caption": "Sample"
               },
               "Children": [
                 {
-                  "Element": "Take",
-                  "Parameter": "take",
-                  "Label": "",
-                  "Properties": {
-                    "caption": "Take"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Wave",
-                  "Parameter": "take",
-                  "Label": "",
-                  "Properties": {
-                    "width": "340",
-                    "height": "90",
-                    "showMarkers": "true",
-                    "showLoop": "true",
-                    "placeholder": "No recording",
-                    "start": "start",
-                    "end": "end",
-                    "loopStart": "loop_start",
-                    "loopEnd": "loop_end"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Row",
+                  "Element": "Column",
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "gap": "8"
+                    "gap": "6"
                   },
                   "Children": [
                     {
-                      "Element": "Number",
-                      "Parameter": "base_note",
+                      "Element": "Take",
+                      "Parameter": "take",
                       "Label": "",
                       "Properties": {
-                        "width": "70"
+                        "caption": "Take"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Wave",
+                      "Parameter": "take",
+                      "Label": "",
+                      "Properties": {
+                        "width": "340",
+                        "height": "90",
+                        "showMarkers": "true",
+                        "showLoop": "true",
+                        "placeholder": "No recording",
+                        "start": "start",
+                        "end": "end",
+                        "loopStart": "loop_start",
+                        "loopEnd": "loop_end"
                       },
                       "Children": []
                     },
                     {
                       "Element": "Label",
-                      "Parameter": "base_note",
+                      "Parameter": "take_details",
                       "Label": "",
                       "Properties": {},
                       "Children": []
                     },
                     {
-                      "Element": "Choice",
-                      "Parameter": "loop_mode",
+                      "Element": "Row",
+                      "Parameter": "",
                       "Label": "",
                       "Properties": {
-                        "options": "None,Forward,Ping-pong",
-                        "width": "110"
+                        "gap": "8"
+                      },
+                      "Children": [
+                        {
+                          "Element": "Number",
+                          "Parameter": "base_note",
+                          "Label": "",
+                          "Properties": {
+                            "width": "70"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Label",
+                          "Parameter": "base_note",
+                          "Label": "",
+                          "Properties": {},
+                          "Children": []
+                        },
+                        {
+                          "Element": "Choice",
+                          "Parameter": "loop_mode",
+                          "Label": "",
+                          "Properties": {
+                            "options": "None,Forward,Ping-pong",
+                            "width": "110"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Switch",
+                          "Parameter": "reverse",
+                          "Label": "",
+                          "Properties": {
+                            "on": "Reverse",
+                            "off": "Forward"
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Switch",
+                          "Parameter": "one_voice",
+                          "Label": "",
+                          "Properties": {
+                            "on": "One",
+                            "off": "Many"
+                          },
+                          "Children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Envelope"
+              },
+              "Children": [
+                {
+                  "Element": "Row",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "gap": "12"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {
+                        "height": "96"
                       },
                       "Children": []
                     },
                     {
-                      "Element": "Switch",
-                      "Parameter": "reverse",
+                      "Element": "Fader",
+                      "Parameter": "decay",
                       "Label": "",
                       "Properties": {
-                        "on": "Reverse",
-                        "off": "Forward"
+                        "height": "96"
                       },
                       "Children": []
                     },
                     {
-                      "Element": "Switch",
-                      "Parameter": "one_voice",
+                      "Element": "Fader",
+                      "Parameter": "sustain",
                       "Label": "",
                       "Properties": {
-                        "on": "One",
-                        "off": "Many"
+                        "height": "96"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "release",
+                      "Label": "",
+                      "Properties": {
+                        "height": "96"
                       },
                       "Children": []
                     }
@@ -346,234 +429,189 @@
           ]
         },
         {
-          "Element": "Group",
+          "Element": "Row",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Envelope"
+            "gap": "10",
+            "equal": "true"
           },
           "Children": [
             {
-              "Element": "Row",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "gap": "12"
+                "caption": "Pitch and modulation"
               },
               "Children": [
                 {
-                  "Element": "Fader",
-                  "Parameter": "attack",
+                  "Element": "Grid",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "height": "96"
+                    "rows": "Auto,Auto",
+                    "columns": "Auto,Auto,Auto,Auto"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "decay",
-                  "Label": "",
-                  "Properties": {
-                    "height": "96"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "sustain",
-                  "Label": "",
-                  "Properties": {
-                    "height": "96"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Fader",
-                  "Parameter": "release",
-                  "Label": "",
-                  "Properties": {
-                    "height": "96"
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tune",
+                      "Label": "",
+                      "Properties": {
+                        "row": "0",
+                        "column": "0",
+                        "margin": "0,0,10,8"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "fine",
+                      "Label": "",
+                      "Properties": {
+                        "row": "0",
+                        "column": "1",
+                        "margin": "0,0,10,8"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vibrato_rate",
+                      "Label": "",
+                      "Properties": {
+                        "row": "0",
+                        "column": "2",
+                        "margin": "0,0,10,8"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vibrato_depth",
+                      "Label": "",
+                      "Properties": {
+                        "row": "0",
+                        "column": "3",
+                        "margin": "0,0,0,8"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "pitch_env",
+                      "Label": "",
+                      "Properties": {
+                        "row": "1",
+                        "column": "0",
+                        "margin": "0,0,10,0"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "pitch_time",
+                      "Label": "",
+                      "Properties": {
+                        "row": "1",
+                        "column": "1",
+                        "margin": "0,0,10,0"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tremolo_rate",
+                      "Label": "",
+                      "Properties": {
+                        "row": "1",
+                        "column": "2",
+                        "margin": "0,0,10,0"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tremolo_depth",
+                      "Label": "",
+                      "Properties": {
+                        "row": "1",
+                        "column": "3"
+                      },
+                      "Children": []
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Pitch and modulation"
-          },
-          "Children": [
+            },
             {
-              "Element": "Grid",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "rows": "Auto,Auto",
-                "columns": "Auto,Auto,Auto,Auto"
+                "caption": "Filter"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "tune",
+                  "Element": "Row",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "row": "0",
-                    "column": "0",
-                    "margin": "0,0,10,8"
+                    "gap": "12"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "fine",
-                  "Label": "",
-                  "Properties": {
-                    "row": "0",
-                    "column": "1",
-                    "margin": "0,0,10,8"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "vibrato_rate",
-                  "Label": "",
-                  "Properties": {
-                    "row": "0",
-                    "column": "2",
-                    "margin": "0,0,10,8"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "vibrato_depth",
-                  "Label": "",
-                  "Properties": {
-                    "row": "0",
-                    "column": "3",
-                    "margin": "0,0,0,8"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "pitch_env",
-                  "Label": "",
-                  "Properties": {
-                    "row": "1",
-                    "column": "0",
-                    "margin": "0,0,10,0"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "pitch_time",
-                  "Label": "",
-                  "Properties": {
-                    "row": "1",
-                    "column": "1",
-                    "margin": "0,0,10,0"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "tremolo_rate",
-                  "Label": "",
-                  "Properties": {
-                    "row": "1",
-                    "column": "2",
-                    "margin": "0,0,10,0"
-                  },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "tremolo_depth",
-                  "Label": "",
-                  "Properties": {
-                    "row": "1",
-                    "column": "3"
-                  },
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "cutoff",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "resonance",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    }
+                  ]
                 }
               ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Filter"
-          },
-          "Children": [
+            },
             {
-              "Element": "Row",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "gap": "12"
+                "caption": "Output"
               },
               "Children": [
                 {
-                  "Element": "Knob",
-                  "Parameter": "cutoff",
-                  "Label": "",
-                  "Properties": {},
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "resonance",
-                  "Label": "",
-                  "Properties": {},
-                  "Children": []
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "Element": "Group",
-          "Parameter": "",
-          "Label": "",
-          "Properties": {
-            "caption": "Output"
-          },
-          "Children": [
-            {
-              "Element": "Row",
-              "Parameter": "",
-              "Label": "",
-              "Properties": {
-                "gap": "12"
-              },
-              "Children": [
-                {
-                  "Element": "Fader",
-                  "Parameter": "level",
+                  "Element": "Row",
+                  "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "height": "96"
+                    "gap": "12"
                   },
-                  "Children": []
-                },
-                {
-                  "Element": "Knob",
-                  "Parameter": "drive",
-                  "Label": "",
-                  "Properties": {},
-                  "Children": []
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {
+                        "height": "96"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "drive",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    }
+                  ]
                 }
               ]
             }
