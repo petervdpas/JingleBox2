@@ -5,7 +5,6 @@
   "Author": "Peter van de Pas",
   "Version": "1.0",
   "Engine": "",
-  "StartsFrom": "takes",
   "Theme": {
     "Accent": "#3FA6A0",
     "Face": 0.68,
@@ -16,6 +15,7 @@
     "RowOver": 0.3,
     "RowPicked": 0.58
   },
+  "StartsFrom": "takes",
   "Parameters": [
     {
       "Key": "base_note",
@@ -24,7 +24,8 @@
       "Min": 0,
       "Max": 119,
       "Default": 48,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "start",
@@ -33,7 +34,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "end",
@@ -42,7 +44,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "loop_mode",
@@ -51,7 +54,8 @@
       "Min": 0,
       "Max": 2,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "loop_start",
@@ -60,7 +64,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "loop_end",
@@ -69,7 +74,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "reverse",
@@ -78,7 +84,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "one_voice",
@@ -87,7 +94,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "attack",
@@ -96,7 +104,8 @@
       "Min": 0,
       "Max": 2000,
       "Default": 2,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "decay",
@@ -105,7 +114,8 @@
       "Min": 0,
       "Max": 5000,
       "Default": 40,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "sustain",
@@ -114,7 +124,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0.6,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "release",
@@ -123,7 +134,8 @@
       "Min": 0,
       "Max": 5000,
       "Default": 80,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "tune",
@@ -132,7 +144,8 @@
       "Min": -24,
       "Max": 24,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "fine",
@@ -141,7 +154,8 @@
       "Min": -100,
       "Max": 100,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "vibrato_rate",
@@ -150,7 +164,8 @@
       "Min": 0,
       "Max": 20,
       "Default": 0,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     },
     {
       "Key": "vibrato_depth",
@@ -159,7 +174,8 @@
       "Min": 0,
       "Max": 200,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "pitch_env",
@@ -168,7 +184,8 @@
       "Min": -24,
       "Max": 24,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "pitch_time",
@@ -177,7 +194,8 @@
       "Min": 0,
       "Max": 2000,
       "Default": 60,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "tremolo_rate",
@@ -186,7 +204,8 @@
       "Min": 0,
       "Max": 20,
       "Default": 0,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     },
     {
       "Key": "tremolo_depth",
@@ -195,7 +214,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "cutoff",
@@ -204,7 +224,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "resonance",
@@ -213,7 +234,8 @@
       "Min": 0,
       "Max": 0.98,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "level",
@@ -222,7 +244,8 @@
       "Min": -60,
       "Max": 6,
       "Default": 0,
-      "Step": 0.5
+      "Step": 0.5,
+      "Saved": true
     },
     {
       "Key": "drive",
@@ -231,7 +254,8 @@
       "Min": 1,
       "Max": 10,
       "Default": 1,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     }
   ],
   "Panel": {
@@ -437,7 +461,6 @@
                       "Parameter": "attack",
                       "Label": "",
                       "Properties": {
-                        "track": "96"
                       },
                       "Children": []
                     },
@@ -446,7 +469,6 @@
                       "Parameter": "decay",
                       "Label": "",
                       "Properties": {
-                        "track": "96"
                       },
                       "Children": []
                     },
@@ -455,7 +477,6 @@
                       "Parameter": "sustain",
                       "Label": "",
                       "Properties": {
-                        "track": "96"
                       },
                       "Children": []
                     },
@@ -464,7 +485,6 @@
                       "Parameter": "release",
                       "Label": "",
                       "Properties": {
-                        "track": "96"
                       },
                       "Children": []
                     }
@@ -505,6 +525,7 @@
                       "Parameter": "tune",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "0",
                         "column": "0",
                         "tip": "Whole semitones added to every note this instrument plays."
@@ -516,6 +537,7 @@
                       "Parameter": "fine",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "0",
                         "column": "1",
                         "tip": "Hundredths of a semitone, for sitting this voice against another."
@@ -527,6 +549,7 @@
                       "Parameter": "vibrato_rate",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "0",
                         "column": "2"
                       },
@@ -537,6 +560,7 @@
                       "Parameter": "vibrato_depth",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "0",
                         "column": "3"
                       },
@@ -547,6 +571,7 @@
                       "Parameter": "pitch_env",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "1",
                         "column": "0"
                       },
@@ -557,6 +582,7 @@
                       "Parameter": "pitch_time",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "1",
                         "column": "1"
                       },
@@ -567,6 +593,7 @@
                       "Parameter": "tremolo_rate",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "1",
                         "column": "2"
                       },
@@ -577,6 +604,7 @@
                       "Parameter": "tremolo_depth",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "row": "1",
                         "column": "3"
                       },
@@ -607,6 +635,7 @@
                       "Parameter": "cutoff",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "display": "cutoff_text",
                         "tip": "A low pass. Wide open at the top, where it does nothing at all."
                       },
@@ -617,6 +646,7 @@
                       "Parameter": "resonance",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "tip": "How much the filter rings at its cutoff."
                       },
                       "Children": []
@@ -631,7 +661,7 @@
               "Label": "",
               "Properties": {
                 "caption": "Output",
-                "height": "185"
+                "height": "238"
               },
               "Children": [
                 {
@@ -639,8 +669,7 @@
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "gap": "12",
-                    "height": "150"
+                    "gap": "12"
                   },
                   "Children": [
                     {
@@ -649,8 +678,7 @@
                       "Label": "",
                       "Properties": {
                         "ticks": "6,0,-12,-40",
-                        "tip": "Unity is 0 dB, and above it is makeup gain.",
-                        "track": "96"
+                        "tip": "Unity is 0 dB, and above it is makeup gain."
                       },
                       "Children": []
                     },
@@ -659,6 +687,7 @@
                       "Parameter": "drive",
                       "Label": "",
                       "Properties": {
+                        "dial": "40",
                         "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
                       },
                       "Children": []

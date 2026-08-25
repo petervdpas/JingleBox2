@@ -438,7 +438,7 @@ public class Clavier : ThemedControl
 
         var laid = Keys();
         var sounding = Sounding();
-        var loaded = Loaded();
+        var loaded = Occupied();
 
         // The white keys first, whole, then the raised ones over them. Drawn the other way
         // round a raised key would be sitting under its neighbours instead of on top.
@@ -598,7 +598,7 @@ public class Clavier : ThemedControl
         new(KeysWidth / 2 + LampsWidth() / 2 + ArrowGap, HeadTop, ArrowWidth, ArrowHeight);
 
     /// <summary>And the ones with something on them, read the same way and for the same reason.</summary>
-    private HashSet<int> Loaded()
+    private HashSet<int> Occupied()
     {
         var held = new HashSet<int>();
 

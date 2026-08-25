@@ -116,7 +116,6 @@
                        volume column in a pattern rides this the same as for any instrument. -->
                   <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
                                Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
-                               TrackLength="96"
                                Ticks="6,0,-12,-40"
                                HorizontalAlignment="Left"
                                ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
@@ -414,7 +413,7 @@
                  The envelope is faders because an envelope is four times over the same
                  question, and four sliders answer it at a glance in a way four knobs never
                  do. -->
-            <StackPanel Spacing="10" IsVisible="{Binding Editor.IsSynth}">
+            <StackPanel Spacing="10" IsVisible="{Binding Editor.ShowsWrittenSynth}">
 
               <!-- What it is doing, drawn rather than described. -->
               <StackPanel Orientation="Horizontal" Spacing="16">
@@ -714,6 +713,7 @@
                                  Takes="{Binding Editor.MachineTakes}"
                                  Pads="{Binding Editor.MachinePads}"
                                  Zones="{Binding Editor.MachineZones}"
+                                 Scope="{Binding Editor.MachineScope}"
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
                                  Presets="{Binding Presets}"

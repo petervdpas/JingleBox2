@@ -54,6 +54,7 @@ public sealed class MachinePartSample : Decorator
     private const string KeysKind = "Keys";
     private const string WaveKind = "Wave";
     private const string EnvelopeKind = "Envelope";
+    private const string ScopeKind = "Scope";
     private const string ImageKind = "Image";
     private const string ChoiceKind = "Choice";
     private const string TakeKind = "Take";
@@ -153,6 +154,7 @@ public sealed class MachinePartSample : Decorator
         KeysKind => BuildKeys(),
         WaveKind => new PartSketch(SketchShape.Wave) { Width = 74, Height = 34 },
         EnvelopeKind => BuildEnvelope(),
+        ScopeKind => BuildScope(),
         ImageKind => new PartSketch(SketchShape.Picture) { Width = 60, Height = 40 },
         ChoiceKind => BuildChoice(),
         TakeKind => BuildTake(),
@@ -466,8 +468,52 @@ public sealed class MachinePartSample : Decorator
 
         public void Move(int at, int low, int high, int root) { }
 
-        /// <summary>Never raised: none of this moves.</summary>
-        public event EventHandler? Changed;
+        /// <summary>
+        /// Nowhere to subscribe, because none of this moves.
+        /// </summary>
+        /// <remarks>
+        /// Taken and dropped rather than kept. A stand-in for a chip in the library never changes:
+        /// the zones are three fixed stretches of keyboard and the chip is not hit testable, so
+        /// there is no drag to move one. Holding the handlers would be holding a list that is
+        /// never read.
+        /// </remarks>
+        event EventHandler? IMachineZones.Changed
+        {
+            add { }
+            remove { }
+        }
+    }
+
+    /// <summary>
+    /// The wave, drawn as a wave: the real control against a stand-in that makes a sawtooth.
+    /// </summary>
+    private static Control BuildScope() => new ScopeView
+    {
+        Scope = new SampleWave(),
+        Width = 74,
+        Height = 34,
+        Cycles = 2,
+    };
+
+    /// <summary>A wave for the chip to draw, which no machine is making.</summary>
+    private sealed class SampleWave : IMachineScope
+    {
+        public void Trace(double[] into, double cycles, double seconds, bool running)
+        {
+            for (int at = 0; at < into.Length; at++)
+            {
+                double across = into.Length == 1 ? 0 : at / (into.Length - 1.0);
+
+                into[at] = across * cycles % 1.0 * 2.0 - 1.0;
+            }
+        }
+
+        /// <summary>Nowhere to subscribe: a chip is not hit testable and nothing here plays.</summary>
+        event EventHandler? IMachineScope.Changed
+        {
+            add { }
+            remove { }
+        }
     }
 
     private static Control BuildChoice() => new ComboBox

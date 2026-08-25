@@ -199,6 +199,15 @@ public sealed class SampleVoice : IVoice
     /// </remarks>
     public double WindowSeconds { get; }
 
+    /// <summary>
+    /// A recording with an end of its own, which is any that does not loop.
+    /// </summary>
+    /// <remarks>
+    /// The same fact <see cref="WindowSeconds"/> holds, asked as the question a hand letting go
+    /// needs answered. A looping window has no end and answers no.
+    /// </remarks>
+    public bool OneShot => WindowSeconds > 0;
+
     /// <summary>Which instrument auditioned this, for one that plays one note at a time.</summary>
     public string Audition { get; init; } = "";
 

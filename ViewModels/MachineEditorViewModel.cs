@@ -328,6 +328,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <summary>And a map for the panel to draw, for the same reason there is a kit.</summary>
     public IMachineZones PreviewZones { get; } = new MachinePreviewMap();
 
+    /// <summary>And a wave, so a machine laid out round a picture is laid out round a picture.</summary>
+    public IMachineScope PreviewScope { get; } = new MachinePreviewScope();
+
     /// <summary>
     /// The shelf the panel's picker offers, which on a machine holding a recording is yours.
     /// </summary>
@@ -601,6 +604,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Keys,
         MachineElementKinds.Wave,
         MachineElementKinds.Envelope,
+        MachineElementKinds.Scope,
         MachineElementKinds.Image,
         MachineElementKinds.Take,
         MachineElementKinds.Preset,

@@ -156,7 +156,13 @@ public static class MachinePresetFile
             }
             else
             {
-                loose = new RecordingValues(sound);
+                // A machine with one set of settings and nothing in front of them. There are two
+                // of those and they are different machines: one generates its wave and one plays
+                // a recording back, so which adapter reads the file is which machine it is for.
+                if (kind == TrackerInstrumentKind.Synth)
+                    wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
+                else
+                    loose = new RecordingValues(sound);
             }
 
             foreach (var (key, node) in held)
@@ -269,15 +275,18 @@ public static class MachinePresetFile
             return held.ToJsonString(Layout);
         }
 
-        var plain = new RecordingValues(sound);
+        var kind = Machine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
+
+        IMachineValues plain = kind == TrackerInstrumentKind.Synth
+            ? new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound)
+            : new RecordingValues(sound);
 
         // The machine that holds one recording says where in its own words, so the panel's key is
-        // what the file uses too.
+        // what the file uses too. A machine that generates its sound has none to name.
         if (Named(machine, MachineElementKinds.Take) is { Length: > 0 } take)
             held[take] = Inside(sound.FilePath, home);
 
-        foreach (var parameter in machine.Parameters)
-            held[parameter.Key] = JsonValue.Create(plain.Get(parameter.Key));
+        foreach (string key in owned.Outside) held[key] = JsonValue.Create(plain.Get(key));
 
         return held.ToJsonString(Layout);
     }
@@ -361,13 +370,22 @@ public static class MachinePresetFile
     private static Settings Owned(MachineProject machine)
     {
         var words = Words(machine);
-        var keys = machine.Parameters.Select(one => one.Key).ToList();
 
-        // A machine that says nothing means all of it, which is what a kit means: every knob on
-        // BongaBong is about the pad in hand and there is nothing else for one to be about.
-        if (Held(machine) is not { } holder ||
-            !holder.Properties.TryGetValue(SettingsProperty, out string? said) ||
-            said.Trim().Length == 0)
+        // Only what the machine says is part of the sound. A knob that says how much of the wave
+        // the picture shows is a knob on the face like any other and is no more part of the
+        // instrument than which way you happen to be looking, so no preset carries it: loading a
+        // sound would otherwise set somebody else's view.
+        var keys = machine.Parameters.Where(one => one.Saved).Select(one => one.Key).ToList();
+
+        // A machine that holds no set of things has no blocks, so all of it is the machine's own.
+        // That is not the same as a machine that holds things and has said nothing about them.
+        if (Held(machine) is not { } holder)
+            return new Settings(new List<string>(), new List<string>(), keys, words);
+
+        // And one that holds things but names no settings means all of them are the thing's,
+        // which is what a kit means: every knob on BongaBong is about the pad in hand and there
+        // is nothing else for one to be about.
+        if (!holder.Properties.TryGetValue(SettingsProperty, out string? said) || said.Trim().Length == 0)
             return new Settings(keys, words, new List<string>(), new List<string>());
 
         var named = said

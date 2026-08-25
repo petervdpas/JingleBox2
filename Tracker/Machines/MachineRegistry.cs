@@ -135,9 +135,21 @@ public static class MachineRegistry
 
         bool moved = false;
 
+        var here = In(Installed).ToDictionary(one => one.Id, one => one.Folder, StringComparer.Ordinal);
+
         foreach (var project in In(Shipped))
         {
-            if (project.Id.Length == 0 || offered.Contains(project.Id)) continue;
+            if (project.Id.Length == 0) continue;
+
+            // Already offered, so it is this installation's to keep or throw out. What it is not
+            // is frozen: a machine that ships is the machine, and one edited in its own project
+            // has to reach the rack without anybody copying folders about by hand.
+            if (offered.Contains(project.Id))
+            {
+                if (here.TryGetValue(project.Id, out string? mine)) Refresh(project.Folder, mine);
+
+                continue;
+            }
 
             // Recorded whether or not it went in. A machine that cannot be copied is a machine
             // this installation has still been offered, and trying again on every start would
@@ -153,6 +165,46 @@ public static class MachineRegistry
         }
 
         if (moved) Remember(offered);
+    }
+
+    /// <summary>
+    /// Brings an installed machine up to date with the one that ships, where that is newer.
+    /// </summary>
+    /// <remarks>
+    /// File by file, and nothing is deleted. What ships is overwritten because that is the
+    /// machine; anything else in the folder is yours, which is how a preset you saved onto a
+    /// machine survives the next version of it arriving.
+    ///
+    /// By the clock on each file rather than by the version in the manifest, because a version
+    /// is bumped when somebody remembers and a machine being worked on changes twenty times
+    /// between two of them. A file nobody has touched is copied over nothing.
+    /// </remarks>
+    private static void Refresh(string shipped, string installed)
+    {
+        try
+        {
+            if (!Directory.Exists(shipped) || !Directory.Exists(installed)) return;
+
+            foreach (string from in Directory.EnumerateFiles(shipped, "*", SearchOption.AllDirectories))
+            {
+                string named = Path.GetRelativePath(shipped, from);
+                string to = Path.Combine(installed, named);
+
+                if (File.Exists(to) && File.GetLastWriteTimeUtc(to) >= File.GetLastWriteTimeUtc(from)) continue;
+
+                if (Path.GetDirectoryName(to) is { Length: > 0 } folder) Directory.CreateDirectory(folder);
+
+                File.Copy(from, to, overwrite: true);
+
+                Diagnostics.Log.Write(Diagnostics.LogArea.App,
+                    () => "machine " + named + " brought up to date in " + installed);
+            }
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(
+                Diagnostics.LogArea.App, "A machine could not be brought up to date from " + shipped, ex);
+        }
     }
 
     /// <summary>Which shipped machines this installation has already been offered.</summary>

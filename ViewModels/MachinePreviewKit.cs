@@ -108,8 +108,18 @@ public sealed class MachinePreviewSlices : IMachineSlices
     /// <summary>Nothing. There is no recording here to cut, only a picture of one.</summary>
     public void Chop() { }
 
-    /// <summary>Never raised: none of this moves.</summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
+    /// <summary>
+    /// Nowhere to subscribe, because none of this moves.
+    /// </summary>
+    /// <remarks>
+    /// The picture is made rather than read off a file, the cuts are fixed, and nothing on the
+    /// bench is playing. Holding the handlers would be holding a list that is never read.
+    /// </remarks>
+    event PropertyChangedEventHandler? INotifyPropertyChanged.PropertyChanged
+    {
+        add { }
+        remove { }
+    }
 }
 
 /// <summary>
@@ -172,4 +182,38 @@ public sealed class MachinePreviewMap : IMachineZones
     }
 
     public event EventHandler? Changed;
+}
+
+/// <summary>
+/// A wave for the editor's panel to draw: one the machine being built is not making.
+/// </summary>
+/// <remarks>
+/// The same reason the kit is a real kit and the map a real map. A picture drawn against nothing
+/// is an empty frame, and a machine laid out around an empty frame is laid out around the wrong
+/// thing once there is a sound behind it.
+///
+/// A sawtooth, because it is the shape that reads as a wave at a glance: a sine could be a
+/// squiggle and a square could be a mistake.
+/// </remarks>
+public sealed class MachinePreviewScope : IMachineScope
+{
+    public void Trace(double[] into, double cycles, double seconds, bool running)
+    {
+        for (int at = 0; at < into.Length; at++)
+        {
+            double across = into.Length == 1 ? 0 : at / (into.Length - 1.0);
+            double phase = across * cycles % 1.0;
+
+            into[at] = phase * 2.0 - 1.0;
+        }
+    }
+
+    /// <summary>
+    /// Nowhere to subscribe, because nothing here is playing.
+    /// </summary>
+    event EventHandler? IMachineScope.Changed
+    {
+        add { }
+        remove { }
+    }
 }

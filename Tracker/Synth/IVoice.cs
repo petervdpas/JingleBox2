@@ -32,6 +32,23 @@ public interface IVoice
 
     bool IsFinished { get; }
 
+    /// <summary>
+    /// True for a sound with an end of its own, which a hand cannot cut short.
+    /// </summary>
+    /// <remarks>
+    /// A recording that does not loop is one: it is a hit, and a hit played by hand sounds right
+    /// through whether the mouse came up after two seconds or after two milliseconds. A take cut
+    /// off part way is not the sound the instrument makes, and a click is a few milliseconds
+    /// long, so following the key would make every clicked note a tick.
+    ///
+    /// Only against a hand. A pattern's OFF cuts anything, which is the whole of what an OFF is
+    /// for, and a track is one voice regardless.
+    ///
+    /// False for everything else, because everything else would ring for ever without a key to
+    /// let go of: a generated wave has no end, and neither has a looping window.
+    /// </remarks>
+    bool OneShot => false;
+
     /// <summary>Releases on its own after this long, for auditioning with no key to let go of.</summary>
     void HoldFor(double seconds);
 

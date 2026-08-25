@@ -98,6 +98,16 @@ public class MachinePanelView : Decorator
     public static readonly StyledProperty<IMachineZones?> ZonesProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachineZones?>(nameof(Zones));
 
+    /// <summary>
+    /// The shape the machine is making, for a machine that generates its sound.
+    /// </summary>
+    /// <remarks>
+    /// Beside the settings and not among them, the same way the pads and the map are. What the
+    /// wave looks like is not a setting: it is what the settings add up to this instant.
+    /// </remarks>
+    public static readonly StyledProperty<IMachineScope?> ScopeProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineScope?>(nameof(Scope));
+
     /// <summary>The recording being cut into pieces, for a machine that fills itself from one.</summary>
     public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachineSlices?>(nameof(Slices));
@@ -362,6 +372,12 @@ public class MachinePanelView : Decorator
         set => SetValue(ZonesProperty, value);
     }
 
+    public IMachineScope? Scope
+    {
+        get => GetValue(ScopeProperty);
+        set => SetValue(ScopeProperty, value);
+    }
+
     public IMachineSlices? Slices
     {
         get => GetValue(SlicesProperty);
@@ -567,6 +583,7 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Text => BuildText(element),
             MachineElementKinds.Pads => BuildPads(element),
             MachineElementKinds.PadPicker => BuildPicker(element),
+            MachineElementKinds.Scope => BuildScope(element, parameters),
             MachineElementKinds.Zones => BuildZones(element),
             MachineElementKinds.ZonePicker => BuildZonePicker(element),
             MachineElementKinds.Slices => BuildSlices(element),
@@ -585,8 +602,42 @@ public class MachinePanelView : Decorator
 
         Sized(element, built);
         Tipped(element, built);
+        Live(element, built, parameters);
 
         return Apart(element, Skin(element, built, Holds(element.Element)));
+    }
+
+    /// <summary>
+    /// Greys a control out while the setting it depends on is somewhere else.
+    /// </summary>
+    /// <remarks>
+    /// A pulse's duty cycle is the case this exists for: it means nothing on a sawtooth, and a
+    /// knob that turns and does nothing is worse than a knob you can see is not in play. Said
+    /// here rather than in each builder, because it is a question about the panel and not about
+    /// what the control is: any of them can be the one that only matters sometimes.
+    ///
+    /// Greyed and never taken away. A panel that grows and shrinks depending on what it is set
+    /// to is a different panel every time you look at it, and the knob you were reaching for has
+    /// moved.
+    ///
+    /// One comparison, deliberately. A machine that needed two would be a machine describing a
+    /// program, and this is a description of a front panel.
+    /// </remarks>
+    private void Live(
+        MachineElement element, Control control, Dictionary<string, MachineParameter> parameters)
+    {
+        if (Text(element, "when") is not { Length: > 0 } named) return;
+
+        if (!parameters.TryGetValue(named, out var watched)) return;
+
+        if (!double.TryParse(Text(element, "is"), NumberStyles.Float, CultureInfo.InvariantCulture, out double wanted))
+            return;
+
+        void Ask() => control.IsEnabled = Math.Abs(Start(watched) - wanted) < 0.5;
+
+        Reads(Ask);
+
+        Watch(named, Ask);
     }
 
     /// <summary>
@@ -775,13 +826,15 @@ public class MachinePanelView : Decorator
         // machine says otherwise, which is what a rack looks like.
         var caption = Text(element, "caption");
 
-        // What it holds is clipped, and the group itself is not. Nothing inside a group draws
-        // outside it either way, but clipping the group clips the group's own frame: the rounded
-        // corners came off, so every box on a described panel had four square nicks in it that
-        // the same box written by hand did not.
+        // Not clipped, either the group or what it holds, because a group written by hand is not.
+        // Clipping the group takes the rounded corners off its own frame; clipping the contents
+        // shaves a pixel off anything drawn at the very edge of them, which is every picture on
+        // the machine, since a picture's frame sits exactly on its own boundary.
+        //
+        // What that costs is a group given a height smaller than what is in it, which draws over
+        // whatever is under it. That is what the same group does in XAML, and a machine asking
+        // for a size too small is a machine that wants fixing rather than hiding.
         var held = Inside(element, parameters);
-
-        held.ClipToBounds = true;
 
         var group = new PanelGroup
         {
@@ -931,7 +984,12 @@ public class MachinePanelView : Decorator
                 // field is the case: it is written to sit on the middle line so that it lines up
                 // with the box it names, and a row that pushed it to the top would leave it
                 // riding half a line above the thing it is about.
-                if (across is { } said) control.VerticalAlignment = said;
+                //
+                // A child's own word beats the row's, the way its own margin beats the row's gap.
+                // One knob standing at the foot of a row of boxes is the case: the row wants
+                // everything at the top and that one thing does not.
+                if (Across(child) is { } own) control.VerticalAlignment = own;
+                else if (across is { } said) control.VerticalAlignment = said;
                 else if (control.VerticalAlignment == VerticalAlignment.Stretch)
                     control.VerticalAlignment = Holds(child.Element) && matched
                         ? VerticalAlignment.Stretch
@@ -1067,12 +1125,16 @@ public class MachinePanelView : Decorator
             DefaultValue = parameter.Default,
             Format = Format(parameter),
             Ticks = Text(element, "ticks"),
-
-            // How long the throw is, which is not how tall the control is: a fader draws its
-            // name above the track and its value under it, so a height meant as the throw makes
-            // the whole thing too short and the value is drawn over whatever is below it.
-            TrackLength = Measurement(element, "track") ?? 0,
         };
+
+        // How long the throw is, which is not how tall the control is: a fader draws its name
+        // above the track and its value under it, so a height meant as the throw makes the whole
+        // thing too short and the value is drawn over whatever is below it.
+        //
+        // A machine that says nothing gets the standard throw every fader in the app has, so one
+        // number moves all of them and no machine has to know what it is. Nought is the other
+        // word for it: take whatever height you are given, for a strip that fills its panel.
+        if (Measurement(element, "track") is { } track) fader.TrackLength = track;
 
         fader.PropertyChanged += (_, e) =>
         {
@@ -1098,15 +1160,60 @@ public class MachinePanelView : Decorator
             Label = Caption(element, parameter),
         };
 
+        // Its heading's height, so a switch standing in a row of knobs sits on the same line
+        // they do rather than half a name higher.
+        if (Number(element, "lines", 0) is var lines and > 0) toggle.TitleLines = lines;
+        if (Measurement(element, "headroom") is { } air) toggle.HeadRoom = air;
+
+        // More than two positions, where the machine lists them. The parameter still holds one
+        // number, counting from zero, so a switch of six waves is a setting like any other and a
+        // song saved on one is a song with a number in it.
+        if (Text(element, "options") is { Length: > 0 } listed)
+        {
+            var positions = listed
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            if (positions.Count > 1)
+            {
+                toggle.ItemsSource = positions;
+
+                bool filling = false;
+
+                toggle.PropertyChanged += (_, e) =>
+                {
+                    if (filling || e.Property != Switch.SelectedItemProperty) return;
+
+                    int at = toggle.SelectedItem is string said ? positions.IndexOf(said) : -1;
+
+                    if (at >= 0) Write(parameter.Key, at);
+                };
+
+                Reads(() =>
+                {
+                    int at = (int)Math.Round(Start(parameter));
+
+                    filling = true;
+
+                    try
+                    {
+                        toggle.SelectedItem = positions[Math.Clamp(at, 0, positions.Count - 1)];
+                    }
+                    finally
+                    {
+                        filling = false;
+                    }
+                });
+
+                return toggle;
+            }
+        }
+
         // Only when the panel says so: the switch words itself on and off, and a machine that
         // has nothing better to call the two ends is better off with those than with blanks.
         if (Text(element, "on") is { Length: > 0 } on) toggle.OnLabel = on;
         if (Text(element, "off") is { Length: > 0 } off) toggle.OffLabel = off;
 
-        // Its heading's height, so a switch standing in a row of knobs sits on the same line
-        // they do rather than half a name higher.
-        if (Number(element, "lines", 0) is var lines and > 0) toggle.TitleLines = lines;
-        if (Measurement(element, "headroom") is { } air) toggle.HeadRoom = air;
 
         toggle.PropertyChanged += (_, e) =>
         {
@@ -2072,6 +2179,42 @@ public class MachinePanelView : Decorator
         return int.TryParse(said, out int semitone) ? MachineNotes.Name(semitone) : said;
     }
 
+    /// <summary>
+    /// The shape the machine is making, drawn from the machine's own engine.
+    /// </summary>
+    /// <remarks>
+    /// The one control here that is handed a setting it does not turn: how much of the wave is
+    /// shown is a knob somewhere else on the panel, and this has to be told which so the two
+    /// agree. It is read and never written, the way a picture of a recording reads the take it
+    /// is a picture of.
+    /// </remarks>
+    private Control? BuildScope(MachineElement element, Dictionary<string, MachineParameter> parameters)
+    {
+        var scope = Scope;
+
+        if (scope is null && !Designing) return null;
+
+        var view = new ScopeView
+        {
+            Scope = scope,
+            Width = Measurement(element, "width") ?? 176,
+            Height = Measurement(element, "height") ?? 60,
+        };
+
+        if (Text(element, "cycles") is { Length: > 0 } named
+            && parameters.TryGetValue(named, out var cycles))
+        {
+            Reads(() => view.Cycles = Start(cycles));
+
+            Watch(named, () => view.Cycles = Start(cycles));
+        }
+
+        // Started by a note, the same as the envelope curve beside it.
+        view.Bind(ScopeControl.TriggerProperty, this.GetObservable(TriggerProperty));
+
+        return view;
+    }
+
     /// <summary>The recording on the machine, cut into pieces.</summary>
     private Control? BuildSlices(MachineElement element)
     {
@@ -2453,7 +2596,7 @@ public class MachinePanelView : Decorator
 
         foreach (var (element, control) in _frames)
         {
-            if (Bounds(control) is not { } area || !area.Contains(at)) continue;
+            if (Placed(control) is not { } area || !area.Contains(at)) continue;
 
             double size = area.Width * area.Height;
 
@@ -2488,8 +2631,8 @@ public class MachinePanelView : Decorator
         Rect? around = null;
         Rect? wanted = null;
 
-        if (Selected is { } selected && _frames.TryGetValue(selected, out var picked)) around = Bounds(picked);
-        if (Marked is { } marked && _frames.TryGetValue(marked, out var over)) wanted = Bounds(over);
+        if (Selected is { } selected && _frames.TryGetValue(selected, out var picked)) around = Placed(picked);
+        if (Marked is { } marked && _frames.TryGetValue(marked, out var over)) wanted = Placed(over);
 
         // Only while it is being laid out. A machine in a song is a machine, and its knobs are
         // for turning.
@@ -2782,7 +2925,7 @@ public class MachinePanelView : Decorator
         // picking something else up.
         if (Selected is { } element &&
             _frames.TryGetValue(element, out var control) &&
-            Bounds(control) is { } area)
+            Placed(control) is { } area)
         {
             foreach (var (grip, where) in Handles.For(area))
             {
@@ -2904,7 +3047,7 @@ public class MachinePanelView : Decorator
         // A container is asked to hold the thing, not to stand aside for it.
         if (Holds(over.Element)) return (over, -1);
 
-        var parent = Parent(root, over);
+        var parent = Holder(root, over);
 
         if (parent == null) return (over, -1);
 
@@ -2912,7 +3055,7 @@ public class MachinePanelView : Decorator
 
         if (index < 0) return (parent, -1);
 
-        if (!_frames.TryGetValue(over, out var frame) || Bounds(frame) is not { } area) return (parent, -1);
+        if (!_frames.TryGetValue(over, out var frame) || Placed(frame) is not { } area) return (parent, -1);
 
         bool after = Down(parent)
             ? at.Y > area.Center.Y
@@ -2941,7 +3084,7 @@ public class MachinePanelView : Decorator
         // or the last one when the drop is at the end.
         var beside = index < children.Count ? children[index] : children.Count > 0 ? children[^1] : null;
 
-        if (beside == null || !_frames.TryGetValue(beside, out var frame) || Bounds(frame) is not { } area)
+        if (beside == null || !_frames.TryGetValue(beside, out var frame) || Placed(frame) is not { } area)
             return null;
 
         bool before = index < children.Count;
@@ -2963,20 +3106,20 @@ public class MachinePanelView : Decorator
     private static bool DownKind(string kind) => kind == MachineElementKinds.Column;
 
     /// <summary>What holds that element, or nothing when it is the outermost one.</summary>
-    private static MachineElement? Parent(MachineElement at, MachineElement wanted)
+    private static MachineElement? Holder(MachineElement at, MachineElement wanted)
     {
         foreach (var child in at.Children)
         {
             if (ReferenceEquals(child, wanted)) return at;
 
-            if (Parent(child, wanted) is { } found) return found;
+            if (Holder(child, wanted) is { } found) return found;
         }
 
         return null;
     }
 
     /// <summary>Where an element's frame sits on this panel, or nothing when it is not on it.</summary>
-    private Rect? Bounds(Visual frame)
+    private Rect? Placed(Visual frame)
     {
         if (frame.TranslatePoint(new Point(0, 0), this) is not { } corner) return null;
 

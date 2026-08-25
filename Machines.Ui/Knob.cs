@@ -21,7 +21,24 @@ namespace JingleBox2.Machines.Ui;
 public class Knob : ThemedControl
 {
     /// <summary>Gap between the dial and the label, and between the label and the value.</summary>
-    private const double TextGap = 2;
+    /// <summary>
+    /// The air between a knob's name and its dial, and between its dial and its value.
+    /// </summary>
+    /// <remarks>
+    /// The same a fader leaves under its name and a switch under its title. These three stand
+    /// beside each other in a row all over the app, and a knob that left half as much read as
+    /// crammed against everything around it.
+    /// </remarks>
+    private const double TextGap = 4;
+
+    /// <summary>How far a tick reaches past the dial's edge, the long ones and the short ones.</summary>
+    /// <remarks>
+    /// Written out here rather than at the one place they are drawn, because the layout has to
+    /// leave room for them before anything is drawn at all.
+    /// </remarks>
+    private const double MajorTickReach = 8.5;
+
+    private const double MinorTickReach = 6.5;
 
     private const double LabelFontSize = 11;
     private const double ValueFontSize = 11.5;
@@ -201,12 +218,19 @@ public class Knob : ThemedControl
     /// </summary>
     /// <remarks>
     /// The ring of little lines a machine prints around a knob, which is what lets you read
-    /// roughly where it is set from across the room. Off by default because the same control
-    /// is used on pages that are lists of values rather than panels, and there a ring of marks
-    /// is noise.
+    /// roughly where it is set from across the room. Every knob in the app has one, so it is the
+    /// default and no panel has to ask: a page where some dials carry a scale and some do not
+    /// reads as two pages, and there was no telling which kind you were looking at without
+    /// counting the marks.
+    ///
+    /// Eleven, so there is a mark at each end and one in the middle with four between.
+    ///
+    /// A machine can still say fewer, or none, and none means none: the ring is the only thing
+    /// that says where a knob's travel ends, so a knob without it says nothing until it is
+    /// pointed at.
     /// </remarks>
     public static readonly StyledProperty<int> TicksProperty =
-        AvaloniaProperty.Register<Knob, int>(nameof(Ticks));
+        AvaloniaProperty.Register<Knob, int>(nameof(Ticks), 11);
 
     public bool LabelAbove
     {
@@ -232,6 +256,18 @@ public class Knob : ThemedControl
         set => SetValue(TicksProperty, value);
     }
 
+    /// <summary>
+    /// How far the ring of marks reaches past the dial, or nothing where a knob has none.
+    /// </summary>
+    /// <remarks>
+    /// Room the layout has to leave, not decoration on top of it. The marks are drawn from the
+    /// dial's edge outwards, so a knob measured as its dial alone is measured too small at both
+    /// ends: the top marks climb into the name above and the bottom ones into the value below.
+    /// It never showed while every panel reserved fifty pixels over each dial, and the moment
+    /// that came off, every name on the machine was sitting on its own tick marks.
+    /// </remarks>
+    private double TickReach => Ticks > 1 ? MajorTickReach + 1 : 0;
+
     /// <summary>The room the name is given, however much of it the name actually uses.</summary>
     private double LabelRoom(FormattedText label) =>
         Math.Max(HeadRoom > 0 ? HeadRoom - TextGap : 0,
@@ -248,7 +284,7 @@ public class Knob : ThemedControl
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double width = Math.Max(DialSize, Math.Max(label.Width, value.Width));
-        double height = DialSize + TextGap + LabelRoom(label) + TextGap + value.Height;
+        double height = LabelRoom(label) + TextGap + TickReach + DialSize + TickReach + TextGap + value.Height;
 
         return new Size(width, height);
     }
@@ -267,10 +303,13 @@ public class Knob : ThemedControl
         {
             context.DrawText(label, new Point((Bounds.Width - label.Width) / 2, 0));
 
-            double centerY = LabelRoom(label) + TextGap + radius + 1;
+            double centerY = LabelRoom(label) + TextGap + TickReach + radius + 1;
 
             DrawDial(context, palette, centerX, centerY, radius);
-            context.DrawText(value, new Point((Bounds.Width - value.Width) / 2, centerY + radius + 1 + TextGap));
+
+            context.DrawText(
+                value,
+                new Point((Bounds.Width - value.Width) / 2, centerY + radius + 1 + TickReach + TextGap));
 
             return;
         }
@@ -296,7 +335,8 @@ public class Knob : ThemedControl
                 bool major = mark == 0 || mark == Ticks - 1 || mark * 2 == Ticks - 1;
 
                 var (ax, ay) = KnobMath.PointAt(centerX, centerY, radius + 3, at);
-                var (bx, by) = KnobMath.PointAt(centerX, centerY, radius + (major ? 8.5 : 6.5), at);
+                var (bx, by) = KnobMath.PointAt(
+                    centerX, centerY, radius + (major ? MajorTickReach : MinorTickReach), at);
 
                 context.DrawLine(new Pen(ink, major ? 1.6 : 1), new Point(ax, ay), new Point(bx, by));
             }
@@ -317,14 +357,7 @@ public class Knob : ThemedControl
         var rim = IsFocused || _hovered ? palette.Accent : palette.Border;
         context.DrawEllipse(face, new Pen(new SolidColorBrush(rim), IsFocused ? 1.6 : 1), center, radius, radius);
 
-        // The travel the pointer sweeps, so the ends of the range are visible when the pointer
-        // is not there. A full ring of marks says the same thing better, so it replaces these
-        // rather than being drawn over them.
-        if (Ticks <= 1)
-        {
-            DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees);
-            DrawTick(context, palette.BorderBrush, center, radius, KnobMath.StartDegrees + KnobMath.SweepDegrees);
-        }
+
 
         double angle = KnobMath.AngleFor(Value, Minimum, Maximum);
         var (innerX, innerY) = KnobMath.PointAt(centerX, centerY, radius * 0.15, angle);
@@ -334,14 +367,6 @@ public class Knob : ThemedControl
         context.DrawLine(pointer, new Point(innerX, innerY), new Point(outerX, outerY));
     }
 
-    /// <summary>A short mark just outside the dial, at one end of the sweep.</summary>
-    private static void DrawTick(DrawingContext context, IBrush brush, Point center, double radius, double angleDegrees)
-    {
-        var (x1, y1) = KnobMath.PointAt(center.X, center.Y, radius + 1, angleDegrees);
-        var (x2, y2) = KnobMath.PointAt(center.X, center.Y, radius + 3.5, angleDegrees);
-
-        context.DrawLine(new Pen(brush, 1), new Point(x1, y1), new Point(x2, y2));
-    }
 
     private void DrawText(DrawingContext context, ThemePalette palette, double top)
     {

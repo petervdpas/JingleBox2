@@ -141,7 +141,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         Patch = new SynthPatchViewModel(instrument.Patch, changed);
 
-        if (instrument.IsSynth) return;
+        // A generated wave has no file to read the shape of, and nothing below this line is about
+        // anything else. The machine's own face is, though: it has one whether or not there is a
+        // recording behind it, so it is asked for either way.
+        if (instrument.IsSynth)
+        {
+            Describe(waveforms);
+
+            return;
+        }
 
         instrument.EnsureShape();
         ReadWaveform(waveforms);
@@ -203,6 +211,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject
                 if (e.PropertyName == nameof(DrumKitViewModel.Selected)) SayAgain();
             };
         }
+        else if (IsSynth && Patch is { } voice)
+        {
+            var settings = new Tracker.Machines.SynthValues(voice, _instrument) { Changed = Moved };
+
+            Values = settings;
+
+            // The picture of the wave, drawn out of the same engine that makes the sound.
+            MachineScope = new Tracker.Machines.SynthScope(voice);
+        }
         else if (IsZampler && Zones is { } zones && Zampler is { } zampler)
         {
             Values = new Tracker.Machines.SamplerValues(zones, zampler) { Changed = Moved };
@@ -232,6 +249,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     /// <summary>The map behind the zones, on a machine that lays recordings across the keyboard.</summary>
     public IMachineZones? MachineZones { get; private set; }
+
+    /// <summary>The shape it is making, on a machine that generates its sound.</summary>
+    public IMachineScope? MachineScope { get; private set; }
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
     public IMachineSlices? MachineSlices { get; private set; }
@@ -628,6 +648,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// was written before it was a project.
     /// </remarks>
     public bool ShowsWrittenZampler => IsZampler && !IsDescribed;
+
+    /// <summary>
+    /// True when the wave, the envelope and the filter are the ones written in XAML.
+    /// </summary>
+    /// <remarks>
+    /// The same rule the kit and the sampler go by, and there for the same reason: a machine this
+    /// installation has no project for still has to open, and what it opens as is the panel that
+    /// was written before it was a project.
+    /// </remarks>
+    public bool ShowsWrittenSynth => IsSynth && !IsDescribed;
 
     public bool IsSynth => _instrument.IsSynth;
 

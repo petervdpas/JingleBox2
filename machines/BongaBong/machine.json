@@ -384,6 +384,7 @@
                               "Parameter": "pad_level",
                               "Label": "",
                               "Properties": {
+                                "dial": "40",
                                 "tip": "How loud this pad is, under the track's own level."
                               },
                               "Children": []
@@ -393,6 +394,7 @@
                               "Parameter": "pad_pan",
                               "Label": "",
                               "Properties": {
+                                "dial": "40",
                                 "tip": "Where this pad stands on the kit. The track's own pan is added to it."
                               },
                               "Children": []
@@ -402,6 +404,7 @@
                               "Parameter": "pad_choke",
                               "Label": "",
                               "Properties": {
+                                "dial": "40",
                                 "tip": "Pads sharing a number cut each other off, which is what a closed hihat does to an open one. Nought is no group, which is most of a kit."
                               },
                               "Children": []

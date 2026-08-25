@@ -79,6 +79,12 @@ public sealed class MachineElement
 /// <c>height</c> in pixels, and <c>margin</c>, which is one number for all four sides or a list
 /// of them the way a Thickness is written. A container leaves a gap between the things it holds
 /// on its own, so a margin is for the one element that wants to stand apart from the rest.
+///
+/// Two more belong to every control: <c>when</c> names another parameter and <c>is</c> the value
+/// it has to be at, and together they say when this control does anything. A pulse's duty cycle
+/// is the case: it means nothing on a sawtooth, so on every other wave it greys out rather than
+/// sitting there looking live. Greyed and not taken away, because a panel that grows and shrinks
+/// depending on what it is set to is a different panel every time you look at it.
 /// </remarks>
 public static class MachineElementKinds
 {
@@ -91,9 +97,10 @@ public static class MachineElementKinds
 
     /// <summary>A framed group with a heading. Properties: caption, gap, equal, width, height.</summary>
     /// <remarks>
-    /// Nothing inside it draws outside it. A group given a size smaller than what it holds is a
-    /// group somebody meant to be that size, and a heading with a knob hanging out from under it
-    /// reads as a mistake in the panel rather than a mistake in the description.
+    /// A group given a size smaller than what it holds draws over whatever is under it, which is
+    /// what the same group does written by hand. It is not clipped: a frame sits exactly on its
+    /// own boundary, so clipping a group's contents shaves a pixel off every picture in it, and
+    /// clipping the group takes the corners off its own frame.
     /// </remarks>
     /// <remarks>
     /// Properties: caption and inset, the air between the frame and what is in it. Where a
@@ -145,6 +152,11 @@ public static class MachineElementKinds
     /// values to mark on the scale. The throw is not the height: a fader also draws its name
     /// above and its value below, so a machine asking for a throw of 96 wants a control taller
     /// than that.
+    ///
+    /// Say nothing and the fader takes the standard throw, which is what nearly every machine
+    /// should do: one length, so a panel does not end up with a different fader in each of its
+    /// boxes, and so raising it raises them all. Nought means the other thing, take whatever
+    /// height you are given, for a strip that fills its panel.
     /// </remarks>
     public const string Fader = "Fader";
 
@@ -158,6 +170,12 @@ public static class MachineElementKinds
     ///
     /// <c>lines</c> and <c>headroom</c> are the knob's, and here for the same reason: a switch
     /// standing in a row of dials has to sit on the line they sit on.
+    ///
+    /// <c>options</c> makes it more than two: a comma separated list of positions, and the
+    /// parameter holds which one is chosen, counting from zero. That is the same number a
+    /// <see cref="Choice"/> holds, and the difference is only what it looks like. A list of six
+    /// waves belongs on a switch you can see the position of, not behind a dropdown that has to
+    /// be opened to find out what the machine is set to.
     /// </remarks>
     public const string Switch = "Switch";
 
@@ -226,6 +244,25 @@ public static class MachineElementKinds
     /// whatever it likes and some machines have two.
     /// </remarks>
     public const string Envelope = "Envelope";
+
+    /// <summary>
+    /// The shape the machine is making, drawn. Properties: width, height, cycles.
+    /// </summary>
+    /// <remarks>
+    /// For the machine that generates its sound rather than playing one back: it has no recording
+    /// to show, and a row of knobs does not tell anybody what a wave with the duty at a fifth and
+    /// the drive at four looks like.
+    ///
+    /// It turns nothing. The curve comes from the machine's own engine through
+    /// <see cref="IMachineScope"/>, because what a wave is and what drive does to it are the
+    /// machine's business, and a picture drawn from anything but the real thing would be a
+    /// drawing of a machine rather than of this one.
+    ///
+    /// <c>cycles</c> names the setting saying how much of the wave is shown. It is the one thing
+    /// about this that anybody turns, and on the machine it came from that knob is marked as no
+    /// part of the sound: see <see cref="MachineParameter.Saved"/>.
+    /// </remarks>
+    public const string Scope = "Scope";
 
     /// <summary>
     /// A picture the machine carries: a logo, a badge, a strip of trim.

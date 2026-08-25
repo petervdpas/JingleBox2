@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.UI;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace JingleBox2.Machines.Ui;
@@ -20,9 +21,18 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Fader : ThemedControl
 {
-    private const double GrooveWidth = 5;
-    private const double CapWidth = 22;
-    private const double CapHeight = 11;
+    /// <summary>
+    /// How wide the groove is, and the cap that rides it.
+    /// </summary>
+    /// <remarks>
+    /// Sized against the knobs it stands beside rather than against nothing. A forty pixel dial
+    /// with a ring of marks round it is a substantial thing, and a five pixel groove under a
+    /// twenty two pixel cap read as a scratch next to one.
+    /// </remarks>
+    private const double GrooveWidth = 8;
+
+    private const double CapWidth = 28;
+    private const double CapHeight = 14;
     private const double TextGap = 4;
 
     /// <summary>Short enough to fit anywhere, long enough to still be a fader.</summary>
@@ -64,11 +74,22 @@ public class Fader : ThemedControl
         AvaloniaProperty.Register<Fader, string>(nameof(Format), "0.00");
 
     /// <summary>
+    /// The throw every fader has unless it is told otherwise.
+    /// </summary>
+    /// <remarks>
+    /// One number for the whole app, so a panel does not end up with a different length of fader
+    /// in each of its boxes. Long enough that the hand has somewhere to go: the three machines
+    /// this was gathered from used seventy six, eighty six and ninety six, none of which was
+    /// chosen, all of which were whatever fitted the box that was being drawn at the time.
+    /// </remarks>
+    public const double StandardTrackLength = 120;
+
+    /// <summary>
     /// How long the throw is. Longer means finer control for the same range. Zero means take
     /// whatever height the fader is given, for a strip that should fill its panel.
     /// </summary>
     public static readonly StyledProperty<double> TrackLengthProperty =
-        AvaloniaProperty.Register<Fader, double>(nameof(TrackLength), 110.0);
+        AvaloniaProperty.Register<Fader, double>(nameof(TrackLength), StandardTrackLength);
 
     /// <summary>
     /// The scale beside the groove, as the values to mark: "6,0,-6,-12,-24,-40,-60". Empty for
@@ -300,6 +321,9 @@ public class Fader : ThemedControl
 
         double x = TrackCenterX() + CapWidth / 2 + TickGap;
 
+        // Which numbers there is room for, decided before any of them is drawn.
+        var written = ShowTickLabels ? Room(trackTop, trackLength) : null;
+
         foreach (double mark in _ticks)
         {
             if (mark < Minimum || mark > Maximum) continue;
@@ -317,8 +341,50 @@ public class Fader : ThemedControl
             var text = BuildText(TickText(mark), TickFontSize, FontFamily.Default,
                 unity ? palette.TextBrush : palette.MutedBrush);
 
+            if (written?.Contains(mark) == false) continue;
+
             context.DrawText(text, new Point(x + TickLength + 2, y - text.Height / 2));
         }
+    }
+
+    /// <summary>
+    /// Which of the marks there is room to print a number beside.
+    /// </summary>
+    /// <remarks>
+    /// A scale in decibels crowds at the top, where six and nought are a tenth of the throw
+    /// apart: printed anyway they sit on each other and the whole scale reads as crooked.
+    ///
+    /// Unity goes down first and keeps its place whatever else wants it. On a level fader that
+    /// is the one you aim for, and dropping its number to make room for the number at the very
+    /// end of the travel would be losing the one that is read for the one that is not.
+    /// </remarks>
+    private HashSet<double> Room(double trackTop, double trackLength)
+    {
+        var taken = new List<(double Top, double Bottom)>();
+        var kept = new HashSet<double>();
+
+        bool Fits(double mark)
+        {
+            double y = FaderMath.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
+            double half = BuildText(TickText(mark), TickFontSize, FontFamily.Default, Brushes.Black).Height / 2;
+
+            foreach (var (top, bottom) in taken)
+                if (y + half > top && y - half < bottom) return false;
+
+            taken.Add((y - half, y + half));
+
+            return true;
+        }
+
+        foreach (double mark in _ticks)
+            if (mark >= Minimum && mark <= Maximum && Math.Abs(mark) < 0.0001 && Fits(mark))
+                kept.Add(mark);
+
+        foreach (double mark in _ticks)
+            if (mark >= Minimum && mark <= Maximum && Math.Abs(mark) >= 0.0001 && Fits(mark))
+                kept.Add(mark);
+
+        return kept;
     }
 
     private static string TickText(double mark) =>

@@ -32,4 +32,19 @@ public sealed class MachineParameter
 
     /// <summary>How far one notch of the wheel or one arrow key moves it.</summary>
     public double Step { get; set; } = 0.01;
+
+    /// <summary>
+    /// Whether it is part of the sound, and so whether anything writes it down.
+    /// </summary>
+    /// <remarks>
+    /// Almost everything on a machine is. A few things are not: how much of the wave the picture
+    /// shows is a knob on the face, sits among the others and turns like them, and is no more
+    /// part of the instrument than which way you happen to be looking. A preset that carried it
+    /// would set somebody else's view when they loaded a sound, and a song that saved it would
+    /// be a song claiming the zoom mattered.
+    ///
+    /// True unless the machine says otherwise, so every machine written before this reads as it
+    /// always did.
+    /// </remarks>
+    public bool Saved { get; set; } = true;
 }

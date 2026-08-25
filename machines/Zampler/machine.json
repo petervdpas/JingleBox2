@@ -370,8 +370,7 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "24",
-            "heights": "own"
+            "gap": "12"
           },
           "Children": [
             {
@@ -379,8 +378,7 @@
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "caption": "Zone",
-                "height": "311"
+                "caption": "Zone"
               },
               "Children": [
                 {
@@ -554,10 +552,7 @@
                               "Label": "",
                               "Properties": {
                                 "span": "3",
-                                "dial": "40",
-                                "ticks": "11",
-                                "headroom": "50",
-                                "lines": "2"
+                                "dial": "40"
                               },
                               "Children": []
                             },
@@ -567,10 +562,7 @@
                               "Label": "",
                               "Properties": {
                                 "span": "3",
-                                "dial": "40",
-                                "ticks": "11",
-                                "headroom": "50",
-                                "lines": "2"
+                                "dial": "40"
                               },
                               "Children": []
                             },
@@ -581,9 +573,6 @@
                               "Properties": {
                                 "span": "3",
                                 "dial": "40",
-                                "ticks": "11",
-                                "headroom": "50",
-                                "lines": "2",
                                 "tip": "Hundredths of a semitone, for sitting one zone against the next."
                               },
                               "Children": []
@@ -597,20 +586,19 @@
               ]
             },
             {
-              "Element": "Column",
+              "Element": "Group",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "gap": "8",
-                "align": "stretch"
+                "caption": "Filter"
               },
               "Children": [
                 {
-                  "Element": "Group",
+                  "Element": "Column",
                   "Parameter": "",
                   "Label": "",
                   "Properties": {
-                    "caption": "Filter"
+                    "gap": "6"
                   },
                   "Children": [
                     {
@@ -620,7 +608,7 @@
                       "Properties": {
                         "cell": "26",
                         "gap": "4",
-                        "columns": "3 3 3 3 3"
+                        "columns": "3 3 3"
                       },
                       "Children": [
                         {
@@ -630,9 +618,6 @@
                           "Properties": {
                             "span": "3",
                             "dial": "40",
-                            "ticks": "11",
-                            "headroom": "50",
-                            "lines": "2",
                             "display": "cutoff_text",
                             "tip": "A four pole low pass, twenty four decibels an octave, as the SSM2045 in an Emulator II was."
                           },
@@ -644,10 +629,7 @@
                           "Label": "",
                           "Properties": {
                             "span": "3",
-                            "dial": "40",
-                            "ticks": "11",
-                            "headroom": "50",
-                            "lines": "2"
+                            "dial": "40"
                           },
                           "Children": []
                         },
@@ -658,20 +640,28 @@
                           "Properties": {
                             "span": "3",
                             "dial": "40",
-                            "ticks": "11",
-                            "headroom": "50",
-                            "lines": "2",
                             "tip": "How far the filter's own envelope moves the cutoff, up to six octaves."
                           },
                           "Children": []
-                        },
+                        }
+                      ]
+                    },
+                    {
+                      "Element": "Strip",
+                      "Parameter": "",
+                      "Label": "",
+                      "Properties": {
+                        "cell": "26",
+                        "gap": "4",
+                        "columns": "3 3"
+                      },
+                      "Children": [
                         {
                           "Element": "Switch",
                           "Parameter": "env_polarity",
                           "Label": "",
                           "Properties": {
                             "span": "3",
-                            "lines": "2",
                             "on": "Close",
                             "off": "Open"
                           },
@@ -684,9 +674,6 @@
                           "Properties": {
                             "span": "3",
                             "dial": "40",
-                            "ticks": "11",
-                            "headroom": "50",
-                            "lines": "2",
                             "tip": "How much the cutoff rises with the keyboard, so the top does not go dull."
                           },
                           "Children": []
@@ -694,7 +681,17 @@
                       ]
                     }
                   ]
-                },
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Filter envelope"
+              },
+              "Children": [
                 {
                   "Element": "Row",
                   "Parameter": "",
@@ -704,125 +701,87 @@
                   },
                   "Children": [
                     {
-                      "Element": "Group",
-                      "Parameter": "",
+                      "Element": "Fader",
+                      "Parameter": "filter_attack",
                       "Label": "",
-                      "Properties": {
-                        "caption": "Filter envelope"
-                      },
-                      "Children": [
-                        {
-                          "Element": "Row",
-                          "Parameter": "",
-                          "Label": "",
-                          "Properties": {
-                            "gap": "10"
-                          },
-                          "Children": [
-                            {
-                              "Element": "Fader",
-                              "Parameter": "filter_attack",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "filter_decay",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "filter_sustain",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "filter_release",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            }
-                          ]
-                        }
-                      ]
+                      "Properties": {},
+                      "Children": []
                     },
                     {
-                      "Element": "Group",
-                      "Parameter": "",
+                      "Element": "Fader",
+                      "Parameter": "filter_decay",
                       "Label": "",
-                      "Properties": {
-                        "caption": "Amplifier"
-                      },
-                      "Children": [
-                        {
-                          "Element": "Row",
-                          "Parameter": "",
-                          "Label": "",
-                          "Properties": {
-                            "gap": "10"
-                          },
-                          "Children": [
-                            {
-                              "Element": "Fader",
-                              "Parameter": "attack",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "decay",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "sustain",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "release",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            },
-                            {
-                              "Element": "Fader",
-                              "Parameter": "level",
-                              "Label": "",
-                              "Properties": {
-                                "track": "76"
-                              },
-                              "Children": []
-                            }
-                          ]
-                        }
-                      ]
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "filter_sustain",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "filter_release",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Amplifier"
+              },
+              "Children": [
+                {
+                  "Element": "Row",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "gap": "10"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Fader",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "decay",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "sustain",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "release",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Fader",
+                      "Parameter": "level",
+                      "Label": "",
+                      "Properties": {},
+                      "Children": []
                     }
                   ]
                 }

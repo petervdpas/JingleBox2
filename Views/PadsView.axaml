@@ -290,7 +290,6 @@
                                    Label="Volume" Unit=" dB" Format="0.0" DefaultValue="0"
                                    Minimum="-60" Maximum="0"
                                    SmallStep="0.5" LargeStep="3"
-                                   TrackLength="90"
                                    Ticks="0,-6,-12,-24,-40,-60"
                                    ToolTip.Tip="Drag it, or use the wheel and the arrow keys. Double click for 0 dB."
                                    Value="{Binding VolumeDecibels}" />

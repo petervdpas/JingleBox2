@@ -803,6 +803,11 @@ public sealed class SynthMixer
         {
             foreach (var voice in _voices)
             {
+                // A hit runs its own length. The mouse coming up is not a stop button on a
+                // recording that has an end of its own, and a click lasts a few milliseconds:
+                // following the key there would turn every drum into a tick.
+                if (voice.OneShot) continue;
+
                 if (voice.Track == SynthVoice.NoTrack
                     && voice.Audition == audition
                     && voice.Note.Semitone == semitone)

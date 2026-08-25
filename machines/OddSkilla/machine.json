@@ -1,0 +1,554 @@
+{
+  "Id": "machine.oddskilla",
+  "Name": "OddSkilla",
+  "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Engine": "",
+  "Theme": {
+    "Accent": "#E2A03F",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "StartsFrom": "presets",
+  "Parameters": [
+    {
+      "Key": "wave",
+      "Name": "Wave",
+      "Unit": "",
+      "Min": 0,
+      "Max": 5,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "duty",
+      "Name": "Duty",
+      "Unit": "",
+      "Min": 0.05,
+      "Max": 0.95,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "tune",
+      "Name": "Tune",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "fine",
+      "Name": "Fine",
+      "Unit": "c",
+      "Min": -100,
+      "Max": 100,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "pitch_env",
+      "Name": "Pitch env",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "pitch_time",
+      "Name": "Pitch time",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 2000,
+      "Default": 60,
+      "Step": 5
+    },
+    {
+      "Key": "attack",
+      "Name": "Attack",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 2000,
+      "Default": 2,
+      "Step": 1
+    },
+    {
+      "Key": "decay",
+      "Name": "Decay",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5000,
+      "Default": 40,
+      "Step": 5
+    },
+    {
+      "Key": "sustain",
+      "Name": "Sustain",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.6,
+      "Step": 0.01
+    },
+    {
+      "Key": "release",
+      "Name": "Release",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 5000,
+      "Default": 80,
+      "Step": 5
+    },
+    {
+      "Key": "drive",
+      "Name": "Drive",
+      "Unit": "",
+      "Min": 1,
+      "Max": 10,
+      "Default": 1,
+      "Step": 0.1
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": " dB",
+      "Min": -60,
+      "Max": 6,
+      "Default": 0,
+      "Step": 0.5
+    },
+    {
+      "Key": "cutoff",
+      "Name": "Cutoff",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    },
+    {
+      "Key": "resonance",
+      "Name": "Resonance",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.98,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "vib_rate",
+      "Name": "Vib rate",
+      "Unit": "Hz",
+      "Min": 0,
+      "Max": 20,
+      "Default": 0,
+      "Step": 0.1
+    },
+    {
+      "Key": "vib_depth",
+      "Name": "Vib depth",
+      "Unit": "c",
+      "Min": 0,
+      "Max": 200,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "trem_rate",
+      "Name": "Trem rate",
+      "Unit": "Hz",
+      "Min": 0,
+      "Max": 20,
+      "Default": 0,
+      "Step": 0.1
+    },
+    {
+      "Key": "trem_depth",
+      "Name": "Trem depth",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "cycles",
+      "Name": "Cycles",
+      "Unit": "",
+      "Min": 1,
+      "Max": 8,
+      "Default": 2,
+      "Step": 1,
+      "Saved": false
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "12"
+          },
+          "Children": [
+            {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "source": "presets",
+                "caption": "Start from",
+                "width": "258"
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "16",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Shape"
+              },
+              "Children": [
+                {
+                  "Element": "Scope",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "width": "176",
+                    "height": "60",
+                    "cycles": "cycles",
+                    "tip": "A window of time onto the wave, with duty and drive applied. Tuning fits more or fewer cycles into it, and a played note bends it as the pitch envelope and vibrato do."
+                  },
+                  "Children": []
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Envelope"
+              },
+              "Children": [
+                {
+                  "Element": "Envelope",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "width": "176",
+                    "height": "60",
+                    "attack": "attack",
+                    "decay": "decay",
+                    "sustain": "sustain",
+                    "release": "release",
+                    "tip": "The envelope, with the dashed line where the key is let go. Play a note and the playhead runs along it."
+                  },
+                  "Children": []
+                }
+              ]
+            },
+            {
+              "Element": "Knob",
+              "Parameter": "cycles",
+              "Label": "",
+              "Properties": {
+                "dial": "40",
+                "align": "bottom",
+                "tip": "How much of the wave the view shows. A view setting: it is not part of the sound."
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Oscillator"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "4",
+                "columns": "4 3 3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Switch",
+                  "Parameter": "wave",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Sine,Square,Saw,Triangle,Pulse,Noise"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "duty",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "when": "wave",
+                    "is": "4",
+                    "tip": "How far through the cycle a pulse turns over. Only a pulse has one, so it greys out on the other waves."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "tune",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "Whole semitones added to every note this instrument plays."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "fine",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "Hundredths of a semitone, for sitting this voice against another."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "pitch_env",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How far the pitch starts away from the note. Negative drops into it, which is a kick drum."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "pitch_time",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How long that pitch offset takes to arrive at the note."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Amplifier"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "4",
+                "columns": "4 3 3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Fader",
+                  "Parameter": "attack",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Fader",
+                  "Parameter": "decay",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Fader",
+                  "Parameter": "sustain",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Fader",
+                  "Parameter": "release",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "drive",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "Rounds the wave off into itself: fuller and harder, at the same level."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Fader",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "ticks": "6,0,-12,-40",
+                    "tip": "Unity is 0 dB, and above it is makeup gain."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Filter and modulation"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "4",
+                "columns": "4 3 3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "cutoff",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "dial": "40",
+                    "display": "cutoff_text",
+                    "tip": "A low pass. Wide open at the top, where it does nothing at all."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "resonance",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How much the filter rings at its cutoff."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "vib_rate",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How fast the pitch wavers."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "vib_depth",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How far it wavers, in hundredths of a semitone."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "trem_rate",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How fast the level wavers."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "trem_depth",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "40",
+                    "tip": "How far it wavers, as a fraction of full level."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

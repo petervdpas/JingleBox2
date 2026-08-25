@@ -85,9 +85,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// </remarks>
     [ObservableProperty] private bool browses;
 
-    /// <summary>The preset itself, for whoever has to write it back down.</summary>
-    private TrackerInstrument? _preset;
-
     /// <summary>What is wrong with it, or nothing when it would save.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasProblem))]
@@ -231,10 +228,19 @@ public sealed partial class MachinePresetDesk : ObservableObject
         return full;
     }
 
-    /// <summary>The folder this preset's recordings are already in, or nothing when it has none.</summary>
+    /// <summary>
+    /// The folder this preset's recordings are already in, or nothing when it has none.
+    /// </summary>
+    /// <remarks>
+    /// Read off the preset itself, which is the JSON on the page. It used to be read off an
+    /// instrument the desk held beside it, and once the page became the file that instrument
+    /// stopped being set: the question was still asked and the answer was always nothing, so
+    /// every recording brought in landed in the presets folder rather than beside the ones this
+    /// preset was already using.
+    /// </remarks>
     private string? Beside()
     {
-        if (_preset?.Kit?.Pads is not { } pads) return null;
+        if (_held is not { } held) return null;
 
         string root;
 
@@ -247,13 +253,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
             return null;
         }
 
-        foreach (var pad in pads)
+        foreach (string named in Named(held))
         {
-            if (!pad.HasSound) continue;
-
             try
             {
-                string full = Path.GetFullPath(pad.FilePath);
+                string full = Path.GetFullPath(Path.Combine(root, named));
 
                 if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
 
@@ -261,11 +265,37 @@ public sealed partial class MachinePresetDesk : ObservableObject
             }
             catch (Exception)
             {
-                // A path that will not read is a path this cannot follow, and the next pad may.
+                // A name that will not read is a name this cannot follow, and the next one may.
             }
         }
 
         return null;
+    }
+
+    /// <summary>Every recording the preset names, in the order it names them.</summary>
+    /// <remarks>
+    /// A preset's recordings live in its blocks, one to a thing on the machine, and the whole
+    /// point of the name is that it is said from the presets folder so the preset travels. So
+    /// anything with a slash in it is one, and nothing else is.
+    /// </remarks>
+    private static IEnumerable<string> Named(JsonObject held)
+    {
+        foreach (var (_, node) in held)
+        {
+            if (node is JsonObject block)
+            {
+                foreach (var (_, line) in block)
+                    if (line is JsonValue said && said.TryGetValue(out string? words)
+                        && words.Length > 0 && words.Contains('/'))
+                        yield return words;
+
+                continue;
+            }
+
+            if (node is JsonValue value && value.TryGetValue(out string? one)
+                && one.Length > 0 && one.Contains('/'))
+                yield return one;
+        }
     }
 
     /// <summary>Reads the folder again, keeping whichever preset was open if it is still there.</summary>
