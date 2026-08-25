@@ -764,7 +764,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
     public string KindText => IsSynth ? "Synth" : IsPlugin ? "Plugin" : "Sample";
 
-    public string SourceText => IsSynth ? "Generated, no file." : IsPlugin ? PluginText : _instrument.FilePath;
+    /// <summary>
+    /// The file this instrument plays, for the one kind that has one.
+    /// </summary>
+    /// <remarks>
+    /// Empty where there is nothing to name, and the line is then not drawn at all rather than
+    /// drawn saying so. A generated sound having no file is not news: the panel is covered in
+    /// oscillator controls, which is the same information and better put.
+    /// </remarks>
+    public string SourceText => IsSynth ? "" : IsPlugin ? PluginText : _instrument.FilePath;
 
     /// <summary>
     /// The sample's shape, one value per pixel column, or null while it is being read. A synth

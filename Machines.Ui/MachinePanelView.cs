@@ -1827,7 +1827,7 @@ public class MachinePanelView : Decorator
 
         if (names is null) return null;
 
-        var chooser = new Chooser { Placeholder = "Start from..." };
+        var chooser = new Chooser { Placeholder = "Presets..." };
 
         Offer(chooser, names, shelf?.Picked ?? 0);
 

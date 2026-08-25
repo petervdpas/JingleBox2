@@ -79,7 +79,7 @@
 
                   <ui:Chooser ItemsSource="{Binding Presets.Items}"
                               SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
-                              Placeholder="Start from..."
+                              Placeholder="Presets..."
                               ToolTip.Tip="{Binding Presets.Hint}" />
                 </StackPanel>
               </StackPanel>
@@ -88,6 +88,7 @@
 
             <TextBlock Classes="cardHint"
                        Text="{Binding Editor.SourceText}"
+                       IsVisible="{Binding Editor.SourceText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                        TextTrimming="CharacterEllipsis" />
 
 

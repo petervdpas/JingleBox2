@@ -282,7 +282,7 @@
               "Label": "",
               "Properties": {
                 "source": "takes",
-                "caption": "Start from",
+                "caption": "Presets",
                 "width": "258"
               },
               "Children": []
@@ -460,32 +460,28 @@
                       "Element": "Fader",
                       "Parameter": "attack",
                       "Label": "",
-                      "Properties": {
-                      },
+                      "Properties": {},
                       "Children": []
                     },
                     {
                       "Element": "Fader",
                       "Parameter": "decay",
                       "Label": "",
-                      "Properties": {
-                      },
+                      "Properties": {},
                       "Children": []
                     },
                     {
                       "Element": "Fader",
                       "Parameter": "sustain",
                       "Label": "",
-                      "Properties": {
-                      },
+                      "Properties": {},
                       "Children": []
                     },
                     {
                       "Element": "Fader",
                       "Parameter": "release",
                       "Label": "",
-                      "Properties": {
-                      },
+                      "Properties": {},
                       "Children": []
                     }
                   ]
