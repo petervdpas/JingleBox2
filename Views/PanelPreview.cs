@@ -225,6 +225,12 @@ public static class PanelPreview
                 {
                     string take = shelf[0].FilePath;
 
+                    // A machine that holds one recording has neither zones nor pads: the take
+                    // is a setting on it like any other, written the way its own panel writes
+                    // it. Without this the Recording machine was the one machine the preview
+                    // showed empty.
+                    designer.Editor?.Values?.SetText("take", take);
+
                     designer.Editor?.Zones?.Selected?.Take(take);
                     designer.Editor?.Kit?.Selected?.Take(take);
                     designer.Editor?.Slices?.SliceCommand.Execute(null);

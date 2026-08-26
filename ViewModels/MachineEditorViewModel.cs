@@ -283,11 +283,26 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             // close up, and the panel is pointed at the names the files now have.
             Tidy();
 
+            // A saved machine is a machine that changed, so the number that says which one it
+            // is goes up by itself. Left to a hand it is bumped when somebody remembers, which
+            // is to say it is bumped after five changes and not after the sixth.
+            //
+            // Unless the number was typed. Somebody who has just written 2.0 in the box means
+            // 2.0, and adding a hundredth to it on the way out would make the box unusable.
+            if (string.Equals(Project.Version, _versionWritten, StringComparison.Ordinal))
+                Project.Version = Bumped(Project.Version);
+
+            _versionWritten = Project.Version;
+
             Project.Save(folder);
-            Status = "Saved to " + Project.Folder;
+            Status = "Saved " + Project.Version + " to " + Project.Folder;
 
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Folder));
+
+            // The version is on a plain object the box is bound straight through to, so the
+            // path has to be said again for the box to show what was just written.
+            OnPropertyChanged(nameof(Project));
 
             // A machine saved for the first time has somewhere to keep presets for the first
             // time, which is the moment that page stops being empty.
@@ -550,6 +565,38 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ParametersHeight))]
     [NotifyPropertyChangedFor(nameof(PanelParametersSizable))]
     private bool parametersOpen = true;
+
+    /// <summary>The version as it was last written, so a hand-typed one is left alone.</summary>
+    private string _versionWritten = "";
+
+    /// <summary>
+    /// The next version up: one hundredth, and the hundredth one is the next whole number.
+    /// </summary>
+    /// <remarks>
+    /// Two numbers and nothing else. A version anybody has written something else in, a date,
+    /// a word, a third number, is handed back untouched: it says something this cannot work
+    /// out, and quietly turning it into 1.01 would throw that away.
+    /// </remarks>
+    private static string Bumped(string version)
+    {
+        var parts = version.Split('.');
+
+        if (parts.Length != 2
+            || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out int major)
+            || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out int minor))
+            return version;
+
+        minor++;
+
+        if (minor > 99)
+        {
+            major++;
+            minor = 0;
+        }
+
+        return major.ToString(CultureInfo.InvariantCulture) + "."
+             + minor.ToString("00", CultureInfo.InvariantCulture);
+    }
 
     /// <summary>Whether the machine's own details are unfolded.</summary>
     [ObservableProperty]
@@ -1568,6 +1615,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Parameters.Clear();
         Elements.Clear();
         SelectedElement = null;
+
+        // What the file says, so the first save of a machine that was only looked at still
+        // counts as a change, and one whose version was typed over does not get bumped as well.
+        _versionWritten = value?.Version ?? "";
 
         if (value == null) return;
 

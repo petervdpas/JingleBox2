@@ -3,7 +3,7 @@
   "Name": "Recording",
   "Summary": "One of your recordings, pitched by resampling.",
   "Author": "Peter van de Pas",
-  "Version": "1.0",
+  "Version": "1.01",
   "Engine": "",
   "Theme": {
     "Accent": "#3FA6A0",
@@ -268,34 +268,53 @@
       },
       "Children": [
         {
-          "Element": "Row",
+          "Element": "Column",
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "gap": "10",
-            "height": "85"
+            "gap": "4"
           },
           "Children": [
             {
-              "Element": "Preset",
+              "Element": "Row",
               "Parameter": "",
               "Label": "",
               "Properties": {
-                "source": "takes",
-                "caption": "Presets",
-                "width": "258",
-                "margin": "0,28,0,0"
+                "gap": "10"
               },
-              "Children": []
+              "Children": [
+                {
+                  "Element": "Preset",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "source": "takes",
+                    "caption": "Presets",
+                    "width": "258",
+                    "align": "bottom"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Image",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "width": "337",
+                    "height": "78",
+                    "file": "images/image1.svg"
+                  },
+                  "Children": []
+                }
+              ]
             },
             {
-              "Element": "Image",
-              "Parameter": "",
+              "Element": "Label",
+              "Parameter": "take",
               "Label": "",
               "Properties": {
-                "width": "337",
-                "height": "78",
-                "file": "images/image1.svg"
+                "style": "hint",
+                "width": "605"
               },
               "Children": []
             }

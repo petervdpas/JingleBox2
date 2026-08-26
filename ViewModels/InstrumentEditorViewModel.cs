@@ -719,8 +719,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// Empty where there is nothing to name, and the line is then not drawn at all rather than
     /// drawn saying so. A generated sound having no file is not news: the panel is covered in
     /// oscillator controls, which is the same information and better put.
+    ///
+    /// A plugin only, now that a machine describes its own panel. The recording behind a
+    /// described machine is one of its own settings and the machine says where it wants it
+    /// said, which for the Recording machine is under the picker that chose it. Said here as
+    /// well it was said twice, and the host's copy was always above the whole panel, since the
+    /// host hands the machine one block and cannot reach inside it. A plugin has no described
+    /// panel to put it on, so that one stays.
     /// </remarks>
-    public string SourceText => IsSynth ? "" : IsPlugin ? PluginText : _instrument.FilePath;
+    public string SourceText => IsPlugin ? PluginText : "";
 
     /// <summary>
     /// The sample's shape, one value per pixel column, or null while it is being read. A synth

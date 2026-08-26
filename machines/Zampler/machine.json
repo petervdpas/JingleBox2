@@ -3,7 +3,7 @@
   "Name": "Zampler",
   "Summary": "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
   "Author": "Peter van de Pas",
-  "Version": "1.0",
+  "Version": "1.01",
   "Engine": "",
   "Theme": {
     "Accent": "#4E86D8",

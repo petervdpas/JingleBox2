@@ -3,7 +3,7 @@
   "Name": "BongaBong",
   "Summary": "A kit. Sixteen pads, one recording to a key, sounding over each other.",
   "Author": "Peter van de Pas",
-  "Version": "1.0",
+  "Version": "1.01",
   "Engine": "",
   "Theme": {
     "Accent": "#D2504A",
@@ -67,6 +67,17 @@
           },
           "Children": [
             {
+              "Element": "Image",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "width": "260",
+                "height": "100",
+                "file": "images/image1.png"
+              },
+              "Children": []
+            },
+            {
               "Element": "Preset",
               "Parameter": "",
               "Label": "",
@@ -75,17 +86,6 @@
                 "caption": "Presets",
                 "width": "258",
                 "margin": "0,50,0,0"
-              },
-              "Children": []
-            },
-            {
-              "Element": "Image",
-              "Parameter": "",
-              "Label": "",
-              "Properties": {
-                "width": "340",
-                "height": "100",
-                "file": "images/image1.png"
               },
               "Children": []
             }
