@@ -519,7 +519,7 @@ public sealed class SynthMixer
     /// it was. Read before the old voice is cut, because cutting it is what makes it stop
     /// being the note before.
     /// </remarks>
-    public void NoteOn(int track, OuroborosPatch patch, Note note, float gain, float pan)
+    public void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan)
     {
         if (patch is null || !note.IsPlayable) return;
 
@@ -531,14 +531,14 @@ public sealed class SynthMixer
             {
                 foreach (var playing in _voices)
                 {
-                    if (playing.Track == track && !playing.IsFinished && playing is OuroborosVoice last)
+                    if (playing.Track == track && !playing.IsFinished && playing is MonoSynthVoice last)
                         from = last.Hz;
                 }
             }
 
             Cut(track);
 
-            Add(new OuroborosVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from));
+            Add(new MonoSynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from));
         }
     }
 
@@ -573,12 +573,12 @@ public sealed class SynthMixer
     /// No glide: an audition has no note before it to slide from. It belongs to no track
     /// either, so it piles up with the other auditions rather than cutting one.
     /// </remarks>
-    public void Preview(OuroborosPatch patch, Note note, float gain, double holdSeconds, string audition)
+    public void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition)
     {
         if (patch is null || !note.IsPlayable) return;
 
-        var voice = new OuroborosVoice(
-            patch, note, OuroborosVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null)
+        var voice = new MonoSynthVoice(
+            patch, note, MonoSynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null)
         {
             Audition = audition
         };
@@ -665,7 +665,7 @@ public sealed class SynthMixer
     /// And unlike a kit, the track's last note is cut: this is an instrument rather than a rack
     /// of them, and one voice to a track is how the tracker has always played one.
     /// </remarks>
-    public void NoteOn(int track, SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain, float pan)
+    public void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain, float pan)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
@@ -683,7 +683,7 @@ public sealed class SynthMixer
     /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
     public double Preview(
-        SampleZone zone, ZamplerPatch patch, SampleData sample, Note note, float gain,
+        SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;

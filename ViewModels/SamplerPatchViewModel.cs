@@ -6,24 +6,24 @@ using System;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The editable face of a <see cref="ZamplerPatch"/>: the filter and the two envelopes.
+/// The editable face of a <see cref="SamplerPatch"/>: the filter and the two envelopes.
 /// </summary>
 /// <remarks>
 /// Every setter clamps through the patch's own limits rather than trusting the control, so a
 /// value typed into a box cannot put the machine somewhere it does not go.
 /// </remarks>
-public sealed class ZamplerPatchViewModel : ObservableObject
+public sealed class SamplerPatchViewModel : ObservableObject
 {
-    private readonly ZamplerPatch _patch;
+    private readonly SamplerPatch _patch;
     private readonly Action _changed;
 
-    public ZamplerPatchViewModel(ZamplerPatch patch, Action changed)
+    public SamplerPatchViewModel(SamplerPatch patch, Action changed)
     {
         _patch = patch;
         _changed = changed;
     }
 
-    public ZamplerPatch Patch => _patch;
+    public SamplerPatch Patch => _patch;
 
     /// <summary>Bumped on every change, so anything drawing the patch knows to redraw.</summary>
     public int Revision { get; private set; }

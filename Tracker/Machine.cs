@@ -54,115 +54,41 @@ public sealed record Machine(
     {
         TrackerInstrumentKind.Synth => "machine.oddskilla",
         TrackerInstrumentKind.Sample => "machine.recording",
-        TrackerInstrumentKind.Ouroboros => "machine.ouroboros",
-        TrackerInstrumentKind.BongaBong => "machine.bongabong",
-        TrackerInstrumentKind.Zampler => "machine.zampler",
+        TrackerInstrumentKind.MonoSynth => "machine.ouroboros",
+        TrackerInstrumentKind.Kit => "machine.bongabong",
+        TrackerInstrumentKind.Sampler => "machine.zampler",
         _ => ""
     };
 
-    /// <summary>True when that id is a machine's own slot rather than something you made.</summary>
-    public static bool IsSlot(string? id) =>
-        !string.IsNullOrEmpty(id) && Ours.Any(m => m.SlotId == id);
+    /// <summary>
+    /// True when that id is a machine's own slot rather than something you made.
+    /// </summary>
+    /// <remarks>
+    /// Asked of every machine there is and not only the installed ones, on purpose. This is what
+    /// decides whether a file on the shelf is retired, and a machine thrown out in SETTINGS must
+    /// leave its settings exactly where they were for when it is added back.
+    /// </remarks>
+    public static bool IsSlot(string? id) => !string.IsNullOrEmpty(id) && KindOf(id) is not null;
 
-    /// <summary>The machine whose slot that is, or null when the id is an ordinary instrument.</summary>
+    /// <summary>
+    /// The machine whose slot that is, or null when the id is an ordinary instrument.
+    /// </summary>
+    /// <remarks>
+    /// Answers for a machine that is not installed as well, since the caller is asking what a
+    /// file on the shelf is rather than what is on the rack. What comes back is greyed and named
+    /// for its engine, which is all anybody knows about a machine that is not here.
+    /// </remarks>
     public static Machine? SlotFor(string? id) =>
-        string.IsNullOrEmpty(id) ? null : Ours.FirstOrDefault(m => m.SlotId == id);
+        KindOf(id) is { } kind ? For(kind) : null;
 
     /// <summary>
-    /// The oscillator machine: a wave, an envelope, a filter, and the modulation to move them.
+    /// A plugin is not a machine project and never will be.
     /// </summary>
     /// <remarks>
-    /// Everything it plays it generates, so it needs no file and travels inside a song as a
-    /// handful of numbers. Its range is wider than "synth" suggests: a sine with a fast pitch
-    /// envelope is a kick, and noise with a short decay is a hihat, which is why the sounds a
-    /// fresh library is stocked with are all built on this one.
+    /// The one entry written out here, because there is nothing to read it from: a plugin is
+    /// somebody else's, sitting wherever they put it, and what the rack shows for one is a
+    /// heading rather than a machine's face. Everything else on the list comes off disc.
     /// </remarks>
-    public static readonly Machine OddSkilla = new(
-        TrackerInstrumentKind.Synth,
-        "OddSkilla",
-        "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
-        true,
-        new MachineTheme("#E2A03F")); // Amber. The oscillator machine, and the one everything else was built out of.
-
-    /// <summary>
-    /// One of your recordings, played back at a pitch: the raw form of Zampler and BongaBong.
-    /// </summary>
-    /// <remarks>
-    /// One file, resampled, through the same envelope and filter OddSkilla uses. This is what
-    /// the tracker played recordings with before there were machines at all, and it is the bare
-    /// engine both sampling machines are made of rather than a stand-in for either of them.
-    ///
-    /// What they add to it is a zone map. Zampler spreads recordings across the keyboard and
-    /// transposes each one over its range; BongaBong puts one on every key and transposes none
-    /// of them. Both are this, plus a list of these and the notes each answers to, so building
-    /// them is building the map rather than building the playback.
-    ///
-    /// Not called "Sampler", which reads as the thing that makes recordings. That is the RECORD
-    /// tab; this only plays what comes out of it.
-    /// </remarks>
-    public static readonly Machine Recording = new(
-        TrackerInstrumentKind.Sample,
-        "Recording",
-        "One of your recordings, pitched by resampling.",
-        true,
-        new MachineTheme("#3FA6A0")); // Teal. What comes off the RECORD tab, played back at a pitch.
-
-    /// <summary>
-    /// The Mother-32 machine: one oscillator blended with noise, a filter that sweeps, an
-    /// envelope that is attack and decay, and glide between notes.
-    /// </summary>
-    /// <remarks>
-    /// Monophonic, which is not a limitation here: this engine has always given a track one
-    /// voice and cut it when the next note arrives, and that is exactly the arrangement glide
-    /// was made for.
-    /// </remarks>
-    public static readonly Machine Ouroboros = new(
-        TrackerInstrumentKind.Ouroboros,
-        "Ouroboros",
-        "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
-        true,
-        new MachineTheme("#9B6DD6")); // Violet. The mono synth, and the odd one out of the family.
-
-    /// <summary>
-    /// The kit machine: sixteen pads, one recording to a key, and none of them transposed.
-    /// </summary>
-    /// <remarks>
-    /// The recording machine with a map in front of it. A key here chooses which recording
-    /// sounds rather than how fast to read one, because a snare played four semitones up is
-    /// not a snare.
-    ///
-    /// It is also the one machine that does not take the tracker's one voice to a track. A
-    /// crash has to go on ringing under the snare that follows it, so its pads sound over each
-    /// other; the only thing that cuts a pad is another pad in its choke group, which is what
-    /// a closed hihat does to an open one.
-    /// </remarks>
-    public static readonly Machine BongaBong = new(
-        TrackerInstrumentKind.BongaBong,
-        "BongaBong",
-        "A kit. Sixteen pads, one recording to a key, sounding over each other.",
-        true,
-        new MachineTheme("#D2504A")); // Red, the colour every drum machine has been since Redrum.
-
-    /// <summary>
-    /// The sampling machine: recordings laid across the keyboard, each transposed from its root.
-    /// </summary>
-    /// <remarks>
-    /// The recording machine with a map in front of it, the same way BongaBong is, and the two
-    /// differ in one line: a pad passes the played note as its own root so nothing moves, and a
-    /// zone passes the note it was recorded at so everything does. A piano sampled every fourth
-    /// key is thirteen zones, each covering the keys either side of its own.
-    ///
-    /// Named for the Emulator, which is where the idea comes from: a keyboard is a map, and
-    /// what a key does is look itself up on it.
-    /// </remarks>
-    public static readonly Machine Zampler = new(
-        TrackerInstrumentKind.Zampler,
-        "Zampler",
-        "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
-        true,
-        new MachineTheme("#4E86D8")); // Blue. The keyboard machine: recordings laid across the keys.
-
-    /// <summary>Somebody else's instrument, hosted: Serum, Vital, anything that takes notes.</summary>
     public static readonly Machine Plugin = new(
         TrackerInstrumentKind.Plugin,
         "Plugin",
@@ -170,54 +96,125 @@ public sealed record Machine(
         false,
         new MachineTheme("#7B838C")); // Grey, and deliberately: a plugin is somebody else's box on the rack.
 
-    /// <summary>What a machine is when nothing has been imported over it.</summary>
-    private static readonly Machine[] Built = { OddSkilla, Ouroboros, Zampler, BongaBong, Recording, Plugin };
-
     /// <summary>
-    /// Every machine there is, in the order they are offered.
+    /// The order machines stand in, which is the app's and not any machine's.
     /// </summary>
     /// <remarks>
-    /// A list rather than a fixed array, because a machine is a project now: what it is called,
-    /// what it says it is and what colour it wears are read off the machine itself when the app
-    /// starts. The ones written out above are what the app falls back to when nothing has been
-    /// imported, which is also what makes a half-installed machines folder harmless.
+    /// Reading order rather than alphabetical: the plainest first and the odd one last, which is
+    /// how they were introduced and how anybody learning them meets them. A machine that is not
+    /// installed simply is not there, so the rest close up.
+    ///
+    /// Also the list of engines this build has. An id that is not one of these is a machine
+    /// written against a later version, and it is left on the shelf rather than put on the rack
+    /// as a box with nothing behind it.
     /// </remarks>
-    public static IReadOnlyList<Machine> All => Registered;
-
-    private static List<Machine> Registered { get; } = Built.ToList();
-
-    /// <summary>The ones that are ours to program, as opposed to a plugin we only host.</summary>
-    public static IReadOnlyList<Machine> Ours => Registered.Where(m => m.IsOurs).ToList();
+    private static readonly TrackerInstrumentKind[] Offered =
+    {
+        TrackerInstrumentKind.Synth,
+        TrackerInstrumentKind.MonoSynth,
+        TrackerInstrumentKind.Sampler,
+        TrackerInstrumentKind.Kit,
+        TrackerInstrumentKind.Sample,
+    };
 
     /// <summary>
-    /// Takes a machine as it was imported, replacing what the app knew about it.
+    /// What a machine of that kind is called before anything has been read off disc.
     /// </summary>
     /// <remarks>
-    /// Matched by id, since that is what a machine is: two entries with the same id are the
-    /// same machine, and the imported one wins. An id nothing knows about is a machine the app
-    /// has no engine for yet, and is left alone rather than added as a box that cannot sound.
+    /// Not the machine's name: the machine is what is missing. This is the engine behind it,
+    /// which is in the program and is what the song's own file says. A song written where
+    /// Zampler was installed and opened where it was not shows a grey "Sampler", which is the
+    /// truth: the sound is there and the box it was programmed on is not.
+    /// </remarks>
+    private static string Engine(TrackerInstrumentKind kind) => kind switch
+    {
+        TrackerInstrumentKind.Synth => "Synth",
+        TrackerInstrumentKind.MonoSynth => "Mono synth",
+        TrackerInstrumentKind.Sampler => "Sampler",
+        TrackerInstrumentKind.Kit => "Kit",
+        TrackerInstrumentKind.Sample => "Recording",
+        _ => "",
+    };
+
+    /// <summary>What the app knows of the machines installed here, plus the plugin heading.</summary>
+    private static List<Machine> Registered { get; } = new() { Plugin };
+
+    /// <summary>Every machine there is: the ones installed, in order, and the plugin heading.</summary>
+    public static IReadOnlyList<Machine> All => Installed.Append(Plugin).ToList();
+
+    /// <summary>
+    /// The machines on the rack: installed here, in the order they are offered.
+    /// </summary>
+    /// <remarks>
+    /// A machine is its project. Without one there is no panel to draw, no presets to offer and
+    /// nothing a box on the rack could do, so a machine thrown out in SETTINGS comes off the rack
+    /// with it and comes back when it is added again.
+    ///
+    /// What it left behind stays where it was. The slot file on the shelf is still a machine's,
+    /// since <see cref="IsSlot"/> asks the engines and not this, so nothing retires it and adding
+    /// the machine back brings the box back with whatever was set on it.
+    /// </remarks>
+    public static IReadOnlyList<Machine> Installed =>
+        Offered.Select(kind => Registered.FirstOrDefault(one => one.Kind == kind))
+            .Where(one => one is not null)
+            .Select(one => one!)
+            .ToList();
+
+    /// <summary>Forgets every machine read off disc, for a list about to be read again.</summary>
+    /// <remarks>
+    /// Called before the folder is walked rather than after, so a machine thrown out is gone from
+    /// the moment the list is rebuilt. Without it a removed machine would keep its place on the
+    /// rack until the app was restarted.
+    /// </remarks>
+    public static void Forget() => Registered.RemoveAll(one => one.IsOurs);
+
+    /// <summary>
+    /// Takes a machine that has just been read off disc.
+    /// </summary>
+    /// <remarks>
+    /// Everything the app shows about a machine comes through here: what it is called, what it
+    /// says it is, and what colour it wears are the machine's own and are read from its folder.
+    /// An id this build has no engine for is refused rather than added as a box that cannot
+    /// sound, which is what makes a machines folder from a later version harmless.
     /// </remarks>
     public static bool Register(string id, string name, string summary, MachineTheme theme)
     {
-        int at = Registered.FindIndex(m => m.SlotId == id);
+        var kind = KindOf(id);
 
-        if (at < 0) return false;
+        if (kind is not { } engine) return false;
 
-        var was = Registered[at];
+        Registered.RemoveAll(one => one.Kind == engine);
 
-        Registered[at] = was with
-        {
-            Name = string.IsNullOrWhiteSpace(name) ? was.Name : name,
-            Summary = string.IsNullOrWhiteSpace(summary) ? was.Summary : summary,
-            Theme = theme ?? was.Theme
-        };
+        Registered.Add(new Machine(
+            engine,
+            string.IsNullOrWhiteSpace(name) ? Engine(engine) : name,
+            summary ?? "",
+            true,
+            theme ?? new MachineTheme("#7B838C")));
 
         return true;
     }
 
-    /// <summary>Which machine a kind is on. Never null: every kind has one.</summary>
+    /// <summary>Which engine that slot id is for, or nothing when this build has none.</summary>
+    private static TrackerInstrumentKind? KindOf(string? id) =>
+        Offered.Where(kind => new Machine(kind, "", "", true, Bare).SlotId == id)
+            .Select(kind => (TrackerInstrumentKind?)kind)
+            .FirstOrDefault();
+
+    /// <summary>The colour of a machine that is not here to say what colour it is.</summary>
+    private static readonly MachineTheme Bare = new("#7B838C");
+
+    /// <summary>
+    /// Which machine a kind is on. Never null: every kind has one.
+    /// </summary>
+    /// <remarks>
+    /// A kind whose machine is not installed answers with the engine behind it, greyed. A song
+    /// still holds instruments of that kind, they still sound, and the list they are in still has
+    /// to write something beside them; what it must not do is name a machine that is not here.
+    /// </remarks>
     public static Machine For(TrackerInstrumentKind kind) =>
-        Registered.FirstOrDefault(m => m.Kind == kind) ?? OddSkilla;
+        Registered.FirstOrDefault(one => one.Kind == kind)
+        ?? new Machine(kind, Engine(kind), "Not installed here.", kind != TrackerInstrumentKind.Plugin, Bare);
 
     public override string ToString() => Name;
 }

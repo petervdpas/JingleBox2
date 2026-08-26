@@ -7,9 +7,11 @@ using JingleBox2.Config;
 using JingleBox2.Diagnostics;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
+using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.Views;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -1547,8 +1549,67 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         RefreshSavedSongs();
 
-        if (await Views.SongDialog.PickAsync(this)) Load();
+        if (!await Views.SongDialog.PickAsync(this)) return;
+
+        Load();
+
+        await TellOfMissingMachines();
     }
+
+    /// <summary>
+    /// Says which machines the song that has just opened plays on and this installation has not
+    /// got.
+    /// </summary>
+    /// <remarks>
+    /// The song is fine either way. Its instruments came with it, they sound exactly as they
+    /// were saved, and they save again untouched; what is missing is the panel to edit them
+    /// with, and the presets to start another one from. Worth saying, because an instrument
+    /// whose panel is blank looks broken and is not.
+    ///
+    /// It tells and does not offer. Putting a machine on the rack is a thing you do to this
+    /// installation, not to a song, and doing it behind a dialog that came up while opening
+    /// something else is how an installation ends up in a state nobody chose. The two places
+    /// that add a machine are the two rows of buttons in SETTINGS, and they stay the only two.
+    ///
+    /// Said once, when the song arrives. Not on every glance at an instrument, and not as a bar
+    /// across the page.
+    /// </remarks>
+    public async Task TellOfMissingMachines()
+    {
+        var wanted = MissingMachines.For(Song);
+
+        if (wanted.Count == 0) return;
+
+        bool one = wanted.Count == 1;
+
+        string names = Listed(wanted.Select(machine => machine.Name).ToList());
+
+        // Two different fixes, and which one it is depends on where the machine came from.
+        string how = wanted.All(machine => machine.Ships)
+            ? "Add " + (one ? "it" : "them") + " under SETTINGS, System."
+            : wanted.Any(machine => machine.Ships)
+                ? "Some ship with the program and can be added under SETTINGS, System. The rest "
+                  + "came in from a zip, so import that zip there."
+                : "They came in from a zip rather than with the program, so import that zip under "
+                  + "SETTINGS, System.";
+
+        await Views.ConfirmDialog.NoteAsync(
+            "Machines this song needs",
+            "'" + SongName + "' plays on " + names + ", which " + (one ? "is" : "are")
+            + " not installed here. It sounds as it was saved and saves again unchanged, but "
+            + "those instruments have no panel until the " + (one ? "machine is" : "machines are")
+            + " back. " + how);
+
+        Status = "Missing machine" + (one ? "" : "s") + ": " + names;
+    }
+
+    /// <summary>Names in a row, the way anybody would say them out loud.</summary>
+    private static string Listed(IReadOnlyList<string> names) => names.Count switch
+    {
+        0 => "",
+        1 => names[0],
+        _ => string.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1],
+    };
 
     /// <summary>
     /// Asks what to call it and saves it under that.

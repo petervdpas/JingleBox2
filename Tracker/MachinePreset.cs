@@ -37,19 +37,6 @@ public sealed record MachinePreset(string Name, TrackerInstrument Sound)
 /// </remarks>
 public static class MachinePresets
 {
-    /// <summary>
-    /// Where the presets of a machine that has not been converted yet live: beside the program,
-    /// under the machine's name.
-    /// </summary>
-    /// <remarks>
-    /// The old place, and on its way out. A machine is a folder now, and what it ships with
-    /// belongs inside that folder so it travels in the zip; a machine whose presets sat out here
-    /// arrived on somebody else's disc with an empty picker. Each machine moves as it is
-    /// converted, and this goes when the last one has.
-    /// </remarks>
-    public static string Directory { get; } =
-        Path.Combine(AppContext.BaseDirectory, "Presets");
-
     private static readonly Dictionary<string, IReadOnlyList<MachinePreset>> Loaded = new();
 
     /// <summary>
@@ -99,23 +86,21 @@ public static class MachinePresets
     }
 
     /// <summary>
-    /// Which folder holds that machine's presets.
+    /// Which folder holds that machine's presets, or nothing when it is not installed.
     /// </summary>
     /// <remarks>
-    /// Inside the machine where the machine is a project on disc, which is where a converted one
-    /// keeps everything else it ships: the panel, the pictures, and the recordings a kit is
-    /// built out of. Beside the program for the machines still waiting their turn.
+    /// Inside the machine, which is where a machine keeps everything else it ships: the panel,
+    /// the pictures, and the recordings a kit is built out of. There was a folder beside the
+    /// program for the machines waiting to become projects, and it went with the last of them:
+    /// presets that sat out there arrived on somebody else's disc with an empty picker.
     ///
     /// By id and not by name, because the name is what the machine calls itself and can be
     /// changed by whoever imports a new version of it. The id is what it is.
     /// </remarks>
-    private static string Folder(Machine machine)
-    {
-        if (Machines.MachineProjects.For(machine.SlotId) is { Folder.Length: > 0 } project)
-            return Path.Combine(project.Folder, Machines.MachineProject.PresetsFolder);
-
-        return Path.Combine(Directory, machine.Name);
-    }
+    private static string Folder(Machine machine) =>
+        Machines.MachineProjects.For(machine.SlotId) is { Folder.Length: > 0 } project
+            ? Path.Combine(project.Folder, Machines.MachineProject.PresetsFolder)
+            : "";
 
     /// <summary>
     /// Turns a preset's relative recordings into real paths, against the folder it came from.
@@ -171,10 +156,10 @@ public static class MachinePresets
             // an instrument in as a preset should not need it edited first.
             sound.Kind = machine.Kind;
             sound.Patch.Clamp();
-            sound.Ouroboros?.Clamp();
+            sound.MonoSynth?.Clamp();
             sound.Kit?.Clamp();
             sound.Zones?.Clamp();
-            sound.Zampler?.Clamp();
+            sound.Sampler?.Clamp();
 
             Locate(sound, Path.GetDirectoryName(path));
 

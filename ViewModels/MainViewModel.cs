@@ -429,7 +429,10 @@ public sealed partial class MainViewModel : ObservableObject
         // A machine imported or removed while the app is running changes what is on the rack and
         // what the panel in front of you is drawn from, so the rack draws it again rather than
         // waiting for the next start.
-        MachineShelf.Changed += () => Machines.Reopen();
+        // A machine added or thrown out changes which boxes the rack has, not only what one of
+        // them looks like, so the list is built again rather than the open panel redrawn.
+        MachineShelf.Changed += () => Machines.Refresh();
+
 
         // The four caps at the top belong to the page you are on. See TransportSwitch for
         // which deck they are patched to and when.

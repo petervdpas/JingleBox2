@@ -24,7 +24,7 @@ namespace JingleBox2.Tracker.Machines;
 /// machine.json written by a later version has to open on an older app rather than take it down.
 /// </remarks>
 /// <param name="patch">The oscillator, the filter, the envelope and the two routes.</param>
-public sealed class MonoSynthValues(OuroborosPatchViewModel patch) : IMachineValues
+public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : IMachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be
     // found by searching for the string that is in the file.
@@ -118,8 +118,8 @@ public sealed class MonoSynthValues(OuroborosPatchViewModel patch) : IMachineVal
     {
         bool moved = key switch
         {
-            WaveKey => Picked((int)patch.Wave, value, (int)OuroborosWave.Pulse,
-                at => patch.Wave = (OuroborosWave)at),
+            WaveKey => Picked((int)patch.Wave, value, (int)MonoSynthWave.Pulse,
+                at => patch.Wave = (MonoSynthWave)at),
             PulseWidthKey => MachineSetting.Moved(patch.PulseWidth, value, () => patch.PulseWidth = value),
             TuneKey => MachineSetting.Moved(patch.TuneSemitones, value, () => patch.TuneSemitones = value),
             FineKey => MachineSetting.Moved(patch.FineCents, value, () => patch.FineCents = value),

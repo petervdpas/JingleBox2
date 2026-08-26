@@ -25,7 +25,7 @@ public sealed class SampleVoice : IVoice
     /// Zampler's own shaping, when this voice is one of its. Null on every other machine, and
     /// the plain filter above is used instead.
     /// </summary>
-    private readonly ZamplerPatch? _zampler;
+    private readonly SamplerPatch? _zampler;
 
     private readonly LadderFilter? _ladderLeft;
     private readonly LadderFilter? _ladderRight;
@@ -75,7 +75,7 @@ public sealed class SampleVoice : IVoice
         float gain,
         float pan,
         int sampleRate,
-        ZamplerPatch? zampler = null)
+        SamplerPatch? zampler = null)
     {
         _sample = sample;
         _patch = patch.Clone();

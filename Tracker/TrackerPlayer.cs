@@ -303,7 +303,7 @@ public sealed class TrackerPlayer : IDisposable
             return PreviewHoldSeconds;
         }
 
-        if (instrument.IsZampler)
+        if (instrument.IsSampler)
         {
             var zone = instrument.Zones?.For(note);
             var zoneSample = zone == null ? null : _samples.Load(zone.FilePath);
@@ -311,11 +311,11 @@ public sealed class TrackerPlayer : IDisposable
             if (zone == null || zoneSample == null) return 0;
 
             return _synth.Mixer.Preview(
-                zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, note,
+                zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, note,
                 (float)(level * zone.Volume), PreviewHoldSeconds, instrument.Id);
         }
 
-        if (instrument.IsBongaBong)
+        if (instrument.IsKit)
         {
             var pad = instrument.Kit?.For(note);
             var padSample = pad == null ? null : _samples.Load(pad.FilePath);
@@ -327,9 +327,9 @@ public sealed class TrackerPlayer : IDisposable
                 (float)(level * pad.Volume), PreviewHoldSeconds, instrument.Id);
         }
 
-        if (instrument.IsOuroboros)
+        if (instrument.IsMonoSynth)
         {
-            _synth.Mixer.Preview(instrument.Ouroboros ?? new Synth.OuroborosPatch(),
+            _synth.Mixer.Preview(instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
                 note, level, PreviewHoldSeconds, instrument.Id);
             return PreviewHoldSeconds;
         }
@@ -826,7 +826,7 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
-        if (instrument.IsZampler)
+        if (instrument.IsSampler)
         {
             var zone = instrument.Zones?.For(e.Note);
 
@@ -846,16 +846,16 @@ public sealed class TrackerPlayer : IDisposable
                 return;
             }
 
-            Where(e.Track, e.Instrument, instrument, song, "played on Zampler");
+            Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
 
             _synth.Mixer.NoteOn(
-                e.Track, zone, instrument.Zampler ?? new Synth.ZamplerPatch(), zoneSample, e.Note,
+                e.Track, zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, e.Note,
                 (float)(mixed * zone.Volume), Placed(placed, zone.Pan));
 
             return;
         }
 
-        if (instrument.IsBongaBong)
+        if (instrument.IsKit)
         {
             var pad = instrument.Kit?.For(e.Note);
 
@@ -873,7 +873,7 @@ public sealed class TrackerPlayer : IDisposable
                 return;
             }
 
-            Where(e.Track, e.Instrument, instrument, song, "played on BongaBong");
+            Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
 
             _synth.Mixer.NoteOn(
                 e.Track, pad, instrument.Patch, padSample, e.Note,
@@ -882,10 +882,10 @@ public sealed class TrackerPlayer : IDisposable
             return;
         }
 
-        if (instrument.IsOuroboros)
+        if (instrument.IsMonoSynth)
         {
-            Where(e.Track, e.Instrument, instrument, song, "played on Ouroboros");
-            _synth.Mixer.NoteOn(e.Track, instrument.Ouroboros ?? new Synth.OuroborosPatch(),
+            Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
+            _synth.Mixer.NoteOn(e.Track, instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
                 e.Note, mixed, placed ?? 0f);
             return;
         }

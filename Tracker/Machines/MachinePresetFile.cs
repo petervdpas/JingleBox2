@@ -145,10 +145,10 @@ public static class MachinePresetFile
                     made.Zones.Add(new SampleZone { Name = named, Shape = new SampleShape() });
 
                 sound.Zones = made.Zones.Count > 0 ? made : ZoneMap.Empty();
-                sound.Zampler ??= new ZamplerPatch();
+                sound.Sampler ??= new SamplerPatch();
 
                 var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
-                var patch = new ZamplerPatchViewModel(sound.Zampler, () => { });
+                var patch = new SamplerPatchViewModel(sound.Sampler, () => { });
 
                 wide = new SamplerValues(zones, patch);
                 inside = at => new SamplerValues(zones, patch, () => zones.Zones[at]);
@@ -162,7 +162,7 @@ public static class MachinePresetFile
                 // is which machine it is for.
                 if (kind == TrackerInstrumentKind.Synth)
                     wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
-                else if (kind == TrackerInstrumentKind.Ouroboros)
+                else if (kind == TrackerInstrumentKind.MonoSynth)
                     wide = new MonoSynthValues(Mono(sound));
                 else
                     loose = new RecordingValues(sound);
@@ -193,7 +193,7 @@ public static class MachinePresetFile
             sound.Patch.Clamp();
             sound.Kit?.Clamp(buttons.Count);
             sound.Zones?.Clamp();
-            sound.Zampler?.Clamp();
+            sound.Sampler?.Clamp();
 
             return sound;
         }
@@ -250,10 +250,10 @@ public static class MachinePresetFile
         if (Map(machine) != null)
         {
             sound.Zones ??= ZoneMap.Empty();
-            sound.Zampler ??= new ZamplerPatch();
+            sound.Sampler ??= new SamplerPatch();
 
             var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
-            var patch = new ZamplerPatchViewModel(sound.Zampler, () => { });
+            var patch = new SamplerPatchViewModel(sound.Sampler, () => { });
 
             // The machine's own half first, so the file opens on the filter rather than on the
             // eleventh piece of a chop.
@@ -284,7 +284,7 @@ public static class MachinePresetFile
         {
             TrackerInstrumentKind.Synth =>
                 new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
-            TrackerInstrumentKind.Ouroboros => new MonoSynthValues(Mono(sound)),
+            TrackerInstrumentKind.MonoSynth => new MonoSynthValues(Mono(sound)),
             _ => new RecordingValues(sound),
         };
 
@@ -308,11 +308,11 @@ public static class MachinePresetFile
     /// made to answer twenty questions and then dropped would otherwise leave a timer running
     /// once per preset for as long as the app is up.
     /// </remarks>
-    private static ViewModels.OuroborosPatchViewModel Mono(TrackerInstrument sound)
+    private static ViewModels.MonoSynthPatchViewModel Mono(TrackerInstrument sound)
     {
-        sound.Ouroboros ??= new Synth.OuroborosPatch();
+        sound.MonoSynth ??= new Synth.MonoSynthPatch();
 
-        var patch = new ViewModels.OuroborosPatchViewModel(sound.Ouroboros, () => { });
+        var patch = new ViewModels.MonoSynthPatchViewModel(sound.MonoSynth, () => { });
 
         patch.Close();
 

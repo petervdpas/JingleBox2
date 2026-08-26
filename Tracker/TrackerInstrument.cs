@@ -16,13 +16,13 @@ public enum TrackerInstrumentKind
     Plugin = 2,
 
     /// <summary>Ouroboros: one oscillator, a filter that sweeps, and glide between notes.</summary>
-    Ouroboros = 3,
+    MonoSynth = 3,
 
     /// <summary>BongaBong: a kit, one recording to a key, none of them transposed.</summary>
-    BongaBong = 4,
+    Kit = 4,
 
     /// <summary>Zampler: recordings laid across the keyboard, each transposed from its root.</summary>
-    Zampler = 5
+    Sampler = 5
 }
 
 /// <summary>
@@ -102,16 +102,21 @@ public sealed class TrackerInstrument
     public string PluginState { get; set; } = "";
 
     /// <summary>
-    /// What Ouroboros plays from. Null on every other machine, and left out of the file there.
+    /// What the mono synth plays from. Null on every other machine, and left out of the file there.
     /// </summary>
     /// <remarks>
     /// Its own field rather than a wider version of the older patch. The two machines have
     /// different panels and different parameters, and a single patch with everything on it
     /// would be a shape neither of them fits, growing another set of fields for every machine
     /// added after.
+    ///
+    /// Written under the name the machine had when the field was added, because every song
+    /// already saved says that. What it is called in a file is a fact about the file; what it
+    /// is called here is a fact about the thing, and the two need not agree.
     /// </remarks>
+    [JsonPropertyName("Ouroboros")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Synth.OuroborosPatch? Ouroboros { get; set; }
+    public Synth.MonoSynthPatch? MonoSynth { get; set; }
 
     /// <summary>
     /// What BongaBong plays: sixteen pads, each with a recording and a key of its own.
@@ -135,19 +140,24 @@ public sealed class TrackerInstrument
     public ZoneMap? Zones { get; set; }
 
     /// <summary>
-    /// What Zampler does to a recording once it has been read: its filter and its envelopes.
+    /// What the sampler does to a recording once it has been read: its filter and its envelopes.
     /// </summary>
+    /// <remarks>
+    /// Written under the machine's name for the reason the mono synth's patch is: that is what
+    /// the songs already saved call it.
+    /// </remarks>
+    [JsonPropertyName("Zampler")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Synth.ZamplerPatch? Zampler { get; set; }
+    public Synth.SamplerPatch? Sampler { get; set; }
 
     [JsonIgnore]
-    public bool IsZampler => Kind == TrackerInstrumentKind.Zampler;
+    public bool IsSampler => Kind == TrackerInstrumentKind.Sampler;
 
     [JsonIgnore]
-    public bool IsBongaBong => Kind == TrackerInstrumentKind.BongaBong;
+    public bool IsKit => Kind == TrackerInstrumentKind.Kit;
 
     [JsonIgnore]
-    public bool IsOuroboros => Kind == TrackerInstrumentKind.Ouroboros;
+    public bool IsMonoSynth => Kind == TrackerInstrumentKind.MonoSynth;
 
     /// <summary>Which machine this instrument is on, by name and description.</summary>
     [JsonIgnore]
@@ -230,14 +240,14 @@ public sealed class TrackerInstrument
     public static TrackerInstrument CreateSynth(string name) => CreateSynth(name, new SynthPatch());
 
     /// <summary>A new instrument on Zampler: one empty zone across the whole keyboard.</summary>
-    public static TrackerInstrument CreateZampler(string name)
+    public static TrackerInstrument CreateSampler(string name)
     {
         var instrument = new TrackerInstrument
         {
             Name = name,
-            Kind = TrackerInstrumentKind.Zampler,
+            Kind = TrackerInstrumentKind.Sampler,
             Zones = ZoneMap.Empty(),
-            Zampler = new Synth.ZamplerPatch()
+            Sampler = new Synth.SamplerPatch()
         };
 
         instrument.EnsureId();
@@ -245,12 +255,12 @@ public sealed class TrackerInstrument
     }
 
     /// <summary>A new kit on BongaBong: sixteen pads with nothing on them yet.</summary>
-    public static TrackerInstrument CreateBongaBong(string name)
+    public static TrackerInstrument CreateKit(string name)
     {
         var instrument = new TrackerInstrument
         {
             Name = name,
-            Kind = TrackerInstrumentKind.BongaBong,
+            Kind = TrackerInstrumentKind.Kit,
             Kit = DrumKit.Empty()
         };
 
@@ -259,13 +269,13 @@ public sealed class TrackerInstrument
     }
 
     /// <summary>A new instrument on Ouroboros, with the machine's own patch ready to shape.</summary>
-    public static TrackerInstrument CreateOuroboros(string name)
+    public static TrackerInstrument CreateMonoSynth(string name)
     {
         var instrument = new TrackerInstrument
         {
             Name = name,
-            Kind = TrackerInstrumentKind.Ouroboros,
-            Ouroboros = new Synth.OuroborosPatch()
+            Kind = TrackerInstrumentKind.MonoSynth,
+            MonoSynth = new Synth.MonoSynthPatch()
         };
 
         instrument.EnsureId();
@@ -275,9 +285,9 @@ public sealed class TrackerInstrument
     /// <summary>A new instrument on whichever machine was asked for.</summary>
     public static TrackerInstrument CreateOn(Machine machine, string name) => machine?.Kind switch
     {
-        TrackerInstrumentKind.Ouroboros => CreateOuroboros(name),
-        TrackerInstrumentKind.BongaBong => CreateBongaBong(name),
-        TrackerInstrumentKind.Zampler => CreateZampler(name),
+        TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
+        TrackerInstrumentKind.Kit => CreateKit(name),
+        TrackerInstrumentKind.Sampler => CreateSampler(name),
 
         // A recording with no recording on it yet, which is what the Recording machine is until
         // you put a take on it. Without this it fell through and came back an OddSkilla wearing
@@ -357,10 +367,10 @@ public sealed class TrackerInstrument
         Name = other.Name;
         Kind = other.Kind;
         Patch = other.Patch.Clone();
-        Ouroboros = other.Ouroboros?.Clone();
+        MonoSynth = other.MonoSynth?.Clone();
         Kit = other.Kit?.Clone();
         Zones = other.Zones?.Clone();
-        Zampler = other.Zampler?.Clone();
+        Sampler = other.Sampler?.Clone();
         FilePath = other.FilePath;
         BaseNoteSemitone = other.BaseNoteSemitone;
         Volume = other.Volume;
@@ -399,20 +409,20 @@ public sealed class TrackerInstrument
                 Patch.CopyFrom(other.Patch);
                 break;
 
-            case TrackerInstrumentKind.Ouroboros:
-                Ouroboros ??= new Synth.OuroborosPatch();
-                Ouroboros.CopyFrom(other.Ouroboros ?? new Synth.OuroborosPatch());
+            case TrackerInstrumentKind.MonoSynth:
+                MonoSynth ??= new Synth.MonoSynthPatch();
+                MonoSynth.CopyFrom(other.MonoSynth ?? new Synth.MonoSynthPatch());
                 break;
 
-            case TrackerInstrumentKind.Zampler:
+            case TrackerInstrumentKind.Sampler:
                 Zones ??= ZoneMap.Empty();
                 Zones.CopyFrom(other.Zones ?? ZoneMap.Empty());
 
-                Zampler ??= new Synth.ZamplerPatch();
-                Zampler.CopyFrom(other.Zampler ?? new Synth.ZamplerPatch());
+                Sampler ??= new Synth.SamplerPatch();
+                Sampler.CopyFrom(other.Sampler ?? new Synth.SamplerPatch());
                 break;
 
-            case TrackerInstrumentKind.BongaBong:
+            case TrackerInstrumentKind.Kit:
                 Kit ??= DrumKit.Empty();
                 Kit.CopyFrom(other.Kit ?? DrumKit.Empty());
                 Patch.CopyFrom(other.Patch);
@@ -443,10 +453,10 @@ public sealed class TrackerInstrument
         Name = Name,
         Kind = Kind,
         Patch = Patch.Clone(),
-        Ouroboros = Ouroboros?.Clone(),
+        MonoSynth = MonoSynth?.Clone(),
         Kit = Kit?.Clone(),
         Zones = Zones?.Clone(),
-        Zampler = Zampler?.Clone(),
+        Sampler = Sampler?.Clone(),
         FilePath = FilePath,
         BaseNoteSemitone = BaseNoteSemitone,
         Volume = Volume,

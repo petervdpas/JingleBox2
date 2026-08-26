@@ -39,7 +39,7 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public sealed class SamplerValues(
     ZoneMapViewModel map,
-    ZamplerPatchViewModel patch,
+    SamplerPatchViewModel patch,
     Func<SampleZoneViewModel?>? about = null) : IMachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be

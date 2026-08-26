@@ -3,7 +3,7 @@ using System;
 namespace JingleBox2.Tracker.Synth;
 
 /// <summary>Which of the two shapes the oscillator makes.</summary>
-public enum OuroborosWave
+public enum MonoSynthWave
 {
     Saw = 0,
     Pulse = 1
@@ -51,7 +51,7 @@ public enum LfoWave
 /// it goes. Two knobs and two switches reach further than four knobs that each do one thing,
 /// and a third destination later is a value in an enum rather than another pair of knobs.
 /// </remarks>
-public sealed class OuroborosPatch
+public sealed class MonoSynthPatch
 {
     public const double MinTimeMs = 0;
     public const double MaxAttackMs = 4000;
@@ -71,7 +71,7 @@ public sealed class OuroborosPatch
 
     // ---- oscillator -------------------------------------------------------
 
-    public OuroborosWave Wave { get; set; } = OuroborosWave.Saw;
+    public MonoSynthWave Wave { get; set; } = MonoSynthWave.Saw;
 
     /// <summary>How wide the pulse is, nought to one. Only heard on the pulse wave.</summary>
     public double PulseWidth { get; set; } = 0.5;
@@ -164,7 +164,7 @@ public sealed class OuroborosPatch
     /// <summary>How far the pitch modulation reaches when it is pointed at frequency.</summary>
     public const double PitchModSemitones = 24;
 
-    public OuroborosPatch Clone() => new()
+    public MonoSynthPatch Clone() => new()
     {
         Wave = Wave,
         PulseWidth = PulseWidth,
@@ -194,7 +194,7 @@ public sealed class OuroborosPatch
     /// Takes on another patch's settings without becoming another object, for a preset landing
     /// on the patch the panel and any sounding voice are already holding.
     /// </summary>
-    public void CopyFrom(OuroborosPatch other)
+    public void CopyFrom(MonoSynthPatch other)
     {
         if (other is null || ReferenceEquals(other, this)) return;
 
@@ -227,7 +227,7 @@ public sealed class OuroborosPatch
     /// <summary>Brings a patch read off disk back into range, whatever was in the file.</summary>
     public void Clamp()
     {
-        if (!Enum.IsDefined(Wave)) Wave = OuroborosWave.Saw;
+        if (!Enum.IsDefined(Wave)) Wave = MonoSynthWave.Saw;
         if (!Enum.IsDefined(FilterMode)) FilterMode = FilterMode.LowPass;
         if (!Enum.IsDefined(LfoWave)) LfoWave = LfoWave.Triangle;
         if (!Enum.IsDefined(VcoModSource)) VcoModSource = ModSource.Lfo;

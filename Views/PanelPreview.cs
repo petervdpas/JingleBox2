@@ -35,14 +35,16 @@ public static class PanelPreview
     public static bool Claims(string[] args) =>
         args != null && args.Any(a => string.Equals(a, Argument, StringComparison.Ordinal));
 
-    /// <summary>Which machine was asked for, or Ouroboros when none was named.</summary>
+    /// <summary>Which machine was asked for, or the first one installed when none was named.</summary>
     private static Machine Wanted(string[] args)
     {
         int at = Array.IndexOf(args, Argument);
         string name = at >= 0 && at + 1 < args.Length ? args[at + 1] : "";
 
         return Machine.All.FirstOrDefault(m =>
-            string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)) ?? Machine.Ouroboros;
+                   string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
+               ?? Machine.Installed.FirstOrDefault()
+               ?? Machine.Plugin;
     }
 
     public static int Run(string[] args)
@@ -164,7 +166,7 @@ public static class PanelPreview
 
     private sealed class PreviewApp : Application
     {
-        public static Machine Wanted { get; set; } = Machine.Ouroboros;
+        public static Machine Wanted { get; set; } = Machine.Plugin;
 
         /// <summary>False to see the panel with no track behind it, the way the rack shows it.</summary>
         public static bool Playing { get; set; } = true;

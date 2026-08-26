@@ -11,14 +11,14 @@ namespace JingleBox2.Tracker.Synth;
 /// the next note arrives, which is what glide needs to mean anything: a note slides from
 /// whatever the last one was, so a line phrases instead of stepping.
 /// </remarks>
-public sealed class OuroborosVoice : IVoice
+public sealed class MonoSynthVoice : IVoice
 {
     public const int NoTrack = -1;
 
     /// <summary>How long a cut takes, so a retrigger is a new note rather than a click.</summary>
     private const double CutSeconds = 0.004;
 
-    private readonly OuroborosPatch _patch;
+    private readonly MonoSynthPatch _patch;
     private readonly int _sampleRate;
     private readonly SweepFilter _filter;
     private readonly Envelope _envelope;
@@ -32,11 +32,11 @@ public sealed class OuroborosVoice : IVoice
     private readonly double _targetHz;
     private readonly double _glidePerSample;
 
-    public OuroborosVoice(
-        OuroborosPatch patch, Note note, int track, float gain, float pan,
+    public MonoSynthVoice(
+        MonoSynthPatch patch, Note note, int track, float gain, float pan,
         int sampleRate, int noiseSeed, double? fromHz)
     {
-        _patch = patch ?? new OuroborosPatch();
+        _patch = patch ?? new MonoSynthPatch();
         _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
 
         Track = track;
@@ -143,7 +143,7 @@ public sealed class OuroborosVoice : IVoice
             {
                 if (_patch.VcoModTarget == VcoModTarget.Frequency)
                 {
-                    double semitones = vco * _patch.VcoModAmount * OuroborosPatch.PitchModSemitones;
+                    double semitones = vco * _patch.VcoModAmount * MonoSynthPatch.PitchModSemitones;
                     hz *= Math.Pow(2, semitones / 12.0);
                 }
                 else
@@ -156,7 +156,7 @@ public sealed class OuroborosVoice : IVoice
             if (_phase >= 1) _phase -= Math.Floor(_phase);
 
             // The mixer: the oscillator and the noise, both, in whatever proportion.
-            double tone = _patch.Wave == OuroborosWave.Pulse
+            double tone = _patch.Wave == MonoSynthWave.Pulse
                 ? (_phase < width ? 1.0 : -1.0)
                 : _phase * 2.0 - 1.0;
 
@@ -236,7 +236,7 @@ public sealed class OuroborosVoice : IVoice
 
         private readonly double _rate;
 
-        public Envelope(OuroborosPatch patch, int sampleRate)
+        public Envelope(MonoSynthPatch patch, int sampleRate)
         {
             double rate = sampleRate <= 0 ? 44100 : sampleRate;
 

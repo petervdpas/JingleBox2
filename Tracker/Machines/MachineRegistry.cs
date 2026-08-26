@@ -49,6 +49,10 @@ public static class MachineRegistry
     {
         Seed();
 
+        // Everything read last time goes first. A machine thrown out in SETTINGS has to be gone
+        // from the list the moment it is rebuilt, not at the next start.
+        Machine.Forget();
+
         var taken = new List<MachineProject>();
 
         foreach (var project in In(Installed))

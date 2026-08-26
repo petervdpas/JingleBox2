@@ -169,7 +169,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         Machines.Clear();
 
         // The machines first, in the order they are declared in, and the plugins after them.
-        foreach (var machine in Machine.Ours)
+        foreach (var machine in Machine.Installed)
         {
             var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
 
@@ -183,13 +183,17 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     }
 
     /// <summary>
-    /// Makes sure every machine of ours has its slot on the shelf.
+    /// Makes sure every machine installed here has its slot on the shelf.
     /// </summary>
     /// <remarks>
     /// Written once, the first time the rack is opened without them, and then they are
     /// ordinary files that keep whatever you set on them. Not the same thing as stocking a
-    /// rack with sounds to start from: those are presets and live beside the program. These
-    /// are the machines themselves, and a rack with no boxes in it is not a rack.
+    /// rack with sounds to start from: those are presets and live inside the machine. These
+    /// are the machines themselves.
+    ///
+    /// Installed here, and not simply ours. A machine thrown out in SETTINGS has no panel to
+    /// draw and no presets to offer, so there is nothing a box on the rack could do; its slot
+    /// stays on the shelf untouched and the box comes back when the machine does.
     /// </remarks>
     /// <summary>
     /// Brings the shelf to what a rack is: the machines, then the plugins, and nothing else.
@@ -222,7 +226,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             Log.Write(LogArea.App, () => "retired '" + name + "' from the rack");
         }
 
-        foreach (var machine in Machine.Ours)
+        foreach (var machine in Machine.Installed)
         {
             if (_rack.Load(machine.SlotId) != null) continue;
 
@@ -343,25 +347,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         {
             Status = $"Could not save '{instrument.Name}': {ex.Message}";
         }
-    }
-
-    /// <summary>
-    /// Draws the machine in front of you again, because the machine itself has changed.
-    /// </summary>
-    /// <remarks>
-    /// A machine imported while the app is running is a new description of something that may be
-    /// on screen this moment. The panel is built when an instrument is picked, so the way to
-    /// draw the new one is to pick it again, which also puts down whatever the old panel was
-    /// holding: a sounding note, an open plugin window, a kit watching the keyboard.
-    /// </remarks>
-    public void Reopen()
-    {
-        var was = Selected;
-
-        if (was == null) return;
-
-        Selected = null;
-        Selected = was;
     }
 
     partial void OnSelectedChanged(RackMachine? value)

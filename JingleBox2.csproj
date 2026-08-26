@@ -103,13 +103,4 @@
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
   </Target>
-  <!-- The machines' presets: a folder to a machine, a file to a preset, and whatever
-       recordings a preset carries beside it. They go with the program rather than into your
-       data, because they are part of it, and a kit that carries its own recordings is a kit
-       that still works after the folder it was built from has moved. -->
-  <ItemGroup>
-    <None Include="Presets\**\*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="Presets" />
-    <None Include="Presets\**\*.wav" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="Presets" />
-  </ItemGroup>
-
 </Project>

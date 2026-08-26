@@ -65,25 +65,25 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         // Both kinds run through the same voice now, so both have a patch to edit: a sample
         // has an envelope, a filter and modulation exactly as a generated wave does. Only the
         // oscillator half of it is meaningless for a recording, and the page hides that.
-        // The machine decides which patch there is to edit. Ouroboros keeps its own; every
+        // The machine decides which patch there is to edit. The mono synth keeps its own; every
         // other kind of ours plays from the older one.
-        if (instrument.IsOuroboros)
+        if (instrument.IsMonoSynth)
         {
-            instrument.Ouroboros ??= new OuroborosPatch();
-            Ouroboros = new OuroborosPatchViewModel(instrument.Ouroboros, changed);
+            instrument.MonoSynth ??= new MonoSynthPatch();
+            MonoSynth = new MonoSynthPatchViewModel(instrument.MonoSynth, changed);
         }
 
-        if (instrument.IsZampler)
+        if (instrument.IsSampler)
         {
             instrument.Zones ??= ZoneMap.Empty();
             instrument.Zones.Clamp();
 
-            instrument.Zampler ??= new ZamplerPatch();
-            instrument.Zampler.Clamp();
+            instrument.Sampler ??= new SamplerPatch();
+            instrument.Sampler.Clamp();
 
             Zones = new ZoneMapViewModel(instrument.Zones, Sounded(changed), tap);
 
-            Zampler = new ZamplerPatchViewModel(instrument.Zampler, changed);
+            Sampler = new SamplerPatchViewModel(instrument.Sampler, changed);
 
             Slices = Cutting(
                 waveforms, ZoneMap.MaxZones,
@@ -105,7 +105,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             FollowSound();
         }
 
-        if (instrument.IsBongaBong)
+        if (instrument.IsKit)
         {
             // How many pads there are is the machine's to say, declared as buttons on its panel.
             // A machine that is not installed as a project says nothing, and the kit keeps
@@ -195,7 +195,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         {
             Values = new Tracker.Machines.RecordingValues(_instrument, shelf) { Changed = Moved };
         }
-        else if (IsBongaBong && Kit is { } kit)
+        else if (IsKit && Kit is { } kit)
         {
             Values = new Tracker.Machines.KitValues(kit) { Changed = Moved };
 
@@ -220,13 +220,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             // The picture of the wave, drawn out of the same engine that makes the sound.
             MachineScope = new Tracker.Machines.SynthScope(voice);
         }
-        else if (IsOuroboros && Ouroboros is { } mono)
+        else if (IsMonoSynth && MonoSynth is { } mono)
         {
             Values = new Tracker.Machines.MonoSynthValues(mono) { Changed = Moved };
         }
-        else if (IsZampler && Zones is { } zones && Zampler is { } zampler)
+        else if (IsSampler && Zones is { } zones && Sampler is { } filter)
         {
-            Values = new Tracker.Machines.SamplerValues(zones, zampler) { Changed = Moved };
+            Values = new Tracker.Machines.SamplerValues(zones, filter) { Changed = Moved };
 
             MachineZones = new Tracker.Machines.SamplerZones(zones);
             MachineSlices = Slices;
@@ -333,12 +333,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// True when the keyboard at the foot of the panel is the one to show.
     /// </summary>
     /// <remarks>
-    /// It is there unless something else already put a keyboard on the panel, and two things
-    /// can have: the machine's own description, or the hand written kit block, which puts one
-    /// beside its pads because hitting a key and watching its pad answer is one glance. Both
-    /// asked here, so there is one place that decides and no way for the two to disagree.
+    /// It is there unless the machine's own description already put one on the panel, which a
+    /// kit does: hitting a key and watching its pad answer is one glance, so a kit's keyboard
+    /// belongs beside its pads rather than at the foot of the page.
     /// </remarks>
-    public bool ShowsSharedKeys => !DescribesKeys && !ShowsWrittenKit;
+    public bool ShowsSharedKeys => !DescribesKeys;
 
     private static bool Holds(MachineElement element, string kind)
     {
@@ -377,13 +376,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>The voice settings, which both kinds of instrument have.</summary>
     public SynthPatchViewModel? Patch { get; }
 
-    /// <summary>Ouroboros's own patch, when that is the machine. Null on every other.</summary>
-    public OuroborosPatchViewModel? Ouroboros { get; }
+    /// <summary>The mono synth's own patch, when that is the machine. Null on every other.</summary>
+    public MonoSynthPatchViewModel? MonoSynth { get; }
 
     /// <summary>BongaBong's kit, when that is the machine. Null on every other.</summary>
     public DrumKitViewModel? Kit { get; }
 
-    public bool IsBongaBong => _instrument.IsBongaBong;
+    public bool IsKit => _instrument.IsKit;
 
     /// <summary>
     /// Your own takes, offered to the machines that put recordings on things.
@@ -418,7 +417,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         return taken.Select(r => r.FilePath).ToList();
     }
 
-    /// <summary>Zampler's map, when that is the machine. Null on every other.</summary>
+    /// <summary>The sampler's map, when that is the machine. Null on every other.</summary>
     public ZoneMapViewModel? Zones { get; }
 
     /// <summary>
@@ -554,10 +553,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         return slices;
     }
 
-    /// <summary>Zampler's filter and envelopes, when that is the machine.</summary>
-    public ZamplerPatchViewModel? Zampler { get; }
+    /// <summary>The sampler's filter and envelopes, when that is the machine.</summary>
+    public SamplerPatchViewModel? Sampler { get; }
 
-    public bool IsZampler => _instrument.IsZampler;
+    public bool IsSampler => _instrument.IsSampler;
 
     /// <summary>
     /// A preset has landed on the instrument: everything the panel shows may have moved.
@@ -569,10 +568,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     public void Reloaded()
     {
         Patch?.RefreshAll();
-        Ouroboros?.RefreshAll();
+        MonoSynth?.RefreshAll();
         Kit?.Refresh();
         Zones?.Refresh();
-        Zampler?.RefreshAll();
+        Sampler?.RefreshAll();
 
         // A take landing on the Recording machine is a different file, and the picture was read
         // once when this was built. Without this it goes on saying the old one is missing.
@@ -606,78 +605,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>What the machine is called, so the panel can say which one this is.</summary>
     public string MachineName => _instrument.Machine.Name;
 
-    public bool IsOuroboros => _instrument.IsOuroboros;
-
-    /// <summary>
-    /// True for the machines that share the older voice: a recording and the older synth.
-    /// </summary>
-    /// <remarks>
-    /// A plugin does its own envelope and filter, and Ouroboros brings its own panel, so
-    /// neither shows the shared one. Without this both panels are drawn at once.
-    /// </remarks>
-    /// <summary>
-    /// True for the machines that still share the general voice editor rather than having a
-    /// front panel of their own.
-    /// </summary>
-    /// <remarks>
-    /// Only the sampler now. OddSkilla and Ouroboros each have a panel of their own and a
-    /// plugin has its own interface, so what is left is the one that is not a machine yet, and
-    /// it keeps the shared editor until Zampler is built to replace it.
-    /// </remarks>
-    public bool HasCommonVoice => IsSample;
-
-    /// <summary>True when the voice is the one written out in XAML rather than the machine's own.</summary>
-    public bool ShowsWrittenVoice => HasCommonVoice && !IsDescribed;
-
-    /// <summary>And the same question about the kit, for a machine that has one.</summary>
-    /// <remarks>
-    /// The blocks written out in XAML are the same controls said twice. Where the machine draws
-    /// its own face, showing both would be one instrument edited from two places, with two pads
-    /// selected and two names in two boxes.
-    ///
-    /// It is also what the keyboard at the foot of every panel asks. That keyboard is hidden on
-    /// a hand written kit because the kit's own block puts one beside its pads, where it belongs:
-    /// hitting a key and watching its pad answer is one glance. A described kit has no keyboard
-    /// of its own, so the shared one comes back, and asking this rather than asking whether the
-    /// machine is BongaBong is what keeps the two answers from drifting apart.
-    /// </remarks>
-    public bool ShowsWrittenKit => IsBongaBong && !IsDescribed;
-
-    /// <summary>
-    /// True when the map, the zone and the filter are the ones written in XAML.
-    /// </summary>
-    /// <remarks>
-    /// The same rule the kit goes by, and there for the same reason: a machine that this
-    /// installation has no project for still has to open, and what it opens as is the panel that
-    /// was written before it was a project.
-    /// </remarks>
-    public bool ShowsWrittenZampler => IsZampler && !IsDescribed;
-
-    /// <summary>
-    /// True when the wave, the envelope and the filter are the ones written in XAML.
-    /// </summary>
-    /// <remarks>
-    /// The same rule the kit and the sampler go by, and there for the same reason: a machine this
-    /// installation has no project for still has to open, and what it opens as is the panel that
-    /// was written before it was a project.
-    /// </remarks>
-    public bool ShowsWrittenSynth => IsSynth && !IsDescribed;
-
-    /// <summary>
-    /// True when the mono synth's two rows are the ones written in XAML.
-    /// </summary>
-    /// <remarks>
-    /// The same rule the rest go by, and there for the same reason: a machine this installation
-    /// has no project for still has to open, and what it opens as is the panel that was written
-    /// before it was a project.
-    /// </remarks>
-    public bool ShowsWrittenOuroboros => IsOuroboros && !IsDescribed;
+    public bool IsMonoSynth => _instrument.IsMonoSynth;
 
     public bool IsSynth => _instrument.IsSynth;
 
     public bool IsPlugin => _instrument.IsPlugin;
 
-    public bool IsSample => !IsSynth && !IsPlugin && !IsOuroboros && !IsBongaBong && !IsZampler;
+    public bool IsSample => !IsSynth && !IsPlugin && !IsMonoSynth && !IsKit && !IsSampler;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }

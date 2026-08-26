@@ -15,7 +15,7 @@ namespace JingleBox2.Tracker.Synth;
 /// the same shape. A string that fades slowly while its top goes almost at once is two
 /// envelopes and cannot be one.
 /// </remarks>
-public sealed class ZamplerPatch
+public sealed class SamplerPatch
 {
     public const double MinTimeMs = 0;
     public const double MaxAttackMs = 4000;
@@ -69,7 +69,7 @@ public sealed class ZamplerPatch
     /// <summary>0-1 gain for the whole instrument, under the cell's volume column.</summary>
     public double Volume { get; set; } = 1.0;
 
-    public ZamplerPatch Clone() => new()
+    public SamplerPatch Clone() => new()
     {
         AttackMs = AttackMs,
         DecayMs = DecayMs,
@@ -91,7 +91,7 @@ public sealed class ZamplerPatch
     /// Takes on another patch's settings without becoming another object, for a preset landing
     /// on the patch the panel and any sounding voice are already holding.
     /// </summary>
-    public void CopyFrom(ZamplerPatch other)
+    public void CopyFrom(SamplerPatch other)
     {
         if (other is null || ReferenceEquals(other, this)) return;
 

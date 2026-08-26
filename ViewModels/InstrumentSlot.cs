@@ -66,7 +66,7 @@ public sealed partial class InstrumentSlot : ObservableObject
             return Instrument.Kind switch
             {
                 TrackerInstrumentKind.Synth => machine + ", " + Instrument.Patch.Wave.ToString().ToLowerInvariant(),
-                TrackerInstrumentKind.Ouroboros => machine + ", " + (Instrument.Ouroboros?.Wave.ToString().ToLowerInvariant() ?? "saw"),
+                TrackerInstrumentKind.MonoSynth => machine + ", " + (Instrument.MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
                 _ => machine + ", " + Instrument.BaseNote
             };
         }

@@ -209,7 +209,7 @@ public sealed partial class MachineShelfViewModel : ObservableObject
 
         Status = installed == null
             ? "Could not add " + name + "."
-            : "Added " + name + ". It is on the rack the next time the app starts.";
+            : "Added " + name + ". It is on the rack now.";
     }
 
     /// <summary>Throws a machine out of this installation, and says whether it can come back.</summary>

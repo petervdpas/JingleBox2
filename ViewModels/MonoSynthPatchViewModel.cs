@@ -5,19 +5,19 @@ using System;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// The editable face of an <see cref="OuroborosPatch"/>. The patch stays plain data that
+/// The editable face of an <see cref="MonoSynthPatch"/>. The patch stays plain data that
 /// serializes with the song; this is what the panel's knobs and switches are bound to.
 /// </summary>
 /// <remarks>
 /// Every setter clamps through the patch's own limits rather than trusting the control, so a
 /// value typed into a box cannot put the machine somewhere it does not go.
 /// </remarks>
-public sealed class OuroborosPatchViewModel : ObservableObject
+public sealed class MonoSynthPatchViewModel : ObservableObject
 {
-    private readonly OuroborosPatch _patch;
+    private readonly MonoSynthPatch _patch;
     private readonly Action _changed;
 
-    public OuroborosPatchViewModel(OuroborosPatch patch, Action changed)
+    public MonoSynthPatchViewModel(MonoSynthPatch patch, Action changed)
     {
         _patch = patch;
         _changed = changed;
@@ -25,7 +25,7 @@ public sealed class OuroborosPatchViewModel : ObservableObject
         StartLamp();
     }
 
-    public OuroborosPatch Patch => _patch;
+    public MonoSynthPatch Patch => _patch;
 
     /// <summary>Bumped on every change, so a scope watching plain data knows to redraw.</summary>
     public int Revision { get; private set; }
@@ -86,7 +86,7 @@ public sealed class OuroborosPatchViewModel : ObservableObject
 
     // ---- the lists the switches are drawn from ---------------------------
 
-    public OuroborosWave[] Waves { get; } = Enum.GetValues<OuroborosWave>();
+    public MonoSynthWave[] Waves { get; } = Enum.GetValues<MonoSynthWave>();
     public FilterMode[] FilterModes { get; } = Enum.GetValues<FilterMode>();
     public LfoWave[] LfoWaves { get; } = Enum.GetValues<LfoWave>();
     public ModSource[] ModSources { get; } = Enum.GetValues<ModSource>();
@@ -94,7 +94,7 @@ public sealed class OuroborosPatchViewModel : ObservableObject
 
     // ---- oscillator -------------------------------------------------------
 
-    public OuroborosWave Wave
+    public MonoSynthWave Wave
     {
         get => _patch.Wave;
         set => Set(value, _patch.Wave, v => _patch.Wave = v);
