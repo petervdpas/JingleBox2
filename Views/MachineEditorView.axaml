@@ -589,7 +589,7 @@
                         </Grid>
 
                         <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                                   Text="A grid takes rows and columns, and anything in one takes row, column and span. A group takes a caption, a spacer takes width and height." />
+                                   Text="A grid takes rows and columns, and anything in one takes row, column and span. A group takes a caption, a spacer takes width and height. Anything at all takes an align of top, centre or bottom, and a margin of left, top, right, bottom that nudges it out of line and stands in for the gap its row or column would have given it." />
 
                         <ItemsControl ItemsSource="{Binding Properties}">
                           <ItemsControl.ItemTemplate>

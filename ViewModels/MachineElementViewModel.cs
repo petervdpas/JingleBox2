@@ -314,25 +314,32 @@ public sealed partial class MachineElementViewModel : ObservableObject
     }
 
     /// <summary>The same, for a wrapper that already exists, which is what moving one is.</summary>
+    /// <remarks>
+    /// The description is changed before the wrappers, and that order is the whole of it. The
+    /// wrappers are what the editor is listening to, and it redraws the panel the instant they
+    /// move. Moving them first means the panel is drawn again from a description that has not
+    /// been touched yet, so what you see is what it was.
+    /// </remarks>
     public void Put(MachineElementViewModel child, int at)
     {
         int place = at < 0 || at > Children.Count ? Children.Count : at;
 
-        Children.Insert(place, child);
         Element.Children.Insert(place, child.Element);
+        Children.Insert(place, child);
 
         child.Parent = this;
     }
 
     /// <summary>Takes one out, and returns whether it was in there to begin with.</summary>
+    /// <remarks>The description first, for the reason given on <see cref="Put(MachineElementViewModel, int)"/>.</remarks>
     public bool Remove(MachineElementViewModel child)
     {
         int at = Children.IndexOf(child);
 
         if (at < 0) return false;
 
-        Children.RemoveAt(at);
         Element.Children.Remove(child.Element);
+        Children.RemoveAt(at);
 
         child.Parent = null;
 
@@ -346,6 +353,12 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// Order is the only positioning a container has of its own, so this is how a row is put in
     /// the right sequence. A step that would run off either end does nothing rather than
     /// wrapping around, which is what a button held down expects.
+    ///
+    /// The description first, for the reason given on <see cref="Put(MachineElementViewModel, int)"/>.
+    /// A move is where that mattered most, because nothing else happens afterwards to put it
+    /// right: adding and removing both change what is picked, and the panel is drawn again for
+    /// that instead. Flipping two things over leaves the same one picked, so the stale drawing
+    /// stood until the machine was opened again.
     /// </remarks>
     public bool Move(MachineElementViewModel child, int by)
     {
@@ -357,10 +370,10 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
         if (to < 0 || to >= Children.Count) return false;
 
-        Children.Move(at, to);
-
         Element.Children.RemoveAt(at);
         Element.Children.Insert(to, child.Element);
+
+        Children.Move(at, to);
 
         return true;
     }

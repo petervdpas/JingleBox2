@@ -24,7 +24,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_level",
@@ -33,7 +34,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "zone_pan",
@@ -42,7 +44,8 @@
       "Min": -1,
       "Max": 1,
       "Default": 0,
-      "Step": 0.02
+      "Step": 0.02,
+      "Saved": true
     },
     {
       "Key": "zone_fine",
@@ -51,7 +54,8 @@
       "Min": -100,
       "Max": 100,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_low",
@@ -60,7 +64,8 @@
       "Min": 0,
       "Max": 119,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_high",
@@ -69,7 +74,8 @@
       "Min": 0,
       "Max": 119,
       "Default": 119,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_root",
@@ -78,7 +84,8 @@
       "Min": 0,
       "Max": 119,
       "Default": 48,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_start",
@@ -87,7 +94,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "zone_end",
@@ -96,7 +104,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "zone_loop",
@@ -105,7 +114,8 @@
       "Min": 0,
       "Max": 2,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "zone_loop_start",
@@ -114,7 +124,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "zone_loop_end",
@@ -123,7 +134,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.001
+      "Step": 0.001,
+      "Saved": true
     },
     {
       "Key": "cutoff",
@@ -132,7 +144,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "resonance",
@@ -141,7 +154,8 @@
       "Min": 0,
       "Max": 0.98,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "env_amount",
@@ -150,7 +164,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "env_polarity",
@@ -159,7 +174,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "key_follow",
@@ -168,7 +184,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "filter_attack",
@@ -177,7 +194,8 @@
       "Min": 0,
       "Max": 4000,
       "Default": 2,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "filter_decay",
@@ -186,7 +204,8 @@
       "Min": 0,
       "Max": 8000,
       "Default": 300,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "filter_sustain",
@@ -195,7 +214,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0.5,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "filter_release",
@@ -204,7 +224,8 @@
       "Min": 0,
       "Max": 8000,
       "Default": 200,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "attack",
@@ -213,7 +234,8 @@
       "Min": 0,
       "Max": 4000,
       "Default": 2,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "decay",
@@ -222,7 +244,8 @@
       "Min": 0,
       "Max": 8000,
       "Default": 200,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "sustain",
@@ -231,7 +254,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "release",
@@ -240,7 +264,8 @@
       "Min": 0,
       "Max": 8000,
       "Default": 160,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "level",
@@ -249,7 +274,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     }
   ],
   "Panel": {
@@ -271,13 +297,25 @@
           },
           "Children": [
             {
+              "Element": "Image",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "width": "400",
+                "height": "100",
+                "file": "images/image1.svg"
+              },
+              "Children": []
+            },
+            {
               "Element": "Preset",
               "Parameter": "",
               "Label": "",
               "Properties": {
                 "source": "presets",
                 "caption": "Presets",
-                "width": "258"
+                "width": "258",
+                "margin": "0,20,0,0"
               },
               "Children": []
             }
@@ -640,7 +678,7 @@
                           "Properties": {
                             "span": "3",
                             "dial": "40",
-                            "tip": "How far the filter's own envelope moves the cutoff, up to six octaves."
+                            "tip": "How far the filter\u0027s own envelope moves the cutoff, up to six octaves."
                           },
                           "Children": []
                         }

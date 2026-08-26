@@ -283,7 +283,8 @@
               "Properties": {
                 "source": "takes",
                 "caption": "Presets",
-                "width": "258"
+                "width": "258",
+                "margin": "0,28,0,0"
               },
               "Children": []
             },

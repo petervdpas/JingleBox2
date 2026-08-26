@@ -555,8 +555,15 @@ public class MachinePanelView : Decorator
 
         // The layer only exists while the panel is being laid out. Off, the panel measures to
         // exactly what it draws, which is what a machine standing in a song has to do.
+        //
+        // Transparent rather than nothing, and that is what makes the panel answer the pointer
+        // at all. Everything Skin builds is made deaf while designing so a press meant to pick a
+        // knob up does not turn it, and a container with no brush is not something Avalonia
+        // hit-tests either. With nothing under the pointer the press never reaches this panel,
+        // so nothing can be picked by clicking it and no handle can be grabbed. The brush costs
+        // one filled rectangle, and only while the bench is open.
         Child = Designing && built != null
-            ? new Panel { Children = { built, _handles } }
+            ? new Panel { Background = Brushes.Transparent, Children = { built, _handles } }
             : built;
 
         ShowSelection();

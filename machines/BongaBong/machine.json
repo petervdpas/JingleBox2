@@ -24,7 +24,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "pad_pan",
@@ -33,7 +34,8 @@
       "Min": -1,
       "Max": 1,
       "Default": 0,
-      "Step": 0.02
+      "Step": 0.02,
+      "Saved": true
     },
     {
       "Key": "pad_choke",
@@ -42,7 +44,8 @@
       "Min": 0,
       "Max": 8,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     }
   ],
   "Panel": {
@@ -70,7 +73,19 @@
               "Properties": {
                 "source": "presets",
                 "caption": "Presets",
-                "width": "258"
+                "width": "258",
+                "margin": "0,50,0,0"
+              },
+              "Children": []
+            },
+            {
+              "Element": "Image",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "width": "340",
+                "height": "100",
+                "file": "images/image1.png"
               },
               "Children": []
             }
@@ -385,7 +400,7 @@
                               "Label": "",
                               "Properties": {
                                 "dial": "40",
-                                "tip": "How loud this pad is, under the track's own level."
+                                "tip": "How loud this pad is, under the track\u0027s own level."
                               },
                               "Children": []
                             },
@@ -395,7 +410,7 @@
                               "Label": "",
                               "Properties": {
                                 "dial": "40",
-                                "tip": "Where this pad stands on the kit. The track's own pan is added to it."
+                                "tip": "Where this pad stands on the kit. The track\u0027s own pan is added to it."
                               },
                               "Children": []
                             },

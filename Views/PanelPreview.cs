@@ -49,6 +49,11 @@ public static class PanelPreview
 
     public static int Run(string[] args)
     {
+        // The machines have to be read before one can be asked for by name. The application
+        // does this at startup; nothing here did, so every --panel showed the plugin panel
+        // whatever was typed after it.
+        Tracker.Machines.MachineProjects.Keep(Tracker.Machines.MachineRegistry.Load());
+
         PreviewApp.Wanted = Wanted(args);
         PreviewApp.Playing = !args.Any(a => string.Equals(a, Idle, StringComparison.Ordinal));
 
