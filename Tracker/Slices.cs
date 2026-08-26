@@ -44,7 +44,7 @@ public static class Slices
             if (path.Length == 0) return "";
 
             if (first is null) first = path;
-            else if (!string.Equals(path, first, StringComparison.Ordinal)) return "";
+            else if (!FilePaths.Same(path, first)) return "";
         }
 
         return first ?? "";

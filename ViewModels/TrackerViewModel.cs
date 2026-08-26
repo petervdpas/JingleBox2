@@ -997,7 +997,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             _store.Save(Song, path);
 
-            if (!string.Equals(_kept, path, StringComparison.Ordinal))
+            if (!FilePaths.Same(_kept, path))
             {
                 Drop();
                 _kept = path;
@@ -1695,7 +1695,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _store.Save(Song, path);
 
             RefreshSavedSongs();
-            SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == path);
+            SelectedSongFile = SavedSongs.FirstOrDefault(f => FilePaths.Same(f.Path, path));
 
             IsDirty = false;
 
@@ -1918,7 +1918,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         foreach (var file in _store.ListSongs())
             SavedSongs.Add(file);
 
-        SelectedSongFile = SavedSongs.FirstOrDefault(f => f.Path == keep);
+        SelectedSongFile = SavedSongs.FirstOrDefault(f => FilePaths.Same(f.Path, keep));
     }
 
     public void Dispose()

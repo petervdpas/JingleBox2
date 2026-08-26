@@ -2408,7 +2408,14 @@ public class MachinePanelView : Decorator
 
             string full = Path.GetFullPath(Path.Combine(root, file));
 
-            if (!full.StartsWith(root, StringComparison.Ordinal)) return null;
+            // By what the file system thinks, not by what the language thinks. Windows treats
+            // two paths differing only in case as one path, so an exact comparison there refuses
+            // to draw a picture that is plainly in the folder.
+            var same = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
+            if (!full.StartsWith(root, same)) return null;
 
             return File.Exists(full) ? full : null;
         }

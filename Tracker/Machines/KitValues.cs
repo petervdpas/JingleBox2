@@ -93,7 +93,7 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
         switch (key)
         {
             case TakeKey:
-                if (pad.Pad.FilePath == value) return;
+                if (FilePaths.Same(pad.Pad.FilePath, value)) return;
 
                 // Through the pad's own way of taking one, which names it after the file when
                 // it has no name of its own. A pad called "live-snare-shot-pic" is a pad you can

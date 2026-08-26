@@ -277,15 +277,13 @@ public static class MachineArchive
     /// <summary>Copies a machine's folder, sounds and all, into the folder being staged.</summary>
     private static bool Copy(string from, string into)
     {
-        string root = Path.GetFullPath(into) + Path.DirectorySeparatorChar;
-
         foreach (string file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
         {
             string full = Path.GetFullPath(Path.Combine(into, Path.GetRelativePath(from, file)));
 
             // A link inside the source folder pointing out of it would otherwise copy a file
             // from somewhere else in under the machine's name.
-            if (!full.StartsWith(root, StringComparison.Ordinal)) return false;
+            if (!MachinePaths.Under(full, into)) return false;
 
             string? holds = Path.GetDirectoryName(full);
             if (!string.IsNullOrEmpty(holds)) Directory.CreateDirectory(holds);
@@ -299,8 +297,6 @@ public static class MachineArchive
     /// <summary>Writes every entry under that prefix into the folder, and says whether it could.</summary>
     private static bool Unpack(ZipArchive zip, string prefix, string into)
     {
-        string root = Path.GetFullPath(into) + Path.DirectorySeparatorChar;
-
         foreach (var entry in zip.Entries)
         {
             string name = Slashed(entry.FullName);
@@ -320,7 +316,7 @@ public static class MachineArchive
 
             string full = Path.GetFullPath(Path.Combine(into, name));
 
-            if (!full.StartsWith(root, StringComparison.Ordinal))
+            if (!MachinePaths.Under(full, into))
             {
                 Diagnostics.Log.Write(Diagnostics.LogArea.App,
                     () => "machine zip refused: " + entry.FullName + " lands outside " + into);
@@ -386,12 +382,5 @@ public static class MachineArchive
     private static string Slashed(string name) => name.Replace('\\', '/');
 
     /// <summary>Whether that path is inside that folder, rather than beside it or above it.</summary>
-    private static bool Under(string path, string folder)
-    {
-        string root = Path.GetFullPath(folder);
-
-        if (!root.EndsWith(Path.DirectorySeparatorChar)) root += Path.DirectorySeparatorChar;
-
-        return path.StartsWith(root, StringComparison.Ordinal) && path.Length > root.Length;
-    }
+    private static bool Under(string path, string folder) => MachinePaths.Under(path, folder);
 }

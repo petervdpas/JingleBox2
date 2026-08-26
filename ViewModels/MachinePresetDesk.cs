@@ -215,10 +215,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     {
         try
         {
-            string root = Path.GetFullPath(Folder);
-
-            if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                return full[(root.Length + 1)..].Replace(Path.DirectorySeparatorChar, '/');
+            if (Tracker.Machines.MachinePaths.Named(full, Folder) is { } named) return named;
         }
         catch (Exception)
         {
@@ -259,7 +256,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
             {
                 string full = Path.GetFullPath(Path.Combine(root, named));
 
-                if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+                if (!Tracker.Machines.MachinePaths.Under(full, root)) continue;
 
                 if (Path.GetDirectoryName(full) is { Length: > 0 } home) return home;
             }
@@ -320,7 +317,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
             }
         }
 
-        Picked = Presets.FirstOrDefault(one => one.Path == was) ?? Presets.FirstOrDefault();
+        Picked = Presets.FirstOrDefault(one => Tracker.FilePaths.Same(one.Path, was)) ?? Presets.FirstOrDefault();
     }
 
     /// <summary>
@@ -348,7 +345,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
             Reread();
 
-            Picked = Presets.FirstOrDefault(one => one.Path == path) ?? Picked;
+            Picked = Presets.FirstOrDefault(one => Tracker.FilePaths.Same(one.Path, path)) ?? Picked;
 
             Said = "Made " + Path.GetFileName(path);
         }
@@ -408,10 +405,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         try
         {
-            string home = Path.GetFullPath(Folder);
-
-            if (Path.GetFullPath(path).StartsWith(home + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                return path;
+            if (Tracker.Machines.MachinePaths.Under(path, Folder)) return path;
         }
         catch (Exception)
         {

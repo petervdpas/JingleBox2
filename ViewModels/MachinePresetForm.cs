@@ -531,19 +531,7 @@ public sealed partial class MachinePresetForm : ObservableObject
     {
         if (path.Length == 0 || _home.Length == 0) return path;
 
-        try
-        {
-            string full = Path.GetFullPath(path);
-            string root = Path.GetFullPath(_home);
-
-            if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return path;
-
-            return full[(root.Length + 1)..].Replace(Path.DirectorySeparatorChar, '/');
-        }
-        catch (Exception)
-        {
-            return path;
-        }
+        return Tracker.Machines.MachinePaths.Named(path, _home) ?? path;
     }
 }
 

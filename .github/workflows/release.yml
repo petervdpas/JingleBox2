@@ -122,35 +122,35 @@ jobs:
 
           test -f "$OUT/${APP_NAME}"
 
-      - name: Verify presets are packaged (Linux)
+      - name: Verify machines are packaged (Linux)
         if: startsWith(matrix.rid, 'linux')
         shell: bash
         run: |
           set -euo pipefail
           OUT="out/${{ matrix.name }}"
-          bash .github/scripts/verify-presets.sh "$OUT"
+          bash .github/scripts/verify-machines.sh "$OUT"
 
-      - name: Verify presets are packaged (Windows)
+      - name: Verify machines are packaged (Windows)
         if: startsWith(matrix.rid, 'win')
         shell: pwsh
         run: |
           $out = "out\${{ matrix.name }}"
-          $expJson = @(Get-ChildItem -Recurse -File -Path "Presets" -Filter *.json).Count
-          $expWav  = @(Get-ChildItem -Recurse -File -Path "Presets" -Filter *.wav).Count
+          $expJson = @(Get-ChildItem -Recurse -File -Path "machines" -Filter *.json).Count
+          $expWav  = @(Get-ChildItem -Recurse -File -Path "machines" -Filter *.wav).Count
           $actJson = 0
           $actWav  = 0
-          if (Test-Path "$out\Presets") {
-            $actJson = @(Get-ChildItem -Recurse -File -Path "$out\Presets" -Filter *.json).Count
-            $actWav  = @(Get-ChildItem -Recurse -File -Path "$out\Presets" -Filter *.wav).Count
+          if (Test-Path "$out\machines") {
+            $actJson = @(Get-ChildItem -Recurse -File -Path "$out\machines" -Filter *.json).Count
+            $actWav  = @(Get-ChildItem -Recurse -File -Path "$out\machines" -Filter *.wav).Count
           }
-          Write-Host "presets: $actJson/$expJson json, $actWav/$expWav wav"
-          if ($expJson -eq 0) { throw "No presets in the source tree; the check itself is broken" }
+          Write-Host "machines: $actJson/$expJson json, $actWav/$expWav wav"
+          if ($expJson -eq 0) { throw "No machines in the source tree; the check itself is broken" }
           if ($actJson -ne $expJson -or $actWav -ne $expWav) {
-            Get-ChildItem -Recurse -File -Path "$out\Presets" -ErrorAction SilentlyContinue |
+            Get-ChildItem -Recurse -File -Path "$out\machines" -ErrorAction SilentlyContinue |
               Select-Object -ExpandProperty FullName
-            throw "Presets missing from $out\Presets"
+            throw "Machines missing from $out\machines"
           }
-          Write-Host "OK: presets present"
+          Write-Host "OK: machines present"
 
       - name: Install Inno Setup
         if: startsWith(matrix.os, 'windows')
@@ -255,11 +255,11 @@ jobs:
 
           test -f out/linux-x64/JingleBox2
 
-      - name: Verify presets are packaged
+      - name: Verify machines are packaged
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/verify-presets.sh out/linux-x64
+          bash .github/scripts/verify-machines.sh out/linux-x64
 
       - name: Prepare RPM sources (patch spec Version + create matching Source0)
         shell: bash
@@ -315,15 +315,15 @@ jobs:
             fi
           fi
 
-      - name: Verify presets inside the RPM
+      - name: Verify machines inside the RPM
         shell: bash
         run: |
           set -euo pipefail
-          EXPECTED="$(find Presets -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
-          ACTUAL="$(rpm -qpl /github/home/rpmbuild/RPMS/*/*.rpm | grep -c '^/opt/JingleBox2/Presets/.*\.\(json\|wav\)$' || true)"
-          echo "presets in RPM: $ACTUAL/$EXPECTED"
+          EXPECTED="$(find machines -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
+          ACTUAL="$(rpm -qpl /github/home/rpmbuild/RPMS/*/*.rpm | grep -c '^/opt/JingleBox2/machines/.*\.\(json\|wav\)$' || true)"
+          echo "machines in RPM: $ACTUAL/$EXPECTED"
           if [ "$ACTUAL" -ne "$EXPECTED" ]; then
-            echo "ERROR: the RPM does not carry every preset"
+            echo "ERROR: the RPM does not carry every machine file"
             exit 1
           fi
 
@@ -399,11 +399,11 @@ jobs:
 
           test -f "$OUT/${APP_NAME}"
 
-      - name: Verify presets are packaged
+      - name: Verify machines are packaged
         shell: bash
         run: |
           set -euo pipefail
-          bash .github/scripts/verify-presets.sh out/linux-x64
+          bash .github/scripts/verify-machines.sh out/linux-x64
 
       - name: Build .deb
         shell: bash
@@ -451,15 +451,15 @@ jobs:
           fakeroot dpkg-deb --build "$PKGDIR" "dist/${NAME}_${VER}_${ARCH}.deb"
           ls -la dist
 
-      - name: Verify presets inside the .deb
+      - name: Verify machines inside the .deb
         shell: bash
         run: |
           set -euo pipefail
-          EXPECTED="$(find Presets -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
-          ACTUAL="$(dpkg-deb -c dist/*.deb | grep -c ' \./opt/JingleBox2/Presets/.*\.\(json\|wav\)$' || true)"
-          echo "presets in .deb: $ACTUAL/$EXPECTED"
+          EXPECTED="$(find machines -type f \( -name '*.json' -o -name '*.wav' \) | wc -l | tr -d '[:space:]')"
+          ACTUAL="$(dpkg-deb -c dist/*.deb | grep -c ' \./opt/JingleBox2/machines/.*\.\(json\|wav\)$' || true)"
+          echo "machines in .deb: $ACTUAL/$EXPECTED"
           if [ "$ACTUAL" -ne "$EXPECTED" ]; then
-            echo "ERROR: the .deb does not carry every preset"
+            echo "ERROR: the .deb does not carry every machine file"
             exit 1
           fi
 

@@ -112,7 +112,7 @@ JingleBox2/
 ├─ Views/              # Avalonia views, and the app's own drawn controls
 ├─ Themes/             # One resource dictionary per theme
 ├─ Diagnostics/        # The log and the crash report
-├─ Presets/            # Starting sounds shipped with the app
+├─ machines/           # The machines that ship: a folder each, panel and presets inside
 ├─ native/             # BASS binaries per platform
 ├─ installer/windows/  # Inno Setup script
 └─ packaging/fedora/   # RPM spec and desktop entry

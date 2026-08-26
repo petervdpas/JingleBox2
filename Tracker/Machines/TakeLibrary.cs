@@ -110,7 +110,7 @@ public sealed class TakeLibrary : IMachineTakes
 
         foreach (var recording in _shelf ?? (IReadOnlyList<Recording>)Array.Empty<Recording>())
         {
-            if (string.Equals(recording.FilePath, take, StringComparison.Ordinal) ||
+            if (FilePaths.Same(recording.FilePath, take) ||
                 string.Equals(recording.Name, take, StringComparison.Ordinal))
             {
                 return recording.Name.Length > 0 ? recording.Name : Path.GetFileNameWithoutExtension(recording.FilePath);

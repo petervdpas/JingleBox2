@@ -786,7 +786,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     private void Reread()
     {
         if (_instrument.IsSynth || _instrument.IsPlugin) return;
-        if (_instrument.FilePath == _drawn) return;
+        if (Tracker.FilePaths.Same(_instrument.FilePath, _drawn)) return;
 
         _waveform = null;
         _sampleProblem = null;

@@ -249,7 +249,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
             return;
         }
 
-        if (string.Equals(path, FilePath, StringComparison.Ordinal))
+        if (Tracker.FilePaths.Same(path, FilePath))
         {
             // Same recording, but a preset may have landed on it with cuts of its own.
             if (!Holds(points)) Settle(points);
@@ -402,7 +402,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
         }).ContinueWith(read => Dispatcher.UIThread.Post(() =>
         {
             // The panel may have moved on to another take while this one was being read.
-            if (!string.Equals(path, FilePath, StringComparison.Ordinal)) return;
+            if (!Tracker.FilePaths.Same(path, FilePath)) return;
 
             var data = read.Result;
 

@@ -518,30 +518,11 @@ public static class MachinePresetFile
     /// <summary>That recording said from the presets folder, so the preset travels with the machine.</summary>
     private static string Inside(string path, string home)
     {
-        if (path.Length == 0 || home.Length == 0) return path;
-
-        try
-        {
-            string full = Path.GetFullPath(path);
-            string root = Path.GetFullPath(home);
-
-            if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return path;
-
-            return full[(root.Length + 1)..].Replace(Path.DirectorySeparatorChar, '/');
-        }
-        catch (Exception)
-        {
-            return path;
-        }
+        return MachinePaths.Named(path, home) ?? path;
     }
 
     /// <summary>And back: where that name really is on this disc.</summary>
-    private static string Outside(string named, string home)
-    {
-        if (named.Length == 0 || home.Length == 0 || Path.IsPathRooted(named)) return named;
-
-        return Path.GetFullPath(Path.Combine(home, named.Replace('/', Path.DirectorySeparatorChar)));
-    }
+    private static string Outside(string named, string home) => MachinePaths.Outside(named, home);
 
     /// <summary>The pad buttons the machine declares, with the key each answers to.</summary>
     public static List<(string Name, string Key, int Semitone)> Buttons(MachineProject machine)

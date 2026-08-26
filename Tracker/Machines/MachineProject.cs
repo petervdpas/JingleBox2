@@ -419,7 +419,7 @@ public sealed class MachineProject
                 string suffix = Path.GetExtension(was);
                 string now = Path.Combine(images, ImageStem + (i + 1) + suffix);
 
-                if (string.Equals(was, now, StringComparison.Ordinal)) continue;
+                if (FilePaths.Same(was, now)) continue;
 
                 File.Move(was, now);
 
@@ -456,7 +456,7 @@ public sealed class MachineProject
             string images = Path.GetFullPath(Path.Combine(Folder, ImagesFolder));
             string wanted = Path.GetFullPath(Path.Combine(Folder, named));
 
-            if (!wanted.StartsWith(images + Path.DirectorySeparatorChar, StringComparison.Ordinal)) return false;
+            if (!MachinePaths.Under(wanted, images)) return false;
 
             if (!File.Exists(wanted)) return false;
 

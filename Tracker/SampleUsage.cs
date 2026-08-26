@@ -22,7 +22,7 @@ public static class SampleUsage
         string wanted = Normalize(filePath);
 
         foreach (string path in Files(instrument))
-            if (string.Equals(Normalize(path), wanted, PathComparison)) return true;
+            if (FilePaths.Same(Normalize(path), wanted)) return true;
 
         return false;
     }
@@ -72,7 +72,7 @@ public static class SampleUsage
         bool moved = false;
 
         bool Same(string path) =>
-            !string.IsNullOrWhiteSpace(path) && string.Equals(Normalize(path), wanted, PathComparison);
+            !string.IsNullOrWhiteSpace(path) && FilePaths.Same(Normalize(path), wanted);
 
         if (Same(instrument.FilePath))
         {
@@ -136,22 +136,7 @@ public static class SampleUsage
         return $"'{names[0]}', '{names[1]}' and {rest} {(rest == 1 ? "other" : "others")}";
     }
 
-    /// <summary>Windows does not care about case in a path; the others do.</summary>
-    private static StringComparison PathComparison =>
-        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-
-    private static string Normalize(string path)
-    {
-        try
-        {
-            return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
-        }
-        catch (Exception)
-        {
-            // An unusable path cannot match a real one, and that is answer enough.
-            return path;
-        }
-    }
+    private static string Normalize(string path) => FilePaths.Full(path);
 }
 
 /// <summary>

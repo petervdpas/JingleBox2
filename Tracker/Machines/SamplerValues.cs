@@ -230,7 +230,7 @@ public sealed class SamplerValues(
         switch (key)
         {
             case TakeKey:
-                if (zone.Zone.FilePath == value) return;
+                if (FilePaths.Same(zone.Zone.FilePath, value)) return;
 
                 // Through the zone's own way of taking one, which names it after the file unless
                 // the zone has a name somebody chose. A zone still called after the recording it
