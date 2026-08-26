@@ -460,7 +460,7 @@
               </StackPanel>
             </ToggleButton>
 
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                   IsVisible="{Binding MachineEditor.MachineOpen}"
                   ColumnSpacing="10" RowSpacing="8">
               <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
@@ -482,6 +482,23 @@
                          TextTrimming="CharacterEllipsis"
                          Text="{Binding MachineEditor.Project.Id}"
                          ToolTip.Tip="What songs write down. Made once, and never changed." />
+
+              <!-- Picked off the picture rather than typed, because six hex digits say nothing
+                   about whether the thing will look like a rack device. The seven shades the
+                   colour is worked into are behind the button: most machines never touch them. -->
+              <TextBlock Grid.Row="5" Grid.Column="0" Classes="label" Text="Colour:"
+                         VerticalAlignment="Top" Margin="0,3,0,0" />
+              <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6"
+                          IsEnabled="{Binding MachineEditor.HasProject}">
+                <views:ColourPicker Height="124" Colour="{Binding MachineEditor.Accent, Mode=TwoWay}"
+                                    ToolTip.Tip="The colour the machine wears wherever it is shown. It keeps it whichever theme the application is wearing." />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                  <TextBox Grid.Column="0" FontFamily="Consolas,Menlo,monospace"
+                           Text="{Binding MachineEditor.AccentHex, UpdateSourceTrigger=LostFocus}" />
+                  <Button Grid.Column="1" Content="Colours..." Click="Colours_Click"
+                          ToolTip.Tip="The seven shades the colour is worked into: the face, the groups on it, the lines around them and the marks." />
+                </Grid>
+              </StackPanel>
             </Grid>
           </StackPanel>
         </Border>

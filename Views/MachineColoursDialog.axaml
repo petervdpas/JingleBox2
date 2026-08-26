@@ -1,0 +1,171 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
+        x:Class="JingleBox2.Views.MachineColoursDialog"
+        x:DataType="vm:MachineColours"
+        Title="Colours"
+        Width="660"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- One colour and seven distances from it. The colour is picked off the picture and the
+       seven are numbers, because that is what they are: a machine is not eight colours, it is
+       one colour and how deep its face is. The preview is the real panel code tinted with what
+       is showing, so what is on the right is what the machine will look like. -->
+
+  <Window.Styles>
+    <Style Selector="TextBlock.reading">
+      <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <!-- The swatch beside each one: the shade that slider sets, at the size it is worth. -->
+    <Style Selector="Border.swatch">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.legend">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </Window.Styles>
+
+  <StackPanel Spacing="16" Margin="20">
+
+    <TextBlock Name="Preamble" TextWrapping="Wrap" Classes="legend" />
+
+    <Grid ColumnDefinitions="*,18,268">
+
+      <!-- What the machine is. -->
+      <StackPanel Grid.Column="0" Spacing="10">
+        <TextBlock Text="The colour it is" Classes="legend" />
+
+        <views:ColourPicker Height="196" Colour="{Binding Accent, Mode=TwoWay}" />
+
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <TextBlock Grid.Column="0" Text="Written down:" Classes="legend" />
+          <TextBox Grid.Column="1" Text="{Binding AccentHex, UpdateSourceTrigger=LostFocus}"
+                   FontFamily="Consolas,Menlo,monospace"
+                   ToolTip.Tip="Six hex digits. Anything else is put back to what it was." />
+        </Grid>
+      </StackPanel>
+
+      <!-- And what it comes to. -->
+      <StackPanel Grid.Column="2" Spacing="10">
+        <TextBlock Text="What it comes to" Classes="legend" />
+
+        <!-- Tinted from code, not bound: this is the same call the machine's own panel gets, so
+             a preview that looked right and a panel that did not would be impossible. -->
+        <Border Name="Preview" CornerRadius="6" Padding="12" MinHeight="196"
+                Background="{Binding FaceBrush}">
+          <StackPanel Spacing="10">
+            <TextBlock Name="PanelName" FontWeight="SemiBold" FontSize="12"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+
+            <Border Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="10,8">
+              <StackPanel Spacing="10">
+                <TextBlock Text="OSCILLATOR" FontSize="9"
+                           Foreground="{DynamicResource TextMutedBrush}" />
+
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                  <ui:Knob Label="CUTOFF" Minimum="0" Maximum="1" Value="0.62" DialSize="40" />
+                  <ui:Knob Label="RES" Minimum="0" Maximum="1" Value="0.28" DialSize="40" />
+                  <ui:Fader Label="LEVEL" Minimum="0" Maximum="1" Value="0.72" TrackLength="62" />
+                  <ui:Led IsLit="True" Size="11" VerticalAlignment="Center"
+                          Colour="{DynamicResource Color.Accent}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="On a list" Classes="legend" />
+
+        <StackPanel Spacing="2">
+          <Border Background="{Binding RowBrush}" CornerRadius="3" Padding="8,5">
+            <TextBlock Text="A row of the rack" FontSize="11" />
+          </Border>
+          <Border Background="{Binding RowOverBrush}" CornerRadius="3" Padding="8,5">
+            <TextBlock Text="Under the pointer" FontSize="11" />
+          </Border>
+          <Border Background="{Binding RowPickedBrush}" CornerRadius="3" Padding="8,5">
+            <TextBlock Text="The one in hand" FontSize="11" />
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+
+    <Separator />
+
+    <!-- The seven, which most machines never touch. A swatch beside each one, because the number
+         is not the point: what a distance of 0.68 comes to is a colour, and the square is that
+         colour. Turn the handle and the square turns with it, and a double click on one puts
+         that one back to the distance a machine has unless it says otherwise. -->
+    <Grid ColumnDefinitions="*,26,*">
+
+      <StackPanel Grid.Column="0" Spacing="8">
+        <TextBlock Text="The panel" Classes="legend" />
+
+        <Grid ColumnDefinitions="Auto,74,*,38" RowDefinitions="Auto,Auto,Auto,Auto"
+              ColumnSpacing="8" RowSpacing="6">
+      <Border Grid.Row="0" Grid.Column="0" Classes="swatch" Background="{Binding FaceBrush}" />
+      <TextBlock Grid.Row="0" Grid.Column="1" Classes="legend" Text="Face" ToolTip.Tip="How far the chassis is darkened from the colour." />
+      <ui:Slide Grid.Row="0" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.68" Value="{Binding Face}" />
+      <TextBlock Grid.Row="0" Grid.Column="3" Classes="reading" Text="{Binding Face, StringFormat={}{0:0.00}}" />
+      <Border Grid.Row="1" Grid.Column="0" Classes="swatch" Background="{Binding PanelBrush}" />
+      <TextBlock Grid.Row="1" Grid.Column="1" Classes="legend" Text="Groups" ToolTip.Tip="And the groups standing on the face, which are lighter than it." />
+      <ui:Slide Grid.Row="1" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.52" Value="{Binding Panel}" />
+      <TextBlock Grid.Row="1" Grid.Column="3" Classes="reading" Text="{Binding Panel, StringFormat={}{0:0.00}}" />
+      <Border Grid.Row="2" Grid.Column="0" Classes="swatch" Background="{Binding EdgeBrush}" />
+      <TextBlock Grid.Row="2" Grid.Column="1" Classes="legend" Text="Lines" ToolTip.Tip="How far the lines around them are lightened from the colour." />
+      <ui:Slide Grid.Row="2" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.10" Value="{Binding Edge}" />
+      <TextBlock Grid.Row="2" Grid.Column="3" Classes="reading" Text="{Binding Edge, StringFormat={}{0:0.00}}" />
+      <Border Grid.Row="3" Grid.Column="0" Classes="swatch" Background="{Binding MarkBrush}" />
+      <TextBlock Grid.Row="3" Grid.Column="1" Classes="legend" Text="Marks" ToolTip.Tip="The marks, curves and meters, which have to be seen against the face." />
+      <ui:Slide Grid.Row="3" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.35" Value="{Binding Mark}" />
+      <TextBlock Grid.Row="3" Grid.Column="3" Classes="reading" Text="{Binding Mark, StringFormat={}{0:0.00}}" />
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Grid.Column="2" Spacing="8">
+        <TextBlock Text="The rows" Classes="legend" />
+
+        <Grid ColumnDefinitions="Auto,74,*,38" RowDefinitions="Auto,Auto,Auto"
+              ColumnSpacing="8" RowSpacing="6">
+      <Border Grid.Row="0" Grid.Column="0" Classes="swatch" Background="{Binding RowBrush}" />
+      <TextBlock Grid.Row="0" Grid.Column="1" Classes="legend" Text="Row" ToolTip.Tip="How much of the colour a row on a list is washed with." />
+      <ui:Slide Grid.Row="0" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.18" Value="{Binding Row}" />
+      <TextBlock Grid.Row="0" Grid.Column="3" Classes="reading" Text="{Binding Row, StringFormat={}{0:0.00}}" />
+      <Border Grid.Row="1" Grid.Column="0" Classes="swatch" Background="{Binding RowOverBrush}" />
+      <TextBlock Grid.Row="1" Grid.Column="1" Classes="legend" Text="Pointed at" ToolTip.Tip="The same row under the pointer." />
+      <ui:Slide Grid.Row="1" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.30" Value="{Binding RowOver}" />
+      <TextBlock Grid.Row="1" Grid.Column="3" Classes="reading" Text="{Binding RowOver, StringFormat={}{0:0.00}}" />
+      <Border Grid.Row="2" Grid.Column="0" Classes="swatch" Background="{Binding RowPickedBrush}" />
+      <TextBlock Grid.Row="2" Grid.Column="1" Classes="legend" Text="In hand" ToolTip.Tip="And the row in hand, which is the machine you are working on." />
+      <ui:Slide Grid.Row="2" Grid.Column="2" Minimum="0" Maximum="1" DefaultValue="0.58" Value="{Binding RowPicked}" />
+      <TextBlock Grid.Row="2" Grid.Column="3" Classes="reading" Text="{Binding RowPicked, StringFormat={}{0:0.00}}" />
+        </Grid>
+      </StackPanel>
+    </Grid>
+
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+      <Button Grid.Column="0" Content="Back to the usual" Click="Reset_Click"
+              ToolTip.Tip="The seven distances a machine has unless it says otherwise. The colour is left alone." />
+      <Button Grid.Column="2" Content="Cancel" Click="Cancel_Click" MinWidth="88" IsCancel="True" />
+      <Button Grid.Column="3" Content="Use these" Click="Confirm_Click" MinWidth="88" IsDefault="True" />
+    </Grid>
+  </StackPanel>
+
+</Window>

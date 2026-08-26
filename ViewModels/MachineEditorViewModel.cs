@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Machines;
@@ -34,6 +35,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanExport))]
     [NotifyPropertyChangedFor(nameof(Title))]
     [NotifyPropertyChangedFor(nameof(Folder))]
+    [NotifyPropertyChangedFor(nameof(Accent))]
+    [NotifyPropertyChangedFor(nameof(AccentHex))]
     private MachineProject? project;
 
     public MachineEditorViewModel()
@@ -114,6 +117,78 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// plain data and says nothing when its folder is written.
     /// </remarks>
     public string Folder => Project?.Folder ?? "";
+
+    /// <summary>
+    /// The colour the machine is, as the picker deals in it.
+    /// </summary>
+    /// <remarks>
+    /// On the page rather than behind the dialog with the other seven, because it is the one of
+    /// the eight that every machine has an opinion about: the colour is how you know which
+    /// machine you are in front of, and the seven are how deep its face is.
+    /// </remarks>
+    public Color Accent
+    {
+        get => Views.MachineTint.Hue(Project?.Theme.Accent, out var hue) ? hue : Colors.Gray;
+        set => Wear(Views.MachineTint.Hex(value));
+    }
+
+    /// <summary>The same colour written down, for somebody who has the number already.</summary>
+    /// <remarks>
+    /// Anything that is not a colour is refused and the box put back to what it was showing.
+    /// Half a number typed into a box is not a machine wearing half a colour.
+    /// </remarks>
+    public string AccentHex
+    {
+        get => Project?.Theme.Accent ?? "";
+        set
+        {
+            if (!Views.MachineTint.Hue((value ?? "").Trim(), out var hue))
+            {
+                Status = "'" + value + "' is not a colour, so nothing changed.";
+
+                OnPropertyChanged();
+
+                return;
+            }
+
+            Wear(Views.MachineTint.Hex(hue));
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>The grey a machine wears until it is given a colour of its own.</summary>
+    private const string Bare = "#7B838C";
+
+    /// <summary>Paints the machine that colour, keeping the seven distances it already had.</summary>
+    private void Wear(string colour)
+    {
+        if (Project is not { } project) return;
+
+        if (string.Equals(project.Theme.Accent, colour, StringComparison.OrdinalIgnoreCase)) return;
+
+        Dressed(project.Theme with { Accent = colour });
+    }
+
+    /// <summary>
+    /// Puts a whole theme on the machine, which is what comes back from the colours dialog.
+    /// </summary>
+    /// <remarks>
+    /// Said out loud even where nothing on this page shows it, because the panel beside it is
+    /// painted from the theme by the view and has no other way of hearing that it moved.
+    /// </remarks>
+    public void Dressed(MachineTheme theme)
+    {
+        if (Project is not { } project) return;
+
+        project.Theme = theme;
+
+        OnPropertyChanged(nameof(Accent));
+        OnPropertyChanged(nameof(AccentHex));
+    }
+
+    /// <summary>The colours as they stand, for the dialog that fine tunes them.</summary>
+    public MachineTheme Theme => Project?.Theme ?? new MachineTheme(Bare);
 
     /// <summary>
     /// A machine nobody has saved yet, with an id of its own from the start.

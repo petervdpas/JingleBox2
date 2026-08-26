@@ -62,14 +62,39 @@ public partial class MachineEditorView : UserControl
 
     private void OnEditorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MachineEditorViewModel.Project)) Retint();
+        // The colour as well as the machine, because the colour is picked here: the panel beside
+        // the picker is the whole of the feedback, and a panel that only recoloured on opening
+        // would mean choosing a colour by saving and looking.
+        if (e.PropertyName is nameof(MachineEditorViewModel.Project)
+            or nameof(MachineEditorViewModel.Accent)) Retint();
     }
 
     private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
 
     /// <summary>Puts the machine's colours on the plate, so it looks like the box it is.</summary>
     private void Retint() =>
-        MachineTint.Apply(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
+        MachineTint.Repaint(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
+
+    /// <summary>
+    /// Opens the colours, and puts back whatever comes out of them.
+    /// </summary>
+    /// <remarks>
+    /// The whole theme rather than the seven, because the dialog holds the colour too: somebody
+    /// in there to make the face lighter may well move the colour while looking at it, and
+    /// keeping half of what they did would be worse than keeping none.
+    /// </remarks>
+    private async void Colours_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { Project: not null } editor) return;
+
+        var wanted = await MachineColoursDialog.AskAsync(editor.Project.Name, editor.Theme);
+
+        if (wanted == null) return;
+
+        editor.Dressed(wanted);
+
+        Retint();
+    }
 
     /// <summary>
     /// Puts one recording on the one line that asked for it.

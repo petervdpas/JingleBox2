@@ -1,6 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using System;
+using System.Linq;
 using JingleBox2.Machines;
 using JingleBox2.Machines.Ui;
 
@@ -47,22 +50,65 @@ public static class MachineTint
 
         if (machine == null) return;
 
-        if (!Hue(machine.Accent, out var hue)) return;
+        if (Shades(machine) is not { } shade) return;
+
+        Set(panel, BackgroundKey, BackgroundBrushKey, shade.Face);
+        Set(panel, SurfaceKey, SurfaceBrushKey, shade.Panel);
+        Set(panel, BorderKey, BorderBrushKey, shade.Edge);
+        Set(panel, AccentKey, AccentBrushKey, shade.Mark);
+        Set(panel, TextKey, TextBrushKey, shade.Ink);
+        Set(panel, MutedKey, MutedBrushKey, shade.Muted);
+    }
+
+    /// <summary>
+    /// The same, and every drawn control inside it told to draw itself again.
+    /// </summary>
+    /// <remarks>
+    /// A control bound to the theme's brushes hears a resource change on its own. One that
+    /// paints itself does not: it reads the colours once per render, and nothing has asked it
+    /// to render. That is invisible while a machine is only ever tinted as it opens, and it is
+    /// the whole of the feedback while somebody is moving the colour about, so the panel is
+    /// told outright.
+    /// </remarks>
+    public static void Repaint(Control panel, Machines.MachineTheme? machine)
+    {
+        Apply(panel, machine);
+
+        foreach (var inside in panel.GetVisualDescendants()) inside.InvalidateVisual();
+    }
+
+    /// <summary>
+    /// What a machine's theme comes to, once the distances have been worked out from its colour.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than inside <see cref="Apply"/> because two things want the answer and only
+    /// one of them is a panel: somebody setting the distances has to be shown what they do, and
+    /// a preview drawn from a second copy of the arithmetic is a preview of something else.
+    /// </remarks>
+    public static MachineShades? Shades(Machines.MachineTheme? machine)
+    {
+        if (machine == null) return null;
+
+        if (!Hue(machine.Accent, out var hue)) return null;
 
         var face = Mix(hue, Colors.Black, machine.Face);
-        var group = Mix(hue, Colors.Black, machine.Panel);
 
         // Whatever the face turned out to be, the lettering has to be readable on it. A pale
         // machine gets dark lettering the same way a dark one gets pale.
         var ink = Light(face) ? Color.FromRgb(0x14, 0x16, 0x1A) : Colors.White;
 
-        Set(panel, BackgroundKey, BackgroundBrushKey, face);
-        Set(panel, SurfaceKey, SurfaceBrushKey, group);
-        Set(panel, BorderKey, BorderBrushKey, Mix(hue, Colors.White, machine.Edge));
-        Set(panel, AccentKey, AccentBrushKey, Mix(hue, Colors.White, machine.Mark));
-        Set(panel, TextKey, TextBrushKey, ink);
-        Set(panel, MutedKey, MutedBrushKey, Mix(ink, face, 0.42));
+        return new MachineShades(
+            face,
+            Mix(hue, Colors.Black, machine.Panel),
+            Mix(hue, Colors.White, machine.Edge),
+            Mix(hue, Colors.White, machine.Mark),
+            ink,
+            Mix(ink, face, 0.42));
     }
+
+    /// <summary>A colour written the way a machine writes one down.</summary>
+    public static string Hex(Color colour) =>
+        "#" + colour.R.ToString("X2") + colour.G.ToString("X2") + colour.B.ToString("X2");
 
     /// <summary>The colour a machine is painted in, or nothing when it does not say.</summary>
     public static bool Hue(string? colour, out Color hue)
@@ -106,12 +152,17 @@ public static class MachineTint
         panel.Resources[brushKey] = new SolidColorBrush(colour);
     }
 
-    /// <summary>The theme's colour with that much of the machine's mixed into it.</summary>
-    private static Color Mix(Color theme, Color machine, double amount) => Color.FromArgb(
-        theme.A,
-        Blend(theme.R, machine.R, amount),
-        Blend(theme.G, machine.G, amount),
-        Blend(theme.B, machine.B, amount));
+    /// <summary>One colour with that much of another mixed into it.</summary>
+    /// <remarks>
+    /// The whole of the recipe. A machine's face is its colour with black mixed in, and a row on
+    /// a list is whatever the list stands on with the machine's colour mixed in: the same sum
+    /// read from either end.
+    /// </remarks>
+    private static Color Mix(Color from, Color to, double amount) => Color.FromArgb(
+        from.A,
+        Blend(from.R, to.R, amount),
+        Blend(from.G, to.G, amount),
+        Blend(from.B, to.B, amount));
 
     private static byte Blend(byte from, byte to, double amount) =>
         (byte)Math.Clamp(Math.Round(from + (to - from) * amount), 0, 255);
