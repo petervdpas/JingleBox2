@@ -35,12 +35,89 @@ public class Led : ThemedControl
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<Led, double>(nameof(FontSize), 9.0);
 
+    /// <summary>
+    /// How fast it goes round on its own, in hertz. Nought and it does not: something else says
+    /// whether it is lit.
+    /// </summary>
+    /// <remarks>
+    /// A lamp beside a rate knob is not reporting a value, it is the value: a number in hertz is
+    /// a number, and a light going round at it is the rate itself, which is the thing being set.
+    /// It runs whether or not anything is sounding, which is exactly when the rate is being set.
+    ///
+    /// The lamp does its own timing rather than being flashed from outside, so nothing above it
+    /// has to keep a timer, and a panel with one on it is not read from top to bottom ten times
+    /// a second to move a single dot.
+    /// </remarks>
+    public static readonly StyledProperty<double> RateProperty =
+        AvaloniaProperty.Register<Led, double>(nameof(Rate));
+
     private const double LabelGap = 3;
+
+    /// <summary>
+    /// The slowest and fastest it is worth going round at.
+    /// </summary>
+    /// <remarks>
+    /// Faster than the top and a lamp is simply on; slower than the bottom and it is a light
+    /// that changes once a minute, which reads as broken rather than as slow.
+    /// </remarks>
+    private const double SlowestBlink = 0.2;
+
+    private const double FastestBlink = 20;
 
     static Led()
     {
         AffectsRender<Led>(IsLitProperty, SizeProperty, ColourProperty, LabelProperty, FontSizeProperty);
         AffectsMeasure<Led>(SizeProperty, LabelProperty, FontSizeProperty);
+    }
+
+    public Led()
+    {
+        AttachedToVisualTree += (_, _) => { _shown = true; Beat(); };
+        DetachedFromVisualTree += (_, _) => { _shown = false; _clock?.Stop(); };
+    }
+
+    public double Rate
+    {
+        get => GetValue(RateProperty);
+        set => SetValue(RateProperty, value);
+    }
+
+    private Avalonia.Threading.DispatcherTimer? _clock;
+
+    /// <summary>Whether it is on screen. A lamp in a panel nobody is looking at does not tick.</summary>
+    private bool _shown;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == RateProperty) Beat();
+    }
+
+    /// <summary>Sets the lamp going at whatever rate it has now, or stops it having none.</summary>
+    private void Beat()
+    {
+        if (Rate <= 0 || !_shown)
+        {
+            _clock?.Stop();
+
+            return;
+        }
+
+        // Half a turn per tick, so it is lit for half of every cycle.
+        var half = TimeSpan.FromMilliseconds(500.0 / Math.Clamp(Rate, SlowestBlink, FastestBlink));
+
+        if (_clock is null)
+        {
+            _clock = new Avalonia.Threading.DispatcherTimer { Interval = half };
+            _clock.Tick += (_, _) => IsLit = !IsLit;
+        }
+        else
+        {
+            _clock.Interval = half;
+        }
+
+        _clock.Start();
     }
 
     public bool IsLit

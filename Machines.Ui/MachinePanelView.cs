@@ -898,6 +898,11 @@ public class MachinePanelView : Decorator
 
             PanelStrip.SetSpan(control, Math.Max(1, Number(child, "span", 1)));
 
+            // Where in the cell it stands, for the one thing on a strip that is not a control:
+            // a lamp is a dot, and a dot stretched to the height of the knobs beside it is a
+            // dot in the wrong place.
+            if (Across(child) is { } own) control.VerticalAlignment = own;
+
             strip.Children.Add(control);
         }
 
@@ -1345,28 +1350,35 @@ public class MachinePanelView : Decorator
     private static bool Presses(Key key) => key is Key.Space or Key.Enter;
 
     /// <summary>
-    /// A lamp, lit by the top half of the parameter's range.
+    /// A lamp, lit by the top half of the parameter's range, or going round at it.
     /// </summary>
     /// <remarks>
     /// What is written under it is the element's own wording and nothing when it has none,
     /// rather than falling back to the parameter's name the way a knob does. A lamp is a dot,
     /// and a dot with a sentence under it is as wide as the sentence.
     ///
-    /// Read only, and it reads once: the value is fetched as the panel is drawn and nothing
-    /// says when it has moved since. A lamp that has to follow the sound is not this element.
+    /// Read only. Lit or unlit it reads once: the value is fetched as the panel is drawn and
+    /// nothing says when it has moved since, so a lamp that has to follow the sound is not this
+    /// element. Blinking is the exception and reads the setting like any other control, because
+    /// there the setting is a rate and the lamp is what that rate looks like.
     /// </remarks>
     private Control? BuildLed(MachineElement element, Dictionary<string, MachineParameter> parameters)
     {
         if (Parameter(element, parameters) is not { } parameter) return null;
 
+        bool blinks = Flag(element, "blink");
+
         var lamp = new Led
         {
             Label = element.Label.Length > 0 ? element.Label : null,
-            IsLit = Start(parameter) > Middle(parameter),
+            IsLit = !blinks && Start(parameter) > Middle(parameter),
         };
 
         if (Measurement(element, "size") is { } size) lamp.Size = size;
         if (Colour(element, "colour") is { } colour) lamp.Colour = colour;
+
+        // The parameter is a rate in hertz, and the lamp does the timing itself.
+        if (blinks) Reads(() => lamp.Rate = Start(parameter));
 
         return lamp;
     }

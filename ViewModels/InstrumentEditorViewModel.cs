@@ -220,6 +220,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
             // The picture of the wave, drawn out of the same engine that makes the sound.
             MachineScope = new Tracker.Machines.SynthScope(voice);
         }
+        else if (IsOuroboros && Ouroboros is { } mono)
+        {
+            Values = new Tracker.Machines.MonoSynthValues(mono) { Changed = Moved };
+        }
         else if (IsZampler && Zones is { } zones && Zampler is { } zampler)
         {
             Values = new Tracker.Machines.SamplerValues(zones, zampler) { Changed = Moved };
@@ -658,6 +662,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// was written before it was a project.
     /// </remarks>
     public bool ShowsWrittenSynth => IsSynth && !IsDescribed;
+
+    /// <summary>
+    /// True when the mono synth's two rows are the ones written in XAML.
+    /// </summary>
+    /// <remarks>
+    /// The same rule the rest go by, and there for the same reason: a machine this installation
+    /// has no project for still has to open, and what it opens as is the panel that was written
+    /// before it was a project.
+    /// </remarks>
+    public bool ShowsWrittenOuroboros => IsOuroboros && !IsDescribed;
 
     public bool IsSynth => _instrument.IsSynth;
 

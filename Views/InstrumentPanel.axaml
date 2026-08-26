@@ -566,7 +566,7 @@
             <!-- Ouroboros. Everything stands on one grid: a knob is three cells, a toggle two,
                  so the rows line up down the panel even though nothing in them is the same
                  width. Reading a row left to right is reading the signal path. -->
-            <StackPanel Spacing="10" IsVisible="{Binding Editor.IsOuroboros}">
+            <StackPanel Spacing="10" IsVisible="{Binding Editor.ShowsWrittenOuroboros}">
 
               <!-- Two rows, and the difference between them is the whole layout. The top one
                    is the signal path in the order the sound goes through it: oscillator, mixer,

@@ -198,8 +198,13 @@ public static class MachineElementKinds
 
     /// <summary>
     /// A lamp. Read only: lit when the parameter is past the middle of its range. Properties:
-    /// size, colour.
+    /// size, colour, blink.
     /// </summary>
+    /// <remarks>
+    /// <c>blink</c> says the parameter is a rate in hertz rather than something to be past the
+    /// middle of, and the lamp goes round at it. For the lamp beside a low frequency oscillator's
+    /// rate knob, which is not reporting the rate so much as being it.
+    /// </remarks>
     public const string Led = "Led";
 
     /// <summary>

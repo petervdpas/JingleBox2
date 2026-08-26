@@ -156,11 +156,14 @@ public static class MachinePresetFile
             }
             else
             {
-                // A machine with one set of settings and nothing in front of them. There are two
-                // of those and they are different machines: one generates its wave and one plays
-                // a recording back, so which adapter reads the file is which machine it is for.
+                // A machine with one set of settings and nothing in front of them. There are
+                // three of those and they are different machines: two generate their wave in
+                // different ways and one plays a recording back, so which adapter reads the file
+                // is which machine it is for.
                 if (kind == TrackerInstrumentKind.Synth)
                     wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
+                else if (kind == TrackerInstrumentKind.Ouroboros)
+                    wide = new MonoSynthValues(Mono(sound));
                 else
                     loose = new RecordingValues(sound);
             }
@@ -277,9 +280,13 @@ public static class MachinePresetFile
 
         var kind = Machine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
 
-        IMachineValues plain = kind == TrackerInstrumentKind.Synth
-            ? new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound)
-            : new RecordingValues(sound);
+        IMachineValues plain = kind switch
+        {
+            TrackerInstrumentKind.Synth =>
+                new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
+            TrackerInstrumentKind.Ouroboros => new MonoSynthValues(Mono(sound)),
+            _ => new RecordingValues(sound),
+        };
 
         // The machine that holds one recording says where in its own words, so the panel's key is
         // what the file uses too. A machine that generates its sound has none to name.
@@ -292,6 +299,25 @@ public static class MachinePresetFile
     }
 
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
+
+    /// <summary>
+    /// The mono synth's patch, wrapped for reading and writing and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Its lamp is stopped straight away. Reading a file is not showing a panel, and a view model
+    /// made to answer twenty questions and then dropped would otherwise leave a timer running
+    /// once per preset for as long as the app is up.
+    /// </remarks>
+    private static ViewModels.OuroborosPatchViewModel Mono(TrackerInstrument sound)
+    {
+        sound.Ouroboros ??= new Synth.OuroborosPatch();
+
+        var patch = new ViewModels.OuroborosPatchViewModel(sound.Ouroboros, () => { });
+
+        patch.Close();
+
+        return patch;
+    }
 
     /// <summary>
     /// One of the machine's things, as the block of JSON it stands for.
