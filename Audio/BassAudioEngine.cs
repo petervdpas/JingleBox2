@@ -493,17 +493,15 @@ public sealed class BassAudioEngine : IAudioEngine
     private bool InRange(int padIndex) =>
         padIndex >= 0 && padIndex < _padStreams.Length;
 
-    private void LoadPlugins()
-    {
-        // Load AAC plugin if available
-        var dir = AppContext.BaseDirectory;
-        var aacLib = OperatingSystem.IsWindows()
-            ? Path.Combine(dir, "bass_aac.dll")
-            : Path.Combine(dir, "libbass_aac.so");
-
-        if (File.Exists(aacLib))
-            Bass.PluginLoad(aacLib);
-    }
+    /// <summary>
+    /// Loads whatever BASS add-ons are beside the program, so a pad can play what they read.
+    /// </summary>
+    /// <remarks>
+    /// Named nothing in particular, and the same call the importer makes. Dropping a library in
+    /// beside the program is then the whole of adding a format: the pads play it and the shelf
+    /// takes it, without either of them being told it exists.
+    /// </remarks>
+    private void LoadPlugins() => BassPlugins.Load();
 
     /// <summary>
     /// Brings BASS up if nothing has yet. The tracker plays through the same device as the

@@ -132,7 +132,7 @@ public partial class RecordView : UserControl
     }
 
     /// <summary>
-    /// Brings WAV files in from the disc onto the shelf of takes.
+    /// Brings recordings in from the disc onto the shelf of takes.
     /// </summary>
     /// <remarks>
     /// The picker belongs to the window, so it is opened here and only the answer goes to the
@@ -151,7 +151,7 @@ public partial class RecordView : UserControl
             AllowMultiple = true,
             FileTypeFilter = new[]
             {
-                new FilePickerFileType("WAV files")
+                new FilePickerFileType("Recordings")
                 {
                     Patterns = RecordingImport.Kinds.Select(k => "*" + k).ToArray()
                 }

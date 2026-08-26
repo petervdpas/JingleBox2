@@ -23,12 +23,19 @@ public static class RecordingImport
 {
     /// <summary>What can be brought in.</summary>
     /// <remarks>
-    /// WAV and nothing else, because WAV is what a machine can play. A pad goes through BASS
-    /// and will happily take an mp3; an instrument is read into memory by <c>SampleStore</c>,
-    /// which decodes WAV alone. Offering the others here would let one be picked, copied in and
-    /// put on a zone, where it would then sit silently with nothing to say why.
+    /// WAV first, because that is what the shelf holds, then everything the decoder can turn
+    /// into one. A machine still only ever plays a WAV: an instrument is read into memory by
+    /// <c>SampleStore</c>, which decodes WAV alone, and the shelf is what it reads from.
+    ///
+    /// So this is not a list of what a machine can play. It is a list of what can be made into
+    /// something a machine can play, on the way in, once, before the file is on the shelf at
+    /// all. What is offered follows what is really installed, so nothing is offered here that
+    /// would then fail: see <see cref="BassPlugins"/>.
     /// </remarks>
-    public static readonly string[] Kinds = { ".wav" };
+    public static string[] Kinds =>
+        new[] { WavKind }.Concat(AudioDecode.Kinds).ToArray();
+
+    private const string WavKind = ".wav";
 
     /// <summary>Where JingleBox keeps its recordings.</summary>
     public static string Directory =>
@@ -45,6 +52,9 @@ public static class RecordingImport
     /// </remarks>
     public static bool Converts(string path)
     {
+        // Anything that is not a WAV is decoded and written out as one, whatever is inside it.
+        if (AudioDecode.Handles(path)) return true;
+
         try
         {
             return !WavFile.StoredAs(path).IsOurs;
@@ -74,7 +84,12 @@ public static class RecordingImport
 
             try
             {
-                string landed = Path.GetDirectoryName(path) == home ? path : Copy(path, home);
+                // A WAV already sitting on the shelf is left where it is, so importing twice
+                // does not make two. Anything else is brought in even from that folder, since
+                // an mp3 lying there is not on the shelf: nothing reads it.
+                bool already = Path.GetDirectoryName(path) == home && !Converts(path);
+
+                string landed = already ? path : Copy(path, home);
 
                 taken.Add(new Recording
                 {
@@ -104,7 +119,10 @@ public static class RecordingImport
     private static string Copy(string path, string home)
     {
         string stem = Path.GetFileNameWithoutExtension(path);
-        string suffix = Path.GetExtension(path);
+
+        // Always a WAV, whatever came in. What lands here is what the machines read, and a file
+        // called .mp3 holding a WAV would be a lie that something downstream eventually acts on.
+        const string suffix = WavKind;
 
         string wanted = Path.Combine(home, stem + suffix);
         int at = 2;
@@ -135,6 +153,19 @@ public static class RecordingImport
     /// </remarks>
     private static void Convert(string path, string wanted)
     {
+        // Not a WAV at all: decoded, and written out as one. This is the only place in the
+        // program that meets an mp3, and the file it writes is the only thing anything else
+        // will ever see of it.
+        if (AudioDecode.Handles(path))
+        {
+            if (AudioDecode.Read(path) is not { } decoded)
+                throw new InvalidOperationException(AudioDecode.Trouble(path));
+
+            WavFile.Write(wanted, decoded.Samples, decoded.SampleRate, decoded.Channels);
+
+            return;
+        }
+
         WavFile.Stored stored;
 
         try
@@ -163,6 +194,9 @@ public static class RecordingImport
     /// <summary>How a file is written, for a panel that wants to say what it did with it.</summary>
     public static string Describe(string path)
     {
+        // A compressed file has no bit depth worth reporting: what it is called is what it is.
+        if (AudioDecode.Handles(path)) return Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+
         try
         {
             return WavFile.StoredAs(path).ToString();
