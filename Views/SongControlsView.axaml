@@ -42,8 +42,13 @@
                                      IsVisible="{Binding IsPinned}"
                                      Text="{Binding Where}" />
 
-                          <TextBlock Grid.Column="3" Classes="cardHint" VerticalAlignment="Center"
-                                     Text="{Binding How}" />
+                          <!-- Pressed when the guess was wrong. A button that repeats while
+                               it is held sends what an encoder sends, so working it out from
+                               the values cannot be right every time. -->
+                          <Button Grid.Column="3" Classes="page"
+                                  Content="{Binding How}"
+                                  Command="{Binding NextCommand}"
+                                  ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
 
                           <Button Grid.Column="4" Content="Forget" Classes="danger"
                                   Command="{Binding ForgetCommand}" />

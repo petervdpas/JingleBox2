@@ -456,53 +456,6 @@ public sealed class ControlLink
     }
 
     /// <summary>
-    /// Moves a link between the song and the desk, whichever it is on now.
-    /// </summary>
-    /// <remarks>
-    /// The two are one gesture because the question is one question: is this control's job
-    /// about this piece of music, or about the hardware. You find out which by working, not by
-    /// deciding in advance, so a link made in a song can be promoted to the desk once you
-    /// notice you want it everywhere, and one on the desk can be pushed down into a song when
-    /// it turns out to be about that song alone.
-    /// </remarks>
-    public void Move(ControlMapping? mapping)
-    {
-        if (mapping is null) return;
-
-        var song = Song?.Invoke();
-
-        if (song is not null && song.Remove(mapping))
-        {
-            lock (_lock)
-            {
-                _mappings.RemoveAll(one => one.Channel == mapping.Channel && one.Cc == mapping.Cc);
-                _mappings.Add(mapping);
-            }
-
-            _changed();
-            SongChanged?.Invoke();
-        }
-        else
-        {
-            if (song is null) return;
-
-            bool had;
-
-            lock (_lock) had = _mappings.Remove(mapping);
-
-            if (!had) return;
-
-            song.RemoveAll(one => one.Channel == mapping.Channel && one.Cc == mapping.Cc);
-            song.Add(mapping);
-
-            _changed();
-            SongChanged?.Invoke();
-        }
-
-        Say(() => Changed?.Invoke());
-    }
-
-    /// <summary>
     /// Takes off everything learned on one controller, because it is being forgotten.
     /// </summary>
     /// <remarks>

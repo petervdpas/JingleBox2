@@ -154,14 +154,15 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   physical control being pointed somewhere else, or something else being pointed at the same
   target; a controller that is simply not plugged in keeps its links untouched, since leaving
   one in the other room is not a decision to unwire it
-- Linking lives in two layers. The desk is in the settings and is true of every song: these
-  faders are the track levels. A song's own is in its `.jibx` and wins over the desk while that
-  song is open: this song's third track is the lead. A link made with a song open goes into the
-  song; with none open, onto the desk; and either can be moved to the other in SETTINGS.
-  Which of the two a link lands in is decided by where you pointed and not by what is open: a
-  machine on the rack is the machine, and a knob pointed at its filter there is true of every
-  song you will ever open, so it goes on the desk. An instrument on a track is this song's, and
-  so is anything pointed at it, plugins on a track's chain included
+- Linking lives in two layers, and which one a link lands in is decided by where you pointed.
+  A machine on the rack is the machine: a knob pointed at its filter there is true of every song
+  you will ever open, so it goes on the desk, which is kept in the settings and listed in
+  SETTINGS. An instrument on a track is this song's, and so is anything pointed at it, plugins
+  on a track's chain included: that goes in the song's own `.jibx` and is listed in the tracker
+  under MIDI CC. The song's wins where both name the same control. One list per layer, because
+  one list showing both with a word beside each row reads as a leak whatever the word says.
+  Moving a link between the layers was built and taken out again: what anybody actually wants
+  is a new song that starts with a layout already on it, which is a song template
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound

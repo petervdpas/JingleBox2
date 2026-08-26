@@ -23,13 +23,17 @@ public sealed class ControlLinksViewModel : ObservableObject
     private readonly ControlLink _link;
 
     /// <summary>
-    /// Whether this shows only what the open song holds, or everything there is.
+    /// Which of the two layers this list is about.
     /// </summary>
     /// <remarks>
-    /// Two lists of the same thing, wanted in two places for two reasons. The settings show
-    /// everything, because that is where a controller is looked after and the desk's layout
-    /// lives. The tracker shows the song's own, because that is a thing the song holds like its
-    /// patterns and its instruments, and looking at it means looking at this song.
+    /// One each, and never both. The settings are the desk: what your controller does whatever
+    /// you open, looked after where the hardware is looked after. The tracker's page is the
+    /// song's own, which comes and goes with the song like its patterns do.
+    ///
+    /// They were one list showing everything with a word beside each row saying which layer it
+    /// belonged to, and that word was not enough: a link made in a song turned up in the
+    /// settings, where nothing about the surroundings suggested a song had anything to do with
+    /// it. Two lists, each about one thing, and the boundary is the page you are on.
     /// </remarks>
     private readonly bool _songOnly;
 
@@ -46,7 +50,7 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// <summary>What to say when there is nothing to show, which differs between the two.</summary>
     public string Nothing => _songOnly
         ? "This song has no controls of its own. Point a knob at an instrument on a track and it will be kept here, and travel in the song's file."
-        : "Nothing is pointed at anything yet.";
+        : "Nothing is pointed at anything yet. Point a knob at a machine on the rack and it will be kept here, and work in every song.";
 
     public ObservableCollection<ControlLinkRow> Links { get; } = new();
 
@@ -87,7 +91,7 @@ public sealed class ControlLinksViewModel : ObservableObject
 
         // By controller, then by number within it, then by machine where one number holds a
         // job on several: a knob's rows sit together and read as the one knob they are.
-        var order = (_songOnly ? _link.Kept : _link.Mappings)
+        var order = (_songOnly ? _link.Kept : _link.Desk)
             .OrderBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
             .ThenBy(one => one.Channel)
             .ThenBy(one => one.Cc)
@@ -178,37 +182,14 @@ public sealed class ControlLinkRow
     /// <summary>What kind of control it turned out to be, or that it is still listening.</summary>
     public string How => ControlSense.Describe(Mapping.Pickup, Mapping.Turn);
 
-    /// <summary>Whether this belongs to the song that is open or to the desk.</summary>
+    /// <summary>
+    /// Whether this belongs to the song that is open or to the desk.
+    /// </summary>
+    /// <remarks>
+    /// Kept for the tip on the button rather than shown. Each list is one layer now, so a
+    /// column saying which would say the same thing on every row of it.
+    /// </remarks>
     public string Home => _link.IsSong(Mapping) ? "this song" : "the desk";
-
-    /// <summary>
-    /// What the button does, said as the thing it does rather than as where the link is now.
-    /// </summary>
-    /// <remarks>
-    /// The button used to be labelled with where the link lived and explain itself with "press
-    /// to move it the other way", which says nothing: the other way from what, to where. A
-    /// button says what pressing it does.
-    /// </remarks>
-    public string Moves => _link.IsSong(Mapping) ? "Move to the desk" : "Move to this song";
-
-    /// <summary>Why it might not be pressable, for the tip on it.</summary>
-    public string MoveTip => _link.HasSong
-        ? (_link.IsSong(Mapping)
-            ? "Takes it out of this song and onto the desk, where it works in every song."
-            : "Takes it off the desk and into this song, where it wins over the desk and travels in the song's file.")
-        : "There is no song open to move it into.";
-
-    /// <summary>Greyed when there is no song open to move it into or out of.</summary>
-    public bool CanMove => _link.HasSong;
-
-    /// <summary>
-    /// Moves it between the song and the desk.
-    /// </summary>
-    /// <remarks>
-    /// A link on the desk is true of everything you open; one in a song travels in its file and
-    /// wins over the desk while that song is the one in front of you.
-    /// </remarks>
-    public IRelayCommand MoveCommand => new RelayCommand(() => _link.Move(Mapping));
 
     /// <summary>
     /// Says it is something else, for the times the guess was wrong.
@@ -227,7 +208,8 @@ public sealed class ControlLinkRow
             ControlPickup.Takeover => ControlPickup.Jump,
             ControlPickup.Jump => ControlPickup.Relative,
             ControlPickup.Relative when Mapping.Turn == ControlTurn.Offset => Turned(ControlTurn.Twos),
-            ControlPickup.Relative => ControlPickup.Sensed,
+            ControlPickup.Relative => ControlPickup.Endless,
+            ControlPickup.Endless => ControlPickup.Sensed,
             _ => ControlPickup.Takeover
         };
 

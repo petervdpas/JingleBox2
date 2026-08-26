@@ -358,7 +358,7 @@
               <TextBlock Classes="cardTitle" Text="Knobs and faders" />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="Press Ctrl+Shift+M and the panels stop turning: rest the pointer on a knob, it glows red, and the next thing you touch on your controller takes it. Press a glowing control to take the link off again. In a plugin's own window there is nothing to point at, so the knob you last turned there is the one that is offered. Laid out on a machine on the rack, a link is the desk's and works in every song; laid out on an instrument in a song, it is that song's and travels in its file." />
+                         Text="What your controller does whatever you open. Press Ctrl+Shift+M with a machine's panel open on the rack, rest the pointer on a knob until it glows, and touch the control on your desk. What you point at on an instrument in a song belongs to that song instead, and is listed in the tracker under MIDI CC." />
 
               <Border Classes="inset" IsVisible="{Binding Links.HasLinks}">
                 <!-- Under the controller each was learned on. Flat, the list runs on: one knob
@@ -374,7 +374,7 @@
                       <ItemsControl ItemsSource="{Binding Links}" Margin="10,0,0,0">
                        <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
                         <TextBlock Grid.Column="0" VerticalAlignment="Center"
                                    FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
                                    Text="{Binding Control}" />
@@ -398,18 +398,7 @@
                                 Command="{Binding NextCommand}"
                                 ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
 
-                        <!-- Where it lives, said plainly, and beside it a button labelled
-                             with what pressing it does rather than with where the link is. -->
-                        <TextBlock Grid.Column="4" Classes="cardHint" VerticalAlignment="Center"
-                                   Text="{Binding Home}" />
-
-                        <Button Grid.Column="5" Classes="page"
-                                Content="{Binding Moves}"
-                                IsEnabled="{Binding CanMove}"
-                                Command="{Binding MoveCommand}"
-                                ToolTip.Tip="{Binding MoveTip}" />
-
-                        <Button Grid.Column="6" Content="Forget" Classes="danger"
+                        <Button Grid.Column="5" Content="Forget" Classes="danger"
                                 Command="{Binding ForgetCommand}" />
                       </Grid>
                         </DataTemplate>

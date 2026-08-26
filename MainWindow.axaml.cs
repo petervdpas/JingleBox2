@@ -154,7 +154,32 @@ public partial class MainWindow : Window
         // added here is one press too.
         bool first = _held.Pressed(e.Key);
 
-        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
+        if (e.Handled) return;
+
+        // Ctrl+R records, and what that means is whatever the page you are on says it means:
+        // the transport is patched to the page's own deck. On RECORD it takes a take, on
+        // TRACKER it arms the pattern for typing, and on the pages that record nothing the deck
+        // says it cannot and the keystroke passes through. The cap at the top of the window is
+        // this same thing pressed with a mouse.
+        if (first && e.Key == Key.R && e.KeyModifiers == KeyModifiers.Control)
+        {
+            // Not while somebody is typing a name into something.
+            if (FocusManager?.GetFocusedElement() is TextBox) return;
+
+            if (DataContext is not MainViewModel deck || deck.Transport is not { } transport) return;
+
+            // Stopping is the other half of the same key. On RECORD that ends the take; on
+            // TRACKER, where recording is an armed state rather than a running one, the deck
+            // treats pressing it again as disarming.
+            if (transport.IsRecording) transport.StopCommand.Execute(null);
+            else if (transport.CanRecord) transport.RecordCommand.Execute(null);
+            else return;
+
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
 
         switch (FocusManager?.GetFocusedElement())
         {
