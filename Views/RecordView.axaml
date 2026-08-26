@@ -6,11 +6,18 @@
              x:Class="JingleBox2.Views.RecordView"
              x:DataType="vm:RecordViewModel">
 
-  <ScrollViewer>
-    <StackPanel Classes="tabRoot">
+  <!-- Rows rather than one long scroll. The two cards at the top are whatever height they
+       need, and the shelf takes what is left and scrolls inside itself.
 
-      <!-- Recording Controls -->
-      <Border Classes="card">
+       A list inside a scrolling page is given no height to fit into, so it grows to the height
+       of every row it holds and the page grows with it. At two thousand takes that page is
+       eight hundred thousand pixels tall: the scrollbar is a hairline, the top cards scroll
+       away as you look through the list, and the list cannot be scrolled on its own at all.
+       Given a row of its own it stays the size of the window whatever the shelf holds. -->
+  <Grid RowDefinitions="Auto,Auto,*" Margin="0,12">
+
+    <!-- Recording Controls -->
+      <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">
         <!-- The gain sits down the right, where a desk keeps it: the controls that start and
              stop a take belong together, and the fader belongs next to the meter it feeds. -->
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
@@ -101,7 +108,8 @@
       </Border>
 
       <!-- The take that is picked: its picture, and everything you can do to it. -->
-      <Border Classes="card" IsVisible="{Binding SelectedRecording, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Border Grid.Row="1" Classes="card" Margin="0,0,0,12"
+              IsVisible="{Binding SelectedRecording, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Classes="cardBody">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
@@ -166,16 +174,22 @@
       </Border>
 
       <!-- Recordings Library -->
-      <Border Classes="card" IsVisible="{Binding Recordings.Count}">
-        <StackPanel Classes="cardBody">
-          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <Border Grid.Row="2" Classes="card" IsVisible="{Binding Recordings.Count}">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,220,Auto" ColumnSpacing="8" Margin="0,0,0,8">
             <TextBlock Grid.Column="0" Classes="cardTitle" Text="Recordings" VerticalAlignment="Center" />
 
             <!-- Only while something is hidden, since "10 of 10" is a line about nothing. -->
             <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                        Text="{Binding Shelf.Showing}" />
 
-            <ComboBox Grid.Column="2" MinWidth="170"
+            <!-- Before the category, because the two narrow together and this is the one you
+                 reach for first: a category is which shelf, a name is which take. -->
+            <TextBox Grid.Column="2" Text="{Binding Shelf.Search}"
+                     PlaceholderText="Search by name..."
+                     ToolTip.Tip="Show only the takes whose name has this in it, inside whichever category is picked." />
+
+            <ComboBox Grid.Column="3" MinWidth="170"
                       ItemsSource="{Binding Shelf.Filters}"
                       SelectedItem="{Binding Shelf.Filter}"
                       ToolTip.Tip="Narrow the shelf to one category, or to the takes nobody has put in one yet." />
@@ -221,10 +235,9 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
-        </StackPanel>
+        </DockPanel>
       </Border>
 
-    </StackPanel>
-  </ScrollViewer>
+  </Grid>
 
 </UserControl>

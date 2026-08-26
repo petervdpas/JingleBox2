@@ -27,9 +27,16 @@ public partial class SongDialog : Window
     /// Shows the list over the app's window. True when a song was picked to open, false when
     /// it was cancelled or there is no window to sit over.
     /// </summary>
-    public static Task<bool> PickAsync(object tracker)
+    public static Task<bool> PickAsync(ViewModels.TrackerViewModel tracker)
     {
+        // Opened showing everything, whatever was typed the last time it was open.
+        tracker.SongSearch = "";
+
         var dialog = new SongDialog { DataContext = tracker };
+
+        // Typing is the first thing you do on a long list and costs nothing on a short one.
+        // Enter still opens what is picked, since the Open button is the default.
+        dialog.Opened += (_, _) => dialog.FindControl<TextBox>("SearchBox")?.Focus();
 
         return Dialog.ShowAsync(dialog, false);
     }

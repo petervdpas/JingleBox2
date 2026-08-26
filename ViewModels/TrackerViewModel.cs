@@ -314,6 +314,32 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public ObservableCollection<string> OrderEntries { get; } = new();
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
+    /// <summary>
+    /// The songs the open dialog shows: what is saved, narrowed by what has been typed.
+    /// </summary>
+    /// <remarks>
+    /// Its own list rather than a filter on the one above, because the one above is what there
+    /// is and this is what you are looking at. Deleting from the dialog acts on a song, not on
+    /// a row, so the two never have to agree about anything but which songs exist.
+    /// </remarks>
+    public ObservableCollection<SongFile> ShownSongs { get; } = new();
+
+    /// <summary>Part of a song's name to look for, or empty to look for nothing in particular.</summary>
+    /// <remarks>
+    /// The name and not the note under it. A note is what a song is about and a name is what it
+    /// is called, and somebody opening a song is looking for the one they named.
+    /// </remarks>
+    [ObservableProperty] private string songSearch = "";
+
+    partial void OnSongSearchChanged(string value) => RestockSongs();
+
+    /// <summary>True when there are songs but none of them match what was typed.</summary>
+    /// <remarks>
+    /// Told apart from having no songs at all, because an empty list means two different things
+    /// and only one of them is worth doing something about.
+    /// </remarks>
+    public bool NoSongsFound => SavedSongs.Count > 0 && ShownSongs.Count == 0;
+
     [ObservableProperty] private SongFile? selectedSongFile;
 
     public TrackerViewModel(
@@ -1918,8 +1944,40 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         foreach (var file in _store.ListSongs())
             SavedSongs.Add(file);
 
+        RestockSongs();
+
         SelectedSongFile = SavedSongs.FirstOrDefault(f => FilePaths.Same(f.Path, keep));
     }
+
+    /// <summary>
+    /// Puts the songs the search allows in the shown list, and only those.
+    /// </summary>
+    /// <remarks>
+    /// A song that is in both lists is left where it is rather than being taken out and put
+    /// back, so the one you had picked stays picked while you type past it and back.
+    ///
+    /// Both passes ask the same question, which is what a song is rather than which object it
+    /// is. Every refresh reads the folder again and builds new <see cref="SongFile"/> records,
+    /// so a pass that kept a row by what it says and then replaced it by what it is put every
+    /// song in the list twice.
+    /// </remarks>
+    private void RestockSongs()
+    {
+        var wanted = SavedSongs.Where(Named).ToList();
+
+        for (int i = ShownSongs.Count - 1; i >= 0; i--)
+            if (!wanted.Contains(ShownSongs[i])) ShownSongs.RemoveAt(i);
+
+        for (int i = 0; i < wanted.Count; i++)
+            if (i >= ShownSongs.Count || !Equals(ShownSongs[i], wanted[i]))
+                ShownSongs.Insert(i, wanted[i]);
+
+        OnPropertyChanged(nameof(NoSongsFound));
+    }
+
+    private bool Named(SongFile file) =>
+        SongSearch.Length == 0 ||
+        (file.Name ?? "").Contains(SongSearch, StringComparison.CurrentCultureIgnoreCase);
 
     public void Dispose()
     {

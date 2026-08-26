@@ -13,16 +13,30 @@
 
   <StackPanel Spacing="16" Margin="20">
 
+    <!-- Always here, whether there are three songs or three hundred. A box that appears once
+         the list is long enough is a box nobody knows about until the day it turns up. -->
+    <TextBox Name="SearchBox"
+             Text="{Binding SongSearch}"
+             PlaceholderText="Search by name..." />
+
     <TextBlock Text="Nothing saved yet."
                IsVisible="{Binding !SavedSongs.Count}"
                Opacity="0.7" />
 
-    <!-- Double click opens, as a list of files does everywhere else. -->
+    <TextBlock Text="No song by that name."
+               IsVisible="{Binding NoSongsFound}"
+               Opacity="0.7" />
+
+    <!-- Eight rows and then it scrolls, so a shelf of songs does not push the buttons off the
+         bottom of the screen. Eight of the usual kind: a row is sixty five pixels with its
+         margin, and one whose note runs to a second line is taller, so a list of wordy songs
+         shows seven and a list of bare ones shows nine. Double click opens, as a list of files
+         does everywhere else. -->
     <ListBox Name="Songs"
              Classes="cards"
-             MaxHeight="320"
-             IsVisible="{Binding SavedSongs.Count}"
-             ItemsSource="{Binding SavedSongs}"
+             MaxHeight="520"
+             IsVisible="{Binding ShownSongs.Count}"
+             ItemsSource="{Binding ShownSongs}"
              SelectedItem="{Binding SelectedSongFile}"
              DoubleTapped="Songs_DoubleTapped">
       <ListBox.ItemTemplate>
