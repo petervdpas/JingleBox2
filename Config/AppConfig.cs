@@ -92,6 +92,21 @@ public sealed class AppConfig
 
     // Off by default. On, the app and every plugin process write what they are doing to
     // jinglebox.log next to this file. See JingleBox2.Diagnostics.Log.
+    /// <summary>
+    /// Whether the tracker puts its plugins down when you go and work somewhere else.
+    /// </summary>
+    /// <remarks>
+    /// Off, because the cost is on the way back rather than while you are away. Each plugin is
+    /// a process with its patch loaded, and a song of four keeps four of them and the audio
+    /// engine running while you are on the pads. Switched on, going to another page lets all of
+    /// that go, and coming back to the tracker starts them again, which is the several seconds
+    /// a plugin takes to load, every time you switch.
+    ///
+    /// Worth it on a machine where the memory matters more than the wait, and not otherwise,
+    /// which is why it is asked rather than decided.
+    /// </remarks>
+    public bool FreeTrackerPlugins { get; set; }
+
     public bool WriteLog { get; set; }
 
     /// <summary>

@@ -19,6 +19,10 @@ public partial class MachineWindow : Window
     public MachineWindow()
     {
         InitializeComponent();
+
+        // The pointer goes where the windows are, so the mode has to be reachable from all of
+        // them. See LinkKey.
+        LinkKey.Listen(this);
     }
 
     /// <summary>

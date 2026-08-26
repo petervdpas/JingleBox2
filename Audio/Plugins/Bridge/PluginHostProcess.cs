@@ -137,6 +137,11 @@ public static class PluginHostProcess
         int maxFrames = int.TryParse(args[7], out int frames) ? frames : 512;
         bool asInstrument = args[8] == "instrument";
 
+        // Before anything opens a window. Xlib answers a bad request by printing to the
+        // terminal this process happened to inherit, which is nowhere the log can see and
+        // nowhere at all for an application started from a menu. See XErrors.
+        XErrors.Catch(System.IO.Path.GetFileName(path));
+
         Socket control;
         Socket audio;
 

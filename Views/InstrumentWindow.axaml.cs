@@ -21,6 +21,10 @@ public partial class InstrumentWindow : Window
     public InstrumentWindow()
     {
         InitializeComponent();
+
+        // The pointer goes where the windows are, so the mode has to be reachable from all of
+        // them. See LinkKey.
+        LinkKey.Listen(this);
     }
 
     /// <summary>Opens the designer for a track's instrument, or brings its window forward.</summary>
@@ -38,8 +42,16 @@ public partial class InstrumentWindow : Window
 
         Open[key] = window;
 
+        // The window in front is what a knob pointed at "the track you are on" means, once
+        // there are panels open in windows of their own: the pattern cursor is on neither of
+        // them. Nothing is applied by saying it; the mappings are walked per message, so the
+        // next thing you touch resolves against this track instead.
+        window.Activated += (_, _) => designer.InFront();
+
         window.Closed += (_, _) =>
         {
+            designer.NotInFront();
+
             Open.Remove(key);
             closed?.Invoke();
         };

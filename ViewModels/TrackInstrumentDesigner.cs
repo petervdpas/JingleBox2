@@ -72,6 +72,11 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// <summary>Which track this is the instrument of, for a title that says so.</summary>
     public int Track { get; }
 
+    /// <summary>This panel's window is in front, or is not any more. See ITrackerPanel.</summary>
+    public void InFront() => _tracker?.PanelInFront(Track);
+
+    public void NotInFront() => _tracker?.PanelGone(Track);
+
     public InstrumentEditorViewModel? Editor { get; }
 
     /// <summary>The name for the window's title bar: the instrument, and where it is playing.</summary>

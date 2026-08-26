@@ -24,6 +24,10 @@ public partial class PluginWindow : Window
     {
         InitializeComponent();
 
+        // The pointer goes where the windows are, so the mode has to be reachable from all of
+        // them. See LinkKey.
+        LinkKey.Listen(this);
+
         // XEMBED makes the embedder responsible for telling the plugin when its window is the
         // one being used, every time, not once when it was handed over. Without these the
         // plugin believes whatever it was told at attach, which after the first click on

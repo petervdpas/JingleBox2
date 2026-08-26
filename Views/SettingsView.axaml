@@ -224,7 +224,7 @@
               <ItemsControl ItemsSource="{Binding Midi.Devices}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
                       <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="cardHint"
@@ -244,6 +244,14 @@
                                 VerticalAlignment="Center"
                                 IsChecked="{Binding DrivesControls}"
                                 ToolTip.Tip="This device's knobs and faders move parameters. Its own switch, because a keyboard whose keys should play the tracker is not always one whose wheel should move something." />
+
+                      <!-- Only for one that is not plugged in. A controller on the desk comes
+                           straight back the next time the list is read. -->
+                      <Button Grid.Column="4" Content="Forget" Classes="danger"
+                              VerticalAlignment="Center"
+                              IsVisible="{Binding CanForget}"
+                              Command="{Binding ForgetCommand}"
+                              ToolTip.Tip="Takes this controller off the list for good, along with anything that was pointed at something with it. Unplugging one does not do this: what is listed keeps its layout until you say otherwise." />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -350,22 +358,36 @@
               <TextBlock Classes="cardTitle" Text="Knobs and faders" />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="Press Ctrl+Shift+M and the panels stop turning: rest the pointer on a knob, it glows red, and the next thing you touch on your controller takes it. Press a glowing control to take the link off again. In a plugin's own window there is nothing to point at, so the knob you last turned there is the one that is offered." />
+                         Text="Press Ctrl+Shift+M and the panels stop turning: rest the pointer on a knob, it glows red, and the next thing you touch on your controller takes it. Press a glowing control to take the link off again. In a plugin's own window there is nothing to point at, so the knob you last turned there is the one that is offered. Laid out on a machine on the rack, a link is the desk's and works in every song; laid out on an instrument in a song, it is that song's and travels in its file." />
 
               <Border Classes="inset" IsVisible="{Binding Links.HasLinks}">
-                <ItemsControl ItemsSource="{Binding Links.Links}">
+                <!-- Under the controller each was learned on. Flat, the list runs on: one knob
+                     can hold a job per machine, and two controllers interleave by number into
+                     something nobody can read. -->
+                <ItemsControl ItemsSource="{Binding Links.Controllers}">
                   <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
+                   <DataTemplate>
+                    <StackPanel Margin="0,0,0,10">
+                      <TextBlock Classes="cardHint" FontWeight="SemiBold" Margin="0,0,0,4"
+                                 Text="{Binding Said}" />
+
+                      <ItemsControl ItemsSource="{Binding Links}" Margin="10,0,0,0">
+                       <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
                         <TextBlock Grid.Column="0" VerticalAlignment="Center"
                                    FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
                                    Text="{Binding Control}" />
 
+                        <!-- Which controller, said once on the heading above rather than on
+                             every row under it. -->
                         <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="{Binding What}" />
+                                   TextTrimming="CharacterEllipsis" Text="{Binding What}" />
 
+                        <!-- Only when it is pinned to a track. Almost every link follows
+                             you, and a column saying so on every row says nothing. -->
                         <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
+                                   IsVisible="{Binding IsPinned}"
                                    Text="{Binding Where}" />
 
                         <!-- Pressed when the guess was wrong. A button that repeats while it
@@ -376,10 +398,25 @@
                                 Command="{Binding NextCommand}"
                                 ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
 
-                        <Button Grid.Column="4" Content="Forget" Classes="danger"
+                        <!-- Where it lives, said plainly, and beside it a button labelled
+                             with what pressing it does rather than with where the link is. -->
+                        <TextBlock Grid.Column="4" Classes="cardHint" VerticalAlignment="Center"
+                                   Text="{Binding Home}" />
+
+                        <Button Grid.Column="5" Classes="page"
+                                Content="{Binding Moves}"
+                                IsEnabled="{Binding CanMove}"
+                                Command="{Binding MoveCommand}"
+                                ToolTip.Tip="{Binding MoveTip}" />
+
+                        <Button Grid.Column="6" Content="Forget" Classes="danger"
                                 Command="{Binding ForgetCommand}" />
                       </Grid>
-                    </DataTemplate>
+                        </DataTemplate>
+                       </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                   </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </Border>
@@ -600,6 +637,21 @@
 
           <!-- Off by default and free when off. On when something has gone wrong and somebody
                wants to know what, including inside the processes plugins run in. -->
+          <!-- Each plugin a song uses is a process of its own, and they go on holding their
+               patches while you work somewhere else. Asked rather than decided, because the
+               cost is on the way back and whether that is worth it depends on the machine. -->
+          <Border Classes="card">
+            <StackPanel Spacing="8">
+              <TextBlock Classes="cardTitle" Text="Plugins in the tracker" />
+
+              <CheckBox Content="Let go of a song's plugins when leaving the tracker"
+                        IsChecked="{Binding FreeTrackerPlugins}" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="On, leaving the tracker puts down every plugin the song is holding, and coming back starts them again, which is the few seconds a plugin takes to load, every time you switch. Whatever was turned in a plugin's own window is read back onto the song first, so nothing is lost. A song that is playing is left alone." />
+            </StackPanel>
+          </Border>
+
           <Border Classes="card">
             <StackPanel Spacing="8">
               <StackPanel Orientation="Horizontal" Spacing="8">

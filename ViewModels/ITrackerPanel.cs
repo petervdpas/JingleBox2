@@ -18,6 +18,21 @@ public interface ITrackerPanel : INotifyPropertyChanged
     /// <summary>The row being played, or -1 when nothing is playing.</summary>
     int PlayingLine { get; }
 
+    /// <summary>
+    /// This panel's window came to the front, so its track is the one being worked on.
+    /// </summary>
+    /// <remarks>
+    /// For a hardware knob pointed at "the track you are on". The cursor answers that while
+    /// you are working in the pattern, and stops answering it the moment a panel is open in a
+    /// window of its own: two of those and the cursor is on neither. Nothing is applied by
+    /// saying this. The mappings are walked per message, so the next thing you touch simply
+    /// resolves against a different track.
+    /// </remarks>
+    void PanelInFront(int track) { }
+
+    /// <summary>And has gone, so the cursor says where you are again.</summary>
+    void PanelGone(int track) { }
+
     /// <summary>How many rows the pattern has, which sets how many pages of eight there are.</summary>
     int PatternLines { get; }
 

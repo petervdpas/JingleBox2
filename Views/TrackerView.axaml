@@ -73,6 +73,14 @@
                 Classes.active="{Binding ShowsMixer}"
                 Command="{Binding ShowCommand}" CommandParameter="Mixer"
                 ToolTip.Tip="The levels, the panning and the inserts of this song's tracks." />
+
+        <!-- Here rather than only in the settings, because what a song has its controller
+             pointed at is a thing the song holds, like its patterns: it comes and goes with the
+             song, and the settings are where the desk's layout lives. -->
+        <Button Content="MIDI CC" Classes="page"
+                Classes.active="{Binding ShowsControls}"
+                Command="{Binding ShowCommand}" CommandParameter="Controls"
+                ToolTip.Tip="What this song has its controller pointed at, and which travels in its file." />
       </StackPanel>
       </Grid>
     </Border>
@@ -348,6 +356,8 @@
     </ContentControl>
 
     <views:MixerView IsVisible="{Binding ShowsMixer}" />
+
+    <views:SongControlsView IsVisible="{Binding ShowsControls}" />
 
     </Grid>
   </DockPanel>

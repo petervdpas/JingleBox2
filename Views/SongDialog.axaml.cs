@@ -43,6 +43,29 @@ public partial class SongDialog : Window
 
     private void Songs_DoubleTapped(object? sender, RoutedEventArgs e) => Open_Click(sender, e);
 
+    /// <summary>
+    /// Deletes the song on that row, whichever row the button was on.
+    /// </summary>
+    /// <remarks>
+    /// From the button's own row rather than from what is picked in the list, because a press
+    /// on a row's button is about that row. Picking it first and then deleting would be one
+    /// gesture too many, and picking it is also how you open it.
+    /// </remarks>
+    private async void Delete_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ViewModels.TrackerViewModel tracker) return;
+        if (sender is not Control button || button.DataContext is not Tracker.SongFile file) return;
+
+        // Not the list's press. Without this, deleting also picks the row, and a press meant
+        // to remove a song leaves it selected and ready to be opened by Enter.
+        e.Handled = true;
+
+        await tracker.DeleteSongFile(file);
+
+        // Nothing left to choose from is a dialog with nothing to do.
+        if (tracker.ShownSongs.Count == 0) Close(false);
+    }
+
     private void Open_Click(object? sender, RoutedEventArgs e)
     {
         // Nothing picked, nothing to open: the double click landed on the empty part of the list.

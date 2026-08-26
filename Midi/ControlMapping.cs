@@ -1,3 +1,5 @@
+using System;
+
 namespace JingleBox2.Midi;
 
 /// <summary>What kind of thing a hardware control is pointed at.</summary>
@@ -156,6 +158,23 @@ public enum ControlScope
 /// </remarks>
 public sealed class ControlMapping
 {
+    /// <summary>
+    /// The controller this was learned on, by name.
+    /// </summary>
+    /// <remarks>
+    /// Kept because a controller number means nothing on its own: two devices both have a CC 22
+    /// and they are not the same knob. Without the name, plugging in a second controller would
+    /// have it quietly driving whatever the first one was pointed at.
+    ///
+    /// A mapping whose device is not plugged in is kept exactly as it is. Nothing prunes it and
+    /// nothing warns about it: a controller left in the other room is not a decision to unwire
+    /// it, and the layout has to be there when it comes back. It is only ever displaced by
+    /// somebody pointing something else at the same control.
+    ///
+    /// Empty means any device, which is what a mapping made before this existed reads as.
+    /// </remarks>
+    public string Device { get; set; } = "";
+
     /// <summary>1 to 16, as the message says it.</summary>
     public int Channel { get; set; } = 1;
 
@@ -201,10 +220,72 @@ public sealed class ControlMapping
     /// <summary>What to call it in a list of mappings. Filled in when it is learned.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>One of its own, for a song keeping a copy of what it was handed.</summary>
+    public static ControlMapping Copy(ControlMapping one) => new()
+    {
+        Device = one.Device,
+        Channel = one.Channel,
+        Cc = one.Cc,
+        Kind = one.Kind,
+        Scope = one.Scope,
+        Track = one.Track,
+        Machine = one.Machine,
+        Key = one.Key,
+        Plugin = one.Plugin,
+        Slot = one.Slot,
+        Parameter = one.Parameter,
+        Mix = one.Mix,
+        Pickup = one.Pickup,
+        Turn = one.Turn,
+        Name = one.Name
+    };
+
     /// <summary>True when this mapping and that message are about each other.</summary>
+    /// <remarks>
+    /// The device as well as the number, unless the mapping does not name one. Two controllers
+    /// on the desk both have a CC 22, and a mapping made on one has nothing to say about the
+    /// other.
+    /// </remarks>
     public bool Answers(MidiMessage message) =>
         message != null
         && message.Type == MidiMessageType.ControlChange
         && message.Channel == Channel
-        && message.Value == Cc;
+        && message.Value == Cc
+        && (Device.Length == 0 || MidiService.SameName(Device, message.Device));
+
+    /// <summary>
+    /// True when both point at the same thing in the program, whatever they were learned on.
+    /// </summary>
+    /// <remarks>
+    /// What makes a link the last one laid down on a control rather than one of a growing pile.
+    /// Pointing a second knob at a filter is saying you want that knob on it, not that you want
+    /// two, and the one you meant is the one you just turned.
+    /// </remarks>
+    public bool SameTarget(ControlMapping other)
+    {
+        if (other is null || other.Kind != Kind) return false;
+
+        return Kind switch
+        {
+            ControlKind.Instrument or ControlKind.Action =>
+                string.Equals(other.Machine, Machine, StringComparison.Ordinal)
+                && string.Equals(other.Key, Key, StringComparison.Ordinal),
+
+            ControlKind.Insert =>
+                string.Equals(other.Plugin, Plugin, StringComparison.Ordinal)
+                && other.Parameter == Parameter,
+
+            ControlKind.Mix => other.Mix == Mix && other.Scope == Scope
+                               && (Scope != ControlScope.Fixed || other.Track == Track),
+
+            _ => false
+        };
+    }
+
+    /// <summary>True when both are the same physical control on the same controller.</summary>
+    public bool SameControl(ControlMapping other) =>
+        other != null
+        && other.Channel == Channel
+        && other.Cc == Cc
+        && MidiService.SameName(other.Device, Device);
 }

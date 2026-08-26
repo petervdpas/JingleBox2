@@ -131,6 +131,37 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   nothing said. Only `song.json` is read for this, and the answer is cached per song by its
   write time: the shelf asks once per take, so the uncached version opened every song file
   once per recording
+- A hardware knob is pointed at a software one by resting the pointer on it in the other mouse
+  mode (Ctrl+Shift+M) and touching the control on the desk. The mapping names the machine and
+  the parameter key, never a track or an instrument id, so it is Zampler's cutoff on every track
+  and in every song; which track is a separate question answered by `ControlScope`. Only things
+  that name a `MachineParameter` can be pointed at, and buttons separately as actions; a label
+  or a take picker cannot, and does not glow. `MidiControlRouter` works out from three messages
+  whether a control is a button, a knob or an encoder, since a CC says nothing about what sent
+  it, and parks a control against an end until the stream turns round
+- What "the track you are on" means is the instrument window in front when there is one, and
+  the pattern cursor otherwise. Two panels open in their own windows and the cursor is on
+  neither of them, so a knob would drive whichever track the pattern last happened to be on.
+  Nothing is applied when a window comes to the front: the mappings are walked per message, so
+  the next thing you touch simply resolves against a different track
+- One knob does one job, but a job can be spelled out once per machine: two links on one CC
+  naming two machines are kept, because a link only answers while the track plays its machine
+  and at most one can ever match. That makes an encoder "the filter, on whatever machine I am
+  looking at". Pointing the same knob at another parameter of a machine it already has still
+  replaces, since both of those would fire
+- A link records the controller it was learned on, because a CC number means nothing on its
+  own: two devices both have a CC 22. A link is displaced by exactly two things, the same
+  physical control being pointed somewhere else, or something else being pointed at the same
+  target; a controller that is simply not plugged in keeps its links untouched, since leaving
+  one in the other room is not a decision to unwire it
+- Linking lives in two layers. The desk is in the settings and is true of every song: these
+  faders are the track levels. A song's own is in its `.jibx` and wins over the desk while that
+  song is open: this song's third track is the lead. A link made with a song open goes into the
+  song; with none open, onto the desk; and either can be moved to the other in SETTINGS.
+  Which of the two a link lands in is decided by where you pointed and not by what is open: a
+  machine on the rack is the machine, and a knob pointed at its filter there is true of every
+  song you will ever open, so it goes on the desk. An instrument on a track is this song's, and
+  so is anything pointed at it, plugins on a track's chain included
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound

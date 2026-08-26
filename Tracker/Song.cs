@@ -63,6 +63,27 @@ public sealed class Song
     /// <summary>One strip per track: level, placement, mute and solo.</summary>
     public List<TrackMix> Mix { get; set; } = new();
 
+    /// <summary>
+    /// What this song's own controller layout is, over the top of the one in the settings.
+    /// </summary>
+    /// <remarks>
+    /// Two layers, because a controller is two things at once. Some of what you wire up is
+    /// about the desk and true of everything you ever open: these faders are the track levels,
+    /// that knob is the filter on whatever machine is in front of me. That belongs in the
+    /// settings, where the hardware lives, and it is there.
+    ///
+    /// The rest is about one piece of music. This song's third track is the lead and its filter
+    /// is the one your hand should fall on, and next week's song will have the lead somewhere
+    /// else. That cannot live with the hardware, because it is not about the hardware. It
+    /// travels with the song, and a song handed to somebody else arrives with its own layout on
+    /// it.
+    ///
+    /// The song's win where the two name the same control, which is what makes them overrides
+    /// rather than a second list: the desk is what a control does unless this song has
+    /// something to say about it.
+    /// </remarks>
+    public List<Midi.ControlMapping> Controls { get; set; } = new();
+
     [JsonIgnore]
     public TrackerTiming Timing => new(Bpm, LinesPerBeat);
 

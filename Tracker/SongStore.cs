@@ -484,6 +484,9 @@ public sealed class SongStore : ISampleUsage
         public List<int> Order { get; set; } = new();
         public List<int> TrackInstruments { get; set; } = new();
         public List<TrackMix> Mix { get; set; } = new();
+
+        /// <summary>This song's own controller layout. See <see cref="Song.Controls"/>.</summary>
+        public List<Midi.ControlMapping> Controls { get; set; } = new();
         public List<TrackerInstrument> Instruments { get; set; } = new();
         public List<PatternDocument> Patterns { get; set; } = new();
 
@@ -498,6 +501,7 @@ public sealed class SongStore : ISampleUsage
             Order = new List<int>(song.Order),
             TrackInstruments = new List<int>(song.TrackInstruments),
             Mix = song.Mix.Select(m => m.Clone()).ToList(),
+            Controls = song.Controls.Select(Midi.ControlMapping.Copy).ToList(),
             Instruments = song.Instruments.Select(Written).ToList(),
             Patterns = song.Patterns.Select(PatternDocument.From).ToList()
         };
@@ -554,6 +558,7 @@ public sealed class SongStore : ISampleUsage
                 Order = new List<int>(Order),
                 TrackInstruments = new List<int>(TrackInstruments),
                 Mix = Mix.Select(m => m.Clone()).ToList(),
+                Controls = Controls.Select(Midi.ControlMapping.Copy).ToList(),
                 Instruments = Instruments.Select(Read).ToList()
             };
 

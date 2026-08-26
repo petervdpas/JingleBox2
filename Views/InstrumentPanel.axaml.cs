@@ -53,8 +53,12 @@ public partial class InstrumentPanel : UserControl
         DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
         UI.ThemeManager.Changed += Later;
 
+        // There is something to point at while this is on screen, which is what makes
+        // Ctrl+Shift+M mean anything. See LinkKey.
         AttachedToVisualTree += (_, _) =>
         {
+            LinkKey.Showing();
+
             if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
 
             // A hardware button pressed comes out here, and this panel does it if it is the
@@ -66,6 +70,8 @@ public partial class InstrumentPanel : UserControl
 
         DetachedFromVisualTree += (_, _) =>
         {
+            LinkKey.Gone();
+
             UI.ThemeManager.Changed -= Later;
 
             if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
@@ -182,8 +188,20 @@ public partial class InstrumentPanel : UserControl
             Machine = editor.MachineId,
             Key = key,
             Name = editor.MachineName + " " + key
-        });
+        }, InSong);
     }
+
+    /// <summary>
+    /// Whether this panel is a song's instrument or the machine itself on the rack.
+    /// </summary>
+    /// <remarks>
+    /// The same control stands in two places and they mean different things. On the rack it is
+    /// the machine: pointing a knob at its filter is a fact about your hardware and that
+    /// machine, true in every song you open, so it belongs on the desk. On a track it is this
+    /// song's instrument, and pointing a knob at its filter is about this piece of music, so it
+    /// travels in the file.
+    /// </remarks>
+    private bool InSong => Designer is TrackInstrumentDesigner;
 
     /// <summary>
     /// Offers a button on the panel, which is a press rather than a value.
@@ -208,7 +226,7 @@ public partial class InstrumentPanel : UserControl
             // A press, so there is nothing to work out and nothing to pick up from.
             Pickup = Midi.ControlPickup.Jump,
             Name = editor.MachineName + " " + action.Replace('_', ' ')
-        });
+        }, InSong);
     }
 
     /// <summary>Does what a mapped hardware button asked for, if it asked this machine.</summary>

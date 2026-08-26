@@ -86,9 +86,43 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Which tab is open, so the bar can say where you are rather than where you were.</summary>
     [ObservableProperty] private int selectedTab;
 
+    /// <summary>Whether the last page was the tracker, so leaving it can be told from arriving.</summary>
+    private bool _wasOnTracker;
+
+    /// <summary>
+    /// Whether the tracker puts its plugins down when you leave it.
+    /// </summary>
+    /// <remarks>
+    /// Takes effect at the next change of page rather than at once: switched on while you are
+    /// standing in the tracker, the thing it is about has not happened yet.
+    /// </remarks>
+    public bool FreeTrackerPlugins
+    {
+        get => _cfg.FreeTrackerPlugins;
+        set
+        {
+            if (_cfg.FreeTrackerPlugins == value) return;
+
+            _cfg.FreeTrackerPlugins = value;
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+        }
+    }
+
     partial void OnSelectedTabChanged(int value)
     {
         Retell();
+
+        // Going away from the tracker, and asked to. Each plugin the song holds is a process
+        // with its patch loaded, and they go on holding it while you work on the pads.
+        if (_cfg.FreeTrackerPlugins)
+        {
+            if (_wasOnTracker && value != TrackerTab) Tracker.LetGoOfPlugins();
+            else if (!_wasOnTracker && value == TrackerTab) Tracker.TakeUpPlugins();
+        }
+
+        _wasOnTracker = value == TrackerTab;
 
         // The caps are patched to the page you are on, so moving pages moves them.
         Transport?.Moved();
@@ -635,15 +669,28 @@ public sealed partial class MainViewModel : ObservableObject
             () => ControlLink.Say());
         ControlLink.UseThis();
 
+        // A song keeps its own layout and takes it with it. What the link is handed is the
+        // list and a way of saying it moved; where the list lives is the tracker's business.
+        ControlLink.Song = () => Tracker.Song?.Controls;
+        ControlLink.SongChanged = Tracker.ControlsChanged;
+
         Links = new ControlLinksViewModel(ControlLink);
+
+        // The same links again, narrowed to what the open song holds, for the page in the
+        // tracker. Two lists of one thing, wanted in two places for two reasons.
+        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true);
 
         // A message is offered to the link first and then driven anyway. Pointing at a knob and
         // turning one links them, and the same turn moves the thing you pointed at, which is
         // the only confirmation worth having.
+        // FIRE is the pads and nothing else. A controller with both jobs ticked sends one note
+        // to both lanes, and the same pad that fires a sample also plays the armed track's
+        // instrument: two sounds from one press, neither of them asked for. On the page whose
+        // whole purpose is the pads, the pads have it.
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,
             padRouter.Handle,
-            noteRouter.Handle,
+            msg => { if (SelectedTab != UseTab) noteRouter.Handle(msg); },
             msg =>
             {
                 if (ControlLink.Handle(msg) is { } made) controlRouter.Caught(made);

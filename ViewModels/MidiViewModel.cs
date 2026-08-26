@@ -71,13 +71,46 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         Devices.Clear();
         foreach (var entry in MidiDeviceBindings.Merge(_midi.GetInputDevices(), _cfg.Midi.Devices))
-            Devices.Add(new MidiDeviceViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged));
+            Devices.Add(new MidiDeviceViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged, Forget));
 
         HasDevices = Devices.Count > 0;
 
         UpdatePadDevice();
         ApplyBindings();
         Status = DescribeDevices();
+    }
+
+    /// <summary>
+    /// Takes a controller off the list for good, with whatever was learned on it.
+    /// </summary>
+    /// <remarks>
+    /// Not the same as unticking its jobs. A device with nothing ticked is still a device the
+    /// list remembers, waiting to be plugged back in; this is for one that is not coming back.
+    /// Its links go with it, because a layout for hardware nobody owns is a list of
+    /// instructions to nothing.
+    ///
+    /// Only offered for a device that is not connected: one that is plugged in comes straight
+    /// back the next time the list is read.
+    /// </remarks>
+    private void Forget(MidiDeviceViewModel device)
+    {
+        if (device is null || device.IsConnected) return;
+
+        MidiDeviceBindings.SetRole(_cfg.Midi.Devices, device.Name, MidiDeviceRole.None);
+
+        int gone = Midi.ControlLink.Current?.Forget(device.Name) ?? 0;
+
+        Devices.Remove(device);
+
+        UpdatePadDevice();
+        ApplyBindings();
+        SaveMidi();
+
+        Status = gone == 0
+            ? $"Forgot '{device.Name}'."
+            : gone == 1
+                ? $"Forgot '{device.Name}' and the one control that was pointed at something."
+                : $"Forgot '{device.Name}' and the {gone} controls that were pointed at something.";
     }
 
     private void OnDeviceRoleChanged(MidiDeviceViewModel device)
@@ -122,7 +155,18 @@ public sealed partial class MidiViewModel : ObservableObject
         if (Devices.Count == 0) return "No MIDI devices found.";
 
         int open = _midi.OpenDevices.Count;
-        if (open == 0) return "No controller assigned yet. Tick Pads, Tracker or Controls.";
+
+        if (open == 0)
+        {
+            // Told apart, because they are two different situations and only one of them is
+            // something to do about it. Nothing ticked is a controller waiting to be given a
+            // job; everything ticked and nothing open is hardware that is not plugged in.
+            bool anyBound = Devices.Any(d => d.Role != MidiDeviceRole.None);
+
+            return anyBound
+                ? "Nothing is plugged in. What is listed keeps what it was set to drive."
+                : "No controller assigned yet. Tick Pads, Tracker or Controls.";
+        }
 
         var missing = Devices.Where(d => !d.IsConnected && d.Role != MidiDeviceRole.None).ToList();
         if (missing.Count > 0)

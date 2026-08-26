@@ -138,7 +138,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
             Plugin = Plugin.Info.Id,
             Parameter = id,
             Name = Plugin.Info.Name + " " + (parameter?.Name ?? id.ToString())
-        });
+        }, keep: true);
     }
 
     /// <summary>Which parameters the plugin is reporting rather than being set to.</summary>

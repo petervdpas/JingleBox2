@@ -103,6 +103,9 @@ public partial class MainWindow : Window
         // The space bar works the transport from wherever you are in the window, and is taken
         // on the way down so that nothing else can spend it first.
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+
+        // The pointer mode, which every window answers. See Views.LinkKey.
+        Views.LinkKey.Listen(this);
         AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
 
         // Keys held while the window loses focus are released somewhere else, and this window
@@ -151,25 +154,7 @@ public partial class MainWindow : Window
         // added here is one press too.
         bool first = _held.Pressed(e.Key);
 
-        if (e.Handled) return;
-
-        // The other mouse mode: what the pointer rests on is offered to the controller rather
-        // than turned. Here rather than on a page, because a hardware knob is pointed at a
-        // machine panel, a plugin panel or a mixer strip and the mode means the same in all
-        // three. Ctrl+Shift+M, and it is a press rather than a hold.
-        if (first && e.Key == Key.M
-            && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
-        {
-            if (DataContext is MainViewModel linking)
-            {
-                linking.ControlLink.IsLinking = !linking.ControlLink.IsLinking;
-                e.Handled = true;
-            }
-
-            return;
-        }
-
-        if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
+        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
 
         switch (FocusManager?.GetFocusedElement())
         {

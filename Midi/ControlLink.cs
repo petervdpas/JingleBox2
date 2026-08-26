@@ -62,6 +62,22 @@ public sealed class ControlLink
     /// <summary>Makes this the one everything asks. Called once, as the window is built.</summary>
     public void UseThis() => Current = this;
 
+    /// <summary>
+    /// The open song's own layout, when there is one, and how to say it has changed.
+    /// </summary>
+    /// <remarks>
+    /// Set once as the window is built. A link is not a setting of the song in the way a
+    /// pattern is: nothing here reaches into the tracker, it is handed a list and a way of
+    /// saying the list moved.
+    /// </remarks>
+    public Func<List<ControlMapping>?>? Song { get; set; }
+
+    /// <summary>Told when the song's own layout changed, so the song reads as unsaved.</summary>
+    public Action? SongChanged { get; set; }
+
+    /// <summary>True when there is a song open for a link to be kept in or moved to.</summary>
+    public bool HasSong => Song?.Invoke() is not null;
+
     private bool _linking;
 
     /// <summary>Whether the pointer is laying out the controller rather than playing.</summary>
@@ -85,6 +101,20 @@ public sealed class ControlLink
 
     /// <summary>What the pointer is resting on, or nothing.</summary>
     private ControlMapping? _offered;
+
+    /// <summary>
+    /// Whether what is being offered belongs to the song or to the desk.
+    /// </summary>
+    /// <remarks>
+    /// Decided by where you pointed, not by whether a song happens to be open. A machine on the
+    /// rack is the machine itself, and a knob pointed at it there is a fact about your hardware
+    /// and that machine: true in every song you ever open. An instrument on a track is this
+    /// song's, and a knob pointed at it there is about this piece of music.
+    ///
+    /// Laying out a controller on the rack with a song open used to put the whole layout in
+    /// that song, which is the opposite of what anybody means by it.
+    /// </remarks>
+    private bool _offeredToSong;
 
     /// <summary>What is being offered to the controller, for a panel that wants to light it.</summary>
     public ControlMapping? Offered => _offered;
@@ -132,12 +162,17 @@ public sealed class ControlLink
     /// parameter, whether it follows the cursor. What is missing is the half only the hardware
     /// can say, and that is what <see cref="Handle"/> fills in.
     /// </remarks>
-    public void Offer(ControlMapping? what)
+    /// <param name="keep">
+    /// True when this belongs to the song being worked on: an instrument on a track. False for
+    /// the machine itself on the rack, which is about the machine and not about any song.
+    /// </param>
+    public void Offer(ControlMapping? what, bool keep = false)
     {
         if (!_linking) return;
         if (ReferenceEquals(_offered, what)) return;
 
         _offered = what;
+        _offeredToSong = keep;
 
         Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
             what == null
@@ -178,6 +213,7 @@ public sealed class ControlLink
 
         if (_offered is not { } wanted) return null;
 
+        wanted.Device = message.Device ?? "";
         wanted.Channel = message.Channel;
         wanted.Cc = message.Value;
 
@@ -185,10 +221,25 @@ public sealed class ControlLink
         // things from one control and that is a real arrangement, but it is one to build on
         // purpose in the list, not one to arrive at by pointing at a second knob and forgetting
         // the first was taken.
-        lock (_lock)
+        // Two things are displaced by this, and both lists are asked, because a link on the
+        // desk and a link in the song are both things a new one can be replacing.
+        //
+        // What was on this control, so one knob does one thing. And what was on this target,
+        // so one knob on the screen answers to one knob on the desk: pointing a second at a
+        // filter is saying you want that one on it, not that you want two. Which is also the
+        // only thing that ever displaces a mapping whose controller is not plugged in.
+        Displace(Song?.Invoke(), wanted);
+        lock (_lock) Displace(_mappings, wanted);
+
+        if (_offeredToSong && Song?.Invoke() is { } keeping)
         {
-            _mappings.RemoveAll(one => one.Channel == wanted.Channel && one.Cc == wanted.Cc);
-            _mappings.Add(wanted);
+            keeping.Add(wanted);
+
+            SongChanged?.Invoke();
+        }
+        else
+        {
+            lock (_lock) _mappings.Add(wanted);
         }
 
         // Held rather than offered again. Wiggling the same knob twice is one link, and the
@@ -210,10 +261,88 @@ public sealed class ControlLink
         return wanted;
     }
 
-    /// <summary>Everything pointed at anything, for a list to show. A copy, taken safely.</summary>
+    /// <summary>
+    /// Everything pointed at anything: the song's layout first, then the desk's.
+    /// </summary>
+    /// <remarks>
+    /// The song's win where both name the same control, which is what makes the song's an
+    /// override rather than a second list. The desk is what a control does unless this song has
+    /// something to say about it.
+    ///
+    /// A copy, taken safely, because the desk's half is written from the MIDI thread.
+    /// </remarks>
     public IReadOnlyList<ControlMapping> Mappings
     {
+        get
+        {
+            var song = Song?.Invoke();
+
+            ControlMapping[] desk;
+
+            lock (_lock) desk = _mappings.ToArray();
+
+            if (song is null || song.Count == 0) return desk;
+
+            var all = new List<ControlMapping>(song);
+
+            foreach (var one in desk)
+                if (!song.Any(said => said.Channel == one.Channel && said.Cc == one.Cc))
+                    all.Add(one);
+
+            return all;
+        }
+    }
+
+    /// <summary>Just the desk's, for a list that shows the two apart.</summary>
+    public IReadOnlyList<ControlMapping> Desk
+    {
         get { lock (_lock) return _mappings.ToArray(); }
+    }
+
+    /// <summary>And just the song's.</summary>
+    public IReadOnlyList<ControlMapping> Kept => Song?.Invoke()?.ToArray() ?? Array.Empty<ControlMapping>();
+
+    /// <summary>True when that mapping is one the song keeps rather than one of the desk's.</summary>
+    public bool IsSong(ControlMapping mapping) => Song?.Invoke()?.Contains(mapping) == true;
+
+    /// <summary>Takes off whatever the new link is replacing: its control, and its target.</summary>
+    private static void Displace(List<ControlMapping>? from, ControlMapping wanted) =>
+        from?.RemoveAll(one => one.SameTarget(wanted)
+                               || (one.SameControl(wanted) && !Apart(one, wanted)));
+
+    /// <summary>
+    /// True when two links share a control but can never answer the same message.
+    /// </summary>
+    /// <remarks>
+    /// One knob does one job, which is why a new link takes the old one off the control it was
+    /// on. But a link about a machine only answers while the track is playing that machine, so
+    /// two on one knob naming two machines are not competing for it: at most one of them can
+    /// ever match, and which depends on where you are.
+    ///
+    /// That turns one encoder into "the filter, on whatever machine I am looking at", spelled
+    /// out once per machine, which is one job and not several. Pointing the same knob at a
+    /// different parameter of the same machine still replaces, which is the case the rule was
+    /// protecting: that really would be two jobs on one knob and both would fire.
+    ///
+    /// A link naming no machine answers for all of them, so it is never apart from anything.
+    /// </remarks>
+    private static bool Apart(ControlMapping one, ControlMapping wanted)
+    {
+        if (one.Kind != wanted.Kind) return false;
+
+        return one.Kind switch
+        {
+            ControlKind.Instrument or ControlKind.Action =>
+                one.Machine.Length > 0 && wanted.Machine.Length > 0
+                && !string.Equals(one.Machine, wanted.Machine, StringComparison.Ordinal),
+
+            ControlKind.Insert =>
+                one.Plugin.Length > 0 && wanted.Plugin.Length > 0
+                && !string.Equals(one.Plugin, wanted.Plugin, StringComparison.Ordinal),
+
+            // A strip has no machine to tell two of them apart, so both would answer.
+            _ => false
+        };
     }
 
     /// <summary>What is pointed at this, if anything, for a panel that wants to say so.</summary>
@@ -257,9 +386,12 @@ public sealed class ControlLink
     /// </remarks>
     public void Unlink(string machine, string key)
     {
-        int gone;
+        int gone = Song?.Invoke()?.RemoveAll(one =>
+            (one.Kind == ControlKind.Instrument || one.Kind == ControlKind.Action)
+            && string.Equals(one.Machine, machine, StringComparison.Ordinal)
+            && string.Equals(one.Key, key, StringComparison.Ordinal)) ?? 0;
 
-        lock (_lock) gone = _mappings.RemoveAll(one =>
+        lock (_lock) gone += _mappings.RemoveAll(one =>
             (one.Kind == ControlKind.Instrument || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal));
@@ -307,9 +439,12 @@ public sealed class ControlLink
     /// <summary>Takes off whatever is pointed at that parameter of that plugin.</summary>
     public void UnlinkPlugin(string plugin, uint parameter)
     {
-        int gone;
+        int gone = Song?.Invoke()?.RemoveAll(one =>
+            one.Kind == ControlKind.Insert
+            && string.Equals(one.Plugin, plugin, StringComparison.Ordinal)
+            && one.Parameter == parameter) ?? 0;
 
-        lock (_lock) gone = _mappings.RemoveAll(one =>
+        lock (_lock) gone += _mappings.RemoveAll(one =>
             one.Kind == ControlKind.Insert
             && string.Equals(one.Plugin, plugin, StringComparison.Ordinal)
             && one.Parameter == parameter);
@@ -320,12 +455,90 @@ public sealed class ControlLink
         Say(() => Changed?.Invoke());
     }
 
+    /// <summary>
+    /// Moves a link between the song and the desk, whichever it is on now.
+    /// </summary>
+    /// <remarks>
+    /// The two are one gesture because the question is one question: is this control's job
+    /// about this piece of music, or about the hardware. You find out which by working, not by
+    /// deciding in advance, so a link made in a song can be promoted to the desk once you
+    /// notice you want it everywhere, and one on the desk can be pushed down into a song when
+    /// it turns out to be about that song alone.
+    /// </remarks>
+    public void Move(ControlMapping? mapping)
+    {
+        if (mapping is null) return;
+
+        var song = Song?.Invoke();
+
+        if (song is not null && song.Remove(mapping))
+        {
+            lock (_lock)
+            {
+                _mappings.RemoveAll(one => one.Channel == mapping.Channel && one.Cc == mapping.Cc);
+                _mappings.Add(mapping);
+            }
+
+            _changed();
+            SongChanged?.Invoke();
+        }
+        else
+        {
+            if (song is null) return;
+
+            bool had;
+
+            lock (_lock) had = _mappings.Remove(mapping);
+
+            if (!had) return;
+
+            song.RemoveAll(one => one.Channel == mapping.Channel && one.Cc == mapping.Cc);
+            song.Add(mapping);
+
+            _changed();
+            SongChanged?.Invoke();
+        }
+
+        Say(() => Changed?.Invoke());
+    }
+
+    /// <summary>
+    /// Takes off everything learned on one controller, because it is being forgotten.
+    /// </summary>
+    /// <remarks>
+    /// The one thing that unwires an absent device, and it is a decision rather than a
+    /// circumstance. A controller not plugged in keeps its links: it is in the other room, and
+    /// the layout has to be there when it comes back. A controller somebody has pressed Forget
+    /// on is a controller they are done with, and leaving its links behind would leave a list
+    /// full of instructions for hardware that is not coming back.
+    /// </remarks>
+    /// <returns>How many were taken off, for a page that wants to say so.</returns>
+    public int Forget(string device)
+    {
+        if (string.IsNullOrWhiteSpace(device)) return 0;
+
+        int gone = Song?.Invoke()?.RemoveAll(one => MidiService.SameName(one.Device, device)) ?? 0;
+
+        lock (_lock) gone += _mappings.RemoveAll(one => MidiService.SameName(one.Device, device));
+
+        if (gone == 0) return 0;
+
+        _changed();
+        SongChanged?.Invoke();
+
+        Say(() => Changed?.Invoke());
+
+        return gone;
+    }
+
     /// <summary>Takes a link off, for a control that is pointed at and clicked.</summary>
     public void Unlink(ControlMapping? mapping)
     {
-        bool removed;
+        if (mapping is null) return;
 
-        lock (_lock) removed = mapping is not null && _mappings.Remove(mapping);
+        bool removed = Song?.Invoke()?.Remove(mapping) == true;
+
+        if (!removed) lock (_lock) removed = _mappings.Remove(mapping);
 
         if (!removed) return;
 

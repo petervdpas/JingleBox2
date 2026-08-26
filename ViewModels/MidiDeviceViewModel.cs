@@ -10,6 +10,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class MidiDeviceViewModel : ObservableObject
 {
     private readonly Action<MidiDeviceViewModel> _roleChanged;
+    private readonly Action<MidiDeviceViewModel>? _forget;
 
     // The checkboxes are set from the stored role while the row is being built, and that must
     // not read back as the user changing something.
@@ -34,11 +35,14 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private bool drivesControls;
 
-    public MidiDeviceViewModel(string name, bool isConnected, MidiDeviceRole role, Action<MidiDeviceViewModel> roleChanged)
+    public MidiDeviceViewModel(string name, bool isConnected, MidiDeviceRole role,
+                               Action<MidiDeviceViewModel> roleChanged,
+                               Action<MidiDeviceViewModel>? forget = null)
     {
         Name = name;
         IsConnected = isConnected;
         _roleChanged = roleChanged;
+        _forget = forget;
 
         drivesPads = (role & MidiDeviceRole.Pads) != 0;
         drivesTracker = (role & MidiDeviceRole.Tracker) != 0;
@@ -46,6 +50,21 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
 
         _loaded = true;
     }
+
+    /// <summary>
+    /// Only one that is not plugged in, because that is the only one worth forgetting.
+    /// </summary>
+    /// <remarks>
+    /// A controller sitting on the desk comes straight back the next time the list is read, so
+    /// forgetting it would be a button that does nothing you can see. What it is for is the row
+    /// left behind by hardware that has gone: a name in a list, with a layout attached to it,
+    /// for something you no longer own.
+    /// </remarks>
+    public bool CanForget => !IsConnected;
+
+    /// <summary>Takes the device off the list, and everything learned on it with it.</summary>
+    public CommunityToolkit.Mvvm.Input.IRelayCommand ForgetCommand =>
+        new CommunityToolkit.Mvvm.Input.RelayCommand(() => _forget?.Invoke(this));
 
     public MidiDeviceRole Role =>
         (DrivesPads ? MidiDeviceRole.Pads : MidiDeviceRole.None) |

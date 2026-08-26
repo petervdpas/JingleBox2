@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using JingleBox2.Audio;
+using JingleBox2.Diagnostics;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge;
 using JingleBox2.Tracker.Synth;
@@ -831,6 +832,62 @@ public sealed class TrackerPlayer : IDisposable
         }
 
         foreach (var (_, plugin) in leaving) plugin.Dispose();
+    }
+
+    /// <summary>
+    /// Puts down every plugin this song is holding: the instruments and the inserts both.
+    /// </summary>
+    /// <remarks>
+    /// For leaving the tracker behind. Each plugin is a process with its patch loaded, and a
+    /// song of four is four of them sitting there while you work on the pads, keeping the
+    /// engine running besides, because a track with an insert has to be given blocks.
+    ///
+    /// What is loaded is read back onto the song first. A plugin's own window is where most of
+    /// its settings are turned, and letting go without capturing would throw away everything
+    /// since the last save, which is the sort of loss nobody would connect to changing tabs.
+    ///
+    /// The chain is emptied by hand rather than by <c>Clear</c>, which drops the devices
+    /// without putting them down: that would leave the processes running with nothing holding
+    /// them, which is the leak this is supposed to be the opposite of.
+    /// </remarks>
+    public void LetGoOfPlugins(Song song)
+    {
+        if (song == null) return;
+
+        CaptureChains(song);
+
+        ClearPlayers();
+        ClearPreviewPlayer();
+
+        for (int track = 0; track < song.Mix.Count; track++)
+        {
+            if (_synth.Mixer.InsertOn(track) is not PluginChain chain) continue;
+
+            var leaving = chain.Devices.ToArray();
+
+            chain.Clear();
+
+            foreach (var device in leaving)
+            {
+                try { (device.Insert as IDisposable)?.Dispose(); }
+                catch (Exception) { }
+            }
+        }
+
+        Log.Write(LogArea.Tracker, () => "let go of the plugins '" + song.Name + "' was holding");
+    }
+
+    /// <summary>Picks them all up again, for coming back to the tracker.</summary>
+    /// <remarks>
+    /// The chains first, because a track's inserts are what the engine needs to run at all, and
+    /// then the instruments side by side, as opening a song does.
+    /// </remarks>
+    public void TakeUpPlugins(Song song)
+    {
+        if (song == null) return;
+
+        RestoreChains(song);
+        PreloadPlugins(song);
     }
 
     /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>

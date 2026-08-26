@@ -496,14 +496,74 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public event EventHandler? RecordingsArrived;
 
     /// <summary>
+    /// The song's own controller layout changed, so there is something to save.
+    /// </summary>
+    /// <remarks>
+    /// A link made while a song is open belongs to that song and travels in its file, so it
+    /// counts as work the same as a note does. Without this, pointing a knob at something and
+    /// closing the song would lose it without a word.
+    /// </remarks>
+    public void ControlsChanged() => MarkDirty();
+
+    /// <summary>
+    /// Puts down every plugin the song is holding, for going away to work somewhere else.
+    /// </summary>
+    /// <remarks>
+    /// What is loaded is read back onto the song first, plugin windows included, exactly as
+    /// saving does: a knob turned in Serum's own window and then a change of page would
+    /// otherwise be a knob turned and lost, and nobody would connect the two.
+    ///
+    /// Not while it is playing. Leaving the page is not asking for the song to stop, and taking
+    /// the plugins out from under a running pattern would be a bar of silence and a fright.
+    /// </remarks>
+    public void LetGoOfPlugins()
+    {
+        if (IsPlaying) return;
+
+        _player.CaptureChains(Song);
+
+        foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
+
+        CloseInstrumentBoxes();
+
+        _player.LetGoOfPlugins(Song);
+    }
+
+    /// <summary>And picks them up again, for coming back.</summary>
+    public void TakeUpPlugins() => _player.TakeUpPlugins(Song);
+
+    /// <summary>
     /// The track a hardware control drives when its mapping does not name one.
     /// </summary>
     /// <remarks>
-    /// Where the cursor is, which is where you are working. A bank of knobs then drives
-    /// whatever is in front of you without anything being reassigned, and the mappings that
-    /// should not move with you say so instead: see <see cref="Midi.ControlScope"/>.
+    /// An instrument's own window, when one is in front, and the cursor otherwise.
+    ///
+    /// The cursor is where you are working while you are working in the pattern, and that is
+    /// most of the time. It stops being true the moment a panel is open in a window of its
+    /// own: two of those on screen at once and the cursor is on neither of them, so a knob
+    /// would drive whichever track the pattern last happened to be on while you look at
+    /// something else entirely. A window brought to the front is as plain a statement of what
+    /// you are working on as there is.
     /// </remarks>
-    public int FocusedTrack => Cursor.Track;
+    public int FocusedTrack => _panelTrack ?? Cursor.Track;
+
+    /// <summary>The track whose panel is in front, or nothing when none is.</summary>
+    private int? _panelTrack;
+
+    /// <summary>An instrument's window came to the front, so that is the track being worked on.</summary>
+    public void PanelInFront(int track) => _panelTrack = track;
+
+    /// <summary>
+    /// And has gone. The cursor says where you are again.
+    /// </summary>
+    /// <remarks>
+    /// Only when the one that left is the one that was in front. Closing the window behind the
+    /// one you are using is not you leaving the one you are using.
+    /// </remarks>
+    public void PanelGone(int track)
+    {
+        if (_panelTrack == track) _panelTrack = null;
+    }
 
     /// <summary>Which machine a track plays, by its slot id, or nothing when it plays a plugin.</summary>
     public string MachineOn(int track)
@@ -975,10 +1035,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private const string MixerPage = "Mixer";
 
+    /// <summary>What this song's controller is pointed at, which travels in its file.</summary>
+    private const string ControlsPage = "Controls";
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPattern))]
     [NotifyPropertyChangedFor(nameof(ShowsMachines))]
     [NotifyPropertyChangedFor(nameof(ShowsMixer))]
+    [NotifyPropertyChangedFor(nameof(ShowsControls))]
     private string page = PatternPage;
 
     public bool ShowsPattern => Page == PatternPage;
@@ -988,14 +1052,45 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public bool ShowsMixer => Page == MixerPage;
 
     /// <summary>
+    /// True while the song's own controller layout is showing.
+    /// </summary>
+    /// <remarks>
+    /// Beside the rack and the mixer because it is the same kind of thing: something the song
+    /// holds, wanted while you are working on the song. It was only in the settings, which is
+    /// where the desk's layout belongs and is the wrong place entirely for this song's, since
+    /// it changes when the song does.
+    /// </remarks>
+    public bool ShowsControls => Page == ControlsPage;
+
+    /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
+    /// <remarks>
+    /// Handed in rather than built here, because the same list narrowed differently is what
+    /// SETTINGS shows, and both are views of the one registry. It says when it arrives, so the
+    /// page is not left bound to nothing if it happens to be built first.
+    /// </remarks>
+    public ControlLinksViewModel? SongControls
+    {
+        get => _songControls;
+        set
+        {
+            _songControls = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private ControlLinksViewModel? _songControls;
+
+    /// <summary>
     /// Shows a page, or goes back to the pattern when the page asked for is already up.
     /// </summary>
     /// <remarks>
-    /// Two buttons rather than three, because the pattern is where you are: the other two are
-    /// somewhere you go and come back from, and pressing the lit button again is the way back.
+    /// The pattern is where you are: the others are somewhere you go and come back from, and
+    /// pressing the lit button again is the way back.
     /// </remarks>
     public IRelayCommand<string> ShowCommand => new RelayCommand<string>(which =>
-        Page = which == Page || which is not (MachinesPage or MixerPage) ? PatternPage : which);
+        Page = which == Page || which is not (MachinesPage or MixerPage or ControlsPage)
+            ? PatternPage
+            : which);
 
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 
@@ -1946,6 +2041,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = PatternCursor.Start.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
         PlayingLine = -1;
 
+        // The song's own controller layout came with it, so anything showing that layout is
+        // showing the last song's until it is told. Nothing else notices: the mappings are
+        // read per message and were already right; it is the list on the screen that was not.
+        SongControls?.Reread();
+
         // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
         IsDirty = false;
 
@@ -2029,6 +2129,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// has nowhere to go back to, which is what an untitled song is, so it is marked unsaved and
     /// the picker forgets it.
     /// </remarks>
+    /// <summary>The button in the bar, which is about the song that is open.</summary>
     private async Task DeleteSong()
     {
         string name = SongName.Trim();
@@ -2039,9 +2140,27 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
+        string path = _store.PathFor(name);
+
+        await DeleteSongFile(new SongFile(name, path, Song.Description));
+    }
+
+    /// <summary>
+    /// Deletes a song off the list, whichever one, rather than the one that is open.
+    /// </summary>
+    /// <remarks>
+    /// The same delete and the same question, so there is one way of getting rid of a song and
+    /// not two. Deleting the one that happens to be open leaves it on the screen, unsaved, the
+    /// way the button in the bar does: what is in front of you is not something a list of files
+    /// gets to take away.
+    /// </remarks>
+    public async Task DeleteSongFile(SongFile? file)
+    {
+        if (file is null) return;
+
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete song",
-            "Delete '" + name + "' from disc? The instruments it used are untouched. " +
+            "Delete '" + file.Name + "' from disc? The instruments it used are untouched. " +
                 "This cannot be undone.",
             "Delete");
 
@@ -2049,21 +2168,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         try
         {
-            _store.Delete(_store.PathFor(name));
+            bool wasOpen = FilePaths.Same(file.Path, _store.PathFor(SongName.Trim()));
 
-            SelectedSongFile = null;
+            _store.Delete(file.Path);
+
+            if (SelectedSongFile != null && FilePaths.Same(SelectedSongFile.Path, file.Path))
+                SelectedSongFile = null;
 
             RefreshSavedSongs();
 
-            // Still on the screen, and now the only copy of itself.
-            MarkDirty();
-            OnPropertyChanged(nameof(CanDeleteSong));
+            if (wasOpen)
+            {
+                // Still on the screen, and now the only copy of itself.
+                MarkDirty();
+                OnPropertyChanged(nameof(CanDeleteSong));
 
-            Status = "Deleted '" + name + "'. What is open is still here, but unsaved.";
+                Status = "Deleted '" + file.Name + "'. What is open is still here, but unsaved.";
+            }
+            else
+            {
+                Status = "Deleted '" + file.Name + "'.";
+            }
         }
         catch (Exception ex)
         {
-            Status = "Could not delete '" + name + "': " + ex.Message;
+            Status = "Could not delete '" + file.Name + "': " + ex.Message;
         }
     }
 

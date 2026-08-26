@@ -16,11 +16,35 @@ namespace JingleBox2.Views;
 /// </remarks>
 public static class Dialog
 {
-    /// <summary>The window a modal opens over, or null when there is none.</summary>
-    public static Window? Owner =>
-        Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-            ? desktop.MainWindow
-            : null;
+    /// <summary>
+    /// The window a modal opens over, or null when there is none.
+    /// </summary>
+    /// <remarks>
+    /// Whichever window is in front, and not always the application's own. A dialog opened from
+    /// inside a dialog is the case: the song list is already modal over the main window, and a
+    /// confirmation owned by the main window is one the desktop is entitled to put behind the
+    /// list that asked for it. What that looks like is a button that does nothing, because the
+    /// question is on screen somewhere underneath and nobody can answer it.
+    ///
+    /// The last active one, since the windows are in the order they were made and the newest
+    /// active one is the one that asked. The main window when none of them says it is active,
+    /// which is the application not being focused at all.
+    /// </remarks>
+    public static Window? Owner
+    {
+        get
+        {
+            if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                return null;
+
+            Window? front = null;
+
+            foreach (var window in desktop.Windows)
+                if (window.IsActive) front = window;
+
+            return front ?? desktop.MainWindow;
+        }
+    }
 
     /// <summary>
     /// Shows a window modally over the app's own and gives back what it closed with.
