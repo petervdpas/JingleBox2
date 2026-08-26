@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using JingleBox2.Tracker;
+using System.IO;
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
@@ -94,6 +96,22 @@ public partial class MachineEditorView : UserControl
         editor.Dressed(wanted);
 
         Retint();
+    }
+
+    /// <summary>
+    /// Points the level tool at a folder of recordings anywhere on the disc.
+    /// </summary>
+    /// <remarks>
+    /// The whole point of that scope: a pack downloaded this morning is levelled where it lies,
+    /// before any of it is brought into a machine, rather than one file at a time afterwards.
+    /// </remarks>
+    private async void LevelFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { } editor) return;
+
+        string? folder = await PickFolder("A folder of recordings to level");
+
+        if (folder != null) editor.Utilities.Pick(folder);
     }
 
     /// <summary>
@@ -607,6 +625,15 @@ public partial class MachineEditorView : UserControl
     /// <summary>True while a choice is being written, so the box cannot answer its own writing.</summary>
     private bool _picking;
 
+    /// <summary>
+    /// Asks for a folder, starting where the machines are rather than where the system was last.
+    /// </summary>
+    /// <remarks>
+    /// Opening a machine is not opening a file. The system offers wherever you last were, which
+    /// after an afternoon of anything else is a folder with no machines in it and three levels
+    /// to climb out of. So it starts beside the machine already open, which is the folder the
+    /// others are in, and at the installed machines when there is none.
+    /// </remarks>
     private async System.Threading.Tasks.Task<string?> PickFolder(string title)
     {
         var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
@@ -616,9 +643,44 @@ public partial class MachineEditorView : UserControl
         var picked = await storage.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = title,
-            AllowMultiple = false
+            AllowMultiple = false,
+            SuggestedStartLocation = await Among(storage),
         });
 
-        return picked.Count == 0 ? null : picked[0].TryGetLocalPath();
+        string? landed = picked.Count == 0 ? null : picked[0].TryGetLocalPath();
+
+        // Where the next one starts, so a second machine opened out of somebody else's folder
+        // does not send you back to this one.
+        if (landed is { Length: > 0 } && Path.GetDirectoryName(landed) is { Length: > 0 } home) _lastHome = home;
+
+        return landed;
     }
+
+    /// <summary>Where machines were last seen: beside the one open, or the installed ones.</summary>
+    private async System.Threading.Tasks.Task<IStorageFolder?> Among(IStorageProvider storage)
+    {
+        foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Tracker.Machines.MachineRegistry.Installed })
+        {
+            if (home is not { Length: > 0 } || !Directory.Exists(home)) continue;
+
+            try
+            {
+                if (await storage.TryGetFolderFromPathAsync(home) is { } folder) return folder;
+            }
+            catch (Exception)
+            {
+                // A path the platform will not make a folder of is a path to pass over, and the
+                // next one may work. None of them working is the system's own last folder, which
+                // is where this started.
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The folder a machine sits in, which is the folder its neighbours sit in.</summary>
+    private static string? Beside(string? machine) =>
+        machine is { Length: > 0 } ? Path.GetDirectoryName(machine) : null;
+
+    private string? _lastHome;
 }

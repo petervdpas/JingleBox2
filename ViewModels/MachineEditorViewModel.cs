@@ -45,7 +45,17 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         PresetDesk = new MachinePresetDesk(() => Project);
 
-        Utilities = new MachineUtilities(PresetDesk);
+        Utilities = new MachineUtilities(() => Project);
+
+        // The tab comes and goes with the tools, and the tab strip is what moves off a page
+        // that has gone. Doing that here as well put the strip and this in a race: opening the
+        // page reads the machines again, the list is empty for the instant it takes to rebuild,
+        // and a page that closed itself on the strength of that instant snapped straight back
+        // to the panel every time it was opened.
+        Utilities.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MachineUtilities.HasWork)) OnPropertyChanged(nameof(ShowsUtilities));
+        };
     }
 
     /// <summary>
@@ -66,7 +76,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// recordings have nothing to say to each other about layout, and neither of them is
     /// something you do while you are doing anything else.
     /// </remarks>
-    public MachineUtilities Utilities { get; }
+    public MachineUtilities Utilities { get; } = null!;
 
     /// <summary>
     /// Which page is open: nought the screen, one the presets, two the tools.
@@ -99,6 +109,16 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public bool OnPresets => Page == 1;
 
     public bool OnUtilities => Page == 2;
+
+    /// <summary>
+    /// True while the tools have anything to work on, which is a machine with a preset in it.
+    /// </summary>
+    /// <remarks>
+    /// Renaming a preset is nearly always something somebody wants, so this is nearly always
+    /// true; the case it covers is an installation with the rack emptied, where the page would
+    /// be two cards about nothing.
+    /// </remarks>
+    public bool ShowsUtilities => Utilities.HasWork;
 
     /// <summary>
     /// Reads the machine's presets folder when that tab is opened.
@@ -1540,6 +1560,11 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     partial void OnProjectChanged(MachineProject? value)
     {
+        // The tools work on whichever machine is open, so opening one is what they hear. Asked
+        // gently, because this can run before the field has been given anything: a machine
+        // opened during construction would otherwise reach a tool set that does not exist yet.
+        Utilities?.Reread();
+
         Parameters.Clear();
         Elements.Clear();
         SelectedElement = null;
