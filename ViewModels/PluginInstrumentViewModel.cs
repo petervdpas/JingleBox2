@@ -125,7 +125,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         // had. Writing nothing over something is how a saved sound gets lost.
         if (patch == null || patch.Length == 0) return;
 
-        _instrument.StateBytes = patch;
+        _instrument.PluginState = patch;
     }
 
     /// <summary>

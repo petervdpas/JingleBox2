@@ -155,3 +155,53 @@ public interface ISampleUsage
     /// </summary>
     int Repoint(string from, string to);
 }
+
+/// <summary>
+/// Several places that might be playing a recording, asked as one.
+/// </summary>
+/// <remarks>
+/// There are two: the rack, which is the instruments you own, and the songs folder, which is
+/// the instruments your songs own. They are genuinely separate, on purpose, because a song
+/// keeps its own copies of what it plays. The recording underneath is the one file, though, so
+/// the question RECORD asks before deleting one has to be put to both.
+/// </remarks>
+public sealed class SampleUsers : ISampleUsage
+{
+    private readonly IReadOnlyList<ISampleUsage> _asked;
+
+    public SampleUsers(params ISampleUsage?[] asked)
+    {
+        var list = new List<ISampleUsage>();
+
+        foreach (var one in asked ?? Array.Empty<ISampleUsage?>())
+            if (one != null) list.Add(one);
+
+        _asked = list;
+    }
+
+    public IReadOnlyList<string> InstrumentsUsing(string filePath)
+    {
+        var names = new List<string>();
+
+        foreach (var one in _asked)
+        {
+            try { names.AddRange(one.InstrumentsUsing(filePath)); }
+            catch (Exception) { }
+        }
+
+        return names;
+    }
+
+    public int Repoint(string from, string to)
+    {
+        int moved = 0;
+
+        foreach (var one in _asked)
+        {
+            try { moved += one.Repoint(from, to); }
+            catch (Exception) { }
+        }
+
+        return moved;
+    }
+}

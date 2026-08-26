@@ -91,15 +91,25 @@ public sealed class TrackerInstrument
     public string PluginName { get; set; } = "";
 
     /// <summary>
-    /// The plugin's own state, as text so it can live in a JSON file.
+    /// The plugin's own state, as the plugin handed it over.
     /// </summary>
     /// <remarks>
     /// This is the patch, and it is not the same as the parameters. A Serum sound is its
     /// wavetables, its samples and its modulation as much as it is knob positions, and none of
     /// those is a parameter the host can see. Saving the parameters and not this would reopen
     /// a song with the right knobs on the wrong sound.
+    ///
+    /// Bytes rather than base64 text, because that is what both ends of it are. The plugin
+    /// gives bytes and takes bytes back, and a quarter of a megabyte of wavetables was being
+    /// encoded to text every time a knob stopped moving and decoded again to play a note. A
+    /// rack file still writes it as base64, since a rack file is JSON and has nowhere else to
+    /// put it; a song writes it as it stands, beside the song rather than inside it.
+    ///
+    /// Passed by reference and never written into. Anything changing a patch replaces the
+    /// array, so two instruments sharing one costs nothing and surprises nobody.
     /// </remarks>
-    public string PluginState { get; set; } = "";
+    [JsonConverter(typeof(PluginStateJson))]
+    public byte[] PluginState { get; set; } = Array.Empty<byte>();
 
     /// <summary>
     /// What the mono synth plays from. Null on every other machine, and left out of the file there.
@@ -175,28 +185,6 @@ public sealed class TrackerInstrument
         string.IsNullOrWhiteSpace(PluginPath)
             ? null
             : new Audio.Plugins.PluginInfo(PluginId, PluginName, "", "", PluginPath, PluginFormat, IsInstrument: true);
-
-    /// <summary>The state as bytes, or nothing when there is none or it will not read.</summary>
-    [JsonIgnore]
-    public byte[] StateBytes
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(PluginState)) return Array.Empty<byte>();
-
-            try
-            {
-                return Convert.FromBase64String(PluginState);
-            }
-            catch (FormatException)
-            {
-                // A state written by something else, or damaged. The instrument still loads;
-                // it opens at the plugin's defaults rather than not at all.
-                return Array.Empty<byte>();
-            }
-        }
-        set => PluginState = value == null || value.Length == 0 ? "" : Convert.ToBase64String(value);
-    }
 
     /// <summary>An instrument that is a plugin, at whatever the plugin opens with.</summary>
     public static TrackerInstrument CreatePlugin(string name, Audio.Plugins.PluginInfo plugin)

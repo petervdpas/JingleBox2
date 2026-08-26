@@ -42,6 +42,39 @@ public static class MachineRegistry
         Path.Combine(Config.AppFolder.Path(), FolderName);
 
     /// <summary>
+    /// True when a file is one the program ships, and so is on every installation there is.
+    /// </summary>
+    /// <remarks>
+    /// Asked by a song about to be packed for somebody else. A machine's own presets are
+    /// installed with the application, so putting them in the file would be sending a person a
+    /// copy of something they already have, once per song. What is worth carrying is what only
+    /// this machine has: the user's own takes.
+    ///
+    /// Answered by looking, not by where the path points. Both folders hold machines and the
+    /// installed one holds the user's as well, so the only honest test is whether the same file
+    /// is also in the folder beside the program.
+    /// </remarks>
+    public static bool Ships(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+
+        try
+        {
+            string installed = Path.GetFullPath(Installed);
+            string full = Path.GetFullPath(path);
+
+            if (!full.StartsWith(installed + Path.DirectorySeparatorChar, FilePaths.Comparison))
+                return false;
+
+            return File.Exists(Path.Combine(Shipped, full.Substring(installed.Length + 1)));
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Reads the machines this installation has and takes them into the list the app works from.
     /// </summary>
     /// <returns>What was taken, for the log and for the settings page to show.</returns>

@@ -455,8 +455,13 @@ public sealed partial class MainViewModel : ObservableObject
         };
 
         // A recording that an instrument is built on cannot be thrown away, so the RECORD page
-        // asks the rack before it deletes anything.
-        Record.SampleUsage = rack;
+        // asks before it deletes anything. Both places: the rack is the instruments you own,
+        // and a song owns its own, so a take nothing on the rack plays can still be the sound
+        // of three songs.
+        Record.SampleUsage = new JingleBox2.Tracker.SampleUsers(rack, Tracker.Songs);
+
+        // A packed song puts the recordings it carried on the shelf as it opens.
+        Tracker.RecordingsArrived += (_, _) => Record.Rescan();
 
         // Trimming a recording changes what its instruments sound like, and the player is
         // holding the old audio.

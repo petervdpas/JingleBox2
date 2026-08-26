@@ -34,6 +34,39 @@ public static class SafeFile
     /// Falls back to writing straight to the path if the move will not go through, since a file
     /// written the risky way is worth more than a file not written at all.
     /// </remarks>
+    /// <summary>
+    /// Writes a file through a stream, all of it or none of it.
+    /// </summary>
+    /// <remarks>
+    /// The same move, for a file that is not text. A song is a zip now, built an entry at a
+    /// time, and building it straight over the old one would mean a song half rewritten is a
+    /// zip with no central directory: not a song, and not the old song either.
+    /// </remarks>
+    public static void Write(string path, Action<Stream> write)
+    {
+        if (string.IsNullOrWhiteSpace(path) || write == null) return;
+
+        string folder = Path.GetDirectoryName(path) ?? "";
+
+        if (folder.Length > 0) Directory.CreateDirectory(folder);
+
+        string writing = path + Suffix;
+
+        try
+        {
+            using (var stream = File.Create(writing)) write(stream);
+
+            File.Move(writing, path, overwrite: true);
+        }
+        catch (Exception)
+        {
+            try { if (File.Exists(writing)) File.Delete(writing); } catch (Exception) { }
+
+            using var stream = File.Create(path);
+            write(stream);
+        }
+    }
+
     public static void Write(string path, string text)
     {
         if (string.IsNullOrWhiteSpace(path)) return;

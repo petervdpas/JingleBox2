@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Reactive;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
@@ -63,6 +64,40 @@ public partial class TrackerView : UserControl
     }
 
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
+
+    /// <summary>
+    /// Writes the open song somewhere of the user's choosing, with its recordings inside it.
+    /// </summary>
+    /// <remarks>
+    /// Somewhere of their choosing, and never the songs folder, because this is not a save. It
+    /// is the copy that leaves: an archive, or a file going to somebody who has none of your
+    /// takes. The song being worked on is untouched by it.
+    /// </remarks>
+    private async void Pack_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } tracker) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage == null) return;
+
+        var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Pack song",
+            SuggestedFileName = tracker.SongName,
+            DefaultExtension = "jibx",
+            FileTypeChoices = new[] { PackedSong }
+        });
+
+        string? path = file?.TryGetLocalPath();
+
+        if (path != null) tracker.Pack(path);
+    }
+
+    /// <summary>What a song looks like on disc once it has left here.</summary>
+    private static readonly FilePickerFileType PackedSong = new("Song")
+    {
+        Patterns = new[] { "*.jibx" }
+    };
 
     /// <summary>
     /// The two things that can be dragged here.

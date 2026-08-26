@@ -705,7 +705,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         if (!_patchStale || _plugin == null) return;
 
         _patchStale = false;
-        _instrument.StateBytes = _plugin.SaveState();
+        _instrument.PluginState = _plugin.SaveState();
     }
 
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);

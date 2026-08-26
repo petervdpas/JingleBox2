@@ -79,7 +79,8 @@ Everything the app keeps lives in one folder: `%APPDATA%\JingleBox2` on Windows,
 ```bash
 config.json      # settings, pad profiles, window size
 recordings/      # your takes, 16-bit WAV
-songs/           # one JSON file per song
+songs/           # one .jibx per song: a zip holding song.json and each plugin's patch
+                 # Pack writes one with the recordings inside it too, for handing over
 instruments/     # the machines and the plugins you have added
 crashes/         # what the app was doing when a run ended badly
 jinglebox.log    # off unless switched on

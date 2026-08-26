@@ -32,7 +32,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Diagnostics/` - The log: one file for the app and every plugin process, off by default
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
-- `Tracker/` - Song model, sequencing, playback, JSON song files, and the machine rack
+- `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the machine rack
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
@@ -109,6 +109,28 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   it needs no new storage and the take is decoded once for all of them. The cuts are not stored
   separately; they are read back off the pieces. Put a different sample on one piece and it
   stops being a chop, which is why `IsSliced` is asked rather than the `Sliced` flag
+- A song is a `.jibx`, which is a zip: `song.json` for the patterns, the order, the mix and the
+  instruments, and `state/NN.bin` for each plugin instrument's patch, as the plugin handed it
+  over. The patches came out of the document because they are almost all of it (one song here
+  is 348 KB of which the music is 781 bytes and one synth's patch is 331 KB) and because a
+  document is all or nothing: a patch that came back damaged used to cost the song. Recordings
+  are named `{app}/...` when they live in the application folder, so a song survives that folder
+  moving or being on another machine. Songs written before this are converted on the way in and
+  the original is kept as `.json.old`
+- A song can also be packed, which is Pack in the TRACKER bar: the same `.jibx` with the
+  recordings inside it, written where you choose and never to the songs folder. Saving does not
+  do this, because a song built on a long take is tens of megabytes and the open song is written
+  out every twenty seconds. What travels is decided per recording by where it came from: a
+  machine's presets ship with the program and are named, your own takes are carried. Reason's
+  rule, and the same reason for it. Opening a packed song puts what it carried on the shelf
+  through `RecordingImport` and repoints the instruments, skipping anything already there byte
+  for byte, so opening one twice adds nothing
+- RECORD asks the songs as well as the rack before deleting a take (`SampleUsers` over
+  `MachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
+  rack plays can still be the sound of three songs, and deleting it used to empty them with
+  nothing said. Only `song.json` is read for this, and the answer is cached per song by its
+  write time: the shelf asks once per take, so the uncached version opened every song file
+  once per recording
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound

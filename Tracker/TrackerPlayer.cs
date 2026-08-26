@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge;
@@ -449,6 +450,30 @@ public sealed class TrackerPlayer : IDisposable
     private readonly object _playerLock = new();
 
     /// <summary>
+    /// The plugins being started right now, by track and by which instrument they are.
+    /// </summary>
+    /// <remarks>
+    /// Loading happens outside the lock, so two things can ask a track for its plugin while it
+    /// is still coming up: the song opening and starting them all, and the first note arriving
+    /// before that has finished. Without this they each start a copy, which for a plugin means
+    /// a second process, a second set of wavetables, and one of them thrown away. Whoever asks
+    /// second waits on the one already running instead.
+    /// </remarks>
+    private readonly Dictionary<int, (string Instrument, Task<IPluginInstrument?> Loading)> _loading = new();
+
+    /// <summary>
+    /// Which set of players is the current one. Bumped whenever they are all put down.
+    /// </summary>
+    /// <remarks>
+    /// Opening a song puts the last song's plugins down, and a plugin started for the last
+    /// song can still be coming up when that happens. Installed after the fact it would be an
+    /// instrument nobody asked for, playing under the new song's notes on a track that means
+    /// something else now. So a plugin that comes up into a different generation goes straight
+    /// back down.
+    /// </remarks>
+    private int _playerGeneration;
+
+    /// <summary>
     /// Moves a track to another position, live: the plugins loaded on it, the effects
     /// inserted on it, and the levels its notes were last set to.
     /// </summary>
@@ -506,20 +531,13 @@ public sealed class TrackerPlayer : IDisposable
     }
 
     /// <summary>
-    /// The plugin for a track, loading it if that track is not already playing this
-    /// instrument. Null when the plugin is missing or this host cannot play its kind.
-    /// </summary>
-    /// <remarks>
-    /// Loading happens here, on the thread that triggered the note, which is the clock. That
-    /// is a stall on the very first note of a plugin and nothing after: an instrument that has
-    /// been opened in the editor is already in memory, and a plugin put down is parked rather
-    /// than taken apart, so picking it up again costs almost nothing.
-    /// </remarks>
-    /// <summary>
     /// The plugin a track plays, loaded if it is not already. The same one the notes go to,
     /// deliberately: a second copy would be a second sound, and turning a knob on it would
     /// change something nobody can hear.
     /// </summary>
+    /// <remarks>
+    /// Null when the plugin is missing or this host cannot play its kind.
+    /// </remarks>
     public IPluginInstrument? EnsurePlayerOn(int track, TrackerInstrument instrument)
     {
         EnsureEngine();
@@ -527,15 +545,114 @@ public sealed class TrackerPlayer : IDisposable
         return PlayerFor(track, instrument);
     }
 
+    /// <summary>
+    /// The plugin on a track, started if it is not already there.
+    /// </summary>
+    /// <remarks>
+    /// Starting one is not quick. It is another process, a plugin binary of its own, and a
+    /// patch of a quarter of a megabyte to swallow before it will make the right sound. Held
+    /// under the lock, that cost fell on whichever thread asked first, which is the clock, and
+    /// every other track's first note queued behind it. So the lock is taken twice around the
+    /// slow part and not across it: once to see whether there is anything to do, and once to
+    /// put down what came back.
+    ///
+    /// Which means two callers can arrive at the same track at once, and <see cref="_loading"/>
+    /// is what stops that from starting the plugin twice. It is also what lets a song start
+    /// all of its plugins side by side, in <see cref="PreloadPlugins"/>.
+    /// </remarks>
     private IPluginInstrument? PlayerFor(int track, TrackerInstrument instrument)
     {
         if (track < 0 || instrument == null || !instrument.IsPlugin) return null;
+        if (instrument.Plugin == null) return null;
+
+        Task<IPluginInstrument?> loading;
 
         lock (_playerLock)
         {
+            if (_players.TryGetValue(track, out var existing)
+                && string.Equals(existing.Instrument, instrument.Id, StringComparison.Ordinal))
+                return existing.Plugin;
+
+            if (_loading.TryGetValue(track, out var running)
+                && string.Equals(running.Instrument, instrument.Id, StringComparison.Ordinal))
+            {
+                loading = running.Loading;
+            }
+            else
+            {
+                int generation = _playerGeneration;
+
+                // A thread of its own rather than a pool one. Starting a plugin is mostly
+                // waiting on another process, and a song's worth of them waiting at once on
+                // pool threads is a pool with nothing left to run the note that is waiting
+                // for one of them.
+                loading = Task.Factory.StartNew(
+                    () => Start(track, instrument, generation),
+                    CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
+
+                _loading[track] = (instrument.Id, loading);
+            }
+        }
+
+        // The caller wanted a plugin and is entitled to wait for one. What it is not entitled
+        // to is holding the lock while it waits, which is the whole of the change.
+        return loading.GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Brings one plugin up and puts it on its track. Runs off the lock, and off whatever
+    /// thread asked.
+    /// </summary>
+    private IPluginInstrument? Start(int track, TrackerInstrument instrument, int generation)
+    {
+        var description = instrument.Plugin;
+        if (description == null) return null;
+
+        IPluginInstrument? player = null;
+
+        try
+        {
+            player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
+            if (player == null) return null;
+
+            // The patch goes in before the first note, or the first note is the wrong sound.
+            player.LoadState(instrument.PluginState);
+        }
+        catch (Exception)
+        {
+            // A plugin that will not start is a silent track, not a silent application.
+            try { player?.Dispose(); } catch (Exception) { }
+            player = null;
+        }
+
+        lock (_playerLock)
+        {
+            if (_loading.TryGetValue(track, out var mine)
+                && string.Equals(mine.Instrument, instrument.Id, StringComparison.Ordinal))
+                _loading.Remove(track);
+
+            if (player == null) return null;
+
+            // The song this was being started for is not the song any more.
+            if (generation != _playerGeneration)
+            {
+                var late = player;
+                Task.Run(() => { try { late.Dispose(); } catch (Exception) { } });
+                return null;
+            }
+
             if (_players.TryGetValue(track, out var existing))
             {
-                if (string.Equals(existing.Instrument, instrument.Id, StringComparison.Ordinal)) return existing.Plugin;
+                // Somebody put this very plugin here while it was coming up. Theirs is the one
+                // the mixer is already playing, so this one goes back down.
+                if (string.Equals(existing.Instrument, instrument.Id, StringComparison.Ordinal))
+                {
+                    var spare = player;
+                    Task.Run(() => { try { spare.Dispose(); } catch (Exception) { } });
+                    return existing.Plugin;
+                }
 
                 // A different instrument on this track. The old one comes off the mix before
                 // it is put down, or it plays into a bus that is about to be somebody else's.
@@ -544,19 +661,63 @@ public sealed class TrackerPlayer : IDisposable
                 _players.Remove(track);
             }
 
-            var description = instrument.Plugin;
-            if (description == null) return null;
-
-            var player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
-            if (player == null) return null;
-
-            // The patch goes in before the first note, or the first note is the wrong sound.
-            player.LoadState(instrument.StateBytes);
-
             _players[track] = (instrument.Id, player);
             _synth.Mixer.SetInstrument(track, player);
 
             return player;
+        }
+    }
+
+    /// <summary>
+    /// Starts every plugin this song's tracks are set to, at once, without waiting for any of
+    /// them.
+    /// </summary>
+    /// <remarks>
+    /// A song used to start its plugins one note at a time, on the clock, which is the worst
+    /// possible moment and the worst possible thread: the first bar of a song with three
+    /// plugins in it stuttered three times, once per track, each stall the length of a plugin
+    /// starting up. Opening the song is the moment nobody is listening, and each plugin is its
+    /// own process, so there is nothing to be gained by starting them in a queue.
+    ///
+    /// Nothing here is waited on. What this returns is a song whose plugins are on their way;
+    /// a note that arrives before its own plugin is up waits for that one, as it always did,
+    /// and not for the others.
+    /// </remarks>
+    public void PreloadPlugins(Song song)
+    {
+        if (song == null) return;
+
+        var wanted = new List<(int Track, TrackerInstrument Instrument)>();
+
+        for (int track = 0; track < song.TrackCount; track++)
+        {
+            var instrument = song.InstrumentAt(song.GetTrackInstrument(track));
+            if (instrument == null || !instrument.IsPlugin || instrument.Plugin == null) continue;
+
+            wanted.Add((track, instrument));
+        }
+
+        if (wanted.Count == 0) return;
+
+        // A plugin is opened at a sample rate and keeps it, so the rate has to be the real one
+        // before any of them start. Nothing to start, nothing opened: a song of samples and
+        // synths does not turn the device on early for the sake of it.
+        EnsureEngine();
+
+        foreach (var (track, instrument) in wanted)
+        {
+            int which = track;
+            var playing = instrument;
+
+            Task.Factory.StartNew(
+                () =>
+                {
+                    try { PlayerFor(which, playing); }
+                    catch (Exception) { }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
         }
     }
 
@@ -627,7 +788,7 @@ public sealed class TrackerPlayer : IDisposable
             var player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
             if (player == null) return null;
 
-            player.LoadState(instrument.StateBytes);
+            player.LoadState(instrument.PluginState);
 
             _auditioned = (instrument.Id, player);
             _synth.Mixer.SetPreviewInstrument(player);
@@ -665,6 +826,8 @@ public sealed class TrackerPlayer : IDisposable
             foreach (var track in _players.Keys) _synth.Mixer.SetInstrument(track, null);
 
             _players.Clear();
+            _loading.Clear();
+            _playerGeneration++;
         }
 
         foreach (var (_, plugin) in leaving) plugin.Dispose();

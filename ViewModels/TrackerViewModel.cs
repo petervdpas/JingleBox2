@@ -483,6 +483,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
 
     /// <summary>
+    /// The songs on disc, for anything that has to ask them a question.
+    /// </summary>
+    /// <remarks>
+    /// RECORD asks before deleting a take, because a song owns its instruments and a recording
+    /// nothing on the rack uses can still be the sound of three songs.
+    /// </remarks>
+    public SongStore Songs => _store;
+
+    /// <summary>Raised when opening a song put recordings on the shelf that were not there.</summary>
+    public event EventHandler? RecordingsArrived;
+
+    /// <summary>
     /// Throws away the song that is open, as it stands on disc. What is on the screen stays
     /// there, unsaved, so a delete by mistake costs a save rather than the work.
     /// </summary>
@@ -1749,7 +1761,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
-        var loaded = _store.Load(file.Path);
+        var loaded = _store.Load(file.Path, out var arrived);
         if (loaded == null)
         {
             Status = $"'{file.Name}' could not be read.";
@@ -1757,7 +1769,73 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
 
         Adopt(loaded, file.Name);
-        Status = $"Opened '{file.Name}'";
+
+        // A packed song brought its takes with it and they are on the shelf now, so the shelf
+        // has to be told to look again or they are there and nobody can see them.
+        if (arrived.Count > 0) RecordingsArrived?.Invoke(this, EventArgs.Empty);
+
+        Status = arrived.Count == 0
+            ? $"Opened '{file.Name}'"
+            : arrived.Count == 1
+                ? $"Opened '{file.Name}', and one recording it carried is now on the shelf"
+                : $"Opened '{file.Name}', and {arrived.Count} recordings it carried are now on the shelf";
+    }
+
+    /// <summary>The recordings this song names that are not on this machine.</summary>
+    private static IReadOnlyList<string> Lost(Song song)
+    {
+        var lost = new List<string>();
+        if (song == null) return lost;
+
+        var seen = new HashSet<string>(FilePaths.Comparer);
+
+        foreach (var instrument in song.Instruments)
+            foreach (string path in SampleUsage.Files(instrument))
+            {
+                if (string.IsNullOrWhiteSpace(path)) continue;
+
+                string full = FilePaths.Full(path);
+
+                if (!seen.Add(full)) continue;
+                if (File.Exists(full)) continue;
+
+                lost.Add(Path.GetFileName(full));
+            }
+
+        return lost;
+    }
+
+    /// <summary>
+    /// Writes the open song somewhere with its recordings inside it, for handing over.
+    /// </summary>
+    /// <remarks>
+    /// Not a save: this one does not become the song being worked on, does not clear the star
+    /// on the save button, and is not written to the songs folder. It is a copy that plays on a
+    /// machine that has none of your takes.
+    /// </remarks>
+    public void Pack(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            _player.CaptureChains(Song);
+            foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
+
+            int carried = SongSamples.Wanted(Song).Count;
+
+            _store.Save(Song, path, withSamples: true);
+
+            Status = carried == 0
+                ? $"Packed '{SongName}'. Everything it plays ships with the program, so it carries nothing."
+                : carried == 1
+                    ? $"Packed '{SongName}' with one recording inside it."
+                    : $"Packed '{SongName}' with {carried} recordings inside it.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Pack failed: {ex.Message}";
+        }
     }
 
     private void NewSong()
@@ -1800,8 +1878,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // The effects come back with the song. A plugin that is not on this machine is
         // reported rather than passed over in silence.
         var missing = _player.RestoreChains(Song);
-        if (missing.Count > 0)
-            Status = "Missing plugin(s): " + string.Join(", ", missing);
+        var lost = Lost(Song);
+
+        if (missing.Count > 0 || lost.Count > 0)
+        {
+            var said = new List<string>();
+
+            if (missing.Count > 0) said.Add("Missing plugin(s): " + string.Join(", ", missing));
+
+            // Said rather than left to be noticed. A song whose recordings are not on this
+            // machine opens perfectly and plays nothing on those tracks, and nothing about
+            // that looks like a fault until you go looking for one.
+            if (lost.Count > 0) said.Add("Missing recording(s): " + string.Join(", ", lost));
+
+            Status = string.Join("  ", said);
+        }
+
+        // The instruments as well, and now rather than on the note that wants one. Each is a
+        // process of its own with a patch to swallow, and left to the clock they came up one
+        // at a time, each stall landing on the first bar somebody was listening to.
+        _player.PreloadPlugins(Song);
 
         // The panel is about a track whose chain has just been rebuilt.
         PointEffectSlot();

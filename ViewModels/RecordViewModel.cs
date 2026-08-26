@@ -724,6 +724,21 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
     }
 
     /// <summary>
+    /// Reads the shelf again, for takes that arrived without this page putting them there.
+    /// </summary>
+    /// <remarks>
+    /// A packed song puts its recordings on the shelf as it opens, through the same door as
+    /// anything imported, but nothing on this page did it and nothing on this page knows. Read
+    /// again rather than told what to add, so what turns up in the list is built exactly the
+    /// way every other row was.
+    /// </remarks>
+    public void Rescan()
+    {
+        LoadRecordings();
+        RefreshUsage();
+    }
+
+    /// <summary>
     /// Marks each recording with the instruments that play it. Called whenever the rack
     /// changes, so a recording becomes free again the moment its last instrument goes.
     /// </summary>
