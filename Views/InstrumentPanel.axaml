@@ -717,6 +717,7 @@
                                  Scope="{Binding Editor.MachineScope}"
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
+                                 Location="{Binding MachineLocation}"
                                  Presets="{Binding Presets}"
                                  Reread="{Binding Editor.PanelReread}"
                                  Playhead="{Binding Editor.Playhead}"

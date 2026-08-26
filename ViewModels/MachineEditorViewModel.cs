@@ -331,6 +331,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <summary>And a wave, so a machine laid out round a picture is laid out round a picture.</summary>
     public IMachineScope PreviewScope { get; } = new MachinePreviewScope();
 
+    /// <summary>And a pattern to count, so the lamps and their pages take the room they will.</summary>
+    public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
+
     /// <summary>
     /// The shelf the panel's picker offers, which on a machine holding a recording is yours.
     /// </summary>
@@ -602,6 +605,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Led,
         MachineElementKinds.Meter,
         MachineElementKinds.Keys,
+        MachineElementKinds.Location,
         MachineElementKinds.Wave,
         MachineElementKinds.Envelope,
         MachineElementKinds.Scope,

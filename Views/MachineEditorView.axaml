@@ -350,6 +350,7 @@
                                    Pads="{Binding MachineEditor.PreviewPads}"
                                    Zones="{Binding MachineEditor.PreviewZones}"
                                    Scope="{Binding MachineEditor.PreviewScope}"
+                                   Location="{Binding MachineEditor.PreviewLocation}"
                                    Slices="{Binding MachineEditor.PreviewSlices}"
                                    Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
                                    Designing="{Binding MachineEditor.Designing}">

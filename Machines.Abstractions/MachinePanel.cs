@@ -214,6 +214,21 @@ public static class MachineElementKinds
     public const string Meter = "Meter";
 
     /// <summary>
+    /// Where the track playing this instrument has got to. Properties: caption, pages, colour,
+    /// size, gap, width.
+    /// </summary>
+    /// <remarks>
+    /// A button per page of rows over the lamps that count them, and it turns nothing: the
+    /// pattern is the tracker's and this watches it. Read only in the sense that matters, since
+    /// the one thing the buttons do is choose which run of rows the lamps show.
+    ///
+    /// <c>pages</c> is false for the lamps alone, on a machine with room for one and not the
+    /// other. It names no parameter: where a song has got to is not a setting of the machine,
+    /// so the host hands it over the way it hands over the keyboard.
+    /// </remarks>
+    public const string Location = "Location";
+
+    /// <summary>
     /// The keyboard, and the octave it is showing. Properties: keys, caption.
     /// </summary>
     /// <remarks>

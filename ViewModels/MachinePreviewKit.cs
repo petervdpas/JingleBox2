@@ -217,3 +217,43 @@ public sealed class MachinePreviewScope : IMachineScope
         remove { }
     }
 }
+
+/// <summary>
+/// A track for the editor's panel to count: one nothing is really playing.
+/// </summary>
+/// <remarks>
+/// The same reason the kit is a real kit. A row of lamps laid out against no pattern is a row
+/// of eight dark dots, and how much room the page buttons want cannot be judged from that: it
+/// is the number of them and the width of what is written on them that decides it.
+///
+/// A pattern of the usual length, stopped part way through, so the chip shows a lit lamp and a
+/// picked page as well as the dark ones.
+/// </remarks>
+public sealed class MachinePreviewLocation : IMachineLocation
+{
+    private static readonly string[] Runs = { "0-7", "8-15", "16-23", "24-31" };
+
+    /// <summary>Not live, so the panel being designed shows the row as the rack shows it.</summary>
+    public bool Live => false;
+
+    public int Lamps => 8;
+
+    public int Lit => 3;
+
+    public int FirstNumber => 8;
+
+    public IReadOnlyList<string> Pages => Runs;
+
+    public int Page => 1;
+
+    public void Show(int page) { }
+
+    /// <summary>
+    /// Nowhere to subscribe, because nothing here is playing.
+    /// </summary>
+    event EventHandler? IMachineLocation.Changed
+    {
+        add { }
+        remove { }
+    }
+}

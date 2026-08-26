@@ -2,9 +2,8 @@ using Avalonia;
 using Avalonia.Media;
 using System;
 using System.Globalization;
-using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.Views;
+namespace JingleBox2.Machines.Ui;
 
 /// <summary>
 /// A row of lamps that counts something, with one of them lit.
@@ -17,6 +16,9 @@ namespace JingleBox2.Views;
 /// eight lamps and a converter apiece.
 ///
 /// One binding drives it: the index that is lit. Nothing is lit at -1.
+///
+/// It lives beside <see cref="Led"/> rather than with the app's own views because a machine
+/// bought from somebody else is built out of the same lamps the app's own machines are.
 /// </remarks>
 public class LedRow : ThemedControl
 {

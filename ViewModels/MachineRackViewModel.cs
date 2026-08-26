@@ -151,6 +151,12 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
     public bool HasLocation => Location?.IsLive == true;
 
+    /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
+    public Machines.IMachineLocation? MachineLocation =>
+        _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
+
+    private Machines.IMachineLocation? _place;
+
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     public void Refresh()
     {

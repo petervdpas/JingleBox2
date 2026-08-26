@@ -115,4 +115,15 @@ public interface IInstrumentDesigner
 
     /// <summary>True when there is a location worth putting on the panel.</summary>
     bool HasLocation { get; }
+
+    /// <summary>
+    /// The same thing again, in the words a machine's own face understands.
+    /// </summary>
+    /// <remarks>
+    /// Beside <see cref="Location"/> rather than instead of it while both panels exist: the
+    /// blocks written in XAML bind to the view model, and a described panel is handed this.
+    /// Never null, because the row is drawn dimmed where nothing is playing rather than taken
+    /// off a panel that has asked for it.
+    /// </remarks>
+    IMachineLocation? MachineLocation { get; }
 }

@@ -52,6 +52,7 @@ public sealed class MachinePartSample : Decorator
     private const string LedKind = "Led";
     private const string MeterKind = "Meter";
     private const string KeysKind = "Keys";
+    private const string LocationKind = "Location";
     private const string WaveKind = "Wave";
     private const string EnvelopeKind = "Envelope";
     private const string ScopeKind = "Scope";
@@ -152,6 +153,7 @@ public sealed class MachinePartSample : Decorator
         LedKind => BuildLeds(),
         MeterKind => BuildMeter(),
         KeysKind => BuildKeys(),
+        LocationKind => BuildLocation(),
         WaveKind => new PartSketch(SketchShape.Wave) { Width = 74, Height = 34 },
         EnvelopeKind => BuildEnvelope(),
         ScopeKind => BuildScope(),
@@ -401,6 +403,21 @@ public sealed class MachinePartSample : Decorator
         Lit = new[] { 4 },
     };
 
+    /// <summary>
+    /// The lamps and one page of buttons, with the playhead a third of the way through.
+    /// </summary>
+    /// <remarks>
+    /// Two pages rather than the eight a full pattern has, because the chip is a chip: what it
+    /// has to say is that this part is a row of buttons over a row of lamps, and a picture of
+    /// the whole pattern's worth would say it at a quarter of the size.
+    /// </remarks>
+    private static Control BuildLocation() => new LocationView
+    {
+        Location = new SampleRun(),
+        LampSize = 7,
+        Gap = 6,
+    };
+
     /// <summary>The ordinary drop down, with something picked, since an empty one says nothing.</summary>
     /// <summary>
     /// The map, drawn as a map: three stretches of keyboard, one of them in hand.
@@ -444,6 +461,33 @@ public sealed class MachinePartSample : Decorator
     /// The same reason the pads on a chip are real buttons. Nothing here can be edited: the chip
     /// is not hit testable, so the drag that moves an edge never reaches it.
     /// </remarks>
+    /// <summary>A track a third of the way through the first of two pages.</summary>
+    private sealed class SampleRun : IMachineLocation
+    {
+        private static readonly string[] Runs = { "0-7", "8-15" };
+
+        public bool Live => true;
+
+        public int Lamps => 8;
+
+        public int Lit => 2;
+
+        public int FirstNumber => 0;
+
+        public System.Collections.Generic.IReadOnlyList<string> Pages => Runs;
+
+        public int Page => 0;
+
+        public void Show(int page) { }
+
+        /// <summary>Nowhere to subscribe, because a chip does not play.</summary>
+        public event EventHandler? Changed
+        {
+            add { }
+            remove { }
+        }
+    }
+
     private sealed class SampleMap : IMachineZones
     {
         private static readonly (int Low, int High)[] Laid =

@@ -205,6 +205,12 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
     public bool HasLocation => Location?.IsLive == true;
 
+    /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
+    public Machines.IMachineLocation? MachineLocation =>
+        _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
+
+    private Machines.IMachineLocation? _place;
+
     private void Test() => Play(Note.FromOctave(0, Octave));
 
     /// <summary>

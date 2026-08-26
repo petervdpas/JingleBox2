@@ -116,6 +116,10 @@ public class MachinePanelView : Decorator
     public static readonly StyledProperty<IMachineKeys?> KeyboardProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachineKeys?>(nameof(Keyboard));
 
+    /// <summary>Where the track playing this instrument has got to.</summary>
+    public static readonly StyledProperty<IMachineLocation?> LocationProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineLocation?>(nameof(Location));
+
     /// <summary>
     /// The machine's own folder, which is what the pictures on its panel are named against.
     /// </summary>
@@ -390,6 +394,12 @@ public class MachinePanelView : Decorator
         set => SetValue(KeyboardProperty, value);
     }
 
+    public IMachineLocation? Location
+    {
+        get => GetValue(LocationProperty);
+        set => SetValue(LocationProperty, value);
+    }
+
     /// <summary>Where the machine keeps its own files, for the elements that name one.</summary>
     public MachineElement? Selected
     {
@@ -459,7 +469,8 @@ public class MachinePanelView : Decorator
             change.Property == DesigningProperty ||
             change.Property == PadsProperty ||
             change.Property == SlicesProperty ||
-            change.Property == KeyboardProperty)
+            change.Property == KeyboardProperty ||
+            change.Property == LocationProperty)
         {
             Rebuild();
         }
@@ -574,6 +585,7 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Meter => BuildMeter(element, parameters),
             MachineElementKinds.Choice => BuildChoice(element, parameters),
             MachineElementKinds.Keys => BuildKeys(element, parameters),
+            MachineElementKinds.Location => BuildLocation(element),
             MachineElementKinds.Wave => BuildWave(element, parameters),
             MachineElementKinds.Envelope => BuildEnvelope(element, parameters),
             MachineElementKinds.Image => BuildImage(element),
@@ -1448,6 +1460,28 @@ public class MachinePanelView : Decorator
         Reads(() => box.SelectedIndex = Chosen(parameter, Start(parameter), options.Length));
 
         return Captioned(Caption(element, parameter), box);
+    }
+
+    /// <summary>
+    /// Where the track playing this instrument has got to.
+    /// </summary>
+    /// <remarks>
+    /// It names no parameter, which is why it takes only the element: where a song has got to
+    /// is not a setting of the machine. The host hands it over the way it hands over the
+    /// keyboard, and where there is none the row is drawn dimmed rather than left out.
+    /// </remarks>
+    private Control BuildLocation(MachineElement element)
+    {
+        var row = new LocationView { Location = Location };
+
+        if (Has(element, "caption")) row.Caption = Text(element, "caption");
+        if (Has(element, "pages")) row.HasPages = Flag(element, "pages");
+        if (Colour(element, "colour") is { } colour) row.Colour = colour;
+        if (Measurement(element, "size") is { } size) row.LampSize = size;
+        if (Measurement(element, "gap") is { } gap) row.Gap = gap;
+        if (Measurement(element, "width") is { } width) row.PageWidth = width;
+
+        return row;
     }
 
     /// <summary>
