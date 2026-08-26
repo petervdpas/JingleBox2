@@ -46,14 +46,55 @@ public class Fader : ThemedControl
     private const double TickGap = 3;
     private const double TickLength = 5;
 
+    /// <summary>
+    /// Where it is set to, which is never outside its own ends.
+    /// </summary>
+    /// <remarks>
+    /// Held in range by the property itself rather than by whoever writes it. A control drawn
+    /// on a front panel is the last thing standing between a number and somebody's eyes, and it
+    /// has to be able to say what it is showing without asking anything else whether that is
+    /// allowed. Only the drawing used to clamp, so a value from outside the ends was kept whole,
+    /// drawn at the nearest end, and handed straight back to whatever the control was writing
+    /// to: the picture said one thing and the machine held another.
+    ///
+    /// Nothing sets a knob to a number outside its range on purpose. Things do it by accident,
+    /// through arithmetic that went wrong somewhere else, and this is where that stops rather
+    /// than where it spreads.
+    /// </remarks>
     public static readonly StyledProperty<double> ValueProperty =
-        AvaloniaProperty.Register<Fader, double>(nameof(Value), defaultBindingMode: BindingMode.TwoWay);
+        AvaloniaProperty.Register<Fader, double>(
+            nameof(Value), defaultBindingMode: BindingMode.TwoWay, coerce: Held);
+
+    /// <summary>A value as this control is prepared to hold it: inside its ends, and a number.</summary>
+    private static double Held(AvaloniaObject sender, double value)
+    {
+        if (sender is not Fader control) return value;
+
+        double low = control.Minimum;
+        double high = control.Maximum;
+
+        if (double.IsNaN(value)) return low;
+        if (high < low) return low;
+
+        return Math.Clamp(value, low, high);
+    }
 
     public static readonly StyledProperty<double> MinimumProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(Minimum));
 
     public static readonly StyledProperty<double> MaximumProperty =
         AvaloniaProperty.Register<Fader, double>(nameof(Maximum), 1.0);
+
+    /// <summary>
+    /// The ends moved, so what is being held has to be asked again whether it still fits.
+    /// </summary>
+    /// <remarks>
+    /// A panel hands a control its range and its value in whatever order the layout happens to
+    /// build them. Without this, a value set while the ends were still their defaults would
+    /// keep whatever it was coerced to then.
+    /// </remarks>
+    private static void EndsMoved(Fader control, AvaloniaPropertyChangedEventArgs e) =>
+        control.CoerceValue(ValueProperty);
 
     /// <summary>The grid the value snaps to, and one press of an arrow key.</summary>
     public static readonly StyledProperty<double> SmallStepProperty =
@@ -119,6 +160,11 @@ public class Fader : ThemedControl
 
     static Fader()
     {
+        // The ends decide what the value may be, so a change to either has to put the question
+        // to it again.
+        MinimumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
+        MaximumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
+
         AffectsRender<Fader>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
             UnitProperty, FormatProperty, TrackLengthProperty, TicksProperty, ShowTickLabelsProperty);

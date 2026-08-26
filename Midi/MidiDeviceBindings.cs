@@ -13,8 +13,18 @@ public readonly record struct MidiDeviceEntry(string Device, bool IsConnected, M
 /// </summary>
 public static class MidiDeviceBindings
 {
-    /// <summary>Const so it can be matched as a pattern, not just tested as a mask.</summary>
-    public const MidiDeviceRole AnyRole = MidiDeviceRole.Pads | MidiDeviceRole.Tracker;
+    /// <summary>
+    /// Every job a device can be given.
+    /// </summary>
+    /// <remarks>
+    /// Const so it can be matched as a pattern, not just tested as a mask, and it has to name
+    /// every flag there is. <see cref="Normalize"/> masks the stored role with this, so a job
+    /// missing from here is a job silently taken off every device on the way in, and a device
+    /// given only that job is a binding that quietly disappears. Adding a role to
+    /// <see cref="MidiDeviceRole"/> means adding it here, in the same breath.
+    /// </remarks>
+    public const MidiDeviceRole AnyRole =
+        MidiDeviceRole.Pads | MidiDeviceRole.Tracker | MidiDeviceRole.Controls;
 
     private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
 
@@ -27,7 +37,7 @@ public static class MidiDeviceBindings
         foreach (var binding in bindings)
         {
             if (binding is null) continue;
-            if (NameComparer.Equals(binding.Device, device)) role |= binding.Role;
+            if (MidiService.SameName(binding.Device, device)) role |= binding.Role;
         }
 
         return role;
@@ -39,7 +49,7 @@ public static class MidiDeviceBindings
         if (bindings is null || string.IsNullOrWhiteSpace(device)) return;
 
         string name = device.Trim();
-        bindings.RemoveAll(b => b is null || NameComparer.Equals(b.Device, name));
+        bindings.RemoveAll(b => b is null || MidiService.SameName(b.Device, name));
 
         if (role != MidiDeviceRole.None)
             bindings.Add(new MidiDeviceBinding { Device = name, Role = role });

@@ -94,6 +94,21 @@ public sealed class AppConfig
     // jinglebox.log next to this file. See JingleBox2.Diagnostics.Log.
     public bool WriteLog { get; set; }
 
+    /// <summary>
+    /// Which parts of the app write to it, as the flags of <see cref="Diagnostics.LogArea"/>.
+    /// </summary>
+    /// <remarks>
+    /// Everything, unless somebody has narrowed it. Narrowing matters because the areas are not
+    /// alike: most lines are written once or only when something has gone wrong, and a few are
+    /// written per message or per block. One noisy area switched on with the rest fills the
+    /// queue, and a full queue drops lines, so switching everything on is how you lose the one
+    /// line you were looking for.
+    ///
+    /// Zero reads as everything, so a settings file written before this existed logs the way it
+    /// always did.
+    /// </remarks>
+    public int LogAreas { get; set; }
+
     // 0 means never resized, so fall back to sizing from the pad matrix.
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

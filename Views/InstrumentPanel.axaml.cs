@@ -44,9 +44,34 @@ public partial class InstrumentPanel : UserControl
         // nothing about where recordings are kept.
         MachineFace.TakeWanted += PickTake;
 
-        DataContextChanged += (_, _) => Watch();
+        // Laying out a controller. The panel says what the pointer is resting on and what was
+        // pressed; where a hardware knob comes from is none of a drawing's business.
+        MachineFace.LinkWanted += Offer;
+        MachineFace.LinkActionWanted += OfferAction;
+        MachineFace.UnlinkWanted += Drop;
+
+        DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
         UI.ThemeManager.Changed += Later;
-        DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
+
+        AttachedToVisualTree += (_, _) =>
+        {
+            if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
+
+            // A hardware button pressed comes out here, and this panel does it if it is the
+            // machine that was pointed at.
+            Midi.ControlActions.Current.Fired += Do;
+
+            ShowLinks();
+        };
+
+        DetachedFromVisualTree += (_, _) =>
+        {
+            UI.ThemeManager.Changed -= Later;
+
+            if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
+
+            Midi.ControlActions.Current.Fired -= Do;
+        };
     }
 
     /// <summary>
@@ -121,6 +146,105 @@ public partial class InstrumentPanel : UserControl
 
     /// <summary>The designer whose editor is being watched, so it is let go of again.</summary>
     private System.ComponentModel.INotifyPropertyChanged? _watched;
+
+    /// <summary>
+    /// Offers what the pointer is resting on to whatever is holding a controller.
+    /// </summary>
+    /// <remarks>
+    /// The machine and the key, and no track. A knob is pointed at Zampler's cutoff rather than
+    /// at track three's, so the same link works on every track that plays a Zampler and follows
+    /// you as you move between them. What names a track is the mixer, which is a different kind
+    /// of mapping for a different reason: see <see cref="Midi.ControlScope"/>.
+    /// </remarks>
+    private void Offer(object? sender, string key)
+    {
+        if (Midi.ControlLink.Current is not { IsLinking: true } link)
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
+                "panel: pointer on '" + key + "' but "
+                + (Midi.ControlLink.Current is null ? "THERE IS NO LINK" : "the mode is off"));
+
+            return;
+        }
+
+        if (Designer?.Editor is not { } editor)
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
+                "panel: pointer on '" + key + "' but THERE IS NO EDITOR behind the panel, so nothing is offered");
+
+            return;
+        }
+
+        link.Offer(new Midi.ControlMapping
+        {
+            Kind = Midi.ControlKind.Instrument,
+            Scope = Midi.ControlScope.Focused,
+            Machine = editor.MachineId,
+            Key = key,
+            Name = editor.MachineName + " " + key
+        });
+    }
+
+    /// <summary>
+    /// Offers a button on the panel, which is a press rather than a value.
+    /// </summary>
+    /// <remarks>
+    /// A knob points at a parameter, which lives on the instrument and can be written by
+    /// anything. A button points at something to be done, and only a panel knows how to do it:
+    /// see <see cref="Midi.ControlActions"/>.
+    /// </remarks>
+    private void OfferAction(object? sender, string action)
+    {
+        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
+        if (Designer?.Editor is not { } editor) return;
+
+        link.Offer(new Midi.ControlMapping
+        {
+            Kind = Midi.ControlKind.Action,
+            Scope = Midi.ControlScope.Focused,
+            Machine = editor.MachineId,
+            Key = action,
+
+            // A press, so there is nothing to work out and nothing to pick up from.
+            Pickup = Midi.ControlPickup.Jump,
+            Name = editor.MachineName + " " + action.Replace('_', ' ')
+        });
+    }
+
+    /// <summary>Does what a mapped hardware button asked for, if it asked this machine.</summary>
+    private void Do(string machine, string action)
+    {
+        if (Designer?.Editor is not { } editor) return;
+        if (!string.Equals(machine, editor.MachineId, StringComparison.Ordinal)) return;
+
+        // On the drawing thread, because what these do is open dialogs and rebuild grids.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => Asked(this, action));
+    }
+
+    /// <summary>Takes whatever is pointed at that control off it.</summary>
+    private void Drop(object? sender, string key)
+    {
+        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
+        if (Designer?.Editor is not { } editor) return;
+
+        link.Unlink(editor.MachineId, key);
+    }
+
+    /// <summary>Tells the panel what mode the pointer is in and what is already pointed at.</summary>
+    private void ShowLinks()
+    {
+        var link = Midi.ControlLink.Current;
+
+        MachineFace.Linking = link?.IsLinking ?? false;
+
+        MachineFace.Linked = link is null || Designer?.Editor is not { } editor
+            ? null
+            : link.KeysOn(editor.MachineId);
+
+        MachineFace.LinkedActions = link is null || Designer?.Editor is not { } showing
+            ? null
+            : link.ActionsOn(showing.MachineId);
+    }
 
     private void Watch()
     {

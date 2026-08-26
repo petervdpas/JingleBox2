@@ -24,7 +24,7 @@ namespace JingleBox2.Tracker.Machines;
 /// machine.json written by a later version has to open on an older app rather than take it down.
 /// </remarks>
 /// <param name="patch">The oscillator, the filter, the envelope and the two routes.</param>
-public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : IMachineValues
+public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be
     // found by searching for the string that is in the file.
@@ -76,10 +76,7 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : IMachineVal
     private const string VcfAmountKey = "vcf_amount";
     private const string VcfPolarityKey = "vcf_polarity";
 
-    /// <summary>Told when something moved, for saving the song and redrawing what else shows it.</summary>
-    public Action? Changed { get; set; }
-
-    public double Get(string key) => key switch
+    public override double Get(string key) => key switch
     {
         WaveKey => (double)patch.Wave,
         PulseWidthKey => patch.PulseWidth,
@@ -114,53 +111,51 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : IMachineVal
         _ => 0,
     };
 
-    public void Set(string key, double value)
+    protected override bool Write(string key, double value)
     {
-        bool moved = key switch
+        return key switch
         {
             WaveKey => Picked((int)patch.Wave, value, (int)MonoSynthWave.Pulse,
                 at => patch.Wave = (MonoSynthWave)at),
-            PulseWidthKey => MachineSetting.Moved(patch.PulseWidth, value, () => patch.PulseWidth = value),
-            TuneKey => MachineSetting.Moved(patch.TuneSemitones, value, () => patch.TuneSemitones = value),
-            FineKey => MachineSetting.Moved(patch.FineCents, value, () => patch.FineCents = value),
-            GlideKey => MachineSetting.Moved(patch.GlideMs, value, () => patch.GlideMs = value),
+            PulseWidthKey => Moved(patch.PulseWidth, value, () => patch.PulseWidth = value),
+            TuneKey => Moved(patch.TuneSemitones, value, () => patch.TuneSemitones = value),
+            FineKey => Moved(patch.FineCents, value, () => patch.FineCents = value),
+            GlideKey => Moved(patch.GlideMs, value, () => patch.GlideMs = value),
 
-            NoiseMixKey => MachineSetting.Moved(patch.NoiseMix, value, () => patch.NoiseMix = value),
+            NoiseMixKey => Moved(patch.NoiseMix, value, () => patch.NoiseMix = value),
 
-            CutoffKey => MachineSetting.Moved(patch.CutoffHz, value, () => patch.CutoffHz = value),
-            ResonanceKey => MachineSetting.Moved(patch.Resonance, value, () => patch.Resonance = value),
+            CutoffKey => Moved(patch.CutoffHz, value, () => patch.CutoffHz = value),
+            ResonanceKey => Moved(patch.Resonance, value, () => patch.Resonance = value),
             FilterModeKey => Picked((int)patch.FilterMode, value, (int)FilterMode.HighPass,
                 at => patch.FilterMode = (FilterMode)at),
 
             EnvelopeToAmpKey => Flagged(patch.EnvelopeToAmp, value, on => patch.EnvelopeToAmp = on),
-            VolumeKey => MachineSetting.Moved(patch.Volume, value, () => patch.Volume = value),
+            VolumeKey => Moved(patch.Volume, value, () => patch.Volume = value),
 
-            AttackKey => MachineSetting.Moved(patch.AttackMs, value, () => patch.AttackMs = value),
+            AttackKey => Moved(patch.AttackMs, value, () => patch.AttackMs = value),
             SustainKey => Flagged(patch.Sustain, value, on => patch.Sustain = on),
-            DecayKey => MachineSetting.Moved(patch.DecayMs, value, () => patch.DecayMs = value),
+            DecayKey => Moved(patch.DecayMs, value, () => patch.DecayMs = value),
 
-            LfoRateKey => MachineSetting.Moved(patch.LfoRateHz, value, () => patch.LfoRateHz = value),
+            LfoRateKey => Moved(patch.LfoRateHz, value, () => patch.LfoRateHz = value),
             LfoWaveKey => Picked((int)patch.LfoWave, value, (int)LfoWave.Square,
                 at => patch.LfoWave = (LfoWave)at),
 
             VcoSourceKey => Picked((int)patch.VcoModSource, value, (int)ModSource.Lfo,
                 at => patch.VcoModSource = (ModSource)at),
-            VcoAmountKey => MachineSetting.Moved(patch.VcoModAmount, value, () => patch.VcoModAmount = value),
+            VcoAmountKey => Moved(patch.VcoModAmount, value, () => patch.VcoModAmount = value),
             VcoTargetKey => Picked((int)patch.VcoModTarget, value, (int)VcoModTarget.PulseWidth,
                 at => patch.VcoModTarget = (VcoModTarget)at),
 
             VcfSourceKey => Picked((int)patch.VcfModSource, value, (int)ModSource.Lfo,
                 at => patch.VcfModSource = (ModSource)at),
-            VcfAmountKey => MachineSetting.Moved(patch.VcfModAmount, value, () => patch.VcfModAmount = value),
+            VcfAmountKey => Moved(patch.VcfModAmount, value, () => patch.VcfModAmount = value),
             VcfPolarityKey => Flagged(patch.VcfModInverted, value, on => patch.VcfModInverted = on),
 
             _ => false,
         };
-
-        if (moved) Changed?.Invoke();
     }
 
-    public string GetText(string key) => key switch
+    public override string GetText(string key) => key switch
     {
         CutoffTextKey => patch.CutoffText,
         _ => "",

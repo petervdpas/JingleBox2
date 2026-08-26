@@ -5,7 +5,7 @@ using System;
 namespace JingleBox2.ViewModels;
 
 /// <summary>
-/// One row in the MIDI device list: a controller and the two jobs it can be given.
+/// One row in the MIDI device list: a controller and the jobs it can be given.
 /// </summary>
 public sealed partial class MidiDeviceViewModel : ObservableObject
 {
@@ -23,6 +23,17 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     [ObservableProperty] private bool drivesPads;
     [ObservableProperty] private bool drivesTracker;
 
+    /// <summary>
+    /// Whether this device's knobs and faders move parameters.
+    /// </summary>
+    /// <remarks>
+    /// Apart from the other two because a controller is usually two things at once: the keys
+    /// play the tracker and the knobs move the machine, and either half is worth switching off
+    /// on its own. A keyboard whose modulation wheel is doing something unwanted is the whole
+    /// reason.
+    /// </remarks>
+    [ObservableProperty] private bool drivesControls;
+
     public MidiDeviceViewModel(string name, bool isConnected, MidiDeviceRole role, Action<MidiDeviceViewModel> roleChanged)
     {
         Name = name;
@@ -31,16 +42,19 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
 
         drivesPads = (role & MidiDeviceRole.Pads) != 0;
         drivesTracker = (role & MidiDeviceRole.Tracker) != 0;
+        drivesControls = (role & MidiDeviceRole.Controls) != 0;
 
         _loaded = true;
     }
 
     public MidiDeviceRole Role =>
         (DrivesPads ? MidiDeviceRole.Pads : MidiDeviceRole.None) |
-        (DrivesTracker ? MidiDeviceRole.Tracker : MidiDeviceRole.None);
+        (DrivesTracker ? MidiDeviceRole.Tracker : MidiDeviceRole.None) |
+        (DrivesControls ? MidiDeviceRole.Controls : MidiDeviceRole.None);
 
     partial void OnDrivesPadsChanged(bool value) => NotifyRoleChanged();
     partial void OnDrivesTrackerChanged(bool value) => NotifyRoleChanged();
+    partial void OnDrivesControlsChanged(bool value) => NotifyRoleChanged();
 
     private void NotifyRoleChanged()
     {

@@ -32,7 +32,7 @@ namespace JingleBox2.Tracker.Machines;
 /// named one, because a preset holds all sixteen. Both are the same mapping from a key to a
 /// thing on a pad, so they are the same class asked about a different pad.
 /// </remarks>
-public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? about = null) : IMachineValues
+public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? about = null) : MachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be
     // found by searching for the string that is in the file.
@@ -49,13 +49,10 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
     /// <summary>And the file it is playing, said in one line under the name.</summary>
     private const string DetailsKey = "pad_details";
 
-    /// <summary>Told when something moved, for saving the song and redrawing what else shows it.</summary>
-    public Action? Changed { get; set; }
-
     /// <summary>The pad every one of these keys is about, or nothing before one is picked.</summary>
     private DrumPadViewModel? Pad => about != null ? about() : kit.Selected;
 
-    public double Get(string key) => key switch
+    public override double Get(string key) => key switch
     {
         LevelKey => Pad?.Volume ?? 1,
         PanKey => Pad?.Pan ?? 0,
@@ -63,22 +60,20 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
         _ => 0,
     };
 
-    public void Set(string key, double value)
+    protected override bool Write(string key, double value)
     {
-        if (Pad is not { } pad) return;
+        if (Pad is not { } pad) return false;
 
-        bool moved = key switch
+        return key switch
         {
-            LevelKey => MachineSetting.Moved(pad.Volume, value, () => pad.Volume = value),
-            PanKey => MachineSetting.Moved(pad.Pan, value, () => pad.Pan = value),
-            ChokeKey => MachineSetting.Moved(pad.Choke, Math.Round(value), () => pad.Choke = Math.Round(value)),
+            LevelKey => Moved(pad.Volume, value, () => pad.Volume = value),
+            PanKey => Moved(pad.Pan, value, () => pad.Pan = value),
+            ChokeKey => Moved(pad.Choke, Math.Round(value), () => pad.Choke = Math.Round(value)),
             _ => false,
         };
-
-        if (moved) Changed?.Invoke();
     }
 
-    public string GetText(string key) => key switch
+    public override string GetText(string key) => key switch
     {
         TakeKey => Pad?.Pad.FilePath ?? "",
         NameKey => Pad?.Name ?? "",
@@ -86,34 +81,32 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
         _ => "",
     };
 
-    public void SetText(string key, string value)
+    protected override bool WriteText(string key, string value)
     {
-        if (Pad is not { } pad) return;
+        if (Pad is not { } pad) return false;
 
         switch (key)
         {
             case TakeKey:
-                if (FilePaths.Same(pad.Pad.FilePath, value)) return;
+                if (FilePaths.Same(pad.Pad.FilePath, value)) return false;
 
                 // Through the pad's own way of taking one, which names it after the file when
                 // it has no name of its own. A pad called "live-snare-shot-pic" is a pad you can
                 // find in the grid; a pad called nothing is sixteen pads called nothing.
                 pad.Take(value);
 
-                break;
+                return true;
 
             case NameKey:
-                if (pad.Name == value) return;
+                if (pad.Name == value) return false;
 
                 pad.Name = value;
 
-                break;
+                return true;
 
             default:
-                return;
+                return false;
         }
-
-        Changed?.Invoke();
     }
 
 }

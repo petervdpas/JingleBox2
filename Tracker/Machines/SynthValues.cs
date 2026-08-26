@@ -25,7 +25,7 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 /// <param name="patch">The wave, the envelope, the filter and the modulation.</param>
 /// <param name="instrument">Whose level it is, which is not the patch's.</param>
-public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : IMachineValues
+public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be
     // found by searching for the string that is in the file.
@@ -67,16 +67,13 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// </remarks>
     private const string CyclesKey = "cycles";
 
-    /// <summary>Told when something moved, for saving the song and redrawing what else shows it.</summary>
-    public Action? Changed { get; set; }
-
     /// <summary>Where the view setting is kept, since the instrument is no place for it.</summary>
     private double _cycles = 2;
 
     /// <summary>What the picture is set to show, for whoever is drawing it.</summary>
     public double Cycles => _cycles;
 
-    public double Get(string key) => key switch
+    public override double Get(string key) => key switch
     {
         WaveKey => (double)patch.Wave,
         DutyKey => patch.Duty,
@@ -107,37 +104,37 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
         _ => 0,
     };
 
-    public void Set(string key, double value)
+    protected override bool Write(string key, double value)
     {
-        bool moved = key switch
+        return key switch
         {
             WaveKey => Wave(value),
-            DutyKey => MachineSetting.Moved(patch.Duty, value, () => patch.Duty = value),
-            TuneKey => MachineSetting.Moved(patch.TuneSemitones, value, () => patch.TuneSemitones = value),
-            FineKey => MachineSetting.Moved(patch.FineCents, value, () => patch.FineCents = value),
-            PitchEnvKey => MachineSetting.Moved(
+            DutyKey => Moved(patch.Duty, value, () => patch.Duty = value),
+            TuneKey => Moved(patch.TuneSemitones, value, () => patch.TuneSemitones = value),
+            FineKey => Moved(patch.FineCents, value, () => patch.FineCents = value),
+            PitchEnvKey => Moved(
                 patch.PitchEnvSemitones, value, () => patch.PitchEnvSemitones = value),
-            PitchTimeKey => MachineSetting.Moved(patch.PitchEnvMs, value, () => patch.PitchEnvMs = value),
+            PitchTimeKey => Moved(patch.PitchEnvMs, value, () => patch.PitchEnvMs = value),
 
-            AttackKey => MachineSetting.Moved(patch.AttackMs, value, () => patch.AttackMs = value),
-            DecayKey => MachineSetting.Moved(patch.DecayMs, value, () => patch.DecayMs = value),
-            SustainKey => MachineSetting.Moved(patch.Sustain, value, () => patch.Sustain = value),
-            ReleaseKey => MachineSetting.Moved(patch.ReleaseMs, value, () => patch.ReleaseMs = value),
-            DriveKey => MachineSetting.Moved(patch.Drive, value, () => patch.Drive = value),
+            AttackKey => Moved(patch.AttackMs, value, () => patch.AttackMs = value),
+            DecayKey => Moved(patch.DecayMs, value, () => patch.DecayMs = value),
+            SustainKey => Moved(patch.Sustain, value, () => patch.Sustain = value),
+            ReleaseKey => Moved(patch.ReleaseMs, value, () => patch.ReleaseMs = value),
+            DriveKey => Moved(patch.Drive, value, () => patch.Drive = value),
 
-            LevelKey => MachineSetting.Moved(
+            LevelKey => Moved(
                 GainScale.ToDecibels(instrument.Volume), value,
                 () => instrument.Volume = GainScale.ToAmplitude(
                     Math.Clamp(value, GainScale.MinimumDecibels, GainScale.MaximumDecibels))),
 
-            CutoffKey => MachineSetting.Moved(patch.FilterCutoff, value, () => patch.FilterCutoff = value),
-            ResonanceKey => MachineSetting.Moved(
+            CutoffKey => Moved(patch.FilterCutoff, value, () => patch.FilterCutoff = value),
+            ResonanceKey => Moved(
                 patch.FilterResonance, value, () => patch.FilterResonance = value),
-            VibratoRateKey => MachineSetting.Moved(patch.VibratoRateHz, value, () => patch.VibratoRateHz = value),
-            VibratoDepthKey => MachineSetting.Moved(
+            VibratoRateKey => Moved(patch.VibratoRateHz, value, () => patch.VibratoRateHz = value),
+            VibratoDepthKey => Moved(
                 patch.VibratoDepthCents, value, () => patch.VibratoDepthCents = value),
-            TremoloRateKey => MachineSetting.Moved(patch.TremoloRateHz, value, () => patch.TremoloRateHz = value),
-            TremoloDepthKey => MachineSetting.Moved(patch.TremoloDepth, value, () => patch.TremoloDepth = value),
+            TremoloRateKey => Moved(patch.TremoloRateHz, value, () => patch.TremoloRateHz = value),
+            TremoloDepthKey => Moved(patch.TremoloDepth, value, () => patch.TremoloDepth = value),
 
             // Nobody saves it, so nobody is told it moved either. The picture reads it back on
             // the next frame, which is sixteen milliseconds away.
@@ -145,11 +142,9 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
 
             _ => false,
         };
-
-        if (moved) Changed?.Invoke();
     }
 
-    public string GetText(string key) => key switch
+    public override string GetText(string key) => key switch
     {
         CutoffTextKey => patch.FilterCutoffText,
         _ => "",

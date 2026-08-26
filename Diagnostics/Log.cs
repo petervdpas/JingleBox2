@@ -54,7 +54,14 @@ public enum LogArea
 /// </remarks>
 public static class Log
 {
-    /// <summary>Set this to 1 to log without the settings, for a run that will not get that far.</summary>
+    /// <summary>
+    /// Set this to log without the settings, for a run that will not get that far.
+    /// </summary>
+    /// <remarks>
+    /// <c>JB_LOG=1</c> for everything, or the areas by name: <c>JB_LOG=midi</c>, or
+    /// <c>JB_LOG=midi,plugin</c>. A name this build does not know is passed over rather than
+    /// refused, so a variable left set from a later version still starts the application.
+    /// </remarks>
     public const string Variable = "JB_LOG";
 
     /// <summary>What the file is called. The one before it keeps the same name with .old on it.</summary>
@@ -126,12 +133,16 @@ public static class Log
     /// </remarks>
     public static void Open(string folder, bool on, LogArea areas = LogArea.Everything)
     {
-        bool forced = Environment.GetEnvironmentVariable(Variable) == "1";
+        var asked = Asked(Environment.GetEnvironmentVariable(Variable));
+
+        // The variable beats the settings, and says which areas as well as whether. A run that
+        // will not reach its settings is exactly the run worth narrowing by hand.
+        if (asked != LogArea.None) areas = asked;
 
         lock (Gate)
         {
             _folder = folder ?? "";
-            _areas = on || forced ? areas : LogArea.None;
+            _areas = on || asked != LogArea.None ? areas : LogArea.None;
 
             // Whatever is still waiting when this stops is written before it does. A log that
             // loses its last lines loses exactly the ones anybody wanted.
@@ -337,6 +348,44 @@ public static class Log
         {
         }
     }
+
+    /// <summary>
+    /// What the environment variable is asking for, or nothing when it is not asking.
+    /// </summary>
+    /// <remarks>
+    /// "1" is everything, for the hands that have been typing that for months. Anything else is
+    /// read as a list of area names, so one area can be had on its own without the other four
+    /// burying it.
+    /// </remarks>
+    private static LogArea Asked(string? said)
+    {
+        if (string.IsNullOrWhiteSpace(said)) return LogArea.None;
+
+        said = said.Trim();
+
+        if (said == "1" || said.Equals("all", StringComparison.OrdinalIgnoreCase)) return LogArea.Everything;
+        if (said == "0") return LogArea.None;
+
+        var wanted = LogArea.None;
+
+        foreach (string part in said.Split(',', ' ', ';'))
+        {
+            string name = part.Trim();
+            if (name.Length == 0) continue;
+
+            foreach (var (area, called) in Names)
+                if (name.Equals(called, StringComparison.OrdinalIgnoreCase)) wanted |= area;
+        }
+
+        return wanted;
+    }
+
+    /// <summary>Every area there is, with the word each is written under.</summary>
+    /// <remarks>
+    /// For the settings page, so the list of switches is the list of areas and the two cannot
+    /// come apart: an area added here turns up there without anybody being told to add it.
+    /// </remarks>
+    public static IReadOnlyDictionary<LogArea, string> Everywhere => Names;
 
     private static readonly Dictionary<LogArea, string> Names = new()
     {

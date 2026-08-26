@@ -31,6 +31,16 @@ public static class PanelPreview
     /// <summary>Opens the panel as the rack page shows it: nothing playing, lamps greyed.</summary>
     public const string Idle = "--idle";
 
+    /// <summary>
+    /// Opens it in the other mouse mode, with a couple of parameters already spoken for.
+    /// </summary>
+    /// <remarks>
+    /// For looking at what pointing at a control does, which is a thing to be photographed
+    /// rather than described. There is no controller here and nothing is written down: the
+    /// links are made up so that the rings have something to be around.
+    /// </remarks>
+    public const string Link = "--link";
+
     /// <summary>True when these arguments ask for a panel rather than the application.</summary>
     public static bool Claims(string[] args) =>
         args != null && args.Any(a => string.Equals(a, Argument, StringComparison.Ordinal));
@@ -56,6 +66,28 @@ public static class PanelPreview
 
         PreviewApp.Wanted = Wanted(args);
         PreviewApp.Playing = !args.Any(a => string.Equals(a, Idle, StringComparison.Ordinal));
+
+        if (args.Any(a => string.Equals(a, Link, StringComparison.Ordinal)))
+        {
+            var pretend = new System.Collections.Generic.List<Midi.ControlMapping>();
+
+            // Two of the machine's own parameters, whichever they turn out to be, so the quiet
+            // rings have somewhere to go.
+            foreach (var parameter in Tracker.Machines.MachineProjects.For(PreviewApp.Wanted.SlotId)
+                                          ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Machines.MachineParameter>())
+            {
+                pretend.Add(new Midi.ControlMapping
+                {
+                    Kind = Midi.ControlKind.Instrument,
+                    Machine = PreviewApp.Wanted.SlotId,
+                    Key = parameter.Key
+                });
+            }
+
+            var link = new Midi.ControlLink(pretend, () => { });
+            link.UseThis();
+            link.IsLinking = true;
+        }
 
         AppBuilder.Configure<PreviewApp>()
             .UsePlatformDetect()

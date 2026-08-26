@@ -5,6 +5,7 @@ using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Config;
 using JingleBox2.Diagnostics;
+using JingleBox2.Machines;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
@@ -493,6 +494,40 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Raised when opening a song put recordings on the shelf that were not there.</summary>
     public event EventHandler? RecordingsArrived;
+
+    /// <summary>
+    /// The track a hardware control drives when its mapping does not name one.
+    /// </summary>
+    /// <remarks>
+    /// Where the cursor is, which is where you are working. A bank of knobs then drives
+    /// whatever is in front of you without anything being reassigned, and the mappings that
+    /// should not move with you say so instead: see <see cref="Midi.ControlScope"/>.
+    /// </remarks>
+    public int FocusedTrack => Cursor.Track;
+
+    /// <summary>Which machine a track plays, by its slot id, or nothing when it plays a plugin.</summary>
+    public string MachineOn(int track)
+    {
+        var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
+
+        return instrument is null || instrument.IsPlugin ? "" : instrument.Machine.SlotId;
+    }
+
+    /// <summary>
+    /// Where a track's machine keeps its settings, for something that wants to move one.
+    /// </summary>
+    /// <remarks>
+    /// Through the track's own box, which is the same one the panel uses, so a knob turned by
+    /// hand and a knob turned from a controller are turning the one thing. Built if it has not
+    /// been opened yet: a controller works whether or not the panel is on screen, and the panel
+    /// showing the change afterwards is the same object having been moved.
+    /// </remarks>
+    public IMachineValues? MachineValuesOn(int track) =>
+        InstrumentBoxFor(track)?.Designer?.Editor?.Values;
+
+    /// <summary>The plugins inserted on a track, for something that wants to move one's knob.</summary>
+    public Audio.Plugins.PluginChain? InsertsOn(int track) =>
+        track >= 0 && track < Song.TrackCount ? _player.ChainFor(track) : null;
 
     /// <summary>
     /// Throws away the song that is open, as it stands on disc. What is on the screen stays

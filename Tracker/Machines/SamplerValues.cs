@@ -40,7 +40,7 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class SamplerValues(
     ZoneMapViewModel map,
     SamplerPatchViewModel patch,
-    Func<SampleZoneViewModel?>? about = null) : IMachineValues
+    Func<SampleZoneViewModel?>? about = null) : MachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can be
     // found by searching for the string that is in the file.
@@ -106,7 +106,6 @@ public sealed class SamplerValues(
     private const string LevelOutKey = "level";
 
     /// <summary>Told when something moved, for saving the song and redrawing what else shows it.</summary>
-    public Action? Changed { get; set; }
 
     /// <summary>The zone every zone key is about, or nothing before one is picked.</summary>
     private SampleZoneViewModel? Zone => about != null ? about() : map.Selected;
@@ -122,7 +121,7 @@ public sealed class SamplerValues(
         }
     }
 
-    public double Get(string key) => key switch
+    public override double Get(string key) => key switch
     {
         LevelKey => Zone?.Volume ?? 1,
         PanKey => Zone?.Pan ?? 0,
@@ -160,45 +159,25 @@ public sealed class SamplerValues(
         _ => 0,
     };
 
-    public void Set(string key, double value)
+    protected override bool Write(string key, double value)
     {
         // The instrument's own half first, because it is there whether or not a zone is picked:
         // a map with nothing selected still has a filter.
-        switch (key)
+        if (Patch(key, value) is { } mine) return mine;
+
+        if (Zone is not { } zone) return false;
+
+        return key switch
         {
-            case ChoppedKey: map.Map.Sliced = value > 0.5; return;
-
-            case CutoffKey: patch.Cutoff = value; return;
-            case ResonanceKey: patch.Resonance = value; return;
-            case EnvelopeAmountKey: patch.EnvelopeAmount = value; return;
-            case EnvelopePolarityKey: patch.EnvelopeInverted = value > 0.5; return;
-            case KeyFollowKey: patch.KeyFollow = value; return;
-
-            case FilterAttackKey: patch.FilterAttackMs = value; return;
-            case FilterDecayKey: patch.FilterDecayMs = value; return;
-            case FilterSustainKey: patch.FilterSustain = value; return;
-            case FilterReleaseKey: patch.FilterReleaseMs = value; return;
-
-            case AttackKey: patch.AttackMs = value; return;
-            case DecayKey: patch.DecayMs = value; return;
-            case SustainKey: patch.Sustain = value; return;
-            case ReleaseKey: patch.ReleaseMs = value; return;
-            case LevelOutKey: patch.Volume = value; return;
-        }
-
-        if (Zone is not { } zone) return;
-
-        bool moved = key switch
-        {
-            LevelKey => MachineSetting.Moved(zone.Volume, value, () => zone.Volume = value),
-            PanKey => MachineSetting.Moved(zone.Pan, value, () => zone.Pan = value),
-            FineKey => MachineSetting.Moved(zone.FineCents, value, () => zone.FineCents = value),
+            LevelKey => Moved(zone.Volume, value, () => zone.Volume = value),
+            PanKey => Moved(zone.Pan, value, () => zone.Pan = value),
+            FineKey => Moved(zone.FineCents, value, () => zone.FineCents = value),
 
             // The edges the way the map moves them: whichever is travelling outwards goes first,
             // or the two cross on the way and are turned round behind our back.
-            LowKey => MachineSetting.Moved(zone.Low, value, () => zone.Low = value),
-            HighKey => MachineSetting.Moved(zone.High, value, () => zone.High = value),
-            RootKey => MachineSetting.Moved(zone.Root, value, () => zone.Root = value),
+            LowKey => Moved(zone.Low, value, () => zone.Low = value),
+            HighKey => Moved(zone.High, value, () => zone.High = value),
+            RootKey => Moved(zone.Root, value, () => zone.Root = value),
 
             StartKey => Window(shape => shape.Start = value),
             EndKey => Window(shape => shape.End = value),
@@ -208,11 +187,54 @@ public sealed class SamplerValues(
 
             _ => false,
         };
-
-        if (moved) Changed?.Invoke();
     }
 
-    public string GetText(string key) => key switch
+    /// <summary>
+    /// The half of the machine that belongs to the instrument rather than to a zone.
+    /// </summary>
+    /// <returns>Whether it moved, or nothing at all when the key is not one of these.</returns>
+    /// <remarks>
+    /// Every one of these says so when it moves, and that is the whole of why this exists. They
+    /// were written straight into the patch and returned, which is right for the sound and
+    /// wrong for everything watching: nothing was told, so nothing redrew. Turned by hand it
+    /// never showed, because the knob you are dragging draws itself from your hand and not from
+    /// the setting. Turned from a controller it showed at once: the sound followed and the panel
+    /// went on displaying where the knob used to be.
+    /// </remarks>
+    private bool? Patch(string key, double value)
+    {
+        bool moved;
+
+        switch (key)
+        {
+            case ChoppedKey: moved = Moved(map.Map.Sliced, value, on => map.Map.Sliced = on); break;
+
+            case CutoffKey: moved = Moved(patch.Cutoff, value, () => patch.Cutoff = value); break;
+            case ResonanceKey: moved = Moved(patch.Resonance, value, () => patch.Resonance = value); break;
+            case EnvelopeAmountKey: moved = Moved(patch.EnvelopeAmount, value, () => patch.EnvelopeAmount = value); break;
+
+            case EnvelopePolarityKey: moved = Moved(patch.EnvelopeInverted, value, on => patch.EnvelopeInverted = on); break;
+
+            case KeyFollowKey: moved = Moved(patch.KeyFollow, value, () => patch.KeyFollow = value); break;
+
+            case FilterAttackKey: moved = Moved(patch.FilterAttackMs, value, () => patch.FilterAttackMs = value); break;
+            case FilterDecayKey: moved = Moved(patch.FilterDecayMs, value, () => patch.FilterDecayMs = value); break;
+            case FilterSustainKey: moved = Moved(patch.FilterSustain, value, () => patch.FilterSustain = value); break;
+            case FilterReleaseKey: moved = Moved(patch.FilterReleaseMs, value, () => patch.FilterReleaseMs = value); break;
+
+            case AttackKey: moved = Moved(patch.AttackMs, value, () => patch.AttackMs = value); break;
+            case DecayKey: moved = Moved(patch.DecayMs, value, () => patch.DecayMs = value); break;
+            case SustainKey: moved = Moved(patch.Sustain, value, () => patch.Sustain = value); break;
+            case ReleaseKey: moved = Moved(patch.ReleaseMs, value, () => patch.ReleaseMs = value); break;
+            case LevelOutKey: moved = Moved(patch.Volume, value, () => patch.Volume = value); break;
+
+            default: return null;
+        }
+
+        return moved;
+    }
+
+    public override string GetText(string key) => key switch
     {
         TakeKey => Zone?.Zone.FilePath ?? "",
         NameKey => Zone?.Name ?? "",
@@ -223,34 +245,32 @@ public sealed class SamplerValues(
         _ => "",
     };
 
-    public void SetText(string key, string value)
+    protected override bool WriteText(string key, string value)
     {
-        if (Zone is not { } zone) return;
+        if (Zone is not { } zone) return false;
 
         switch (key)
         {
             case TakeKey:
-                if (FilePaths.Same(zone.Zone.FilePath, value)) return;
+                if (FilePaths.Same(zone.Zone.FilePath, value)) return false;
 
                 // Through the zone's own way of taking one, which names it after the file unless
                 // the zone has a name somebody chose. A zone still called after the recording it
                 // used to hold says the old recording is still on it.
                 zone.Take(value);
 
-                break;
+                return true;
 
             case NameKey:
-                if (zone.Name == value) return;
+                if (zone.Name == value) return false;
 
                 zone.Name = value;
 
-                break;
+                return true;
 
             default:
-                return;
+                return false;
         }
-
-        Changed?.Invoke();
     }
 
     /// <summary>

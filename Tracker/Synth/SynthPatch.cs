@@ -169,7 +169,18 @@ public sealed class SynthPatch
 
         // A patch written before the filter existed has no cutoff at all, which reads as zero
         // and would silence it. Nothing is a filter that is not there, so it opens up.
-        FilterCutoffHz = FilterCutoffHz <= MinCutoffHz ? MaxCutoffHz : Clamp(FilterCutoffHz, MinCutoffHz, MaxCutoffHz);
+        // A patch written before the filter existed has no cutoff at all, which reads as zero
+        // and would silence it. Nothing is a filter that is not there, so it opens up.
+        //
+        // Nothing, and not merely low. A cutoff sitting on the bottom of its own range is a
+        // filter somebody has turned all the way down, and it stays where they put it. The two
+        // were one test, and the bottom of the range is exactly the minimum, so a filter closed
+        // by hand sprang wide open at the instant it arrived: through the beginning and out at
+        // the end. Nothing else in the application could do that, which is why it took so long
+        // to find; the knob and the wire were both innocent.
+        FilterCutoffHz = FilterCutoffHz <= 0 || double.IsNaN(FilterCutoffHz)
+            ? MaxCutoffHz
+            : Clamp(FilterCutoffHz, MinCutoffHz, MaxCutoffHz);
         FilterResonance = Clamp(FilterResonance, MinResonance, MaxResonance);
     }
 

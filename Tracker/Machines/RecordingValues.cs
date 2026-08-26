@@ -30,7 +30,7 @@ namespace JingleBox2.Tracker.Machines;
 /// simply does not go anywhere. The alternative is a crash on a file somebody has already
 /// shipped.
 /// </remarks>
-public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : IMachineValues
+public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : MachineValues
 {
     // Written out one by one, never built from a name or a loop, so every key in the app can
     // be found by searching for the string that is in the file.
@@ -65,21 +65,6 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     private const string DriveKey = "drive";
 
     /// <summary>
-    /// Told that something moved, if anybody is listening.
-    /// </summary>
-    /// <remarks>
-    /// The instrument is plain data and says nothing when it is written to, so everything that
-    /// has to happen after a change, saving the song, redrawing a scope, retuning a voice in
-    /// the air, happens because something called this. It is the same callback the instrument
-    /// editor's view models are handed, and it is set by whoever builds this, not here.
-    ///
-    /// It fires only when a write really moved something. A knob that reports the value it
-    /// already had, which happens on every mouse move that did not cross a step, is not a
-    /// change and must not mark a song dirty.
-    /// </remarks>
-    public Action? Changed { get; set; }
-
-    /// <summary>
     /// The voice the recording plays through: its envelope, its filter and its modulation.
     /// </summary>
     /// <remarks>
@@ -106,7 +91,7 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// not have reads as zero, which is the far end of every range the machine declares, so a
     /// knob for a setting that is not here sits where it does nothing.
     /// </remarks>
-    public double Get(string key) => key switch
+    public override double Get(string key) => key switch
     {
         BaseNoteKey => instrument.BaseNoteSemitone,
         StartKey => instrument.Shape?.Start ?? 0,
@@ -146,39 +131,37 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// is the same problem as an unknown key, one version further on, and the answer is the
     /// same: take what can be taken and do not break.
     /// </remarks>
-    public void Set(string key, double value)
+    protected override bool Write(string key, double value)
     {
-        // A knob cannot produce one; a file can. Letting it through would put a NaN into a
-        // voice, where it spreads through the filter and silences the instrument for good.
-        if (double.IsNaN(value)) return;
-
-        switch (key)
+        return key switch
         {
-            case BaseNoteKey: Whole(instrument.BaseNoteSemitone, value, Note.MinSemitone, Note.MaxSemitone, v => instrument.BaseNoteSemitone = v); break;
-            case StartKey: Number(instrument.Shape?.Start ?? 0, value, 0, 1, v => Window.Start = v); break;
-            case EndKey: Number(instrument.Shape?.End ?? 1, value, 0, 1, v => Window.End = v); break;
-            case LoopModeKey: Loop(value); break;
-            case LoopStartKey: Number(instrument.Shape?.LoopStart ?? 0, value, 0, 1, v => Window.LoopStart = v); break;
-            case LoopEndKey: Number(instrument.Shape?.LoopEnd ?? 1, value, 0, 1, v => Window.LoopEnd = v); break;
-            case ReverseKey: Flag(instrument.Shape?.Reverse == true, value, v => Window.Reverse = v); break;
-            case OneVoiceKey: Flag(instrument.OneVoice, value, v => instrument.OneVoice = v); break;
-            case AttackKey: Number(Voice.AttackMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxAttackMs, v => Voice.AttackMs = v); break;
-            case DecayKey: Number(Voice.DecayMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxDecayMs, v => Voice.DecayMs = v); break;
-            case SustainKey: Number(Voice.Sustain, value, SynthPatch.MinSustain, SynthPatch.MaxSustain, v => Voice.Sustain = v); break;
-            case ReleaseKey: Number(Voice.ReleaseMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxReleaseMs, v => Voice.ReleaseMs = v); break;
-            case TuneKey: Number(Voice.TuneSemitones, value, SynthPatch.MinTuneSemitones, SynthPatch.MaxTuneSemitones, v => Voice.TuneSemitones = v); break;
-            case FineKey: Number(Voice.FineCents, value, SynthPatch.MinFineCents, SynthPatch.MaxFineCents, v => Voice.FineCents = v); break;
-            case VibratoRateKey: Number(Voice.VibratoRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.VibratoRateHz = v); break;
-            case VibratoDepthKey: Number(Voice.VibratoDepthCents, value, SynthPatch.MinVibratoDepthCents, SynthPatch.MaxVibratoDepthCents, v => Voice.VibratoDepthCents = v); break;
-            case PitchEnvKey: Number(Voice.PitchEnvSemitones, value, SynthPatch.MinPitchEnvSemitones, SynthPatch.MaxPitchEnvSemitones, v => Voice.PitchEnvSemitones = v); break;
-            case PitchTimeKey: Number(Voice.PitchEnvMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, v => Voice.PitchEnvMs = v); break;
-            case TremoloRateKey: Number(Voice.TremoloRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.TremoloRateHz = v); break;
-            case TremoloDepthKey: Number(Voice.TremoloDepth, value, SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, v => Voice.TremoloDepth = v); break;
-            case CutoffKey: Number(UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz), value, 0, 1, v => Voice.FilterCutoffHz = UI.FrequencyScale.ToHz(v)); break;
-            case ResonanceKey: Number(Voice.FilterResonance, value, SynthPatch.MinResonance, SynthPatch.MaxResonance, v => Voice.FilterResonance = v); break;
-            case LevelKey: Number(UI.GainScale.ToDecibels(instrument.Volume), value, UI.GainScale.MinimumDecibels, UI.GainScale.MaximumDecibels, v => instrument.Volume = UI.GainScale.ToAmplitude(v)); break;
-            case DriveKey: Number(Voice.Drive, value, SynthPatch.MinDrive, SynthPatch.MaxDrive, v => Voice.Drive = v); break;
-        }
+            BaseNoteKey => Whole(instrument.BaseNoteSemitone, value, Note.MinSemitone, Note.MaxSemitone, v => instrument.BaseNoteSemitone = v),
+            StartKey => Number(instrument.Shape?.Start ?? 0, value, 0, 1, v => Window.Start = v),
+            EndKey => Number(instrument.Shape?.End ?? 1, value, 0, 1, v => Window.End = v),
+            LoopModeKey => Loop(value),
+            LoopStartKey => Number(instrument.Shape?.LoopStart ?? 0, value, 0, 1, v => Window.LoopStart = v),
+            LoopEndKey => Number(instrument.Shape?.LoopEnd ?? 1, value, 0, 1, v => Window.LoopEnd = v),
+            ReverseKey => Flag(instrument.Shape?.Reverse == true, value, v => Window.Reverse = v),
+            OneVoiceKey => Flag(instrument.OneVoice, value, v => instrument.OneVoice = v),
+            AttackKey => Number(Voice.AttackMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxAttackMs, v => Voice.AttackMs = v),
+            DecayKey => Number(Voice.DecayMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxDecayMs, v => Voice.DecayMs = v),
+            SustainKey => Number(Voice.Sustain, value, SynthPatch.MinSustain, SynthPatch.MaxSustain, v => Voice.Sustain = v),
+            ReleaseKey => Number(Voice.ReleaseMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxReleaseMs, v => Voice.ReleaseMs = v),
+            TuneKey => Number(Voice.TuneSemitones, value, SynthPatch.MinTuneSemitones, SynthPatch.MaxTuneSemitones, v => Voice.TuneSemitones = v),
+            FineKey => Number(Voice.FineCents, value, SynthPatch.MinFineCents, SynthPatch.MaxFineCents, v => Voice.FineCents = v),
+            VibratoRateKey => Number(Voice.VibratoRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.VibratoRateHz = v),
+            VibratoDepthKey => Number(Voice.VibratoDepthCents, value, SynthPatch.MinVibratoDepthCents, SynthPatch.MaxVibratoDepthCents, v => Voice.VibratoDepthCents = v),
+            PitchEnvKey => Number(Voice.PitchEnvSemitones, value, SynthPatch.MinPitchEnvSemitones, SynthPatch.MaxPitchEnvSemitones, v => Voice.PitchEnvSemitones = v),
+            PitchTimeKey => Number(Voice.PitchEnvMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, v => Voice.PitchEnvMs = v),
+            TremoloRateKey => Number(Voice.TremoloRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.TremoloRateHz = v),
+            TremoloDepthKey => Number(Voice.TremoloDepth, value, SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, v => Voice.TremoloDepth = v),
+            CutoffKey => Number(UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz), value, 0, 1, v => Voice.FilterCutoffHz = UI.FrequencyScale.ToHz(v)),
+            ResonanceKey => Number(Voice.FilterResonance, value, SynthPatch.MinResonance, SynthPatch.MaxResonance, v => Voice.FilterResonance = v),
+            LevelKey => Number(UI.GainScale.ToDecibels(instrument.Volume), value, UI.GainScale.MinimumDecibels, UI.GainScale.MaximumDecibels, v => instrument.Volume = UI.GainScale.ToAmplitude(v)),
+            DriveKey => Number(Voice.Drive, value, SynthPatch.MinDrive, SynthPatch.MaxDrive, v => Voice.Drive = v),
+
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -190,16 +173,16 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// step here. Letting them disagree means an instrument that says it loops and a window
     /// that says it does not, and which one wins depends on which code asked.
     /// </remarks>
-    private void Loop(double value)
+    private bool Loop(double value)
     {
         var wanted = (SampleLoopMode)(int)Math.Clamp(Math.Round(value), 0, 2);
 
-        if (wanted == (instrument.Shape?.LoopMode ?? SampleLoopMode.None)) return;
+        if (wanted == (instrument.Shape?.LoopMode ?? SampleLoopMode.None)) return false;
 
         Window.LoopMode = wanted;
         instrument.Loop = wanted != SampleLoopMode.None;
 
-        Changed?.Invoke();
+        return true;
     }
 
     /// <summary>
@@ -216,7 +199,7 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// musician has for it, C-4 rather than 48, and there is nothing to write back: setting it
     /// is setting the number the panel already has a field for.
     /// </remarks>
-    public string GetText(string key) => key switch
+    public override string GetText(string key) => key switch
     {
         TakeKey => instrument.FilePath ?? "",
         TakeDetailsKey => shelf?.Details(instrument.FilePath ?? "") ?? "",
@@ -234,54 +217,56 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// deleted something above it. Emptying it is allowed, and is what a Recording machine with
     /// nothing on it yet looks like.
     /// </remarks>
-    public void SetText(string key, string value)
+    protected override bool WriteText(string key, string value) => key switch
     {
-        switch (key)
-        {
-            case TakeKey: Text(instrument.FilePath, value, v => instrument.FilePath = v); break;
-        }
-    }
+        TakeKey => Text(instrument.FilePath, value, v => instrument.FilePath = v),
+        _ => false,
+    };
 
-    private void Number(double current, double value, double min, double max, Action<double> apply)
+    private static bool Number(double current, double value, double min, double max, Action<double> apply)
     {
         double clamped = Math.Clamp(value, min, max);
-        if (clamped.Equals(current)) return;
+        if (clamped.Equals(current)) return false;
 
         apply(clamped);
-        Changed?.Invoke();
+
+        return true;
     }
 
     /// <summary>
     /// A setting that counts rather than sweeps: the base note, which is a semitone or nothing.
     /// </summary>
-    private void Whole(int current, double value, int min, int max, Action<int> apply)
+    private static bool Whole(int current, double value, int min, int max, Action<int> apply)
     {
         int rounded = (int)Math.Clamp(Math.Round(value), min, max);
-        if (rounded == current) return;
+        if (rounded == current) return false;
 
         apply(rounded);
-        Changed?.Invoke();
+
+        return true;
     }
 
     /// <summary>
     /// A switch, arriving as a number because that is all a panel has. Half way up is on, so a
     /// control that sweeps rather than clicks still lands somewhere definite.
     /// </summary>
-    private void Flag(bool current, double value, Action<bool> apply)
+    private static bool Flag(bool current, double value, Action<bool> apply)
     {
         bool on = value >= 0.5;
-        if (on == current) return;
+        if (on == current) return false;
 
         apply(on);
-        Changed?.Invoke();
+
+        return true;
     }
 
-    private void Text(string current, string value, Action<string> apply)
+    private static bool Text(string current, string value, Action<string> apply)
     {
         string wanted = value ?? "";
-        if (string.Equals(current ?? "", wanted, StringComparison.Ordinal)) return;
+        if (string.Equals(current ?? "", wanted, StringComparison.Ordinal)) return false;
 
         apply(wanted);
-        Changed?.Invoke();
+
+        return true;
     }
 }

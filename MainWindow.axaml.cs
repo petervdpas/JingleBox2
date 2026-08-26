@@ -65,7 +65,7 @@ public partial class MainWindow : Window
 
         // Before anything else that might have something to say. Off unless the setting says
         // otherwise, and free when off. See JingleBox2.Diagnostics.Log.
-        Diagnostics.Log.Open(Config.AppFolder.Path(), cfg.WriteLog);
+        Diagnostics.Log.Open(Config.AppFolder.Path(), cfg.WriteLog, Areas(cfg));
         Diagnostics.Log.Write(Diagnostics.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
 
@@ -139,13 +139,37 @@ public partial class MainWindow : Window
     /// Two things are left alone: a text box, where a space is a space, and a combo box with
     /// its list open, where it picks the row that is lit.
     /// </remarks>
+    /// <summary>
+    /// Which parts of the app the settings ask for, with nothing said meaning all of them.
+    /// </summary>
+    private static Diagnostics.LogArea Areas(Config.AppConfig cfg) =>
+        cfg.LogAreas == 0 ? Diagnostics.LogArea.Everything : (Diagnostics.LogArea)cfg.LogAreas;
+
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         // Every key, so the record of what is down is the whole keyboard and the next shortcut
         // added here is one press too.
         bool first = _held.Pressed(e.Key);
 
-        if (e.Handled || e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
+        if (e.Handled) return;
+
+        // The other mouse mode: what the pointer rests on is offered to the controller rather
+        // than turned. Here rather than on a page, because a hardware knob is pointed at a
+        // machine panel, a plugin panel or a mixer strip and the mode means the same in all
+        // three. Ctrl+Shift+M, and it is a press rather than a hold.
+        if (first && e.Key == Key.M
+            && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            if (DataContext is MainViewModel linking)
+            {
+                linking.ControlLink.IsLinking = !linking.ControlLink.IsLinking;
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
 
         switch (FocusManager?.GetFocusedElement())
         {

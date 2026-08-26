@@ -28,6 +28,19 @@ public sealed partial class MainViewModel : ObservableObject
     private bool _suspendSave;
 
     public MidiViewModel Midi { get; }
+
+    /// <summary>
+    /// The second mouse mode: what the pointer rests on is offered to the controller.
+    /// </summary>
+    /// <remarks>
+    /// On the window rather than on a page, because a hardware knob is pointed at machine
+    /// panels, plugin panels and mixer strips alike, and the mode has to mean the same thing
+    /// wherever the pointer happens to be. Ctrl+Shift+M turns it on and off.
+    /// </remarks>
+    public Midi.ControlLink ControlLink { get; private set; } = null!;
+
+    /// <summary>What the controller is pointed at, for the list in SETTINGS.</summary>
+    public ControlLinksViewModel Links { get; private set; } = null!;
     public RecordViewModel Record { get; }
 
     /// <summary>The shelf of takes, for filling a pad from it.</summary>
@@ -291,12 +304,51 @@ public sealed partial class MainViewModel : ObservableObject
             _cfg.WriteLog = value;
             _store.Save(_cfg);
 
-            if (value) Diagnostics.Log.Open(Config.AppFolder.Path(), true);
+            if (value) Diagnostics.Log.Open(Config.AppFolder.Path(), true, Written);
             else Diagnostics.Log.Close();
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(LogHint));
         }
+    }
+
+    /// <summary>
+    /// Which parts of the app write to the log, one switch each.
+    /// </summary>
+    /// <remarks>
+    /// Built from the areas the log itself knows about rather than from a list written out
+    /// here, so an area added to <see cref="Diagnostics.LogArea"/> turns up on the page without
+    /// anybody being told to add it.
+    /// </remarks>
+    public System.Collections.ObjectModel.ObservableCollection<LogAreaViewModel> LogParts { get; } = new();
+
+    /// <summary>The areas the settings ask for, with nothing said meaning all of them.</summary>
+    private Diagnostics.LogArea Written =>
+        _cfg.LogAreas == 0 ? Diagnostics.LogArea.Everything : (Diagnostics.LogArea)_cfg.LogAreas;
+
+    private void BuildLogParts()
+    {
+        var on = Written;
+
+        foreach (var (area, name) in Diagnostics.Log.Everywhere)
+            LogParts.Add(new LogAreaViewModel(area, name, (on & area) != 0, LogPartChanged));
+    }
+
+    private void LogPartChanged(LogAreaViewModel part)
+    {
+        var wanted = Diagnostics.LogArea.None;
+
+        foreach (var one in LogParts)
+            if (one.Writes) wanted |= one.Area;
+
+        _cfg.LogAreas = (int)wanted;
+        _store.Save(_cfg);
+
+        // Straight away rather than at the next start: the point of narrowing it is usually
+        // that something is happening right now and the log is too loud to read.
+        if (WriteLog) Diagnostics.Log.Open(Config.AppFolder.Path(), true, Written);
+
+        OnPropertyChanged(nameof(LogHint));
     }
 
     /// <summary>Where the file is, said out loud so it can be found without being hunted for.</summary>
@@ -564,11 +616,40 @@ public sealed partial class MainViewModel : ObservableObject
         // Pads
         BuildPadsFromSelectedProfile(PadCount);
 
+        BuildLogParts();
+
         // MIDI routing: global, profile-independent mapping. Which controller reaches which
         // half of the app is decided by the roles in SETTINGS, not here.
         var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
         var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker, Machines));
-        var dispatcher = new MidiDispatcher(_cfg.Midi, padRouter.Handle, noteRouter.Handle);
+
+        // Knobs and faders. The router knows the mappings and the adapter knows the program,
+        // as with the two above, and the link is what puts a mapping there in the first place.
+        ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
+
+        // Through the link rather than at the list itself: the link is written from the MIDI
+        // thread and read here on the same one, and it is the only thing holding the lock.
+        var controlRouter = new MidiControlRouter(
+            () => ControlLink.Mappings,
+            new ControlTargets(Tracker, Machines),
+            () => ControlLink.Say());
+        ControlLink.UseThis();
+
+        Links = new ControlLinksViewModel(ControlLink);
+
+        // A message is offered to the link first and then driven anyway. Pointing at a knob and
+        // turning one links them, and the same turn moves the thing you pointed at, which is
+        // the only confirmation worth having.
+        var dispatcher = new MidiDispatcher(
+            _cfg.Midi,
+            padRouter.Handle,
+            noteRouter.Handle,
+            msg =>
+            {
+                if (ControlLink.Handle(msg) is { } made) controlRouter.Caught(made);
+
+                controlRouter.Handle(msg);
+            });
 
         // NOTE: MidiViewModel already subscribes for learn/status.
         // This subscription is for playing things.

@@ -9,7 +9,14 @@ public enum MidiDeviceRole
 {
     None = 0,
     Pads = 1,
-    Tracker = 2
+    Tracker = 2,
+
+    /// <summary>
+    /// Knobs and faders, driving parameters. Its own flag because a controller is often two
+    /// things at once: the keys play the tracker and the knobs move the machine, and one of
+    /// those is a device somebody may want off without the other.
+    /// </summary>
+    Controls = 4
 }
 
 /// <summary>

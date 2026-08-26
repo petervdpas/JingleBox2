@@ -224,7 +224,7 @@
               <ItemsControl ItemsSource="{Binding Midi.Devices}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
                       <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="cardHint"
@@ -239,6 +239,11 @@
                       <CheckBox Grid.Column="2" Content="Tracker"
                                 VerticalAlignment="Center"
                                 IsChecked="{Binding DrivesTracker}" />
+
+                      <CheckBox Grid.Column="3" Content="Controls"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding DrivesControls}"
+                                ToolTip.Tip="This device's knobs and faders move parameters. Its own switch, because a keyboard whose keys should play the tracker is not always one whose wheel should move something." />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -339,6 +344,56 @@
             </Border>
 
           </views:Beside>
+
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Knobs and faders" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Press Ctrl+Shift+M and the panels stop turning: rest the pointer on a knob, it glows red, and the next thing you touch on your controller takes it. Press a glowing control to take the link off again. In a plugin's own window there is nothing to point at, so the knob you last turned there is the one that is offered." />
+
+              <Border Classes="inset" IsVisible="{Binding Links.HasLinks}">
+                <ItemsControl ItemsSource="{Binding Links.Links}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
+                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                   FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
+                                   Text="{Binding Control}" />
+
+                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding What}" />
+
+                        <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
+                                   Text="{Binding Where}" />
+
+                        <!-- Pressed when the guess was wrong. A button that repeats while it
+                             is held sends what an encoder sends, so this cannot be right every
+                             time, and past the end of the list it goes back to listening. -->
+                        <Button Grid.Column="3" Classes="page"
+                                Content="{Binding How}"
+                                Command="{Binding NextCommand}"
+                                ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
+
+                        <Button Grid.Column="4" Content="Forget" Classes="danger"
+                                Command="{Binding ForgetCommand}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+
+              <TextBlock Classes="cardHint"
+                         IsVisible="{Binding !Links.HasLinks}"
+                         Text="Nothing is pointed at anything yet." />
+
+              <Button Content="Forget them all" Classes="danger"
+                      HorizontalAlignment="Left"
+                      IsVisible="{Binding Links.HasLinks}"
+                      Command="{Binding Links.ForgetAllCommand}" />
+            </StackPanel>
+          </Border>
 
           <!-- On the page rather than behind a button. It is about the devices listed above
                it, and a dialog you have to open to see a mapping is one you have to close
@@ -553,6 +608,25 @@
               </StackPanel>
 
               <CheckBox Content="Write down what the app is doing" IsChecked="{Binding WriteLog}" />
+
+              <!-- One switch per part, because the parts are not alike: most of what is
+                   written happens once or only when something has gone wrong, and a few lines
+                   are written per message or once a second for ever. Everything switched on at
+                   once is how the line you turned it on for gets buried. -->
+              <WrapPanel Orientation="Horizontal" IsVisible="{Binding WriteLog}" Margin="18,0,0,0">
+                <ItemsControl ItemsSource="{Binding LogParts}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <CheckBox Content="{Binding Name}" IsChecked="{Binding Writes}" Margin="0,0,16,0" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </WrapPanel>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding LogHint}" />
             </StackPanel>

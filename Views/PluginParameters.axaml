@@ -80,7 +80,10 @@
                IsVisible="{Binding IsTruncated}"
                Text="{Binding TruncationNote}" />
 
-    <ItemsControl ItemsSource="{Binding Controls}">
+    <!-- The knobs, with the ring the pointer leaves on one lying over the top of them. Over
+         and never in, or the row would move when a knob was pointed at. -->
+    <Panel>
+    <ItemsControl x:Name="Dials" ItemsSource="{Binding Controls}">
       <ItemsControl.ItemsPanel>
         <ItemsPanelTemplate>
           <WrapPanel Orientation="Horizontal" />
@@ -102,6 +105,9 @@
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
+
+    <ui:LinkGlow x:Name="Glow" IsHitTestVisible="False" />
+    </Panel>
 
     <!-- The on and off ones. A dial with two positions is a tick box wearing a hat. -->
     <ItemsControl ItemsSource="{Binding Switches}" IsVisible="{Binding HasSwitches}">

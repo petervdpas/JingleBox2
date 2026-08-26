@@ -122,7 +122,7 @@ public sealed partial class MidiViewModel : ObservableObject
         if (Devices.Count == 0) return "No MIDI devices found.";
 
         int open = _midi.OpenDevices.Count;
-        if (open == 0) return "No controller assigned yet. Tick Pads or Tracker.";
+        if (open == 0) return "No controller assigned yet. Tick Pads, Tracker or Controls.";
 
         var missing = Devices.Where(d => !d.IsConnected && d.Role != MidiDeviceRole.None).ToList();
         if (missing.Count > 0)
@@ -135,7 +135,11 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         MidiDeviceRole.Pads => "the pads",
         MidiDeviceRole.Tracker => "the tracker",
-        MidiDeviceBindings.AnyRole => "the pads and the tracker",
+        MidiDeviceRole.Controls => "the knobs and faders",
+        MidiDeviceRole.Pads | MidiDeviceRole.Tracker => "the pads and the tracker",
+        MidiDeviceRole.Pads | MidiDeviceRole.Controls => "the pads and the knobs",
+        MidiDeviceRole.Tracker | MidiDeviceRole.Controls => "the tracker and the knobs",
+        MidiDeviceBindings.AnyRole => "the pads, the tracker and the knobs",
         _ => "nothing"
     };
 

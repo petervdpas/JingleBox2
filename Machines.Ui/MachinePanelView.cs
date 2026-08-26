@@ -172,6 +172,26 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, bool>(nameof(Designing));
 
     /// <summary>
+    /// The other mouse mode: the panel is being pointed at rather than played.
+    /// </summary>
+    /// <remarks>
+    /// The same arrangement as <see cref="Designing"/> and for the same reason, which is why
+    /// they share the machinery below: the controls go deaf, a transparent sheet over the top
+    /// takes the pointer, and what is under it is worked out from where things ended up rather
+    /// than by hit testing. What differs is only what happens then. Designing picks an element
+    /// up; this offers the parameter under the pointer to whatever is holding a controller,
+    /// which is none of the drawing's business, so it is said and not acted on.
+    /// </remarks>
+    public static readonly StyledProperty<bool> LinkingProperty =
+        AvaloniaProperty.Register<MachinePanelView, bool>(nameof(Linking));
+
+    /// <summary>
+    /// The parameter keys that already have something pointed at them, so the panel can say so.
+    /// </summary>
+    public static readonly StyledProperty<IReadOnlyCollection<string>?> LinkedProperty =
+        AvaloniaProperty.Register<MachinePanelView, IReadOnlyCollection<string>?>(nameof(Linked));
+
+    /// <summary>
     /// How far through the recording the machine has got, or -1 while nothing is sounding.
     /// </summary>
     /// <remarks>
@@ -278,6 +298,11 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private readonly Handles _handles = new() { IsHitTestVisible = false };
 
+    private readonly LinkGlow _glow = new() { IsHitTestVisible = false };
+
+    /// <summary>The parameters the panel was last built against, by key.</summary>
+    private Dictionary<string, MachineParameter> _values = new(StringComparer.Ordinal);
+
     /// <summary>What is being sized, or nothing when nobody is dragging a handle.</summary>
     private Sizing? _sizing;
 
@@ -294,7 +319,7 @@ public class MachinePanelView : Decorator
 
     static MachinePanelView()
     {
-        AffectsMeasure<MachinePanelView>(FaceProperty, DesigningProperty);
+        AffectsMeasure<MachinePanelView>(FaceProperty, DesigningProperty, LinkingProperty);
     }
 
     /// <summary>Raised whenever the selection lands somewhere, for code that would rather not bind.</summary>
@@ -413,6 +438,59 @@ public class MachinePanelView : Decorator
         set => SetValue(DesigningProperty, value);
     }
 
+    public bool Linking
+    {
+        get => GetValue(LinkingProperty);
+        set => SetValue(LinkingProperty, value);
+    }
+
+    public IReadOnlyCollection<string>? Linked
+    {
+        get => GetValue(LinkedProperty);
+        set => SetValue(LinkedProperty, value);
+    }
+
+    /// <summary>
+    /// The pointer came to rest on a control, naming the parameter behind it.
+    /// </summary>
+    /// <remarks>
+    /// The key and nothing else, in the shape of <see cref="TakeWanted"/> and
+    /// <see cref="ActionWanted"/>: the panel says what is under the pointer and whoever put it
+    /// on screen decides what that is worth. A drawing does not know what a controller is, and
+    /// this assembly is not going to learn.
+    ///
+    /// Said once per control rather than on every pointer move, so a hand crossing a panel
+    /// raises this as many times as there are controls under it and not four hundred.
+    /// </remarks>
+    public event EventHandler<string>? LinkWanted;
+
+    /// <summary>Somebody pressed a control that already has something pointed at it.</summary>
+    public event EventHandler<string>? UnlinkWanted;
+
+    /// <summary>
+    /// The pointer came to rest on a button, naming what that button asks for.
+    /// </summary>
+    /// <remarks>
+    /// Apart from <see cref="LinkWanted"/> because it is a different thing to point at. A knob
+    /// names a value, which anything can write; a button names something to be done, which only
+    /// whoever put the panel on screen knows how to do. A hardware button pressed on one is a
+    /// press, not a position.
+    /// </remarks>
+    public event EventHandler<string>? LinkActionWanted;
+
+    /// <summary>The actions that already have something pointed at them.</summary>
+    public static readonly StyledProperty<IReadOnlyCollection<string>?> LinkedActionsProperty =
+        AvaloniaProperty.Register<MachinePanelView, IReadOnlyCollection<string>?>(nameof(LinkedActions));
+
+    public IReadOnlyCollection<string>? LinkedActions
+    {
+        get => GetValue(LinkedActionsProperty);
+        set => SetValue(LinkedActionsProperty, value);
+    }
+
+    /// <summary>What the pointer last came to rest on, which is what the glow is around.</summary>
+    private MachineElement? _offered;
+
     /// <summary>
     /// Where the thing being carried would land, drawn as a line between two elements.
     /// </summary>
@@ -467,6 +545,7 @@ public class MachinePanelView : Decorator
             change.Property == PresetsProperty ||
             change.Property == AssetsProperty ||
             change.Property == DesigningProperty ||
+            change.Property == LinkingProperty ||
             change.Property == PadsProperty ||
             change.Property == SlicesProperty ||
             change.Property == KeyboardProperty ||
@@ -477,6 +556,12 @@ public class MachinePanelView : Decorator
         else if (change.Property == RereadProperty)
         {
             Said();
+        }
+        else if (change.Property == LinkedProperty || change.Property == LinkedActionsProperty)
+        {
+            // What is pointed at what changed, and the rings say which. Nothing about the
+            // panel itself moved, so it is redrawn rather than rebuilt.
+            ShowLinks();
         }
         else if (change.Property == MarkedProperty)
         {
@@ -509,6 +594,7 @@ public class MachinePanelView : Decorator
     public MachinePanelView()
     {
         AddHandler(PointerPressedEvent, Grabbed, RoutingStrategies.Tunnel);
+        AddHandler(PointerMovedEvent, Offers, RoutingStrategies.Tunnel);
         AddHandler(PointerMovedEvent, Sizes, RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent, Sized, RoutingStrategies.Tunnel);
     }
@@ -547,11 +633,18 @@ public class MachinePanelView : Decorator
                 parameters[parameter.Key] = parameter;
         }
 
+        // Kept, so that the pointer can be told which controls are worth pointing at. Not
+        // everything on a panel that names something names a value: a take picker names a text
+        // setting and a button names an action, and a knob turned at either does nothing a
+        // knob can do.
+        _values = parameters;
+
         var built = Build(panel.Root, parameters);
 
         // The layer outlives the panel it was over, so it has to be taken off the old one before
         // it can go on the new one. A control has one parent, and putting it on a second throws.
         if (_handles.Parent is Panel was) was.Children.Remove(_handles);
+        if (_glow.Parent is Panel lit) lit.Children.Remove(_glow);
 
         // The layer only exists while the panel is being laid out. Off, the panel measures to
         // exactly what it draws, which is what a machine standing in a song has to do.
@@ -562,11 +655,16 @@ public class MachinePanelView : Decorator
         // hit-tests either. With nothing under the pointer the press never reaches this panel,
         // so nothing can be picked by clicking it and no handle can be grabbed. The brush costs
         // one filled rectangle, and only while the bench is open.
-        Child = Designing && built != null
-            ? new Panel { Background = Brushes.Transparent, Children = { built, _handles } }
+        Child = (Designing || Linking) && built != null
+            ? new Panel { Background = Brushes.Transparent, Children = { built, _handles, _glow } }
             : built;
 
+        // A panel rebuilt is a panel whose controls are new objects, so what the pointer was
+        // resting on is gone whether or not it looks the same.
+        _offered = null;
+
         ShowSelection();
+        ShowLinks();
     }
 
     /// <summary>
@@ -1698,10 +1796,27 @@ public class MachinePanelView : Decorator
     /// everything from the top.
     /// </remarks>
     /// <summary>Has every control on the panel read its setting again.</summary>
+    /// <remarks>
+    /// Not while a control is in the middle of writing. A knob's value is set, which raises its
+    /// own change, which writes the setting, which tells whatever is watching, which asks the
+    /// panel to read itself again, which sets that same knob's value: all of it inside the first
+    /// setter, before it has finished. Avalonia promises nothing sensible about a property set
+    /// from within its own notification, and a read that lands wrong puts the control on its
+    /// default, which for a filter is wide open. So a knob being turned is not told what it has
+    /// just said. It already knows.
+    ///
+    /// A setting moved from anywhere else, a controller or another panel, does not come through
+    /// <see cref="Write(string, double)"/> and is read back as it always was.
+    /// </remarks>
     private void Said()
     {
+        if (_writing) return;
+
         foreach (var reader in _readers) Quietly(reader);
     }
+
+    /// <summary>True while a control on this panel is writing its setting.</summary>
+    private bool _writing;
 
     /// <summary>
     /// Remembers how a control says itself again, and says it once now.
@@ -2614,7 +2729,7 @@ public class MachinePanelView : Decorator
         _frames[element] = built;
         _elements[built] = element;
 
-        if (Designing && !holdsOthers) built.IsHitTestVisible = false;
+        if ((Designing || Linking) && !holdsOthers) built.IsHitTestVisible = false;
 
         return built;
     }
@@ -2667,6 +2782,115 @@ public class MachinePanelView : Decorator
         }
 
         return found;
+    }
+
+    /// <summary>
+    /// The pointer moved while the controller is being laid out.
+    /// </summary>
+    /// <remarks>
+    /// Resting on a control is the whole gesture. There is nothing to click, and that is what
+    /// makes laying out a bank of knobs a sweep of the hand rather than sixteen trips through a
+    /// menu: point at a knob, touch the one on the desk, point at the next.
+    ///
+    /// What was offered stays offered until the pointer reaches something else, which is not
+    /// tidiness but the point. Reaching for the controller means looking away from the screen,
+    /// and the pointer is then wherever it was left.
+    /// </remarks>
+    private void Offers(object? sender, PointerEventArgs e)
+    {
+        // Never on the bench. Laying a machine out and laying a controller out are two jobs
+        // with the same gesture, and the bench is the one place a pointer means something else
+        // already: there, a control is a thing to move and resize, not a thing to point at.
+        if (!Linking || Designing) return;
+
+        var under = ElementUnder(e.GetPosition(this));
+
+        // Between controls. What was offered is still offered.
+        if (under is null) return;
+
+        // Over something that names a setting a value cannot move: the take picker, which names
+        // a recording, or a label, which names something to print. Offering those would be an
+        // invitation to make a link that reaches nothing, and the glow would be the invitation.
+        // So the pointer passes over them as if they were not there.
+        // A button first: it names an action rather than a parameter, so it would fail the test
+        // below and be passed over, and pointing a hardware button at one is the whole reason
+        // this exists.
+        if (OffersAction(under)) return;
+
+        if (under.Parameter.Length == 0 || !_values.ContainsKey(under.Parameter)) return;
+
+        if (ReferenceEquals(under, _offered)) return;
+
+        _offered = under;
+
+        ShowLinks();
+
+        LinkWanted?.Invoke(this, under.Parameter);
+    }
+
+    /// <summary>
+    /// The pointer moved over a button while the controller is being laid out.
+    /// </summary>
+    /// <remarks>
+    /// A separate walk from <see cref="Offers"/> because a button is found a different way: it
+    /// names an action rather than a parameter, and the two are looked up in different places.
+    /// </remarks>
+    private bool OffersAction(MachineElement under)
+    {
+        if (Text(under, "action") is not { Length: > 0 } action) return false;
+
+        if (ReferenceEquals(under, _offered)) return true;
+
+        _offered = under;
+
+        ShowLinks();
+
+        LinkActionWanted?.Invoke(this, action);
+
+        return true;
+    }
+
+    /// <summary>Puts the glow where the pointer is and a quiet ring on everything already taken.</summary>
+    private void ShowLinks()
+    {
+        if (!Linking || Designing)
+        {
+            _glow.Showing(null, Array.Empty<Rect>());
+            return;
+        }
+
+        Rect? offered = _offered is { } one && _frames.TryGetValue(one, out var control)
+            ? Placed(control)
+            : null;
+
+        var taken = new List<Rect>();
+
+        if (Linked is { Count: > 0 } keys)
+        {
+            foreach (var (element, built) in _frames)
+            {
+                if (element.Parameter.Length == 0) continue;
+                if (!_values.ContainsKey(element.Parameter)) continue;
+                if (ReferenceEquals(element, _offered)) continue;
+                if (!keys.Contains(element.Parameter)) continue;
+
+                if (Placed(built) is { } area) taken.Add(area);
+            }
+        }
+
+        if (LinkedActions is { Count: > 0 } doing)
+        {
+            foreach (var (element, built) in _frames)
+            {
+                if (ReferenceEquals(element, _offered)) continue;
+                if (Text(element, "action") is not { Length: > 0 } action) continue;
+                if (!doing.Contains(action)) continue;
+
+                if (Placed(built) is { } area) taken.Add(area);
+            }
+        }
+
+        _glow.Showing(offered, taken);
     }
 
     /// <summary>
@@ -2800,7 +3024,18 @@ public class MachinePanelView : Decorator
     {
         if (_reading) return;
 
-        Values?.Set(key, value);
+        bool was = _writing;
+
+        _writing = true;
+
+        try
+        {
+            Values?.Set(key, value);
+        }
+        finally
+        {
+            _writing = was;
+        }
 
         if (!_watchers.TryGetValue(key, out var told)) return;
 
@@ -2977,6 +3212,30 @@ public class MachinePanelView : Decorator
     /// </remarks>
     private void Grabbed(object? sender, PointerPressedEventArgs e)
     {
+        // Laying out a controller, where a press takes a link off. Pointing at a control is
+        // what makes one, so the press is free for the other half of the job. Not on the bench,
+        // where a press picks an element up.
+        if (Linking && !Designing)
+        {
+            if (ElementUnder(e.GetPosition(this)) is { } pressed)
+            {
+                if (Text(pressed, "action") is { Length: > 0 } action
+                    && LinkedActions is { } doing && doing.Contains(action))
+                {
+                    UnlinkWanted?.Invoke(this, action);
+                    e.Handled = true;
+                }
+                else if (pressed.Parameter.Length > 0
+                         && Linked is { } keys && keys.Contains(pressed.Parameter))
+                {
+                    UnlinkWanted?.Invoke(this, pressed.Parameter);
+                    e.Handled = true;
+                }
+            }
+
+            return;
+        }
+
         if (!Designing) return;
 
         var at = e.GetPosition(this);

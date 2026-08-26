@@ -1,3 +1,4 @@
+using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -87,7 +88,57 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         if (Reads(id)) return;
 
+        Offer(id);
+
         _changed?.Invoke();
+    }
+
+    /// <summary>
+    /// When was the last time a parameter moved, and which ones have moved lately.
+    /// </summary>
+    /// <remarks>
+    /// A plugin drawing its own window is the one place the pointer cannot be used to say which
+    /// knob you mean, because the window belongs to another process and we do not know where
+    /// your mouse is inside it. What both standards do tell us is which parameter you touched:
+    /// VST3 the moment you touch it, CLAP at the end of the block. So in that window the knob
+    /// you just turned is the offer, and pointing at it is turning it.
+    /// </remarks>
+    private readonly System.Collections.Generic.Dictionary<uint, DateTime> _lately = new();
+
+    /// <summary>
+    /// Offers the parameter that just moved to whatever is holding a controller.
+    /// </summary>
+    /// <remarks>
+    /// Unless several moved at once, which is not a hand. Some plugins report a preset arriving
+    /// as a hundred separate moves rather than through <see cref="IPluginParameters.Reloaded"/>,
+    /// and taking the last of those as what you meant would point your knob at whatever
+    /// happened to be reported last.
+    /// </remarks>
+    private void Offer(uint id)
+    {
+        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
+
+        var now = DateTime.UtcNow;
+
+        _lately[id] = now;
+
+        foreach (var stale in _lately.Where(one => now - one.Value > TimeSpan.FromMilliseconds(250))
+                                     .Select(one => one.Key).ToList())
+            _lately.Remove(stale);
+
+        // A hand is on one knob. Three at once is a patch arriving.
+        if (_lately.Count > 2) return;
+
+        var parameter = Plugin.Parameters().FirstOrDefault(one => one.Id == id);
+
+        link.Offer(new Midi.ControlMapping
+        {
+            Kind = Midi.ControlKind.Insert,
+            Scope = Midi.ControlScope.Focused,
+            Plugin = Plugin.Info.Id,
+            Parameter = id,
+            Name = Plugin.Info.Name + " " + (parameter?.Name ?? id.ToString())
+        });
     }
 
     /// <summary>Which parameters the plugin is reporting rather than being set to.</summary>

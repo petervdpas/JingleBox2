@@ -605,6 +605,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     /// <summary>What the machine is called, so the panel can say which one this is.</summary>
     public string MachineName => _instrument.Machine.Name;
 
+    /// <summary>
+    /// Which machine this is, by the id its settings are stored under.
+    /// </summary>
+    /// <remarks>
+    /// For anything pointing at one of its parameters. A hardware knob is pointed at Zampler's
+    /// cutoff rather than at this instrument's, so the machine is what the mapping names and
+    /// the name on the front is not it: that can be reworded, and the id never is.
+    /// </remarks>
+    public string MachineId => Machine.For(_instrument.Kind).SlotId;
+
     public bool IsMonoSynth => _instrument.IsMonoSynth;
 
     public bool IsSynth => _instrument.IsSynth;
