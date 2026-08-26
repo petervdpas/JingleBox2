@@ -417,24 +417,82 @@ public sealed partial class MachinePresetDesk : ObservableObject
         return brought.Length > 0 ? Path.Combine(Folder, brought.Replace('/', Path.DirectorySeparatorChar)) : path;
     }
 
-    /// <summary>Takes it out of the machine, file and all.</summary>
+    /// <summary>
+    /// Takes it out of the machine, recordings and all.
+    /// </summary>
+    /// <remarks>
+    /// The recordings as well, because they are the preset's: they were copied inside the
+    /// machine so that the preset would travel, and a preset thrown away that leaves its audio
+    /// behind is audio that goes on being handed to whoever the machine is sent to, in a zip,
+    /// for ever, with nothing left pointing at it to say what it was.
+    ///
+    /// Only the files this preset names, and only then the folder, and only when it is empty
+    /// afterwards. A folder another preset also plays out of is left where it is, and so is
+    /// anything in there that no preset named: a note somebody dropped in beside the drums is
+    /// theirs, and this is not the place to decide otherwise.
+    /// </remarks>
     public IRelayCommand DeleteCommand => new RelayCommand(() =>
     {
         if (Picked is not { } one) return;
 
         try
         {
+            int gone = Sweep(one);
+
             File.Delete(one.Path);
 
-            Said = "Removed " + one.FileName;
-
             Reread();
+
+            // After the list is rebuilt, not before: picking a different preset is what happens
+            // when this one goes, and picking clears whatever the page was saying.
+            Said = gone == 0
+                ? "Removed " + one.FileName
+                : "Removed " + one.FileName + " and " + (gone == 1 ? "its recording" : gone + " recordings");
         }
         catch (Exception ex)
         {
             Problem = "It could not be removed: " + ex.Message;
         }
     });
+
+    /// <summary>
+    /// Removes the recordings a preset about to be deleted was the only one playing.
+    /// </summary>
+    /// <returns>How many files went.</returns>
+    private int Sweep(MachinePresetSlot one)
+    {
+        string home = Folder;
+
+        if (home.Length == 0) return 0;
+
+        if (Tracker.Machines.PresetWaves.Folder(one.Path, home) is not { Length: > 0 } folder) return 0;
+
+        // Anybody else playing out of it and the folder is not this preset's to take.
+        var others = Tracker.Machines.PresetWaves.Users(folder, home, Presets
+            .Where(slot => !Tracker.FilePaths.Same(slot.Path, one.Path))
+            .Select(slot => slot.Path));
+
+        if (others.Count > 0) return 0;
+
+        int gone = 0;
+
+        foreach (string named in Tracker.Machines.PresetWaves.Named(one.Path))
+        {
+            string full = Tracker.Machines.MachinePaths.Outside(named, home);
+
+            if (!Tracker.Machines.MachinePaths.Under(full, home) || !File.Exists(full)) continue;
+
+            File.Delete(full);
+
+            gone++;
+        }
+
+        // Only when nothing of anybody else's is left in it.
+        if (Directory.Exists(folder) && Directory.GetFileSystemEntries(folder).Length == 0)
+            Directory.Delete(folder);
+
+        return gone;
+    }
 
     /// <summary>
     /// Copies a recording into the preset's own folder, and hands back what to write down.
@@ -458,8 +516,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
             string home = Path.GetFullPath(Waves);
 
-            Directory.CreateDirectory(home);
-
             string named = Path.GetFileNameWithoutExtension(path);
             string suffix = Path.GetExtension(path);
 
@@ -475,6 +531,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
                     continue;
                 }
+
+                // Made here rather than on the way in, so an import that goes wrong leaves
+                // nothing behind. An empty folder named after a preset is a folder somebody has
+                // to work out the meaning of later.
+                Directory.CreateDirectory(home);
 
                 File.Copy(path, full);
 

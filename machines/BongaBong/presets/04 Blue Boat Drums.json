@@ -1,0 +1,60 @@
+{
+  "Name": "Blue Boat Drums",
+  "Machine": "machine.bongabong",
+  "C-4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-low-kick.wav",
+    "pad_name": "Kick",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "C#4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-clap.wav",
+    "pad_name": "Clap",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "D-4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-closed-hi-hat.wav",
+    "pad_name": "Hat closed",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "D#4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-open-hi-hat.wav",
+    "pad_name": "Hat open",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "E-4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-mid-kick.wav",
+    "pad_name": "Kick mid",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "F-4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-high-kick.wav",
+    "pad_name": "Kick high",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "F#4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-ride.wav",
+    "pad_name": "Ride",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "G-4": {
+    "pad_take": "Blue Boat Drums/blue-boat-drum-shot-shaker.wav",
+    "pad_name": "Shaker",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  }
+}

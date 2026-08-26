@@ -44,6 +44,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Values = new MachinePreviewValues(Parameters);
 
         PresetDesk = new MachinePresetDesk(() => Project);
+
+        Utilities = new MachineUtilities(PresetDesk);
     }
 
     /// <summary>
@@ -57,7 +59,17 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public MachinePresetDesk PresetDesk { get; }
 
     /// <summary>
-    /// Which page is open: nought the screen, one the presets.
+    /// The jobs that are neither drawing a panel nor filling in a preset.
+    /// </summary>
+    /// <remarks>
+    /// Its own page for the same reason the presets have one: renaming a kit and levelling its
+    /// recordings have nothing to say to each other about layout, and neither of them is
+    /// something you do while you are doing anything else.
+    /// </remarks>
+    public MachineUtilities Utilities { get; }
+
+    /// <summary>
+    /// Which page is open: nought the screen, one the presets, two the tools.
     /// </summary>
     /// <remarks>
     /// A number rather than two flags, since exactly one is open and two flags can say
@@ -66,6 +78,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OnScreen))]
     [NotifyPropertyChangedFor(nameof(OnPresets))]
+    [NotifyPropertyChangedFor(nameof(OnUtilities))]
     [NotifyPropertyChangedFor(nameof(CanDesign))]
     private int page;
 
@@ -85,6 +98,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     public bool OnPresets => Page == 1;
 
+    public bool OnUtilities => Page == 2;
+
     /// <summary>
     /// Reads the machine's presets folder when that tab is opened.
     /// </summary>
@@ -96,6 +111,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     partial void OnPageChanged(int value)
     {
         if (OnPresets) PresetDesk.Reread();
+
+        // The same reason, one step further along: a level is a fact about a file, and the file
+        // may have been rewritten by anything since the last time this page was looked at.
+        if (OnUtilities) Utilities.Reread();
     }
 
     public bool HasProject => Project != null;

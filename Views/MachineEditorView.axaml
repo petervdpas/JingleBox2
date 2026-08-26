@@ -670,7 +670,7 @@
                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                     Command="{Binding MachineEditor.PresetDesk.DeleteCommand}"
                     IsEnabled="{Binding MachineEditor.PresetDesk.HasPreset}"
-                    ToolTip.Tip="Deletes the file. What it pointed at is left alone." />
+                    ToolTip.Tip="Deletes the preset and the recordings it was the only one playing. A folder another preset plays out of is left alone, and so is anything in there no preset named." />
           </Grid>
 
           <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
@@ -812,6 +812,117 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+    </Grid>
+    </TabItem>
+
+    <TabItem Header="Utilities">
+    <!-- The jobs somebody would otherwise do in a file manager and a text editor. Both act on
+         the preset picked on the presets page, because that is what you are working on and a
+         second picker would only let the two pages disagree about it. -->
+    <Grid Margin="0,8,0,0" ColumnDefinitions="380,12,*" MinWidth="0">
+
+      <Border Grid.Column="0" Classes="card" VerticalAlignment="Top">
+        <StackPanel Classes="cardBody">
+          <TextBlock Classes="cardTitle" Text="Rename the preset" />
+
+          <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                     Text="Three things at once: the file, the name written inside it, and the folder its recordings sit in along with every path that points into it. The number the file starts with is kept, so a preset stays where it is in the list." />
+
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="6"
+                Margin="0,4,0,0">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="File:" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding MachineEditor.Utilities.PresetFile}" />
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Recordings:" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Text="{Binding MachineEditor.Utilities.WaveFolder}"
+                       ToolTip.Tip="The folder this preset plays out of. It is renamed with the preset, unless another preset plays out of it too." />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,4,0,0">
+            <TextBox Grid.Column="0" Text="{Binding MachineEditor.Utilities.Wanted}"
+                     IsEnabled="{Binding MachineEditor.Utilities.HasPreset}"
+                     PlaceholderText="What it should be called" />
+
+            <Button Grid.Column="1" Content="Rename"
+                    Command="{Binding MachineEditor.Utilities.RenameCommand}"
+                    IsEnabled="{Binding MachineEditor.Utilities.HasPreset}" />
+          </Grid>
+
+          <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                     IsVisible="{Binding !MachineEditor.Utilities.HasPreset}"
+                     Text="Pick a preset on the presets page first." />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Level the recordings" />
+
+          <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap" Margin="0,4,0,0"
+                     Text="The files this preset plays, rewritten at a new level. They live inside the machine and travel with it, so the level travels too." />
+
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,180,Auto,Auto,*,Auto"
+                ColumnSpacing="10" Margin="0,10,0,0">
+            <TextBlock Grid.Column="0" Classes="label" Text="Loudest onto:" VerticalAlignment="Center" />
+
+            <ui:Slide Grid.Column="1" VerticalAlignment="Center"
+                      Minimum="{Binding MachineEditor.Utilities.LeastTarget}"
+                      Maximum="{Binding MachineEditor.Utilities.MostTarget}"
+                      SmallStep="0.5" LargeStep="3" DefaultValue="-1"
+                      Value="{Binding MachineEditor.Utilities.Target}" />
+
+            <TextBlock Grid.Column="2" VerticalAlignment="Center" MinWidth="52"
+                       FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                       Text="{Binding MachineEditor.Utilities.Target, StringFormat={}{0:0.0} dB}" />
+
+            <CheckBox Grid.Column="3" VerticalAlignment="Center"
+                      IsChecked="{Binding MachineEditor.Utilities.KeepsBalance}"
+                      Content="Keep the balance"
+                      ToolTip.Tip="One gain for the whole set, taken from the loudest file, so a kit that was simply recorded quiet comes up without the quiet things starting to shout. Off, every file is put on the target itself, which suits a folder of odds and ends that were never a set." />
+
+            <Button Grid.Column="5" Content="Level them"
+                    Command="{Binding MachineEditor.Utilities.LevelCommand}"
+                    IsEnabled="{Binding MachineEditor.Utilities.CanLevel}" />
+          </Grid>
+
+          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
+                     Margin="0,8,0,0" Foreground="{DynamicResource DangerBrush}"
+                     IsVisible="{Binding MachineEditor.Utilities.HasProblem}"
+                     Text="{Binding MachineEditor.Utilities.Problem}" />
+
+          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" Margin="0,8,0,0"
+                     Text="{Binding MachineEditor.Utilities.Said}" />
+
+          <Border Classes="inset" Margin="0,10,0,0" Padding="0">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding MachineEditor.Utilities.Waves}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:WaveLevel">
+                    <Grid ColumnDefinitions="*,70,70" ColumnSpacing="8" Margin="8,3">
+                      <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                 ToolTip.Tip="{Binding Named}"
+                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+                      <TextBlock Grid.Column="1" Text="{Binding PeakText}"
+                                 FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+
+                      <TextBlock Grid.Column="2" Text="{Binding GainText}" Classes="cardHint"
+                                 FontFamily="Consolas,Menlo,monospace" FontSize="11"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
         </DockPanel>
       </Border>
 

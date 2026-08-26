@@ -1,0 +1,53 @@
+{
+  "Name": "Dirty Old-School",
+  "Machine": "machine.bongabong",
+  "C-4": {
+    "pad_take": "Dirty Old-School/dirty-old-school-kick.wav",
+    "pad_name": "Kick",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "C#4": {
+    "pad_take": "Dirty Old-School/old-school-snare-fat-punchy.wav",
+    "pad_name": "Snare",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "D-4": {
+    "pad_take": "Dirty Old-School/muted-dirty-open-hi-hat.wav",
+    "pad_name": "Hat muted",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "D#4": {
+    "pad_take": "Dirty Old-School/noisy-open-hi-hat.wav",
+    "pad_name": "Hat open",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 1
+  },
+  "E-4": {
+    "pad_take": "Dirty Old-School/dirty-muddy-old-school-kick.wav",
+    "pad_name": "Kick muddy",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "F-4": {
+    "pad_take": "Dirty Old-School/noisy-lo-fi-kick.wav",
+    "pad_name": "Kick lo-fi",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  },
+  "F#4": {
+    "pad_take": "Dirty Old-School/creepy-church-bell.wav",
+    "pad_name": "Bell",
+    "pad_level": 1,
+    "pad_pan": 0,
+    "pad_choke": 0
+  }
+}
