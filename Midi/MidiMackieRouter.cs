@@ -78,15 +78,21 @@ public sealed class MidiMackieRouter
 
     private readonly IControlTargets _targets;
     private readonly Func<int> _tracks;
+    private readonly MackieSurface? _surface;
 
     /// <param name="tracks">
     /// How many there are, so banking stops at the end instead of walking off it and leaving
     /// eight faders pointed at nothing with no clue as to why.
     /// </param>
-    public MidiMackieRouter(IControlTargets targets, Func<int> tracks)
+    /// <param name="surface">
+    /// The half that writes back, where there is one. Optional because the reading half is
+    /// worth having on its own and because every test of this would otherwise need a port.
+    /// </param>
+    public MidiMackieRouter(IControlTargets targets, Func<int> tracks, MackieSurface? surface = null)
     {
         _targets = targets;
         _tracks = tracks;
+        _surface = surface;
     }
 
     /// <summary>Which track the leftmost strip is on.</summary>
@@ -95,6 +101,17 @@ public sealed class MidiMackieRouter
     public void Handle(MidiMessage? message)
     {
         if (message is null) return;
+
+        // A surface speaks and listens on the same port, so the first thing it says is also
+        // where to answer. Nothing has to be ticked twice and a device moved to another socket
+        // still works.
+        if (_surface is not null && !string.Equals(_surface.Device, message.Device, StringComparison.Ordinal))
+        {
+            _surface.Device = message.Device;
+            _surface.Bank = Bank;
+            _surface.Gone();
+            _surface.Draw();
+        }
 
         switch (message.Type)
         {
@@ -114,10 +131,9 @@ public sealed class MidiMackieRouter
     /// are the same thing and there is nothing to reconcile. Picking up would mean hunting for a
     /// value the fader is already sitting on.
     ///
-    /// Until the writing half of this exists the motors are not driven, so the first touch of a
-    /// fader after opening a song will jump the level to wherever the fader was left. That is
-    /// what the protocol asks for and what fixes it is sending positions back, not softening
-    /// this.
+    /// Which is only true because <see cref="MackieSurface"/> drives it there. Without the
+    /// writing half this would be right in principle and wrong in the room: the first touch
+    /// after opening a song would throw the level to wherever the fader was left standing.
     /// </remarks>
     private void Fader(MidiMessage message)
     {
@@ -136,6 +152,10 @@ public sealed class MidiMackieRouter
         if (Aim(strip, MixControl.Volume) is not { } target) return;
 
         double part = Math.Clamp(message.Data / Travel, 0, 1);
+
+        // Written down as though it had been sent, which is what stops the level, having
+        // changed, asking for this fader to be moved to where it already is.
+        _surface?.Heard(strip, message.Data);
 
         target.Set(target.Min + part * (target.Max - target.Min));
 
@@ -175,11 +195,14 @@ public sealed class MidiMackieRouter
     /// <summary>A button, on the press and not the release.</summary>
     private void Pressed(MidiMessage message)
     {
-        // Held is a note on at full velocity and let go is the same note at nothing, which is
-        // how surfaces send it. Doing both would toggle twice and leave everything as it was.
-        if (!message.IsOn) return;
-
         int note = message.Value;
+
+        // Letting go of a fader is a message worth having, and it is a note off. Everything
+        // else here is a press: held is a note on at full velocity and let go is the same note
+        // at nothing, and acting on both would toggle twice and leave it as it was.
+        if (Within(note, TouchFrom)) { _surface?.Touched(note - TouchFrom, message.IsOn); return; }
+
+        if (!message.IsOn) return;
 
         // Answered by the transport router, which is on this same port. Reading it here as well
         // would start and then stop on one press.
@@ -203,10 +226,6 @@ public sealed class MidiMackieRouter
         if (Within(note, SelectFrom)) { Say(message, "select on strip " + (note - SelectFrom + 1) + ", which this does nothing with yet"); return; }
         if (Within(note, PressFrom)) { Say(message, "a knob pressed on strip " + (note - PressFrom + 1) + ", which this does nothing with yet"); return; }
 
-        // A hand landing on a fader, which is worth nothing until the motors are driven: it is
-        // how a surface says stop moving this one, and nothing is moving it.
-        if (Within(note, TouchFrom)) return;
-
         Log.Write(LogArea.Midi, () =>
             "mackie: '" + message.Device + "' sent note " + note
             + ", which is a button this does not read");
@@ -226,6 +245,8 @@ public sealed class MidiMackieRouter
         double now = target.Value >= 0.5 ? 0 : 1;
 
         target.Set(now);
+
+        _surface?.Draw();
 
         Log.Write(LogArea.Midi, () =>
             "mackie: '" + message.Device + "' pressed " + called + " on strip " + (strip + 1)
@@ -268,6 +289,8 @@ public sealed class MidiMackieRouter
         }
 
         Bank = wanted;
+
+        if (_surface is not null) { _surface.Bank = Bank; _surface.Draw(); }
 
         Log.Write(LogArea.Midi, () =>
             "mackie: '" + message.Device + "' moved the strips to tracks "

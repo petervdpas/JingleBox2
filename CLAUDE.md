@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-313 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+329 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -225,7 +225,11 @@ because that exact thing was wrong once.
   lists, and says what each of a device's ports is for in SETTINGS, which is the answer to why a
   MiniLab shows up four times. It also works out which of the device's programs is running, from
   the numbers arriving: a MiniLab has seven and switching rearranges everything it sends, with
-  nothing announced, but the programs do not overlap so one message is usually enough. A number
+  nothing announced, but the programs do not overlap so one message is usually enough. That is
+  not a workaround for a missing question. Arturia's own settings protocol was read with
+  `sysex-controls` on 2026-08-27 and its Selected Preset Name field is **write-only**: the
+  device will accept a name for the current preset and will not say which one is loaded. Even
+  the vendor cannot ask, so inferring it from the numbers is the only method there is. A number
   in two programs says nothing and is ignored; a name from the wrong program would be worse than
   a number, since a number is merely unhelpful. Nothing requires a profile: without one a control
   is called by its number, which is what it always was
@@ -378,8 +382,29 @@ because that exact thing was wrong once.
 - A fader lands rather than picking up, which contradicts every other position-reporting
   control here and is right: on a surface like this the fader is motorised and has already been
   driven to where the parameter is, so picking up would be hunting for a value it is sitting on.
-  Until the writing half exists the motors are not driven, so the first touch after opening a
-  song jumps the level. What fixes that is sending positions back, not softening this
+  That is only true because the writing half drives it there, which is why the two halves are
+  one piece of work rather than two
+- `Midi/MackieSurface.cs` is what a surface is told: fader positions as pitch bend, button
+  lights as note on at 0x7F or nothing, the ring round each knob as CC 0x30 plus the strip with
+  the mode in bits 4 and 5, and the two lines of the display as
+  `F0 00 00 66 14 12 <offset> <fifty six characters> F7` with the second line at 0x38. Seven
+  characters a strip, the track's name above and its pan below, since the fader is already
+  showing the level in the one way a number cannot. Every message is compared with what was
+  last sent and dropped if it would say the same again, which is not tidiness: a display line
+  is sixty two bytes and the mix moves for all sorts of reasons
+- Which port to write to is learned from what arrives rather than configured. A surface speaks
+  and listens on the same port, so the first thing it says is also the address to answer on,
+  and a device moved to another socket still works
+- Two things stop the desk fighting the hand. A hand on a fader is a note in the 0x68 row, and
+  while it is there the motor is left alone, because driving it against a hand feels like a
+  fault rather than a policy; letting go puts it back. And a fader position that arrives is
+  written down as though it had been sent, which breaks the loop where a hand moves the fader,
+  the level follows, and the level having changed asks for the fader to be moved to where it
+  already is. No timing and no suppression window
+- `TrackerViewModel.MixShown` is how the surface hears that the mix moved, since the levels are
+  under its own faders and the names on its own display. Deliberately not a subscription to each
+  strip: the strips are rebuilt whenever the song is, so anything holding them would be holding
+  the last song's
 - The five transport notes are refused by name in the Mackie router, because
   `MidiTransportRouter` already answers them and they arrive on the same port. That is the only
   place the two could overlap, and answering twice would stop what the press had started
@@ -483,6 +508,28 @@ because that exact thing was wrong once.
   is cheaper: read the manual in `docs/` before asking somebody to press a button, because two
   rounds went on asking for a 16 Level button that this model does not have and neighbouring
   Akai models do
+- The MiniLab 3's file was checked against the device itself on 2026-08-27, with `sysex-controls`
+  reading Arturia's own settings protocol rather than anybody turning anything. All twelve of the
+  Arturia program's numbers are right, knobs 74, 71, 76, 77, 93, 18, 19, 16 and faders 82, 83,
+  85, 17, and its pads are notes 36 to 51 over two banks on channel 10, gated. Two things came
+  out of it that the wire could not have said. The Controller page's Transport Mode reads MCU,
+  which had only been inferred. And every knob's Option reads Absolute where this file says that
+  program counts notches, which is unresolved: what was read is User Preset 1 and not the factory
+  Analog Lab program, so both can be true, and it is written up in the file rather than acted on.
+  Reading it also turned up the main knob, three controls that were missing from the file
+  altogether (CC 114 turning, 112 with Shift, 115 pressed), and the hard justification for the
+  Lua codec: the Pitch strip's page has no CC field at all, only a channel and a range, so it
+  cannot be made to send a controller on the device and the codec is the only way that strip can
+  ever be pointed at anything
+- The MPD218 answers the universal identity request and refuses everything else. `F0 7E 00 06 02
+  47 34 00 19 00 01 01 02 00 00 7F 7F 7F` and then its serial number in ASCII: manufacturer 47 is
+  Akai, family 0034, member 0019. That is in `controllers/mpd218.json` now and it is the one name
+  a device has that survives a different operating system, a different socket and a second one
+  being plugged in. What it will not answer is Akai's own settings protocol, which is the thing
+  that would have read all eighteen knob assignments without anybody turning anything:
+  `sysex-controls` asks and gets ETIMEDOUT, and lists this model as supported but untested. So
+  the by-hand measurement was not avoidable here, whatever it looked like. It would be avoidable
+  on the Arturia hardware, which that tool really does support
 - Lua is embedded, MoonSharp, and it is fenced in: `Scripting/LuaScript.cs` names every library
   a script may reach rather than using a preset, so there is no io, no os and no loading more
   code, and a script that throws or takes more than 20ms is switched off rather than called

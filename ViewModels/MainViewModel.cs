@@ -824,7 +824,23 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         // A control surface, which needs no file and no learning: the protocol says what every
         // control on it is. Reaches the mixer through the same targets a link does.
-        var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount);
+        //
+        // Both halves. The writing one is what makes a desk feel attached to the music rather
+        // than wired to it, and it is also what makes the reading half correct: a fader here
+        // lands on the value rather than picking up, which is only right because the fader has
+        // already been driven to where the value is.
+        var surface = new MackieSurface(
+            midiService, targets, () => Tracker.TrackCount,
+            track => Tracker.Strips.FirstOrDefault(one => one.Track == track)?.InstrumentName
+                         is { Length: > 0 } named
+                     ? named
+                     : "TR-" + (track + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture));
+
+        var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount, surface);
+
+        // The levels are under its faders and the names are on its display, and it has no other
+        // way of hearing that either moved.
+        Tracker.MixShown = surface.Draw;
 
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,

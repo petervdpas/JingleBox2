@@ -1793,6 +1793,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Strips.Add(new TrackStripViewModel(
                 track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount, OnMixChanged));
         }
+
+        MixShown?.Invoke();
     }
 
     /// <summary>
@@ -1807,7 +1809,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             var instrument = Song.InstrumentAt(Song.GetTrackInstrument(strip.Track));
             strip.InstrumentName = instrument?.Name ?? "";
         }
+
+        MixShown?.Invoke();
     }
+
+    /// <summary>
+    /// Told whenever the mix moves, for anything showing it that is not on the screen.
+    /// </summary>
+    /// <remarks>
+    /// A control surface, which has the levels under its own faders and the names on its own
+    /// display and has no other way of hearing that either changed. Deliberately not a
+    /// subscription to each strip: the strips are rebuilt whenever the song is, so anything
+    /// holding them would be holding the last song's.
+    /// </remarks>
+    public Action? MixShown { get; set; }
 
     /// <summary>A fader or a mute moved: hear it now, and remember the song has changed.</summary>
     private void OnMixChanged()
@@ -1817,6 +1832,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _player.ApplyMix();
         MarkDirty();
+
+        MixShown?.Invoke();
     }
 
     /// <summary>

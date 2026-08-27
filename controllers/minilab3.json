@@ -1,82 +1,228 @@
 {
   "name": "MiniLab 3",
-
-  "matches": [ "Minilab3*", "MiniLab 3*", "*MiniLab3*" ],
-
+  "matches": [
+    "Minilab3*",
+    "MiniLab 3*",
+    "*MiniLab3*"
+  ],
   "identity": {
     "manufacturer": "00 20 6B",
     "family": "0002",
     "member": "0404"
   },
-
   "ports": [
-    { "match": "*MIDI*", "role": "controls",
-      "note": "notes, pads, encoders, sliders, and the transport while it is in its DAW program" },
-    { "match": "*MCU*", "role": "transport",
-      "note": "Mackie Control, on a port of its own. Arturia asks for this or the DAW program and never both, or every press is answered twice" },
-    { "match": "*ALV*", "role": "screen",
-      "note": "Analog Lab's screen messages. JingleBox2 writes the screen on the main port instead" },
-    { "match": "*DIN*", "role": "thru",
-      "note": "the host out to the 5-pin socket. an output, so nothing ever arrives from it" }
+    {
+      "match": "*MIDI*",
+      "role": "controls",
+      "note": "notes, pads, encoders, sliders, and the transport while it is in its DAW program"
+    },
+    {
+      "match": "*MCU*",
+      "role": "transport",
+      "note": "Mackie Control, on a port of its own. Arturia asks for this or the DAW program and never both, or every press is answered twice"
+    },
+    {
+      "match": "*ALV*",
+      "role": "screen",
+      "note": "Analog Lab's screen messages. JingleBox2 writes the screen on the main port instead"
+    },
+    {
+      "match": "*DIN*",
+      "role": "thru",
+      "note": "the host out to the 5-pin socket. an output, so nothing ever arrives from it"
+    }
   ],
-
   "controls": [
-    { "name": "Mod strip", "cc": 1, "kind": "strip" }
+    {
+      "name": "Mod strip",
+      "cc": 1,
+      "kind": "strip"
+    },
+    {
+      "name": "Main knob",
+      "cc": 114,
+      "channel": 0,
+      "kind": "encoder"
+    },
+    {
+      "name": "Main knob + Shift",
+      "cc": 112,
+      "channel": 0,
+      "kind": "encoder",
+      "shift": true
+    },
+    {
+      "name": "Main knob click",
+      "cc": 115,
+      "channel": 0,
+      "kind": "button"
+    }
   ],
-
   "programs": [
     {
       "name": "DAW",
-
       "//": "Encoders here walk through a range, measured on the wire. They are endless knobs reporting a position, which is the awkward combination: read as a position they are a fader that never ends, read as movement they behave as the hardware does.",
       "sends": "absolute",
-
       "controls": [
-        { "name": "Encoder 1", "cc": 86, "kind": "encoder" },
-        { "name": "Encoder 2", "cc": 87, "kind": "encoder" },
-        { "name": "Encoder 3", "cc": 89, "kind": "encoder" },
-        { "name": "Encoder 4", "cc": 90, "kind": "encoder" },
-        { "name": "Encoder 5", "cc": 110, "kind": "encoder" },
-        { "name": "Encoder 6", "cc": 111, "kind": "encoder" },
-        { "name": "Encoder 7", "cc": 116, "kind": "encoder" },
-        { "name": "Encoder 8", "cc": 117, "kind": "encoder" },
-
-        { "name": "Slider 1", "cc": 14, "kind": "fader" },
-        { "name": "Slider 2", "cc": 15, "kind": "fader" },
-        { "name": "Slider 3", "cc": 30, "kind": "fader" },
-        { "name": "Slider 4", "cc": 31, "kind": "fader" },
-
-        { "name": "Loop", "cc": 105, "kind": "button", "shift": true },
-        { "name": "Stop", "cc": 106, "kind": "button", "shift": true },
-        { "name": "Play", "cc": 107, "kind": "button", "shift": true },
-        { "name": "Record", "cc": 108, "kind": "button", "shift": true },
-        { "name": "Tap tempo", "cc": 109, "kind": "button", "shift": true }
+        {
+          "name": "Encoder 1",
+          "cc": 86,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 2",
+          "cc": 87,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 3",
+          "cc": 89,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 4",
+          "cc": 90,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 5",
+          "cc": 110,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 6",
+          "cc": 111,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 7",
+          "cc": 116,
+          "kind": "encoder"
+        },
+        {
+          "name": "Encoder 8",
+          "cc": 117,
+          "kind": "encoder"
+        },
+        {
+          "name": "Slider 1",
+          "cc": 14,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 2",
+          "cc": 15,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 3",
+          "cc": 30,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 4",
+          "cc": 31,
+          "kind": "fader"
+        },
+        {
+          "name": "Loop",
+          "cc": 105,
+          "kind": "button",
+          "shift": true
+        },
+        {
+          "name": "Stop",
+          "cc": 106,
+          "kind": "button",
+          "shift": true
+        },
+        {
+          "name": "Play",
+          "cc": 107,
+          "kind": "button",
+          "shift": true
+        },
+        {
+          "name": "Record",
+          "cc": 108,
+          "kind": "button",
+          "shift": true
+        },
+        {
+          "name": "Tap tempo",
+          "cc": 109,
+          "kind": "button",
+          "shift": true
+        }
       ]
     },
-
     {
       "name": "Arturia",
-
       "//": "And here the same eight knobs send the same number over and over, which is a notch count. Which of the two counting conventions is not recorded, so it is watched for rather than assumed.",
       "sends": "relative",
-
       "controls": [
-        { "name": "Knob 1 (Brightness)", "cc": 74, "kind": "encoder" },
-        { "name": "Knob 2 (Timbre)", "cc": 71, "kind": "encoder" },
-        { "name": "Knob 3 (Time)", "cc": 76, "kind": "encoder" },
-        { "name": "Knob 4 (Movement)", "cc": 77, "kind": "encoder" },
-        { "name": "Knob 5 (FX A)", "cc": 93, "kind": "encoder" },
-        { "name": "Knob 6 (FX B)", "cc": 18, "kind": "encoder" },
-        { "name": "Knob 7 (Delay)", "cc": 19, "kind": "encoder" },
-        { "name": "Knob 8 (Reverb)", "cc": 16, "kind": "encoder" },
-
-        { "name": "Fader 1 (Bass)", "cc": 82, "kind": "fader" },
-        { "name": "Fader 2 (Mid)", "cc": 83, "kind": "fader" },
-        { "name": "Fader 3 (Treble)", "cc": 85, "kind": "fader" },
-        { "name": "Fader 4 (Master)", "cc": 17, "kind": "fader" }
+        {
+          "name": "Knob 1 (Brightness)",
+          "cc": 74,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 2 (Timbre)",
+          "cc": 71,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 3 (Time)",
+          "cc": 76,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 4 (Movement)",
+          "cc": 77,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 5 (FX A)",
+          "cc": 93,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 6 (FX B)",
+          "cc": 18,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 7 (Delay)",
+          "cc": 19,
+          "kind": "encoder"
+        },
+        {
+          "name": "Knob 8 (Reverb)",
+          "cc": 16,
+          "kind": "encoder"
+        },
+        {
+          "name": "Fader 1 (Bass)",
+          "cc": 82,
+          "kind": "fader"
+        },
+        {
+          "name": "Fader 2 (Mid)",
+          "cc": 83,
+          "kind": "fader"
+        },
+        {
+          "name": "Fader 3 (Treble)",
+          "cc": 85,
+          "kind": "fader"
+        },
+        {
+          "name": "Fader 4 (Master)",
+          "cc": 17,
+          "kind": "fader"
+        }
       ]
     }
   ],
-
-  "note": "Eight encoders in two rows of four, four sliders, eight pads in two banks (channel 10, notes 36-43 and 44-51), 25 keys, a pitch strip and a mod strip, and an OLED with a clickable browser knob. Shift and Pad 3 cycles the programs: Arturia, DAW, and up to five the owner builds in Arturia's MIDI Control Center. The two here are the manufacturer's. The transport is Shift and Pads 4 to 8, which is why a bare press sends nothing at all. Encoders in DAW send absolute values; in Arturia they count notches. The pitch strip sends pitch bend, which minilab3.lua turns into CC 2. Measured on the wire and checked against docs/minilab-3_Manual_1_0_5_EN.pdf."
+  "note": "Eight encoders in two rows of four, four sliders, eight pads in two banks (channel 10, notes 36-43 and 44-51), 25 keys, a pitch strip and a mod strip, and an OLED with a clickable browser knob. Shift and Pad 3 cycles the programs: Arturia, DAW, and up to five the owner builds in Arturia's MIDI Control Center. The two here are the manufacturer's. The transport is Shift and Pads 4 to 8, which is why a bare press sends nothing at all. Encoders in DAW send absolute values; in Arturia they count notches. The pitch strip sends pitch bend, which minilab3.lua turns into CC 2. Measured on the wire and checked against docs/minilab-3_Manual_1_0_5_EN.pdf.\n\nVerified against the device on 2026-08-27 with sysex-controls, which reads Arturia's own settings protocol. All twelve of the Arturia program's numbers are right: knobs 74, 71, 76, 77, 93, 18, 19, 16 and faders 82, 83, 85, 17, with Arturia's own names beside them. Firmware 1.2.0, and the Controller page's Transport Mode reads MCU, which had only been inferred from the wire.\n\nOne thing disagrees and is left as it is for now. Every knob's Option reads Absolute, and this file says the Arturia program sends relative. What was read is User Preset 1, which is not the factory Analog Lab program and only carries its numbers, so the two can both be true. It matters because it is exactly the failure ControlPickup.Endless exists for: a knob reporting positions, matched to a program this file says counts notches, is told nothing and then sensed as a fader, and every session after that opens with a hunt for the value using a knob that has no end to hunt from. Settled by turning one knob with the device on the factory program and watching whether the value walks or repeats.\n\nThe Selected Preset Name field is write-only. The device will accept a name for the current preset and will not say which one is loaded, so working the program out from the numbers arriving is not a workaround for a missing question: there is no question to ask.\n\nThe pads were read at the same time and cannot be written down here, since this file describes continuous controllers and a pad is a note. Sixteen of them in two banks of eight, consecutive from 36: bank A is 36 to 43 and bank B is 44 to 51, all on channel 10, sending notes rather than controllers, and gated rather than latching so a pad held is a note held. Each one also carries a colour, which is the half of this device nothing here writes to: the screen is driven and the pad lights are not.\n\nThe main knob beside the screen is three controls and was missing from this file entirely: turning it is CC 114, turning it with Shift held is CC 112, and pressing it is CC 115 gated between 0 and 127. Read on User Presets 1 and 2 and identical on both, so it is a fact about the device rather than about a preset, which is why it sits with the modulation strip rather than inside a program. It has no Absolute or Relative option of its own, unlike the eight knobs, so nothing is claimed about how it counts.\n\nThe Shift / Pitch / Mod page settles why the Lua codec exists. The Mod strip's page has an Output field set to CC and a CC field reading 1 Modulation Wheel, which is what this file says. The Pitch strip's page has no Output field and no CC field at all: channel, minimum and maximum, and nothing else. It cannot be made to send a controller on the device, because pitch bend has no controller number, so `controllers/minilab3.lua` is not a convenience. It is the only way that strip can ever be pointed at anything.\n\nShift Mode on that page read Off, which means CC 112, the shifted main knob, fires on no preset where it is left that way. The same shape as an MPD218 with Full Level lit: a control doing nothing for a reason the wire never mentions."
 }

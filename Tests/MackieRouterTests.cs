@@ -64,7 +64,8 @@ public class MackieRouterTests
 
         // Every other position-reporting control here is picked up. This one is not, and that
         // is not an inconsistency: the fader is motorised and has already been driven to where
-        // the parameter is, so picking up would mean hunting for a value it is sitting on.
+        // the parameter is by MackieSurface, so picking up would mean hunting for a value it is
+        // sitting on.
         router.Handle(Fader(0, 4096));
 
         Assert.Equal(0.25, mixer.At(0).Value, 3);

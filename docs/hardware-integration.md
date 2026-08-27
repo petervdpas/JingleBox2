@@ -739,8 +739,14 @@ somewhere that is about Arturia.
                                 still open: one device row rather than four, and a link
                                 that stores the control's name rather than its number
 
-4  Mackie Control, writing      track names, meters, lit buttons        unknown
-   the half that makes a surface feel connected rather than merely wired
+4  Mackie Control, writing      BUILT, except meters. Fader positions, mute and solo lights,
+                                the ring round each knob, and both lines of the display, in
+                                Midi/MackieSurface.cs. Meters are left out: they want feeding
+                                at audio rate and they are the one part of this nobody misses.
+                                Also not built: the timecode display and the two character one
+   the half that makes a surface feel connected rather than merely wired, and the half that
+   makes the reading half correct: a fader lands on its value rather than picking up, which is
+   only right because something has driven it there
 
 5  the vendor's own protocol    reading a knob's current CC back        a day
                                 pad colours, encoder rings              unknown

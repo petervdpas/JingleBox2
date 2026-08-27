@@ -114,6 +114,20 @@ public class ControllerProfileTests
     }
 
     [Fact]
+    public void A_device_that_answers_who_it_is_has_that_written_down()
+    {
+        // The one name a device has that does not change with the operating system, the port
+        // it is plugged into, or how many of them are plugged in. Read off the wire: the MPD218
+        // answers F0 7E 00 06 02 47 34 00 19 ... and then its serial number in ASCII.
+        var known = ControllerProfiles.For(Mpd)?.Identity;
+
+        Assert.NotNull(known);
+        Assert.Equal("47", known!.Manufacturer);
+        Assert.Equal("0034", known.Family);
+        Assert.Equal("0019", known.Member);
+    }
+
+    [Fact]
     public void A_knob_that_reports_a_position_is_picked_up()
     {
         // Measured on the device rather than read anywhere: an MPD218's six are sold as 360
@@ -224,6 +238,29 @@ public class ControllerProfileTests
         Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 0));
         Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 16));
         Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Korg, 1, 41));
+    }
+
+    [Fact]
+    public void The_main_knob_is_the_same_whatever_program_is_running()
+    {
+        // Three controls on one knob, read off the device rather than the wire: turning it,
+        // turning it with Shift held, and pressing it. Identical on two presets, so it sits
+        // with the modulation strip rather than inside a program.
+        ControllerProfiles.Saw(Lab, 1, 86);
+        Assert.Equal("Main knob", ControllerProfiles.Named(Lab, 1, 114));
+
+        ControllerProfiles.Saw(Lab, 1, 74);
+        Assert.Equal("Main knob", ControllerProfiles.Named(Lab, 1, 114));
+
+        Assert.Equal("Main knob + Shift", ControllerProfiles.Named(Lab, 1, 112));
+        Assert.Equal("Main knob click", ControllerProfiles.Named(Lab, 1, 115));
+
+        // Nothing claimed about how it counts: it has no absolute or relative option of its
+        // own, unlike the eight knobs beside it.
+        Assert.Null(ControllerProfiles.Pickup(Lab, 1, 114));
+
+        // And the press is a press, which is the one thing that can be said for certain.
+        Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Lab, 1, 115));
     }
 
     [Fact]
