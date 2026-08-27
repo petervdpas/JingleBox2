@@ -7,6 +7,7 @@ using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Midi;
+using JingleBox2.Scripting;
 using JingleBox2.Tracker;
 using JingleBox2.Models;
 using JingleBox2.UI;
@@ -21,6 +22,9 @@ namespace JingleBox2.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>The controller scripts, kept because they watch their own folder.</summary>
+    private readonly ControllerCodecs _codecs;
+
     private readonly IAudioEngine _audio;
     private readonly ConfigStore _store;
     private readonly AppConfig _cfg;
@@ -699,9 +703,57 @@ public sealed partial class MainViewModel : ObservableObject
             },
             new MidiTransportRouter(new TransportAdapter(Transport)).Handle);
 
-        // NOTE: MidiViewModel already subscribes for learn/status.
+        // A controller with a screen is told what the knob under your hand is doing. Nothing
+        // asks whether it has one: a device with no output is answered with a quiet false, and
+        // a few bytes down a port nobody reads cost nothing. See ArturiaDisplay.
+        // The controls, and not everything with a role. A screen sits with the knobs, and the
+        // transport arrives on a port of its own that speaks Mackie Control: writing Arturia's
+        // own system exclusive down that one is talking to a protocol in another language, and
+        // it stopped the transport answering until the device was power cycled.
+        var screen = new ArturiaDisplay(
+            midiService,
+            () => MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Controls));
+
+        // What the screen says at rest, replacing the name of whichever DAW the device was
+        // told about. A knob's reading lands on top of this and comes back to it.
+        screen.Standing("JingleBox2", Tracker.SongName);
+
+        Tracker.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TrackerViewModel.SongName))
+                screen.Standing("JingleBox2", Tracker.SongName);
+        };
+
+        controlRouter.Moved += (mapping, target, value) =>
+        {
+            double range = target.Max - target.Min;
+
+            screen.Moved(
+                mapping.Device,
+                mapping.Kind switch
+                {
+                    ControlKind.Action => ArturiaDisplay.Kind.Pad,
+                    ControlKind.Mix => ArturiaDisplay.Kind.Fader,
+                    _ => ArturiaDisplay.Kind.Knob
+                },
+                range > 0 ? (value - target.Min) / range : 0,
+                target.Name,
+                target.Reads(value));
+        };
+
+        // A controller's own file, if it has one, gets first refusal on every message. It can
+        // only say that these bytes mean those bytes: it cannot add a feature or take one away,
+        // and a device nobody has written a file for is passed straight through. See
+        // Scripting/ControllerCodecs.
+        _codecs = new ControllerCodecs(midiService);
+
+        // NOTE: MidiViewModel already subscribes for learn/status, and sees what really
+        // arrived rather than what a codec made of it, which is what a monitor is for.
         // This subscription is for playing things.
-        midiService.MessageReceived += (_, msg) => dispatcher.Handle(msg);
+        midiService.MessageReceived += (_, msg) =>
+        {
+            if (_codecs.Read(msg) is { } read) dispatcher.Handle(read);
+        };
 
         // Apply initial theme once
         ThemeManager.Apply(SelectedTheme);

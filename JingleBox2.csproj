@@ -28,6 +28,11 @@
     <None Include="machines\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The controller codecs that ship. A codec is a Lua file read at startup, and adding a
+         controller is adding one of these rather than changing any of this. -->
+    <None Include="controllers\**\*.lua" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its
          sources and its build folder, and compile both twice. -->
     <Compile Remove="Machines.Abstractions\**" />
@@ -51,6 +56,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="ManagedBass.Wasapi" Version="4.0.2" />
+    <PackageReference Include="MoonSharp" Version="2.0.0" />
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.2" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="ManagedBass" Version="4.0.2" />

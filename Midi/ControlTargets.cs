@@ -104,7 +104,8 @@ public sealed class ControlTargets : IControlTargets
             () => values.Get(mapping.Key),
             value => Written(values, mapping.Key, value),
             this,
-            mapping);
+            mapping,
+            parameter.Unit);
     }
 
     /// <summary>
@@ -143,7 +144,8 @@ public sealed class ControlTargets : IControlTargets
             () => values.Get(mapping.Key),
             value => Written(values, mapping.Key, value),
             this,
-            mapping);
+            mapping,
+            parameter.Unit);
     }
 
     /// <summary>
@@ -190,7 +192,8 @@ public sealed class ControlTargets : IControlTargets
             () => wanted.ValueOf(mapping.Parameter),
             value => wanted.SetValue(mapping.Parameter, value),
             this,
-            mapping);
+            mapping,
+            parameter.Units);
     }
 
     /// <summary>
@@ -288,7 +291,7 @@ public sealed class ControlTargets : IControlTargets
         private readonly ControlMapping _mapping;
 
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
-                      ControlTargets desk, ControlMapping mapping)
+                      ControlTargets desk, ControlMapping mapping, string unit = "")
         {
             Name = name;
             Min = min;
@@ -297,6 +300,17 @@ public sealed class ControlTargets : IControlTargets
             _write = write;
             _desk = desk;
             _mapping = mapping;
+            _unit = unit;
+        }
+
+        private readonly string _unit;
+
+        /// <summary>The number, and what it is measured in when the machine said.</summary>
+        public string Reads(double value)
+        {
+            string said = value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+            return _unit.Length > 0 ? said + " " + _unit : said;
         }
 
         public string Name { get; }

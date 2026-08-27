@@ -167,10 +167,36 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   commands, one per parameter per track per pattern, values normalised 0 to 1 and converted
   through `IControlTarget`, which is the same interface remote control writes through. Recording
   a lane from a knob that is already linked is nearly free; the editor is all of the work
-- `docs/controller-profiles.md` is a plan, not built: a controller described in a file the way
-  a machine is, so a link names `encoder3` rather than CC 89. A device's DAW mode changes every
-  number it sends, which silently breaks a whole layout and cannot be detected from outside; a
-  profile knows both dialects and works out which is in use from the first number that arrives
+- A controller with a screen is written to: `ArturiaDisplay` puts the parameter's name, its
+  reading and a value bar on a MiniLab 3 while a knob is turned. Arturia's own system exclusive,
+  on the device's main port, and only while it is in a DAW mode. `MidiService.Send` opens an
+  output on demand and answers false for a device with none, so nothing has to know which
+  controllers have screens
+- `docs/hardware-integration.md` is mostly a plan, and the rule in it governs everything here:
+  plain MIDI is the floor, not a fallback. A controller nobody has written anything about works
+  today, taught by hovering a knob and touching the hardware, so a profile may add names, shape
+  and shortcuts and may never add capability. Three rungs: nothing, which is built; a file
+  describing a controller the way `machine.json` describes a machine, so a link names `encoder3`
+  rather than CC 89; and the vendor's own protocol, which is the screen and the lights. There is
+  no handshake to sort them out. A device is known by its port name, since the universal identity
+  request went unanswered by the one device here. Not built either: a default layout, which is
+  what makes a device useful the moment it is plugged in. The encoders take the machine's
+  parameters in panel order, so the third encoder is the third knob on whatever face is in front
+  of you, and no profile is needed for it. The MiniLab 3's own manuals are in `Assets/`, and two
+  things in them are operational rather than background: its four ports each have a stated job,
+  and Arturia asks a host to use either the DAW program or the MCU port and never both, which
+  SETTINGS currently offers as two independent tick boxes
+- Lua is embedded, MoonSharp, and it is fenced in: `Scripting/LuaScript.cs` names every library
+  a script may reach rather than using a preset, so there is no io, no os and no loading more
+  code, and a script that throws or takes more than 20ms is switched off rather than called
+  again. It is Lua 5.2, which means `bit32.rshift` and not `>>`. The first thing built on it is
+  `Scripting/ControllerCodecs.cs`: one `.lua` per controller, matched on the port name, sitting
+  between the wire and the routing. A codec can only say that these bytes mean those bytes, so
+  it cannot add a feature or remove one, and a device with no codec is passed through untouched.
+  Codecs live in `controllers/` beside the program and are copied to the app folder on first
+  run, the way machines are, and the folder is watched: saving a codec reloads it, with no
+  restart and no replugging. `controllers/minilab3.lua` is the shipped example and does one real
+  thing, turning the pitch strip into CC 2 so a control that did nothing becomes linkable
 - `docs/scratch-machine.md` is an idea, not a plan for now: a fader as a needle on a record,
   where the sound comes from how fast the position moves rather than where it is. It is the
   first machine that would need an engine of its own rather than a described panel over an

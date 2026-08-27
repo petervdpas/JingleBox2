@@ -122,6 +122,106 @@ public sealed class MidiService : IMidiService
         return true;
     }
 
+    /// <summary>
+    /// The outputs that have been opened, by the name they were asked for.
+    /// </summary>
+    /// <remarks>
+    /// Kept open. A device with a screen is written to on every turn of a knob, and opening a
+    /// port per message would be absurd.
+    /// </remarks>
+    private readonly Dictionary<string, IMidiOutput> _outputs = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Sends bytes to a controller. Opens its output the first time, and keeps it.
+    /// </summary>
+    /// <remarks>
+    /// A device with no output, or one that will not open, is answered with false rather than
+    /// an exception: writing to a screen is a courtesy, and a controller without one is the
+    /// ordinary case rather than a fault.
+    /// </remarks>
+    public bool Send(string deviceIdOrName, byte[] bytes)
+    {
+        if (_access is null || bytes is null || bytes.Length == 0) return false;
+        if (string.IsNullOrWhiteSpace(deviceIdOrName)) return false;
+
+        string name = deviceIdOrName.Trim();
+
+        IMidiOutput? output;
+
+        lock (_lock) _outputs.TryGetValue(name, out output);
+
+        if (output is null)
+        {
+            output = OpenOutput(name);
+
+            if (output is null) return false;
+        }
+
+        try
+        {
+            output.Send(bytes, 0, bytes.Length, 0);
+
+            return true;
+        }
+        catch (Exception sending)
+        {
+            Log.Write(LogArea.Midi, () => "port: could not write to '" + name + "': " + sending.Message);
+
+            // Dropped rather than kept, so the next write opens it again: a device unplugged
+            // mid-session leaves a handle that will never work.
+            lock (_lock) _outputs.Remove(name);
+
+            return false;
+        }
+    }
+
+    private IMidiOutput? OpenOutput(string name)
+    {
+        IMidiPortDetails? port;
+
+        try
+        {
+            port = _access!.Outputs.FirstOrDefault(p => SameName(p.Id, name) || SameName(p.Name, name));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+
+        if (port is null)
+        {
+            Log.Write(LogArea.Midi, () => "port: '" + name + "' has no output to write to");
+            return null;
+        }
+
+        IMidiOutput opened;
+
+        try
+        {
+            opened = _access.OpenOutputAsync(port.Id).GetAwaiter().GetResult();
+        }
+        catch (Exception opening)
+        {
+            Log.Write(LogArea.Midi, () => "port: the output of '" + name + "' would not open: " + opening.Message);
+            return null;
+        }
+
+        lock (_lock)
+        {
+            if (_outputs.TryGetValue(name, out var already))
+            {
+                TryDispose(opened);
+                return already;
+            }
+
+            _outputs[name] = opened;
+        }
+
+        Log.Write(LogArea.Midi, () => "port: '" + name + "' is open to write to");
+
+        return opened;
+    }
+
     /// <summary>Every input this system is offering, for a log that has to say why one was missed.</summary>
     private string Inputs()
     {
@@ -179,11 +279,11 @@ public sealed class MidiService : IMidiService
         TryDispose(port.Input);
     }
 
-    private static void TryDispose(IMidiInput input)
+    private static void TryDispose(IDisposable port)
     {
         try
         {
-            input.Dispose();
+            port.Dispose();
         }
         catch
         {
@@ -223,7 +323,7 @@ public sealed class MidiService : IMidiService
         {
             Log.Write(LogArea.Midi, () =>
                 "port: '" + device + "' sent " + Bytes(e.Data, e.Start, e.Length)
-                + " which is not a note or a knob, so it is dropped here");
+                + " which is not a kind read here, so it is dropped");
 
             return;
         }
@@ -303,20 +403,29 @@ public sealed class MidiService : IMidiService
             }
         }
 
-        // Every kind read here carries two data bytes.
-        if (at + 1 >= end) return null;
-
         int type = status & 0xF0;
         int channel = (status & 0x0F) + 1;
 
+        // Not every kind carries two. A program change and a channel pressure carry one, and
+        // reading them as two takes the next message's status byte for a value and then loses
+        // that message. Nothing here wants either of them, but running status means a wrong
+        // length is not a wrong message, it is every message after it.
+        int wants = type is 0xC0 or 0xD0 ? 1 : 2;
+        if (at + wants > end) return null;
+
         byte d1 = data[at];
-        byte d2 = data[at + 1];
+        byte d2 = wants > 1 ? data[at + 1] : (byte)0;
 
         return type switch
         {
             0x90 => new MidiMessage { Device = device, Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
             0x80 => new MidiMessage { Device = device, Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = false },
             0xB0 => new MidiMessage { Device = device, Type = MidiMessageType.ControlChange, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
+
+            // Least significant seven bits first, which is the other way round from how the
+            // rest of MIDI does it and the easiest thing in this file to write backwards.
+            0xE0 => new MidiMessage { Device = device, Type = MidiMessageType.PitchBend, Channel = channel, Value = 0, Data = (d2 << 7) | d1, IsOn = false },
+
             _ => null
         };
     }

@@ -1813,6 +1813,16 @@ public class MachinePanelView : Decorator
         if (_writing) return;
 
         foreach (var reader in _readers) Quietly(reader);
+
+        // And everything that shows a setting it does not turn. These hang off Write, because
+        // the ordinary way an envelope changes is somebody dragging one of the four faders it
+        // is drawn from. A controller does not go through Write: it writes the setting straight
+        // and the panel is told to read itself again, which moved the faders and left the curve
+        // exactly as it was. So a slider on the desk redrew half the panel and not the half
+        // that was the point of watching.
+        foreach (var told in _watchers.Values)
+            foreach (var one in told)
+                Quietly(one);
     }
 
     /// <summary>True while a control on this panel is writing its setting.</summary>

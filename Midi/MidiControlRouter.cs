@@ -84,7 +84,7 @@ public sealed class MidiControlRouter
     /// For the status line, and for a panel that wants to light the control being turned. Not
     /// for making the sound: that has already happened by the time this is raised.
     /// </remarks>
-    public event Action<IControlTarget, double>? Moved;
+    public event Action<ControlMapping, IControlTarget, double>? Moved;
 
     /// <summary>
     /// Raised when a control was ignored because it has not yet reached the value it is about
@@ -408,6 +408,6 @@ public sealed class MidiControlRouter
             "controls: " + target.Name + " moved to " + landed.ToString("0.####")
             + " (CC " + mapping.Cc + " sent " + data + ")");
 
-        Moved?.Invoke(target, landed);
+        Moved?.Invoke(mapping, target, landed);
     }
 }

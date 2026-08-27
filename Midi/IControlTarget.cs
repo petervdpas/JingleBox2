@@ -27,6 +27,18 @@ public interface IControlTarget
 
     /// <summary>Moves it. Clamping is the target's own business.</summary>
     void Set(double value);
+
+    /// <summary>
+    /// How the value reads, for a controller with a screen to show.
+    /// </summary>
+    /// <remarks>
+    /// A plain number unless the thing knows better. The panel on the screen knows how to print
+    /// its own settings and this does not, so a machine parameter says its unit and everything
+    /// else says the number: "0.42" is not much, but beside the parameter's name it is enough
+    /// to see where you have got to without looking up.
+    /// </remarks>
+    string Reads(double value) =>
+        value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 /// <summary>

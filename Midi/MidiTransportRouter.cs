@@ -46,17 +46,66 @@ public sealed class MidiTransportRouter
     private const int Record = 0x5F;
     private const int Cycle = 0x56;
 
+    /// <summary>
+    /// The same four buttons as ordinary controllers, which is the other thing they do.
+    /// </summary>
+    /// <remarks>
+    /// A MiniLab 3's transport is not a row of buttons at all. It is pads four to eight with
+    /// shift held, and in the device's DAW program they arrive on the ordinary port as plain
+    /// controllers, in the order Mackie Control puts them in too:
+    /// <code>
+    /// CC 105  loop     CC 106  stop     CC 107  play     CC 108  record     CC 109  tap tempo
+    /// </code>
+    ///
+    /// Under Mackie Control the first four are notes 0x56, 0x5D, 0x5E and 0x5F, in the same
+    /// order. Arturia's manual asks for one or the other and not both: a host using the DAW
+    /// program is told to leave the MCU port switched off, because the two would answer the
+    /// same press twice.
+    ///
+    /// So both are read, and reading both costs nothing. A device sends one or the other
+    /// depending on which program it is in, and neither number means anything else on a port
+    /// somebody has pointed at the transport.
+    ///
+    /// Tap tempo is named and left alone. It is the one button here with somewhere obvious to
+    /// go that it has not been given yet: four taps is a tempo, and the tracker has one.
+    /// </remarks>
+    private const int StopCc = 106;
+    private const int PlayCc = 107;
+    private const int RecordCc = 108;
+    private const int CycleCc = 105;
+
+    /// <summary>Tap tempo, which is the fifth of them and sets nothing here yet.</summary>
+    private const int TapCc = 109;
+
     private readonly ITransportKeys _transport;
 
     public MidiTransportRouter(ITransportKeys transport) => _transport = transport;
 
     public void Handle(MidiMessage message)
     {
-        if (message is null || message.Type != MidiMessageType.Note) return;
+        if (message is null) return;
 
         // The press, not the release. A button sends both, and doing it twice would stop what
         // the press had just started.
         if (!message.IsOn) return;
+
+        if (message.Type == MidiMessageType.ControlChange)
+        {
+            switch (message.Value)
+            {
+                case PlayCc: Say(message, "play"); _transport.Play(); return;
+                case StopCc: Say(message, "stop"); _transport.Stop(); return;
+                case RecordCc: Say(message, "record"); _transport.Record(); return;
+                case CycleCc: Say(message, "loop, which this does nothing with yet"); return;
+                case TapCc: Say(message, "tap tempo, which this does nothing with yet"); return;
+            }
+
+            // Every other controller on that port is somebody's knob, and this is not the
+            // place that reads those.
+            return;
+        }
+
+        if (message.Type != MidiMessageType.Note) return;
 
         switch (message.Value)
         {
