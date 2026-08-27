@@ -1,13 +1,54 @@
 {
   "name": "MPD218",
 
-  "//": "The name it reports itself by, from soyersoyer/sysex-controls, which lists it as supported but untested.",
+  "//": "Measured on the device, 2026-08-27, by listening to the port while its owner worked the controls. Every number here was seen on the wire.",
   "matches": [ "MPD218*", "*MPD218*" ],
+
+  "identity": null,
 
   "ports": [
     { "match": "*", "role": "controls",
-      "note": "one port, and everything comes out of it: pads on channel 10, and the six knobs" }
+      "note": "one port, and everything comes out of it: sixteen pads as notes on channel 10, and the six knobs as controllers on channel 1" }
   ],
 
-  "note": "Sixteen velocity and pressure sensitive pads in three banks, and six 360 degree potentiometers in three banks, which is eighteen knob assignments. There is no controller map here because Akai does not publish one: the user guide is twenty pages in five languages and prints not a single number, pointing instead at a separate Preset Documentation download. So this file names the device and says what its ports are for, and the numbers are learned by touching a control, which is what happens for every device with no file at all. Two things are worth knowing and neither can be turned into a mapping. The knobs turn for ever but their default type is an ordinary controller, so they report a position that comes round, which is the awkward combination ControlPickup.Endless exists for; it is not claimed here because a knob's type is settable in Akai's editor to Inc/Dec, and a knob set that way and read as movement would do nothing at all. And the three banks change what all six knobs send with nothing announced, no screen to say which bank, and no way to ask, so on this device the program problem has no answer at any level: a link is learned by touch and stays where it was put. Sources: docs/MPD218-UserGuide-v1.0.pdf, and github.com/soyersoyer/sysex-controls/tree/main/src/mpd218 for the knob's settable type."
+  "programs": [
+    {
+      "name": "Control Bank A",
+      "sends": "absolute",
+      "controls": [
+        { "name": "Knob 1", "cc": 3, "channel": 1, "kind": "knob" },
+        { "name": "Knob 2", "cc": 9, "channel": 1, "kind": "knob" },
+        { "name": "Knob 3", "cc": 12, "channel": 1, "kind": "knob" },
+        { "name": "Knob 4", "cc": 13, "channel": 1, "kind": "knob" },
+        { "name": "Knob 5", "cc": 14, "channel": 1, "kind": "knob" },
+        { "name": "Knob 6", "cc": 15, "channel": 1, "kind": "knob" }
+      ]
+    },
+    {
+      "name": "Control Bank B",
+      "sends": "absolute",
+      "controls": [
+        { "name": "Knob 1", "cc": 16, "channel": 1, "kind": "knob" },
+        { "name": "Knob 2", "cc": 17, "channel": 1, "kind": "knob" },
+        { "name": "Knob 3", "cc": 18, "channel": 1, "kind": "knob" },
+        { "name": "Knob 4", "cc": 19, "channel": 1, "kind": "knob" },
+        { "name": "Knob 5", "cc": 20, "channel": 1, "kind": "knob" },
+        { "name": "Knob 6", "cc": 21, "channel": 1, "kind": "knob" }
+      ]
+    },
+    {
+      "name": "Control Bank C",
+      "sends": "absolute",
+      "controls": [
+        { "name": "Knob 1", "cc": 22, "channel": 1, "kind": "knob" },
+        { "name": "Knob 2", "cc": 23, "channel": 1, "kind": "knob" },
+        { "name": "Knob 3", "cc": 24, "channel": 1, "kind": "knob" },
+        { "name": "Knob 4", "cc": 25, "channel": 1, "kind": "knob" },
+        { "name": "Knob 5", "cc": 26, "channel": 1, "kind": "knob" },
+        { "name": "Knob 6", "cc": 27, "channel": 1, "kind": "knob" }
+      ]
+    }
+  ],
+
+  "note": "Sixteen pads and six knobs, and no screen, which is what makes this device awkward to describe. Everything here was measured rather than looked up: Akai publishes no controller map, the twenty page user guide prints not one number in five languages, and sysex-controls has none either because it reads its numbers off the device at runtime.\n\nThe knobs report a position and they have ends. This matters because they are sold as 360 degree potentiometers, which reads as endless, meaning a value that comes round and has to be followed rather than picked up. It is not so. One knob turned steadily walked 35 up to 127 in two seconds and then sat at 127 for a further seven while it was still being turned: 254 messages of a full sweep with no repeat and no step bigger than one. So they are picked up exactly as a fader is, and 360 degree describes the absence of a detent rather than the behaviour of the value. Read as movement they would do almost nothing.\n\nThe one caveat is Akai's own editor, where a knob's type can be changed to Inc/Dec. A device set that way is not the device described here, which is why nothing is claimed for a program that says it counts notches.\n\nCTRL BANK cycles the knobs through the three sets above with nothing announced on the wire. The letters were confirmed twice over: the owner said which bank the device was showing, and then two presses from C landed on B, which is the cycle A to B to C wrapping round and agrees with what the numbers said. Bank A's six are scattered rather than consecutive because Akai stepped around the controllers everybody else uses, 7 for volume and 10 for pan and 11 for expression. Banks B and C are plain runs.\n\nThe pads are notes rather than controllers and so cannot be named in this file, which describes continuous controllers. They send on channel 10, sixteen consecutive notes per bank, and PAD BANK cycles 36-51, 52-67, 68-83, which is the one part of this device that follows the convention everybody else uses. Pressure is channel aftertouch and not polyphonic, so it says how hard something is being held without saying which pad, and cannot drive anything per pad.\n\nFull Level, 16 Level and Note Repeat send nothing on the wire, measured by pressing each one with the port being listened to: not a note, not a controller, not a byte. They change what the pads do rather than saying anything themselves, and the change is visible only in the pads. Full Level is the one worth knowing about, because a device left with it on looks broken from the software side: every pad arrives at velocity 127 however softly it is hit, there is no message to say why, and the only clue is a lit button on the hardware. Switched off, the same pad gave 102 and then 127 for a soft hit and a hard one. It is a toggle and it survives being unplugged.\n\nSources: measured on the wire; docs/MPD218-UserGuide-v1.0.pdf for the hardware; github.com/soyersoyer/sysex-controls/tree/main/src/mpd218 for the knob's settable type."
 }

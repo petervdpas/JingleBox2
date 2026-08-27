@@ -113,6 +113,57 @@ public class ControllerProfileTests
     }
 
     [Fact]
+    public void A_knob_that_reports_a_position_is_picked_up()
+    {
+        // Measured on the device rather than read anywhere: an MPD218's six are sold as 360
+        // degree, and one turned steadily walked 35 to 127 in two seconds and then sat at 127
+        // for another seven while it was still being turned. So they have ends and they say
+        // where they are, which is a fader that happens to be round.
+        ControllerProfiles.Saw(Mpd, 1, 22);
+
+        Assert.Equal("Knob 1", ControllerProfiles.Named(Mpd, 1, 22));
+        Assert.Equal("Knob 6", ControllerProfiles.Named(Mpd, 1, 27));
+
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 22));
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 27));
+
+        // And the same knob in a bank whose numbers are scattered rather than consecutive,
+        // which is bank A, where Akai stepped around 7 and 10 and 11.
+        ControllerProfiles.Saw(Mpd, 1, 3);
+
+        Assert.Equal("Knob 3", ControllerProfiles.Named(Mpd, 1, 12));
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 15));
+    }
+
+    [Fact]
+    public void The_knob_banks_are_told_apart_by_the_numbers_arriving()
+    {
+        // Three banks, nothing announced, and no screen on the device to say which is running.
+        // The numbers do not overlap, so one message settles it.
+        ControllerProfiles.Saw(Mpd, 1, 3);
+        Assert.Equal("Control Bank A", ControllerProfiles.ProgramOn(Mpd));
+
+        ControllerProfiles.Saw(Mpd, 1, 17);
+        Assert.Equal("Control Bank B", ControllerProfiles.ProgramOn(Mpd));
+
+        ControllerProfiles.Saw(Mpd, 1, 27);
+        Assert.Equal("Control Bank C", ControllerProfiles.ProgramOn(Mpd));
+    }
+
+    [Fact]
+    public void A_knob_the_file_does_not_describe_is_left_to_be_watched()
+    {
+        // Everything this device sends is now described: eighteen knob assignments across three
+        // banks, and the pads, which are notes and so belong nowhere in a file about continuous
+        // controllers. A number outside all of that is a number the device does not send, and it
+        // is answered the way it would be for a device with no file at all.
+        ControllerProfiles.Saw(Mpd, 1, 3);
+
+        Assert.Equal("", ControllerProfiles.Named(Mpd, 1, 111));
+        Assert.Null(ControllerProfiles.Pickup(Mpd, 1, 111));
+    }
+
+    [Fact]
     public void Nothing_is_claimed_for_a_device_with_no_file()
     {
         Assert.Null(ControllerProfiles.Pickup(Nobodys, 1, 86));
@@ -155,14 +206,13 @@ public class ControllerProfileTests
     [Fact]
     public void A_file_with_no_control_map_claims_nothing_about_any_control()
     {
-        // Both of these describe a device without naming a single controller, because neither
-        // manufacturer publishes the numbers. Naming the device is the whole of what they do,
-        // and a profile is never allowed to guess.
+        // The KeyLab file describes a device without naming a single controller, because
+        // Arturia does not publish the numbers for it and nobody here owns one to measure.
+        // Naming the device is the whole of what it does, and a profile is never allowed to
+        // guess. The MPD218 was in the same state until somebody sat down with the hardware
+        // and turned every knob, which is the only way that file could ever have been filled.
         Assert.Equal("", ControllerProfiles.Named("KeyLab mkII 49 MIDI", 1, 74));
         Assert.Null(ControllerProfiles.Pickup("KeyLab mkII 49 MIDI", 1, 74));
-
-        Assert.Equal("", ControllerProfiles.Named("MPD218 Port A", 1, 20));
-        Assert.Null(ControllerProfiles.Pickup("MPD218 Port A", 1, 20));
     }
 
     [Fact]

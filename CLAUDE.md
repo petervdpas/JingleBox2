@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-225 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+259 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -374,6 +374,27 @@ because that exact thing was wrong once.
   which works whether the firmware wraps at the top or stops there. Nothing is claimed for an
   encoder that counts notches, since which of the two conventions it counts in is not in the
   file and guessing wrong throws a parameter across its range
+- The kinds a profile may call a control are `encoder`, `fader`, `strip`, `pad`, `button` and
+  `knob`, and the last one is the interesting one because it is where a plausible reading of a
+  manufacturer's own words turned out to be wrong. An MPD218's six knobs are sold as 360 degree
+  potentiometers, which reads as endless, meaning a value that comes round and has to be
+  followed rather than picked up. Measured on the wire it is nothing of the kind: one turned
+  steadily walked 35 to 127 in two seconds and then sat at 127 for another seven while it was
+  still being turned, 254 messages of a full sweep with no repeat and no step bigger than one.
+  So a knob is a fader that happens to be round, `Takeover` in the file and ranked among the
+  faders by `DefaultLayout`, whose only question is whether a control says where it is or how
+  far it moved. 360 degree describes the absence of a detent, not the behaviour of the value.
+  The device's own numbers were measured the same way and are in `controllers/mpd218.json`: all
+  eighteen knob assignments, since CTRL BANK cycles three sets of six with nothing announced on
+  the wire. Bank A is scattered (3, 9, 12, 13, 14, 15) because Akai stepped around the
+  controllers everybody else uses; B and C are plain runs from 16 and from 22. Which letter is
+  which was confirmed twice, once by the owner reading the device and once by the cycle wrapping
+  where it should. Its three remaining buttons send nothing on the wire, and Full Level is worth
+  knowing about for the shape of the fault rather than the fact: a device left with it on
+  delivers every pad at velocity 127 however softly it is hit, says nothing about why, and the
+  only clue is a lit button on the hardware. Half an hour went on the same shape once before,
+  on a MiniLab whose play button turned out to be Shift and a pad. A controller can be in a
+  state the wire does not mention, and the wire is all we have
 - Lua is embedded, MoonSharp, and it is fenced in: `Scripting/LuaScript.cs` names every library
   a script may reach rather than using a preset, so there is no io, no os and no loading more
   code, and a script that throws or takes more than 20ms is switched off rather than called

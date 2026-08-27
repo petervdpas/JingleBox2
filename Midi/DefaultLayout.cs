@@ -142,7 +142,12 @@ public sealed class DefaultLayout
         control.Pickup = Controllers.ControllerProfiles.Pickup(message.Device, message.Channel, message.Value)
                          ?? ControlPickup.Sensed;
 
-        return kind;
+        // A layout has two categories and a profile has the device's own words. A knob is a
+        // fader that is round: it reports a position and it has ends, so it belongs with the
+        // faders here, ranked among them and pinned to a track. The distinction that matters to
+        // this file is whether a control says where it is or how far it moved, and on that
+        // question a knob and a fader are the same control.
+        return kind == "knob" ? "fader" : kind;
     }
 
     /// <summary>

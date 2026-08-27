@@ -368,6 +368,14 @@ public static class ControllerProfiles
         {
             "encoder" when sends == "absolute" => ControlPickup.Endless,
             "fader" or "strip" => ControlPickup.Takeover,
+
+            // A knob is a fader that is round: a pot with ends, reporting where it is. Measured
+            // on an MPD218, whose six are sold as 360 degree and are nothing of the kind: one
+            // walked 35 to 127 in two seconds and then sat at 127 for another seven while it was
+            // still being turned. Nothing claimed when the program counts notches, because a
+            // knob's type is settable in Akai's own editor and one set that way, read as a
+            // position, would do nothing whatever.
+            "knob" when sends != "relative" => ControlPickup.Takeover,
             "button" or "pad" => ControlPickup.Jump,
             _ => null
         };
