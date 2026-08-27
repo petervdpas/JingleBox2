@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-263 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+265 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -367,6 +367,20 @@ because that exact thing was wrong once.
   profile knows which is which, and that is the whole of what a profile adds here. It is also
   what makes an MPD218 useful on arrival, since six knobs and no faders would otherwise be a six
   channel mixer on a box built for hitting things
+- `controllers/nanokontrol2.json` is the first file here written from somebody else's reading of
+  a device rather than from the wire, and it says so at the top. Korg's parameter guide has a
+  page per control type explaining what CC Number means and never prints one; the numbers come
+  from Mixxx's mapping for the device as shipped, agreeing with every community list. Fifty one
+  controls, all fixed: sliders 0-7, knobs 16-23, solo 32-39, mute 48-55, rec 64-71, transport
+  41-46 and 58-62. They hold in CC mode, which is the factory mode, and mean nothing in the five
+  DAW modes where the same controls speak that DAW's protocol. It buys the most of any file here
+  because the device is the plainest surface anybody makes: eight faders on eight track levels
+  and eight knobs on the panel in front of you, working before it is unwrapped
+- A device whose file describes exactly one program is in it, and `ProgramOn` says so without
+  waiting. `Saw` declines to work out the program of such a device, rightly, since there is
+  nothing to resolve; the cost was that no program was ever running, so a file that put its
+  controls inside its one program described a device whose every control came back unknown. The
+  MiniLab and the MPD218 have two and three programs and never met it
 - SETTINGS has a Control Surfaces page, and it lists what you own rather than what the operating
   system offers. A controller is often several ports with nearly identical names and only one of
   them carries the knobs; the profile says which, so the jobs are ticked once on the device and

@@ -13,6 +13,7 @@ public class DefaultLayoutTests
 {
     private const string Nobodys = "Some Other Box Port 1";
     private const string Mpd = "MPD218 Port A";
+    private const string Korg = "nanoKONTROL2 MIDI 1";
 
     private static MidiMessage Cc(int number, int value, string device = Nobodys) => new()
     {
@@ -226,6 +227,42 @@ public class DefaultLayoutTests
 
         Assert.NotNull(link);
         Assert.Equal(ControlKind.Mix, link!.Kind);
+    }
+
+    [Fact]
+    public void A_nanokontrols_sliders_go_to_the_mixer_and_its_knobs_to_the_machine()
+    {
+        var layout = new DefaultLayout();
+
+        Controllers.ControllerProfiles.Saw(Korg, 1, 0);
+
+        // Eight faders on the first eight tracks, which is what a mixer is, and eight knobs on
+        // whatever panel is open. Nobody linked any of it. This is the whole reason the two
+        // words are kept apart in a controller's file.
+        var slider = layout.For(Cc(0, 40, Korg));
+        var knob = layout.For(Cc(16, 40, Korg));
+
+        Assert.Equal(ControlKind.Mix, slider!.Kind);
+        Assert.Equal(ControlScope.Fixed, slider.Scope);
+        Assert.Equal(0, slider.Track);
+
+        Assert.Equal(ControlKind.Instrument, knob!.Kind);
+        Assert.Equal(ControlScope.Focused, knob.Scope);
+        Assert.Equal(0, knob.Ordinal);
+
+        // Counted apart, so with the whole surface worked slider 8 is track 8 and knob 8 is the
+        // machine's eighth control, rather than the two kinds sharing one run of sixteen.
+        for (int at = 0; at < 8; at++)
+        {
+            layout.For(Cc(at, 40, Korg));
+            layout.For(Cc(16 + at, 40, Korg));
+        }
+
+        Assert.Equal(7, layout.For(Cc(7, 40, Korg))!.Track);
+        Assert.Equal(7, layout.For(Cc(23, 40, Korg))!.Ordinal);
+
+        // And a strip button is not something a layout has an opinion about.
+        Assert.Null(layout.For(Cc(41, 127, Korg)));
     }
 
     [Fact]

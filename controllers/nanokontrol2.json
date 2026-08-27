@@ -1,0 +1,333 @@
+{
+  "name": "nanoKONTROL2",
+  "//": "Not measured. Taken from Mixxx's mapping for the device as shipped and cross checked against community lists; see the note. Confirm against hardware.",
+  "matches": [
+    "nanoKONTROL2*",
+    "*nanoKONTROL2*",
+    "*nanoKONTROL 2*",
+    "*nanoKontrol2*"
+  ],
+  "identity": null,
+  "ports": [
+    {
+      "match": "*",
+      "role": "controls",
+      "note": "one port, and everything comes out of it: eight sliders, eight knobs, twenty four strip buttons and eleven transport buttons, all as controllers on channel 1"
+    }
+  ],
+  "programs": [
+    {
+      "name": "CC",
+      "sends": "absolute",
+      "controls": [
+        {
+          "name": "Slider 1",
+          "cc": 0,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 2",
+          "cc": 1,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 3",
+          "cc": 2,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 4",
+          "cc": 3,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 5",
+          "cc": 4,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 6",
+          "cc": 5,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 7",
+          "cc": 6,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Slider 8",
+          "cc": 7,
+          "channel": 1,
+          "kind": "fader"
+        },
+        {
+          "name": "Knob 1",
+          "cc": 16,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 2",
+          "cc": 17,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 3",
+          "cc": 18,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 4",
+          "cc": 19,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 5",
+          "cc": 20,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 6",
+          "cc": 21,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 7",
+          "cc": 22,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Knob 8",
+          "cc": 23,
+          "channel": 1,
+          "kind": "knob"
+        },
+        {
+          "name": "Solo 1",
+          "cc": 32,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 2",
+          "cc": 33,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 3",
+          "cc": 34,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 4",
+          "cc": 35,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 5",
+          "cc": 36,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 6",
+          "cc": 37,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 7",
+          "cc": 38,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Solo 8",
+          "cc": 39,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 1",
+          "cc": 48,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 2",
+          "cc": 49,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 3",
+          "cc": 50,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 4",
+          "cc": 51,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 5",
+          "cc": 52,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 6",
+          "cc": 53,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 7",
+          "cc": 54,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Mute 8",
+          "cc": 55,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 1",
+          "cc": 64,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 2",
+          "cc": 65,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 3",
+          "cc": 66,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 4",
+          "cc": 67,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 5",
+          "cc": 68,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 6",
+          "cc": 69,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 7",
+          "cc": 70,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rec 8",
+          "cc": 71,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Track left",
+          "cc": 58,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Track right",
+          "cc": 59,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Cycle",
+          "cc": 46,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Set marker",
+          "cc": 60,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Marker left",
+          "cc": 61,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Marker right",
+          "cc": 62,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Rewind",
+          "cc": 43,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Fast forward",
+          "cc": 44,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Stop",
+          "cc": 42,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Play",
+          "cc": 41,
+          "channel": 1,
+          "kind": "button"
+        },
+        {
+          "name": "Record",
+          "cc": 45,
+          "channel": 1,
+          "kind": "button"
+        }
+      ]
+    }
+  ],
+  "note": "Eight channel strips and a transport, and nothing else: a slider, a knob and three buttons per strip, which is the plainest control surface anybody makes. That plainness is why it is worth having a file for at all, since every number below is fixed and none of it needs a manual to use.\n\nRead this file with one caveat that the MPD218's does not carry: none of it was measured. The device was on order when this was written. Korg's own parameter guide describes every setting and prints not one factory value, so the numbers come from Mixxx's mapping for the device as it ships, cross checked against every community list, which all agree. They should be confirmed against the hardware and this paragraph replaced when they are.\n\nThe numbers hold in CC mode and nowhere else. The device also has five DAW modes (Cubase, Digital Performer, Live, Pro Tools, SONAR) in which the same controls speak that DAW's own protocol and none of these numbers means anything. CC is the factory mode, it is the only one described here, and it is entered by holding SET MARKER and CYCLE while plugging the USB cable in. Everything goes back to factory by holding PREV TRACK, NEXT TRACK and CYCLE while it powers up, after which every transport button except CYCLE blinks.\n\nThe knobs are called knobs and the sliders faders on purpose, because that is the one thing in here the application acts on without being told: faders go to the mixer and knobs to the machine in front of you, so the eight sliders are the first eight tracks' levels and the eight knobs are the first eight controls on whatever panel is open. Neither is stored, and any link made by hand beats both.\n\nThe thirty five buttons are named and nothing more. A name is what turns a link list from CC 46 into Cycle, which is the whole of what a profile is allowed to add. The transport buttons in particular are not wired to the transport: this device sends plain controllers rather than MMC or Mackie, so a play button here is a controller like any other and has to be pointed at something.\n\nOne port on Linux. Korg's own driver presents extra ports named SLIDER/KNOB and CTRL on Windows and macOS, which are not described here because nobody has seen them from this application.\n\nSources: github.com/mixxxdj/mixxx res/controllers/Korg nanoKONTROL 2.midi.xml for the numbers; Korg's nanoKONTROL2 parameter guide for the modes and the resets."
+}

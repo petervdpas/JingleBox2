@@ -16,6 +16,7 @@ public class ControllerProfileTests
 {
     private const string Lab = "Minilab3 MIDI";
     private const string Mpd = "MPD218 Port A";
+    private const string Korg = "nanoKONTROL2 MIDI 1";
 
     /// <summary>A controller nobody has ever written a file for, which is most of them.</summary>
     private const string Nobodys = "Some Other Box Port 1";
@@ -201,6 +202,28 @@ public class ControllerProfileTests
     {
         Assert.Contains("notes", ControllerProfiles.PortIs("KeyLab mkII 49 MIDI"));
         Assert.Contains("Mackie", ControllerProfiles.PortIs("KeyLab mkII 49 MCU/HUI"));
+    }
+
+    [Fact]
+    public void A_nanokontrol_is_a_mixer_and_its_knobs_are_not()
+    {
+        // The plainest surface anybody makes, and the one where saying which control is which
+        // buys the most: eight sliders, eight knobs, and thirty five buttons that all send
+        // plain controllers and would otherwise be numbers.
+        ControllerProfiles.Saw(Korg, 1, 0);
+
+        Assert.Equal("nanoKONTROL2", ControllerProfiles.Called(Korg));
+
+        Assert.Equal("Slider 1", ControllerProfiles.Named(Korg, 1, 0));
+        Assert.Equal("Slider 8", ControllerProfiles.Named(Korg, 1, 7));
+        Assert.Equal("Knob 1", ControllerProfiles.Named(Korg, 1, 16));
+        Assert.Equal("Mute 3", ControllerProfiles.Named(Korg, 1, 50));
+        Assert.Equal("Play", ControllerProfiles.Named(Korg, 1, 41));
+
+        // A slider is picked up, a knob is picked up, a button jumps.
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 0));
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 16));
+        Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Korg, 1, 41));
     }
 
     [Fact]

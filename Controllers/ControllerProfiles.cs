@@ -214,11 +214,21 @@ public static class ControllerProfiles
     }
 
     /// <summary>Which program a device is believed to be in, or nothing while nobody knows.</summary>
+    /// <remarks>
+    /// A device whose file describes exactly one program is in it, and nothing has to be watched
+    /// to find that out. <see cref="Saw"/> declines to work on such a device, correctly, since
+    /// there is no ambiguity for it to resolve; without this the declining would mean no program
+    /// was ever running, and a file that puts its controls in its one program would describe a
+    /// device whose every control came back unknown. Which is what a nanoKONTROL2 did.
+    /// </remarks>
     public static string ProgramOn(string? device)
     {
         if (string.IsNullOrWhiteSpace(device)) return "";
 
-        lock (Lock) return Running.TryGetValue(device, out string? one) ? one : "";
+        lock (Lock)
+            if (Running.TryGetValue(device, out string? one)) return one;
+
+        return For(device) is { Programs.Count: 1 } profile ? profile.Programs[0].Name : "";
     }
 
     /// <summary>
