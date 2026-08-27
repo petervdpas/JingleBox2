@@ -225,6 +225,49 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   notches arrive in the time the drawing thread takes to wake once, each adds a notch to the same
   stale number, only the last write survives the coalescing, and the parameter moves one notch.
   Measured: identical movement whether you turned it once or forty times
+- The machine designer has undo too, and by a different mechanism, because the document is a
+  different shape. `ViewModels/DesignHistory.cs` keeps a step as the machine's own JSON: that
+  reader and writer already exist and are trusted with people's work, so a step cannot disagree
+  with what a save would produce, and 14 KB a machine means a hundred steps is under two
+  megabytes. Put back **in place** rather than as a new instance, since panels and the rack hold
+  the project they were opened on. The fields are found rather than listed, by walking the
+  project's serialisable properties, so a field added later comes back without anybody naming it.
+  The door is `MachineEditorViewModel.Redraw`, which every edit ends at: told more often than
+  there are edits, and a redraw where nothing moved leaves no step
+- An instrument's knobs have undo too, and that one had to turn a stream back into a gesture: a
+  knob dragged across its range is one thing a person did and forty messages, and a controller
+  sends a hundred a second. `ViewModels/InstrumentHistory.cs` gathers by the same control within
+  half a second, deliberately not by "while the mouse is down", which is true of a mouse and
+  false of a controller and of automation. A step is the instrument as its file holds it, minus
+  `PluginState`, which a described panel cannot move anyway. Restoring pours into nested objects
+  rather than replacing them, for the third time in this codebase and the same reason each time:
+  the patch, the kit and the shape are held by reference by the panel's own view models
+- SETTINGS aside, the tracker's song bar has Cancel changes: read the song back off disc as it
+  was last saved, asked first, dead unless there is both a saved copy and something to lose. And
+  the Save button glows warm instead of wearing a star, because a star is a character somebody
+  has to know the meaning of and it moves the button's width as it comes and goes. `Color.Unsaved`
+  is per theme
+- Setting `currentPattern` rather than `CurrentPattern` in the tracker's constructor meant the
+  song the application starts on never subscribed to its own pattern's changes: typing a note
+  into it left the song looking saved. Every song opened afterwards went through the property and
+  was fine, which is why it survived. Worth remembering as a shape: a backing field assignment
+  skips exactly the part that was worth having
+- The tracker's undo is one history with two kinds of step, because Ctrl+Z means the last thing
+  you did and not the last thing of a kind. A pattern edit is a memory copy of its cells; a song
+  edit (an instrument added or taken out, the order, the track count) is the song as its own file
+  would hold it, through `SongStore.Copy`/`Uncopy` and back in through `Song.TakeFrom`. They are
+  apart because they cost 5 KB and 80 KB, and serialising the song per keystroke would be
+  wasteful exactly where it must not be. `TakeFrom` keeps the patterns' identity as well as the
+  song's: the cheap steps hold a pattern by reference, and replacing the list left them pointing
+  at orphans, so undoing a note after undoing an instrument silently did nothing `Tracker/TrackerHistory.cs` keeps
+  whole copies of a pattern rather than describing each change, which is right because a pattern
+  is one array of value types: a step is 0.15ms for the largest pattern there can be, and
+  describing edits instead would mean an inverse per operation and the certainty that one of them
+  would be wrong. The unit is one call to `PatternEdit`, hooked inside that class rather than at
+  its call sites so an edit added later is recorded without anybody remembering. An edit that
+  changed nothing leaves no step; every step knows which pattern it is about, so undo after
+  switching patterns goes back to the right one and takes the view with it; and the history is
+  emptied when a song is opened
 - Keyboard shortcuts are three pieces kept apart, in `Shortcuts/`. `ShortcutAction` is the closed
   list of what a key can ask for, `ShortcutMap` is which key asks for which and is the settings
   half (stored, edited, shown), and `ShortcutKeys` delivers and knows nothing about either. A page

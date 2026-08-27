@@ -20,9 +20,55 @@ namespace JingleBox2.ViewModels;
 /// The instrument currently open in the editor. A sample and a synth share a name and a
 /// level; the rest of the page shows whichever half applies.
 /// </summary>
-public sealed class InstrumentEditorViewModel : ObservableObject
+public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.IShortcutContext
 {
     private readonly TrackerInstrument _instrument;
+
+    /// <summary>
+    /// What has been done to this instrument, so it can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// The third history, and the only one that has to turn a stream back into a gesture: a knob
+    /// dragged across its range is one thing a person did and forty messages. See
+    /// <see cref="InstrumentHistory"/>.
+    /// </remarks>
+    public InstrumentHistory History { get; } = new();
+
+    /// <summary>
+    /// Has the history hear about every setting this panel writes.
+    /// </summary>
+    /// <remarks>
+    /// Through the values rather than through the panel, so a setting moved by a controller or
+    /// by anything else is recorded too. The panel is one of the ways a knob gets turned and
+    /// increasingly not the usual one.
+    /// </remarks>
+    private T Watched<T>(T values) where T : Machines.MachineValues
+    {
+        values.Said += key => History.Did(_instrument, key);
+
+        return values;
+    }
+
+    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    {
+        Shortcuts.ShortcutAction.Undo => History.CanUndo,
+        Shortcuts.ShortcutAction.Redo => History.CanRedo,
+        _ => false
+    };
+
+    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    {
+        bool walked = action switch
+        {
+            Shortcuts.ShortcutAction.Undo => History.Undo(_instrument),
+            Shortcuts.ShortcutAction.Redo => History.Redo(_instrument),
+            _ => false
+        };
+
+        // The settings under the panel have moved without the panel writing them, which is the
+        // one case it cannot notice for itself. The same thing a preset being loaded does.
+        if (walked) SaidAgain();
+    }
     private readonly Action _changed;
 
     private WaveformData? _waveform;
@@ -44,6 +90,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject
     {
         Index = index;
         _instrument = instrument;
+
+        // Where this instrument stood when the panel was opened. Nothing before that can be
+        // taken back, and a history outliving its instrument would hand back another one's patch.
+        History.Opened(instrument);
         _changed = changed;
 
         // A tap on a pad or a zone is a note played on this panel, and the panel is what knows
@@ -193,11 +243,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
 
         if (IsSample)
         {
-            Values = new Tracker.Machines.RecordingValues(_instrument, shelf) { Changed = Moved };
+            Values = Watched(new Tracker.Machines.RecordingValues(_instrument, shelf) { Changed = Moved });
         }
         else if (IsKit && Kit is { } kit)
         {
-            Values = new Tracker.Machines.KitValues(kit) { Changed = Moved };
+            Values = Watched(new Tracker.Machines.KitValues(kit) { Changed = Moved });
 
             MachinePads = new Tracker.Machines.KitPads(kit);
             MachineSlices = Slices;
@@ -213,7 +263,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         }
         else if (IsSynth && Patch is { } voice)
         {
-            var settings = new Tracker.Machines.SynthValues(voice, _instrument) { Changed = Moved };
+            var settings = Watched(new Tracker.Machines.SynthValues(voice, _instrument) { Changed = Moved });
 
             Values = settings;
 
@@ -222,11 +272,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject
         }
         else if (IsMonoSynth && MonoSynth is { } mono)
         {
-            Values = new Tracker.Machines.MonoSynthValues(mono) { Changed = Moved };
+            Values = Watched(new Tracker.Machines.MonoSynthValues(mono) { Changed = Moved });
         }
         else if (IsSampler && Zones is { } zones && Sampler is { } filter)
         {
-            Values = new Tracker.Machines.SamplerValues(zones, filter) { Changed = Moved };
+            Values = Watched(new Tracker.Machines.SamplerValues(zones, filter) { Changed = Moved });
 
             MachineZones = new Tracker.Machines.SamplerZones(zones);
             MachineSlices = Slices;

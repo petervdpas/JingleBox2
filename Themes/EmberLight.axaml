@@ -19,6 +19,9 @@
 
   <!-- Burnt, so Delete is not written in the same red as every heading around it. -->
   <Color x:Key="Color.Danger">#8F2F12</Color>
+  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
+       and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Unsaved">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#C2183C</Color>
   <Color x:Key="SystemAccentColorLight1">#E4506E</Color>

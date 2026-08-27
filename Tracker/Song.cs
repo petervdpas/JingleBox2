@@ -84,6 +84,54 @@ public sealed class Song
     /// </remarks>
     public List<Midi.ControlMapping> Controls { get; set; } = new();
 
+    /// <summary>
+    /// Takes everything from another song, without becoming a different object.
+    /// </summary>
+    /// <remarks>
+    /// For a history putting a step back. The player, the mixer, every panel and the view model
+    /// all hold the song they were opened on, so what comes back has to be the contents rather
+    /// than a replacement.
+    ///
+    /// The patterns keep their identity too, and that is not a nicety. A history's cheap steps
+    /// are a pattern and its cells, held by reference; replacing the list would leave every one
+    /// of them pointing at an object no longer in the song, and undoing a note after undoing an
+    /// instrument would appear to do nothing at all. So a pattern that already exists is filled
+    /// rather than swapped, and only the count changing adds or drops one.
+    ///
+    /// Everything else is found rather than listed, because a list written out here would be
+    /// right the day it was written and wrong the first time a field is added.
+    /// </remarks>
+    public void TakeFrom(Song? was)
+    {
+        if (was is null) return;
+
+        foreach (var property in typeof(Song).GetProperties(
+                     System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+        {
+            if (!property.CanRead || !property.CanWrite) continue;
+            if (property.Name == nameof(Patterns)) continue;
+
+            property.SetValue(this, property.GetValue(was));
+        }
+
+        while (Patterns.Count > was.Patterns.Count) Patterns.RemoveAt(Patterns.Count - 1);
+
+        for (int at = 0; at < was.Patterns.Count; at++)
+        {
+            var wanted = was.Patterns[at];
+
+            if (at < Patterns.Count)
+            {
+                Patterns[at].Name = wanted.Name;
+                Patterns[at].Restore(wanted.Cells(), wanted.Lines, wanted.TrackCount);
+            }
+            else
+            {
+                Patterns.Add(wanted);
+            }
+        }
+    }
+
     [JsonIgnore]
     public TrackerTiming Timing => new(Bpm, LinesPerBeat);
 

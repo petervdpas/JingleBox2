@@ -16,6 +16,9 @@
 
   <Color x:Key="Color.Accent">#FF9800</Color>
   <Color x:Key="Color.Danger">#C95C5C</Color>
+  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
+       and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Unsaved">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#FF9800</Color>
   <Color x:Key="SystemAccentColorLight1">#FFB74D</Color>

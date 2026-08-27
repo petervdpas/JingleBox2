@@ -37,7 +37,7 @@ public abstract class MachineValues : IMachineValues
     /// an event cannot be. Two names for two relationships rather than one name doing both
     /// badly.
     /// </remarks>
-    public event Action? Said;
+    public event Action<string>? Said;
 
     public abstract double Get(string key);
 
@@ -56,7 +56,7 @@ public abstract class MachineValues : IMachineValues
         if (!Write(key, value)) return;
 
         Changed?.Invoke();
-        Said?.Invoke();
+        Said?.Invoke(key);
     }
 
     /// <summary>Writes one setting, and says whether it actually moved.</summary>
@@ -72,17 +72,17 @@ public abstract class MachineValues : IMachineValues
         if (!WriteText(key, value ?? "")) return;
 
         Changed?.Invoke();
-        Said?.Invoke();
+        Said?.Invoke(key);
     }
 
     /// <summary>Writes one text setting, and says whether it actually changed.</summary>
     protected virtual bool WriteText(string key, string value) => false;
 
     /// <summary>Says it moved, for the few things that change without going through a key.</summary>
-    protected void Say()
+    protected void Say(string key = "")
     {
         Changed?.Invoke();
-        Said?.Invoke();
+        Said?.Invoke(key);
     }
 
     /// <summary>Writes a number if it really is different, and says whether it was.</summary>

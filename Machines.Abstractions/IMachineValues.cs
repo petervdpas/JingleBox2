@@ -38,7 +38,7 @@ public interface IMachineValues
     void SetText(string key, string value) { }
 
     /// <summary>
-    /// Raised when something in here moved, for anything that is merely showing these.
+    /// Raised when something in here moved, saying which, for anything showing these.
     /// </summary>
     /// <remarks>
     /// Not the same relationship as the one who owns the values, who is told through their own
@@ -52,8 +52,12 @@ public interface IMachineValues
     /// read itself again. From the outside that is a controller with a lag of anywhere between
     /// a second and for ever.
     ///
+    /// It says which setting moved, which a panel does not need and a history does: a knob being
+    /// dragged is one edit and forty messages, and gathering those into one step means knowing
+    /// they were all the same control.
+    ///
     /// Given a body so that anything holding a machine's settings today still compiles. Not
     /// raising it costs the drawing and nothing else.
     /// </remarks>
-    event System.Action? Said { add { } remove { } }
+    event System.Action<string>? Said { add { } remove { } }
 }

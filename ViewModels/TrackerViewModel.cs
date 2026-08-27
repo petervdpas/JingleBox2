@@ -25,7 +25,7 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Shortcuts.IShortcutContext
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
@@ -87,6 +87,102 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>How many rows the pattern has, for a panel showing where its track is.</summary>
     public int PatternLines => CurrentPattern?.Lines ?? 0;
+
+    /// <summary>
+    /// What has been done to this song's patterns, so it can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// The tracker's own, and only the tracker's. Undo belongs to the thing being edited rather
+    /// than to the application: what a step means here is a call to <see cref="PatternEdit"/>,
+    /// and what it would mean in the machine designer is something else entirely, so one shared
+    /// history would have to pretend they were the same kind of thing.
+    /// </remarks>
+    public TrackerHistory History { get; } = new();
+
+    /// <summary>
+    /// Undo and redo, when the tracker is what you are looking at.
+    /// </summary>
+    /// <remarks>
+    /// Saving is not answered here on purpose. It belongs to the page rather than to the grid,
+    /// and the keystroke walks outwards until something takes it, so it reaches
+    /// <see cref="MainViewModel"/> and saves the song exactly as it did before.
+    /// </remarks>
+    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    {
+        Shortcuts.ShortcutAction.Undo => History.CanUndo,
+        Shortcuts.ShortcutAction.Redo => History.CanRedo,
+        _ => false
+    };
+
+    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    {
+        switch (action)
+        {
+            case Shortcuts.ShortcutAction.Undo: TakeBack(History.UndoIsAbout, History.Undo); break;
+            case Shortcuts.ShortcutAction.Redo: TakeBack(History.RedoIsAbout, History.Redo); break;
+        }
+    }
+
+    /// <summary>
+    /// Says the song itself is about to change, so the change can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// For the edits a pattern snapshot cannot describe. Taking an instrument out renumbers
+    /// every pattern that referred to it, which is an edit across the whole document, and it is
+    /// exactly the sort of thing somebody does by accident and wants back.
+    /// </remarks>
+    private void Changing(string what) => History.Taking(Song, what, Pour);
+
+    /// <summary>
+    /// Pours a song read back out of the history into the one that is open.
+    /// </summary>
+    /// <remarks>
+    /// Into rather than instead of. The player, the mixer, every panel and this view model all
+    /// hold the song they were opened on, so handing back a different object would leave every
+    /// one of them playing the song as it was before the undo. What comes back is its contents.
+    ///
+    /// Field by field and found rather than listed, the same as the machine designer's, and for
+    /// the same reason: a list written out here would be right the day it was written and wrong
+    /// the first time a field is added to a song, and an undo that silently drops one is worse
+    /// than no undo at all. The patterns keep their identity, which is what stops the cheap
+    /// steps in the history pointing at objects the song no longer holds. See
+    /// <see cref="Song.TakeFrom"/>.
+    /// </remarks>
+    private bool Pour(Song live, Song was)
+    {
+        live.TakeFrom(was);
+
+        // Everything the tracker hangs off the song has to be hung off it again: the instrument
+        // list, the mixer strips, and whichever pattern the order now points at.
+        SyncInstruments();
+
+        CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
+
+        OnPropertyChanged(nameof(Song));
+        OnPropertyChanged(nameof(TrackCount));
+        OnPropertyChanged(nameof(PatternLines));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Walks the history, having first gone to the pattern the step is about.
+    /// </summary>
+    /// <remarks>
+    /// Undo after switching patterns puts the right one back, and the grid follows it there. The
+    /// alternative is a pattern changing behind your back while you look at another, which is
+    /// the one thing an undo must never do.
+    /// </remarks>
+    private void TakeBack(Pattern? about, Func<bool> walk)
+    {
+        if (about is not null && !ReferenceEquals(about, CurrentPattern))
+            for (int at = 0; at < Song.Order.Count; at++)
+                if (ReferenceEquals(Song.PatternAt(at), about)) { OrderIndex = at; break; }
+
+        if (!walk()) return;
+
+        MarkDirty();
+    }
 
     /// <summary>
     /// The player's notes, passed straight through to whatever panels are open.
@@ -257,7 +353,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Set by every edit, cleared by a save. Nothing here is on disk until then.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SaveSongText))]
+    [NotifyPropertyChangedFor(nameof(NeedsSaving))]
+    [NotifyPropertyChangedFor(nameof(CanRevertSong))]
     private bool isDirty;
 
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
@@ -354,6 +451,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         _waveforms = waveforms;
 
+        // Every edit to any pattern goes through PatternEdit, which tells this before it
+        // happens. Set here rather than by PatternEdit itself, because a history belongs to the
+        // thing being edited and a pattern has never heard of one.
+        PatternEdit.Watching = History.Taking;
+
         _configStore = configStore;
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
@@ -376,7 +478,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _recordings = recordings;
 
         song = Song.CreateDefault();
-        currentPattern = song.Patterns[0];
+
+        // Through the property, not the field. Setting the field is what the generated setter
+        // does plus nothing, and the plus nothing is the part that subscribes to the pattern's
+        // own change. Assigned directly, the song the application starts on never heard about
+        // its own edits: typing a note into it left the song looking saved, the Save button
+        // unmarked, and nothing in the log to say so. Every song opened afterwards was fine,
+        // which is exactly why it survived.
+        CurrentPattern = song.Patterns[0];
 
         // The meters are polled rather than pushed: the audio side should not be calling into
         // the UI dozens of times a second, and a meter that misses a frame costs nothing.
@@ -446,7 +555,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public bool CanPause => Transport == TrackerTransportState.Playing;
 
     /// <summary>The save button carries the unsaved marker, so it is visible where it matters.</summary>
-    public string SaveSongText => IsDirty ? "Save song *" : "Save song";
+    /// <summary>
+    /// True while there is work that is not on disc.
+    /// </summary>
+    /// <remarks>
+    /// Shown by the Save button warming rather than by a star after its label. A star is a
+    /// character somebody has to know the meaning of, and it moves the button's width when it
+    /// comes and goes; a colour is read without being decoded and from further away.
+    /// </remarks>
+    public bool NeedsSaving => IsDirty;
 
     /// <summary>The two things the play button can walk through.</summary>
     public TrackerPlayMode[] PlayModes { get; } = { TrackerPlayMode.Pattern, TrackerPlayMode.Song };
@@ -604,6 +721,60 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public string SongDescription => Song.Description;
 
+    /// <summary>
+    /// True when there is a saved copy to go back to and something to go back from.
+    /// </summary>
+    /// <remarks>
+    /// Both halves matter. A song never written down has nothing to return to, and a song with
+    /// no changes has nothing to lose, so in either case the button is dead rather than a thing
+    /// that looks like it might do something.
+    /// </remarks>
+    public bool CanRevertSong => IsDirty && CanDeleteSong;
+
+    /// <summary>
+    /// Throws away everything since the last save and reads the song back off disc.
+    /// </summary>
+    /// <remarks>
+    /// Asked first, because this is the one button on the bar that destroys work and cannot be
+    /// undone: the history goes with the song, which is the point of it.
+    ///
+    /// Read from the file rather than kept in memory. What is on disc is what the song is, and
+    /// holding a copy of the last save in memory would be a second answer to that question and
+    /// a chance for the two to disagree.
+    /// </remarks>
+    public IAsyncRelayCommand RevertSongCommand => new AsyncRelayCommand(RevertSong);
+
+    private async Task RevertSong()
+    {
+        if (!CanRevertSong) return;
+
+        string name = SongName.Trim();
+
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Cancel the changes",
+            $"Throw away everything done to '{name}' since it was last saved, and read it back "
+                + "as it was? What you have undone and redone goes with it.",
+            "Cancel changes");
+
+        if (!confirmed) return;
+
+        string path = _store.PathFor(name);
+
+        var loaded = _store.Load(path, out var arrived);
+
+        if (loaded == null)
+        {
+            Status = $"'{name}' could not be read, so nothing was changed.";
+            return;
+        }
+
+        Adopt(loaded, name);
+
+        if (arrived.Count > 0) RecordingsArrived?.Invoke(this, EventArgs.Empty);
+
+        Status = $"'{name}' is back as it was last saved.";
+    }
+
     /// <summary>False for a song that has never been written down, which has nothing to delete.</summary>
     public bool CanDeleteSong
     {
@@ -748,6 +919,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         MarkDirty();
         OnPropertyChanged(nameof(CanDeleteSong));
+        OnPropertyChanged(nameof(CanRevertSong));
     }
 
     public bool HasSelection => !Selection.IsEmpty;
@@ -1519,6 +1691,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private void AddPattern()
     {
+        Changing("adding a pattern");
+
         int index = Song.AddPattern();
         Song.Order.Add(index);
         RefreshOrder();
@@ -1529,6 +1703,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private void RemoveOrderEntry()
     {
+        Changing("removing an order slot");
+
         if (Song.Order.Count <= 1) return;
 
         Song.Order.RemoveAt(Math.Clamp(OrderIndex, 0, Song.Order.Count - 1));
@@ -1648,6 +1824,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
+        Changing("adding an instrument");
+
         // A copy with an id of its own, because it is the song's from here on: name it what you
         // like, set it how you like, and take a second one off the same machine if you want one.
         // Sharing the rack's id would have meant one Zampler to a song and a name you could not
@@ -1698,6 +1876,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!confirmed) return;
 
         // Cells point at instruments by number, so the song renumbers them as it removes one.
+        // Before, because this is the edit that reaches furthest: every pattern that named this
+        // instrument is renumbered, and nothing smaller than the whole song would put it back.
+        Changing("taking an instrument out");
+
         if (!Song.RemoveInstrumentAt(index)) return;
 
         SyncInstruments();
@@ -1873,6 +2055,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             RefreshSavedSongs();
 
             OnPropertyChanged(nameof(CanDeleteSong));
+            OnPropertyChanged(nameof(CanRevertSong));
+        OnPropertyChanged(nameof(CanRevertSong));
 
             Status = $"Saved '{name}'";
         }
@@ -1993,6 +2177,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Song = replacement;
         SongName = name;
         Song.Name = name;
+
+        // A history outliving its song would hand somebody another song's notes back.
+        History.Forget();
 
         // The octave came with the song, so the pattern editor and every panel open on it.
         Octave = Math.Clamp(Song.KeyboardOctave, 0, 9);
@@ -2182,6 +2369,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 // Still on the screen, and now the only copy of itself.
                 MarkDirty();
                 OnPropertyChanged(nameof(CanDeleteSong));
+                OnPropertyChanged(nameof(CanRevertSong));
+            OnPropertyChanged(nameof(CanRevertSong));
+        OnPropertyChanged(nameof(CanRevertSong));
 
                 Status = "Deleted '" + file.Name + "'. What is open is still here, but unsaved.";
             }

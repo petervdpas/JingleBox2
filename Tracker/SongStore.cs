@@ -332,6 +332,40 @@ public sealed class SongStore : ISampleUsage
     }
 
     /// <summary>What song.json says, and nothing else out of the container.</summary>
+    /// <summary>
+    /// The song as its own file would hold it, and back again.
+    /// </summary>
+    /// <remarks>
+    /// For a history to keep a step in. Through the same reader and writer a save goes through,
+    /// deliberately: those two are already trusted with people's work and already know what
+    /// belongs in a song and what does not, so a step written this way cannot disagree with what
+    /// saving would produce. Writing a second copier beside them is how the two drift apart, and
+    /// the way that fails is an undo that silently drops whatever the second one forgot.
+    ///
+    /// Not what a song is stored as on disc: that is a container with the plugins' own patches
+    /// beside the document, and those are megabytes and do not change when somebody removes an
+    /// instrument. This is the document alone.
+    /// </remarks>
+    public static string Copy(Song song) =>
+        song is null ? "" : JsonSerializer.Serialize(SongDocument.From(song), JsonOptions);
+
+    /// <summary>Reads one back. Null when it will not read, which costs the step and nothing else.</summary>
+    public static Song? Uncopy(string said)
+    {
+        if (string.IsNullOrWhiteSpace(said)) return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<SongDocument>(said, JsonOptions)?.ToSong();
+        }
+        catch (Exception bad)
+        {
+            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () => "history: a step will not read back: " + bad.Message);
+
+            return null;
+        }
+    }
+
     private static SongDocument? Written(ZipArchive container)
     {
         var entry = container.GetEntry(SongEntry);

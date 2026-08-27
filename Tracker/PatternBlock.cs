@@ -63,6 +63,9 @@ public sealed class PatternBlock
     /// </remarks>
     public PatternSelection Paste(Pattern? pattern, PatternCursor at)
     {
+        // The one edit that is not a PatternEdit, and it has to be recorded like the rest.
+        if (pattern is not null) PatternEdit.Watching?.Invoke(pattern, "pasting");
+
         if (pattern == null || IsEmpty) return PatternSelection.None;
         if (!pattern.Contains(at.Line, at.Track)) return PatternSelection.None;
 

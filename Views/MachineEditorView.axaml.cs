@@ -204,11 +204,15 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     {
         Shortcuts.ShortcutAction.Save => Editor?.Project != null,
         Shortcuts.ShortcutAction.Delete => Editor?.RemoveElementCommand.CanExecute(null) == true,
+        Shortcuts.ShortcutAction.Undo => Editor?.History.CanUndo == true,
+        Shortcuts.ShortcutAction.Redo => Editor?.History.CanRedo == true,
         _ => false
     };
 
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
+        if (Editor is not { } editor) return;
+
         switch (action)
         {
             case Shortcuts.ShortcutAction.Save:
@@ -216,9 +220,33 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
                 break;
 
             case Shortcuts.ShortcutAction.Delete:
-                Editor?.RemoveElementCommand.Execute(null);
+                editor.RemoveElementCommand.Execute(null);
+                break;
+
+            // The step goes back into the project that is open, so every wrapper on screen is
+            // still pointed at the elements that were there a moment ago. Hanging them off the
+            // tree again is what makes the panel show what the machine now says.
+            case Shortcuts.ShortcutAction.Undo when editor.History.Undo(editor.Project):
+                editor.Rewrap();
+                break;
+
+            case Shortcuts.ShortcutAction.Redo when editor.History.Redo(editor.Project):
+                editor.Rewrap();
                 break;
         }
+    }
+
+    private async void Cancel_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { } editor || !editor.CanCancelChanges) return;
+
+        bool confirmed = await ConfirmDialog.AskAsync(
+            "Cancel the changes",
+            $"Throw away everything done to '{editor.Project!.Name}' since it was last saved, and "
+                + "read it back as it was? What you have undone and redone goes with it.",
+            "Cancel changes");
+
+        if (confirmed) editor.CancelChanges();
     }
 
     private async void Save_Click(object? sender, RoutedEventArgs e)

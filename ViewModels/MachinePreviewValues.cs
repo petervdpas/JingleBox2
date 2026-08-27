@@ -26,7 +26,7 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
     /// panel would never hear about it. This class does not inherit that one because the editor's
     /// values are the parameters it is showing rather than a machine's settings.
     /// </remarks>
-    public event System.Action? Said;
+    public event System.Action<string>? Said;
 
     public double Get(string key) => Find(key)?.Value ?? 0;
 
@@ -40,7 +40,7 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
 
         parameter.Value = value;
 
-        Said?.Invoke();
+        Said?.Invoke(key);
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
 
         texts[key] = value;
 
-        Said?.Invoke();
+        Said?.Invoke(key);
     }
 
     private MachineParameterViewModel? Find(string key) =>

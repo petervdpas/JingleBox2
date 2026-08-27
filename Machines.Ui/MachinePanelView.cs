@@ -1856,7 +1856,7 @@ public class MachinePanelView : Decorator
     /// already knows where it is, and setting it from inside its own change notification is the
     /// re-entrancy the whole of <see cref="Said"/> exists to avoid.
     /// </remarks>
-    private void OnValuesSaid()
+    private void OnValuesSaid(string key)
     {
         if (_writing || _refreshing) return;
 

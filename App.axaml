@@ -257,6 +257,21 @@
                 <SolidColorBrush Color="{DynamicResource Color.Danger}" />
             </Setter>
         </Style>
+
+        <!-- A button whose work is not on disc yet. It glows warm rather than wearing a star:
+             a star is a character somebody has to know the meaning of and it moves the button's
+             width as it comes and goes, where a colour is read without being decoded and from
+             across the room. Warm and not red, because unsaved work is a reminder rather than
+             a fault. -->
+        <Style Selector="Button.unsaved">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Unsaved}" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Unsaved}" />
+            </Setter>
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
     </Application.Styles>
 
     <Application.Resources>

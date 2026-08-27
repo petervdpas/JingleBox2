@@ -102,9 +102,11 @@
       <ControlTemplate>
         <Grid RowDefinitions="Auto,*">
           <Grid.ColumnDefinitions>
-            <!-- Wide enough for the longest heading to start with. The stops are where the
+            <!-- Room for the longest heading and then some, rather than exactly enough for it.
+                 A rail cut to the width of its widest word reads as though it is about to
+                 clip, and every heading sits hard against the edge. The stops are where the
                  words stop being readable and where a column is all the page. -->
-            <ColumnDefinition Width="150" MinWidth="96" MaxWidth="340" />
+            <ColumnDefinition Width="300" MinWidth="96" MaxWidth="420" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
           </Grid.ColumnDefinitions>

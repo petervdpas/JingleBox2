@@ -22,6 +22,9 @@
   <!-- Salmon rather than another red. Delete is written in this, and in a theme built out of
        reds it has to be the one that is not the accent. -->
   <Color x:Key="Color.Danger">#FF8A7A</Color>
+  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
+       and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Unsaved">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#F03A52</Color>
   <Color x:Key="SystemAccentColorLight1">#FF7285</Color>

@@ -28,6 +28,47 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineEditorViewModel : ObservableObject
 {
+    /// <summary>
+    /// What has been done to the machine being designed, so it can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// The designer's own. Undo belongs to the thing being edited: a step here is the machine as
+    /// its file would hold it, and a step in the tracker is a pattern's cells, and one history
+    /// pretending they were the same kind of thing would be a lie about both.
+    /// </remarks>
+    public DesignHistory History { get; } = new();
+
+    /// <summary>True while the machine on screen is not the machine in the folder.</summary>
+    /// <remarks>
+    /// Shown by the Save button warming, the same as the song's. A machine that has never been
+    /// saved counts as having changes from its first edit, which is right: there is nothing in
+    /// any folder that matches it.
+    /// </remarks>
+    public bool NeedsSaving => Project != null && History.NeedsSaving;
+
+    /// <summary>
+    /// True when there is a saved copy to go back to and something to go back from.
+    /// </summary>
+    /// <remarks>
+    /// A machine that has never been written down has nothing to return to. Its changes are the
+    /// whole of it, and the way to be rid of those is New.
+    /// </remarks>
+    public bool CanCancelChanges => Project is { IsSaved: true } && History.NeedsSaving;
+
+    /// <summary>Throws away everything since the last save. Asked first by the view.</summary>
+    public bool CancelChanges()
+    {
+        if (!CanCancelChanges) return false;
+
+        if (!History.Cancel(Project)) return false;
+
+        Rewrap();
+
+        Status = "Back to " + Project!.Name + " as it was last saved.";
+
+        return true;
+    }
+
     /// <summary>The project being worked on, or null when nothing is open.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasProject))]
@@ -41,6 +82,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     public MachineEditorViewModel()
     {
+        History.Changed += HistoryMoved;
+
         Values = new MachinePreviewValues(Parameters);
 
         PresetDesk = new MachinePresetDesk(() => Project);
@@ -303,6 +346,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             // The version is on a plain object the box is bound straight through to, so the
             // path has to be said again for the box to show what was just written.
             OnPropertyChanged(nameof(Project));
+
+            // What is in the folder is what is on screen, from here until the next edit.
+            History.Saved(Project);
 
             // A machine saved for the first time has somewhere to keep presets for the first
             // time, which is the moment that page stops being empty.
@@ -1306,6 +1352,11 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public void Redraw()
     {
+        // Every edit ends here, however it was made, so this is where the history hears about
+        // it. Told more often than there are edits, which is safe: a redraw where nothing about
+        // the machine moved reads the same as before and leaves no step.
+        History.Did(Project);
+
         OnPropertyChanged(nameof(Shown));
         OnPropertyChanged(nameof(Shape));
 
@@ -1605,7 +1656,35 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Redraw();
     }
 
+    /// <summary>
+    /// Hangs the editor's wrappers off a project's tree again.
+    /// </summary>
+    /// <remarks>
+    /// Called when a machine is opened, and again when a step is put back: an undo replaces the
+    /// panel and the parameters inside the project that is already open, and every wrapper on
+    /// screen is still pointed at the elements that were there before.
+    /// </remarks>
+    public void Rewrap() => Wrap(Project);
+
+    /// <summary>Told by the history, so the buttons that depend on it are redrawn.</summary>
+    private void HistoryMoved()
+    {
+        OnPropertyChanged(nameof(NeedsSaving));
+        OnPropertyChanged(nameof(CanCancelChanges));
+    }
+
     partial void OnProjectChanged(MachineProject? value)
+    {
+        // Only when a different machine is opened, and not when a step is put back into the one
+        // that already is. Putting a step back rebuilds the same wrappers over the same project,
+        // and a history that emptied itself on the way would undo once and then refuse to undo
+        // again.
+        History.Opened(value);
+
+        Wrap(value);
+    }
+
+    private void Wrap(MachineProject? value)
     {
         // The tools work on whichever machine is open, so opening one is what they hear. Asked
         // gently, because this can run before the field has been given anything: a machine

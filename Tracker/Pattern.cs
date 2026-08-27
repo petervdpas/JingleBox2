@@ -118,6 +118,58 @@ public sealed class Pattern
         return copy;
     }
 
+    /// <summary>Everything in it, as one array to keep. For a history to hold a step in.</summary>
+    /// <remarks>
+    /// The array itself and not the pattern, because a step is a thing to be kept a hundred of
+    /// and a pattern carries an event with whatever is listening to it attached. Cells are value
+    /// types in one block, so this is a copy of the contents and shares nothing.
+    /// </remarks>
+    public TrackerCell[] Cells()
+    {
+        var kept = new TrackerCell[_cells.Length];
+        Array.Copy(_cells, kept, _cells.Length);
+
+        return kept;
+    }
+
+    /// <summary>True when what it holds now is exactly that.</summary>
+    public bool Holds(TrackerCell[]? cells, int lines, int trackCount)
+    {
+        if (cells is null || lines != Lines || trackCount != TrackCount) return false;
+        if (cells.Length != _cells.Length) return false;
+
+        for (int at = 0; at < _cells.Length; at++)
+            if (_cells[at] != cells[at]) return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Puts a kept copy back, shape and all, and says so once.
+    /// </summary>
+    /// <remarks>
+    /// Once, rather than a change per cell, because putting a step back is one thing that
+    /// happened however many cells it touched. Going through the indexer would raise the event a
+    /// couple of hundred times and redraw the grid as many.
+    /// </remarks>
+    public void Restore(TrackerCell[] cells, int lines, int trackCount)
+    {
+        if (cells is null) return;
+
+        int newLines = Math.Clamp(lines, MinLines, MaxLines);
+        int newTracks = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
+
+        if (cells.Length != newLines * newTracks) return;
+
+        _cells = new TrackerCell[cells.Length];
+        Array.Copy(cells, _cells, cells.Length);
+
+        Lines = newLines;
+        TrackCount = newTracks;
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
     private void Rebuild(int lines, int trackCount)
     {
         int newLines = Math.Clamp(lines, MinLines, MaxLines);

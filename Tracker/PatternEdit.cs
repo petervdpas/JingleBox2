@@ -9,6 +9,25 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public static class PatternEdit
 {
+    /// <summary>
+    /// Told before every edit, so something can keep what is about to be replaced.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than at the call sites, which is the whole reason this class is the only way
+    /// a pattern is edited: an edit added later is recorded without anybody remembering to say
+    /// so, and an edit made from somewhere new is recorded too.
+    ///
+    /// A hook and not an interface because there is one of it, it is the application's own
+    /// history, and a pattern knows nothing about songs or views. Nothing at all is set in a
+    /// test or a tool, which is the other reason it is allowed to be nothing.
+    /// </remarks>
+    public static Action<Pattern, string>? Watching;
+
+    private static void Taking(Pattern? pattern, string what)
+    {
+        if (pattern is not null) Watching?.Invoke(pattern, what);
+    }
+
     /// <summary>Writes a note and the current instrument, leaving the other columns alone.</summary>
     public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument) =>
         EnterNote(pattern, cursor, note, instrument, TrackerCell.NoVolume);
@@ -19,6 +38,8 @@ public static class PatternEdit
     /// </summary>
     public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument, int volume)
     {
+        Taking(pattern, "a note");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         var cell = pattern[cursor.Line, cursor.Track];
@@ -37,6 +58,8 @@ public static class PatternEdit
     /// </remarks>
     public static void EnterNoteOff(Pattern pattern, PatternCursor cursor)
     {
+        Taking(pattern, "a note off");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         var cell = pattern[cursor.Line, cursor.Track];
@@ -54,6 +77,8 @@ public static class PatternEdit
     /// </summary>
     public static bool EnterHexDigit(Pattern pattern, PatternCursor cursor, char digit)
     {
+        Taking(pattern, "a digit");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return false;
         if (!TryHexValue(digit, out int value)) return false;
 
@@ -88,6 +113,8 @@ public static class PatternEdit
     /// <summary>Sets the effect letter under the cursor, keeping the parameter.</summary>
     public static bool EnterEffectCommand(Pattern pattern, PatternCursor cursor, char command)
     {
+        Taking(pattern, "an effect");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return false;
         if (cursor.Column != CellColumn.Effect) return false;
         if (!char.IsLetter(command)) return false;
@@ -101,6 +128,8 @@ public static class PatternEdit
     /// <summary>Clears the column under the cursor. On the note column, clears the whole cell.</summary>
     public static void ClearAtCursor(Pattern pattern, PatternCursor cursor)
     {
+        Taking(pattern, "clearing a cell");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         var cell = pattern[cursor.Line, cursor.Track];
@@ -123,6 +152,8 @@ public static class PatternEdit
     /// </summary>
     public static int SetTrackVolume(Pattern pattern, int track, int volume)
     {
+        Taking(pattern, "a track's volume");
+
         if (track < 0 || track >= pattern.TrackCount) return 0;
 
         int wanted = volume == TrackerCell.NoVolume
@@ -149,6 +180,8 @@ public static class PatternEdit
     /// <summary>Moves every note on a track by semitones. Empty cells and note-offs are left alone.</summary>
     public static void TransposeTrack(Pattern pattern, int track, int semitones)
     {
+        Taking(pattern, "transposing a track");
+
         if (track < 0 || track >= pattern.TrackCount) return;
 
         for (int line = 0; line < pattern.Lines; line++)
@@ -166,12 +199,16 @@ public static class PatternEdit
     /// </summary>
     public static int ClearRegion(Pattern pattern, PatternSelection selection)
     {
+        Taking(pattern, "clearing a selection");
+
         return Apply(pattern, selection, cell => TrackerCell.Empty);
     }
 
     /// <summary>Moves every note in a block, leaving note-offs and empty cells alone.</summary>
     public static int TransposeRegion(Pattern pattern, PatternSelection selection, int semitones)
     {
+        Taking(pattern, "transposing a selection");
+
         return Apply(pattern, selection, cell =>
             cell.Note.IsPlayable ? cell with { Note = cell.Note.Transpose(semitones) } : cell);
     }
@@ -179,6 +216,8 @@ public static class PatternEdit
     /// <summary>Gives every note in a block the same volume, or takes the column off them.</summary>
     public static int SetRegionVolume(Pattern pattern, PatternSelection selection, int volume)
     {
+        Taking(pattern, "a selection's volume");
+
         int wanted = volume == TrackerCell.NoVolume
             ? TrackerCell.NoVolume
             : Math.Clamp(volume, 0, TrackerCell.MaxVolume);
@@ -220,6 +259,8 @@ public static class PatternEdit
     /// <summary>Empties one track, leaving every other track as it was.</summary>
     public static void ClearTrack(Pattern pattern, int track)
     {
+        Taking(pattern, "clearing a track");
+
         if (track < 0 || track >= pattern.TrackCount) return;
 
         for (int line = 0; line < pattern.Lines; line++)
@@ -229,6 +270,8 @@ public static class PatternEdit
     /// <summary>Empties the whole pattern.</summary>
     public static void ClearPattern(Pattern pattern)
     {
+        Taking(pattern, "clearing the pattern");
+
         for (int track = 0; track < pattern.TrackCount; track++)
             ClearTrack(pattern, track);
     }
@@ -245,6 +288,8 @@ public static class PatternEdit
     /// </remarks>
     public static int Quantize(Pattern pattern, int track, int grid)
     {
+        Taking(pattern, "quantising");
+
         if (track < 0 || track >= pattern.TrackCount || grid <= 1) return 0;
 
         var placed = new TrackerCell[pattern.Lines];
@@ -307,6 +352,8 @@ public static class PatternEdit
     /// </summary>
     public static void InsertLine(Pattern pattern, PatternCursor cursor)
     {
+        Taking(pattern, "inserting a line");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         for (int line = pattern.Lines - 1; line > cursor.Line; line--)
@@ -318,6 +365,8 @@ public static class PatternEdit
     /// <summary>Pulls every cell on a track up one line into the cursor, blanking the last.</summary>
     public static void DeleteLine(Pattern pattern, PatternCursor cursor)
     {
+        Taking(pattern, "deleting a line");
+
         if (!pattern.Contains(cursor.Line, cursor.Track)) return;
 
         for (int line = cursor.Line; line < pattern.Lines - 1; line++)

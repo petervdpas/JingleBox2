@@ -89,7 +89,7 @@
          and the name box were along here, taking a hand's depth of the window for the whole of
          the time nobody was opening or renaming anything. Both are dialogs now. -->
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
         <TextBlock Grid.Column="0" Classes="field" Text="Song:" />
         <!-- The name, and what the song says about itself beside it. The note is what tells
              two songs apart months later, and reading it should not need the picker opening. -->
@@ -108,21 +108,31 @@
         </Grid>
 
         <Button Grid.Column="2" Content="Open..." Command="{Binding OpenSongCommand}" />
-        <Button Grid.Column="3" Content="{Binding SaveSongText}" Command="{Binding SaveCommand}"
-                ToolTip.Tip="A star means there are changes that are not on disk yet." />
+        <!-- Warm rather than starred. A star is a character somebody has to know the meaning
+             of, and it moves the button's width as it comes and goes. -->
+        <Button Grid.Column="3" Content="Save song" Command="{Binding SaveCommand}"
+                Classes.unsaved="{Binding NeedsSaving}"
+                ToolTip.Tip="Writes the song to disc. The button warms while there are changes that are not on disc yet." />
         <Button Grid.Column="4" Content="Save as..." Command="{Binding SaveAsCommand}" />
+
+        <!-- The other half of saving, and the one nothing offered until now: putting it back.
+             Dead unless there is both a saved copy to return to and something to return from. -->
+        <Button Grid.Column="5" Content="Cancel changes"
+                IsEnabled="{Binding CanRevertSong}"
+                Command="{Binding RevertSongCommand}"
+                ToolTip.Tip="Throws away everything done since the last save and reads the song back as it was. Asked first, because it cannot be undone." />
 
         <!-- A copy with the recordings inside it, for somebody who has none of your takes.
              Saving does not do this: a song built on a long take is tens of megabytes, and the
              open song is written out every twenty seconds whether anybody asked or not. -->
-        <Button Grid.Column="5" Content="Pack..." Click="Pack_Click"
+        <Button Grid.Column="6" Content="Pack..." Click="Pack_Click"
                 ToolTip.Tip="Writes a copy with the recordings it plays inside it, for handing to somebody else. Presets that ship with the program are named rather than carried, since every installation already has them." />
 
-        <Button Grid.Column="6" Content="New" Command="{Binding NewSongCommand}" />
+        <Button Grid.Column="7" Content="New" Command="{Binding NewSongCommand}" />
 
         <!-- The song this bar is about, since that is the one you are looking at. What is on
              the screen stays there afterwards, unsaved. -->
-        <Button Grid.Column="7" Content="Delete" Classes="danger"
+        <Button Grid.Column="8" Content="Delete" Classes="danger"
                 IsEnabled="{Binding CanDeleteSong}"
                 Command="{Binding DeleteSongCommand}"
                 ToolTip.Tip="Deletes this song from disc. What is open stays open, and the machines it used are untouched." />
