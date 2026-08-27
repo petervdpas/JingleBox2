@@ -51,7 +51,10 @@ public sealed class ControlTargets : IControlTargets
             _ => null
         };
 
-        if (found == null)
+        // Also asked first: a link whose machine is not on the track you are looking at answers
+        // nothing on every message that arrives, which is a perfectly ordinary thing for it to
+        // do and not worth an allocation each time.
+        if (found == null && Log.On(LogArea.Midi))
             Log.Write(LogArea.Midi, () =>
                 "controls: CC " + mapping.Cc + " names " + mapping.Kind + " '" + mapping.Key + "'"
                 + " of machine '" + mapping.Machine + "' but nothing here answers: track " + track

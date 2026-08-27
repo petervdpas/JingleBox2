@@ -250,7 +250,7 @@ public static class PluginHostProcess
         {
             Knock.WaitOne(5);
 
-            if (Log.IsOn && Environment.TickCount64 - census > 2000)
+            if (Log.On(LogArea.Plugins) && Environment.TickCount64 - census > 2000)
             {
                 census = Environment.TickCount64;
                 long blocks = _blocks;
@@ -653,7 +653,7 @@ public static class PluginHostProcess
             //
             // The whole block rather than the first hundred samples: a block that starts
             // quiet and ends loud is a note beginning, which is exactly the one worth seeing.
-            if (Log.IsOn)
+            if (Log.On(LogArea.Plugins))
             {
                 float peak = 0;
                 for (int index = 0; index < samples; index++)

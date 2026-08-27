@@ -884,7 +884,7 @@ public sealed class SynthMixer
 
         lock (_lock)
         {
-            if (Diagnostics.Log.IsOn && Environment.TickCount64 - _said > 1000)
+            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && Environment.TickCount64 - _said > 1000)
             {
                 _said = Environment.TickCount64;
 
@@ -1091,7 +1091,7 @@ public sealed class SynthMixer
 
             // Only when somebody is reading. Scanning the block to see how loud it came out is
             // a pass over every sample on the audio thread, and off it must cost nothing.
-            if (Diagnostics.Log.IsOn) _census[track].Played(Peak(bus, samples), instrument);
+            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
 
             Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
         }
@@ -1139,7 +1139,7 @@ public sealed class SynthMixer
             var bus = _busses[track];
             if (bus == null) continue;
 
-            bool watching = Diagnostics.Log.IsOn;
+            bool watching = Diagnostics.Log.On(Diagnostics.LogArea.Audio);
             int samples = frames * 2;
             float before = watching ? Peak(bus, samples) : 0f;
 

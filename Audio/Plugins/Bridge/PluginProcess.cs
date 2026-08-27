@@ -276,7 +276,7 @@ internal sealed class PluginProcess : IDisposable
 
         // A child logs when the application does. It cannot read the setting itself: it has no
         // settings, on purpose.
-        if (Diagnostics.Log.IsOn)
+        if (Diagnostics.Log.On(Diagnostics.LogArea.Plugins))
         {
             start.Environment[PluginBridge.TraceVariable] = "1";
             start.Environment[PluginBridge.LogFolderVariable] = System.IO.Path.GetDirectoryName(Diagnostics.Log.Path) ?? "";

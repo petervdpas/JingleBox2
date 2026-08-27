@@ -198,6 +198,19 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   in two programs says nothing and is ignored; a name from the wrong program would be worse than
   a number, since a number is merely unhelpful. Nothing requires a profile: without one a control
   is called by its number, which is what it always was
+- The message path is measured, not guessed at. One MIDI message cost 2200 bytes and 3.2us and
+  now costs 200 and 1.2; a control nothing is pointed at cost 1776 and now costs 88. Three things
+  did it. `ControlLink.Mappings` merged the song's links and the desk's into a new list on every
+  message and is now kept until one of them moves, invalidated in `Say`, which every change ends
+  at. `ControllerProfiles` works out what a number implies about a device's program, and what a
+  control's pickup should be, once per control rather than per message. And `Log.On(area)` exists
+  so the two or three places that write a line per message can ask before building the closure:
+  the guard inside `Log.Write` is checked after the caller has already allocated it. Everywhere
+  else still writes without asking, because a line written when something is decided costs
+  nothing worth counting
+- The log switch is per area everywhere now. Ten places gated on `Log.IsOn`, which is any area at
+  all, and then wrote to one: two of them on the audio thread, so switching MIDI logging on made
+  the mixer do census work per block that nothing would ever print
 - A panel hears about a value it did not write. `IMachineValues.Said` is raised alongside the
   owner's `Changed` callback, and `MachinePanelView` subscribes to it and reads itself again,
   coalesced to once a frame. Before this the only thing that made a panel redraw was the host

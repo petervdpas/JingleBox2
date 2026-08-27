@@ -114,6 +114,19 @@ public static class Log
     /// <summary>True when anything at all is being written.</summary>
     public static bool IsOn => _areas != LogArea.None;
 
+    /// <summary>
+    /// Whether anything written about that area would be kept.
+    /// </summary>
+    /// <remarks>
+    /// For the handful of places that write a line per MIDI message. The guard inside
+    /// <see cref="Write(LogArea, Func{string})"/> is checked after the caller has already built
+    /// the closure holding whatever the line mentions, which is an object and a delegate
+    /// allocated on every message whether or not anybody is reading. Asked first, that goes to
+    /// one comparison. Not worth doing anywhere else: a line written when something is decided
+    /// or has gone wrong costs nothing worth counting.
+    /// </remarks>
+    public static bool On(LogArea area) => (_areas & area) != 0;
+
     /// <summary>Where the file is, for a page that wants to say so.</summary>
     public static string Path
     {

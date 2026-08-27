@@ -463,9 +463,14 @@ public sealed class MidiControlRouter
 
         // The one line a message earns: what moved, and where to. Everything else about the
         // journey is only worth saying when something went wrong on it.
-        Log.Write(LogArea.Midi, () =>
-            "controls: " + target.Name + " moved to " + landed.ToString("0.####")
-            + " (CC " + mapping.Cc + " sent " + data + ")");
+        //
+        // Asked before the line is built, unlike everywhere else. This is the one that runs per
+        // message, and the closure holding the target and the mapping is allocated at the call
+        // whether or not anybody is reading the log.
+        if (Log.On(LogArea.Midi))
+            Log.Write(LogArea.Midi, () =>
+                "controls: " + target.Name + " moved to " + landed.ToString("0.####")
+                + " (CC " + mapping.Cc + " sent " + data + ")");
 
         Moved?.Invoke(mapping, target, landed);
     }

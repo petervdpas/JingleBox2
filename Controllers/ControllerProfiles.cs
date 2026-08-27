@@ -68,6 +68,8 @@ public static class ControllerProfiles
             Held.AddRange(found);
             Decided.Clear();
             Running.Clear();
+            Implied.Clear();
+            Decided2.Clear();
             _read = true;
         }
 
@@ -154,17 +156,7 @@ public static class ControllerProfiles
         if (string.IsNullOrWhiteSpace(device)) return;
         if (For(device) is not { } profile || profile.Programs.Count < 2) return;
 
-        string? only = null;
-
-        foreach (var program in profile.Programs)
-        {
-            if (!program.Controls.Any(one => Answers(one, channel, cc))) continue;
-
-            // In two programs at once, so it tells us nothing about which.
-            if (only is not null) return;
-
-            only = program.Name;
-        }
+        string? only = Implies(profile, device, channel, cc);
 
         if (only is null) return;
 
@@ -180,6 +172,45 @@ public static class ControllerProfiles
                 + (was is null ? "" : ", which it was not a moment ago (" + was + ")")
                 + ", worked out from CC " + cc);
         }
+    }
+
+    /// <summary>What a controller number on a device implies about its program, worked out once.</summary>
+    /// <remarks>
+    /// The answer never changes for a given number on a given device, so it is worked out on the
+    /// first message and looked up on the three hundred a second after it. The scan it replaces
+    /// walked every control of every program with a lambda per control, which for a MiniLab is
+    /// fifty-eight comparisons and a couple of hundred bytes of rubbish per message, to arrive
+    /// at the same answer it arrived at last time.
+    /// </remarks>
+    private static readonly Dictionary<(string Device, int Channel, int Cc), string?> Implied = new();
+
+    private static string? Implies(ControllerProfile profile, string device, int channel, int cc)
+    {
+        var asked = (device, channel, cc);
+
+        lock (Lock)
+            if (Implied.TryGetValue(asked, out string? known)) return known;
+
+        string? only = null;
+
+        foreach (var program in profile.Programs)
+        {
+            bool has = false;
+
+            foreach (var one in program.Controls)
+                if (Answers(one, channel, cc)) { has = true; break; }
+
+            if (!has) continue;
+
+            // In two programs at once, so it says nothing about which of them is running.
+            if (only is not null) { only = null; break; }
+
+            only = program.Name;
+        }
+
+        lock (Lock) Implied[asked] = only;
+
+        return only;
     }
 
     /// <summary>Which program a device is believed to be in, or nothing while nobody knows.</summary>
@@ -302,14 +333,36 @@ public static class ControllerProfiles
     /// </remarks>
     public static ControlPickup? Pickup(string? device, int channel, int cc)
     {
-        if (For(device) is not { } profile) return null;
+        if (device is null || For(device) is not { } profile) return null;
 
+        // Asked on every message, so the answer is worked out once per control per program and
+        // looked up after that. It cannot change without the program changing, and the program
+        // is part of the question.
+        string program = ProgramOn(device);
+        var asked = (device, channel, cc, program);
+
+        lock (Lock)
+            if (Decided2.TryGetValue(asked, out var known)) return known;
+
+        var answer = Work(profile, device, channel, cc, program);
+
+        lock (Lock) Decided2[asked] = answer;
+
+        return answer;
+    }
+
+    /// <summary>What was decided about a control, per program, so it is decided once.</summary>
+    private static readonly Dictionary<(string Device, int Channel, int Cc, string Program), ControlPickup?> Decided2 = new();
+
+    private static ControlPickup? Work(ControllerProfile profile, string device, int channel, int cc, string program)
+    {
         var control = Control(device, channel, cc);
         if (control is null || control.Kind.Length == 0) return null;
 
-        string sends = profile.Programs
-            .FirstOrDefault(one => string.Equals(one.Name, ProgramOn(device), StringComparison.Ordinal))
-            ?.Sends ?? "";
+        string sends = "";
+
+        foreach (var one in profile.Programs)
+            if (string.Equals(one.Name, program, StringComparison.Ordinal)) { sends = one.Sends; break; }
 
         return control.Kind switch
         {

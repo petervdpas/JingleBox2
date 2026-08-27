@@ -1148,7 +1148,7 @@ public sealed class TrackerPlayer : IDisposable
     /// </remarks>
     private void Where(int track, int addressed, TrackerInstrument? instrument, Song song, string went)
     {
-        if (!Diagnostics.Log.IsOn || track < 0 || track >= _lastAddressed.Length) return;
+        if (!Diagnostics.Log.On(Diagnostics.LogArea.Tracker) || track < 0 || track >= _lastAddressed.Length) return;
 
         _lastAddressed[track] = addressed;
         _lastWent[track] = went;
@@ -1297,7 +1297,7 @@ public sealed class TrackerPlayer : IDisposable
     /// </remarks>
     private void Muster()
     {
-        if (!Diagnostics.Log.IsOn) return;
+        if (!Diagnostics.Log.On(Diagnostics.LogArea.Tracker)) return;
 
         try
         {

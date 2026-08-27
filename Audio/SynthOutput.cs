@@ -385,7 +385,7 @@ public sealed class SynthOutput : IDisposable
 
             // Said once a second at most, and from here rather than from the mixing thread,
             // because this is the end that knows the sound card went without.
-            if (Diagnostics.Log.IsOn && Environment.TickCount64 - _complained > 1000)
+            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && Environment.TickCount64 - _complained > 1000)
             {
                 _complained = Environment.TickCount64;
 
@@ -408,7 +408,7 @@ public sealed class SynthOutput : IDisposable
         int samples = length / sizeof(float);
         if (samples <= 0) return 0;
 
-        if (Diagnostics.Log.IsOn && (samples < _smallest || samples > _largest || _largest == 0))
+        if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && (samples < _smallest || samples > _largest || _largest == 0))
         {
             if (_smallest == 0 || samples < _smallest) _smallest = samples;
             if (samples > _largest) _largest = samples;

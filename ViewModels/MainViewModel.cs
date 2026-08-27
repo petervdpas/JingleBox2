@@ -379,6 +379,23 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var one in LogParts)
             if (one.Writes) wanted |= one.Area;
 
+        // Nothing ticked is the log off, and not the log on with nothing to say.
+        //
+        // Nought is stored as "whatever there is", which is what makes a settings file written
+        // before the areas existed read as the whole log rather than as silence. The cost of
+        // that is this: taking the last area off would store nought, which reads back as all of
+        // them, so the one action anybody would take to quieten a log turned every area back on
+        // and there was nothing on the page to suggest why.
+        //
+        // So taking the last one off turns the log off, which is what somebody doing it means,
+        // and switching it on again with nothing remembered gives them everything.
+        if (wanted == Diagnostics.LogArea.None)
+        {
+            WriteLog = false;
+
+            return;
+        }
+
         _cfg.LogAreas = (int)wanted;
         _store.Save(_cfg);
 
