@@ -167,6 +167,16 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <!-- The little window that opens the panel. Its own class rather than the switch's,
+         because the icon is drawn to the pixel and a button with no vertical padding puts
+         its frame flush against the edges it sits between. -->
+    <Style Selector="Button.open">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="5,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
     <!-- Out. Red, square, and the same height as the switch beside it. -->
     <Style Selector="Button.remove">
       <Setter Property="MinWidth" Value="0" />
@@ -257,7 +267,7 @@
 
             <!-- Under it, in the other corner of the same gutter: out at the top, in at the
                  bottom, and neither of them costing a row. -->
-            <Button Grid.Column="1" Classes="power"
+            <Button Grid.Column="1" Classes="open"
                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
                     Margin="0,0,5,5"
                     Content="."
@@ -325,7 +335,7 @@
                           ToolTip.Tip="Take it out of the chain" />
 
                   <!-- Under it, in the other corner of the same gutter. -->
-                  <Button Classes="power"
+                  <Button Classes="open"
                           HorizontalAlignment="Right" VerticalAlignment="Bottom"
                           Margin="0,0,5,5"
                           Content="."
