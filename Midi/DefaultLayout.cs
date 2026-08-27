@@ -199,8 +199,14 @@ public sealed class DefaultLayout
     /// </remarks>
     private static string Job(string kind) => kind switch
     {
-        "fader" or "strip" => Mix,
+        "fader" => Mix,
         "knob" or "encoder" => Machine,
+
+        // A pad, a button, and a modulation strip, which is the one worth saying out loud. A
+        // strip is picked up exactly as a fader is and it would be easy to file it with them,
+        // but it is a performance control and not a mixer one: it springs back, it is played
+        // while a note sounds, and a track whose level it drove would drop to nothing the
+        // moment your thumb came off.
         _ => ""
     };
 

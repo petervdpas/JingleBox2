@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-262 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+263 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -356,8 +356,10 @@ because that exact thing was wrong once.
   order, so "the third knob" is the third one your eye lands on. `ControlMapping.Ordinal` names a
   place where a link somebody made names a parameter
 - There are two things a layout can point at, the mixer and the machine in front of you, and
-  `DefaultLayout.Job` decides which from the kind: faders and strips to the mixer, knobs and
-  encoders to the machine. Knobs and encoders share one order rather than having one each, or a
+  `DefaultLayout.Job` decides which from the kind: faders to the mixer, knobs and encoders to
+  the machine, and everything else nowhere. A modulation strip is the one that looks like it
+  belongs somewhere and does not: it is picked up exactly as a fader is, and it springs back, so
+  a track whose level it drove would drop to nothing the moment a thumb came off. Knobs and encoders share one order rather than having one each, or a
   desk with both would have two first controls pointed at the same parameter. Faders to the
   mixer and knobs to the machine is a statement about desks and not about electronics: both
   report a position and are picked up identically, so `ControlSense` cannot tell them apart and

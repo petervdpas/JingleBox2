@@ -229,6 +229,23 @@ public class DefaultLayoutTests
     }
 
     [Fact]
+    public void A_modulation_strip_is_left_alone()
+    {
+        var layout = new DefaultLayout();
+
+        // It is picked up exactly as a fader is, so it would be easy to file it with them. It
+        // springs back, which is the whole difference: a track whose level it drove would drop
+        // to nothing the moment a thumb came off.
+        Controllers.ControllerProfiles.Saw("Minilab3 MIDI", 1, 86);
+
+        Assert.Null(layout.For(new MidiMessage
+        {
+            Device = "Minilab3 MIDI", Type = MidiMessageType.ControlChange,
+            Channel = 1, Value = 1, Data = 40, IsOn = true
+        }));
+    }
+
+    [Fact]
     public void What_it_worked_out_is_carried_on_the_mapping()
     {
         // Both this and the router listen for three messages to decide the same thing about the
