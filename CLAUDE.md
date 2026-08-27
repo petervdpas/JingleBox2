@@ -401,12 +401,15 @@ because that exact thing was wrong once.
   the wire. Bank A is scattered (3, 9, 12, 13, 14, 15) because Akai stepped around the
   controllers everybody else uses; B and C are plain runs from 16 and from 22. Which letter is
   which was confirmed twice, once by the owner reading the device and once by the cycle wrapping
-  where it should. Its three remaining buttons send nothing on the wire, and Full Level is worth
+  where it should. None of its six buttons sends anything on the wire, and Full Level is worth
   knowing about for the shape of the fault rather than the fact: a device left with it on
   delivers every pad at velocity 127 however softly it is hit, says nothing about why, and the
   only clue is a lit button on the hardware. Half an hour went on the same shape once before,
   on a MiniLab whose play button turned out to be Shift and a pad. A controller can be in a
-  state the wire does not mention, and the wire is all we have
+  state the wire does not mention, and the wire is all we have. The other half of that lesson
+  is cheaper: read the manual in `docs/` before asking somebody to press a button, because two
+  rounds went on asking for a 16 Level button that this model does not have and neighbouring
+  Akai models do
 - Lua is embedded, MoonSharp, and it is fenced in: `Scripting/LuaScript.cs` names every library
   a script may reach rather than using a preset, so there is no io, no os and no loading more
   code, and a script that throws or takes more than 20ms is switched off rather than called
