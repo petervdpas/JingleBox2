@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-259 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+262 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -355,6 +355,16 @@ because that exact thing was wrong once.
   instrument, and the second kind never points at this application. `PanelOrder` is the reading
   order, so "the third knob" is the third one your eye lands on. `ControlMapping.Ordinal` names a
   place where a link somebody made names a parameter
+- There are two things a layout can point at, the mixer and the machine in front of you, and
+  `DefaultLayout.Job` decides which from the kind: faders and strips to the mixer, knobs and
+  encoders to the machine. Knobs and encoders share one order rather than having one each, or a
+  desk with both would have two first controls pointed at the same parameter. Faders to the
+  mixer and knobs to the machine is a statement about desks and not about electronics: both
+  report a position and are picked up identically, so `ControlSense` cannot tell them apart and
+  does not try, and a device with no file keeps its knobs on the mixer exactly as before. Only a
+  profile knows which is which, and that is the whole of what a profile adds here. It is also
+  what makes an MPD218 useful on arrival, since six knobs and no faders would otherwise be a six
+  channel mixer on a box built for hitting things
 - SETTINGS has a Control Surfaces page, and it lists what you own rather than what the operating
   system offers. A controller is often several ports with nearly identical names and only one of
   them carries the knobs; the profile says which, so the jobs are ticked once on the device and

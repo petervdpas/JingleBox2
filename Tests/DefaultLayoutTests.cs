@@ -12,6 +12,7 @@ namespace JingleBox2.Tests;
 public class DefaultLayoutTests
 {
     private const string Nobodys = "Some Other Box Port 1";
+    private const string Mpd = "MPD218 Port A";
 
     private static MidiMessage Cc(int number, int value, string device = Nobodys) => new()
     {
@@ -36,6 +37,10 @@ public class DefaultLayoutTests
     /// <summary>An encoder: the same number over and over, counting notches.</summary>
     private static ControlMapping? Encoder(DefaultLayout layout, int cc) =>
         Turn(layout, cc, 65, 65, 65, 65);
+
+    /// <summary>A knob on a device whose file says it is one. One message is enough.</summary>
+    private static ControlMapping? Knobbed(DefaultLayout layout, int cc) =>
+        layout.For(Cc(cc, 40, Mpd));
 
     [Fact]
     public void A_fader_is_a_tracks_level_and_is_pinned_to_that_track()
@@ -162,6 +167,62 @@ public class DefaultLayoutTests
             Device = "Minilab3 MIDI", Type = MidiMessageType.ControlChange,
             Channel = 1, Value = 14, Data = 40, IsOn = true
         });
+
+        Assert.NotNull(link);
+        Assert.Equal(ControlKind.Mix, link!.Kind);
+    }
+
+    [Fact]
+    public void An_mpd218s_knobs_drive_the_machine_rather_than_the_mixer()
+    {
+        var layout = new DefaultLayout();
+
+        // Six knobs and no faders. Left on the mixer they would be a six channel desk on a box
+        // built for hitting things, which is the wrong half of the application to land on.
+        Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
+
+        var link = Knobbed(layout, 22);
+
+        Assert.NotNull(link);
+        Assert.Equal(ControlKind.Instrument, link!.Kind);
+        Assert.Equal(ControlScope.Focused, link.Scope);
+        Assert.Equal(0, link.Ordinal);
+
+        // And picked up, because a knob says where it is.
+        Assert.Equal(ControlPickup.Takeover, link.Pickup);
+    }
+
+    [Fact]
+    public void And_they_take_the_machines_controls_in_the_order_their_numbers_run()
+    {
+        var layout = new DefaultLayout();
+
+        Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
+
+        // Touched out of order on purpose: the order is the numbers, not the touching.
+        Knobbed(layout, 25);
+        Knobbed(layout, 22);
+
+        Assert.Equal(0, Knobbed(layout, 22)!.Ordinal);
+        Assert.Equal(1, Knobbed(layout, 25)!.Ordinal);
+
+        // And a knob nobody has touched yet turning up in between moves the one above it, which
+        // is accepted rather than engineered around: any link somebody makes beats all of this.
+        Knobbed(layout, 23);
+
+        Assert.Equal(1, Knobbed(layout, 23)!.Ordinal);
+        Assert.Equal(2, Knobbed(layout, 25)!.Ordinal);
+    }
+
+    [Fact]
+    public void A_device_nobody_has_written_a_file_for_keeps_its_knobs_on_the_mixer()
+    {
+        var layout = new DefaultLayout();
+
+        // A knob and a fader both report a position and are picked up identically, so watching
+        // cannot tell them apart and does not try. Saying which is which is the whole of what a
+        // profile adds here, and without one nothing changes.
+        var link = Fader(layout, 20);
 
         Assert.NotNull(link);
         Assert.Equal(ControlKind.Mix, link!.Kind);

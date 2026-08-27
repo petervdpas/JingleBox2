@@ -9,9 +9,16 @@ namespace JingleBox2.Midi;
 /// What a controller does before anybody has pointed it at anything.
 /// </summary>
 /// <remarks>
-/// Plug in eight faders and they are the levels of the first eight tracks. Turn an encoder and
-/// it is the third knob on whatever machine is in front of you. Nobody linked any of it, nothing
-/// was stored, and it works on hardware this application has never heard of.
+/// Plug in eight faders and they are the levels of the first eight tracks. Turn a knob or an
+/// encoder and it is the third control on whatever machine is in front of you. Nobody linked any
+/// of it, nothing was stored, and it works on hardware this application has never heard of.
+///
+/// Faders to the mixer and knobs to the machine is a statement about desks rather than about
+/// electronics. Both report a position and are picked up identically, so watching cannot tell
+/// them apart and does not try: a device nobody has written a file for keeps its knobs on the
+/// mixer, exactly as before. A file that says which is which moves them, and that is the whole
+/// of what a profile adds here. It is what makes an MPD218 useful on arrival, since six knobs
+/// and no faders would otherwise be a six channel mixer on a box built for hitting things.
 ///
 /// The reason it can is that it is expressed against the machine rather than against the device.
 /// A profile knows a MiniLab has eight encoders and what each is called; it cannot know that
@@ -111,9 +118,9 @@ public sealed class DefaultLayout
                 device.Seen++;
             }
 
-            // A knob is not one of the things a layout has an opinion about: pressing a button
+            // A pad or a button is not something a layout has an opinion about: pressing one
             // nobody assigned should do nothing rather than something surprising.
-            if (control.Kind is not ("encoder" or "fader")) return null;
+            if (Job(control.Kind) is not (Mix or Machine)) return null;
 
             if (control.Mapping is not null && control.Made == device.Seen) return control.Mapping;
 
@@ -125,8 +132,8 @@ public sealed class DefaultLayout
             Log.Write(LogArea.Midi, () =>
                 "layout: " + message.Device + " CC " + control.Cc + " is " + control.Kind + " "
                 + (place + 1) + ", so it drives "
-                + (control.Kind == "fader" ? "track " + (place + 1) + "'s level"
-                                           : "control " + (place + 1) + " on the machine in front of you"));
+                + (Job(control.Kind) == Mix ? "track " + (place + 1) + "'s level"
+                                            : "control " + (place + 1) + " on the machine in front of you"));
 
             return control.Mapping;
         }
@@ -142,12 +149,7 @@ public sealed class DefaultLayout
         control.Pickup = Controllers.ControllerProfiles.Pickup(message.Device, message.Channel, message.Value)
                          ?? ControlPickup.Sensed;
 
-        // A layout has two categories and a profile has the device's own words. A knob is a
-        // fader that is round: it reports a position and it has ends, so it belongs with the
-        // faders here, ranked among them and pinned to a track. The distinction that matters to
-        // this file is whether a control says where it is or how far it moved, and on that
-        // question a knob and a fader are the same control.
-        return kind == "knob" ? "fader" : kind;
+        return kind;
     }
 
     /// <summary>
@@ -177,10 +179,35 @@ public sealed class DefaultLayout
         };
     }
 
-    /// <summary>Where this control stands among the others of its kind, counting from nought.</summary>
+    /// <summary>The mixer, and the machine in front of you. All a layout has to point at.</summary>
+    private const string Mix = "mix";
+    private const string Machine = "machine";
+
+    /// <summary>
+    /// What a control of this kind is for here.
+    /// </summary>
+    /// <remarks>
+    /// A fader belongs to the mixer and a knob belongs to the machine, and that is a statement
+    /// about the desk rather than about the electronics: both of them report a position and are
+    /// picked up identically, so <see cref="ControlSense"/> cannot tell them apart and does not
+    /// try. Only a profile knows which is which, which is the whole of what a profile adds here.
+    /// A device with no file keeps its knobs on the mixer, as it always did.
+    ///
+    /// Knobs and encoders share one order rather than having one each, because they are the same
+    /// job done two ways. A desk with both would otherwise have two first controls, both pointed
+    /// at the same parameter.
+    /// </remarks>
+    private static string Job(string kind) => kind switch
+    {
+        "fader" or "strip" => Mix,
+        "knob" or "encoder" => Machine,
+        _ => ""
+    };
+
+    /// <summary>Where this control stands among the others doing its job, counting from nought.</summary>
     private static int Place(Device device, Control control) =>
         device.Controls.Values
-            .Where(one => one.Kind == control.Kind)
+            .Where(one => Job(one.Kind) == Job(control.Kind))
             .OrderBy(one => one.Channel)
             .ThenBy(one => one.Cc)
             .ToList()
@@ -191,11 +218,11 @@ public sealed class DefaultLayout
     /// </summary>
     /// <remarks>
     /// A fader is a track's level and is pinned to that track, which is what a mixer is: fader
-    /// three is track three whether or not you are looking at it. An encoder follows you, because
-    /// what somebody wants from a bank of knobs is the thing in front of them.
+    /// three is track three whether or not you are looking at it. A knob or an encoder follows
+    /// you, because what somebody wants from a bank of knobs is the thing in front of them.
     /// </remarks>
     private static ControlMapping Made(string device, Control control, int place) =>
-        control.Kind == "fader"
+        Job(control.Kind) == Mix
             ? new ControlMapping
             {
                 Device = device,
