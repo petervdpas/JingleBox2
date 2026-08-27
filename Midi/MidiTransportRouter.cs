@@ -81,9 +81,46 @@ public sealed class MidiTransportRouter
 
     public MidiTransportRouter(ITransportKeys transport) => _transport = transport;
 
+    /// <summary>The three realtime bytes, which are the transport as MIDI has always had it.</summary>
+    /// <remarks>
+    /// Older than Mackie Control by a decade and understood by every sequencer ever built,
+    /// because they are in the specification rather than in a manufacturer's protocol. One byte,
+    /// no channel, no data. Continue is play: a device that stopped part way and is starting
+    /// again is asking for the same thing here, since this transport has no memory of where it
+    /// was.
+    /// </remarks>
+    private const int Started = 0xFA;
+    private const int Continued = 0xFB;
+    private const int RealtimeStop = 0xFC;
+
+    /// <summary>
+    /// What a MIDI Machine Control message asks for.
+    /// </summary>
+    /// <remarks>
+    /// The other dialect, and the one a KeyStep Pro sends by default, which is why it exists
+    /// here: on that device the three transport buttons are MMC unless somebody goes into the
+    /// utility menu and changes it. The frame is
+    /// <code>F0 7F &lt;device&gt; 06 &lt;command&gt; F7</code>
+    /// where the device byte is 0x7F for everybody at once, and the command is the whole of the
+    /// message.
+    /// </remarks>
+    private const int MmcStop = 0x01;
+    private const int MmcPlay = 0x02;
+    private const int MmcDeferredPlay = 0x03;
+    private const int MmcForward = 0x04;
+    private const int MmcRewind = 0x05;
+    private const int MmcRecord = 0x06;
+    private const int MmcRecordExit = 0x07;
+    private const int MmcPause = 0x09;
+
     public void Handle(MidiMessage message)
     {
         if (message is null) return;
+
+        // Neither of these is a button, so neither has a press to wait for. Both are read
+        // before the guard below rather than being given a pressed-ness they do not have.
+        if (message.Type == MidiMessageType.Realtime) { Realtime(message); return; }
+        if (message.Type == MidiMessageType.SystemExclusive) { Exclusive(message); return; }
 
         // The press, not the release. A button sends both, and doing it twice would stop what
         // the press had just started.
@@ -125,6 +162,74 @@ public sealed class MidiTransportRouter
             + ", which is not one of Mackie Control's transport buttons");
     }
 
+    /// <summary>Start, continue or stop, straight off the wire.</summary>
+    private void Realtime(MidiMessage message)
+    {
+        switch (message.Value)
+        {
+            case Started: Told(message, "start"); _transport.Play(); return;
+            case Continued: Told(message, "continue, which is play here"); _transport.Play(); return;
+            case RealtimeStop: Told(message, "stop"); _transport.Stop(); return;
+        }
+    }
+
+    /// <summary>MIDI Machine Control, which is a system exclusive message and nothing else.</summary>
+    private void Exclusive(MidiMessage message)
+    {
+        int command = Command(message.Bytes);
+
+        if (command < 0)
+        {
+            // Every other system exclusive message belongs to somebody: a device answering who
+            // it is, or a manufacturer's own settings protocol. Not this router's business, and
+            // the wire has already written down what arrived.
+            return;
+        }
+
+        switch (command)
+        {
+            case MmcPlay: Told(message, "play"); _transport.Play(); return;
+            case MmcDeferredPlay: Told(message, "deferred play, which is play here"); _transport.Play(); return;
+            case MmcStop: Told(message, "stop"); _transport.Stop(); return;
+
+            // A pause is a stop to a transport with nowhere to be paused at.
+            case MmcPause: Told(message, "pause, which is stop here"); _transport.Stop(); return;
+
+            case MmcRecord: Told(message, "record"); _transport.Record(); return;
+
+            case MmcRecordExit: Told(message, "record exit, which this does nothing with yet"); return;
+            case MmcForward: Told(message, "fast forward, which this does nothing with yet"); return;
+            case MmcRewind: Told(message, "rewind, which this does nothing with yet"); return;
+        }
+
+        Log.Write(LogArea.Midi, () =>
+            "transport: '" + message.Device + "' sent machine control command "
+            + command.ToString("X2") + ", which is not one this reads");
+    }
+
+    /// <summary>
+    /// The command out of a machine control message, or below nought when it is not one.
+    /// </summary>
+    /// <remarks>
+    /// <c>F0 7F &lt;device&gt; 06 &lt;command&gt; F7</c>. The device byte is not checked: 0x7F means
+    /// everybody and is what hardware sends, and a device addressed to a particular unit number
+    /// is addressing a tape machine that has not existed for thirty years. Refusing it would
+    /// mean a transport button that does nothing for a reason nobody could ever guess.
+    /// </remarks>
+    private static int Command(byte[]? sysex)
+    {
+        if (sysex is null || sysex.Length < 6) return -1;
+
+        if (sysex[0] != 0xF0 || sysex[1] != 0x7F || sysex[3] != 0x06) return -1;
+        if (sysex[^1] != 0xF7) return -1;
+
+        return sysex[4];
+    }
+
     private static void Say(MidiMessage message, string what) =>
         Log.Write(LogArea.Midi, () => "transport: '" + message.Device + "' pressed " + what);
+
+    /// <summary>The same line, for the two dialects where nobody pressed anything.</summary>
+    private static void Told(MidiMessage message, string what) =>
+        Log.Write(LogArea.Midi, () => "transport: '" + message.Device + "' asked for " + what);
 }

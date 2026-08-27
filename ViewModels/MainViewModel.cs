@@ -787,9 +787,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         // Through the link rather than at the list itself: the link is written from the MIDI
         // thread and read here on the same one, and it is the only thing holding the lock.
+        // One of these, shared. Two would be two caches of the same answers and two chances of
+        // them disagreeing, and a control surface asks the same question a knob does.
+        var targets = new ControlTargets(Tracker, Machines);
+
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
-            new ControlTargets(Tracker, Machines),
+            targets,
             () => ControlLink.Say(),
             Layout);
         ControlLink.UseThis();
@@ -816,6 +820,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         // to both lanes, and the same pad that fires a sample also plays the armed track's
         // instrument: two sounds from one press, neither of them asked for. On the page whose
         // whole purpose is the pads, the pads have it.
+        var transport = new MidiTransportRouter(new TransportAdapter(Transport));
+
+        // A control surface, which needs no file and no learning: the protocol says what every
+        // control on it is. Reaches the mixer through the same targets a link does.
+        var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount);
+
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,
             padRouter.Handle,
@@ -826,7 +836,18 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
                 controlRouter.Handle(msg);
             },
-            new MidiTransportRouter(new TransportAdapter(Transport)).Handle);
+            msg =>
+            {
+                transport.Handle(msg);
+
+                // Both, on the same port and on purpose. A surface speaking Mackie Control is
+                // one device sending one stream: its transport buttons and its faders come out
+                // together and there is no way to have the first without the second. The two
+                // routers divide the stream between them rather than competing for it, and the
+                // one place they could have overlapped, the five transport notes, is refused
+                // by name in the second.
+                mackie.Handle(msg);
+            });
 
         // A controller with a screen is told what the knob under your hand is doing. Nothing
         // asks whether it has one: a device with no output is answered with a quiet false, and

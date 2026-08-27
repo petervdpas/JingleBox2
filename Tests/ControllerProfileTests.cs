@@ -227,6 +227,24 @@ public class ControllerProfileTests
     }
 
     [Fact]
+    public void A_device_with_no_factory_numbers_has_none_written_down()
+    {
+        const string Ksp = "KeyStep Pro MIDI 1";
+
+        // The KeyStep Pro's five encoders have no factory controller number at all: its manual
+        // marks a default for every neighbouring parameter and none for these. So there is
+        // nothing to write down even in principle, and they are learned by touch like any
+        // control on a device nobody has described.
+        Assert.Equal("KeyStep Pro", ControllerProfiles.Called(Ksp));
+        Assert.Equal("", ControllerProfiles.Named(Ksp, 1, 74));
+        Assert.Null(ControllerProfiles.Pickup(Ksp, 1, 74));
+
+        // The one control the manual does fix, and it is picked up rather than followed.
+        Assert.Equal("Looper strip", ControllerProfiles.Named(Ksp, 1, 9));
+        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Ksp, 1, 9));
+    }
+
+    [Fact]
     public void A_file_with_no_control_map_claims_nothing_about_any_control()
     {
         // The KeyLab file describes a device without naming a single controller, because

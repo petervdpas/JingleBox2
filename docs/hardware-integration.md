@@ -688,10 +688,27 @@ because pitch bend is the only 14-bit message in MIDI and a fader wants more tha
 So the largest single piece of hardware integration in this document is blocked by three lines in
 a switch statement, and by `MidiMessage` having somewhere to put fourteen bits.
 
-**System exclusive is dropped, on purpose.** A status byte of 0xF0 or above clears the running
-status and returns null, which is right today: nothing reads one. Reassembly is perhaps thirty
-lines whenever something does, and it belongs there, at the wire, beside the running status it
-sits next to. It is not a module. See the note on that below.
+**System exclusive is read, and reassembled at the wire.** It was dropped on purpose until the
+KeyStep Pro turned up in this room and its three transport buttons turned out to send MIDI
+Machine Control by default, which meant three things were waiting on the same thirty lines:
+machine control, the identity reply, and Arturia's settings protocol. `MidiService.Gather` keeps
+a buffer per device, beside the running status and for the same reason. Only 0xF7 ends one. A
+realtime byte threaded through the middle is not part of it, which is exactly what a device
+sending clock does while it answers an identity request. Any other status byte means the sender
+gave up part way, which is what a pulled cable looks like, and the message after it must still
+be read. Capped at 4096 bytes.
+
+**The realtime transport is read too**: 0xFA start, 0xFB continue, 0xFC stop, one byte each and
+belonging to no channel. Older than Mackie Control by a decade, in the specification rather than
+in a manufacturer's protocol, and understood by every sequencer ever built. Continue is play and
+MMC's pause is stop, because this transport has no memory of where it was. The clock and active
+sensing are dropped without a word, which they were before, except that they were also logged
+once each as unread; at twenty four clocks a beat that line would drown the ones the log is for.
+
+**Neither of them is a press.** `IsOn` is false on both, which is what keeps a transport byte out
+of the pads without a line being added to any other router: all three of them begin by asking for
+a press. The transport router reads the two new kinds before its own press guard rather than
+giving them a pressed-ness they do not have.
 
 **There is no module in this whose subject is system exclusive.** It is an envelope, not a job.
 A device's screen, a transport command, a settings read and an identity reply have nothing in
@@ -709,10 +726,12 @@ somewhere that is about Arturia.
                                 the live layout, cached per control     half a day
    no profile needed, and testable on the MPD218
 
-2  Mackie Control, reading      pitch bend through the parser           an hour
-                                faders, v-pots, buttons, banks          a day
-                                verifying all of it on a wire           an evening
-   one piece of work, and every control surface made in twenty years answers to it
+2  Mackie Control, reading      BUILT. pitch bend through the parser, then faders, v-pots,
+                                mute and solo, and banking, in Midi/MidiMackieRouter.cs.
+                                The numbers came off Ardour, GPL 2 or later, which is the
+                                right direction into this. Still to verify on a wire, which
+                                needs a surface that speaks it: the nanoKONTROL2's DAW modes
+                                are the nearest thing in this room
 
 3  profiles                     BUILT. the file, the registry, naming a control in both
                                 lists, what each port is for in SETTINGS, and which program
@@ -726,7 +745,9 @@ somewhere that is about Arturia.
 5  the vendor's own protocol    reading a knob's current CC back        a day
                                 pad colours, encoder rings              unknown
 
-   MMC, whenever system exclusive is being read anyway                  an afternoon
+   system exclusive, reassembled at the wire     BUILT
+   the realtime transport, FA FB FC              BUILT
+   MMC                                           BUILT, and it was the afternoon it said
 ```
 
 The order matters more than the estimates. One is worth having on its own and needs nothing.

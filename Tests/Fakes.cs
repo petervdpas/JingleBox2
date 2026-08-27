@@ -39,6 +39,51 @@ internal sealed class OneTarget : IControlTargets
     public IControlTarget? Find(ControlMapping mapping) => Knob;
 }
 
+/// <summary>
+/// A mixer of a fixed size: one knob per track per thing on its strip.
+/// </summary>
+/// <remarks>
+/// Enough for a control surface, which asks for a named thing on a numbered track and cares
+/// about which one it got. <see cref="OneTarget"/> answers everything with the same knob, which
+/// is exactly wrong for testing whether fader three reached track three.
+/// </remarks>
+internal sealed class Desk : IControlTargets
+{
+    private readonly Dictionary<(int Track, MixControl What), Knob> _knobs = new();
+
+    public Desk(int tracks = 16) => Tracks = tracks;
+
+    public int Tracks { get; }
+
+    /// <summary>Every mapping this was asked about, in order, so a test can see what was aimed at.</summary>
+    public List<ControlMapping> Asked { get; } = new();
+
+    public Knob At(int track, MixControl what = MixControl.Volume) => Knob(track, what);
+
+    private Knob Knob(int track, MixControl what)
+    {
+        if (!_knobs.TryGetValue((track, what), out var knob))
+            _knobs[(track, what)] = knob = what switch
+            {
+                MixControl.Pan => new Knob(0, -1, 1) { Name = "Pan on TR-" + (track + 1) },
+                MixControl.Mute or MixControl.Solo => new Knob(0, 0, 1) { Name = what + " on TR-" + (track + 1) },
+                _ => new Knob(0.5, 0, 1) { Name = "Level on TR-" + (track + 1) }
+            };
+
+        return knob;
+    }
+
+    public IControlTarget? Find(ControlMapping mapping)
+    {
+        Asked.Add(mapping);
+
+        if (mapping.Kind != ControlKind.Mix) return null;
+        if (mapping.Track < 0 || mapping.Track >= Tracks) return null;
+
+        return Knob(mapping.Track, mapping.Mix);
+    }
+}
+
 /// <summary>A controller that is not there, for anything that only needs to send.</summary>
 internal sealed class NoMidi : IMidiService
 {

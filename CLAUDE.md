@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-265 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+313 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -367,6 +367,34 @@ because that exact thing was wrong once.
   profile knows which is which, and that is the whole of what a profile adds here. It is also
   what makes an MPD218 useful on arrival, since six knobs and no faders would otherwise be a six
   channel mixer on a box built for hitting things
+- Mackie Control is read, and it is the one protocol here that needs no file, no learning and
+  no layout, because it says what every control on it is. `Midi/MidiMackieRouter.cs` is the
+  fifth router and the same shape as the four before it: faders as pitch bend on channels 1 to
+  8, knobs as relative controllers 0x10 to 0x17 with the direction in bit 6 and the ticks in
+  the six below it, mute and solo as notes 0x10 and 0x08 plus the strip, banking on 0x2E and
+  0x2F by eight and 0x30 and 0x31 by one. It reaches the mixer through `IControlTargets`, the
+  same door a link written by hand goes through, and it holds none of the sensing machinery
+  because there is nothing to sense
+- A fader lands rather than picking up, which contradicts every other position-reporting
+  control here and is right: on a surface like this the fader is motorised and has already been
+  driven to where the parameter is, so picking up would be hunting for a value it is sitting on.
+  Until the writing half exists the motors are not driven, so the first touch after opening a
+  song jumps the level. What fixes that is sending positions back, not softening this
+- The five transport notes are refused by name in the Mackie router, because
+  `MidiTransportRouter` already answers them and they arrive on the same port. That is the only
+  place the two could overlap, and answering twice would stop what the press had started
+- Ticking Transport in SETTINGS now gives a real Mackie surface its mixer as well. A device
+  speaking that protocol is one device sending one stream and there is no way to have the
+  buttons without the faders. The flag's name is narrower than what it does; it is kept because
+  it is what is stored and what people have already ticked
+- The numbers came off Ardour, which has carried a Mackie implementation under GPL 2 or later
+  since 2006, and this is GPL 2, so the licence runs the right way. `libs/surfaces/mackie/
+  device_info.cc` and `surface.cc`; copyright John Anderson and Paul Davis, credited in the
+  router's own remarks. Nothing was copied. The 250 KB around those tables is written against
+  Ardour's Session and Route model and porting it would be a rewrite of somebody else's
+  architecture; the tables are facts about hardware and are what nobody should reinvent. Mackie
+  themselves never published any of it: the same hardware shipped as Emagic's Logic Control and
+  Emagic did
 - `controllers/nanokontrol2.json` is the first file here written from somebody else's reading of
   a device rather than from the wire, and it says so at the top. Korg's parameter guide has a
   page per control type explaining what CC Number means and never prints one; the numbers come
@@ -376,6 +404,37 @@ because that exact thing was wrong once.
   DAW modes where the same controls speak that DAW's protocol. It buys the most of any file here
   because the device is the plainest surface anybody makes: eight faders on eight track levels
   and eight knobs on the panel in front of you, working before it is unwrapped
+- `controllers/keystep-pro.json` is the one that says a device cannot be described, and why.
+  Its five encoders have no factory controller number: the manual's Controller page marks a
+  default for channel, mode, min and max and marks none for CC, so the omission is deliberate
+  and there is nothing to write down even in principle. Measuring one would report what its
+  owner assigned. Two facts are in the file instead. The Looper strip sends CC 9 with its MIDI
+  send off until a menu is visited, which reads as broken hardware. And its three transport
+  buttons send MIDI Machine Control, which is why that is read here at all
+- The transport is read in three dialects now, and a device speaks whichever its program or its
+  menu chose. Mackie Control notes and the plain controllers a MiniLab sends were already there.
+  Added: the realtime bytes 0xFA start, 0xFB continue and 0xFC stop, which are in the
+  specification and understood by every sequencer ever built; and MIDI Machine Control,
+  `F0 7F <device> 06 <command> F7`, which is what a KeyStep Pro sends unless somebody changes it.
+  Continue is play and pause is stop, because this transport has no memory of where it was. The
+  unit number is not checked: 0x7F means everybody and is what hardware sends, and refusing
+  anything else would mean a button doing nothing for a reason nobody could guess
+- System exclusive is read off the wire, which three separate things were waiting on: machine
+  control, the universal identity reply, and Arturia's own settings protocol. It is the only
+  message MIDI has with no length and so the only one that can arrive in pieces, so
+  `MidiService.Gather` keeps a buffer per device, the same way running status is kept per device
+  and for the same reason. Only 0xF7 ends one; a realtime byte threaded through the middle is
+  not part of it, which is exactly what a device sending clock does while it answers an identity
+  request; any other status byte means the sender gave up part way, which is what a pulled cable
+  looks like. Capped at 4096 bytes so a broken stream cannot grow without end
+- Neither of the two new kinds is a press, and `IsOn` is false on both. That is what keeps a
+  transport byte out of the pads without a line being added anywhere: all three of the other
+  routers begin by asking for a press. The transport router reads them before its own press
+  guard rather than being given a pressed-ness they do not have
+- The clock and active sensing are dropped at the wire without a word. They already were, but
+  they were also logged as "not a kind read here" once each, and at twenty four clocks a beat
+  that line would drown the ones the log is kept for. `MidiService.Chatter` is the difference
+  between a message nobody reads and a message dropped on purpose
 - A device whose file describes exactly one program is in it, and `ProgramOn` says so without
   waiting. `Saw` declines to work out the program of such a device, rightly, since there is
   nothing to resolve; the cost was that no program was ever running, so a file that put its

@@ -253,7 +253,7 @@
 
                           <CheckBox Grid.Column="4" Content="Transport" VerticalAlignment="Center"
                                     IsChecked="{Binding DrivesTransport}"
-                                    ToolTip.Tip="This device's play, stop and record buttons work the caps at the top of the window, which means whatever the page you are on says they mean. Where they arrive is the device's business: some send them as ordinary controllers and some speak Mackie Control on a port of their own, and both are listened to." />
+                                    ToolTip.Tip="This device's play, stop and record buttons work the caps at the top of the window, which means whatever the page you are on says they mean. Where they arrive is the device's business: some send them as ordinary controllers, some send machine control, some send start and stop as the specification has always had them, and some speak Mackie Control on a port of their own. All of them are listened to. On a port that really does speak Mackie Control this also gives the device its mixer: eight faders on eight track levels, the knobs on pan, and mute and solo on the buttons under them. That comes with the transport rather than separately because it is one device sending one stream." />
 
                           <Button Grid.Column="5" Content="Forget" Classes="danger"
                                   VerticalAlignment="Center"

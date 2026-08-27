@@ -321,14 +321,69 @@ public sealed class MidiService : IMidiService
         // vanished without a word.
         if (msg is null)
         {
-            Log.Write(LogArea.Midi, () =>
-                "port: '" + device + "' sent " + Bytes(e.Data, e.Start, e.Length)
-                + " which is not a kind read here, so it is dropped");
+            // The clock and active sensing arrive dozens of times a second on any device with a
+            // sequencer in it, and a piece of a system exclusive message arrives whenever one is
+            // long. Reporting either as unread would drown the very lines this log is kept for.
+            if (!Chatter(e.Data, e.Start, e.Length))
+                Log.Write(LogArea.Midi, () =>
+                    "port: '" + device + "' sent " + Bytes(e.Data, e.Start, e.Length)
+                    + " which is not a kind read here, so it is dropped");
 
             return;
         }
 
+        // Rare, and the only kind worth printing whole. It is also how a device's identity gets
+        // into a controller file: plug it in, ask, and read the answer out of the log.
+        if (msg.Type == MidiMessageType.SystemExclusive)
+            Log.Write(LogArea.Midi, () =>
+                "port: '" + device + "' sent " + Said(msg.Bytes) + ": "
+                + Bytes(msg.Bytes, 0, msg.Bytes?.Length ?? 0));
+
         MessageReceived?.Invoke(this, msg);
+    }
+
+    /// <summary>
+    /// Whether those bytes are something dropped on purpose rather than something not understood.
+    /// </summary>
+    /// <remarks>
+    /// Telling those two apart is the whole point of the line this guards. A message nobody
+    /// reads is worth a line; the clock is not, at twenty four of them a beat.
+    /// </remarks>
+    private bool Chatter(byte[]? data, int start, int length)
+    {
+        if (data is null || length <= 0 || start < 0 || start >= data.Length) return true;
+
+        byte first = data[start];
+
+        // Clock, undefined, active sensing, reset.
+        if (first is 0xF8 or 0xF9 or 0xFD or 0xFE or 0xFF) return true;
+
+        // A piece of a system exclusive message that has not finished arriving.
+        return first < 0x80 || first == 0xF0;
+    }
+
+    /// <summary>What a system exclusive message is, in words, for the log.</summary>
+    /// <remarks>
+    /// Three of them are worth naming and the rest are worth their manufacturer. The identity
+    /// reply is the useful one: it is the only name a device has that is the same on every
+    /// operating system, and it is what a controller file's identity field is for.
+    /// </remarks>
+    private static string Said(byte[]? sysex)
+    {
+        if (sysex is null || sysex.Length < 4) return "a system exclusive message";
+
+        // F0 7F <device> 06 <command> F7
+        if (sysex[1] == 0x7F && sysex.Length > 4 && sysex[3] == 0x06)
+            return "MIDI Machine Control, command " + sysex[4].ToString("X2");
+
+        // F0 7E <device> 06 01 F7 asks; 06 02 answers.
+        if (sysex[1] == 0x7E && sysex.Length > 4 && sysex[3] == 0x06)
+        {
+            if (sysex[4] == 0x01) return "an identity request";
+            if (sysex[4] == 0x02) return "an identity reply, which is what a profile's identity field wants";
+        }
+
+        return "a system exclusive message from manufacturer " + sysex[1].ToString("X2");
     }
 
     /// <summary>The raw bytes, for a log that has to say what really came off the wire.</summary>
@@ -359,6 +414,86 @@ public sealed class MidiService : IMidiService
     /// </remarks>
     private readonly Dictionary<string, byte> _running = new(StringComparer.Ordinal);
 
+    /// <summary>The three realtime bytes that mean something here.</summary>
+    private const byte Started = 0xFA;
+    private const byte Continued = 0xFB;
+    private const byte Stopped = 0xFC;
+
+    /// <summary>
+    /// A system exclusive message being collected, per device.
+    /// </summary>
+    /// <remarks>
+    /// Every other message in MIDI is one, two or three bytes and arrives whole. This one is as
+    /// long as its sender likes and may be handed over in pieces, so it is the only place here
+    /// that has to remember anything between callbacks. Per device for the same reason running
+    /// status is: two controllers are two streams.
+    /// </remarks>
+    private readonly Dictionary<string, List<byte>> _building = new(StringComparer.Ordinal);
+
+    /// <summary>Far more than any of these is, so a broken stream cannot grow without end.</summary>
+    private const int TooLong = 4096;
+
+    private bool Building(string device)
+    {
+        lock (_lock) return _building.ContainsKey(device);
+    }
+
+    /// <summary>
+    /// Adds what has arrived to what was already there, and answers once it is whole.
+    /// </summary>
+    /// <remarks>
+    /// Only 0xF7 ends one of these. A realtime byte is allowed to appear inside one and is not
+    /// part of it, which is in the specification and is exactly what a device sending clock
+    /// does while it answers an identity request. Any other byte with the top bit set means the
+    /// sender abandoned the message part way, which is what a cable being pulled looks like.
+    /// </remarks>
+    private MidiMessage? Gather(string device, byte[] data, int at, int end)
+    {
+        lock (_lock)
+        {
+            // Whatever run of messages was going, this ended it.
+            _running.Remove(device);
+
+            if (!_building.TryGetValue(device, out var so)) _building[device] = so = new List<byte>(16);
+
+            for (; at < end; at++)
+            {
+                byte b = data[at];
+
+                // Realtime, threaded through the middle of it. Not part of the message.
+                if (b >= 0xF8) continue;
+
+                if (b >= 0x80 && b != 0xF7)
+                {
+                    so.Clear();
+
+                    // A fresh one starting is the common way to see this, and it is not a
+                    // fault: the piece before it was simply never finished.
+                    if (b != 0xF0) { _building.Remove(device); return null; }
+                }
+
+                so.Add(b);
+
+                if (b == 0xF7)
+                {
+                    var whole = so.ToArray();
+                    _building.Remove(device);
+
+                    return new MidiMessage
+                    {
+                        Device = device, Type = MidiMessageType.SystemExclusive,
+                        Channel = 0, Value = 0, Data = 0, IsOn = false, Bytes = whole
+                    };
+                }
+
+                if (so.Count > TooLong) { _building.Remove(device); return null; }
+            }
+        }
+
+        // More of it to come.
+        return null;
+    }
+
     /// <summary>
     /// One message off the wire, or nothing when those bytes are not one this host plays.
     /// </summary>
@@ -375,14 +510,22 @@ public sealed class MidiService : IMidiService
 
         byte status;
 
+        // The one message with no length, and so the one that can arrive in pieces.
+        if (data[at] == 0xF0 || Building(device)) return Gather(device, data, at, end);
+
         if (data[at] >= 0x80)
         {
             status = data[at];
             at++;
 
             // A real time byte can turn up in the middle of anything and changes nothing about
-            // what was being sent; a system common one ends the run.
-            if (status >= 0xF8) return null;
+            // what was being sent. Three of them are the transport and are read; the rest are
+            // the clock and active sensing, which arrive dozens of times a second and say
+            // nothing this application acts on.
+            if (status >= 0xF8)
+                return status is Started or Continued or Stopped
+                    ? new MidiMessage { Device = device, Type = MidiMessageType.Realtime, Channel = 0, Value = status, Data = 0, IsOn = false }
+                    : null;
 
             if (status >= 0xF0)
             {
