@@ -13,14 +13,16 @@ public sealed class MidiDispatcher
     private readonly Action<MidiMessage>? _pads;
     private readonly Action<MidiMessage>? _tracker;
     private readonly Action<MidiMessage>? _controls;
+    private readonly Action<MidiMessage>? _transport;
 
     public MidiDispatcher(MidiConfig cfg, Action<MidiMessage>? pads, Action<MidiMessage>? tracker,
-                          Action<MidiMessage>? controls = null)
+                          Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null)
     {
         _cfg = cfg;
         _pads = pads;
         _tracker = tracker;
         _controls = controls;
+        _transport = transport;
     }
 
     public void Handle(MidiMessage msg)
@@ -41,5 +43,6 @@ public sealed class MidiDispatcher
         if ((role & MidiDeviceRole.Pads) != 0) _pads?.Invoke(msg);
         if ((role & MidiDeviceRole.Tracker) != 0) _tracker?.Invoke(msg);
         if ((role & MidiDeviceRole.Controls) != 0) _controls?.Invoke(msg);
+        if ((role & MidiDeviceRole.Transport) != 0) _transport?.Invoke(msg);
     }
 }

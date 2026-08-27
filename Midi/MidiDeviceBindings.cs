@@ -24,7 +24,7 @@ public static class MidiDeviceBindings
     /// <see cref="MidiDeviceRole"/> means adding it here, in the same breath.
     /// </remarks>
     public const MidiDeviceRole AnyRole =
-        MidiDeviceRole.Pads | MidiDeviceRole.Tracker | MidiDeviceRole.Controls;
+        MidiDeviceRole.Pads | MidiDeviceRole.Tracker | MidiDeviceRole.Controls | MidiDeviceRole.Transport;
 
     private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
 

@@ -163,6 +163,18 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   one list showing both with a word beside each row reads as a leak whatever the word says.
   Moving a link between the layers was built and taken out again: what anybody actually wants
   is a new song that starts with a layout already on it, which is a song template
+- Automation is not built. `docs/automation.md` is the plan: lanes rather than more effect
+  commands, one per parameter per track per pattern, values normalised 0 to 1 and converted
+  through `IControlTarget`, which is the same interface remote control writes through. Recording
+  a lane from a knob that is already linked is nearly free; the editor is all of the work
+- `docs/controller-profiles.md` is a plan, not built: a controller described in a file the way
+  a machine is, so a link names `encoder3` rather than CC 89. A device's DAW mode changes every
+  number it sends, which silently breaks a whole layout and cannot be detected from outside; a
+  profile knows both dialects and works out which is in use from the first number that arrives
+- `docs/scratch-machine.md` is an idea, not a plan for now: a fader as a needle on a record,
+  where the sound comes from how fast the position moves rather than where it is. It is the
+  first machine that would need an engine of its own rather than a described panel over an
+  existing one, and the first thing that would want a parameter delivered uncoalesced
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound

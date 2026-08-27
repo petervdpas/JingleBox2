@@ -35,6 +35,17 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private bool drivesControls;
 
+    /// <summary>
+    /// Whether this device's transport buttons work the caps at the top of the window.
+    /// </summary>
+    /// <remarks>
+    /// Its own switch because a controller in a DAW mode is two devices as far as this list is
+    /// concerned: the buttons come out one port speaking Mackie Control and everything else out
+    /// another. On the port they arrive on, note 94 is the play button and not a note anybody
+    /// wants to hear, so the pads and the tracker must not be pointed at it.
+    /// </remarks>
+    [ObservableProperty] private bool drivesTransport;
+
     public MidiDeviceViewModel(string name, bool isConnected, MidiDeviceRole role,
                                Action<MidiDeviceViewModel> roleChanged,
                                Action<MidiDeviceViewModel>? forget = null)
@@ -47,6 +58,7 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
         drivesPads = (role & MidiDeviceRole.Pads) != 0;
         drivesTracker = (role & MidiDeviceRole.Tracker) != 0;
         drivesControls = (role & MidiDeviceRole.Controls) != 0;
+        drivesTransport = (role & MidiDeviceRole.Transport) != 0;
 
         _loaded = true;
     }
@@ -69,11 +81,13 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     public MidiDeviceRole Role =>
         (DrivesPads ? MidiDeviceRole.Pads : MidiDeviceRole.None) |
         (DrivesTracker ? MidiDeviceRole.Tracker : MidiDeviceRole.None) |
-        (DrivesControls ? MidiDeviceRole.Controls : MidiDeviceRole.None);
+        (DrivesControls ? MidiDeviceRole.Controls : MidiDeviceRole.None) |
+        (DrivesTransport ? MidiDeviceRole.Transport : MidiDeviceRole.None);
 
     partial void OnDrivesPadsChanged(bool value) => NotifyRoleChanged();
     partial void OnDrivesTrackerChanged(bool value) => NotifyRoleChanged();
     partial void OnDrivesControlsChanged(bool value) => NotifyRoleChanged();
+    partial void OnDrivesTransportChanged(bool value) => NotifyRoleChanged();
 
     private void NotifyRoleChanged()
     {

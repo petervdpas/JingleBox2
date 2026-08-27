@@ -16,7 +16,18 @@ public enum MidiDeviceRole
     /// things at once: the keys play the tracker and the knobs move the machine, and one of
     /// those is a device somebody may want off without the other.
     /// </summary>
-    Controls = 4
+    Controls = 4,
+
+    /// <summary>
+    /// The transport buttons of a controller that speaks Mackie Control.
+    /// </summary>
+    /// <remarks>
+    /// Its own flag because such a controller is two devices as far as the settings are
+    /// concerned: the buttons come out one port and everything else out another. On the port
+    /// they arrive on, note 94 is the play button and not a note anybody wants to hear, so the
+    /// pads and the tracker must not be pointed at it.
+    /// </remarks>
+    Transport = 8
 }
 
 /// <summary>

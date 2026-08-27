@@ -224,7 +224,7 @@
               <ItemsControl ItemsSource="{Binding Midi.Devices}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,0,0,6">
                       <StackPanel Grid.Column="0" VerticalAlignment="Center">
                         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="cardHint"
@@ -245,9 +245,17 @@
                                 IsChecked="{Binding DrivesControls}"
                                 ToolTip.Tip="This device's knobs and faders move parameters. Its own switch, because a keyboard whose keys should play the tracker is not always one whose wheel should move something." />
 
+                      <!-- A controller told which DAW it is talking to sends its transport
+                           buttons down a port of their own, speaking Mackie Control. On that
+                           port note 94 is the play button, not a note. -->
+                      <CheckBox Grid.Column="4" Content="Transport"
+                                VerticalAlignment="Center"
+                                IsChecked="{Binding DrivesTransport}"
+                                ToolTip.Tip="This device's play, stop and record buttons work the caps at the top of the window, which means whatever the page you are on says they mean." />
+
                       <!-- Only for one that is not plugged in. A controller on the desk comes
                            straight back the next time the list is read. -->
-                      <Button Grid.Column="4" Content="Forget" Classes="danger"
+                      <Button Grid.Column="5" Content="Forget" Classes="danger"
                               VerticalAlignment="Center"
                               IsVisible="{Binding CanForget}"
                               Command="{Binding ForgetCommand}"

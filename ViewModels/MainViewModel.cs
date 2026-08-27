@@ -696,7 +696,8 @@ public sealed partial class MainViewModel : ObservableObject
                 if (ControlLink.Handle(msg) is { } made) controlRouter.Caught(made);
 
                 controlRouter.Handle(msg);
-            });
+            },
+            new MidiTransportRouter(new TransportAdapter(Transport)).Handle);
 
         // NOTE: MidiViewModel already subscribes for learn/status.
         // This subscription is for playing things.
