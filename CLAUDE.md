@@ -91,6 +91,32 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 
+## Tests
+
+```bash
+dotnet test Tests/JingleBox2.Tests.csproj
+```
+
+225 of them, in about two seconds, with no window and no hardware. xunit, and they run one at a
+time on purpose: several of them read and write the application folder, which
+`Tests/Sandbox.cs` points at a temporary one before anything runs, and an environment variable
+belongs to a process rather than to a test.
+
+The suite exists because the code was already built for it. Five classes say in their own remarks
+that they were kept free of Avalonia and of ports so they could be tested, and `MidiService.Read`
+is public for exactly that. What was missing was somewhere to put the tests.
+
+`Tests/` is inside the application's folder, so `JingleBox2.csproj` has to remove it from its own
+globs the way it already does for the machine assemblies. Without that the app compiles the test
+sources into itself and every generated assembly attribute is defined twice.
+
+What is covered, and it is the parts that can be got wrong quietly: the wire (running status,
+pitch bend, one-byte statuses), what kind of control is sending, pickup and endless knobs and
+parking, device roles, controller profiles and codecs, shortcuts, all four histories, patterns
+and their edits, a song being written down and poured back, the mix, envelopes, portable paths,
+the screen's bytes, the transport's two dialects, and the Lua fence. Several of those tests exist
+because that exact thing was wrong once.
+
 ## Technical Notes
 
 - Configurable pad matrix size (rows x columns) via SETTINGS tab

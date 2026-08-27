@@ -45,6 +45,15 @@
     <AvaloniaResource Remove="Machines.Ui\**" />
     <AvaloniaXaml Remove="Machines.Abstractions\**" />
     <AvaloniaXaml Remove="Machines.Ui\**" />
+
+    <!-- And the tests, for the same reason: a project inside this one's folder is swallowed by
+         this one's own globs, which compiles its sources here as well and duplicates everything
+         the build generates. -->
+    <Compile Remove="Tests\**" />
+    <EmbeddedResource Remove="Tests\**" />
+    <None Remove="Tests\**" />
+    <AvaloniaResource Remove="Tests\**" />
+    <AvaloniaXaml Remove="Tests\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.1" />

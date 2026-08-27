@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+
+    <!-- The application is a windowed program and its own csproj says so. A test project that
+         inherited that would be a test runner nobody can see the output of. -->
+    <OutputType>Library</OutputType>
+
+    <!-- managed-midi's obsolete warnings, the same suppression the application uses. -->
+    <NoWarn>CS0618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JingleBox2.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The controller files the profile and codec tests read. Taken from the application's
+         own folder rather than copied by hand, so a test cannot pass against a stale copy. -->
+    <None Include="..\controllers\**\*" CopyToOutputDirectory="PreserveNewest"
+          LinkBase="controllers" />
+  </ItemGroup>
+
+</Project>
