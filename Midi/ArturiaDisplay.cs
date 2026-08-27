@@ -13,7 +13,7 @@ namespace JingleBox2.Midi;
 /// Arturia's own, and not a standard. Mackie Control can write text to a device's display and
 /// this device is deaf to it: that message was written for a two line character panel in the
 /// nineties and this is a colour screen the manufacturer drives their own way. Tried and
-/// recorded in <c>docs/controller-profiles.md</c>, along with everything else that got nothing.
+/// recorded in <c>docs/hardware-integration.md</c>, along with everything else that got nothing.
 ///
 /// The shape came from https://gist.github.com/Janiczek/04a87c2534b9d1435a1d8159c742d260,
 /// reverse engineered from what Arturia's own software sends:
@@ -44,7 +44,7 @@ public sealed class ArturiaDisplay
     /// that: preset 02, param 40, control 6A, value 21. Something is being switched on rather
     /// than roused, which is the likeliest reason the device stops speaking Mackie Control once
     /// it has been sent. The settings protocol is documented by https://github.com/soyersoyer/sysex-controls;
-    /// see docs/controller-profiles.md.
+    /// see docs/hardware-integration.md.
     /// </remarks>
     private static readonly byte[] Wake = { 0xF0, 0x00, 0x20, 0x6B, 0x7F, 0x42, 0x02, 0x02, 0x40, 0x6A, 0x21, 0xF7 };
 

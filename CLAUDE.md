@@ -182,7 +182,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   request went unanswered by the one device here. Not built either: a default layout, which is
   what makes a device useful the moment it is plugged in. The encoders take the machine's
   parameters in panel order, so the third encoder is the third knob on whatever face is in front
-  of you, and no profile is needed for it. The MiniLab 3's own manuals are in `Assets/`, and two
+  of you, and no profile is needed for it. The MiniLab 3's own manuals are in `docs/`, and two
   things in them are operational rather than background: its four ports each have a stated job,
   and Arturia asks a host to use either the DAW program or the MCU port and never both, which
   SETTINGS currently offers as two independent tick boxes

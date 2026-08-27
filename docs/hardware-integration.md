@@ -189,7 +189,7 @@ when a device offers it and nothing better, and it costs a switch statement.
 
 ## Five devices, and what each one asks for
 
-The manuals in `Assets/` are four controllers and a sequencer, which turns out to be a good spread
+The manuals in `docs/` are four controllers and a sequencer, which turns out to be a good spread
 for testing whether the design holds.
 
 ```
@@ -252,7 +252,7 @@ than a mapping problem and none of the rungs above apply to it.
 ## One device, measured, and then read up on
 
 A MiniLab 3 in its DAW mode, every control worked once in physical order and read off the wire.
-Then `Assets/minilab-3_Manual_1_0_5_EN.pdf` and its cheat sheet, which settled several things the
+Then `docs/minilab-3_Manual_1_0_5_EN.pdf` and its cheat sheet, which settled several things the
 wire could not and corrected two the wire got wrong.
 
 ### Its four ports, in the manufacturer's own words
@@ -725,15 +725,24 @@ two correct rather than lucky, and everything after that is comfort.
 ## Sources
 
 ```
-Assets/minilab-3_Manual_1_0_5_EN.pdf              the device, from its manufacturer
-Assets/minilab-3_Manual_1_0_0-cheatsheet_EN.pdf   one page, and the faster read of the two
-Assets/keylab-mkii_Manual_2_2_0_EN.pdf            MCU, HUI and MMC, and a mixer's worth of
-                                                  controls. section 4.9 is the important one
-Assets/MPD218-UserGuide-v1.0.pdf                  20 pages, 5 languages, and no CC map at all
-Assets/KeyStep_Manual_1_1_1_EN.pdf                a clock master, not a control surface
-Assets/keystep-pro_Manual_2_5_2_EN.pdf            the same, four tracks of it
-https://github.com/soyersoyer/sysex-controls      a repository, GPL-3
-                                                  the settings protocol, src/sc-midi.c
+docs/minilab-3_Manual_1_0_0-cheatsheet_EN.pdf
+                     one page, and the faster read of the two
+docs/minilab-3_Manual_1_0_5_EN.pdf
+                     the device, from its manufacturer
+docs/keylab-mkii_Manual_2_2_0_EN.pdf
+                     MCU, HUI and MMC, and a mixer's worth of controls.
+                     section 4.9 is the one that changed this document
+docs/MPD218-UserGuide-v1.0.pdf
+                     20 pages, 5 languages, and no controller map at all
+docs/KeyStep_Manual_1_1_1_EN.pdf
+docs/keystep-pro_Manual_2_5_2_EN.pdf
+                     clock masters, not control surfaces. a different question
+
+https://github.com/soyersoyer/sysex-controls
+                     a repository, GPL-3. the settings protocol, in src/sc-midi.c,
+                     and the thing that proved the identity request does answer
 https://gist.github.com/Janiczek/04a87c2534b9d1435a1d8159c742d260
-                                                  a gist, one page, the display messages
+                     a gist, one page. the display messages
+https://www.arturia.com/products/hybrid-synths/minilab-3/overview
+                     "1 DAW preset for any major DAW, MCU for every other DAW"
 ```
