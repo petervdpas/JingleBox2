@@ -385,6 +385,17 @@ public sealed class SongStore : ISampleUsage
     private static string StateName(int index) =>
         StateFolder + index.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
 
+    /// <summary>What one effect's patch is called inside the file.</summary>
+    /// <remarks>
+    /// By the track it sits on and its place in that track's chain, for the same reason an
+    /// instrument's goes by its place in the list: both numbers are what the reader has in its
+    /// hand as it walks the same lists the writer walked. The "t" keeps the two kinds apart in
+    /// a folder somebody may well open.
+    /// </remarks>
+    private static string ChainStateName(int track, int device) =>
+        StateFolder + "t" + track.ToString("00", CultureInfo.InvariantCulture)
+        + "-" + device.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
+
     /// <summary>
     /// Writes a song, and when asked, the recordings it plays along with it.
     /// </summary>
@@ -403,6 +414,7 @@ public sealed class SongStore : ISampleUsage
 
         var document = SongDocument.From(song);
         var states = document.TakeStatesOut();
+        var patches = document.TakeChainStatesOut();
 
         Config.SafeFile.Write(filePath, stream =>
         {
@@ -417,6 +429,13 @@ public sealed class SongStore : ISampleUsage
             foreach (var (index, bytes) in states)
             {
                 var patch = container.CreateEntry(StateName(index), CompressionLevel.Fastest);
+                using var writing = patch.Open();
+                writing.Write(bytes, 0, bytes.Length);
+            }
+
+            foreach (var (track, device, bytes) in patches)
+            {
+                var patch = container.CreateEntry(ChainStateName(track, device), CompressionLevel.Fastest);
                 using var writing = patch.Open();
                 writing.Write(bytes, 0, bytes.Length);
             }
@@ -483,21 +502,41 @@ public sealed class SongStore : ISampleUsage
     {
         for (int index = 0; index < document.Instruments.Count; index++)
         {
-            var entry = container.GetEntry(StateName(index));
-            if (entry == null) continue;
+            var bytes = Lump(container, StateName(index));
+            if (bytes != null) document.Instruments[index].PluginState = bytes;
+        }
 
-            try
+        for (int track = 0; track < document.Mix.Count; track++)
+        {
+            var devices = document.Mix[track].Plugins?.Devices;
+            if (devices == null) continue;
+
+            for (int device = 0; device < devices.Count; device++)
             {
-                var bytes = new byte[entry.Length];
-
-                using var reading = entry.Open();
-                reading.ReadExactly(bytes);
-
-                document.Instruments[index].PluginState = bytes;
+                var bytes = Lump(container, ChainStateName(track, device));
+                if (bytes != null) devices[device].State = bytes;
             }
-            catch (Exception)
-            {
-            }
+        }
+    }
+
+    /// <summary>One patch out of the container, or null when it is not there or will not read.</summary>
+    private static byte[]? Lump(ZipArchive container, string name)
+    {
+        var entry = container.GetEntry(name);
+        if (entry == null) return null;
+
+        try
+        {
+            var bytes = new byte[entry.Length];
+
+            using var reading = entry.Open();
+            reading.ReadExactly(bytes);
+
+            return bytes;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 
@@ -566,6 +605,40 @@ public sealed class SongStore : ISampleUsage
 
                 states.Add((index, bytes));
                 Instruments[index].PluginState = Array.Empty<byte>();
+            }
+
+            return states;
+        }
+
+        /// <summary>
+        /// The same for every effect on every track, which is where a Serum on a track keeps
+        /// its preset.
+        /// </summary>
+        /// <remarks>
+        /// Out here for exactly the reason the instruments' patches are. One effect's lump is
+        /// bigger than the whole of the music, it does not change when somebody moves a note,
+        /// and a document is all or nothing: a patch that came back damaged used to be able to
+        /// cost the song.
+        ///
+        /// Safe to empty what it takes, because the mix here is already a copy.
+        /// </remarks>
+        public List<(int Track, int Device, byte[] Bytes)> TakeChainStatesOut()
+        {
+            var states = new List<(int Track, int Device, byte[] Bytes)>();
+
+            for (int track = 0; track < Mix.Count; track++)
+            {
+                var devices = Mix[track].Plugins?.Devices;
+                if (devices == null) continue;
+
+                for (int device = 0; device < devices.Count; device++)
+                {
+                    var bytes = devices[device].State;
+                    if (bytes == null || bytes.Length == 0) continue;
+
+                    states.Add((track, device, bytes));
+                    devices[device].State = Array.Empty<byte>();
+                }
             }
 
             return states;

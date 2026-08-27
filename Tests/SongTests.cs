@@ -126,6 +126,91 @@ public class SongTests
     }
 
     [Fact]
+    public void An_effects_own_patch_travels_with_the_song()
+    {
+        var live = Made();
+
+        var chain = new PluginChainConfig();
+        chain.Devices.Add(new PluginDeviceConfig
+        {
+            Id = "serum",
+            Name = "Serum 2 FX",
+            Path = "/p/Serum2.vst3",
+            State = new byte[] { 9, 8, 7, 6 }
+        });
+
+        live.Mix[0].Plugins = chain;
+        live.Name = "patched";
+
+        var store = new SongStore();
+        string path = store.PathFor(live.Name);
+
+        store.Save(live, path);
+
+        var back = store.Load(path)!;
+
+        Assert.Equal(new byte[] { 9, 8, 7, 6 }, back.Mix[0].Plugins!.Devices[0].State);
+    }
+
+    [Fact]
+    public void An_effects_patch_is_kept_beside_the_document_and_not_inside_it()
+    {
+        var live = Made();
+
+        var chain = new PluginChainConfig();
+        chain.Devices.Add(new PluginDeviceConfig { Id = "serum", Name = "Serum 2 FX", State = new byte[64] });
+
+        live.Mix[0].Plugins = chain;
+        live.Name = "beside";
+
+        var store = new SongStore();
+        string path = store.PathFor(live.Name);
+
+        store.Save(live, path);
+
+        using var container = System.IO.Compression.ZipFile.OpenRead(path);
+
+        Assert.NotNull(container.GetEntry("state/t00-00.bin"));
+
+        using var reading = new System.IO.StreamReader(container.GetEntry("song.json")!.Open());
+
+        Assert.DoesNotContain("AAAAAAAA", reading.ReadToEnd());
+    }
+
+    [Fact]
+    public void A_chain_described_is_the_same_chain_without_the_patches()
+    {
+        var chain = new PluginChainConfig();
+        chain.Devices.Add(new PluginDeviceConfig { Id = "one", Name = "One", State = new byte[] { 1, 2 } });
+
+        var described = chain.Described();
+
+        Assert.Empty(described.Devices[0].State);
+        Assert.Equal("One", described.Devices[0].Name);
+
+        // And the chain it came from still has its own.
+        Assert.Equal(2, chain.Devices[0].State.Length);
+    }
+
+    [Fact]
+    public void A_chain_saved_before_patches_existed_reads_back_as_one_without_any()
+    {
+        var chain = new PluginChainConfig();
+        chain.Devices.Add(new PluginDeviceConfig { Id = "old", Name = "Old" });
+
+        var was = SongStore.Uncopy(SongStore.Copy(WithChain(chain)))!;
+
+        Assert.Empty(was.Mix[0].Plugins!.Devices[0].State);
+    }
+
+    private static Song WithChain(PluginChainConfig chain)
+    {
+        var song = Made();
+        song.Mix[0].Plugins = chain;
+        return song;
+    }
+
+    [Fact]
     public void Taking_an_instrument_out_renumbers_every_note_that_named_one_after_it()
     {
         var song = Made();

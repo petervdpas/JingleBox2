@@ -108,7 +108,7 @@ public sealed class TrackerInstrument
     /// Passed by reference and never written into. Anything changing a patch replaces the
     /// array, so two instruments sharing one costs nothing and surprises nobody.
     /// </remarks>
-    [JsonConverter(typeof(PluginStateJson))]
+    [JsonConverter(typeof(Audio.Plugins.PluginStateJson))]
     public byte[] PluginState { get; set; } = Array.Empty<byte>();
 
     /// <summary>

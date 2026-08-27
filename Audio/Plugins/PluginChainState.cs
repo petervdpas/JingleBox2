@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -27,6 +28,22 @@ public sealed class PluginDeviceConfig
     /// a plugin's ids are its own business.
     /// </summary>
     public Dictionary<string, double> Parameters { get; set; } = new();
+
+    /// <summary>
+    /// Everything the plugin keeps that its parameters do not describe: the preset it was
+    /// on, its wavetables, whatever it has loaded inside itself.
+    /// </summary>
+    /// <remarks>
+    /// Empty for the many effects that are nothing but their knobs, and for a chain saved
+    /// before this existed, which reads back as an effect on its parameters alone. That is
+    /// exactly what those chains were.
+    ///
+    /// Base64 through <see cref="PluginStateJson"/>, which treats text it cannot read as no
+    /// state rather than throwing: one bad character in a patch should cost the patch and not
+    /// the song it is written in.
+    /// </remarks>
+    [JsonConverter(typeof(PluginStateJson))]
+    public byte[] State { get; set; } = Array.Empty<byte>();
 }
 
 /// <summary>A saved chain: the devices, in the order the audio went through them.</summary>
@@ -49,10 +66,27 @@ public sealed class PluginChainConfig
                 Format = device.Format,
                 Name = device.Name,
                 Bypassed = device.Bypassed,
-                Parameters = new Dictionary<string, double>(device.Parameters)
+                Parameters = new Dictionary<string, double>(device.Parameters),
+                State = device.State
             });
         }
 
+        return copy;
+    }
+
+    /// <summary>
+    /// The same chain with the patches taken out: what it is, rather than what is inside it.
+    /// </summary>
+    /// <remarks>
+    /// For comparing two chains. A plugin's own lump is not stable enough to compare: Serum
+    /// asked twice hands back two arrays that need not match byte for byte, and a chain that
+    /// looked different every time it was asked would be torn down and rebuilt on every undo,
+    /// which is seconds a plugin. What the description says is what a chain is.
+    /// </remarks>
+    public PluginChainConfig Described()
+    {
+        var copy = Clone();
+        foreach (var device in copy.Devices) device.State = Array.Empty<byte>();
         return copy;
     }
 }
@@ -61,14 +95,24 @@ public sealed class PluginChainConfig
 /// Turning a running chain into something a song or a profile can hold, and back again.
 /// </summary>
 /// <remarks>
-/// Parameter values, not plugin state. Most effects are nothing but their parameters, and
-/// these are readable, diffable and survive a plugin being updated. A plugin that keeps
-/// something else inside it, a sampler with a file loaded or a sequencer with a pattern,
-/// would need the state extension either standard offers, which this does not do yet.
+/// Both halves, and they answer different questions. The parameter values are readable,
+/// diffable and survive a plugin being updated, and for the many effects that are nothing but
+/// their knobs they are the whole of it. The plugin's own lump is everything the parameters
+/// do not describe, which for anything with presets inside it is most of what somebody set up:
+/// Serum on a track came back sounding right and calling itself "- Init -", because its knobs
+/// were saved and its patch was not.
+///
+/// Reading the lump is a round trip to the plugin's own process and a third of a megabyte, so
+/// it is asked for where a save is a save and not where one chain is merely being compared
+/// with another. See <see cref="Capture"/>.
 /// </remarks>
 public static class PluginChainState
 {
-    public static PluginChainConfig Capture(PluginChain? chain)
+    /// <param name="patches">
+    /// Whether to ask each plugin for its own state as well as its parameters. Off by default
+    /// because the cheap half answers most questions.
+    /// </param>
+    public static PluginChainConfig Capture(PluginChain? chain, bool patches = false)
     {
         var config = new PluginChainConfig();
         if (chain == null) return config;
@@ -92,10 +136,35 @@ public static class PluginChainState
                     effect.ValueOf(parameter.Id);
             }
 
+            // Last, because it is the expensive one and there is no point paying for it on a
+            // plugin whose parameters could not be read either.
+            if (patches) saved.State = effect.SaveState();
+
             config.Devices.Add(saved);
         }
 
         return config;
+    }
+
+    /// <summary>
+    /// Just the plugins' own lumps, in chain order, without reading a single knob.
+    /// </summary>
+    /// <remarks>
+    /// For somewhere that is written down far more often than its plugins change. A pad is
+    /// saved on every property it has, and a level dragged across its travel is a hundred of
+    /// those; the patches are read once when the chain settles and carried onto each of those
+    /// saves. Skips whatever <see cref="Capture"/> skips, so the two line up by index.
+    /// </remarks>
+    public static IReadOnlyList<byte[]> Patches(PluginChain? chain)
+    {
+        if (chain == null) return Array.Empty<byte[]>();
+
+        var lumps = new List<byte[]>();
+
+        foreach (var device in chain.Devices)
+            if (device.Insert is IPluginEffect effect) lumps.Add(effect.SaveState());
+
+        return lumps;
     }
 
     /// <summary>
@@ -134,6 +203,12 @@ public static class PluginChainState
                 missing.Add(string.IsNullOrWhiteSpace(saved.Name) ? saved.Id : saved.Name);
                 continue;
             }
+
+            // The lump first and the knobs after it. A patch moves every parameter at once, so
+            // writing the values afterwards is either agreement or the correction for a plugin
+            // whose state did not come back whole. The other order would be a preset landing on
+            // top of the values and quietly winning.
+            if (saved.State is { Length: > 0 }) effect.LoadState(saved.State);
 
             foreach (var (id, value) in saved.Parameters)
             {

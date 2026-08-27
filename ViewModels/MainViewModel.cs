@@ -1432,6 +1432,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             var captured = JingleBox2.Audio.Plugins.PluginChainState.Capture(
                 _audio.GetPadInsert(i) as JingleBox2.Audio.Plugins.PluginChain);
 
+            // And what each of those plugins is holding inside itself, which the pad read when
+            // its chain last settled. Not read here: this runs on every property a pad has.
+            for (int device = 0; device < captured.Devices.Count && device < vm.Patches.Count; device++)
+                captured.Devices[device].State = vm.Patches[device];
+
             pc.Plugins = captured.IsEmpty ? null : captured;
         }
     }

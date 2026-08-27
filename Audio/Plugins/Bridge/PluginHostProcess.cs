@@ -384,11 +384,11 @@ public static class PluginHostProcess
                 break;
 
             case BridgeCall.SaveState:
-                control.Send(BridgeCall.State, (plugin as IPluginInstrument)?.SaveState() ?? Array.Empty<byte>());
+                control.Send(BridgeCall.State, plugin.SaveState());
                 break;
 
             case BridgeCall.LoadState:
-                (plugin as IPluginInstrument)?.LoadState(payload);
+                plugin.LoadState(payload);
                 control.Send(BridgeCall.Ok);
                 break;
 

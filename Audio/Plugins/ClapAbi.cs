@@ -30,6 +30,13 @@ internal static class ClapAbi
     /// <summary>The plugin's own window, when it has one.</summary>
     public const string GuiExtension = "clap.gui";
 
+    /// <summary>
+    /// Everything the plugin keeps that its parameters do not describe. Its preset, in
+    /// practice, and for anything with wavetables or samples inside it that is most of what
+    /// somebody set up.
+    /// </summary>
+    public const string StateExtension = "clap.state";
+
     /// <summary>A clock the plugin asks the host to hold, the same one VST3 calls a run loop.</summary>
     public const string TimerExtension = "clap.timer-support";
 
@@ -322,4 +329,40 @@ internal unsafe struct ClapHostPosixFd
     public delegate* unmanaged[Cdecl]<ClapHost*, int, uint, byte> RegisterFd;
     public delegate* unmanaged[Cdecl]<ClapHost*, int, uint, byte> ModifyFd;
     public delegate* unmanaged[Cdecl]<ClapHost*, int, byte> UnregisterFd;
+}
+
+/// <summary>What a plugin keeps beyond its knobs, written to and read from a host stream.</summary>
+/// <remarks>
+/// Both are main thread calls, and both answer false for a plugin that could not do it, which
+/// is not the same as one that had nothing to say.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapPluginState
+{
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, ClapOutputStream*, byte> Save;
+    public delegate* unmanaged[Cdecl]<ClapPlugin*, ClapInputStream*, byte> Load;
+}
+
+/// <summary>
+/// Somewhere for a plugin to read its own state from. The host owns both the memory and the
+/// function.
+/// </summary>
+/// <remarks>
+/// Nought back means there is no more, which is how a plugin knows it has the whole lump; a
+/// negative number is a failure. A plugin is entitled to ask for it in as many pieces as it
+/// likes and several do.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapInputStream
+{
+    public void* Context;
+    public delegate* unmanaged[Cdecl]<ClapInputStream*, void*, ulong, long> Read;
+}
+
+/// <summary>Somewhere for a plugin to write its own state to.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct ClapOutputStream
+{
+    public void* Context;
+    public delegate* unmanaged[Cdecl]<ClapOutputStream*, void*, ulong, long> Write;
 }

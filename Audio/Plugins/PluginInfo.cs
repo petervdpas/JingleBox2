@@ -119,6 +119,23 @@ public interface IPluginParameters
     /// the same thing: read me again, and whatever you were holding about me is out of date.
     /// </remarks>
     event Action? Reloaded;
+
+    /// <summary>
+    /// Everything inside the plugin, as a lump to keep. Not the same as its parameters: a
+    /// Serum patch is wavetables and samples as much as it is knob positions, and none of
+    /// that is a parameter.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than on <see cref="IPluginInstrument"/>, where it used to be, because
+    /// wanting a patch back is nothing to do with what the plugin is being used as. Serum is
+    /// the same program whether a track plays it or a track's audio goes through it, and its
+    /// preset was in both cases the thing that was not saved. The two classes that host
+    /// plugins each implement both interfaces already, so this moved no code.
+    /// </remarks>
+    byte[] SaveState();
+
+    /// <summary>Puts a saved lump back. Anything unreadable is ignored.</summary>
+    void LoadState(byte[]? state);
 }
 
 /// <summary>
@@ -169,14 +186,4 @@ public interface IPluginInstrument : IPluginParameters, IDisposable
     /// the audio thread.
     /// </summary>
     void Render(float[] buffer, int frames);
-
-    /// <summary>
-    /// Everything inside the plugin, as a lump to keep. Not the same as its parameters: a
-    /// Serum patch is wavetables and samples as much as it is knob positions, and none of
-    /// that is a parameter.
-    /// </summary>
-    byte[] SaveState();
-
-    /// <summary>Puts a saved lump back. Anything unreadable is ignored.</summary>
-    void LoadState(byte[]? state);
 }

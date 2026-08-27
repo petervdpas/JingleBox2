@@ -408,14 +408,19 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>
     /// Writes every track's chain into the song, ready to be saved with it.
     /// </summary>
-    public void CaptureChains(Song song)
+    /// <param name="patches">
+    /// Whether to read each plugin's own state as well as its knobs. True where the song is
+    /// about to be written down, which is every caller: a plugin asked for its patch is a round
+    /// trip to another process, and that is a price worth paying at a save and nowhere else.
+    /// </param>
+    public void CaptureChains(Song song, bool patches = true)
     {
         if (song == null) return;
 
         for (int track = 0; track < song.Mix.Count; track++)
         {
             var chain = _synth.Mixer.InsertOn(track) as PluginChain;
-            var captured = PluginChainState.Capture(chain);
+            var captured = PluginChainState.Capture(chain, patches);
 
             // Null rather than an empty list: a song with no effects should not be full of
             // empty chains.
@@ -476,6 +481,8 @@ public sealed class TrackerPlayer : IDisposable
             // chain is made for a track that has never had one.
             if (chain is null && (wanted is null || wanted.IsEmpty)) continue;
 
+            // Without the patches. Nothing here is being saved, and a chain is what its
+            // description says rather than what its plugins are holding.
             var loaded = PluginChainState.Capture(chain);
 
             if (Same(loaded, wanted)) continue;
@@ -488,7 +495,13 @@ public sealed class TrackerPlayer : IDisposable
         return changed;
     }
 
-    /// <summary>True when two chains would be written down identically.</summary>
+    /// <summary>True when two chains describe the same devices with the same settings.</summary>
+    /// <remarks>
+    /// The plugins' own patches are left out of it. One side is read off what is loaded and the
+    /// other comes out of a history step, and a plugin asked for its lump twice is under no
+    /// obligation to answer the same bytes, so comparing them would report every chain as
+    /// changed and rebuild all of them on every undo.
+    /// </remarks>
     private static bool Same(PluginChainConfig? left, PluginChainConfig? right)
     {
         bool nothingLeft = left is null || left.IsEmpty;
@@ -498,8 +511,8 @@ public sealed class TrackerPlayer : IDisposable
 
         try
         {
-            return System.Text.Json.JsonSerializer.Serialize(left)
-                   == System.Text.Json.JsonSerializer.Serialize(right);
+            return System.Text.Json.JsonSerializer.Serialize(left!.Described())
+                   == System.Text.Json.JsonSerializer.Serialize(right!.Described());
         }
         catch (Exception)
         {

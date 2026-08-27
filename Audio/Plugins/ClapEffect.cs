@@ -33,6 +33,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     private readonly ClapHost* _host;
     private readonly ClapPluginParams* _params;
     private readonly ClapPluginAudioPorts* _ports;
+    private readonly ClapPluginState* _state;
 
     private readonly object _lock = new();
     private readonly Dictionary<uint, double> _pending = new();
@@ -67,6 +68,9 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         using var ports = new NativeText(ClapAbi.AudioPortsExtension);
         _ports = (ClapPluginAudioPorts*)plugin->GetExtension(plugin, ports.Pointer);
+
+        using var state = new NativeText(ClapAbi.StateExtension);
+        _state = (ClapPluginState*)plugin->GetExtension(plugin, state.Pointer);
 
         _inputPortChannels = PortsOf(input: true);
         _outputPortChannels = PortsOf(input: false);
@@ -535,6 +539,115 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
 
         return 1;
+    }
+
+    /// <summary>
+    /// Everything inside the plugin, as a lump to keep. This is where a patch really lives:
+    /// the parameters are knob positions, and a wavetable is not a knob position.
+    /// </summary>
+    /// <remarks>
+    /// Empty for a plugin that does not offer the extension, and empty for one that offers it
+    /// and then fails, which are the same thing to whoever asked: no patch, and the parameters
+    /// alone to describe it. That is what every CLAP effect here was until now.
+    ///
+    /// The stream is a struct on the stack with a static function in it, and where the bytes
+    /// actually go is a field on this thread. Both calls are main-thread by the standard and
+    /// return before the field is cleared, so there is nothing to share.
+    /// </remarks>
+    public byte[] SaveState()
+    {
+        if (_disposed || _state == null || _state->Save == null) return Array.Empty<byte>();
+
+        var writing = new System.IO.MemoryStream();
+        var stream = new ClapOutputStream { Context = null, Write = &Written };
+
+        _writing = writing;
+
+        try
+        {
+            return _state->Save(_plugin, &stream) == 0 ? Array.Empty<byte>() : writing.ToArray();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<byte>();
+        }
+        finally
+        {
+            _writing = null;
+        }
+    }
+
+    /// <summary>Puts a saved lump back. A plugin that refuses it keeps what it had.</summary>
+    public void LoadState(byte[]? state)
+    {
+        if (_disposed || state is not { Length: > 0 }) return;
+        if (_state == null || _state->Load == null) return;
+
+        var reading = new System.IO.MemoryStream(state, writable: false);
+        var stream = new ClapInputStream { Context = null, Read = &Fetched };
+
+        _reading = reading;
+
+        try
+        {
+            _state->Load(_plugin, &stream);
+        }
+        catch (Exception)
+        {
+            // A patch that will not go back in is a plugin on its own defaults, which is what
+            // it would have been without one.
+        }
+        finally
+        {
+            _reading = null;
+        }
+    }
+
+    [ThreadStatic]
+    private static System.IO.MemoryStream? _writing;
+
+    [ThreadStatic]
+    private static System.IO.MemoryStream? _reading;
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+    private static long Written(ClapOutputStream* stream, void* buffer, ulong size)
+    {
+        var writing = _writing;
+        if (writing == null || buffer == null) return -1;
+
+        int wanted = (int)Math.Min(size, int.MaxValue);
+        if (wanted == 0) return 0;
+
+        try
+        {
+            writing.Write(new ReadOnlySpan<byte>(buffer, wanted));
+            return wanted;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
+    private static long Fetched(ClapInputStream* stream, void* buffer, ulong size)
+    {
+        var reading = _reading;
+        if (reading == null || buffer == null) return -1;
+
+        int wanted = (int)Math.Min(size, int.MaxValue);
+        if (wanted == 0) return 0;
+
+        try
+        {
+            // Nought is the end of it rather than a failure, which is how the plugin knows to
+            // stop asking.
+            return reading.Read(new Span<byte>(buffer, wanted));
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
     }
 
     public event Action<uint, double>? Edited;

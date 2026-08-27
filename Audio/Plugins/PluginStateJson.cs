@@ -2,7 +2,7 @@ using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace JingleBox2.Tracker;
+namespace JingleBox2.Audio.Plugins;
 
 /// <summary>
 /// Reads and writes a plugin's state as base64 text, and treats text that is not base64 as no

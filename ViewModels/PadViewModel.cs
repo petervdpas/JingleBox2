@@ -2,6 +2,8 @@
 // ViewModels/PadViewModel.cs
 // ===============================
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -49,6 +51,27 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     private readonly DispatcherTimer _effectSave = new() { Interval = TimeSpan.FromMilliseconds(600) };
 
     /// <summary>
+    /// What the plugins on this pad are holding inside themselves, by their place in the chain.
+    /// </summary>
+    /// <remarks>
+    /// A preset is not a set of knob positions, so a chain saved as its parameters came back
+    /// sounding roughly right and calling itself untitled. These are the rest of it.
+    ///
+    /// Read when the chain settles rather than when the pad is written down, because those are
+    /// two very different rates: a pad is written on every property it has, and asking a plugin
+    /// for its patch is a round trip to another process. The settling is also what makes the
+    /// pad save at all, so what is kept here is never older than what is about to be written.
+    /// </remarks>
+    public IReadOnlyList<byte[]> Patches { get; private set; } = Array.Empty<byte[]>();
+
+    private void ReadPatches()
+    {
+        Patches = Effect?.Target == null
+            ? Array.Empty<byte[]>()
+            : JingleBox2.Audio.Plugins.PluginChainState.Patches(Effect.Target.Chain);
+    }
+
+    /// <summary>
     /// Puts back the effects this pad was saved with. A plugin that is no longer on the
     /// machine is named rather than passed over.
     /// </summary>
@@ -63,6 +86,10 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
             PluginChainViewModel.MaxFrames);
 
         Effect.Reload();
+
+        // What was just put in is what would be saved again, so a pad written down before its
+        // plugins are next touched keeps the patches it was opened with rather than losing them.
+        Patches = saved.Devices.Select(d => d.State).ToList();
 
         if (missing.Count > 0) Effect.Status = "Missing: " + string.Join(", ", missing);
     }
@@ -239,6 +266,10 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         _effectSave.Tick += (_, _) =>
         {
             _effectSave.Stop();
+
+            // Read before the announcement, because the announcement is what saves.
+            ReadPatches();
+
             OnPropertyChanged(nameof(Effect));
         };
     }

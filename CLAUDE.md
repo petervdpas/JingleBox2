@@ -141,13 +141,36 @@ because that exact thing was wrong once.
   separately; they are read back off the pieces. Put a different sample on one piece and it
   stops being a chop, which is why `IsSliced` is asked rather than the `Sliced` flag
 - A song is a `.jibx`, which is a zip: `song.json` for the patterns, the order, the mix and the
-  instruments, and `state/NN.bin` for each plugin instrument's patch, as the plugin handed it
-  over. The patches came out of the document because they are almost all of it (one song here
-  is 348 KB of which the music is 781 bytes and one synth's patch is 331 KB) and because a
-  document is all or nothing: a patch that came back damaged used to cost the song. Recordings
-  are named `{app}/...` when they live in the application folder, so a song survives that folder
-  moving or being on another machine. Songs written before this are converted on the way in and
-  the original is kept as `.json.old`
+  instruments, `state/NN.bin` for each plugin instrument's patch and `state/tNN-DD.bin` for each
+  effect on each track's chain, as the plugin handed it over. The patches came out of the
+  document because they are almost all of it (one song here is 348 KB of which the music is 781
+  bytes and one synth's patch is 331 KB) and because a document is all or nothing: a patch that
+  came back damaged used to cost the song. Recordings are named `{app}/...` when they live in
+  the application folder, so a song survives that folder moving or being on another machine.
+  Songs written before this are converted on the way in and the original is kept as `.json.old`
+- A preset is not a set of knob positions, and for a long time only instruments knew that. A
+  plugin on a track's chain was written down as its parameters and nothing else, so Serum on a
+  track came back sounding roughly right and calling itself "- Init -": the knobs were saved and
+  the patch, which is the wavetables, the FX rack and the preset's own name, was not. `SaveState`
+  and `LoadState` are on `IPluginParameters` now rather than on `IPluginInstrument`, because
+  wanting a patch back has nothing to do with what a plugin is being used as, and both classes
+  that host plugins implemented both interfaces already, so it moved no code. `PluginChainState`
+  reads the lump as well as the knobs, and puts the lump back first: a patch moves every
+  parameter at once, so the values after it are either agreement or the correction for a plugin
+  whose state did not come back whole
+- Reading a patch is a round trip to another process and a third of a megabyte, so it is asked
+  for where a save is a save. `Capture(chain, patches)` is off by default and `MatchChains`
+  leaves it off, and `Same` compares two chains as `Described()`, which is the chain without its
+  patches: a plugin asked for its lump twice is under no obligation to answer the same bytes,
+  and comparing them would report every chain as changed and rebuild all of them on every undo.
+  A pad is the other rate problem, since it is written down on every property it has and a level
+  dragged is a hundred of those: the pad reads its patches when its chain settles, which is the
+  same 600ms tick that makes it save at all, and each save carries what was read
+- CLAP effects had no state at all, because `clap.state` was never implemented: only the
+  parameters had ever been asked for, and nothing noticed since VST3 is the only format that can
+  be an instrument here. The extension is two calls over host-owned streams, which are structs
+  on the stack with static functions in them and a `MemoryStream` on the thread; nought back from
+  a read is the end of the lump rather than a failure, which is how a plugin knows to stop asking
 - A song can also be packed, which is Pack in the TRACKER bar: the same `.jibx` with the
   recordings inside it, written where you choose and never to the songs folder. Saving does not
   do this, because a song built on a long take is tens of megabytes and the open song is written
