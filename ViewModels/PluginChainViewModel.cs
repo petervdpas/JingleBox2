@@ -125,6 +125,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
             return;
         }
 
+        AboutTo();
+
         var device = Target.Chain.Add(effect);
         var row = new PluginDeviceViewModel(this, effect, device);
 
@@ -140,6 +142,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public void Remove(PluginDeviceViewModel device)
     {
         if (Target == null) return;
+
+        AboutTo();
 
         // Out of the chain first, then let go: the audio thread must not be inside something
         // that is being taken apart.
@@ -187,6 +191,17 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// concern reaching back into the view model would be worse than one event.
     /// </summary>
     public event System.Action<PluginDeviceViewModel>? DeviceClosing;
+
+    /// <summary>
+    /// Raised before the chain is about to gain or lose a plugin.
+    /// </summary>
+    /// <remarks>
+    /// Apart from <see cref="Changed"/>, which says it already happened. A history needs the
+    /// state being left rather than the one arrived at, and afterwards the first is gone.
+    /// </remarks>
+    public event System.Action? Changing;
+
+    private void AboutTo() => Changing?.Invoke();
 
     /// <summary>
     /// Raised whenever the chain or anything in it changes: a device added, moved, removed,

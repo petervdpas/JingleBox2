@@ -267,6 +267,11 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         OnPropertyChanged(nameof(Accent));
         OnPropertyChanged(nameof(AccentHex));
+
+        // The colour is part of the machine, so changing it is a change to the machine: the
+        // Save button has to warm and it has to be something undo can take back. This was
+        // saying what it did to the two things showing the colour and to nothing else.
+        Redraw();
     }
 
     /// <summary>The colours as they stand, for the dialog that fine tunes them.</summary>

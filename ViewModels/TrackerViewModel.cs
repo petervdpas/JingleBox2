@@ -150,13 +150,32 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private bool Pour(Song live, Song was)
     {
+        // Any plugin window open over a chain that is about to be taken apart goes first. A
+        // plugin drawing into a window whose plugin has been disposed is a crash inside its own
+        // toolkit, and this is the one moment that can happen: a song opens with no plugin
+        // windows up, and an undo can be pressed with one on screen.
+        TrackEffect.Target = null;
+
         live.TakeFrom(was);
+
+        // The song now says which plugins each track has; the mixer still holds the ones that
+        // were loaded a moment ago. Made to agree, and only for the tracks where they do not:
+        // rebuilding a chain is seconds a plugin, and almost every undo changes none of them.
+        var rebuilt = _player.MatchChains(live);
+
+        if (rebuilt.Count > 0)
+            Log.Write(LogArea.Plugins, () =>
+                "history: " + rebuilt.Count + " track(s) had their inserts built again to match the step");
 
         // Everything the tracker hangs off the song has to be hung off it again: the instrument
         // list, the mixer strips, and whichever pattern the order now points at.
         SyncInstruments();
 
         CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
+
+        // And the slot is pointed at its track again, which builds its rows off whatever the
+        // chain now holds.
+        PointEffectSlot();
 
         OnPropertyChanged(nameof(Song));
         OnPropertyChanged(nameof(TrackCount));
@@ -463,12 +482,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect.Changed += MarkDirty;
 
 
+
         // Assigned to the field rather than the property: this is what was saved, not a
         // change to save again.
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio);
+
+        // And before a chain changes, so a plugin put on a track or taken off one can be taken
+        // back. Wired here rather than with the other half, because it reads the player and the
+        // player has only just been made. The song's own record of the chains is brought up to
+        // date first: a step has to hold what is really loaded, and that record is otherwise
+        // only refreshed at particular moments.
+        TrackEffect.Changing += () =>
+        {
+            _player.CaptureChains(Song);
+
+            Changing("a plugin on a track");
+        };
 
         // Before anything sounds: the rate cannot move once the engine is built.
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
@@ -517,6 +549,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         set
         {
             if (Math.Abs(Song.Bpm - value) < 0.001) return;
+        Changing("the tempo");
+
             Song.Bpm = Math.Clamp(value, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
             OnPropertyChanged();
             MarkDirty();
@@ -529,6 +563,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         set
         {
             if (Song.LinesPerBeat == value) return;
+        Changing("lines per beat");
+
             Song.LinesPerBeat = Math.Clamp(value, TrackerTiming.MinLinesPerBeat, TrackerTiming.MaxLinesPerBeat);
             OnPropertyChanged();
             MarkDirty();
@@ -621,6 +657,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// closing the song would lose it without a word.
     /// </remarks>
     public void ControlsChanged() => MarkDirty();
+
+    /// <summary>The song's own controller layout is about to change. See ControlLink.</summary>
+    public void ControlsChanging() => Changing("a controller link");
 
     /// <summary>
     /// Puts down every plugin the song is holding, for going away to work somewhere else.
@@ -1576,6 +1615,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int previous = Song.GetInstrumentTrack(instrument);
         var displaced = Song.InstrumentAt(Song.GetTrackInstrument(track));
 
+        Changing("pointing a track at an instrument");
+
         Song.SetTrackInstrument(track, instrument);
         SyncInstruments();
         RefreshStrips();
@@ -1624,6 +1665,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
+        Changing("pointing the notes at an instrument");
+
         int changed = Song.PointNotesAtTrackInstrument(track, instrument);
 
         RefreshStrips();
@@ -1647,6 +1690,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         // The song and what is playing have to move together, or the notes arrive at the new
         // track and the sound answers on the old one.
+        Changing("moving a track");
+
         _player.MoveTrack(from, to);
 
         SyncInstruments();
@@ -1665,6 +1710,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Clears a track's default so it falls back to the selected instrument.</summary>
     public void ClearTrackInstrument(int track)
     {
+        Changing("taking an instrument off a track");
+
         Song.SetTrackInstrument(track, TrackerCell.NoInstrument);
         SyncInstruments();
         RefreshStrips();
@@ -1719,6 +1766,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         int clamped = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
         if (clamped == Song.TrackCount) return;
 
+        Changing("how many tracks");
+
         Song.SetTrackCount(clamped);
         Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, clamped);
         SyncInstruments();
@@ -1763,6 +1812,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>A fader or a mute moved: hear it now, and remember the song has changed.</summary>
     private void OnMixChanged()
     {
+        // Gathered, or a fader dragged across its range would be a hundred steps.
+        Changing("the mix");
+
         _player.ApplyMix();
         MarkDirty();
     }
@@ -2269,6 +2321,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             slot.Name);
 
         if (wanted == null || wanted == slot.Name) return;
+
+        Changing("renaming an instrument");
 
         slot.Instrument.Name = wanted;
         slot.Refresh();

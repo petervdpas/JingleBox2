@@ -252,6 +252,39 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   into it left the song looking saved. Every song opened afterwards went through the property and
   was fine, which is why it survived. Worth remembering as a shape: a backing field assignment
   skips exactly the part that was worth having
+- A track's inserts are undoable, and they are the one edit that lives in two places: the song's
+  description of the chain, which a song step carries, and the plugins actually loaded, each in a
+  process of its own. Restoring the description alone leaves the picture and the sound
+  disagreeing. `TrackerPlayer.MatchChains` makes them agree, and only for tracks where they
+  differ, because rebuilding a chain is seconds a plugin: almost every undo changes no chain and
+  pays one comparison, and only undoing a plugin change pays the reload. Compared as the two
+  would be written down, so nothing can be forgotten. `Pour` clears `TrackEffect.Target` first,
+  because a plugin drawing into a window whose plugin has been disposed is a crash inside its own
+  toolkit, and an undo is the one moment that can happen with a plugin window on screen
+- The pads have undo, on PADS and FIRE. A step is every pad at once, which costs nothing at that
+  size and answers what a per-pad history could not: how many pads there are is an edit too, and
+  it is about none of them. Hooked at `OnPadChanged`, the one place every pad edit already ended,
+  and gathered by which pad and which setting so dragging a level is one step
+- Deleting a recording no longer deletes it. It moves into `deleted/` beside the recordings, so
+  undo on RECORD fetches the last one back, and the confirmation stopped having to say "this
+  cannot be undone". A move rather than a copy, because a take is the one thing here that can be
+  a hundred megabytes and paying for the undo up front would be paying whether or not anybody
+  wanted it. Only this session's deletions are offered back: putting back a take from last week
+  is a filing cabinet, not undo, and what is in the bin from before is emptied deliberately
+- `MainViewModel` hands a shortcut to the page it is showing before answering it itself. The
+  dispatcher walks outwards from whatever has the keyboard, and when nothing has it that walk
+  only reaches the window, so a page with no focused control inside it was never asked. Pressing
+  undo on RECORD straight after clicking a button in a dialog is exactly that, and it silently
+  did nothing
+- Song steps are gathered by their own description and time, the same rule the instrument knobs
+  use: a fader dragged across its range says "the mix" a hundred times and is one thing a person
+  did. Fourteen edits announce themselves now (the tempo, lines per beat, track count, the mix,
+  pointing a track at an instrument, pointing its notes, moving a track, taking an instrument off,
+  renaming one, the song's controller links, and the four that were already there). Not announced,
+  and not a missing hook: a plugin added to or taken off a track's chain. The chain's settings are
+  in `TrackMix.Plugins` and so a song step does carry them, but putting them back would leave the
+  plugin that is actually loaded running, so undoing that needs the live chain rebuilt from the
+  config rather than a line of announcement
 - The tracker's undo is one history with two kinds of step, because Ctrl+Z means the last thing
   you did and not the last thing of a kind. A pattern edit is a memory copy of its cells; a song
   edit (an instrument added or taken out, the order, the track count) is the song as its own file

@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 
 namespace JingleBox2.ViewModels;
 
-public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.IShortcutContext
 {
     private readonly IRecordingService _recordingService;
     private readonly ILevelMeterService _levelMeter;
@@ -837,7 +837,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
 
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete recording",
-            $"Delete '{recording.Name}' permanently? This cannot be undone.",
+            $"Delete '{recording.Name}'? It goes into the bin beside the recordings and can be "
+                + "put back until you empty it.",
             "Delete");
 
         if (!confirmed) return;
@@ -848,8 +849,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
             // that will not delete.
             if (ReferenceEquals(_playing, recording)) StopPreview();
 
-            if (File.Exists(recording.FilePath))
-                File.Delete(recording.FilePath);
+            Binned(recording);
 
             Recordings.Remove(recording);
             _filing.Forget(recording.Name);
@@ -862,12 +862,130 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck
                 CurrentWaveform = null;
             }
 
-            Status = $"Deleted '{recording.Name}'";
+            Status = $"'{recording.Name}' is in the bin. Press undo, or SETTINGS to empty it.";
         }
         catch (Exception ex)
         {
             Status = $"Delete failed: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Undo on the RECORD page fetches back the last take you deleted.
+    /// </summary>
+    /// <remarks>
+    /// Not a history of edits, because there is only one edit here that is worth taking back and
+    /// it is the destructive one. Renaming a take or moving it between categories is a thing you
+    /// can simply do again; deleting one used to be a thing you could not.
+    ///
+    /// Redo is deliberately not answered. Redoing a deletion is deleting, and asking somebody
+    /// once is the point.
+    /// </remarks>
+    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) =>
+        action == Shortcuts.ShortcutAction.Undo && CanUnbin;
+
+    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    {
+        if (action == Shortcuts.ShortcutAction.Undo) Unbin();
+    }
+
+    /// <summary>Where a deleted take waits, beside the recordings rather than inside them.</summary>
+    /// <remarks>
+    /// Beside, so that everything reading the shelf sees a folder of recordings and nothing
+    /// else. Inside, every reader would have to learn to skip a folder, and one of them would
+    /// not.
+    /// </remarks>
+    public static string Bin => Path.Combine(Config.AppFolder.Path(), "recordings", "..", "deleted");
+
+    /// <summary>
+    /// What has been thrown away this session and could still be fetched back.
+    /// </summary>
+    /// <remarks>
+    /// The session, and not the folder. Anything in the bin from a previous run stays there and
+    /// is emptied deliberately; undo is about what you have just done, and offering to put back
+    /// a take you deleted last Tuesday is not undo, it is a filing cabinet.
+    /// </remarks>
+    private readonly Stack<(string Name, string Was, string Now)> _binned = new();
+
+    /// <summary>True when the last thing deleted can be fetched back.</summary>
+    public bool CanUnbin => _binned.Count > 0;
+
+    /// <summary>
+    /// Moves a take into the bin rather than deleting it.
+    /// </summary>
+    /// <remarks>
+    /// A move and not a copy, so it costs nothing whatever the take's length: a recording is
+    /// the one thing here that can be a hundred megabytes, and copying one to make a deletion
+    /// reversible would be paying for the undo whether or not anybody wanted it.
+    /// </remarks>
+    private void Binned(Recording recording)
+    {
+        string from = recording.FilePath;
+
+        if (string.IsNullOrWhiteSpace(from) || !File.Exists(from)) return;
+
+        string folder = Path.GetFullPath(Bin);
+
+        Directory.CreateDirectory(folder);
+
+        string to = Path.Combine(folder, Path.GetFileName(from));
+
+        // A second take of the same name deleted later must not land on the first.
+        for (int at = 2; File.Exists(to); at++)
+            to = Path.Combine(folder,
+                Path.GetFileNameWithoutExtension(from) + " (" + at + ")" + Path.GetExtension(from));
+
+        File.Move(from, to);
+
+        _binned.Push((recording.Name, from, to));
+
+        Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "recordings: '" + recording.Name + "' went into the bin");
+    }
+
+    /// <summary>
+    /// Fetches the last thing deleted back out of the bin.
+    /// </summary>
+    /// <remarks>
+    /// Back to where it came from, and only if nothing has taken that name in the meantime: a
+    /// take recorded into the gap since is somebody's work and is not something an undo may
+    /// write over.
+    /// </remarks>
+    public bool Unbin()
+    {
+        while (_binned.Count > 0)
+        {
+            var (name, was, now) = _binned.Pop();
+
+            if (!File.Exists(now)) continue;
+
+            if (File.Exists(was))
+            {
+                Status = $"'{name}' cannot come back: something else is called that now.";
+
+                return false;
+            }
+
+            try
+            {
+                File.Move(now, was);
+            }
+            catch (Exception bad)
+            {
+                Status = $"'{name}' could not be fetched back: {bad.Message}";
+
+                return false;
+            }
+
+            Rescan();
+
+            Status = $"'{name}' is back.";
+
+            Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "recordings: '" + name + "' came back out of the bin");
+
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>What the input can be taken from, where the system lets that be chosen.</summary>

@@ -176,6 +176,8 @@ public sealed class TrackerHistory
             return;
         }
 
+        _gathering = "";
+
         Push(PatternStep.Of(pattern, what));
     }
 
@@ -197,8 +199,29 @@ public sealed class TrackerHistory
     {
         if (song is null || onto is null) return;
 
+        // Gathered by what it is and when, the same rule the instrument panel's knobs use, and
+        // for the same reason: a fader dragged across its range says the mix changed a hundred
+        // times and is one thing a person did. The name is the control here rather than a
+        // parameter key, which is enough: two different edits do not share a description.
+        var at = _since.Elapsed;
+
+        bool same = _gathering == what && at - _last < SameGesture;
+
+        _gathering = what;
+        _last = at;
+
+        if (same) return;
+
         Push(SongStep.Of(song, what, onto));
     }
+
+    /// <summary>How long an edit of the same kind stays the same gesture.</summary>
+    public static readonly TimeSpan SameGesture = TimeSpan.FromMilliseconds(500);
+
+    private readonly System.Diagnostics.Stopwatch _since = System.Diagnostics.Stopwatch.StartNew();
+
+    private string _gathering = "";
+    private TimeSpan _last;
 
     private void Push(Step step)
     {
@@ -249,6 +272,9 @@ public sealed class TrackerHistory
 
         onto.Add(back);
         _bytes += back.Bytes;
+
+        // Whatever was being gathered is over: what is under the hand is not where it was.
+        _gathering = "";
 
         Log.Write(LogArea.Tracker, () => "history: " + said + " " + step.What);
 

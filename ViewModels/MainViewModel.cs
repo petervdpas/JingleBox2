@@ -25,6 +25,16 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
 
+    /// <summary>
+    /// What has been done to the pads, so it can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// A step is every pad at once, which costs almost nothing at this size and answers the one
+    /// question a per-pad history could not: how many pads there are is an edit too, and it is
+    /// not about any one of them.
+    /// </remarks>
+    public PadHistory PadHistory { get; } = new();
+
     private readonly IAudioEngine _audio;
     private readonly ConfigStore _store;
     private readonly AppConfig _cfg;
@@ -106,18 +116,65 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// Undo and redo are not answered anywhere yet, because there is no history to walk in
     /// either direction. See docs/shortcuts.md.
     /// </remarks>
+    /// <summary>
+    /// The page you are on, when it answers keystrokes for itself.
+    /// </summary>
+    /// <remarks>
+    /// Written out per page, like the transport's deck, and needed for a reason the dispatcher
+    /// cannot fix on its own: it walks outwards from whatever has the keyboard, and when nothing
+    /// has it the only thing that walk reaches is the window. A page with no focused control
+    /// inside it would then never be asked, and pressing undo on RECORD after clicking a button
+    /// in a dialog is exactly that situation.
+    ///
+    /// So the window hands off to the page rather than the page waiting to be found. Anything
+    /// that does have focus is still asked first and still wins.
+    /// </remarks>
+    private Shortcuts.IShortcutContext? Page => SelectedTab switch
+    {
+        RecordTab => Record,
+        TrackerTab => Tracker,
+        _ => null
+    };
+
     bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
     {
+        _ when Page?.Can(action) == true => true,
+
         Shortcuts.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
+
+        // The pads are not a document you save, so they are undone from wherever they are laid
+        // out, which is PADS, and from where they are fired, which is FIRE and USE.
+        Shortcuts.ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
+        Shortcuts.ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
+
         _ => false
     };
 
+    /// <summary>True on the pages the pads are laid out or played on.</summary>
+    private bool OnThePads => SelectedTab is PadsTab or UseTab;
+
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
+        // The page first, and only what it does not answer falls through to the window's own.
+        if (Page is { } page && page.Can(action))
+        {
+            page.Do(action);
+
+            return;
+        }
+
         switch (action)
         {
             case Shortcuts.ShortcutAction.Save when SelectedTab == TrackerTab:
                 Tracker.SaveCommand.Execute(null);
+                break;
+
+            case Shortcuts.ShortcutAction.Undo when OnThePads:
+                PadsBack(PadHistory.Undo());
+                break;
+
+            case Shortcuts.ShortcutAction.Redo when OnThePads:
+                PadsBack(PadHistory.Redo());
                 break;
         }
     }
@@ -703,6 +760,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         // Pads
         BuildPadsFromSelectedProfile(PadCount);
 
+        // Where the pads stood when this profile was opened. Nothing before it can be undone,
+        // and a history outliving its profile would put another one's pads back.
+        PadHistory.Opened(PadsInProfile());
+
         BuildLogParts();
 
         // MIDI routing: global, profile-independent mapping. Which controller reaches which
@@ -726,6 +787,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         // list and a way of saying it moved; where the list lives is the tracker's business.
         ControlLink.Song = () => Tracker.Song?.Controls;
         ControlLink.SongChanged = Tracker.ControlsChanged;
+
+        // And before, so the song's own layout can be taken back like anything else in it. The
+        // desk's half is not a song's business and is not recorded.
+        ControlLink.SongChanging = () => Tracker.ControlsChanging();
 
         Links = new ControlLinksViewModel(ControlLink);
 
@@ -1021,6 +1086,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         {
             _suspendSave = false;
         }
+
+        // A different profile is a different set of pads. What was done to the last one is not
+        // something to undo onto this one.
+        PadHistory.Opened(PadsInProfile());
     }
 
     partial void OnSelectedThemeChanged(string value)
@@ -1057,7 +1126,69 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     private void OnPadChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (_suspendSave) return;
+
         SaveNow();
+
+        // After the settings have been written, so what the history reads is what was stored.
+        // Gathered by which pad and which setting: a level is a fader and a fader is a stream,
+        // and dragging one is one thing somebody did.
+        PadsMoved(sender is PadViewModel pad
+            ? Pads.IndexOf(pad) + "." + e.PropertyName
+            : e.PropertyName ?? "");
+    }
+
+    /// <summary>Tells the history what the pads look like now, if it is listening.</summary>
+    /// <remarks>
+    /// Reads them out of the settings rather than off the view models, because the settings are
+    /// what a step has to put back and reading them twice is a chance for the two to disagree.
+    /// </remarks>
+    private void PadsMoved(string about)
+    {
+        if (PadHistory.Walking) return;
+
+        PadHistory.Did(PadsInProfile(), about);
+    }
+
+    /// <summary>The pads of the profile that is open, as they are stored.</summary>
+    private System.Collections.Generic.List<Config.PadConfig>? PadsInProfile()
+    {
+        string name = string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName.Trim();
+
+        return GetProfileByName(name)?.Pads;
+    }
+
+    /// <summary>
+    /// Puts a kept set of pads back, and has the ones on screen read themselves again.
+    /// </summary>
+    /// <remarks>
+    /// Into the profile rather than instead of it, so anything holding the profile is still
+    /// holding the one that is open. The view models are rebuilt from it afterwards, which is
+    /// the same path opening a profile takes.
+    /// </remarks>
+    private void PadsBack(System.Collections.Generic.List<Config.PadConfig>? wanted)
+    {
+        if (wanted is null) return;
+
+        string name = string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName.Trim();
+
+        var profile = GetProfileByName(name);
+        if (profile is null) return;
+
+        PadHistory.Walking = true;
+
+        try
+        {
+            profile.Pads.Clear();
+            profile.Pads.AddRange(wanted);
+
+            BuildPadsFromSelectedProfile(wanted.Count);
+
+            _store.Save(_cfg);
+        }
+        finally
+        {
+            PadHistory.Walking = false;
+        }
     }
 
     private void AddProfile()

@@ -236,6 +236,8 @@ public sealed class ControlLink
         // so one knob on the screen answers to one knob on the desk: pointing a second at a
         // filter is saying you want that one on it, not that you want two. Which is also the
         // only thing that ever displaces a mapping whose controller is not plugged in.
+        Changing();
+
         Displace(Song?.Invoke(), wanted);
         lock (_lock) Displace(_mappings, wanted);
 
@@ -360,6 +362,23 @@ public sealed class ControlLink
         }
     }
 
+    /// <summary>
+    /// Told before the song's own list is about to change, so it can be taken back.
+    /// </summary>
+    /// <remarks>
+    /// Apart from <see cref="SongChanged"/>, which says it already happened. A history needs the
+    /// state being left rather than the one being arrived at, and afterwards the first is gone.
+    /// Nothing at all for the desk's half: that lives in the settings and is not part of any
+    /// song, so undoing a song has nothing to say about it.
+    /// </remarks>
+    public Action? SongChanging;
+
+    /// <summary>Says the song is about to lose or gain a link, when there is a song.</summary>
+    private void Changing()
+    {
+        if (Song?.Invoke() is not null) SongChanging?.Invoke();
+    }
+
     /// <summary>Just the desk's, for a list that shows the two apart.</summary>
     public IReadOnlyList<ControlMapping> Desk
     {
@@ -453,6 +472,8 @@ public sealed class ControlLink
     /// </remarks>
     public void Unlink(string machine, string key)
     {
+        Changing();
+
         int gone = Song?.Invoke()?.RemoveAll(one =>
             (one.Kind == ControlKind.Instrument || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
@@ -506,6 +527,8 @@ public sealed class ControlLink
     /// <summary>Takes off whatever is pointed at that parameter of that plugin.</summary>
     public void UnlinkPlugin(string plugin, uint parameter)
     {
+        Changing();
+
         int gone = Song?.Invoke()?.RemoveAll(one =>
             one.Kind == ControlKind.Insert
             && string.Equals(one.Plugin, plugin, StringComparison.Ordinal)
@@ -536,6 +559,8 @@ public sealed class ControlLink
     public int Forget(string device)
     {
         if (string.IsNullOrWhiteSpace(device)) return 0;
+
+        Changing();
 
         int gone = Song?.Invoke()?.RemoveAll(one => MidiService.SameName(one.Device, device)) ?? 0;
 

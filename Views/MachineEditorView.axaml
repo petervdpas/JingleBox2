@@ -488,19 +488,26 @@
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                   IsVisible="{Binding MachineEditor.MachineOpen}"
                   ColumnSpacing="10" RowSpacing="8">
+              <!-- These write straight into the project, which is a plain object and says
+                   nothing when it moves, so the editor is told here instead. On losing focus
+                   rather than per keystroke: a name typed in is one edit and not eleven. -->
               <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
-              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}" />
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}"
+                       LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="What it is:" />
               <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MachineEditor.Project.Summary}"
+                       LostFocus="Machine_Changed"
                        PlaceholderText="One line, for somebody choosing between machines" />
 
               <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Made by:" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}"
+                       LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Version:" />
               <TextBox Grid.Row="3" Grid.Column="1" Width="120" HorizontalAlignment="Left"
-                       Text="{Binding MachineEditor.Project.Version}" />
+                       Text="{Binding MachineEditor.Project.Version}"
+                       LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Id:" />
               <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"

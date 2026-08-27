@@ -172,6 +172,14 @@ time a field is added, and the way that fails is the worst kind: an undo that si
 whatever was forgotten. Tested by giving a machine a summary, an author and a theme, undoing, and
 finding all three back without any of them being named anywhere in the history.
 
+**A machine's own fields had to be told to speak.** The name, what it is, who made it and its
+version bind straight through to `MachineProject`, which is a plain object with nothing to say
+when it moves, so a rename reached nothing: the Save button stayed cold and undo could not take it
+back, while dropping a knob on the panel did both. The boxes now tell the editor on losing focus,
+which is also the right unit: a name typed in is one edit and not eleven. The colour had the same
+hole, and `Dressed` was saying what it did to the two things showing the colour and to nothing
+else.
+
 **The door is a redraw rather than an edit.** Every edit in the designer ends at
 `MachineEditorViewModel.Redraw`, so that is where the history hears about it. It is told more
 often than there are edits, which is safe: a redraw where nothing about the machine moved reads

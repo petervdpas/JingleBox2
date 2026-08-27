@@ -443,6 +443,72 @@ public sealed class TrackerPlayer : IDisposable
     }
 
     /// <summary>
+    /// Makes the loaded chains match what the song now says, for the tracks where they differ.
+    /// </summary>
+    /// <remarks>
+    /// For a history putting a step back. A track's inserts live in two places: the song holds a
+    /// description of them, which is what a step carries, and the mixer holds the plugins
+    /// themselves, each in a process of its own. Restoring the description alone leaves the
+    /// picture and the sound disagreeing, which is worse than not restoring it at all.
+    ///
+    /// Only where they differ, and that is the whole reason this exists beside
+    /// <see cref="RestoreChains"/>. Rebuilding a chain means stopping every plugin in it and
+    /// starting them again, which is seconds a plugin. Almost every undo changes no chain at
+    /// all, and pays one comparison; only undoing a plugin change pays the reload, which is the
+    /// one case where anybody expects a pause.
+    ///
+    /// Compared as the two would be written down, so nothing can be forgotten: an ordering, a
+    /// parameter, a plugin swapped for another of the same name.
+    /// </remarks>
+    /// <returns>Which tracks were rebuilt, so their panels can be told.</returns>
+    public IReadOnlyList<int> MatchChains(Song song)
+    {
+        var changed = new List<int>();
+        if (song == null) return changed;
+
+        for (int track = 0; track < song.Mix.Count; track++)
+        {
+            var wanted = song.Mix[track].Plugins;
+
+            var chain = _synth.HasMixer ? _synth.Mixer.InsertOn(track) as PluginChain : null;
+
+            // Nothing loaded and nothing wanted is the ordinary case and costs nothing: no
+            // chain is made for a track that has never had one.
+            if (chain is null && (wanted is null || wanted.IsEmpty)) continue;
+
+            var loaded = PluginChainState.Capture(chain);
+
+            if (Same(loaded, wanted)) continue;
+
+            PluginChainState.Restore(ChainFor(track), wanted, _synth.SampleRate, MaxPluginFrames);
+
+            changed.Add(track);
+        }
+
+        return changed;
+    }
+
+    /// <summary>True when two chains would be written down identically.</summary>
+    private static bool Same(PluginChainConfig? left, PluginChainConfig? right)
+    {
+        bool nothingLeft = left is null || left.IsEmpty;
+        bool nothingRight = right is null || right.IsEmpty;
+
+        if (nothingLeft || nothingRight) return nothingLeft && nothingRight;
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Serialize(left)
+                   == System.Text.Json.JsonSerializer.Serialize(right);
+        }
+        catch (Exception)
+        {
+            // Unreadable either way is a reason to rebuild, not a reason to stop.
+            return false;
+        }
+    }
+
+    /// <summary>
     /// The plugin playing each track, and which instrument it is. A track holds on to its
     /// plugin between notes because a plugin has a release to finish.
     /// </summary>

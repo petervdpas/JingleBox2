@@ -236,6 +236,17 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         }
     }
 
+    /// <summary>
+    /// One of the machine's own fields was typed into and left.
+    /// </summary>
+    /// <remarks>
+    /// The name, what it is, who made it and its version bind straight through to the project,
+    /// which is a plain object with nothing to say when it changes. So nothing knew a machine
+    /// had been renamed: the Save button stayed cold and undo could not take it back, while
+    /// dropping a knob on the panel did both. Told here, once, when the box is left.
+    /// </remarks>
+    private void Machine_Changed(object? sender, RoutedEventArgs e) => Editor?.Redraw();
+
     private async void Cancel_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { } editor || !editor.CanCancelChanges) return;
