@@ -1,0 +1,13 @@
+{
+  "name": "MPD218",
+
+  "//": "The name it reports itself by, from soyersoyer/sysex-controls, which lists it as supported but untested.",
+  "matches": [ "MPD218*", "*MPD218*" ],
+
+  "ports": [
+    { "match": "*", "role": "controls",
+      "note": "one port, and everything comes out of it: pads on channel 10, and the six knobs" }
+  ],
+
+  "note": "Sixteen velocity and pressure sensitive pads in three banks, and six 360 degree potentiometers in three banks, which is eighteen knob assignments. There is no controller map here because Akai does not publish one: the user guide is twenty pages in five languages and prints not a single number, pointing instead at a separate Preset Documentation download. So this file names the device and says what its ports are for, and the numbers are learned by touching a control, which is what happens for every device with no file at all. Two things are worth knowing and neither can be turned into a mapping. The knobs turn for ever but their default type is an ordinary controller, so they report a position that comes round, which is the awkward combination ControlPickup.Endless exists for; it is not claimed here because a knob's type is settable in Akai's editor to Inc/Dec, and a knob set that way and read as movement would do nothing at all. And the three banks change what all six knobs send with nothing announced, no screen to say which bank, and no way to ask, so on this device the program problem has no answer at any level: a link is learned by touch and stays where it was put. Sources: docs/MPD218-UserGuide-v1.0.pdf, and github.com/soyersoyer/sysex-controls/tree/main/src/mpd218 for the knob's settable type."
+}

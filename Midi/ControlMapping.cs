@@ -198,6 +198,21 @@ public sealed class ControlMapping
     public string Key { get; set; } = "";
 
     /// <summary>
+    /// Which parameter by place rather than by name: the third knob on whatever face is in
+    /// front of you. Below nought for a link that names one, which is every link a person made.
+    /// </summary>
+    /// <remarks>
+    /// Only ever set by the layout a controller falls back on when nothing has been pointed at
+    /// anything. A link made by hand names its parameter, because you pointed at that parameter
+    /// and no other; a link nobody made cannot, because the machine in front of you tomorrow is
+    /// not the one in front of you now. The place is what the two have in common.
+    ///
+    /// Read through the order a panel reads in, so it means the third control your eye lands on
+    /// and not the third line of a file. See <see cref="Machines.PanelOrder"/>.
+    /// </remarks>
+    public int Ordinal { get; set; } = -1;
+
+    /// <summary>
     /// The plugin this knob is about, by the id the scanner gave it. A plugin's parameter
     /// numbers mean nothing without knowing whose they are.
     /// </summary>
@@ -231,6 +246,7 @@ public sealed class ControlMapping
         Track = one.Track,
         Machine = one.Machine,
         Key = one.Key,
+        Ordinal = one.Ordinal,
         Plugin = one.Plugin,
         Slot = one.Slot,
         Parameter = one.Parameter,

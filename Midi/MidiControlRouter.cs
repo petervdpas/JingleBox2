@@ -75,12 +75,16 @@ public sealed class MidiControlRouter
     }
 
     public MidiControlRouter(Func<IReadOnlyList<ControlMapping>> mappings, IControlTargets targets,
-                             Action? learned = null)
+                             Action? learned = null, DefaultLayout? layout = null)
     {
         _mappings = mappings;
         _targets = targets;
         _learned = learned;
+        _layout = layout;
     }
+
+    /// <summary>What a control does before anybody has pointed it at anything, or nothing.</summary>
+    private readonly DefaultLayout? _layout;
 
     /// <summary>Told when a control turned out to be something, so the answer can be kept.</summary>
     private readonly Action? _learned;
@@ -134,16 +138,37 @@ public sealed class MidiControlRouter
         var mappings = _mappings();
         if (mappings is null) return;
 
+        bool answered = false;
+
         // Every mapping that answers, not the first. One knob on two parameters is a thing
         // people do on purpose, and it is not this router's place to decide it is a mistake.
         foreach (var mapping in mappings)
         {
             if (!mapping.Answers(message)) continue;
 
+            answered = true;
+
             var target = _targets.Find(mapping);
             if (target is null) continue;
 
             Apply(mapping, target, message.Data);
+        }
+
+        // Nobody has pointed this control at anything, so it does what a control of its kind
+        // does by default: a fader is a track's level, an encoder is a knob on the face in
+        // front of you. Anything anybody linked wins, which is why this is asked last and only
+        // when nothing at all answered. See DefaultLayout.
+        if (!answered && _layout?.For(message) is { } fallback
+                      && _targets.Find(fallback) is { } waiting)
+        {
+            // The first time a control falls back on the layout, the hand is demonstrably on
+            // it: the layout has just watched three messages of it moving to decide what it is.
+            // Made to pick up as well, it would sit dead until it happened to sweep past the
+            // parameter, which reads as a control that does not work. The same reasoning, and
+            // the same call, as a link somebody has just made by hand.
+            if (!_hands.TryGetValue(fallback, out _)) Caught(fallback);
+
+            Apply(fallback, waiting, message.Data);
         }
 
         // Nothing said about reaching nothing: ControlTargets says it already, in the same

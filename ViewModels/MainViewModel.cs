@@ -26,6 +26,16 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     private readonly ControllerCodecs _codecs;
 
     /// <summary>
+    /// What a controller does before anybody has pointed it at anything.
+    /// </summary>
+    /// <remarks>
+    /// Eight faders are the first eight tracks' levels and the encoders are the knobs on the
+    /// face in front of you, on hardware this application has never heard of and with nothing
+    /// stored. Anything anybody linked beats it. See <see cref="Midi.DefaultLayout"/>.
+    /// </remarks>
+    public Midi.DefaultLayout Layout { get; } = new();
+
+    /// <summary>
     /// What has been done to the pads, so it can be taken back.
     /// </summary>
     /// <remarks>
@@ -780,7 +790,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
             new ControlTargets(Tracker, Machines),
-            () => ControlLink.Say());
+            () => ControlLink.Say(),
+            Layout);
         ControlLink.UseThis();
 
         // A song keeps its own layout and takes it with it. What the link is handed is the

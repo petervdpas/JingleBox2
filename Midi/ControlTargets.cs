@@ -121,7 +121,7 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     private IControlTarget? OnMachine(ControlMapping mapping, int track)
     {
-        if (mapping.Key.Length == 0) return null;
+        if (mapping.Key.Length == 0 && mapping.Ordinal < 0) return null;
 
         string machine = _tracker.MachineOn(track);
         if (machine.Length == 0) return null;
@@ -132,7 +132,15 @@ public sealed class ControlTargets : IControlTargets
 
         if (Tracker.Machines.MachineProjects.For(machine) is not { } project) return null;
 
-        var parameter = project.Parameters.FirstOrDefault(one => one.Key == mapping.Key);
+        // A link that names no parameter is one nobody made: it means the third knob on
+        // whatever face is in front of you, and which parameter that is depends on the face.
+        string key = mapping.Key.Length > 0
+            ? mapping.Key
+            : Machines.PanelOrder.At(project.Panel, mapping.Ordinal);
+
+        if (key.Length == 0) return null;
+
+        var parameter = project.Parameters.FirstOrDefault(one => one.Key == key);
         if (parameter is null) return null;
 
         var values = _tracker.MachineValuesOn(track);
@@ -144,8 +152,8 @@ public sealed class ControlTargets : IControlTargets
             project.Name + " " + said + " on " + Named(track),
             parameter.Min,
             parameter.Max,
-            () => values.Get(mapping.Key),
-            value => Written(values, mapping.Key, value),
+            () => values.Get(key),
+            value => Written(values, key, value),
             this,
             mapping,
             parameter.Unit);

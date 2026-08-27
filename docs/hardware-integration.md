@@ -454,6 +454,37 @@ One caution for whoever builds it. `MidiControlRouter` holds each mapping's hand
 same instance for the same control every time. Computing a fresh one per message would reset
 pickup on every message and the knob would jump.
 
+## The three files there are
+
+```
+minilab3.json     the full thing: two programs, 29 named controls, four ports, and enough
+                  to tell an endless encoder from a fader
+keylab-mkii.json  the device, its three ports and what each is for. no control map
+mpd218.json       the device and its one port. no control map
+```
+
+The last two are thin for a reason worth writing down, because somebody will otherwise assume
+they were rushed. Neither manufacturer publishes the numbers.
+
+A KeyLab mkII in its DAW mode **does not send controllers at all**: it pretends to be a Mackie
+Control surface, which is a protocol rather than a map. In its User mode every number is whatever
+the owner set in Arturia's editor. So there is nothing fixed to write down, and naming a control
+would be inventing it.
+
+Akai's MPD218 guide is twenty pages in five languages and prints not one controller number,
+pointing instead at a separate download. Its knobs turn for ever and report a position that comes
+round, which is exactly what `ControlPickup.Endless` exists for, and it is still not claimed here:
+a knob's type is settable to Inc/Dec in Akai's editor, and a knob set that way and read as
+movement would do nothing at all. A profile that is wrong is worse than no profile, so the fact
+is in the file's note for a person to read and not in a field for the router to obey.
+
+Which leaves those two files doing one thing each: making the device a named row with its ports
+explained. That is worth having and it is not much. The rest arrives when somebody with the
+hardware measures it, which is the whole reason the format is a file rather than code.
+
+The two KeySteps are not here at all. They are sequencers and clock masters rather than control
+surfaces, and a profile for one would say "this is a keyboard" and stop.
+
 ## The file, and who is expected to write one
 
 This is the part that decides whether the application supports three controllers or fifty, and it

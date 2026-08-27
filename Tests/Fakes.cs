@@ -50,7 +50,11 @@ internal sealed class NoMidi : IMidiService
     public void Close(string device) { }
     public void CloseAll() { }
 
+    /// <summary>Never raised: nothing here has anything to receive. Declared to satisfy the
+    /// contract, which everything else that plays a controller does use.</summary>
+#pragma warning disable CS0067
     public event EventHandler<MidiMessage>? MessageReceived;
+#pragma warning restore CS0067
 
     public bool Send(string device, byte[] bytes)
     {
@@ -59,5 +63,5 @@ internal sealed class NoMidi : IMidiService
         return true;
     }
 
-    public void Dispose() => MessageReceived = null;
+    public void Dispose() { }
 }

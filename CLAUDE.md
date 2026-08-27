@@ -344,6 +344,17 @@ because that exact thing was wrong once.
   to pages that correctly say they cannot, because **there is no undo anywhere in this
   application**: not a stack, not a history, not a type with the word in it. `docs/shortcuts.md`
   is the plan, and the point in it is that undo belongs to each context rather than to the app
+- A controller does something before anybody has pointed it at anything. `Midi/DefaultLayout.cs`:
+  faders are the first tracks' levels, pinned one per track, and encoders are the controls on the
+  face in front of you, in the order the panel reads. It works on hardware nobody has written a
+  file for, nothing is stored, and any link somebody made beats it, so the worst it can be is
+  uninteresting. Expressed against the machine rather than the device, which is the only way it
+  could be: a profile can know a MiniLab has eight encoders and can never know that encoder three
+  should be a filter. The order is controller number ascending within a kind, which is right for
+  any program written for a DAW nobody has heard of and wrong for one written for a particular
+  instrument, and the second kind never points at this application. `PanelOrder` is the reading
+  order, so "the third knob" is the third one your eye lands on. `ControlMapping.Ordinal` names a
+  place where a link somebody made names a parameter
 - SETTINGS has a Control Surfaces page, and it lists what you own rather than what the operating
   system offers. A controller is often several ports with nearly identical names and only one of
   them carries the knobs; the profile says which, so the jobs are ticked once on the device and

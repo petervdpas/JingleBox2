@@ -17,6 +17,9 @@ public class ControllerProfileTests
     private const string Lab = "Minilab3 MIDI";
     private const string Mpd = "MPD218 Port A";
 
+    /// <summary>A controller nobody has ever written a file for, which is most of them.</summary>
+    private const string Nobodys = "Some Other Box Port 1";
+
     public ControllerProfileTests() => ControllerProfiles.Reload();
 
     [Theory]
@@ -29,8 +32,8 @@ public class ControllerProfileTests
     [Fact]
     public void A_device_with_no_file_is_called_what_its_port_is_called()
     {
-        Assert.Equal(Mpd, ControllerProfiles.Called(Mpd));
-        Assert.False(ControllerProfiles.Knows(Mpd));
+        Assert.Equal(Nobodys, ControllerProfiles.Called(Nobodys));
+        Assert.False(ControllerProfiles.Knows(Nobodys));
     }
 
     [Fact]
@@ -40,7 +43,7 @@ public class ControllerProfileTests
         Assert.Contains("Mackie", ControllerProfiles.PortIs("Minilab3 MCU/HUI"));
         Assert.Contains("output", ControllerProfiles.PortIs("Minilab3 DIN THRU"));
 
-        Assert.Equal("", ControllerProfiles.PortIs(Mpd));
+        Assert.Equal("", ControllerProfiles.PortIs(Nobodys));
     }
 
     [Fact]
@@ -76,7 +79,7 @@ public class ControllerProfileTests
     public void A_number_the_file_does_not_mention_is_named_nothing()
     {
         Assert.Equal("", ControllerProfiles.Named(Lab, 1, 3));
-        Assert.Equal("", ControllerProfiles.Named(Mpd, 1, 86));
+        Assert.Equal("", ControllerProfiles.Named(Nobodys, 1, 86));
     }
 
     [Fact]
@@ -112,8 +115,8 @@ public class ControllerProfileTests
     [Fact]
     public void Nothing_is_claimed_for_a_device_with_no_file()
     {
-        Assert.Null(ControllerProfiles.Pickup(Mpd, 1, 86));
-        Assert.Null(ControllerProfiles.Pickup(Mpd, 1, 20));
+        Assert.Null(ControllerProfiles.Pickup(Nobodys, 1, 86));
+        Assert.Null(ControllerProfiles.Pickup(Nobodys, 1, 20));
     }
 
     [Fact]
@@ -132,7 +135,43 @@ public class ControllerProfileTests
 
         // And a port nothing knows about takes everything, because a silent refusal would be
         // worse than a port that does too much.
-        Assert.True(ControllerProfiles.PortTakes(Mpd, MidiDeviceRole.Controls));
+        Assert.True(ControllerProfiles.PortTakes(Nobodys, MidiDeviceRole.Controls));
+    }
+
+    [Theory]
+    [InlineData("KeyLab mkII 49 MIDI", "KeyLab mkII")]
+    [InlineData("KeyLab mkII 88 MCU/HUI", "KeyLab mkII")]
+    [InlineData("MPD218 Port A", "MPD218")]
+    public void The_other_controllers_with_a_file(string port, string called) =>
+        Assert.Equal(called, ControllerProfiles.Called(port));
+
+    [Fact]
+    public void A_keylabs_ports_say_what_they_are_for()
+    {
+        Assert.Contains("notes", ControllerProfiles.PortIs("KeyLab mkII 49 MIDI"));
+        Assert.Contains("Mackie", ControllerProfiles.PortIs("KeyLab mkII 49 MCU/HUI"));
+    }
+
+    [Fact]
+    public void A_file_with_no_control_map_claims_nothing_about_any_control()
+    {
+        // Both of these describe a device without naming a single controller, because neither
+        // manufacturer publishes the numbers. Naming the device is the whole of what they do,
+        // and a profile is never allowed to guess.
+        Assert.Equal("", ControllerProfiles.Named("KeyLab mkII 49 MIDI", 1, 74));
+        Assert.Null(ControllerProfiles.Pickup("KeyLab mkII 49 MIDI", 1, 74));
+
+        Assert.Equal("", ControllerProfiles.Named("MPD218 Port A", 1, 20));
+        Assert.Null(ControllerProfiles.Pickup("MPD218 Port A", 1, 20));
+    }
+
+    [Fact]
+    public void And_the_transport_still_lands_on_the_right_port()
+    {
+        Assert.True(ControllerProfiles.PortTakes("KeyLab mkII 49 MIDI", MidiDeviceRole.Controls));
+        Assert.True(ControllerProfiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Transport));
+        Assert.False(ControllerProfiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Pads));
+        Assert.False(ControllerProfiles.PortTakes("KeyLab mkII 49 DIN THRU", MidiDeviceRole.Controls));
     }
 
     [Theory]

@@ -171,6 +171,99 @@ public class ControlRouterTests
         Assert.Equal(0, knob.Writes);
     }
 
+    /// <summary>Answers only for the mapping it was given, so a test can see which one arrived.</summary>
+    private sealed class OnlyFor : IControlTargets
+    {
+        public OnlyFor(Knob knob) => Knob = knob;
+
+        public Knob Knob { get; }
+
+        public ControlMapping? Asked { get; private set; }
+
+        public IControlTarget? Find(ControlMapping mapping)
+        {
+            Asked = mapping;
+
+            return Knob;
+        }
+    }
+
+    [Fact]
+    public void A_control_nobody_pointed_at_anything_does_what_its_kind_does()
+    {
+        var knob = new Knob(0.5);
+        var targets = new OnlyFor(knob);
+        var layout = new DefaultLayout();
+
+        var router = new MidiControlRouter(() => new List<ControlMapping>(), targets, null, layout);
+
+        // A fader: numbers that walk. Three settles what it is, then it drives something.
+        foreach (int value in new[] { 40, 41, 43, 45 })
+            router.Handle(new MidiMessage
+            {
+                Device = "Some Other Box", Type = MidiMessageType.ControlChange,
+                Channel = 1, Value = 20, Data = value, IsOn = true
+            });
+
+        Assert.NotNull(targets.Asked);
+        Assert.Equal(ControlKind.Mix, targets.Asked!.Kind);
+        Assert.Equal(0, targets.Asked.Track);
+    }
+
+    [Fact]
+    public void And_it_takes_over_at_once_rather_than_picking_up()
+    {
+        // The layout has just watched three messages of this control moving in order to decide
+        // what it is, so the hand is demonstrably on it. Made to pick up as well it would sit
+        // dead until it happened to sweep past the parameter, which reads as a dead control.
+        var knob = new Knob(0.5);
+        var targets = new OnlyFor(knob);
+
+        var router = new MidiControlRouter(() => new List<ControlMapping>(), targets, null, new DefaultLayout());
+
+        foreach (int value in new[] { 40, 41, 43, 45 })
+            router.Handle(new MidiMessage
+            {
+                Device = "Some Other Box", Type = MidiMessageType.ControlChange,
+                Channel = 1, Value = 20, Data = value, IsOn = true
+            });
+
+        Assert.True(knob.Writes > 0);
+    }
+
+    [Fact]
+    public void And_a_control_somebody_did_point_at_something_is_not_touched_by_it()
+    {
+        var link = Link(ControlPickup.Jump, device: "Some Other Box", cc: 20);
+        var targets = new OnlyFor(new Knob(0.5));
+        var layout = new DefaultLayout();
+
+        var router = new MidiControlRouter(() => new List<ControlMapping> { link }, targets, null, layout);
+
+        router.Handle(Turn(link, 127));
+
+        // The link somebody made, not a place the layout invented.
+        Assert.Same(link, targets.Asked);
+        Assert.Equal(1.0, targets.Knob.Value, 3);
+    }
+
+    [Fact]
+    public void With_no_layout_at_all_an_unmapped_control_does_nothing()
+    {
+        var targets = new OnlyFor(new Knob(0.5));
+
+        var router = new MidiControlRouter(() => new List<ControlMapping>(), targets);
+
+        foreach (int value in new[] { 40, 41, 43, 45 })
+            router.Handle(new MidiMessage
+            {
+                Device = "Some Other Box", Type = MidiMessageType.ControlChange,
+                Channel = 1, Value = 20, Data = value, IsOn = true
+            });
+
+        Assert.Null(targets.Asked);
+    }
+
     [Fact]
     public void A_link_just_made_moves_its_parameter_from_the_next_message()
     {

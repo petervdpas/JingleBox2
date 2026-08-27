@@ -1,0 +1,19 @@
+{
+  "name": "KeyLab mkII",
+
+  "//": "The exact names these report themselves by, taken from soyersoyer/sysex-controls, which lists them per model because it talks to them. Every size is the same instrument as far as this is concerned.",
+  "matches": [ "KeyLab mkII*", "*KeyLab mkII*" ],
+
+  "//identity": "Not recorded. A KeyLab answers a universal identity request the way a MiniLab does, but nobody here has one to ask, and a family and member number guessed at is worse than none.",
+
+  "ports": [
+    { "match": "*MIDI*", "role": "controls",
+      "note": "notes, pads, encoders, faders and the wheels" },
+    { "match": "*MCU*", "role": "transport",
+      "note": "Mackie Control or HUI, on a port of its own. Arturia asks for this or a custom DAW mode and never both, or every press is answered twice" },
+    { "match": "*DIN*", "role": "thru",
+      "note": "the host out to the 5-pin socket. an output, so nothing ever arrives from it" }
+  ],
+
+  "note": "Nine encoders, nine faders, sixteen pads, transport, and a screen with a jog wheel. No controller map here, and that is the manual's fault rather than an omission: in its DAW mode this device does not send controllers at all, it pretends to be a Mackie Control surface, and in its User mode every number is whatever the owner set in Arturia's MIDI Control Center. What the manual does state is the part worth knowing: of its nine DAW presets, six are named DAWs and three are Standard MCU, Standard HUI and MMC, with the advice that a DAW not on the list 'is probably compatible with either the MCU or HUI preset'. JingleBox2 reads MCU's four transport notes today and nothing else of it. In DAW mode the encoders are the pan of each track in the selected bank and the faders are the levels, fader nine being the master, which is ControlKind.Mix with ControlScope.Fixed and is what this application already believes a mixer is. Its faders offer Jump or Pickup, which are this application's Jump and Takeover under the other name. Sources: docs/keylab-mkii_Manual_2_2_0_EN.pdf section 4.9, and github.com/soyersoyer/sysex-controls for the names."
+}
