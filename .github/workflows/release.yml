@@ -15,8 +15,44 @@ env:
   DEB_PKG_NAME: jinglebox2
 
 jobs:
+  # Before anything is packaged. A release is the one build nobody gets to take back, so the
+  # tests run first and everything that makes an artefact waits on them.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install ALSA runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2t64 libasound2-dev
+
+      - name: Restore
+        run: dotnet restore JingleBox2.sln
+
+      - name: Test
+        run: dotnet test Tests/JingleBox2.Tests.csproj -c Debug --logger "trx;LogFileName=results.trx"
+
+      - name: Publish results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-release
+          path: "**/TestResults/*.trx"
+          if-no-files-found: ignore
+
   build:
     name: Build & Package (${{ matrix.name }})
+    needs: test
     strategy:
       fail-fast: false
       matrix:
@@ -197,6 +233,7 @@ jobs:
 
   rpm_fedora:
     name: Fedora RPM (x64, Fedora ${{ matrix.fedora }})
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -343,6 +380,7 @@ jobs:
 
   deb_ubuntu:
     name: Ubuntu/Debian .deb (amd64, self-contained)
+    needs: test
     runs-on: ubuntu-latest
 
     steps:

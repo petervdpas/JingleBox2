@@ -97,7 +97,12 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-225 of them, in about two seconds, with no window and no hardware. xunit, and they run one at a
+225 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+and every pull request, on Linux **and** Windows, because two of them are genuinely platform
+specific: a path is written with a separator that is not the same character on the two systems,
+and those are exactly the tests that would pass on one machine for a year and fail on somebody
+else's. The release workflow runs them first and every job that makes an artefact waits on them,
+because a release is the one build nobody gets to take back. xunit, and they run one at a
 time on purpose: several of them read and write the application folder, which
 `Tests/Sandbox.cs` points at a temporary one before anything runs, and an environment variable
 belongs to a process rather than to a test.

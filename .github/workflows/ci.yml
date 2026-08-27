@@ -1,0 +1,69 @@
+# Every push and every pull request. The release workflow only ever ran on a tag, which is the
+# last moment anybody wants to hear that something is broken.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CONFIGURATION: Debug
+
+jobs:
+  test:
+    name: Build & test (${{ matrix.name }})
+
+    # Both, and not because the tests are platform specific. Two of them are: paths are written
+    # with a separator that is not the same character on the two systems, and a song that names
+    # its recordings the portable way has to read back on either. Those are exactly the tests
+    # that would pass on one machine for a year and fail on somebody else's.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: windows
+            os: windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # managed-midi looks for libasound whatever the machine is doing. The tests never open a
+      # port, but the library is loaded to say so.
+      - name: Install ALSA (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2t64 libasound2-dev
+
+      - name: Restore
+        run: dotnet restore JingleBox2.sln
+
+      - name: Build
+        run: dotnet build JingleBox2.sln -c $env:CONFIGURATION --no-restore
+        shell: pwsh
+
+      - name: Test
+        run: dotnet test Tests/JingleBox2.Tests.csproj -c $env:CONFIGURATION --no-build --logger "trx;LogFileName=results.trx"
+        shell: pwsh
+
+      # So a failure can be read without opening the log and hunting for it.
+      - name: Publish results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.name }}
+          path: "**/TestResults/*.trx"
+          if-no-files-found: ignore

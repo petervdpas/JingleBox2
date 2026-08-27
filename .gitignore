@@ -16,3 +16,6 @@ Thumbs.db
 
 # Agent worktrees, which are not part of the project
 .claude/worktrees/
+
+# What a test run leaves behind.
+TestResults/
