@@ -316,7 +316,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
             InstrumentEdited,
-            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings));
+            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings),
+            () => ClearTrackInstrument(track));
 
         _instrumentBoxes[track] = box;
 

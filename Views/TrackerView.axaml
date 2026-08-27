@@ -169,11 +169,19 @@
       <!-- Pattern -->
       <Border Grid.Column="2" Classes="card">
         <DockPanel>
-          <views:PatternHeader x:Name="Header"
-                               DockPanel.Dock="Top"
-                               TrackCount="{Binding TrackCount}"
-                               SelectedTrack="{Binding SelectedTrack}"
-                               Margin="0,0,0,4" />
+          <!-- The header, and the one corner of it that names nothing: the square above the
+               line numbers belongs to no track, so the help sits there rather than taking a
+               place in a row where every other place is a thing you can touch. -->
+          <Grid DockPanel.Dock="Top" Margin="0,0,0,4">
+            <views:PatternHeader x:Name="Header"
+                                 TrackCount="{Binding TrackCount}"
+                                 SelectedTrack="{Binding SelectedTrack}" />
+
+            <views:HelpBadge Topic="tracker.effects"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"
+                             Margin="6,0,0,0" />
+          </Grid>
 
           <!-- The effect for the track the cursor is on, under the pattern it belongs to.
                Moving between tracks changes what this is about. -->

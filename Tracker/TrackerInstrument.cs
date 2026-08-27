@@ -173,6 +173,36 @@ public sealed class TrackerInstrument
     [JsonIgnore]
     public Machine Machine => Machine.For(Kind);
 
+    /// <summary>
+    /// One line saying what this instrument is: which machine, and a word about how it is set.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than on either of the two things that print it, because it is a fact about
+    /// an instrument and not about a list. The song's instrument list and the block at the head
+    /// of a track's chain both say it, and two copies of this sentence would drift.
+    ///
+    /// The machine comes first, the same as on the rack, because the machine is the organising
+    /// idea and because a name you chose says nothing about which panel you get when you open
+    /// it. It used to say "square synth", from before there were machines at all.
+    /// </remarks>
+    [JsonIgnore]
+    public string Detail
+    {
+        get
+        {
+            if (IsPlugin) return PluginName is { Length: > 0 } plugin ? plugin : "Plugin";
+
+            string machine = Machine.Name;
+
+            return Kind switch
+            {
+                TrackerInstrumentKind.Synth => machine + ", " + Patch.Wave.ToString().ToLowerInvariant(),
+                TrackerInstrumentKind.MonoSynth => machine + ", " + (MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
+                _ => machine + ", " + BaseNote
+            };
+        }
+    }
+
     [JsonIgnore]
     public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
 

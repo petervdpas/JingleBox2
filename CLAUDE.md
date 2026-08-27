@@ -97,7 +97,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-329 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+330 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -198,6 +198,14 @@ because that exact thing was wrong once.
   commands, one per parameter per track per pattern, values normalised 0 to 1 and converted
   through `IControlTarget`, which is the same interface remote control writes through. Recording
   a lane from a knob that is already linked is nearly free; the editor is all of the work
+- Polyphony is not built either, and it is two features sharing a word. `docs/polyphony.md` is
+  the plan. A new note action (what happens to the voice a new note lands on) is a setting and
+  two methods `SynthVoice` already has, `Cut` being a 4ms fade and `NoteOff` the patch's own
+  release, so it costs a day and the only real work in it is per-note offs for plugins, which
+  `PluginNoteOn` does not do today. Note columns, a track playing chords, are a week and all of
+  it is the pattern and its editor: the audio side has nothing to learn, since auditions are
+  already polyphonic through the same mixer and a track already renders on its own bus. The
+  numbers came off the Renoise 3.5.4 install rather than from memory
 - A controller with a screen is written to: `ArturiaDisplay` puts the parameter's name, its
   reading and a value bar on a MiniLab 3 while a knob is turned. Arturia's own system exclusive,
   on the device's main port, and only while it is in a DAW mode. `MidiService.Send` opens an
@@ -348,6 +356,53 @@ because that exact thing was wrong once.
   to pages that correctly say they cannot, because **there is no undo anywhere in this
   application**: not a stack, not a history, not a type with the word in it. `docs/shortcuts.md`
   is the plan, and the point in it is that undo belongs to each context rather than to the app
+- The chain under the pattern is blocks rather than pills, and the point of the change is that
+  a row of boxes with names on them tells you the order of the effects and nothing at all about
+  the sound. A plugin block now prints its first four controls and what they read, which is what
+  Renoise and Bitwig both do and the reason both put the controls in the chain rather than behind
+  it. Asked of the plugin itself rather than of its panel, because the panel is built the first
+  time somebody opens the window and a device nobody has opened is exactly the one you want to
+  read; kept, since for a plugin in another process that list is a round trip and Serum answers
+  with 2622. Not polled: the values are read again when the chain says something moved, because
+  `ValueOf` on a bridged plugin is a synchronous round trip and four of them per device per tick
+  is a cost nobody asked for
+- What an instrument *is*, in one sentence, lives on `TrackerInstrument.Detail` and not on
+  either of the two things that print it. The song's instrument list and the block at the head
+  of a track's chain both say it, and it was briefly written out twice, which is how two lists
+  come to disagree about one instrument
+- An instrument's block prints its machine's first three controls, the same as the effects after
+  it, and getting there meant fixing something that was wrong rather than adding a binding. Which
+  values adapter reads an instrument was written out twice, in `InstrumentEditorViewModel` and in
+  `MachinePresetFile`, and both wrote it while doing something else. It is now
+  `Tracker/Machines/MachineValuesFor.cs` and the editor calls it. The view models are optional
+  there because that is the only way the two callers differ: an editor owns the one the panel
+  edits and must hand it over, or the panel and the values would be looking at two copies of one
+  patch, and anything only reading wants a throwaway. Which three controls is `PanelOrder`, so
+  they are the first three your eye lands on when you open the machine
+- `ViewModels/DeviceReading.cs` is one control and its reading, and one row template draws it for
+  both kinds of block, because to a track a machine and a plugin are the same thing. A plugin's
+  wording goes through `PluginParameterViewModel` and is then thrown away: how a value is worded
+  is real work, since a VST3 parameter is nought to one whatever it means and the many that hand
+  back "50.000000" have to be cut down, and doing it again on the strip printed 0.5000 where the
+  window printed 0.5
+- The strip is one height whatever is in it, by `MinHeight` on its card rather than `Height`,
+  which clipped. What it holds changes as the cursor moves between tracks, and a strip that grew
+  and shrank with it would push the pattern above up and down while somebody was reading it. Two
+  things also came off it: the TR-01 badge and the help badge. The track's number is on the tab
+  above, on the status line below and in the pattern itself, and a fourth place saying it was
+  three places too many. The help moved rather than went: the square above the line numbers in
+  `PatternHeader` names no track, so it is the one place in that row where something that is not
+  a thing you touch can sit. Laid over the header rather than inside it, since the header is
+  drawn rather than built out of controls
+- Three readings a block and not four, and the two buttons that are not settings live in the
+  gutter down the right rather than on rows of their own: out at the top as a red cross, in at
+  the bottom as a little window with a title bar. This sits under the pattern and every pixel it
+  takes is a line of music nobody can see, so the ones it takes have to be earning it. The name
+  opens it too, since that is where a hand goes first, but a name that merely happens to be
+  clickable is not a thing anybody can see, and taking the button away on those grounds read as
+  having taken the feature away. The window is a `DataTemplate` applied through `ContentTemplate`
+  rather than a resource set as `Content`, because a template makes a fresh one per button and a
+  control can only have one parent
 - A controller does something before anybody has pointed it at anything. `Midi/DefaultLayout.cs`:
   faders are the first tracks' levels, pinned one per track, and encoders are the controls on the
   face in front of you, in the order the panel reads. It works on hardware nobody has written a

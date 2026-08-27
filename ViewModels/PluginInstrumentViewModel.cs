@@ -30,13 +30,35 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
         Action? changed = null,
-        Func<TrackInstrumentDesigner>? designer = null)
+        Func<TrackInstrumentDesigner>? designer = null,
+        Action? remove = null)
     {
         _instrument = instrument;
         _live = live;
         _changed = changed;
         _designer = designer;
+        _remove = remove;
     }
+
+    private readonly Action? _remove;
+
+    /// <summary>
+    /// Takes the instrument off the track, which is what the corner of its block does.
+    /// </summary>
+    /// <remarks>
+    /// Off the track and not out of the song. An instrument is the song's and can be on no
+    /// track at all, so this is the same thing as pointing the track at nothing: the sound is
+    /// still in the list beside the pattern and can be put back on any track. Taking it out of
+    /// the song is a different act with its own button, and it is destructive where this is not.
+    ///
+    /// Passed in rather than done here, because which track this instrument is on is the
+    /// tracker's business and this box is deliberately ignorant of it.
+    /// </remarks>
+    public CommunityToolkit.Mvvm.Input.IRelayCommand RemoveCommand =>
+        new CommunityToolkit.Mvvm.Input.RelayCommand(() => _remove?.Invoke(), () => _remove is not null);
+
+    /// <summary>True when there is a track to take it off.</summary>
+    public bool CanRemove => _remove is not null;
 
     /// <summary>
     /// True when the sound is a plugin's, false when it is one of ours.
@@ -69,6 +91,95 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
     /// <summary>The instrument this stands for, so the strip can tell one from another.</summary>
     public TrackerInstrument Instrument => _instrument;
+
+    /// <summary>The second line of its block: which machine it is, and how it is set.</summary>
+    /// <remarks>
+    /// The instrument's own sentence, the same one the song's instrument list prints. Two lists
+    /// saying two different things about one instrument would be worse than either.
+    /// </remarks>
+    public string Detail => _instrument.Detail;
+
+    /// <summary>
+    /// The machine's own colour, so a block is recognised before it is read.
+    /// </summary>
+    /// <remarks>
+    /// The same colour the rack and the song's instrument list use for the same machine. A
+    /// plugin has none of ours, so it gets nothing and is told apart by saying VST3 or CLAP.
+    /// </remarks>
+    public string Colour =>
+        _instrument.IsPlugin ? "" : _instrument.Machine.Theme.Accent;
+
+    /// <summary>What kind of thing it is, for the corner of the block.</summary>
+    public string Badge => _instrument.IsPlugin ? "PLUGIN" : "MACHINE";
+
+    /// <summary>
+    /// The first few of its machine's controls, printed on the block itself.
+    /// </summary>
+    /// <remarks>
+    /// The same thing the effects after it print, and for the same reason: a row of boxes with
+    /// names on them tells you the order of the chain and nothing at all about the sound. Which
+    /// few is <see cref="Machines.PanelOrder"/>, the order the panel reads, so it is the first
+    /// three controls your eye lands on when you open the machine rather than the first three
+    /// lines of a file.
+    ///
+    /// Read through a throwaway adapter from <see cref="Tracker.Machines.MachineValuesFor"/>,
+    /// which is cheap: it is a view model over the patch the instrument already holds. What it
+    /// is not is the machine's editor, which is what the panel needs and what this deliberately
+    /// does not build.
+    ///
+    /// A plugin instrument prints nothing here, because its settings are its own and are read
+    /// through the plugin. Its block says the plugin's name instead.
+    /// </remarks>
+    public System.Collections.Generic.IReadOnlyList<DeviceReading> Summary => _summary ??= Pick();
+
+    private System.Collections.Generic.List<DeviceReading>? _summary;
+
+    public bool HasSummary => Summary.Count > 0;
+
+    /// <summary>How many fit on a block without it becoming a panel of its own.</summary>
+    private const int Shown = 3;
+
+    private System.Collections.Generic.List<DeviceReading> Pick()
+    {
+        var found = new System.Collections.Generic.List<DeviceReading>(Shown);
+
+        if (_instrument.IsPlugin) return found;
+
+        if (Tracker.Machines.MachineProjects.For(_instrument.Machine.SlotId) is not { } project) return found;
+        if (Tracker.Machines.MachineValuesFor.Instrument(_instrument) is not { } values) return found;
+
+        foreach (string key in JingleBox2.Machines.PanelOrder.Of(project.Panel))
+        {
+            if (found.Count >= Shown) break;
+
+            if (project.Parameters.Find(one => one.Key == key) is not { } parameter) continue;
+
+            found.Add(new DeviceReading(
+                parameter.Name.Length > 0 ? parameter.Name : parameter.Key,
+                Reads(values.Get(key), parameter.Unit)));
+        }
+
+        return found;
+    }
+
+    /// <summary>A value as the block prints it: the number, and its unit when it has one.</summary>
+    private static string Reads(double value, string unit)
+    {
+        string said = value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+        return unit.Length > 0 ? said + " " + unit : said;
+    }
+
+    /// <summary>Reads the printed values again, for when something else moved them.</summary>
+    public void Reread()
+    {
+        if (_summary is null) return;
+
+        _summary = null;
+
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(HasSummary));
+    }
 
     /// <summary>This plugin's controls, once somebody has asked for them.</summary>
     public PluginControlsViewModel? Panel { get; private set; }

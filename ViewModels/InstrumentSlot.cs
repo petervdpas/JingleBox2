@@ -31,7 +31,7 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
-    public MachineTheme Theme => Machine.For(Instrument.Kind).Theme;
+    public MachineTheme Theme => Instrument.Machine.Theme;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;
@@ -46,31 +46,12 @@ public sealed partial class InstrumentSlot : ObservableObject
             ? new SolidColorBrush(hue, amount)
             : Brushes.Transparent;
 
-    /// <summary>
-    /// The second line of the row: which machine it is on, and a word about how it is set.
-    /// </summary>
+    /// <summary>The second line of the row: which machine it is on, and how it is set.</summary>
     /// <remarks>
-    /// The machine comes first, the same as on the rack, because the machine is the organising
-    /// idea and because a name you chose says nothing about which panel you get when you open
-    /// it. It used to say "square synth", from before there were machines at all.
+    /// The instrument's own sentence, said here rather than worked out here. The block at the
+    /// head of a track's chain says the same one.
     /// </remarks>
-    public string DetailText
-    {
-        get
-        {
-            if (Instrument.IsPlugin)
-                return Instrument.PluginName is { Length: > 0 } plugin ? plugin : "Plugin";
-
-            string machine = Instrument.Machine.Name;
-
-            return Instrument.Kind switch
-            {
-                TrackerInstrumentKind.Synth => machine + ", " + Instrument.Patch.Wave.ToString().ToLowerInvariant(),
-                TrackerInstrumentKind.MonoSynth => machine + ", " + (Instrument.MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
-                _ => machine + ", " + Instrument.BaseNote
-            };
-        }
-    }
+    public string DetailText => Instrument.Detail;
 
     public bool HasTrack => Track >= 0;
 

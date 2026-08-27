@@ -241,14 +241,23 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
 
-        if (IsSample)
-        {
-            Values = Watched(new Tracker.Machines.RecordingValues(_instrument, shelf) { Changed = Moved });
-        }
-        else if (IsKit && Kit is { } kit)
-        {
-            Values = Watched(new Tracker.Machines.KitValues(kit) { Changed = Moved });
+        // Which adapter reads this machine's settings is a fact about the machine and is said
+        // in one place, because a preset reader says it too and three copies of it is how three
+        // places come to disagree about one instrument. The view models are this editor's own
+        // and have to be handed over: the panel edits them, and a values adapter over a second
+        // copy of the same patch would move a sound nobody could see move.
+        if (Tracker.Machines.MachineValuesFor.Instrument(
+                _instrument, shelf, Kit, Patch, MonoSynth, Zones, Sampler) is not { } made)
+            return;
 
+        made.Changed = Moved;
+
+        Values = Watched(made);
+
+        // What is left here is the part that is about editing rather than about reading: a grid
+        // of pads, a picture of a wave, and the redraw when the thing in hand changes.
+        if (IsKit && Kit is { } kit)
+        {
             MachinePads = new Tracker.Machines.KitPads(kit);
             MachineSlices = Slices;
 
@@ -263,21 +272,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
         else if (IsSynth && Patch is { } voice)
         {
-            var settings = Watched(new Tracker.Machines.SynthValues(voice, _instrument) { Changed = Moved });
-
-            Values = settings;
-
             // The picture of the wave, drawn out of the same engine that makes the sound.
             MachineScope = new Tracker.Machines.SynthScope(voice);
         }
-        else if (IsMonoSynth && MonoSynth is { } mono)
+        else if (IsSampler && Zones is { } zones)
         {
-            Values = Watched(new Tracker.Machines.MonoSynthValues(mono) { Changed = Moved });
-        }
-        else if (IsSampler && Zones is { } zones && Sampler is { } filter)
-        {
-            Values = Watched(new Tracker.Machines.SamplerValues(zones, filter) { Changed = Moved });
-
             MachineZones = new Tracker.Machines.SamplerZones(zones);
             MachineSlices = Slices;
 
@@ -287,10 +286,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
             {
                 if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) SayAgain();
             };
-        }
-        else
-        {
-            return;
         }
 
         Described = new MachineFace(face, project.Parameters, project.Folder);

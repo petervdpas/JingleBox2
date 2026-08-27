@@ -190,4 +190,23 @@ public class MixLevelTests
         Assert.True(MixLevels.IsAudible(Four(), 99));
         Assert.True(MixLevels.IsAudible(null, 0));
     }
+
+    [Fact]
+    public void An_instrument_says_what_it_is_in_one_place()
+    {
+        // Said in two: the song's instrument list and the block at the head of a track's chain.
+        // Worked out in one, because two copies of this sentence would drift.
+        var synth = new TrackerInstrument { Name = "Mine", Kind = TrackerInstrumentKind.Synth };
+
+        Assert.StartsWith(synth.Machine.Name, synth.Detail);
+        Assert.Contains(synth.Patch.Wave.ToString().ToLowerInvariant(), synth.Detail);
+
+        var plugin = new TrackerInstrument
+        {
+            Name = "Mine", Kind = TrackerInstrumentKind.Plugin, PluginName = "Serum 2"
+        };
+
+        // A plugin has no machine of ours to name, so it says what it is instead.
+        Assert.Equal("Serum 2", plugin.Detail);
+    }
 }

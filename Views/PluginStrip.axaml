@@ -5,20 +5,101 @@
              x:Class="JingleBox2.Views.PluginStrip"
              x:DataType="vm:PluginChainViewModel">
 
+  <UserControl.Resources>
+    <!-- One control and its reading. The same row whether the block is a plugin or one of our
+         machines, because to a track they are the same thing. -->
+    <DataTemplate x:Key="Reading" x:DataType="vm:DeviceReading">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBlock Grid.Column="0" Classes="deviceKey" Text="{Binding Name}" />
+        <TextBlock Grid.Column="1" Classes="deviceValue" Text="{Binding Text}" />
+      </Grid>
+    </DataTemplate>
+    <!-- The way in to a device's own window, drawn as one: a frame with a title bar. A word
+         saying Open cost most of the room on a title row that already holds a name, a format
+         and a switch, and this says the same thing in thirteen pixels. Applied through
+         ContentTemplate rather than set as Content, because a template makes a fresh one for
+         each button and a control can only have one parent. -->
+    <DataTemplate x:Key="WindowIcon">
+      <Border Width="13" Height="11" CornerRadius="1" BorderThickness="1">
+        <Border.BorderBrush>
+          <SolidColorBrush Color="{DynamicResource Color.TextMuted}" />
+        </Border.BorderBrush>
+
+        <Border Height="3" VerticalAlignment="Top">
+          <Border.Background>
+            <SolidColorBrush Color="{DynamicResource Color.TextMuted}" />
+          </Border.Background>
+        </Border>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <UserControl.Styles>
     <!-- A device reads as a box you can pick up, and the picked one is lit. -->
     <Style Selector="Border.device">
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Padding" Value="0" />
 
-      <!-- The same height whatever is in it. An effect carries a power button and an
-           instrument does not, and without this they are two different sizes in one row. -->
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="VerticalAlignment" Value="Center" />
+      <!-- The same size whatever is in it. An effect carries a power button and a row of
+           readings, an instrument carries neither, and without this they are two different
+           shapes in one row. Tall enough for three of a plugin's controls, which is what makes
+           a chain worth reading rather than merely counting, and no taller: this sits under the
+           pattern and every pixel it takes is a line of music you cannot see. -->
+      <Setter Property="MinHeight" Value="70" />
+      <Setter Property="MinWidth" Value="212" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
       <Setter Property="BorderBrush">
         <SolidColorBrush Color="{DynamicResource Color.Border}" />
       </Setter>
+    </Style>
+
+    <!-- The name across the top of a block. -->
+    <Style Selector="TextBlock.deviceName">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- What it is, under the name. -->
+    <Style Selector="TextBlock.deviceWhat">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.6" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- One control and its reading, on the face of the block. -->
+    <Style Selector="TextBlock.deviceKey">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.deviceValue">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontFamily" Value="monospace" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+
+      <!-- A plugin words its own values and some of them are long: Serum says
+           "40% [-13.0 dB]". Capped so a wordy one cannot squeeze the name it belongs to
+           down to nothing. -->
+      <Setter Property="MaxWidth" Value="104" />
+    </Style>
+
+    <!-- The corner label: MACHINE, PLUGIN, VST3, CLAP. -->
+    <Style Selector="Border.deviceKind">
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.5" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Border.deviceKind > TextBlock">
+      <Setter Property="FontSize" Value="9" />
+      <Setter Property="Opacity" Value="0.7" />
     </Style>
 
     <Style Selector="Border.device.open">
@@ -34,6 +115,82 @@
       <Setter Property="Opacity" Value="0.45" />
     </Style>
 
+    <!-- A device's name, which is also the way in to its controls. -->
+    <Style Selector="Button.deviceOpen">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- The plus: the same height as the blocks it adds to, so the row reads as one row and
+         not as a row with something small sitting beside it. -->
+    <Style Selector="Button.add">
+      <Setter Property="Width" Value="20" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="70" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+
+      <!-- No fill of its own. It is a way in rather than a thing, and a filled column beside
+           an empty row read as the one device the track had. -->
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" />
+      </Setter>
+    </Style>
+
+    <!-- Sized to the name beside it rather than to a button's usual height, or one switch
+         would set how tall every block in the row is. -->
+    <Style Selector="Button.power">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="5,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="ToggleButton.power">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="5,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Out. Red, square, and the same height as the switch beside it. -->
+    <Style Selector="Button.remove">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="5,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Foreground">
+        <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+      </Setter>
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Danger}" Opacity="0.18" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.remove:pointerover /template/ ContentPresenter">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Danger}" Opacity="0.42" />
+      </Setter>
+    </Style>
+
     <Style Selector="Button.tiny">
       <Setter Property="MinWidth" Value="0" />
       <Setter Property="Padding" Value="5,1" />
@@ -43,29 +200,77 @@
 
   <!-- The chain: a row of devices in the order the audio goes through them, a plus to add
        another, and the knobs of whichever one is picked. -->
-  <Border Classes="inset">
-    <StackPanel Spacing="6">
+  <!--
+    One height, always. What is in here changes as the cursor moves between tracks, and a strip
+    that grew and shrank with it would push the pattern above up and down while you were reading
+    it. So the room is taken once and kept, whether the track has a chain or nothing at all.
+  -->
+  <Border Classes="inset" MinHeight="96">
+    <StackPanel Spacing="6" VerticalAlignment="Center">
 
       <StackPanel Orientation="Horizontal" Spacing="6">
-        <Border Classes="badge" VerticalAlignment="Center">
-          <TextBlock Text="{Binding Label}" />
-        </Border>
-
-        <views:HelpBadge Topic="tracker.effects" />
-
         <!-- The instrument the track plays, at the head of the row because that is where it is
              in the audio: it makes the sound and everything after works on what it made. Ours
              or a plugin's, it is the same box; only what opens differs. -->
         <Border Classes="device" Classes.open="{Binding Instrument.IsOpen}"
-                IsVisible="{Binding HasInstrument}">
-          <Button Classes="tiny" Content="{Binding Instrument.Name}"
-                  Click="OnOpenInstrument"
-                  VerticalAlignment="Center"
-                  Background="Transparent" BorderThickness="0"
-                  ToolTip.Tip="The instrument this track plays. Opens its panel in a window." />
+                IsVisible="{Binding HasInstrument}"
+                ToolTip.Tip="The instrument this track plays. Click its name to open its panel.">
+          <Grid ColumnDefinitions="4,*">
+
+            <!-- The machine's own colour, the same one the rack and the song's instrument
+                 list use, so a block is recognised before it is read. A plugin has none of
+                 ours and says PLUGIN instead. -->
+            <Border Grid.Column="0"
+                    CornerRadius="3,0,0,3"
+                    Background="{Binding Instrument.Colour, Converter={StaticResource HexBrush}}" />
+
+            <StackPanel Grid.Column="1" Margin="8,6,32,6" Spacing="2">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <!-- The name opens it as well, since that is where a hand goes first. -->
+                <Button Grid.Column="0" Classes="deviceOpen"
+                        Content="{Binding Instrument.Name}"
+                        Click="OnOpenInstrument" />
+
+                <Border Grid.Column="1" Classes="deviceKind">
+                  <TextBlock Text="{Binding Instrument.Badge}" />
+                </Border>
+              </Grid>
+
+              <TextBlock Classes="deviceWhat" Text="{Binding Instrument.Detail}" />
+
+              <!-- What its machine is set to, the same as the effects after it. A chain of
+                   boxes with names on them says the order and nothing about the sound. -->
+              <ItemsControl ItemsSource="{Binding Instrument.Summary}" Margin="0,2,0,0"
+                            IsVisible="{Binding Instrument.HasSummary}"
+                            ItemTemplate="{StaticResource Reading}" />
+            </StackPanel>
+
+            <!-- Off the track, not out of the song. The sound stays in the list beside the
+                 pattern and can be put on any track again; taking it out of the song is a
+                 different act with its own button, and that one is destructive. -->
+            <Button Grid.Column="1" Classes="remove" Content="✕"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,5,5,0"
+                    IsVisible="{Binding Instrument.CanRemove}"
+                    Command="{Binding Instrument.RemoveCommand}"
+                    ToolTip.Tip="Take this instrument off the track" />
+
+            <!-- Under it, in the other corner of the same gutter: out at the top, in at the
+                 bottom, and neither of them costing a row. -->
+            <Button Grid.Column="1" Classes="power"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    Margin="0,0,5,5"
+                    Content="."
+                    ContentTemplate="{StaticResource WindowIcon}"
+                    Click="OnOpenInstrument"
+                    ToolTip.Tip="Open this instrument's panel" />
+          </Grid>
         </Border>
 
-        <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Center">
+        <!-- Away entirely when there is nothing in it. An empty items control still takes a
+             place in the row, and the two gaps either side of nothing read as a gap. -->
+        <ItemsControl ItemsSource="{Binding Devices}" VerticalAlignment="Stretch"
+                      IsVisible="{Binding !IsEmpty}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
               <StackPanel Orientation="Horizontal" Spacing="4" />
@@ -77,17 +282,57 @@
               <Border Classes="device"
                       Classes.open="{Binding IsOpen}"
                       Classes.off="{Binding IsBypassed}">
-                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                  <Button Classes="tiny" Content="{Binding Name}"
-                          Click="OnOpenDevice"
-                          VerticalAlignment="Center"
-                          Background="Transparent" BorderThickness="0"
-                          ToolTip.Tip="Open this one's controls in a window" />
+                <Grid>
+                <!-- Room kept down the right for the corner button, so nothing runs under it:
+                     the readings are as wide as the block and the button is not only over the
+                     first line of them. -->
+                <StackPanel Margin="8,6,32,6" Spacing="2">
 
-                  <ToggleButton Classes="tiny" Content="⏻"
-                                IsChecked="{Binding IsBypassed}"
-                                ToolTip.Tip="Switch it off without taking it out" />
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="4">
+                    <Button Grid.Column="0" Classes="deviceOpen"
+                            Content="{Binding Name}"
+                            Click="OnOpenDevice"
+                            ToolTip.Tip="Open this one's controls in a window" />
+
+                    <Border Grid.Column="2" Classes="deviceKind" Margin="0,0,2,0">
+                      <TextBlock Text="{Binding Format}" />
+                    </Border>
+
+                    <ToggleButton Grid.Column="3" Classes="power" Content="⏻"
+                                  IsChecked="{Binding IsBypassed}"
+                                  ToolTip.Tip="Switch it off without taking it out" />
+
+                  </Grid>
+
+                  <!-- What it is set to, on the face of it. A chain of boxes with names on
+                       them tells you the order of the effects and nothing about the sound. -->
+                  <ItemsControl ItemsSource="{Binding Summary}" Margin="0,2,0,0"
+                                IsVisible="{Binding HasSummary}"
+                                ItemTemplate="{StaticResource Reading}" />
+
+                  <TextBlock Classes="deviceWhat" Text="{Binding Vendor}"
+                             IsVisible="{Binding !HasSummary}" />
                 </StackPanel>
+
+                  <!-- Taking one out, without going through the menu to do it. In the corner
+                       because that is where a thing that closes lives, and only on an effect:
+                       the instrument at the head of the row is the track's, and taking it off
+                       the track is the song's business rather than the chain's. -->
+                  <Button Classes="remove" Content="✕"
+                          HorizontalAlignment="Right" VerticalAlignment="Top"
+                          Margin="0,5,5,0"
+                          Command="{Binding RemoveCommand}"
+                          ToolTip.Tip="Take it out of the chain" />
+
+                  <!-- Under it, in the other corner of the same gutter. -->
+                  <Button Classes="power"
+                          HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                          Margin="0,0,5,5"
+                          Content="."
+                          ContentTemplate="{StaticResource WindowIcon}"
+                          Click="OnOpenDevice"
+                          ToolTip.Tip="Open this one's controls in a window" />
+                </Grid>
 
                 <Border.ContextMenu>
                   <ContextMenu>
@@ -105,7 +350,7 @@
         </ItemsControl>
 
         <!-- The plus, holding everything installed. -->
-        <Button Classes="tiny" Content="+" Width="28"
+        <Button Classes="add" Content="+"
                 IsEnabled="{Binding HasTarget}"
                 ToolTip.Tip="Add an effect to the end of the chain">
           <Button.Flyout>
@@ -140,12 +385,12 @@
           </Button.Flyout>
         </Button>
 
+        <TextBlock Classes="cardHint" VerticalAlignment="Center"
+                   IsVisible="{Binding IsEmpty}"
+                   Text="No instrument or effect yet." />
+
         <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Status}" />
       </StackPanel>
-
-      <TextBlock Classes="cardHint"
-                 IsVisible="{Binding IsEmpty}"
-                 Text="No effects here." />
     </StackPanel>
   </Border>
 </UserControl>

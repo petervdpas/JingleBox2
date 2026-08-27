@@ -229,6 +229,11 @@ public sealed partial class PluginChainViewModel : ObservableObject
         Log.Write(LogArea.Plugins, () =>
             "the chain on " + Label + " changed, " + (Changed?.GetInvocationList().Length ?? 0) + " listening");
 
+        // The readings printed on each block, which are otherwise whatever they were when the
+        // block was first drawn. Not a poll: this is called when something is known to have
+        // moved, and a chain is four devices rather than four hundred.
+        foreach (var device in Devices) device.Reread();
+
         Changed?.Invoke();
     }
 
