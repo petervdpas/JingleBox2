@@ -20,7 +20,7 @@ using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.ViewModels;
 
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcutContext
 {
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
@@ -89,6 +89,38 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Which tab is open, so the bar can say where you are rather than where you were.</summary>
     [ObservableProperty] private int selectedTab;
+
+    /// <summary>
+    /// What a shortcut means on the page you are on, or nothing where it means nothing.
+    /// </summary>
+    /// <remarks>
+    /// Written out per page rather than defaulting, the same way the transport's deck is, so a
+    /// page added later has to say what saving on it means instead of quietly inheriting
+    /// somebody else's answer. Saying no is a perfectly good answer and the common one: the
+    /// keystroke then carries on as though none of this were here, which is what stops Ctrl+S on
+    /// the pads doing something nobody asked for.
+    ///
+    /// This is the outermost answer. Anything nearer the keyboard is asked first, so a dialog or
+    /// a view with its own idea takes it before this is reached.
+    ///
+    /// Undo and redo are not answered anywhere yet, because there is no history to walk in
+    /// either direction. See docs/shortcuts.md.
+    /// </remarks>
+    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    {
+        Shortcuts.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
+        _ => false
+    };
+
+    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    {
+        switch (action)
+        {
+            case Shortcuts.ShortcutAction.Save when SelectedTab == TrackerTab:
+                Tracker.SaveCommand.Execute(null);
+                break;
+        }
+    }
 
     /// <summary>Whether the last page was the tracker, so leaving it can be told from arriving.</summary>
     private bool _wasOnTracker;

@@ -22,7 +22,7 @@ namespace JingleBox2.Views;
 /// The pickers belong to the window, so they are opened here and only the answer goes to the
 /// view model, the same arrangement the recordings importer uses.
 /// </remarks>
-public partial class MachineEditorView : UserControl
+public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 {
     public MachineEditorView()
     {
@@ -189,6 +189,36 @@ public partial class MachineEditorView : UserControl
         string? folder = await PickFolder("Open a machine");
 
         if (folder != null) editor.Open(folder);
+    }
+
+    /// <summary>
+    /// What the keyboard can ask of the machine editor.
+    /// </summary>
+    /// <remarks>
+    /// Answered by the view rather than by its view model, because saving a machine that has
+    /// never had a folder has to ask where to put it, and asking is a window's job. The
+    /// dispatcher walks outwards from whatever has the keyboard and takes the first thing that
+    /// says yes, so this is reached while the editor is on screen and not otherwise.
+    /// </remarks>
+    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    {
+        Shortcuts.ShortcutAction.Save => Editor?.Project != null,
+        Shortcuts.ShortcutAction.Delete => Editor?.RemoveElementCommand.CanExecute(null) == true,
+        _ => false
+    };
+
+    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    {
+        switch (action)
+        {
+            case Shortcuts.ShortcutAction.Save:
+                Save_Click(this, new RoutedEventArgs());
+                break;
+
+            case Shortcuts.ShortcutAction.Delete:
+                Editor?.RemoveElementCommand.Execute(null);
+                break;
+        }
     }
 
     private async void Save_Click(object? sender, RoutedEventArgs e)

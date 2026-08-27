@@ -124,6 +124,17 @@ public sealed class AppConfig
     /// </remarks>
     public int LogAreas { get; set; }
 
+    /// <summary>
+    /// The shortcuts somebody changed, and only those.
+    /// </summary>
+    /// <remarks>
+    /// What is left alone is not written down, so a default that turns out to be a poor choice
+    /// can be improved and will reach anybody who never had an opinion about it. A shortcut
+    /// deliberately taken off is stored with no keys, which is how that is told from never
+    /// having been touched.
+    /// </remarks>
+    public List<Shortcuts.ShortcutBinding>? Shortcuts { get; set; }
+
     // 0 means never resized, so fall back to sizing from the pad matrix.
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

@@ -106,6 +106,12 @@ public partial class MainWindow : Window
 
         // The pointer mode, which every window answers. See Views.LinkKey.
         Views.LinkKey.Listen(this);
+
+        // Save, delete, undo and redo, delivered to whatever is in front of you that wants them.
+        // Every window listens, including the dialogs, because a dialog is where the focus is
+        // and so is where the answer should come from. See Shortcuts/ShortcutKeys.
+        Shortcuts.ShortcutKeys.Map.Take(cfg.Shortcuts);
+        Shortcuts.ShortcutKeys.Listen(this);
         AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
 
         // Keys held while the window loses focus are released somewhere else, and this window

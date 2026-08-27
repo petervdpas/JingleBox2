@@ -1,0 +1,106 @@
+using System;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
+using JingleBox2.Diagnostics;
+
+namespace JingleBox2.Shortcuts;
+
+/// <summary>
+/// Delivers a keystroke to whatever is in front of you that wants it.
+/// </summary>
+/// <remarks>
+/// Every window listens, and the answer comes from the thing with the keyboard rather than from
+/// a register of which page is open. Starting at what has focus and walking outwards, the first
+/// thing that says it can do the action does it, and if nothing says so the key carries on as
+/// though this were not here. That is what makes it context sensitive without anything having to
+/// be told when the context changed: a dialog answers because the dialog is where the focus is,
+/// and closing it changes the answer by itself.
+///
+/// This knows nothing about what any action means and nothing about what any key is. The first
+/// is <see cref="IShortcutContext"/> and the second is <see cref="ShortcutMap"/>, and that split
+/// is the point: a page that edits shortcuts edits the map, and nothing here changes.
+/// </remarks>
+public static class ShortcutKeys
+{
+    /// <summary>What the keys are set to. Replaced when the settings change them.</summary>
+    public static ShortcutMap Map { get; set; } = new();
+
+    /// <summary>Has a window answer shortcuts. Every window, including the dialogs.</summary>
+    public static void Listen(InputElement window)
+    {
+        if (window is null) return;
+
+        // On the way down, like the space bar and the pointing mode, so a control that would
+        // otherwise spend the keystroke does not get the chance. What it must not do is take one
+        // nobody wants, which is why nothing is handled unless a context said yes first.
+        window.AddHandler(InputElement.KeyDownEvent, Pressed, RoutingStrategies.Tunnel);
+    }
+
+    private static void Pressed(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled) return;
+        if (Map.Match(e.Key, e.KeyModifiers) is not { } action) return;
+
+        // Undo in a box somebody is typing in is the box's own undo, and taking it would be
+        // taking away the only thing that keystroke has ever meant while a caret is blinking.
+        // Save is not like that: saving while typing a name is a perfectly sensible thing to ask
+        // for, and no text box has ever done anything with it.
+        if (Typing(sender) && action is ShortcutAction.Undo or ShortcutAction.Redo or ShortcutAction.Delete)
+            return;
+
+        if (Asked(sender, action) is not { } context) return;
+
+        try
+        {
+            context.Do(action);
+        }
+        catch (Exception bad)
+        {
+            // One page that will not do a thing is one page, not a broken keyboard.
+            Log.Write(LogArea.App, () => "shortcuts: " + action + " threw: " + bad.Message);
+        }
+
+        e.Handled = true;
+    }
+
+    /// <summary>True when a caret is blinking somewhere and the key is probably meant for it.</summary>
+    private static bool Typing(object? sender) =>
+        (sender as TopLevel ?? TopLevel.GetTopLevel(sender as Visual))
+        ?.FocusManager?.GetFocusedElement() is TextBox;
+
+    /// <summary>
+    /// The nearest thing to the keyboard that says it can do this, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Outwards from the focus, and the control itself before its settings, so a view can answer
+    /// for itself where that is simpler and hand over to its view model where it is not. The
+    /// window's own settings are the last thing asked, which is what makes a page-wide answer
+    /// possible without every control on it knowing.
+    /// </remarks>
+    private static IShortcutContext? Asked(object? sender, ShortcutAction action)
+    {
+        var top = sender as TopLevel ?? TopLevel.GetTopLevel(sender as Visual);
+
+        var at = top?.FocusManager?.GetFocusedElement() as Visual ?? top;
+
+        while (at is not null)
+        {
+            if (at is IShortcutContext itself && itself.Can(action)) return itself;
+
+            if (at is StyledElement { DataContext: IShortcutContext behind } && behind.Can(action))
+                return behind;
+
+            at = at.GetVisualParent();
+        }
+
+        // Nothing under the pointer answered, so the window itself is asked. A page that is not
+        // where the focus happens to be is still the page you are looking at.
+        return top is StyledElement { DataContext: IShortcutContext window } && window.Can(action)
+            ? window
+            : null;
+    }
+}

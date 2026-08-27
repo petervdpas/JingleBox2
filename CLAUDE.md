@@ -225,6 +225,18 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   notches arrive in the time the drawing thread takes to wake once, each adds a notch to the same
   stale number, only the last write survives the coalescing, and the parameter moves one notch.
   Measured: identical movement whether you turned it once or forty times
+- Keyboard shortcuts are three pieces kept apart, in `Shortcuts/`. `ShortcutAction` is the closed
+  list of what a key can ask for, `ShortcutMap` is which key asks for which and is the settings
+  half (stored, edited, shown), and `ShortcutKeys` delivers and knows nothing about either. A page
+  says what it can do through `IShortcutContext`: the dispatcher starts at whatever has the
+  keyboard and walks outwards, the first thing that says yes does it, and a key nobody claims
+  carries on untouched. So nothing has to be told when the context changes, a dialog answers
+  because that is where the focus is, and Ctrl+S on the pads correctly does nothing. Only what
+  somebody changed is stored, so a default can still be improved; one key does one job, and
+  putting an action on a key takes it off whatever had it. Undo and redo are delivered correctly
+  to pages that correctly say they cannot, because **there is no undo anywhere in this
+  application**: not a stack, not a history, not a type with the word in it. `docs/shortcuts.md`
+  is the plan, and the point in it is that undo belongs to each context rather than to the app
 - SETTINGS has a Control Surfaces page, and it lists what you own rather than what the operating
   system offers. A controller is often several ports with nearly identical names and only one of
   them carries the knobs; the profile says which, so the jobs are ticked once on the device and
