@@ -317,9 +317,35 @@ public sealed class ControlTargets : IControlTargets
         public double Min { get; }
         public double Max { get; }
 
+        /// <summary>
+        /// Where the parameter is, or where it is about to be when something is on its way.
+        /// </summary>
+        /// <remarks>
+        /// The waiting value first, and this is not a nicety. Writes are coalesced onto the
+        /// drawing thread, so between a message arriving and the panel being drawn the machine
+        /// still holds the old value. Anything that works out its next value from this one then
+        /// works it out from a number that is already out of date, and since only the last write
+        /// survives the coalescing, a burst of them all say the same thing.
+        ///
+        /// For a knob that reports a position that costs nothing, because the new value comes
+        /// from the message and not from here. For one that reports movement it costs almost
+        /// everything: twenty notches of turning arrive in the time the drawing thread takes to
+        /// wake up once, every one of them adds a notch to the same stale number, and the
+        /// parameter moves one notch. The knob feels like it is stuck in treacle, which is
+        /// exactly what it is.
+        ///
+        /// So the pending value is the answer while there is one. It is what the parameter will
+        /// hold a millisecond from now, nothing else can be writing it in the meantime, and it
+        /// makes a burst of relative movement add up to what the hand actually did.
+        /// </remarks>
         public double Value
         {
-            get { try { return _read(); } catch (Exception) { return Min; } }
+            get
+            {
+                if (_desk.Waiting(_mapping) is { } coming) return coming;
+
+                try { return _read(); } catch (Exception) { return Min; }
+            }
         }
 
         public void Set(double value) => _desk.Queue(_mapping, _write, value);
@@ -336,6 +362,13 @@ public sealed class ControlTargets : IControlTargets
     private readonly Dictionary<ControlMapping, (Action<double> Write, double Value)> _waiting = new();
 
     private bool _posted;
+
+    /// <summary>The value on its way to a parameter, or nothing when none is.</summary>
+    private double? Waiting(ControlMapping mapping)
+    {
+        lock (_waiting)
+            return _waiting.TryGetValue(mapping, out var held) ? held.Value : null;
+    }
 
     private void Queue(ControlMapping mapping, Action<double> write, double value)
     {

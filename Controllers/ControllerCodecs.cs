@@ -4,9 +4,10 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Diagnostics;
 using JingleBox2.Midi;
+using JingleBox2.Scripting;
 using MoonSharp.Interpreter;
 
-namespace JingleBox2.Scripting;
+namespace JingleBox2.Controllers;
 
 /// <summary>
 /// The scripts that stand between a controller and the rest of the program.
@@ -33,13 +34,8 @@ namespace JingleBox2.Scripting;
 /// </remarks>
 public sealed class ControllerCodecs : IDisposable
 {
-    public const string FolderName = "controllers";
-
-    /// <summary>Where the codecs that ship with the program live.</summary>
-    public static string Shipped => Path.Combine(AppContext.BaseDirectory, FolderName);
-
-    /// <summary>And where the ones this installation has live.</summary>
-    public static string Installed => Path.Combine(Config.AppFolder.Path(), FolderName);
+    /// <summary>Where a controller's files live. Shared with the profiles beside them.</summary>
+    public static string Installed => ControllerFolder.Installed;
 
     private readonly IMidiService _midi;
     private readonly object _lock = new();
@@ -54,7 +50,7 @@ public sealed class ControllerCodecs : IDisposable
     {
         _midi = midi;
 
-        FirstRun();
+        ControllerFolder.FirstRun();
         Reload();
         Watch();
     }
@@ -68,31 +64,6 @@ public sealed class ControllerCodecs : IDisposable
 
         /// <summary>The port it is answering for at this moment, for anything it sends back.</summary>
         public string Device = "";
-    }
-
-    /// <summary>
-    /// Fills the installation folder from what ships, once, when it is not there at all.
-    /// </summary>
-    /// <remarks>
-    /// Not there and empty are different. Empty is somebody who threw them all out, and putting
-    /// them back would be undoing that. The same rule machines follow.
-    /// </remarks>
-    private static void FirstRun()
-    {
-        try
-        {
-            if (Directory.Exists(Installed)) return;
-            if (!Directory.Exists(Shipped)) { Directory.CreateDirectory(Installed); return; }
-
-            Directory.CreateDirectory(Installed);
-
-            foreach (string file in Directory.GetFiles(Shipped, "*.lua"))
-                File.Copy(file, Path.Combine(Installed, Path.GetFileName(file)), overwrite: false);
-        }
-        catch (Exception bad)
-        {
-            Log.Write(LogArea.Midi, () => "codecs: cannot prepare '" + Installed + "': " + bad.Message);
-        }
     }
 
     /// <summary>
@@ -296,7 +267,7 @@ public sealed class ControllerCodecs : IDisposable
         {
             if (_decided.TryGetValue(device, out var known)) return known;
 
-            Codec? found = _codecs.FirstOrDefault(one => Like(one.Matches, device));
+            Codec? found = _codecs.FirstOrDefault(one => ControllerFolder.Like(one.Matches, device));
             _decided[device] = found;
 
             if (found is not null)
@@ -306,45 +277,22 @@ public sealed class ControllerCodecs : IDisposable
         }
     }
 
-    /// <summary>A name against a pattern, where a star stands for anything at all.</summary>
+    /// <summary>
+    /// Watches the folder, so editing a controller file is editing a file and not a restart.
+    /// </summary>
     /// <remarks>
-    /// Deliberately the smallest possible matcher. A port is called one thing on Linux and the
-    /// same thing with a number in front of it on Windows, so a pattern is the least a match
-    /// can be and still work in both places, and anything more is a language nobody asked for.
+    /// Every file in it, not only the codecs: the profile beside a codec is edited by the same
+    /// person in the same sitting, and a folder where one half reloads and the other needs a
+    /// restart is a folder nobody can hold in their head. This class owns the only watcher on
+    /// that folder, so it tells the profiles as well.
     /// </remarks>
-    private static bool Like(string pattern, string text)
-    {
-        if (string.IsNullOrWhiteSpace(pattern)) return false;
-
-        var parts = pattern.Split('*');
-
-        if (parts.Length == 1)
-            return text.Contains(pattern, StringComparison.OrdinalIgnoreCase);
-
-        int at = 0;
-
-        for (int part = 0; part < parts.Length; part++)
-        {
-            if (parts[part].Length == 0) continue;
-
-            int found = text.IndexOf(parts[part], at, StringComparison.OrdinalIgnoreCase);
-            if (found < 0) return false;
-            if (part == 0 && found != 0) return false;
-
-            at = found + parts[part].Length;
-        }
-
-        return parts[^1].Length == 0 || text.EndsWith(parts[^1], StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>Watches the folder, so editing a codec is editing a codec and not a restart.</summary>
     private void Watch()
     {
         try
         {
             if (!Directory.Exists(Installed)) return;
 
-            _watch = new FileSystemWatcher(Installed, "*.lua")
+            _watch = new FileSystemWatcher(Installed)
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
                 EnableRaisingEvents = true
@@ -374,10 +322,11 @@ public sealed class ControllerCodecs : IDisposable
         try
         {
             Reload();
+            ControllerProfiles.Reload();
         }
         catch (Exception bad)
         {
-            Log.Write(LogArea.Midi, () => "codecs: reload failed: " + bad.Message);
+            Log.Write(LogArea.Midi, () => "controllers: reload failed: " + bad.Message);
         }
     }
 

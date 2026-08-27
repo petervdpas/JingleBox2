@@ -580,7 +580,13 @@ MidiTransportRouter     MCU notes on one port, Arturia's CCs on the other
 ArturiaDisplay          the screen, in Arturia's own system exclusive
 ```
 
-Not built: profiles, the default layout, reading the device's settings back.
+Built since: profiles and codecs, in `Controllers/`. A `.json` per controller naming its
+controls and its ports, a `.lua` per controller translating what the application cannot read,
+both optional, both matched on the port's name, both reloaded from the folder rather than
+compiled in.
+
+Still not built: the default layout, matching on identity rather than on a port name, reading
+the device's settings back, and Mackie Control.
 
 The transport half needed nothing from profiles, which is the rule above holding up in practice.
 `MidiTransportRouter` reads whichever port is ticked for `MidiDeviceRole.Transport` and works the
@@ -677,10 +683,11 @@ somewhere that is about Arturia.
                                 verifying all of it on a wire           an evening
    one piece of work, and every control surface made in twenty years answers to it
 
-3  profiles                     the file, reading it, and a registry    a day
-                                a link resolved through one, both ways  half a day
-                                one device row in SETTINGS, not two     half a day
-                                minilab3.json, from the dumps above     hours
+3  profiles                     BUILT. the file, the registry, naming a control in both
+                                lists, what each port is for in SETTINGS, and which program
+                                the device is in worked out from what arrives
+                                still open: one device row rather than four, and a link
+                                that stores the control's name rather than its number
 
 4  Mackie Control, writing      track names, meters, lit buttons        unknown
    the half that makes a surface feel connected rather than merely wired

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
 using System.Collections.Generic;
@@ -132,7 +133,7 @@ public sealed class ControlDeviceLinks
     /// sitting under a blank heading as if the name had gone missing.
     /// </remarks>
     public string Said =>
-        (Device.Length > 0 ? Device : "Learned before controllers were recorded")
+        (Device.Length > 0 ? ControllerProfiles.Called(Device) : "Learned before controllers were recorded")
         + "  ·  " + Links.Count + (Links.Count == 1 ? " control" : " controls");
 }
 
@@ -149,10 +150,22 @@ public sealed class ControlLinkRow
 
     public ControlMapping Mapping { get; }
 
-    /// <summary>The hardware, as the controller's own manual would put it.</summary>
+    /// <summary>
+    /// The hardware, as the controller's own manual would put it.
+    /// </summary>
+    /// <remarks>
+    /// What is printed on the front of the device where a profile knows, and the number
+    /// otherwise. `Encoder 3` is a thing you can find with your hand; `CC 89 ch 1` is a thing
+    /// you can only find with a manual, and there is no manual for most of what people own.
+    ///
+    /// The number is not a failure to fall back to. It is what this said for its whole life
+    /// until now and it works, which is the entire reason a profile is allowed to be optional.
+    /// </remarks>
     public string Control =>
-        "CC " + Mapping.Cc.ToString(CultureInfo.InvariantCulture)
-        + "  ch " + Mapping.Channel.ToString(CultureInfo.InvariantCulture);
+        ControllerProfiles.Named(Mapping.Device, Mapping.Channel, Mapping.Cc) is { Length: > 0 } named
+            ? named
+            : "CC " + Mapping.Cc.ToString(CultureInfo.InvariantCulture)
+              + "  ch " + Mapping.Channel.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Which controller it was learned on, or nothing when it names none.</summary>
     public string Device => Mapping.Device;

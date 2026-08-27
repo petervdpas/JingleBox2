@@ -186,6 +186,51 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   things in them are operational rather than background: its four ports each have a stated job,
   and Arturia asks a host to use either the DAW program or the MCU port and never both, which
   SETTINGS currently offers as two independent tick boxes
+- A controller can have two files in `controllers/`, named after it, and needs neither. A
+  `.json` saying what it *is* and a `.lua` saying what it *does*. The split is the design: what a
+  MiniLab 3 is, is a fact about every MiniLab 3 and belongs in a file anybody can read; what one
+  does is behaviour and needs a language. `Controllers/ControllerProfiles.cs` matches a profile
+  to a port by pattern, names a control (`Encoder 3` rather than `CC 89 ch 1`) in both link
+  lists, and says what each of a device's ports is for in SETTINGS, which is the answer to why a
+  MiniLab shows up four times. It also works out which of the device's programs is running, from
+  the numbers arriving: a MiniLab has seven and switching rearranges everything it sends, with
+  nothing announced, but the programs do not overlap so one message is usually enough. A number
+  in two programs says nothing and is ignored; a name from the wrong program would be worse than
+  a number, since a number is merely unhelpful. Nothing requires a profile: without one a control
+  is called by its number, which is what it always was
+- A panel hears about a value it did not write. `IMachineValues.Said` is raised alongside the
+  owner's `Changed` callback, and `MachinePanelView` subscribes to it and reads itself again,
+  coalesced to once a frame. Before this the only thing that made a panel redraw was the host
+  bumping `Reread`, which happens when a kit or a zone is picked and never when a controller
+  moves a knob: the number changed, the sound changed, and the picture sat there until something
+  unrelated happened. Two names because there is one owner and any number of onlookers, and the
+  owner's is set in an object initialiser, which an event cannot be
+- And a control target reads where a parameter is *going*, not where it is. Writes are coalesced
+  onto the drawing thread, so between a message arriving and the panel being drawn the machine
+  still holds the old value. For a knob reporting a position that costs nothing, since the new
+  value comes from the message. For one reporting movement it costs almost everything: twenty
+  notches arrive in the time the drawing thread takes to wake once, each adds a notch to the same
+  stale number, only the last write survives the coalescing, and the parameter moves one notch.
+  Measured: identical movement whether you turned it once or forty times
+- SETTINGS has a Control Surfaces page, and it lists what you own rather than what the operating
+  system offers. A controller is often several ports with nearly identical names and only one of
+  them carries the knobs; the profile says which, so the jobs are ticked once on the device and
+  put on whichever port really does them. Transport goes on both the main port and a Mackie one
+  where a device has both, since it sends one or the other depending on its program and never
+  both. `ControlSurfaceViewModel` is a view over the per-port `MidiDeviceViewModel` rows rather
+  than a replacement, so what is stored and loaded did not change and a device with no profile is
+  a surface with one port that behaves as it always did. The MIDI page keeps the three pad boxes,
+  which is all that was ever really about MIDI on it
+- A controller's file decides how a control is read, and beats what `ControlSense` works out by
+  watching, because a fact about the hardware beats an inference from three messages. The case
+  it exists for: an endless encoder reporting a position walks through its range exactly like a
+  fader and is indistinguishable from one until it comes round, so it is sensed as a fader,
+  saved as one, and every session then opens with a hunt for the value using a knob that has no
+  end to hunt from. Nine links in one song, five of them on encoders, all saved as `Takeover`.
+  An encoder in a program that sends positions is read as movement between messages instead,
+  which works whether the firmware wraps at the top or stops there. Nothing is claimed for an
+  encoder that counts notches, since which of the two conventions it counts in is not in the
+  file and guessing wrong throws a parameter across its range
 - Lua is embedded, MoonSharp, and it is fenced in: `Scripting/LuaScript.cs` names every library
   a script may reach rather than using a preset, so there is no io, no os and no loading more
   code, and a script that throws or takes more than 20ms is switched off rather than called

@@ -37,4 +37,23 @@ public interface IMachineValues
     /// <summary>Sets it, because somebody picked something the machine names rather than counts.</summary>
     void SetText(string key, string value) { }
 
+    /// <summary>
+    /// Raised when something in here moved, for anything that is merely showing these.
+    /// </summary>
+    /// <remarks>
+    /// Not the same relationship as the one who owns the values, who is told through their own
+    /// callback because they have work to do about it: mark the song dirty, save the patch. This
+    /// is for a picture of the settings, and there can be several of those at once.
+    ///
+    /// It exists because a panel had no way of hearing about a value it did not write. A knob
+    /// turned with the mouse goes through the panel, which knows perfectly well what it just
+    /// did. A knob turned on a controller writes the value directly and the panel was never
+    /// told, so the drawing sat on the old number until something unrelated happened to make it
+    /// read itself again. From the outside that is a controller with a lag of anywhere between
+    /// a second and for ever.
+    ///
+    /// Given a body so that anything holding a machine's settings today still compiles. Not
+    /// raising it costs the drawing and nothing else.
+    /// </remarks>
+    event System.Action? Said { add { } remove { } }
 }

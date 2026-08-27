@@ -184,10 +184,28 @@ public sealed class ArturiaDisplay
         return bytes.ToArray();
     }
 
+    /// <summary>What was last sent to each device, so the same picture is not sent twice.</summary>
+    /// <remarks>
+    /// A hand on a knob is a hundred messages a second and each one redraws the screen, which is
+    /// fine while the reading is changing because every one of them is a different picture. It
+    /// stops being fine the moment the picture is the same: a control that has not picked up yet
+    /// draws the value it is reaching for, which does not move, so a slow sweep would be several
+    /// hundred identical system exclusive messages sent down the same port the knob's own
+    /// messages are arriving on.
+    /// </remarks>
+    private readonly Dictionary<string, byte[]> _shown = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Sends it, waking the screen the first time this device is written to.</summary>
     private void Write(string device, byte[] message)
     {
         if (string.IsNullOrWhiteSpace(device)) return;
+
+        lock (_shown)
+        {
+            if (_shown.TryGetValue(device, out var was) && was.AsSpan().SequenceEqual(message)) return;
+
+            _shown[device] = message;
+        }
 
         bool first;
 
@@ -219,6 +237,11 @@ public sealed class ArturiaDisplay
         if (!_midi.Send(device, message))
         {
             lock (_woken) _woken.Remove(device);
+
+            // And what it was showing, because it is not showing it any more. Without this the
+            // guard above would refuse to send the very message that would wake it again, on
+            // the grounds that the screen already says that, which it no longer does.
+            lock (_shown) _shown.Remove(device);
         }
     }
 
@@ -226,5 +249,6 @@ public sealed class ArturiaDisplay
     public void Gone(string device)
     {
         lock (_woken) _woken.Remove(device);
+        lock (_shown) _shown.Remove(device);
     }
 }

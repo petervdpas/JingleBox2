@@ -17,13 +17,30 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class MachinePreviewValues(ObservableCollection<MachineParameterViewModel> parameters) : IMachineValues
 {
+    /// <summary>
+    /// Raised when a value here moved, so the panel drawing them follows.
+    /// </summary>
+    /// <remarks>
+    /// The same event <see cref="MachineValues"/> raises, and needed for the same reason: on the
+    /// rack a knob can be pointed at a machine and turned from the desk, and without this the
+    /// panel would never hear about it. This class does not inherit that one because the editor's
+    /// values are the parameters it is showing rather than a machine's settings.
+    /// </remarks>
+    public event System.Action? Said;
+
     public double Get(string key) => Find(key)?.Value ?? 0;
 
     public void Set(string key, double value)
     {
         var parameter = Find(key);
 
-        if (parameter != null) parameter.Value = value;
+        if (parameter is null) return;
+
+        if (System.Math.Abs(parameter.Value - value) < 1e-9) return;
+
+        parameter.Value = value;
+
+        Said?.Invoke();
     }
 
     /// <summary>
@@ -38,7 +55,14 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
 
     public string GetText(string key) => texts.TryGetValue(key, out string? held) ? held : "";
 
-    public void SetText(string key, string value) => texts[key] = value;
+    public void SetText(string key, string value)
+    {
+        if (texts.TryGetValue(key, out string? was) && was == value) return;
+
+        texts[key] = value;
+
+        Said?.Invoke();
+    }
 
     private MachineParameterViewModel? Find(string key) =>
         parameters.FirstOrDefault(p => p.Key == key);

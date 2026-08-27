@@ -7,7 +7,7 @@ using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
 using JingleBox2.Midi;
-using JingleBox2.Scripting;
+using JingleBox2.Controllers;
 using JingleBox2.Tracker;
 using JingleBox2.Models;
 using JingleBox2.UI;
@@ -747,12 +747,43 @@ public sealed partial class MainViewModel : ObservableObject
         // Scripting/ControllerCodecs.
         _codecs = new ControllerCodecs(midiService);
 
+        // Read now rather than when something first asks. Nothing needs them until a message
+        // arrives or a list is drawn, but a startup that says what it found is the difference
+        // between "the names are missing" and "the file is not there", and the log is the only
+        // place either of those is ever visible.
+        ControllerProfiles.Reload();
+
+        // A control that has not caught up yet says so on the device's own screen, which is the
+        // only surface a hand on a knob is looking at. The bar is drawn where the parameter is,
+        // not where the knob is: what you need to know is where to turn to, and when the reading
+        // meets the bar it takes over. Without this the knob is simply dead for half a turn and
+        // nothing anywhere says why.
+        controlRouter.Reaching += (mapping, target, wanted) =>
+        {
+            double range = target.Max - target.Min;
+
+            screen.Moved(
+                mapping.Device,
+                ArturiaDisplay.Kind.Knob,
+                range > 0 ? (target.Value - target.Min) / range : 0,
+                target.Name,
+                "pick up " + target.Reads(target.Value));
+        };
+
         // NOTE: MidiViewModel already subscribes for learn/status, and sees what really
         // arrived rather than what a codec made of it, which is what a monitor is for.
         // This subscription is for playing things.
         midiService.MessageReceived += (_, msg) =>
         {
-            if (_codecs.Read(msg) is { } read) dispatcher.Handle(read);
+            if (_codecs.Read(msg) is not { } read) return;
+
+            // Which mode the device is in, worked out from the numbers it sends, since it will
+            // not say and cannot be asked. Only a clue, only for a device with a profile, and
+            // it changes nothing except what its controls are called. See ControllerProfiles.
+            if (read.Type == MidiMessageType.ControlChange)
+                ControllerProfiles.Saw(read.Device, read.Channel, read.Value);
+
+            dispatcher.Handle(read);
         };
 
         // Apply initial theme once

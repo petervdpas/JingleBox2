@@ -1,0 +1,82 @@
+{
+  "name": "MiniLab 3",
+
+  "matches": [ "Minilab3*", "MiniLab 3*", "*MiniLab3*" ],
+
+  "identity": {
+    "manufacturer": "00 20 6B",
+    "family": "0002",
+    "member": "0404"
+  },
+
+  "ports": [
+    { "match": "*MIDI*", "role": "controls",
+      "note": "notes, pads, encoders, sliders, and the transport while it is in its DAW program" },
+    { "match": "*MCU*", "role": "transport",
+      "note": "Mackie Control, on a port of its own. Arturia asks for this or the DAW program and never both, or every press is answered twice" },
+    { "match": "*ALV*", "role": "screen",
+      "note": "Analog Lab's screen messages. JingleBox2 writes the screen on the main port instead" },
+    { "match": "*DIN*", "role": "thru",
+      "note": "the host out to the 5-pin socket. an output, so nothing ever arrives from it" }
+  ],
+
+  "controls": [
+    { "name": "Mod strip", "cc": 1, "kind": "strip" }
+  ],
+
+  "programs": [
+    {
+      "name": "DAW",
+
+      "//": "Encoders here walk through a range, measured on the wire. They are endless knobs reporting a position, which is the awkward combination: read as a position they are a fader that never ends, read as movement they behave as the hardware does.",
+      "sends": "absolute",
+
+      "controls": [
+        { "name": "Encoder 1", "cc": 86, "kind": "encoder" },
+        { "name": "Encoder 2", "cc": 87, "kind": "encoder" },
+        { "name": "Encoder 3", "cc": 89, "kind": "encoder" },
+        { "name": "Encoder 4", "cc": 90, "kind": "encoder" },
+        { "name": "Encoder 5", "cc": 110, "kind": "encoder" },
+        { "name": "Encoder 6", "cc": 111, "kind": "encoder" },
+        { "name": "Encoder 7", "cc": 116, "kind": "encoder" },
+        { "name": "Encoder 8", "cc": 117, "kind": "encoder" },
+
+        { "name": "Slider 1", "cc": 14, "kind": "fader" },
+        { "name": "Slider 2", "cc": 15, "kind": "fader" },
+        { "name": "Slider 3", "cc": 30, "kind": "fader" },
+        { "name": "Slider 4", "cc": 31, "kind": "fader" },
+
+        { "name": "Loop", "cc": 105, "kind": "button", "shift": true },
+        { "name": "Stop", "cc": 106, "kind": "button", "shift": true },
+        { "name": "Play", "cc": 107, "kind": "button", "shift": true },
+        { "name": "Record", "cc": 108, "kind": "button", "shift": true },
+        { "name": "Tap tempo", "cc": 109, "kind": "button", "shift": true }
+      ]
+    },
+
+    {
+      "name": "Arturia",
+
+      "//": "And here the same eight knobs send the same number over and over, which is a notch count. Which of the two counting conventions is not recorded, so it is watched for rather than assumed.",
+      "sends": "relative",
+
+      "controls": [
+        { "name": "Knob 1 (Brightness)", "cc": 74, "kind": "encoder" },
+        { "name": "Knob 2 (Timbre)", "cc": 71, "kind": "encoder" },
+        { "name": "Knob 3 (Time)", "cc": 76, "kind": "encoder" },
+        { "name": "Knob 4 (Movement)", "cc": 77, "kind": "encoder" },
+        { "name": "Knob 5 (FX A)", "cc": 93, "kind": "encoder" },
+        { "name": "Knob 6 (FX B)", "cc": 18, "kind": "encoder" },
+        { "name": "Knob 7 (Delay)", "cc": 19, "kind": "encoder" },
+        { "name": "Knob 8 (Reverb)", "cc": 16, "kind": "encoder" },
+
+        { "name": "Fader 1 (Bass)", "cc": 82, "kind": "fader" },
+        { "name": "Fader 2 (Mid)", "cc": 83, "kind": "fader" },
+        { "name": "Fader 3 (Treble)", "cc": 85, "kind": "fader" },
+        { "name": "Fader 4 (Master)", "cc": 17, "kind": "fader" }
+      ]
+    }
+  ],
+
+  "note": "Eight encoders in two rows of four, four sliders, eight pads in two banks (channel 10, notes 36-43 and 44-51), 25 keys, a pitch strip and a mod strip, and an OLED with a clickable browser knob. Shift and Pad 3 cycles the programs: Arturia, DAW, and up to five the owner builds in Arturia's MIDI Control Center. The two here are the manufacturer's. The transport is Shift and Pads 4 to 8, which is why a bare press sends nothing at all. Encoders in DAW send absolute values; in Arturia they count notches. The pitch strip sends pitch bend, which minilab3.lua turns into CC 2. Measured on the wire and checked against docs/minilab-3_Manual_1_0_5_EN.pdf."
+}

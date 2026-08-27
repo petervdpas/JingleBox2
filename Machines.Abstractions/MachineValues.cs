@@ -27,6 +27,18 @@ public abstract class MachineValues : IMachineValues
     /// <summary>Told whenever a setting really moves.</summary>
     public Action? Changed { get; set; }
 
+    /// <summary>
+    /// Raised alongside <see cref="Changed"/>, for anything showing these rather than owning
+    /// them. Named for what everything else in here does when something has happened.
+    /// </summary>
+    /// <remarks>
+    /// A separate thing from <see cref="Changed"/> because there is exactly one owner and any
+    /// number of onlookers, and the owner's is set as a property in an object initialiser, which
+    /// an event cannot be. Two names for two relationships rather than one name doing both
+    /// badly.
+    /// </remarks>
+    public event Action? Said;
+
     public abstract double Get(string key);
 
     /// <summary>
@@ -41,7 +53,10 @@ public abstract class MachineValues : IMachineValues
         // filter and silences the instrument for good.
         if (double.IsNaN(value)) return;
 
-        if (Write(key, value)) Changed?.Invoke();
+        if (!Write(key, value)) return;
+
+        Changed?.Invoke();
+        Said?.Invoke();
     }
 
     /// <summary>Writes one setting, and says whether it actually moved.</summary>
@@ -54,14 +69,21 @@ public abstract class MachineValues : IMachineValues
     /// </summary>
     public void SetText(string key, string value)
     {
-        if (WriteText(key, value ?? "")) Changed?.Invoke();
+        if (!WriteText(key, value ?? "")) return;
+
+        Changed?.Invoke();
+        Said?.Invoke();
     }
 
     /// <summary>Writes one text setting, and says whether it actually changed.</summary>
     protected virtual bool WriteText(string key, string value) => false;
 
     /// <summary>Says it moved, for the few things that change without going through a key.</summary>
-    protected void Say() => Changed?.Invoke();
+    protected void Say()
+    {
+        Changed?.Invoke();
+        Said?.Invoke();
+    }
 
     /// <summary>Writes a number if it really is different, and says whether it was.</summary>
     protected static bool Moved(double was, double now, Action write)

@@ -64,6 +64,14 @@ public sealed class MidiControlRouter
 
         /// <summary>What kind of control this is, while that is still being worked out.</summary>
         public readonly ControlSense Sense = new();
+
+        /// <summary>Whether the hunt for the parameter has been mentioned yet.</summary>
+        /// <remarks>
+        /// Once per hunt, not once per message. A hand on a knob sends a hundred a second and
+        /// every one of them is reaching, so saying so each time would bury the log in the one
+        /// situation somebody is reading it to understand.
+        /// </remarks>
+        public bool Told;
     }
 
     public MidiControlRouter(Func<IReadOnlyList<ControlMapping>> mappings, IControlTargets targets,
@@ -87,10 +95,15 @@ public sealed class MidiControlRouter
     public event Action<ControlMapping, IControlTarget, double>? Moved;
 
     /// <summary>
-    /// Raised when a control was ignored because it has not yet reached the value it is about
-    /// to take over, so a panel can say why nothing is happening.
+    /// Raised while a control is being ignored because it has not yet passed the value it is
+    /// about to take over, so something can say why nothing is happening.
     /// </summary>
-    public event Action<IControlTarget, double>? Reaching;
+    /// <remarks>
+    /// Carries the mapping as well as the target, because the only surface where this is worth
+    /// saying is the controller's own screen, and reaching one means knowing which device the
+    /// hand is on.
+    /// </remarks>
+    public event Action<ControlMapping, IControlTarget, double>? Reaching;
 
     /// <summary>
     /// Says a control already has the parameter it names, so it moves it from the next message.
@@ -140,6 +153,29 @@ public sealed class MidiControlRouter
     private void Apply(ControlMapping mapping, IControlTarget target, int data)
     {
         var hand = _hands.GetValue(mapping, _ => new Hand());
+
+        // What the controller's own file says this control is, where there is one, and what was
+        // worked out by watching otherwise. The file wins because it is a fact about the
+        // hardware and the other is an inference from three messages, and the inference is
+        // blind to the one thing that matters most: an endless encoder reporting a position is
+        // indistinguishable from a fader until it comes round, and read as a fader it needs
+        // picking up, which is a hunt with a knob that has nowhere to hunt from.
+        //
+        // A saved mapping is corrected by this rather than migrated. The number in the file was
+        // a guess made before anything knew the device, and the moment a choice of pickup is
+        // offered to a person, that choice has to win over both.
+        var pickup = Controllers.ControllerProfiles.Pickup(mapping.Device, mapping.Channel, mapping.Cc)
+                     ?? mapping.Pickup;
+
+        if (pickup != mapping.Pickup)
+        {
+            Log.Write(LogArea.Midi, () =>
+                "controls: CC " + mapping.Cc + " is read as " + ControlSense.Describe(pickup, mapping.Turn)
+                + " because its controller's file says so, not as "
+                + ControlSense.Describe(mapping.Pickup, mapping.Turn) + ", which is what watching it suggested");
+
+            mapping.Pickup = pickup;
+        }
 
         // Sitting against an end, and still being pushed into it. Nothing a message says can
         // move a parameter past its own end, so the only question left is whether this message
@@ -244,6 +280,13 @@ public sealed class MidiControlRouter
 
         if (Caught(hand, wanted, target.Value))
         {
+            if (hand.Told)
+            {
+                hand.Told = false;
+
+                Log.Write(LogArea.Midi, () => "controls: CC " + mapping.Cc + " has caught " + target.Name);
+            }
+
             hand.Caught = true;
             hand.Last = wanted;
             hand.Was = data;
@@ -258,7 +301,23 @@ public sealed class MidiControlRouter
         hand.Last = wanted;
         hand.Was = data;
 
-        Reaching?.Invoke(target, wanted);
+        // Said once, and this is the one thing on this path that was never said anywhere.
+        // A control that picks up does nothing at all until your hand passes the value the
+        // parameter already holds, which is correct and is what a hardware desk does, and from
+        // the outside is indistinguishable from a link that has stopped working. Every other
+        // outcome here writes a line; this one raised an event nobody had subscribed to.
+        if (!hand.Told)
+        {
+            hand.Told = true;
+
+            Log.Write(LogArea.Midi, () =>
+                "controls: CC " + mapping.Cc + " is reaching for " + target.Name
+                + ": the knob is at " + target.Reads(wanted) + " and the parameter is at "
+                + target.Reads(target.Value) + ", so nothing moves until your hand passes it."
+                + " That is what picking up is; turn it the other way if you have gone past");
+        }
+
+        Reaching?.Invoke(mapping, target, wanted);
     }
 
     /// <summary>

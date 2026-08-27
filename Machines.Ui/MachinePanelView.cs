@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
@@ -539,6 +540,17 @@ public class MachinePanelView : Decorator
 
         // Values is in here with the rest because the controls hold the object they write to.
         // Handed a different one, every control on the panel is still writing to the old one.
+        // Listen to the settings themselves, so a value moved by anything but this panel still
+        // reaches the drawing. Before this the only thing that made a panel read itself again
+        // was the host bumping Reread, which happens when a kit or a zone is picked and not
+        // when a controller moves a knob: the number changed, the sound changed, and the
+        // picture sat there.
+        if (change.Property == ValuesProperty)
+        {
+            if (change.OldValue is IMachineValues before) before.Said -= OnValuesSaid;
+            if (change.NewValue is IMachineValues after) after.Said += OnValuesSaid;
+        }
+
         if (change.Property == FaceProperty ||
             change.Property == ValuesProperty ||
             change.Property == TakesProperty ||
@@ -1827,6 +1839,36 @@ public class MachinePanelView : Decorator
 
     /// <summary>True while a control on this panel is writing its setting.</summary>
     private bool _writing;
+
+    /// <summary>True while a redraw is already on its way, so a burst asks for one.</summary>
+    private bool _refreshing;
+
+    /// <summary>
+    /// Something moved a setting. Read the panel again, once, on the next frame.
+    /// </summary>
+    /// <remarks>
+    /// Coalesced, and that matters more here than anywhere else on this path. A hand on a
+    /// controller is a hundred messages a second and three knobs at once is three hundred, and
+    /// reading the panel again means every control on it asking what it is set to. Once per
+    /// frame is what a picture needs and is the most it can show.
+    ///
+    /// Nothing at all while this panel is the one writing. A knob being turned with the mouse
+    /// already knows where it is, and setting it from inside its own change notification is the
+    /// re-entrancy the whole of <see cref="Said"/> exists to avoid.
+    /// </remarks>
+    private void OnValuesSaid()
+    {
+        if (_writing || _refreshing) return;
+
+        _refreshing = true;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            _refreshing = false;
+
+            Said();
+        }, DispatcherPriority.Render);
+    }
 
     /// <summary>
     /// Remembers how a control says itself again, and says it once now.

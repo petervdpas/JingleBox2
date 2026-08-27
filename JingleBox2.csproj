@@ -30,7 +30,7 @@
   <ItemGroup>
     <!-- The controller codecs that ship. A codec is a Lua file read at startup, and adding a
          controller is adding one of these rather than changing any of this. -->
-    <None Include="controllers\**\*.lua" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="controllers\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its

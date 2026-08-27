@@ -2,6 +2,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Config;
+using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
 using System.Collections.ObjectModel;
@@ -18,13 +19,23 @@ public sealed partial class MidiViewModel : ObservableObject
 
     private PadMidiMappingViewModel? _learningTarget;
 
-    /// <summary>Every controller with a row in SETTINGS, connected or merely remembered.</summary>
+    /// <summary>Every port, connected or merely remembered. What the system offers.</summary>
     public ObservableCollection<MidiDeviceViewModel> Devices { get; } = new();
+
+    /// <summary>
+    /// The same ports gathered into the hardware they belong to. What a person owns.
+    /// </summary>
+    /// <remarks>
+    /// Grouped by what a profile calls the device, and a port with no profile is its own
+    /// surface, named after itself, which is exactly the row it always had.
+    /// </remarks>
+    public ObservableCollection<ControlSurfaceViewModel> Surfaces { get; } = new();
 
     // Row VMs so changes from code (learning) refresh the UI immediately
     public ObservableCollection<PadMidiMappingViewModel> Pads { get; }
 
     [ObservableProperty] private bool hasDevices;
+    [ObservableProperty] private bool hasSurfaces;
     [ObservableProperty] private bool toggleMode;
     [ObservableProperty] private string status = "";
 
@@ -75,9 +86,31 @@ public sealed partial class MidiViewModel : ObservableObject
 
         HasDevices = Devices.Count > 0;
 
+        Regroup();
+
         UpdatePadDevice();
         ApplyBindings();
         Status = DescribeDevices();
+    }
+
+    /// <summary>
+    /// Gathers the ports into the hardware they came out of.
+    /// </summary>
+    /// <remarks>
+    /// Ordered so a device that is plugged in comes before one that is only remembered, since
+    /// the first is what somebody is looking at and the second is what they are keeping.
+    /// </remarks>
+    private void Regroup()
+    {
+        Surfaces.Clear();
+
+        foreach (var group in Devices
+                     .GroupBy(one => ControllerProfiles.Called(one.Name), StringComparer.OrdinalIgnoreCase)
+                     .OrderByDescending(group => group.Any(one => one.IsConnected))
+                     .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+            Surfaces.Add(new ControlSurfaceViewModel(group.Key, group.ToList(), Forget));
+
+        HasSurfaces = Surfaces.Count > 0;
     }
 
     /// <summary>
@@ -101,6 +134,8 @@ public sealed partial class MidiViewModel : ObservableObject
         int gone = Midi.ControlLink.Current?.Forget(device.Name) ?? 0;
 
         Devices.Remove(device);
+
+        Regroup();
 
         UpdatePadDevice();
         ApplyBindings();

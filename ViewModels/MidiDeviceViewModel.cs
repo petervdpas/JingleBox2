@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
 
@@ -20,6 +21,23 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
 
     /// <summary>False for a device that is bound but not plugged in right now.</summary>
     public bool IsConnected { get; }
+
+    /// <summary>
+    /// What this port is for, when a profile knows the device.
+    /// </summary>
+    /// <remarks>
+    /// The row keeps the port's own name at the top, deliberately. A MiniLab 3 is four rows and
+    /// naming all four after the device would leave four identical headings, which is worse than
+    /// the numbers it replaced. What was actually missing is what each port is <i>for</i>, since
+    /// three of the four are wrong for anything a person would guess.
+    ///
+    /// Empty for a device with no profile, which is most of them, and the row reads as it always
+    /// did.
+    /// </remarks>
+    public string PortIs => ControllerProfiles.PortIs(Name);
+
+    /// <summary>True when there is something to say about this port.</summary>
+    public bool HasProfile => PortIs.Length > 0;
 
     [ObservableProperty] private bool drivesPads;
     [ObservableProperty] private bool drivesTracker;
