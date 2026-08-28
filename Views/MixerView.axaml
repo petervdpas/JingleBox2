@@ -28,32 +28,6 @@
       </Setter>
       <Setter Property="Foreground" Value="Black" />
     </Style>
-
-    <!-- Narrower than a button's usual height, because it sits in a column of controls that all
-         have to leave room for the fader below them. -->
-    <Style Selector="Button.auto">
-      <Setter Property="MinWidth" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="4,2" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
-
-    <!-- Lit for the one track whose automation is showing, the same look the tracker's own
-         page buttons use for the page you are on. -->
-    <Style Selector="Button.auto.active">
-      <Setter Property="Background">
-        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
-      </Setter>
-      <Setter Property="Foreground" Value="Black" />
-    </Style>
-
-    <Style Selector="Button.auto.active:pointerover /template/ ContentPresenter">
-      <Setter Property="Background">
-        <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.85" />
-      </Setter>
-      <Setter Property="Foreground" Value="Black" />
-    </Style>
   </UserControl.Styles>
 
   <!-- No margin of its own. This page stands where the pattern grid stands, inside the
@@ -68,11 +42,6 @@
 
           <views:HelpBadge Topic="mixer.strips" />
         </StackPanel>
-
-        <!-- Under the tracks, about whichever one has its AUTO lit, and not there at all until
-             one is. The chain under the pattern is always there because a track always has a
-             chain; automation a track has not got is nothing to look at. -->
-        <views:AutomationStrip DockPanel.Dock="Bottom" IsVisible="{Binding ShowsLanes}" />
 
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding Strips}">
@@ -108,16 +77,6 @@
                         <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
                                       ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
                       </StackPanel>
-
-                      <!-- The way into this track's automation, on the track it is about. One
-                           button per strip and one panel below them all, so pressing another
-                           track's moves the panel rather than opening a second one, and
-                           pressing the lit one is the way back. -->
-                      <Button Classes="auto" Classes.active="{Binding IsAutomating}"
-                              Content="AUTO" HorizontalAlignment="Stretch"
-                              Command="{Binding $parent[views:MixerView].((vm:TrackerViewModel)DataContext).ShowAutomationCommand}"
-                              CommandParameter="{Binding Track}"
-                              ToolTip.Tip="What this track makes move over the pattern, and what else on it could be made to." />
                     </StackPanel>
 
                     <!-- The side chain, along the bottom of the strip: the track it

@@ -72,15 +72,17 @@
     move between parameters, and a strip that grew and shrank with it would push the mixer above
     it up and down while you were reading it.
   -->
-  <Border Classes="inset" MinHeight="96" Margin="0,10,0,0">
+  <Border Classes="inset" MinHeight="96" Margin="0,4,0,0">
     <!-- The head block takes what it needs and the part takes the rest, which is the shape the
          curve wants when there is one to draw: the whole width of the strip, against the lines
          of the pattern. -->
     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
 
       <!-- The head block: which part you are working on. Everything to the right of it is that
-           part. -->
-      <Border Grid.Column="0" Classes="device" Width="280">
+           part, so this takes as little as it can and still be read. Narrower than a block on
+           the chain, since it holds one picker and a box to search it with rather than a name,
+           a switch and three readings. -->
+      <Border Grid.Column="0" Classes="device" Width="200">
         <Grid ColumnDefinitions="4,*">
           <Border Grid.Column="0" CornerRadius="3,0,0,3">
             <Border.Background>
@@ -89,10 +91,10 @@
           </Border>
 
           <StackPanel Grid.Column="1" Margin="8,6" Spacing="4">
-            <!-- Which track and which pattern. The pattern is not on the screen when the mixer
-                 is, and a lane belongs to one as much as to a track. -->
-            <TextBlock Classes="deviceWhat" Text="{Binding Lanes.About}" />
-
+            <!-- Which track it is about is not said here. The pattern is on the screen above
+                 it, the cursor is in the column it is about, and the track's number is already
+                 on the tab, on the status line and in the pattern itself. The chain beside it
+                 had its own badge taken off for the same reason. -->
             <ComboBox HorizontalAlignment="Stretch" FontSize="11"
                       IsVisible="{Binding Lanes.HasAny}"
                       ItemsSource="{Binding Lanes.Parameters}"
@@ -115,7 +117,7 @@
             <!-- A machine has a dozen parameters and needs no finding. A plugin can have two
                  hundred, and a picker that long is not one anybody can use. -->
             <TextBox Text="{Binding Lanes.Search}" FontSize="11" Padding="6,2"
-                     Watermark="Find a parameter" />
+                     PlaceholderText="Find a parameter" />
           </StackPanel>
         </Grid>
       </Border>

@@ -63,28 +63,6 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
-    private bool automating;
-
-    /// <summary>
-    /// True for the one strip whose automation is open below the mixer.
-    /// </summary>
-    /// <remarks>
-    /// One at a time, and set from outside rather than owned here, because what it really says
-    /// is which track the strip under the row is about. Two strips lit would be two answers to
-    /// one question.
-    /// </remarks>
-    public bool IsAutomating
-    {
-        get => automating;
-        set
-        {
-            if (automating == value) return;
-
-            automating = value;
-            OnPropertyChanged();
-        }
-    }
-
     private string effect = "";
 
     /// <summary>The effect running on this track, or empty. Shown on the strip as a tag.</summary>

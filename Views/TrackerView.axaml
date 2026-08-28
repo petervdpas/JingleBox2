@@ -12,6 +12,27 @@
       <Setter Property="Opacity" Value="0.8" />
       <Setter Property="FontSize" Value="12" />
     </Style>
+
+    <!-- The word that folds the automation open and shut. Flat and quiet: it is a label that
+         happens to be pressable, and a button's usual box under the pattern would read as
+         another thing on the chain rather than as the lid of what is below it. -->
+    <Style Selector="Button.fold">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="2,1" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
+
+    <Style Selector="Button.fold:pointerover">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+
+    <Style Selector="Button.fold:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
   </UserControl.Styles>
 
   <!-- The page, with the picture of whatever is being dragged laid over it. The canvas takes
@@ -187,11 +208,29 @@
                              Margin="6,0,0,0" />
           </Grid>
 
-          <!-- The effect for the track the cursor is on, under the pattern it belongs to.
-               Moving between tracks changes what this is about. -->
-          <views:PluginStrip DockPanel.Dock="Bottom"
-                             Margin="0,8,0,0"
-                             DataContext="{Binding TrackEffect}" />
+          <!-- What the track the cursor is on has under it: the chain it plays through, and
+               then what moves over the pattern. Both are about the column the cursor is in, and
+               both change when it moves between tracks.
+
+               In one panel docked at the foot rather than three docked separately, because a
+               DockPanel puts the first one it is given lowest and reading them upside down is a
+               thing somebody would get wrong later. -->
+          <StackPanel DockPanel.Dock="Bottom">
+            <views:PluginStrip Margin="0,8,0,0"
+                               DataContext="{Binding TrackEffect}" />
+
+            <!-- One row tall whether it is open or shut. This is under the pattern, where every
+                 pixel taken is a line of music nobody can see, so what is folded away costs a
+                 word and an arrow. -->
+            <Button Classes="fold"
+                    HorizontalAlignment="Left"
+                    Margin="0,4,0,0"
+                    Content="{Binding LanesHandle}"
+                    Command="{Binding ToggleLanesCommand}"
+                    ToolTip.Tip="What this track makes move over the pattern, and what else on it could be made to." />
+
+            <views:AutomationStrip IsVisible="{Binding ShowsLanes}" />
+          </StackPanel>
 
           <ScrollViewer x:Name="GridScroll"
                         HorizontalScrollBarVisibility="Auto"

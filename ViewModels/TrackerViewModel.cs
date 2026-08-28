@@ -313,6 +313,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         TrackEffect.Target = new TrackPluginTarget(_player, track);
         TrackEffect.Instrument = InstrumentBoxFor(track);
+
+        // The automation under the chain is about the same track the chain is, and for the same
+        // reason: both are what the column the cursor is in has on it. Only while it is open,
+        // since reading it costs a walk over the track's machine and every plugin on it.
+        if (ShowsLanes) Lanes?.Show(track);
     }
 
     /// <summary>
@@ -550,19 +555,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // thing being edited and a pattern has never heard of one.
         PatternEdit.Watching = History.Taking;
 
-        // The same door for a recorded sweep. A lane written into is a pattern edit like any
-        // other, and it goes through the history the same way, one step per lane per pass.
-        Automation = new AutomationRecorder(
-            () => Song,
-            () => Transport == TrackerTransportState.Playing,
-            () => _player.Position,
-            () => FocusedTrack,
-            work => Dispatcher.UIThread.Post(work))
-        {
-            Taking = History.Taking,
-            Dirtied = MarkDirty
-        };
-
         _configStore = configStore;
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
@@ -577,6 +569,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio);
+
+        // The same door as PatternEdit, for a recorded sweep: a lane written into is a pattern
+        // edit like any other and goes through the history the same way, one step per lane per
+        // pass. Made here rather than beside that line because it reads the player, and the
+        // player has only just been made.
+        Automation = new AutomationRecorder(
+            () => Song,
+            () => Transport == TrackerTransportState.Playing,
+            () => _player.Position,
+            () => FocusedTrack,
+            work => Dispatcher.UIThread.Post(work))
+        {
+            Taking = History.Taking,
+            Dirtied = MarkDirty
+        };
 
         // And before a chain changes, so a plugin put on a track or taken off one can be taken
         // back. Wired here rather than with the other half, because it reads the player and the
@@ -1395,40 +1402,33 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private AutomationViewModel? _lanes;
 
     /// <summary>
-    /// True while the automation strip is open under the mixer's tracks.
+    /// True while the automation strip is open under the pattern.
     /// </summary>
     /// <remarks>
-    /// Hidable and hidden by default, because it is about one track at a time and the mixer is
-    /// about all of them. The same reasoning as the chain under the pattern, which is always
-    /// there because a track always has a chain; automation a track has not got is nothing to
-    /// look at.
+    /// Folded away by default, because this sits under the pattern and every pixel it takes is
+    /// a line of music nobody can see. The chain above it is always there since a track always
+    /// has one; automation a track has not got is nothing to look at, and the handle is one row
+    /// tall whether it is open or shut.
     /// </remarks>
-    [ObservableProperty] private bool showsLanes;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LanesHandle))]
+    private bool showsLanes;
 
-    /// <summary>
-    /// Opens the automation strip on a track, or shuts it when that track's is already open.
-    /// </summary>
+    /// <summary>What the handle says, which is also which way it would go.</summary>
+    public string LanesHandle => (ShowsLanes ? "▾" : "▸") + "  automation";
+
+    /// <summary>Folds the automation strip open or shut.</summary>
     /// <remarks>
-    /// One button per strip and one strip below them, so pressing another track's button moves
-    /// the panel rather than opening a second one. Pressing the lit one is the way back, which
-    /// is what the tracker's own page buttons do and so what a hand here already expects.
-    ///
     /// Read when it is opened rather than kept in step while it is shut. Everything on it moves
     /// underneath it, an instrument swapped, a plugin taken off a chain, a pattern changed to,
-    /// and following all of that would be a subscription per kind for a panel that is usually
-    /// not on the screen.
+    /// and following all of that would be a subscription per kind for a panel that is folded
+    /// away most of the time.
     /// </remarks>
-    public IRelayCommand<int> ShowAutomationCommand => new RelayCommand<int>(track =>
+    public IRelayCommand ToggleLanesCommand => new RelayCommand(() =>
     {
-        if (Lanes is not { } lanes) return;
+        ShowsLanes = !ShowsLanes;
 
-        bool same = ShowsLanes && lanes.Track == track;
-
-        ShowsLanes = !same;
-
-        if (ShowsLanes) lanes.Show(track);
-
-        foreach (var strip in Strips) strip.IsAutomating = ShowsLanes && strip.Track == track;
+        if (ShowsLanes) Lanes?.Show(Cursor.Track);
     });
 
     /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
@@ -1943,11 +1943,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void RefreshStrips()
     {
         Song.Normalize();
-
-        // Shut, because the strips are rebuilt when the song or the track count changes and the
-        // track it was open on may not be there any more. Left open, it would go on showing the
-        // last song's parameters with no button lit to say which track they were about.
-        ShowsLanes = false;
 
         Strips.Clear();
         for (int track = 0; track < Song.TrackCount && track < Song.Mix.Count; track++)
