@@ -13,6 +13,8 @@ using JingleBox2.Midi.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -30,6 +32,18 @@ namespace JingleBox2.Views;
 /// </remarks>
 public static class PanelPreview
 {
+    /// <summary>The machines folder on disc.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineRegistry Registry = new MachineRegistry();
+
+    /// <summary>The machines this preview has, filled once before anything is drawn.</summary>
+    /// <remarks>
+    /// The preview is its own little application, so it composes its own rather than being handed
+    /// the one the main window builds. It is read by whichever panel is being previewed, which is
+    /// not the method that fills it, so it cannot be a local.
+    /// </remarks>
+    private static readonly IMachineProjects Projects = new MachineProjects();
+
     /// <summary>The switch that takes over startup, followed by the machine's name.</summary>
     public const string Argument = "--panel";
 
@@ -75,7 +89,7 @@ public static class PanelPreview
     /// </remarks>
     public static int Run(string[] args)
     {
-        Tracker.Machines.MachineProjects.Keep(Tracker.Machines.MachineRegistry.Load());
+        Projects.Keep(Registry.Load());
 
         PreviewApp.Wanted = Wanted(args);
         PreviewApp.Playing = !args.Any(a => string.Equals(a, Idle, StringComparison.Ordinal));
@@ -84,7 +98,7 @@ public static class PanelPreview
         {
             var pretend = new System.Collections.Generic.List<Midi.ControlMapping>();
 
-            foreach (var parameter in Tracker.Machines.MachineProjects.For(PreviewApp.Wanted.SlotId)
+            foreach (var parameter in Projects.For(PreviewApp.Wanted.SlotId)
                                           ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Machines.MachineParameter>())
             {
                 pretend.Add(new Midi.ControlMapping
@@ -298,7 +312,7 @@ public static class PanelPreview
                 var shelf = Takes();
 
                 var designer = new TrackInstrumentDesigner(
-                    0, instrument, new Silent(), () => { },
+                    0, instrument, Projects, new Silent(), () => { },
                     new JingleBox2.Audio.WaveformService(),
                     Playing ? new Marching() : null,
                     null,

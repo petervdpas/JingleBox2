@@ -13,6 +13,10 @@ using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.UI;
+using JingleBox2.Music.Interfaces;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -33,6 +37,12 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class TrackerView : UserControl
 {
+    /// <summary>Which letter sounds which note.</summary>
+    private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
+
+    /// <summary>Where the pattern has to sit for the cursor to stay on the middle.</summary>
+    private readonly IViewportScroller _scroll = new ViewportScroller();
+
     /// <summary>
     /// The shelf of instruments, handed in from outside.
     /// </summary>
@@ -519,7 +529,7 @@ public partial class TrackerView : UserControl
         var pattern = Grid.Pattern;
         if (pattern == null) return;
 
-        double offset = ViewportScroller.CentreRow(
+        double offset = _scroll.CentreRow(
             GridScroll.Viewport.Height, Grid.Metrics, row, pattern.Lines);
 
         SetScrollOffset(offset, GridScroll.Offset.X);
@@ -533,7 +543,7 @@ public partial class TrackerView : UserControl
     {
         if (Grid.Pattern == null) return;
 
-        double offset = ViewportScroller.KeepTrackVisible(
+        double offset = _scroll.KeepTrackVisible(
             GridScroll.Offset.X, GridScroll.Viewport.Width, Grid.Metrics, track);
 
         SetScrollOffset(GridScroll.Offset.Y, offset);
@@ -619,7 +629,7 @@ public partial class TrackerView : UserControl
 
         string key = e.Key.ToString();
 
-        if (KeyboardNoteMap.IsNoteOff(key))
+        if (_keys.IsNoteOff(key))
         {
             vm.EnterNoteOff();
             e.Handled = true;
@@ -628,14 +638,14 @@ public partial class TrackerView : UserControl
 
         if (vm.Cursor.Column == CellColumn.Note)
         {
-            if (KeyboardNoteMap.IsNoteOffInNotes(key))
+            if (_keys.IsNoteOffInNotes(key))
             {
                 vm.EnterNoteOff();
                 e.Handled = true;
                 return;
             }
 
-            if (KeyboardNoteMap.NoteFor(key, vm.Octave) is Note note)
+            if (_keys.NoteFor(key, vm.Octave) is Note note)
             {
                 vm.EnterNote(note);
                 e.Handled = true;

@@ -32,6 +32,10 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Config/` - Configuration models and JSON persistence to `%APPDATA%/JingleBox2/config.json`
 - `Diagnostics/` - The log: one file for the app and every plugin process, off by default
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
+- `Music/` - Notes, pitch and keyboards, knowing nothing about patterns: which key sounds which
+  note, a note as a playback rate, concert pitch, and sharing a keyboard out among pieces
+- `Files/` - Whether two paths are the same file on this machine, which is a question about the
+  operating system rather than about the tracker, and is asked from everywhere
 - `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the machine rack
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
@@ -285,15 +289,35 @@ and, under it, only what is true of that implementation and untrue of the contra
 usually how it does the thing rather than what the thing is. A remark that would still be true of
 a second implementation belongs upstairs.
 
-Not everything is a seam, and forcing an interface over one is indirection bought with nothing.
-Value types and records, pure rule holders that are already answerable without a window
-(`MeterScale`, `PanelKeyboard`, `NumericInput`, `MidiNoteInput`, `PatternEdit`, `FaderMath`),
-enums, and the controls that draw themselves get no interface. **Where there is no interface the
-documentation goes on the block itself**, in the same words it would have had upstairs: the rule
-is where the prose lives, not whether the prose exists.
+**Every class that does something gets one.** That is the rule, and it is wider than the one
+that used to be written here, which said a pure rule holder was already answerable and could stay
+static. It was wrong twice over. A static class cannot be stood in front of, so the moment
+anything above it wants testing the static is the thing in the way; and a class that looks pure
+often is not, which is the trap `FilePaths` was. It takes two strings and answers a bool, which
+reads as arithmetic, and inside it asks `OperatingSystem.IsWindows()`. So the answer changes with
+the machine, a program on Linux cannot ask what Windows would have decided, and the half of this
+application that keys recordings by path is exactly the half where that is silent when it is
+wrong. Handed the rule instead of reading it, both answers can be put a question to on either
+machine.
 
-What does get one: anything that holds state, talks to hardware, touches a file, or is reached by
-something else. Those are the places a test needs to stand.
+So a static class is a decision to be untestable, and it is almost never worth making. The ones
+that were here became sealed instance classes behind interfaces in one pass: the note and
+keyboard maths in `Music/`, the viewport and gain rules in `UI/`, the DSP helpers in
+`Tracker/Synth/`, the machines folder in `Tracker/Machines/`, and the pattern, slice and song
+helpers at the root of `Tracker/`.
+
+What still does not get one: data. Records, enums, and the document types you can already build
+in a test and hand about (`Note`, `TrackerCell`, `Song`, `Pattern`). An `ISong` with forty
+members on it buys no test anything and costs every reader who wanted to know what a song is.
+**Where there is no interface the documentation goes on the block itself**, in the same words it
+would have had upstairs: the rule is where the prose lives, not whether the prose exists.
+
+A dependency arrives through the constructor, optional, defaulted to the real one:
+`public sealed class SongSamples(IFilePaths? paths = null)` holding `paths ?? new FilePaths()`.
+No ambient singleton and no static `Default`, because both are the static class again wearing a
+different hat: whatever a test put there is still there for the next test. These types are
+stateless, so a caller who does not care pays a `new` that costs nothing, and a caller who does
+care hands one in.
 
 An interface lives in a file of its own, named after it, in an `Interfaces` folder beside the
 code it is the contract for: `Audio/Interfaces/IAudioEngine.cs` is `JingleBox2.Audio.Interfaces`,
@@ -381,7 +405,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-330 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+652 of them, in about two seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -407,6 +431,21 @@ the screen's bytes, the transport's two dialects, and the Lua fence. Several of 
 because that exact thing was wrong once.
 
 ## Technical Notes
+
+- **A source folder may not differ from another only in case.** There was a `controllers/` of
+  device profiles beside the `Controllers/` that holds the code for reading them, and on Windows
+  and macOS those are one folder. Git checks both into it, and the csproj glob over
+  `controllers\**\*` then sweeps the C# sources into the output as content. The profiles live in
+  `Controllers/Profiles/` and are given `Link="controllers\..."`, so what lands in the output and
+  in the application folder is exactly what it always was and `ControllerFolder.Shipped` did not
+  have to learn anything
+- Pasting a block is an edit like any other and leaves an undo step, and it very nearly stopped.
+  The hook that records an edit used to hang off a static class, so there was one of it and every
+  caller found it. With `PatternEdit` an instance, `PatternBlock` holding one of its own would
+  have rung a bell nobody had tied to anything: the paste would land, leave no step, and undo
+  would go back past it to whatever happened before, with nothing said. `Paste` takes the editor
+  the caller is using. That is the shape of the risk in making a static an instance, and it is
+  worth remembering: the compiler cannot see a listener that is merely never called
 
 - Configurable pad matrix size (rows x columns) via SETTINGS tab
   - Minimum: 4 pads total (e.g., 2x2, 1x4, 4x1)
@@ -945,7 +984,7 @@ because that exact thing was wrong once.
   architecture; the tables are facts about hardware and are what nobody should reinvent. Mackie
   themselves never published any of it: the same hardware shipped as Emagic's Logic Control and
   Emagic did
-- `controllers/nanokontrol2.json` is the first file here written from somebody else's reading of
+- `Controllers/Profiles/nanokontrol2.json` is the first file here written from somebody else's reading of
   a device rather than from the wire, and it says so at the top. Korg's parameter guide has a
   page per control type explaining what CC Number means and never prints one; the numbers come
   from Mixxx's mapping for the device as shipped, agreeing with every community list. Fifty one
@@ -954,7 +993,7 @@ because that exact thing was wrong once.
   DAW modes where the same controls speak that DAW's protocol. It buys the most of any file here
   because the device is the plainest surface anybody makes: eight faders on eight track levels
   and eight knobs on the panel in front of you, working before it is unwrapped
-- `controllers/keystep-pro.json` is the one that says a device cannot be described, and why.
+- `Controllers/Profiles/keystep-pro.json` is the one that says a device cannot be described, and why.
   Its five encoders have no factory controller number: the manual's Controller page marks a
   default for channel, mode, min and max and marks none for CC, so the omission is deliberate
   and there is nothing to write down even in principle. Measuring one would report what its
@@ -1019,7 +1058,7 @@ because that exact thing was wrong once.
   So a knob is a fader that happens to be round, `Takeover` in the file and ranked among the
   faders by `DefaultLayout`, whose only question is whether a control says where it is or how
   far it moved. 360 degree describes the absence of a detent, not the behaviour of the value.
-  The device's own numbers were measured the same way and are in `controllers/mpd218.json`: all
+  The device's own numbers were measured the same way and are in `Controllers/Profiles/mpd218.json`: all
   eighteen knob assignments, since CTRL BANK cycles three sets of six with nothing announced on
   the wire. Bank A is scattered (3, 9, 12, 13, 14, 15) because Akai stepped around the
   controllers everybody else uses; B and C are plain runs from 16 and from 22. Which letter is
@@ -1048,7 +1087,7 @@ because that exact thing was wrong once.
   ever be pointed at anything
 - The MPD218 answers the universal identity request and refuses everything else. `F0 7E 00 06 02
   47 34 00 19 00 01 01 02 00 00 7F 7F 7F` and then its serial number in ASCII: manufacturer 47 is
-  Akai, family 0034, member 0019. That is in `controllers/mpd218.json` now and it is the one name
+  Akai, family 0034, member 0019. That is in `Controllers/Profiles/mpd218.json` now and it is the one name
   a device has that survives a different operating system, a different socket and a second one
   being plugged in. What it will not answer is Akai's own settings protocol, which is the thing
   that would have read all eighteen knob assignments without anybody turning anything:
@@ -1064,7 +1103,7 @@ because that exact thing was wrong once.
   it cannot add a feature or remove one, and a device with no codec is passed through untouched.
   Codecs live in `controllers/` beside the program and are copied to the app folder on first
   run, the way machines are, and the folder is watched: saving a codec reloads it, with no
-  restart and no replugging. `controllers/minilab3.lua` is the shipped example and does one real
+  restart and no replugging. `Controllers/Profiles/minilab3.lua` is the shipped example and does one real
   thing, turning the pitch strip into CC 2 so a control that did nothing becomes linkable
 - `docs/scratch-machine.md` is an idea, not a plan for now: a fader as a needle on a record,
   where the sound comes from how fast the position moves rather than where it is. It is the

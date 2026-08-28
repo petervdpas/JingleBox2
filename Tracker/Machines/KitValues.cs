@@ -1,6 +1,8 @@
 using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -32,6 +34,9 @@ namespace JingleBox2.Tracker.Machines;
 /// </param>
 public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? about = null) : MachineValues
 {
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>How loud the pad in hand is.</summary>
     /// <remarks>
     /// The keys are written out one by one, never built from a name or a loop, so every key in
@@ -115,7 +120,7 @@ public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? abo
         switch (key)
         {
             case TakeKey:
-                if (FilePaths.Same(pad.Pad.FilePath, value)) return false;
+                if (_paths.Same(pad.Pad.FilePath, value)) return false;
 
                 pad.Take(value);
 

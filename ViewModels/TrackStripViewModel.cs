@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using JingleBox2.ViewModels.Records;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -14,6 +15,9 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class TrackStripViewModel : ObservableObject
 {
+    /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
+    private readonly IGainScale _gain = new GainScale();
+
     /// <summary>
     /// The song's own settings for this track, written into rather than copied out of.
     /// </summary>
@@ -167,8 +171,8 @@ public sealed class TrackStripViewModel : ObservableObject
     /// </summary>
     public double VolumeDecibels
     {
-        get => GainScale.ToDecibels(_strip.Volume);
-        set => Volume = GainScale.ToAmplitude(value);
+        get => _gain.ToDecibels(_strip.Volume);
+        set => Volume = _gain.ToAmplitude(value);
     }
 
     /// <summary>Where the track sits, -1 hard left to 1 hard right, nought in the middle.</summary>

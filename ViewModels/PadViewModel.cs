@@ -13,6 +13,8 @@ using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Records;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -32,6 +34,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
+    /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
+    private readonly IGainScale _gain = new GainScale();
+
     /// <summary>The sound, shared with every other pad and with the tracker.</summary>
     private readonly IAudioEngine _audio;
 
@@ -521,8 +526,8 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// </remarks>
     public double VolumeDecibels
     {
-        get => UI.GainScale.ToDecibels(Volume);
-        set => Volume = (float)UI.GainScale.ToAmplitude(value);
+        get => _gain.ToDecibels(Volume);
+        set => Volume = (float)_gain.ToAmplitude(value);
     }
 
     /// <summary>

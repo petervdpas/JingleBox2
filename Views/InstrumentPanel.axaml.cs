@@ -16,6 +16,8 @@ using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -31,6 +33,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class InstrumentPanel : UserControl
 {
+    /// <summary>Which letter sounds which note.</summary>
+    private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
+
     /// <summary>
     /// Builds the panel and takes on everything a machine's own drawing cannot do for itself.
     /// </summary>
@@ -420,7 +425,7 @@ public partial class InstrumentPanel : UserControl
         if (_keySource?.FocusManager?.GetFocusedElement() is TextBox) return;
         if (e.KeyModifiers != KeyModifiers.None) return;
 
-        if (KeyboardNoteMap.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
+        if (_keys.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
 
         designer.MachineKeys.Play(note.Semitone);
 
@@ -440,7 +445,7 @@ public partial class InstrumentPanel : UserControl
 
         if (designer?.Editor == null || !IsEffectivelyVisible) return;
 
-        if (KeyboardNoteMap.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
+        if (_keys.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
 
         designer.MachineKeys.Let(note.Semitone);
     }

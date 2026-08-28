@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -75,13 +76,28 @@ public sealed class MachineShelfEntry
 /// as one to add.
 ///
 /// It reads the folders itself rather than asking the rack. The rack is built once at startup out
-/// of what <see cref="MachineRegistry.Load"/> found, so it cannot answer for a machine that
+/// of what <see cref="IMachineRegistry.Load"/> found, so it cannot answer for a machine that
 /// arrived a minute ago, and it says nothing about what is only on offer.
 /// </remarks>
 public sealed partial class MachineShelfViewModel : ObservableObject
 {
+    /// <summary>The machines folder on disc.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineRegistry Registry = new MachineRegistry();
+
+    /// <summary>A machine going into a zip and coming back out.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineArchive Crates = new MachineArchive();
+
+    /// <summary>The machines this run has, the one instance everything shares.</summary>
+    private readonly IMachineProjects _machines;
+
     /// <summary>Reads what is installed and what is on offer.</summary>
-    public MachineShelfViewModel() => Refresh();
+    public MachineShelfViewModel(IMachineProjects machines)
+    {
+        _machines = machines;
+        Refresh();
+    }
 
     /// <summary>Every machine there is to show, installed and available together, by name.</summary>
     public ObservableCollection<MachineShelfEntry> Machines { get; } = new();
@@ -123,9 +139,9 @@ public sealed partial class MachineShelfViewModel : ObservableObject
     /// <summary>Reads the machines off the disc again and tells everybody that showed one.</summary>
     private void Reload()
     {
-        var machines = MachineRegistry.Load();
+        var machines = Registry.Load();
 
-        Tracker.Machines.MachineProjects.Keep(machines);
+        _machines.Keep(machines);
 
         Changed?.Invoke();
     }
@@ -140,12 +156,12 @@ public sealed partial class MachineShelfViewModel : ObservableObject
     {
         var rows = new List<MachineShelfEntry>();
 
-        foreach (var project in MachineRegistry.In(MachineRegistry.Installed))
+        foreach (var project in Registry.In(Registry.Installed))
         {
             rows.Add(new MachineShelfEntry(project, installed: true));
         }
 
-        foreach (var project in MachineRegistry.Available())
+        foreach (var project in Registry.Available())
         {
             rows.Add(new MachineShelfEntry(project, installed: false));
         }
@@ -176,7 +192,7 @@ public sealed partial class MachineShelfViewModel : ObservableObject
 
         try
         {
-            installed = MachineArchive.Import(zipPath);
+            installed = Crates.Import(zipPath);
         }
         catch (Exception ex)
         {
@@ -219,7 +235,7 @@ public sealed partial class MachineShelfViewModel : ObservableObject
 
         string name = entry.Name;
 
-        var installed = MachineArchive.Add(entry.Project);
+        var installed = Crates.Add(entry.Project);
 
         Refresh();
 
@@ -251,9 +267,9 @@ public sealed partial class MachineShelfViewModel : ObservableObject
 
         string name = entry.Name;
 
-        bool ships = MachineRegistry.In(MachineRegistry.Shipped).Any(p => p.Id == entry.Id);
+        bool ships = Registry.In(Registry.Shipped).Any(p => p.Id == entry.Id);
 
-        if (!MachineArchive.Remove(entry.Project))
+        if (!Crates.Remove(entry.Project))
         {
             Status = "Could not remove " + name + ".";
 

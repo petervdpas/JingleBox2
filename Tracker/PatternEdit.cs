@@ -1,29 +1,16 @@
 using System;
 using System.Globalization;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// The edit operations a pattern grid performs, as plain functions on a pattern and a cursor.
-/// Keeping them here means the key handling in the view is a lookup table, not logic.
-/// </summary>
-public static class PatternEdit
+/// <inheritdoc/>
+public sealed class PatternEdit : IPatternEdit
 {
-    /// <summary>
-    /// Told before every edit, so something can keep what is about to be replaced.
-    /// </summary>
-    /// <remarks>
-    /// Here rather than at the call sites, which is the whole reason this class is the only way
-    /// a pattern is edited: an edit added later is recorded without anybody remembering to say
-    /// so, and an edit made from somewhere new is recorded too.
-    ///
-    /// A hook and not an interface because there is one of it, it is the application's own
-    /// history, and a pattern knows nothing about songs or views. Nothing at all is set in a
-    /// test or a tool, which is the other reason it is allowed to be nothing.
-    /// </remarks>
-    public static Action<Pattern, string>? Watching;
+    /// <inheritdoc/>
+    public Action<Pattern, string>? Watching { get; set; }
 
     /// <summary>
     /// Rings <see cref="Watching"/> for one edit, and does nothing when there is no pattern.
@@ -33,20 +20,17 @@ public static class PatternEdit
     /// anything. A step for an edit that turned out to do nothing costs nothing: the history
     /// notices that the pattern still holds what the last step kept and reuses it.
     /// </remarks>
-    private static void Taking(Pattern? pattern, string what)
+    private void Taking(Pattern? pattern, string what)
     {
         if (pattern is not null) Watching?.Invoke(pattern, what);
     }
 
-    /// <summary>Writes a note and the current instrument, leaving the other columns alone.</summary>
-    public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument) =>
+    /// <inheritdoc/>
+    public void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument) =>
         EnterNote(pattern, cursor, note, instrument, TrackerCell.NoVolume);
 
-    /// <summary>
-    /// As above, and writes the volume column too. That is how a velocity sensitive keyboard
-    /// records: NoVolume leaves the column as it was, which is what typing a note does.
-    /// </summary>
-    public static void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument, int volume)
+    /// <inheritdoc/>
+    public void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument, int volume)
     {
         Taking(pattern, "a note");
 
@@ -59,14 +43,8 @@ public static class PatternEdit
             : cell with { Note = note, Instrument = instrument, Volume = TrackerCell.ClampVolume(volume) };
     }
 
-    /// <summary>Writes a note-off, which stops the track without starting anything.</summary>
-    /// <remarks>
-    /// Written through the cell rather than over it. The note and the instrument are what a
-    /// note-off replaces; the volume and the effect are not, and a line that stops a note is a
-    /// perfectly ordinary place to also ride the volume down or run an effect. Emptying the
-    /// cell first threw those away without saying so.
-    /// </remarks>
-    public static void EnterNoteOff(Pattern pattern, PatternCursor cursor)
+    /// <inheritdoc/>
+    public void EnterNoteOff(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "a note off");
 
@@ -81,11 +59,8 @@ public static class PatternEdit
         };
     }
 
-    /// <summary>
-    /// Types one hex digit into the column under the cursor, shifting the existing value
-    /// left the way a tracker's two-digit fields work. Does nothing on the note column.
-    /// </summary>
-    public static bool EnterHexDigit(Pattern pattern, PatternCursor cursor, char digit)
+    /// <inheritdoc/>
+    public bool EnterHexDigit(Pattern pattern, PatternCursor cursor, char digit)
     {
         Taking(pattern, "a digit");
 
@@ -120,8 +95,8 @@ public static class PatternEdit
         }
     }
 
-    /// <summary>Sets the effect letter under the cursor, keeping the parameter.</summary>
-    public static bool EnterEffectCommand(Pattern pattern, PatternCursor cursor, char command)
+    /// <inheritdoc/>
+    public bool EnterEffectCommand(Pattern pattern, PatternCursor cursor, char command)
     {
         Taking(pattern, "an effect");
 
@@ -135,8 +110,8 @@ public static class PatternEdit
         return true;
     }
 
-    /// <summary>Clears the column under the cursor. On the note column, clears the whole cell.</summary>
-    public static void ClearAtCursor(Pattern pattern, PatternCursor cursor)
+    /// <inheritdoc/>
+    public void ClearAtCursor(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "clearing a cell");
 
@@ -154,18 +129,8 @@ public static class PatternEdit
         };
     }
 
-    /// <summary>
-    /// Gives every note on a track the same volume, or takes the volume column off them
-    /// entirely with <see cref="TrackerCell.NoVolume"/>, which leaves the instrument's own
-    /// level to decide. What a velocity sensitive keyboard needs after a take: a kick that
-    /// came out a little different every time becomes one kick again. Returns how many changed.
-    /// </summary>
-    /// <remarks>
-    /// Only cells that sound a note are touched. A note-off with a level would be a
-    /// contradiction, and a level on an empty cell is invisible: nothing would ever play it and
-    /// nothing on the screen would say it was there.
-    /// </remarks>
-    public static int SetTrackVolume(Pattern pattern, int track, int volume)
+    /// <inheritdoc/>
+    public int SetTrackVolume(Pattern pattern, int track, int volume)
     {
         Taking(pattern, "a track's volume");
 
@@ -190,8 +155,8 @@ public static class PatternEdit
         return changed;
     }
 
-    /// <summary>Moves every note on a track by semitones. Empty cells and note-offs are left alone.</summary>
-    public static void TransposeTrack(Pattern pattern, int track, int semitones)
+    /// <inheritdoc/>
+    public void TransposeTrack(Pattern pattern, int track, int semitones)
     {
         Taking(pattern, "transposing a track");
 
@@ -206,19 +171,16 @@ public static class PatternEdit
         }
     }
 
-    /// <summary>
-    /// Empties every cell in a block. What Delete does with a selection up, and the only way
-    /// to take out a phrase rather than a note at a time.
-    /// </summary>
-    public static int ClearRegion(Pattern pattern, PatternSelection selection)
+    /// <inheritdoc/>
+    public int ClearRegion(Pattern pattern, PatternSelection selection)
     {
         Taking(pattern, "clearing a selection");
 
         return Apply(pattern, selection, cell => TrackerCell.Empty);
     }
 
-    /// <summary>Moves every note in a block, leaving note-offs and empty cells alone.</summary>
-    public static int TransposeRegion(Pattern pattern, PatternSelection selection, int semitones)
+    /// <inheritdoc/>
+    public int TransposeRegion(Pattern pattern, PatternSelection selection, int semitones)
     {
         Taking(pattern, "transposing a selection");
 
@@ -226,8 +188,8 @@ public static class PatternEdit
             cell.Note.IsPlayable ? cell with { Note = cell.Note.Transpose(semitones) } : cell);
     }
 
-    /// <summary>Gives every note in a block the same volume, or takes the column off them.</summary>
-    public static int SetRegionVolume(Pattern pattern, PatternSelection selection, int volume)
+    /// <inheritdoc/>
+    public int SetRegionVolume(Pattern pattern, PatternSelection selection, int volume)
     {
         Taking(pattern, "a selection's volume");
 
@@ -269,8 +231,8 @@ public static class PatternEdit
         return changed;
     }
 
-    /// <summary>Empties one track, leaving every other track as it was.</summary>
-    public static void ClearTrack(Pattern pattern, int track)
+    /// <inheritdoc/>
+    public void ClearTrack(Pattern pattern, int track)
     {
         Taking(pattern, "clearing a track");
 
@@ -280,8 +242,8 @@ public static class PatternEdit
             pattern[line, track] = TrackerCell.Empty;
     }
 
-    /// <summary>Empties the whole pattern.</summary>
-    public static void ClearPattern(Pattern pattern)
+    /// <inheritdoc/>
+    public void ClearPattern(Pattern pattern)
     {
         Taking(pattern, "clearing the pattern");
 
@@ -289,17 +251,8 @@ public static class PatternEdit
             ClearTrack(pattern, track);
     }
 
-    /// <summary>
-    /// Snaps a track's cells onto every nth line, which is what a tracker means by quantizing:
-    /// notes played in live sit a line or two off the beat, and this pulls them onto it.
-    /// Returns how many moved.
-    /// </summary>
-    /// <remarks>
-    /// Nothing is ever lost. Where two cells want the same line, the second keeps the line it
-    /// was already on, and if that is taken too it takes the nearest free line to where it was
-    /// meant to land. A tidy pattern is worth less than the notes in it.
-    /// </remarks>
-    public static int Quantize(Pattern pattern, int track, int grid)
+    /// <inheritdoc/>
+    public int Quantize(Pattern pattern, int track, int grid)
     {
         Taking(pattern, "quantising");
 
@@ -330,13 +283,8 @@ public static class PatternEdit
         return moved;
     }
 
-    /// <summary>The nearest line that is a multiple of the grid, kept inside the pattern.</summary>
-    /// <remarks>
-    /// The last grid line can fall off the end of a pattern whose length is not a multiple of
-    /// the grid, so the answer walks back a grid at a time until it is inside. A note pushed
-    /// past the end is a note thrown away, and quantising is not allowed to cost anybody a note.
-    /// </remarks>
-    public static int SnapLine(int line, int grid, int lines)
+    /// <inheritdoc/>
+    public int SnapLine(int line, int grid, int lines)
     {
         if (grid <= 1 || lines <= 0) return Math.Clamp(line, 0, Math.Max(0, lines - 1));
 
@@ -362,11 +310,8 @@ public static class PatternEdit
         return -1;
     }
 
-    /// <summary>
-    /// Pushes every cell on a track down one line from the cursor, dropping the last one.
-    /// The insert-line edit every tracker has.
-    /// </summary>
-    public static void InsertLine(Pattern pattern, PatternCursor cursor)
+    /// <inheritdoc/>
+    public void InsertLine(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "inserting a line");
 
@@ -378,8 +323,8 @@ public static class PatternEdit
         pattern[cursor.Line, cursor.Track] = TrackerCell.Empty;
     }
 
-    /// <summary>Pulls every cell on a track up one line into the cursor, blanking the last.</summary>
-    public static void DeleteLine(Pattern pattern, PatternCursor cursor)
+    /// <inheritdoc/>
+    public void DeleteLine(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "deleting a line");
 

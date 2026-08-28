@@ -3,38 +3,48 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// The recordings a song can carry inside it, and what happens to them when one is opened.
-/// </summary>
-/// <remarks>
-/// A song normally names its recordings and does not hold them, which is right for the song
-/// you are working on: it stays small, it saves in milliseconds, and a take you improve is
-/// improved everywhere it plays. It is wrong for a song you are handing to somebody, who has
-/// none of your takes and will open a track that makes no sound.
-///
-/// So a song can be packed, which is the same file with the recordings in it. Packing is asked
-/// for rather than done on every save, because a song built on a long take is tens of megabytes
-/// and the open song is written out every twenty seconds whether anybody asked or not.
-///
-/// What goes in is decided per recording, not per song, and decided by where the recording came
-/// from. A machine's own presets ship with the program and are on every installation there is,
-/// so carrying them would be sending somebody a second copy of what they already have, once per
-/// song. What is worth carrying is what only this machine has: the takes on your own shelf.
-/// Reason has done it this way for twenty years, and its rule is the same one: everything
-/// outside the factory bank travels, everything inside it is named.
-///
-/// Opening a packed song puts its recordings on the shelf, through the same door anything else
-/// gets there by, and points the instruments at what landed. After that it is an ordinary song
-/// playing ordinary takes, which is the point: what arrives is yours, not something hidden
-/// inside a file that only one song can reach.
-/// </remarks>
-public static class SongSamples
+/// <inheritdoc/>
+public sealed class SongSamples : ISongSamples
 {
+    /// <summary>The machines folder on disc.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineRegistry Registry = new MachineRegistry();
+
+    /// <summary>How this system decides two names are the same recording.</summary>
+    private readonly IFilePaths _paths;
+
+    /// <summary>How a path is written down so it survives the application folder moving.</summary>
+    private readonly ISongPaths _songPaths;
+
+    /// <summary>What an instrument plays, and how to point it somewhere else.</summary>
+    private readonly ISampleUsers _usage;
+
+    /// <summary>
+    /// Takes the three rules this needs, or makes the ones the application really uses.
+    /// </summary>
+    /// <param name="paths">Which paths count as the same file.</param>
+    /// <param name="songPaths">How a recording's path is written into a song and read back.</param>
+    /// <param name="usage">What an instrument plays, and how to repoint it.</param>
+    public SongSamples(IFilePaths? paths = null, ISongPaths? songPaths = null, ISampleUsers? usage = null)
+    {
+        _paths = paths ?? new FilePaths();
+        _songPaths = songPaths ?? new SongPaths(_paths);
+        _usage = usage ?? new SampleUsers(_paths);
+    }
+
     /// <summary>What the container calls the list of what it carries.</summary>
     public const string ManifestEntry = "samples.json";
+
+    /// <inheritdoc/>
+    string ISongSamples.ManifestEntry => ManifestEntry;
 
     /// <summary>Where a carried recording sits inside the container.</summary>
     private const string Folder = "samples/";
@@ -62,25 +72,23 @@ public static class SongSamples
         public List<Carried> Files { get; set; } = new();
     }
 
-    /// <summary>
-    /// The recordings this song would carry: what it plays, less what ships with the program.
-    /// </summary>
-    public static IReadOnlyList<string> Wanted(Song song)
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Wanted(Song song)
     {
         var files = new List<string>();
         if (song == null) return files;
 
-        var seen = new HashSet<string>(FilePaths.Comparer);
+        var seen = new HashSet<string>(_paths.Comparer);
 
         foreach (var instrument in song.Instruments)
-            foreach (string path in SampleUsage.Files(instrument))
+            foreach (string path in _usage.Files(instrument))
             {
                 if (string.IsNullOrWhiteSpace(path)) continue;
 
-                string full = FilePaths.Full(path);
+                string full = _paths.Full(path);
 
                 if (!seen.Add(full)) continue;
-                if (Machines.MachineRegistry.Ships(full)) continue;
+                if (Registry.Ships(full)) continue;
                 if (!File.Exists(full)) continue;
 
                 files.Add(full);
@@ -89,19 +97,8 @@ public static class SongSamples
         return files;
     }
 
-    /// <summary>
-    /// Puts those recordings in the container, and the list of them beside.
-    /// </summary>
-    /// <remarks>
-    /// The audio goes in stored rather than compressed. Sixteen bit audio gives up very little to
-    /// deflate and a long take is tens of megabytes: the wait is real and what it buys is not.
-    /// The manifest beside it is compressed, since it is text and it is small.
-    ///
-    /// One recording that will not go in is one silent instrument, not a failed save, so each is
-    /// tried on its own and a failure is passed over. Nothing is written at all when none of them
-    /// went in, so a container with a manifest is a container that really is carrying something.
-    /// </remarks>
-    public static void Write(ZipArchive container, IReadOnlyList<string> files)
+    /// <inheritdoc/>
+    public void Write(ZipArchive container, IReadOnlyList<string> files)
     {
         if (container == null || files == null || files.Count == 0) return;
 
@@ -120,7 +117,7 @@ public static class SongSamples
                 using (var reading = File.OpenRead(path))
                     reading.CopyTo(writing);
 
-                manifest.Files.Add(new Carried { Entry = Folder + name, Path = SongPaths.Pack(path) });
+                manifest.Files.Add(new Carried { Entry = Folder + name, Path = _songPaths.Pack(path) });
             }
             catch (Exception)
             {
@@ -134,22 +131,12 @@ public static class SongSamples
         JsonSerializer.Serialize(said, manifest, JsonOptions);
     }
 
-    /// <summary>True when this container is carrying its recordings.</summary>
-    public static bool Packed(ZipArchive container) =>
+    /// <inheritdoc/>
+    public bool Packed(ZipArchive container) =>
         container != null && container.GetEntry(ManifestEntry) != null;
 
-    /// <summary>
-    /// Puts a packed song's recordings on the shelf and points its instruments at them.
-    /// </summary>
-    /// <remarks>
-    /// One recording at a time, and one that will not come out is passed over: its instrument is
-    /// left pointing where the song said, which is a path this machine may well have anyway.
-    ///
-    /// The instruments are repointed from where the recording was on the machine that packed it
-    /// to where it has just landed here, which is why the manifest keeps the old path at all.
-    /// </remarks>
-    /// <returns>What landed, so the shelf can be told to look again.</returns>
-    public static IReadOnlyList<string> Read(ZipArchive container, Song song)
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Read(ZipArchive container, Song song)
     {
         var landed = new List<string>();
 
@@ -182,12 +169,12 @@ public static class SongSamples
                 var entry = container.GetEntry(carried.Entry);
                 if (entry == null) continue;
 
-                string was = SongPaths.Unpack(carried.Path);
+                string was = _songPaths.Unpack(carried.Path);
                 string now = Land(entry, home, out bool fresh);
                 if (now.Length == 0) continue;
 
                 foreach (var instrument in song.Instruments)
-                    SampleUsage.Repoint(instrument, was, now);
+                    _usage.Repoint(instrument, was, now);
 
                 if (fresh) landed.Add(now);
             }

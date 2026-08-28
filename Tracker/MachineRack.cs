@@ -5,6 +5,7 @@ using System.Linq;
 using JingleBox2.Tracker.Synth;
 using System.Text.Json;
 using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker;
 
 namespace JingleBox2.Tracker;
 
@@ -16,6 +17,10 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public sealed class MachineRack : IMachineRack
 {
+    /// <summary>Which instruments play a given recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISampleUsers Usage = new SampleUsers();
+
     /// <summary>What an instrument file is called. JSON, so it can be read and edited by hand.</summary>
     public const string Extension = ".json";
 
@@ -82,7 +87,7 @@ public sealed class MachineRack : IMachineRack
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<string> InstrumentsUsing(string filePath) => SampleUsage.By(List(), filePath);
+    public IReadOnlyList<string> InstrumentsUsing(string filePath) => Usage.By(List(), filePath);
 
     /// <inheritdoc/>
     /// <remarks>
@@ -96,7 +101,7 @@ public sealed class MachineRack : IMachineRack
 
         foreach (var instrument in List())
         {
-            if (!SampleUsage.Repoint(instrument, from, to)) continue;
+            if (!Usage.Repoint(instrument, from, to)) continue;
 
             Save(instrument);
             moved++;

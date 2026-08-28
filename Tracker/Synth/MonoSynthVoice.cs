@@ -2,6 +2,8 @@ using System;
 using JingleBox2.Tracker.Synth.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
@@ -20,6 +22,13 @@ namespace JingleBox2.Tracker.Synth;
 /// </remarks>
 public sealed class MonoSynthVoice : IVoice
 {
+    /// <summary>Concert pitch, so a note becomes a frequency.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly INoteFrequency Pitch = new NoteFrequency();
+
     /// <summary>Voices not tied to a track, such as an audition, use this.</summary>
     public const int NoTrack = -1;
 
@@ -88,7 +97,7 @@ public sealed class MonoSynthVoice : IVoice
         _noise = (uint)(noiseSeed == 0 ? 1 : noiseSeed);
 
         double offset = _patch.TuneSemitones + _patch.FineCents / 100.0;
-        _targetHz = NoteFrequency.Hz(note) * Math.Pow(2.0, offset / 12.0);
+        _targetHz = Pitch.Hz(note) * Math.Pow(2.0, offset / 12.0);
 
         _hz = _patch.GlideMs > 0 && fromHz is > 0 ? fromHz.Value : _targetHz;
 

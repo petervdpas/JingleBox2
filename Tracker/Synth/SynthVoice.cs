@@ -2,6 +2,9 @@ using System;
 using JingleBox2.Tracker.Synth.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
+using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker.Synth;
 
@@ -17,6 +20,34 @@ namespace JingleBox2.Tracker.Synth;
 /// </remarks>
 public sealed class SynthVoice : IVoice
 {
+    /// <summary>The wave shapes, which are the same maths for every voice that draws one.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IOscillator Shapes = new Oscillator();
+
+    /// <summary>Everything that moves a voice off the note it was given.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IPitchMotion Motion = new PitchMotion();
+
+    /// <summary>The drive, applied last on the way out.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly ISaturation Shaper = new Saturation();
+
+    /// <summary>Concert pitch, so a note becomes a frequency.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly INoteFrequency Pitch = new NoteFrequency();
+
     /// <summary>Voices not tied to a track, such as an audition, use this.</summary>
     public const int NoTrack = -1;
 
@@ -82,11 +113,11 @@ public sealed class SynthVoice : IVoice
 
         _sampleRate = sampleRate <= 0 ? 1 : sampleRate;
         _envelope = new SynthEnvelope(_patch, _sampleRate);
-        _baseFrequency = NoteFrequency.Hz(note) * PitchMotion.Ratio(PitchMotion.Tuning(_patch));
+        _baseFrequency = Pitch.Hz(note) * Motion.Ratio(Motion.Tuning(_patch));
         _pitchEnvSeconds = _patch.PitchEnvMs / 1000.0;
 
         _drive = _patch.Drive;
-        _driveMakeup = Saturation.Makeup(_drive);
+        _driveMakeup = Shaper.Makeup(_drive);
         _filter = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _noise = new Random(noiseSeed);
 
@@ -180,11 +211,11 @@ public sealed class SynthVoice : IVoice
 
             Level = (float)(level * Gain);
 
-            double frequency = _baseFrequency * PitchMotion.Ratio(PitchMotion.MotionAt(_patch, _time));
+            double frequency = _baseFrequency * Motion.Ratio(Motion.MotionAt(_patch, _time));
 
-            _phase = Oscillator.Wrap(_phase + frequency * step);
+            _phase = Shapes.Wrap(_phase + frequency * step);
 
-            double sample = Oscillator.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
+            double sample = Shapes.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
             double value = _filter.Process(Drive(sample)) * level * TremoloAt(_time) * Gain;
 
             int index = frame * 2;
@@ -199,7 +230,7 @@ public sealed class SynthVoice : IVoice
     /// Rounds the wave off into itself. Applied before the envelope, so a note keeps its shape
     /// as it decays instead of losing its edge along with its level.
     /// </summary>
-    private double Drive(double sample) => Saturation.Apply(sample, _drive, _driveMakeup);
+    private double Drive(double sample) => Shaper.Apply(sample, _drive, _driveMakeup);
 
     /// <summary>Amplitude modulation between full and (1 - depth).</summary>
     private double TremoloAt(double time)

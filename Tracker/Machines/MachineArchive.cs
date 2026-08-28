@@ -4,36 +4,40 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
-/// <summary>
-/// A machine as it travels: one zip of the project folder, and the same folder again on
-/// somebody else's disc.
-/// </summary>
-/// <remarks>
-/// A machine is already a folder with a manifest at the top of it, so there is nothing to
-/// invent here. The zip is that folder, and installing is putting it under
-/// <see cref="MachineRegistry.Installed"/> in a folder named after the machine's id, which is
-/// the name songs write down and therefore the only name that cannot collide by accident.
-///
-/// Two ways in and one door. A zip somebody was handed is unpacked; a machine the program ships
-/// with is copied off the shelf beside the program. What arrives is different, where it lands is
-/// not, so both go through <see cref="Install"/> and get the same checking and the same swap.
-///
-/// Everything a bundle says about where its contents go is a claim made by whoever built it, so
-/// none of it is believed: the id has to name a folder and not a path, and a file has to land
-/// inside the folder it is being written into. The rest of the app reads what is on the disc
-/// through <see cref="MachineProject.Open"/>, and this is the one place a stranger's file gets
-/// to put anything there.
-///
-/// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
-/// application's own area, as everything under this folder does. What a bundle was refused for
-/// is the sort of thing somebody goes looking for, and it should not be buried under everything
-/// else the application had to say that session.
-/// </remarks>
-public static class MachineArchive
+/// <inheritdoc/>
+public sealed class MachineArchive : IMachineArchive
 {
+    /// <summary>Who names the folder the installed machines live in.</summary>
+    private readonly IMachineRegistry _registry;
+
+    /// <summary>The two questions asked of every path written into a staging folder.</summary>
+    private readonly IMachinePaths _paths;
+
+    /// <summary>
+    /// Takes the two things this needs, or makes the ordinary ones.
+    /// </summary>
+    /// <remarks>
+    /// The registry and the archive each need the other, so one made without a registry builds
+    /// one and hands itself over, which is what stops the two defaults building each other for
+    /// ever. Anything wiring these up on purpose makes the registry and lets it make the archive.
+    /// </remarks>
+    /// <param name="registry">
+    /// Who names the installed folder. Left out, the ordinary one, pointed back at this archive.
+    /// </param>
+    /// <param name="paths">
+    /// How a path is tested for being inside a folder. Left out, the ordinary one, which reads
+    /// the rule off this system.
+    /// </param>
+    public MachineArchive(IMachineRegistry? registry = null, IMachinePaths? paths = null)
+    {
+        _paths = paths ?? new MachinePaths();
+        _registry = registry ?? new MachineRegistry(this);
+    }
+
     /// <summary>What a half-finished install is called while it is being written.</summary>
     /// <remarks>
     /// Beside the machine rather than in the temp folder, so the swap is a rename within one
@@ -44,18 +48,8 @@ public static class MachineArchive
     /// <summary>And what the install being replaced is called for the moment it takes.</summary>
     private const string OutgoingSuffix = ".outgoing";
 
-    /// <summary>Zips the project folder, manifest and sounds and all, into that file.</summary>
-    /// <remarks>
-    /// Throws rather than reporting: this is asked for by somebody who has just pressed Export
-    /// and is waiting to be told either where the file went or what stopped it.
-    ///
-    /// An existing file is overwritten, which is the ordinary case: exporting twice in a row is
-    /// how a machine gets corrected, and being made to delete the old file first would only be
-    /// in the way.
-    /// </remarks>
-    /// <param name="project">The machine to pack, which has to have been saved.</param>
-    /// <param name="zipPath">Where the zip goes, folders made as needed.</param>
-    public static void Export(MachineProject project, string zipPath)
+    /// <inheritdoc/>
+    public void Export(MachineProject project, string zipPath)
     {
         if (string.IsNullOrWhiteSpace(zipPath)) throw new ArgumentException("A zip needs a name.", nameof(zipPath));
 
@@ -72,22 +66,8 @@ public static class MachineArchive
         ZipFile.CreateFromDirectory(project.Folder, full, CompressionLevel.Optimal, includeBaseDirectory: false);
     }
 
-    /// <summary>
-    /// Unpacks a machine out of that zip and into the installed machines.
-    /// </summary>
-    /// <returns>The machine as it now sits on the disc, or null when the zip held none.</returns>
-    /// <remarks>
-    /// Both shapes of zip are read: the folder's contents at the top, which is what
-    /// <see cref="Export"/> writes, and the folder itself at the top, which is what somebody
-    /// gets who right-clicks the folder and zips that. Refusing the second would only teach
-    /// people that the importer is broken.
-    ///
-    /// Reported rather than thrown, unlike <see cref="Export"/>: a zip somebody was handed can
-    /// be anything at all, and every way it can be wrong ends the same way, with nothing
-    /// installed and a line in the log.
-    /// </remarks>
-    /// <param name="zipPath">The zip somebody was handed.</param>
-    public static MachineProject? Import(string zipPath)
+    /// <inheritdoc/>
+    public MachineProject? Import(string zipPath)
     {
         if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath)) return null;
 
@@ -113,25 +93,8 @@ public static class MachineArchive
         }
     }
 
-    /// <summary>
-    /// Takes a machine the program ships with and puts a copy of it among the installed ones.
-    /// </summary>
-    /// <returns>The machine as it now sits in the installed folder, or null when it could not go.</returns>
-    /// <remarks>
-    /// The folder beside the program is a shelf to take from and is never written to, so this is
-    /// a copy in one direction and the shipped machine is left exactly as it was. That is what
-    /// makes removing a machine reversible: the copy goes, the original is still on the shelf.
-    ///
-    /// It ends where <see cref="Import"/> ends, by the same route, because a machine arriving
-    /// from a zip and a machine arriving from the shelf are the same event once the files are in
-    /// hand. Both are checked the same way, both land through the same swap, and both are read
-    /// back off the disc rather than believed.
-    ///
-    /// Copying the installed folder onto itself is refused. That is not adding a machine, and
-    /// the swap that finishes an install would be moving a folder out from under its own source.
-    /// </remarks>
-    /// <param name="fromCrate">The machine on the shelf beside the program.</param>
-    public static MachineProject? Add(MachineProject fromCrate)
+    /// <inheritdoc/>
+    public MachineProject? Add(MachineProject fromCrate)
     {
         try
         {
@@ -139,7 +102,7 @@ public static class MachineArchive
 
             string source = Path.GetFullPath(fromCrate.Folder);
 
-            if (Under(source, MachineRegistry.Installed)) return null;
+            if (Under(source, _registry.Installed)) return null;
 
             string id = Named(fromCrate.Id);
             if (id.Length == 0) return null;
@@ -154,14 +117,8 @@ public static class MachineArchive
         }
     }
 
-    /// <summary>Deletes an installed machine's folder.</summary>
-    /// <remarks>
-    /// Only one that is installed. The shelf beside the program is what the application ships
-    /// and is never written to, which is exactly what lets this delete freely: a machine that
-    /// ships can be taken again with <see cref="Add"/> the moment it is gone.
-    /// </remarks>
-    /// <param name="project">The machine to delete, which has to be an installed one.</param>
-    public static bool Remove(MachineProject project)
+    /// <inheritdoc/>
+    public bool Remove(MachineProject project)
     {
         try
         {
@@ -169,7 +126,7 @@ public static class MachineArchive
 
             string folder = Path.GetFullPath(project.Folder);
 
-            if (!Under(folder, MachineRegistry.Installed)) return false;
+            if (!Under(folder, _registry.Installed)) return false;
 
             if (!Directory.Exists(folder)) return false;
 
@@ -267,11 +224,11 @@ public static class MachineArchive
     /// Fills the staging folder and says whether it could. Where the files come from is the only
     /// difference between a zip and the shelf beside the program.
     /// </param>
-    private static MachineProject? Install(string id, Func<string, bool> fill)
+    private MachineProject? Install(string id, Func<string, bool> fill)
     {
-        Directory.CreateDirectory(MachineRegistry.Installed);
+        Directory.CreateDirectory(_registry.Installed);
 
-        string target = Path.Combine(MachineRegistry.Installed, id);
+        string target = Path.Combine(_registry.Installed, id);
 
         string staging = target + IncomingSuffix;
 
@@ -313,13 +270,13 @@ public static class MachineArchive
     /// zip's is. A link inside the source folder pointing out of it would otherwise copy a file
     /// from somewhere else in under the machine's name.
     /// </remarks>
-    private static bool Copy(string from, string into)
+    private bool Copy(string from, string into)
     {
         foreach (string file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
         {
             string full = Path.GetFullPath(Path.Combine(into, Path.GetRelativePath(from, file)));
 
-            if (!MachinePaths.Under(full, into)) return false;
+            if (!Under(full, into)) return false;
 
             string? holds = Path.GetDirectoryName(full);
             if (!string.IsNullOrEmpty(holds)) Directory.CreateDirectory(holds);
@@ -339,7 +296,7 @@ public static class MachineArchive
     /// An entry naming a folder is passed over. A zip may or may not have bothered to record
     /// them, and the files themselves make the folders they need.
     /// </remarks>
-    private static bool Unpack(ZipArchive zip, string prefix, string into)
+    private bool Unpack(ZipArchive zip, string prefix, string into)
     {
         foreach (var entry in zip.Entries)
         {
@@ -358,7 +315,7 @@ public static class MachineArchive
 
             string full = Path.GetFullPath(Path.Combine(into, name));
 
-            if (!MachinePaths.Under(full, into))
+            if (!Under(full, into))
             {
                 Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                     () => "machine zip refused: " + entry.FullName + " lands outside " + into);
@@ -432,5 +389,5 @@ public static class MachineArchive
     private static string Slashed(string name) => name.Replace('\\', '/');
 
     /// <summary>Whether that path is inside that folder, rather than beside it or above it.</summary>
-    private static bool Under(string path, string folder) => MachinePaths.Under(path, folder);
+    private bool Under(string path, string folder) => _paths.Under(path, folder);
 }

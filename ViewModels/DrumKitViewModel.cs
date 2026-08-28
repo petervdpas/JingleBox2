@@ -8,6 +8,7 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -211,6 +212,10 @@ public sealed partial class DrumKitViewModel : ObservableObject
 /// <summary>One pad: what is on it, where it sits, and what it takes to change either.</summary>
 public sealed partial class DrumPadViewModel : ObservableObject
 {
+    /// <summary>What a kit and a map do identically with a chopped recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISlices Pieces = new Slices();
+
     /// <summary>Told after every edit, which is how the song learns it has been changed.</summary>
     private readonly Action _changed;
 
@@ -339,7 +344,7 @@ public sealed partial class DrumPadViewModel : ObservableObject
 
         Pad.FilePath = path ?? "";
 
-        if (Pad.HasSound && Slices.Auto(Pad.Name, was))
+        if (Pad.HasSound && Pieces.Auto(Pad.Name, was))
             Pad.Name = Path.GetFileNameWithoutExtension(Pad.FilePath);
 
         Say(nameof(FileText), nameof(HasSound), nameof(CapText), nameof(Name));

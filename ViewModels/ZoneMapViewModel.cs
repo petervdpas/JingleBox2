@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -265,6 +266,10 @@ public sealed partial class ZoneMapViewModel : ObservableObject
 /// <summary>One zone: what is on it, which keys it answers to, and what it takes to change either.</summary>
 public sealed partial class SampleZoneViewModel : ObservableObject
 {
+    /// <summary>What a kit and a map do identically with a chopped recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISlices Pieces = new Slices();
+
     /// <summary>Told after every edit to this zone, which the map passes on to the song.</summary>
     private readonly Action _changed;
 
@@ -417,7 +422,7 @@ public sealed partial class SampleZoneViewModel : ObservableObject
 
         Zone.FilePath = path ?? "";
 
-        if (Zone.HasSound && Slices.Auto(Zone.Name, was))
+        if (Zone.HasSound && Pieces.Auto(Zone.Name, was))
             Zone.Name = Path.GetFileNameWithoutExtension(Zone.FilePath);
 
         Say(nameof(FileText), nameof(HasSound), nameof(Title), nameof(Name));

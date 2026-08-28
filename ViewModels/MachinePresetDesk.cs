@@ -13,6 +13,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -32,6 +35,21 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachinePresetDesk : ObservableObject
 {
+    /// <summary>The waves a preset names.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IPresetWaves WaveFiles = new PresetWaves();
+
+    /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePaths Inside = new MachinePaths();
+
+    /// <summary>How a preset file is read and written.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePresetFile PresetFiles = new MachinePresetFile();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>
     /// The machine being built, asked rather than held.
     /// </summary>
@@ -151,7 +169,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
                         if (pad.HasSound && !Path.IsPathRooted(pad.FilePath))
                             pad.FilePath = Path.GetFullPath(Path.Combine(Folder, pad.FilePath));
 
-                    read = JsonNode.Parse(MachinePresetFile.Write(sound, older)) as JsonObject ?? read;
+                    read = JsonNode.Parse(PresetFiles.Write(sound, older)) as JsonObject ?? read;
                 }
             }
 
@@ -227,7 +245,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     {
         try
         {
-            if (Tracker.Machines.MachinePaths.Named(full, Folder) is { } named) return named;
+            if (Inside.Named(full, Folder) is { } named) return named;
         }
         catch (Exception)
         {
@@ -270,7 +288,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
             {
                 string full = Path.GetFullPath(Path.Combine(root, named));
 
-                if (!Tracker.Machines.MachinePaths.Under(full, root)) continue;
+                if (!Inside.Under(full, root)) continue;
 
                 if (Path.GetDirectoryName(full) is { Length: > 0 } home) return home;
             }
@@ -330,7 +348,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
             }
         }
 
-        Picked = Presets.FirstOrDefault(one => Tracker.FilePaths.Same(one.Path, was)) ?? Presets.FirstOrDefault();
+        Picked = Presets.FirstOrDefault(one => _paths.Same(one.Path, was)) ?? Presets.FirstOrDefault();
     }
 
     /// <summary>
@@ -361,7 +379,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
             Reread();
 
-            Picked = Presets.FirstOrDefault(one => Tracker.FilePaths.Same(one.Path, path)) ?? Picked;
+            Picked = Presets.FirstOrDefault(one => _paths.Same(one.Path, path)) ?? Picked;
 
             Said = "Made " + Path.GetFileName(path);
         }
@@ -426,7 +444,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         try
         {
-            if (Tracker.Machines.MachinePaths.Under(path, Folder)) return path;
+            if (Inside.Under(path, Folder)) return path;
         }
         catch (Exception)
         {
@@ -494,21 +512,21 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         if (home.Length == 0) return 0;
 
-        if (Tracker.Machines.PresetWaves.Folder(one.Path, home) is not { Length: > 0 } folder) return 0;
+        if (WaveFiles.Folder(one.Path, home) is not { Length: > 0 } folder) return 0;
 
-        var others = Tracker.Machines.PresetWaves.Users(folder, home, Presets
-            .Where(slot => !Tracker.FilePaths.Same(slot.Path, one.Path))
+        var others = WaveFiles.Users(folder, home, Presets
+            .Where(slot => !_paths.Same(slot.Path, one.Path))
             .Select(slot => slot.Path));
 
         if (others.Count > 0) return 0;
 
         int gone = 0;
 
-        foreach (string named in Tracker.Machines.PresetWaves.Named(one.Path))
+        foreach (string named in WaveFiles.Named(one.Path))
         {
-            string full = Tracker.Machines.MachinePaths.Outside(named, home);
+            string full = Inside.Outside(named, home);
 
-            if (!Tracker.Machines.MachinePaths.Under(full, home) || !File.Exists(full)) continue;
+            if (!Inside.Under(full, home) || !File.Exists(full)) continue;
 
             File.Delete(full);
 
@@ -602,7 +620,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         var machine = _project();
         var buttons = machine != null
-            ? MachinePresetFile.Buttons(machine)
+            ? PresetFiles.Buttons(machine)
             : new List<(string Name, string Key, int Semitone)>();
 
         string? take = form.Sections

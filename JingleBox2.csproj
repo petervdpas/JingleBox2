@@ -34,9 +34,16 @@
     <None Include="machines\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The controller codecs that ship. A codec is a Lua file read at startup, and adding a
-         controller is adding one of these rather than changing any of this. -->
-    <None Include="controllers\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The controller profiles and codecs that ship. A codec is a Lua file read at startup, and
+         adding a controller is adding one of these rather than changing any of this.
+
+         They live under Controllers\Profiles and land in the output as plain "controllers",
+         which is what ControllerFolder.Shipped looks for. The source folder cannot itself be
+         called "controllers": that differs from the Controllers\ source folder only in case, so
+         Windows and macOS see one folder, git checks both into it, and this glob then sweeps the
+         C# sources into the output as content. -->
+    <None Include="Controllers\Profiles\**\*" CopyToOutputDirectory="PreserveNewest"
+          Link="controllers\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its

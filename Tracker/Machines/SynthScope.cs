@@ -3,6 +3,7 @@ using JingleBox2.Tracker.Synth;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -23,6 +24,27 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="patch">The patch being drawn.</param>
 public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
 {
+    /// <summary>The wave shapes, which are the same maths for every voice that draws one.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IOscillator Shapes = new Oscillator();
+
+    /// <summary>Everything that moves a voice off the note it was given.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IPitchMotion Motion = new PitchMotion();
+
+    /// <summary>The drive, applied last on the way out.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly ISaturation Shaper = new Saturation();
+
     /// <summary>How fast the wave travels while a note sounds, in cycles per second.</summary>
     private const double ScrollCyclesPerSecond = 1.5;
 
@@ -65,12 +87,12 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
         if (into.Length == 0) return;
 
         var sound = patch.Patch;
-        double makeup = Saturation.Makeup(sound.Drive);
+        double makeup = Shaper.Makeup(sound.Drive);
 
-        double semitones = PitchMotion.Tuning(sound)
-            + (running ? PitchMotion.MotionAt(sound, seconds) : 0);
+        double semitones = Motion.Tuning(sound)
+            + (running ? Motion.MotionAt(sound, seconds) : 0);
 
-        double shown = Math.Max(0.25, cycles) * PitchMotion.Ratio(semitones);
+        double shown = Math.Max(0.25, cycles) * Motion.Ratio(semitones);
 
         double travel = running ? seconds * ScrollCyclesPerSecond : 0;
 
@@ -80,11 +102,11 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
         for (int step = 0; step < into.Length; step++)
         {
             double across = into.Length == 1 ? 0 : step / (into.Length - 1.0);
-            double phase = Oscillator.Wrap(across * shown + travel);
+            double phase = Shapes.Wrap(across * shown + travel);
 
-            double sample = Oscillator.Sample(sound.Wave, phase, sound.Duty, noise.NextDouble() * 2.0 - 1.0);
+            double sample = Shapes.Sample(sound.Wave, phase, sound.Duty, noise.NextDouble() * 2.0 - 1.0);
 
-            into[step] = Saturation.Apply(sample, sound.Drive, makeup);
+            into[step] = Shaper.Apply(sample, sound.Drive, makeup);
         }
     }
 

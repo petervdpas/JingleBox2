@@ -1,23 +1,10 @@
 using System;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
-/// <summary>
-/// A recording held in memory, ready to be read at any speed and in either direction.
-/// </summary>
-/// <remarks>
-/// Kept as the 16 bit samples the file already holds rather than as floats: it halves what a
-/// long take costs to keep around, and the conversion is one multiply on a path that is doing
-/// interpolation anyway.
-///
-/// Reads are by fractional frame, because a note is almost never played at the rate the file
-/// was recorded at. Between two frames the value is interpolated, which is what stops a
-/// resampled sample from sounding gritty.
-///
-/// Read from the audio thread and never written after it is made, so any number of voices can
-/// play the same take at once without a lock.
-/// </remarks>
-public sealed class SampleData
+/// <inheritdoc/>
+public sealed class SampleData : ISampleData
 {
     /// <summary>What a 16 bit sample is multiplied by to land in -1..1.</summary>
     private const float Scale = 1f / 32768f;
@@ -43,22 +30,22 @@ public sealed class SampleData
         FrameCount = _samples.Length / Channels;
     }
 
-    /// <summary>How many values one frame holds. One is mono and two is a stereo take.</summary>
+    /// <inheritdoc/>
     public int Channels { get; }
 
-    /// <summary>What the file was recorded at, which is half of how fast a voice reads it.</summary>
+    /// <inheritdoc/>
     public int SampleRate { get; }
 
-    /// <summary>How many frames there are, which is the length in the file's own time.</summary>
+    /// <inheritdoc/>
     public long FrameCount { get; }
 
-    /// <summary>Nothing to play, which is what a take that failed to decode looks like.</summary>
+    /// <inheritdoc/>
     public bool IsEmpty => FrameCount <= 0;
 
-    /// <summary>How long the take is, for anything showing a length rather than reading one.</summary>
+    /// <inheritdoc/>
     public double Seconds => SampleRate > 0 ? (double)FrameCount / SampleRate : 0;
 
-    /// <summary>One frame of one channel, with no interpolation. Outside the file reads silent.</summary>
+    /// <inheritdoc/>
     public float At(long frame, int channel)
     {
         if (frame < 0 || frame >= FrameCount) return 0;
@@ -67,11 +54,7 @@ public sealed class SampleData
         return _samples[index] * Scale;
     }
 
-    /// <summary>
-    /// The value between two frames, mixed in proportion. A sample played at a pitch lands
-    /// between frames almost every time, and stepping to the nearest one instead adds a hiss
-    /// that gets worse the further the note is from the sample's own.
-    /// </summary>
+    /// <inheritdoc/>
     public float Between(double position, int channel)
     {
         if (position <= 0) return At(0, channel);

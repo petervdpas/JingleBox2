@@ -10,6 +10,9 @@ using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker;
 
 namespace JingleBox2.Tracker;
 
@@ -22,6 +25,30 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public sealed class SongStore : ISongStore
 {
+    /// <summary>Recordings written so a song survives its folder moving.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISongPaths Portable = new SongPaths();
+
+    /// <summary>A cell as it reads on screen and in the file.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ITrackerCellText CellText = new TrackerCellText();
+
+    /// <summary>The recordings a packed song carries inside it.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISongSamples Carried = new SongSamples();
+
+    /// <summary>Which instruments play a given recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISampleUsers Usage = new SampleUsers();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    /// <remarks>
+    /// Static because the cache below is keyed by path and a field initializer cannot read an
+    /// instance field. It holds nothing of its own, so one shared between stores is one rule
+    /// rather than one piece of state.
+    /// </remarks>
+    private static readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>What a song file is called. A zip, whatever the extension says.</summary>
     public const string Extension = ".jibx";
 
@@ -202,7 +229,7 @@ public sealed class SongStore : ISongStore
             var (song, instruments) = Playing(path);
             if (instruments.Count == 0) continue;
 
-            foreach (string name in SampleUsage.By(instruments, filePath))
+            foreach (string name in Usage.By(instruments, filePath))
                 names.Add(name + " in '" + song + "'");
         }
 
@@ -249,7 +276,7 @@ public sealed class SongStore : ISongStore
     /// is read once and read again when it is written, which is what the timestamp is for.
     /// </remarks>
     private readonly Dictionary<string, (DateTime Written, string Song, IReadOnlyList<TrackerInstrument> Instruments)> _read =
-        new(FilePaths.Comparer);
+        new(_paths.Comparer);
 
     private readonly object _readLock = new();
 
@@ -285,7 +312,7 @@ public sealed class SongStore : ISongStore
             var document = Written(container);
             if (document == null) return ("", Array.Empty<TrackerInstrument>());
 
-            foreach (var instrument in document.Instruments) SongPaths.UnpackInto(instrument);
+            foreach (var instrument in document.Instruments) Portable.UnpackInto(instrument);
 
             return (Path.GetFileNameWithoutExtension(path), document.Instruments);
         }
@@ -315,9 +342,9 @@ public sealed class SongStore : ISongStore
 
         foreach (var instrument in document.Instruments)
         {
-            SongPaths.UnpackInto(instrument);
-            if (SampleUsage.Repoint(instrument, from, to)) moved = true;
-            SongPaths.PackInto(instrument);
+            Portable.UnpackInto(instrument);
+            if (Usage.Repoint(instrument, from, to)) moved = true;
+            Portable.PackInto(instrument);
         }
 
         if (!moved) return false;
@@ -434,7 +461,7 @@ public sealed class SongStore : ISongStore
     {
         song.Normalize();
 
-        var carrying = withSamples ? SongSamples.Wanted(song) : Array.Empty<string>();
+        var carrying = withSamples ? Carried.Wanted(song) : Array.Empty<string>();
 
         var document = SongDocument.From(song);
         var states = document.TakeStatesOut();
@@ -462,7 +489,7 @@ public sealed class SongStore : ISongStore
                 writing.Write(bytes, 0, bytes.Length);
             }
 
-            SongSamples.Write(container, carrying);
+            Carried.Write(container, carrying);
         });
     }
 
@@ -499,7 +526,7 @@ public sealed class SongStore : ISongStore
             PutStatesBack(container, document);
 
             var song = document.ToSong();
-            arrived = SongSamples.Read(container, song);
+            arrived = Carried.Read(container, song);
 
             song.Normalize();
             return song;
@@ -632,7 +659,7 @@ public sealed class SongStore : ISongStore
         private static TrackerInstrument Written(TrackerInstrument instrument)
         {
             var copy = instrument.Clone();
-            SongPaths.PackInto(copy);
+            Portable.PackInto(copy);
             return copy;
         }
 
@@ -701,7 +728,7 @@ public sealed class SongStore : ISongStore
         private static TrackerInstrument Read(TrackerInstrument instrument)
         {
             var copy = instrument.Clone();
-            SongPaths.UnpackInto(copy);
+            Portable.UnpackInto(copy);
             return copy;
         }
 
@@ -766,7 +793,7 @@ public sealed class SongStore : ISongStore
                     var cell = pattern[line, track];
                     if (cell.IsEmpty) continue;
 
-                    document.Cells.Add($"{line}:{track}:{TrackerCellText.Write(cell)}");
+                    document.Cells.Add($"{line}:{track}:{CellText.Write(cell)}");
                 }
 
             foreach (var lane in pattern.Lanes)
@@ -800,7 +827,7 @@ public sealed class SongStore : ISongStore
                 if (!int.TryParse(parts[0], out int line)) continue;
                 if (!int.TryParse(parts[1], out int track)) continue;
                 if (!pattern.Contains(line, track)) continue;
-                if (!TrackerCellText.TryRead(parts[2], out var cell)) continue;
+                if (!CellText.TryRead(parts[2], out var cell)) continue;
 
                 pattern[line, track] = cell;
             }

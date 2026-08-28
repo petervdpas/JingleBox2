@@ -4,6 +4,7 @@ using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Tracker.Synth.Enums;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -28,6 +29,9 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="instrument">Whose level it is, which is not the patch's.</param>
 public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
 {
+    /// <summary>The fader scale, so a level in decibels can be checked without a window.</summary>
+    private readonly IGainScale _gain = new GainScale();
+
     /// <summary>The oscillator: which shape the wave is.</summary>
     /// <remarks>
     /// The keys are written out one by one, never built from a name or a loop, so every key in
@@ -139,7 +143,7 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
         ReleaseKey => patch.ReleaseMs,
         DriveKey => patch.Drive,
 
-        LevelKey => GainScale.ToDecibels(instrument.Volume),
+        LevelKey => _gain.ToDecibels(instrument.Volume),
 
         CutoffKey => patch.FilterCutoff,
         ResonanceKey => patch.FilterResonance,
@@ -182,8 +186,8 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
             DriveKey => Moved(patch.Drive, value, () => patch.Drive = value),
 
             LevelKey => Moved(
-                GainScale.ToDecibels(instrument.Volume), value,
-                () => instrument.Volume = GainScale.ToAmplitude(
+                _gain.ToDecibels(instrument.Volume), value,
+                () => instrument.Volume = _gain.ToAmplitude(
                     Math.Clamp(value, GainScale.MinimumDecibels, GainScale.MaximumDecibels))),
 
             CutoffKey => Moved(patch.FilterCutoff, value, () => patch.FilterCutoff = value),

@@ -5,6 +5,7 @@ using Xunit;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -20,6 +21,10 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class SongTests
 {
+    /// <summary>Every edit to a pattern, so each one lands in the history.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly IPatternEdit Edits = new PatternEdit();
+
     /// <summary>
     /// A normalised song with two named instruments and a strip per track, which is the least
     /// that makes moving a track or taking an instrument out something that can be seen.
@@ -341,7 +346,7 @@ public class SongTests
         var live = Made();
         var pattern = live.PatternAt(0)!;
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), 0);
+        Edits.EnterNote(pattern, At(0), new Note(60), 0);
 
         var was = SongStore.Uncopy(SongStore.Copy(live))!;
 
@@ -529,7 +534,7 @@ public class SongTests
     {
         var song = Made();
 
-        PatternEdit.EnterNote(song.PatternAt(0)!, At(0), new Note(60), instrument: 1);
+        Edits.EnterNote(song.PatternAt(0)!, At(0), new Note(60), instrument: 1);
 
         song.RemoveInstrumentAt(0);
 
@@ -540,6 +545,10 @@ public class SongTests
 /// <summary>What the mix adds up to, mute and solo included.</summary>
 public class MixLevelTests
 {
+    /// <summary>What the mix adds up to, mute and solo included.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly IMixLevels Levels = new MixLevels();
+
     /// <summary>Four strips at their defaults: audible, unmuted and unsoloed.</summary>
     private static List<TrackMix> Four() => new() { new(), new(), new(), new() };
 
@@ -551,9 +560,9 @@ public class MixLevelTests
     {
         var mix = Four();
 
-        Assert.False(MixLevels.AnySolo(mix));
+        Assert.False(Levels.AnySolo(mix));
 
-        for (int track = 0; track < 4; track++) Assert.True(MixLevels.IsAudible(mix, track));
+        for (int track = 0; track < 4; track++) Assert.True(Levels.IsAudible(mix, track));
     }
 
     /// <summary>Mute silences its own strip and no other.</summary>
@@ -563,8 +572,8 @@ public class MixLevelTests
         var mix = Four();
         mix[1].Mute = true;
 
-        Assert.False(MixLevels.IsAudible(mix, 1));
-        Assert.True(MixLevels.IsAudible(mix, 0));
+        Assert.False(Levels.IsAudible(mix, 1));
+        Assert.True(Levels.IsAudible(mix, 0));
     }
 
     /// <summary>
@@ -577,9 +586,9 @@ public class MixLevelTests
         var mix = Four();
         mix[2].Solo = true;
 
-        Assert.True(MixLevels.AnySolo(mix));
-        Assert.True(MixLevels.IsAudible(mix, 2));
-        Assert.False(MixLevels.IsAudible(mix, 0));
+        Assert.True(Levels.AnySolo(mix));
+        Assert.True(Levels.IsAudible(mix, 2));
+        Assert.False(Levels.IsAudible(mix, 0));
     }
 
     /// <summary>
@@ -593,7 +602,7 @@ public class MixLevelTests
         mix[0].Solo = true;
         mix[0].Mute = true;
 
-        Assert.False(MixLevels.IsAudible(mix, 0));
+        Assert.False(Levels.IsAudible(mix, 0));
     }
 
     /// <summary>
@@ -603,8 +612,8 @@ public class MixLevelTests
     [Fact]
     public void A_track_the_mix_has_never_heard_of_is_left_alone()
     {
-        Assert.True(MixLevels.IsAudible(Four(), 99));
-        Assert.True(MixLevels.IsAudible(null, 0));
+        Assert.True(Levels.IsAudible(Four(), 99));
+        Assert.True(Levels.IsAudible(null, 0));
     }
 
     /// <summary>

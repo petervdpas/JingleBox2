@@ -13,6 +13,9 @@ using System.Threading.Tasks;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -31,6 +34,13 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSlices
 {
+    /// <summary>Where a recording gets cut into pieces.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISampleSlicer Slicer = new SampleSlicer();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>What a fresh slicing aims for when nothing says otherwise.</summary>
     public const int DefaultPieces = 8;
 
@@ -158,7 +168,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
 
     /// <summary>The recording under the picture, or empty for a panel holding none.</summary>
     /// <remarks>
-    /// Compared with <see cref="Tracker.FilePaths.Same"/> rather than as text wherever it
+    /// Compared with <see cref="IFilePaths.Same"/> rather than as text wherever it
     /// decides something, since the same take reaches this from a machine and from a song by
     /// two spellings of one path.
     /// </remarks>
@@ -375,7 +385,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
             return;
         }
 
-        if (Tracker.FilePaths.Same(path, FilePath))
+        if (_paths.Same(path, FilePath))
         {
             if (!Holds(points)) Settle(points);
             return;
@@ -453,12 +463,12 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
 
         var points = CutBy switch
         {
-            "Gaps" => SampleSlicer.Gaps(Peaks, _seconds, want),
-            "Even" => SampleSlicer.Even(want),
-            _ => SampleSlicer.Transients(Peaks, _seconds, want)
+            "Gaps" => Slicer.Gaps(Peaks, _seconds, want),
+            "Even" => Slicer.Even(want),
+            _ => Slicer.Transients(Peaks, _seconds, want)
         };
 
-        return SampleSlicer.Clean(points, _seconds);
+        return Slicer.Clean(points, _seconds);
     }
 
     /// <summary>
@@ -603,7 +613,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
             }
         }).ContinueWith(read => Dispatcher.UIThread.Post(() =>
         {
-            if (!Tracker.FilePaths.Same(path, FilePath)) return;
+            if (!_paths.Same(path, FilePath)) return;
 
             var data = read.Result;
 

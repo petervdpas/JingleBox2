@@ -1,29 +1,16 @@
 using System;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
-/// <summary>
-/// One track pushing another down: the kick keying the bass, the way a desk does it with a
-/// compressor and a side chain. Follows the key track's level and turns that into a gain.
-/// </summary>
-/// <remarks>
-/// Deliberately not a compressor. There is no threshold, no ratio and no knee: the depth knob
-/// says how far down the track goes when the key is at full scale, and the track follows the
-/// key in proportion below that. It is the effect people actually reach for, with two controls
-/// instead of five.
-///
-/// The attack is fixed and fast. A slow duck attack leaves the first part of the key note
-/// fighting the track it is meant to be clearing room for, which is the one thing this is for.
-///
-/// One per strip, and <see cref="Next"/> runs on the audio thread once per frame. Nothing here
-/// allocates or takes a lock; <see cref="ReleaseMs"/> is written from the block that is about
-/// to render, which is why it is a property that works its coefficient out on the spot rather
-/// than something the mixer has to rebuild.
-/// </remarks>
-public sealed class Ducker
+/// <inheritdoc/>
+public sealed class Ducker : IDucker
 {
-    /// <summary>Fast enough to be out of the way before a kick has finished its click.</summary>
+    /// <inheritdoc cref="IDucker.AttackMs"/>
     public const double AttackMs = 5;
+
+    /// <inheritdoc/>
+    double IDucker.AttackMs => AttackMs;
 
     /// <summary>
     /// Below this the duck is inaudible and is treated as gone.
@@ -51,6 +38,8 @@ public sealed class Ducker
     /// match the one the field starts on is not a change, and the coefficient would stay at
     /// nought, which is a duck that goes down and never comes back up.
     /// </remarks>
+    /// <param name="releaseMs">How long the ducked track takes to come back up, as the strip's knob says.</param>
+    /// <param name="sampleRate">The rate the mixer runs at, which is what the coefficients are worked out against.</param>
     public Ducker(double releaseMs, int sampleRate)
     {
         _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
@@ -63,7 +52,7 @@ public sealed class Ducker
     /// <summary>What the strip's release knob says, kept so the property can tell a real change.</summary>
     private double _releaseMs;
 
-    /// <summary>How long the ducked track takes to come back up. Settable while it runs.</summary>
+    /// <inheritdoc/>
     public double ReleaseMs
     {
         get => _releaseMs;
@@ -77,13 +66,10 @@ public sealed class Ducker
         }
     }
 
-    /// <summary>Where the follower is: 0 when the key is silent, 1 when it is at full scale.</summary>
+    /// <inheritdoc/>
     public double Level => _follower;
 
-    /// <summary>
-    /// Takes one frame of the key track and moves the follower towards it. Up quickly, down
-    /// slowly, which is what makes a duck breathe rather than chatter.
-    /// </summary>
+    /// <inheritdoc/>
     public double Next(double keyMagnitude)
     {
         double target = double.IsNaN(keyMagnitude) ? 0 : Math.Clamp(Math.Abs(keyMagnitude), 0, 1);
@@ -96,19 +82,24 @@ public sealed class Ducker
         return _follower;
     }
 
-    /// <summary>Back to no ducking at all, for a transport stop.</summary>
+    /// <inheritdoc/>
     public void Reset() => _follower = 0;
 
-    /// <summary>What to multiply the ducked track by, given where the follower is.</summary>
+    /// <inheritdoc cref="IDucker.GainFor"/>
     /// <remarks>
-    /// Static, and holding nothing, so the mixer can ask what a depth and a follower come to
-    /// without a side chain of its own and a test can ask without an audio device.
+    /// Static as well, so the mixer can ask what a depth and a follower come to without a side
+    /// chain of its own and a test can ask without an audio device.
     /// </remarks>
+    /// <param name="follower">Where the follower stands, from <see cref="Next"/> or <see cref="Level"/>.</param>
+    /// <param name="depth">How far down the strip's knob says the track goes at full scale.</param>
     public static float GainFor(double follower, double depth)
     {
         double amount = Math.Clamp(depth, 0, 1) * Math.Clamp(follower, 0, 1);
         return (float)Math.Clamp(1 - amount, 0, 1);
     }
+
+    /// <inheritdoc/>
+    float IDucker.GainFor(double follower, double depth) => GainFor(follower, depth);
 
     /// <summary>A release that is not a number at all reads as the strip's default.</summary>
     private static double Clamp(double milliseconds) =>

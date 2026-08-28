@@ -23,6 +23,7 @@ using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -42,6 +43,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>The machines this run has, the one instance everything shares.</summary>
+    private readonly IMachineProjects _machines;
+
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
 
@@ -916,8 +920,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         IMidiService midiService,
         IRecordingService recordingService,
         IWaveformService waveformService,
-        IAudioRouting routing)
+        IAudioRouting routing,
+        IMachineProjects machines)
     {
+        _machines = machines;
         _audio = audio;
         _store = store;
         _cfg = cfg;
@@ -936,10 +942,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         var rack = new MachineRack();
 
-        Tracker = new TrackerViewModel(audio, rack, Record.Recordings, store, cfg, Plugins, waveformService);
-        Machines = new MachineRackViewModel(rack, Tracker, Record.Recordings, waveformService, Plugins);
+        Tracker = new TrackerViewModel(audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService);
+        Machines = new MachineRackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins);
 
-        MachineShelf = new MachineShelfViewModel();
+        MachineShelf = new MachineShelfViewModel(_machines);
 
         MachineShelf.Changed += () => Machines.Refresh();
 
@@ -1053,7 +1059,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
-        var targets = new ControlTargets(Tracker, Machines);
+        var targets = new ControlTargets(Tracker, _machines, Machines);
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,

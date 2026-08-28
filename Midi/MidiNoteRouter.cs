@@ -4,6 +4,8 @@ using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
 
 namespace JingleBox2.Midi;
 
@@ -24,10 +26,18 @@ public sealed class MidiNoteRouter
 {
     private readonly INoteTrigger _notes;
 
+    /// <summary>How a number on the wire becomes a note in a pattern.</summary>
+    private readonly IMidiNoteInput _wire;
+
     /// <param name="notes">Where a note goes. Not a view model, so this can be tested.</param>
-    public MidiNoteRouter(INoteTrigger notes)
+    /// <param name="wire">
+    /// How a number on the wire becomes a note. Left out, the real reading; given, whatever a
+    /// test wants the wire to have meant.
+    /// </param>
+    public MidiNoteRouter(INoteTrigger notes, IMidiNoteInput? wire = null)
     {
         _notes = notes;
+        _wire = wire ?? new MidiNoteInput();
     }
 
     /// <summary>
@@ -53,14 +63,14 @@ public sealed class MidiNoteRouter
     public void Handle(MidiMessage msg)
     {
         if (msg is null || msg.Type != MidiMessageType.Note) return;
-        if (!MidiNoteInput.TryNote(msg.Value, out var note)) return;
+        if (!_wire.TryNote(msg.Value, out var note)) return;
 
         if (Log.On(LogArea.Midi))
             Log.Write(LogArea.Midi, () =>
                 "note: '" + msg.Device + "' " + (msg.IsOn ? "down " : "up ") + note
                 + " (" + msg.Value + ") velocity " + msg.Data);
 
-        if (msg.IsOn) _notes.TriggerNote(note, MidiNoteInput.VolumeFor(msg.Data));
+        if (msg.IsOn) _notes.TriggerNote(note, _wire.VolumeFor(msg.Data));
         else _notes.ReleaseNote(note);
     }
 }

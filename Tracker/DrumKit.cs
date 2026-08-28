@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -105,6 +107,10 @@ public sealed class DrumPad
 /// </remarks>
 public sealed class DrumKit
 {
+    /// <summary>What a kit and a map do identically with a chopped recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISlices Pieces = new Slices();
+
     /// <summary>
     /// How many pads a kit has when nothing says otherwise.
     /// </summary>
@@ -164,14 +170,14 @@ public sealed class DrumKit
 
     /// <summary>The recording the slices come from, or empty when they do not agree on one.</summary>
     [JsonIgnore]
-    public string SlicedFile => Slices.OneFile(Sounding().Select(p => p.FilePath));
+    public string SlicedFile => Pieces.OneFile(Sounding().Select(p => p.FilePath));
 
     /// <summary>
     /// Where the recording was cut, read back off the pads. One more point than there are
     /// slices: the first is where the sliced region starts, the last where it ends.
     /// </summary>
     public IReadOnlyList<double> SlicePoints() =>
-        IsSliced ? Slices.PointsFrom(Sounding().Select(p => p.Shape).ToList()) : Array.Empty<double>();
+        IsSliced ? Pieces.PointsFrom(Sounding().Select(p => p.Shape).ToList()) : Array.Empty<double>();
 
     /// <summary>
     /// One recording cut at those points and laid over the pads, a piece to each key.
@@ -201,7 +207,7 @@ public sealed class DrumKit
     {
         int held = Math.Max(1, Pads.Count);
 
-        int slices = Slices.CountFor(points, held);
+        int slices = Pieces.CountFor(points, held);
 
         if (slices == 0) return;
 
@@ -216,7 +222,7 @@ public sealed class DrumKit
             if (i < slices)
             {
                 pad.FilePath = filePath;
-                pad.Name = Slices.NameFor(filePath, i);
+                pad.Name = Pieces.NameFor(filePath, i);
                 pad.Shape.Start = points[i];
                 pad.Shape.End = points[i + 1];
             }

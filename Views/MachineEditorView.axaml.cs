@@ -10,6 +10,8 @@ using System;
 using System.Linq;
 using JingleBox2.Shortcuts.Enums;
 using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -26,6 +28,10 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>The machines folder on disc.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineRegistry Registry = new MachineRegistry();
+
     /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;
 
@@ -817,7 +823,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// </remarks>
     private async System.Threading.Tasks.Task<IStorageFolder?> Among(IStorageProvider storage)
     {
-        foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Tracker.Machines.MachineRegistry.Installed })
+        foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Registry.Installed })
         {
             if (home is not { Length: > 0 } || !Directory.Exists(home)) continue;
 

@@ -1,23 +1,17 @@
 using System;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
-/// <summary>
-/// Everything that moves a voice away from the note it was given: the instrument's own tuning,
-/// which holds still, and the vibrato and pitch envelope, which do not.
-/// </summary>
-/// <remarks>
-/// Shared by the voice that plays a patch and the scope that draws it, so a pitch envelope
-/// bends the picture exactly as far as it bends the sound.
-/// </remarks>
-public static class PitchMotion
+/// <inheritdoc/>
+public sealed class PitchMotion : IPitchMotion
 {
-    /// <summary>The instrument's fixed offset, in semitones. The same for every note and moment.</summary>
-    public static double Tuning(SynthPatch patch) =>
+    /// <inheritdoc/>
+    public double Tuning(SynthPatch patch) =>
         patch is null ? 0 : patch.TuneSemitones + patch.FineCents / 100.0;
 
-    /// <summary>Vibrato and the pitch envelope, in semitones, at a point in the note.</summary>
-    public static double MotionAt(SynthPatch patch, double seconds)
+    /// <inheritdoc/>
+    public double MotionAt(SynthPatch patch, double seconds)
     {
         if (patch is null) return 0;
 
@@ -33,6 +27,6 @@ public static class PitchMotion
         return offset;
     }
 
-    /// <summary>What to multiply a frequency by for an offset in semitones.</summary>
-    public static double Ratio(double semitones) => Math.Pow(2.0, semitones / 12.0);
+    /// <inheritdoc/>
+    public double Ratio(double semitones) => Math.Pow(2.0, semitones / 12.0);
 }

@@ -16,6 +16,8 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2;
 
@@ -34,6 +36,10 @@ namespace JingleBox2;
 /// </remarks>
 public partial class MainWindow : Window
 {
+    /// <summary>The machines folder on disc.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineRegistry Registry = new MachineRegistry();
+
     /// <summary>The settings file, read once on the way up and written whenever something moves.</summary>
     private readonly ConfigStore _store = new("JingleBox2");
 
@@ -157,16 +163,18 @@ public partial class MainWindow : Window
         Diagnostics.CrashReport.Watch(Config.AppFolder.Path());
         Diagnostics.CrashReport.Note("started, " + cfg.Rows + " by " + cfg.Columns + " pads");
 
-        var machines = Tracker.Machines.MachineRegistry.Load();
+        var machines = Registry.Load();
 
-        Tracker.Machines.MachineProjects.Keep(machines);
+        var projects = new Tracker.Machines.MachineProjects();
+
+        projects.Keep(machines);
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
 
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
 
-        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing);
+        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects);
         DataContext = vm;
 
         var version = Assembly.GetExecutingAssembly()

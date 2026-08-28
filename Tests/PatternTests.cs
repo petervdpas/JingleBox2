@@ -1,6 +1,7 @@
 using JingleBox2.Tracker;
 using Xunit;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -9,6 +10,10 @@ namespace JingleBox2.Tests;
 /// </summary>
 public class PatternTests
 {
+    /// <summary>Every edit to a pattern, so each one lands in the history.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly IPatternEdit Edits = new PatternEdit();
+
     /// <summary>
     /// A cursor at a line and track, so the tests read as positions rather than pairs.
     /// </summary>
@@ -23,7 +28,7 @@ public class PatternTests
         var pattern = new Pattern(lines, tracks);
 
         for (int line = 0; line < 4; line++)
-            PatternEdit.EnterNote(pattern, At(line), new Note(60 + line), 0);
+            Edits.EnterNote(pattern, At(line), new Note(60 + line), 0);
 
         return pattern;
     }
@@ -98,7 +103,7 @@ public class PatternTests
         var pattern = new Pattern(4, 4);
 
         for (int track = 0; track < 4; track++)
-            PatternEdit.EnterNote(pattern, At(0, track), new Note(60 + track), 0);
+            Edits.EnterNote(pattern, At(0, track), new Note(60 + track), 0);
 
         pattern.MoveTrack(3, 0);
 
@@ -118,7 +123,7 @@ public class PatternTests
         var pattern = WithNotes();
         var copy = pattern.Clone();
 
-        PatternEdit.ClearPattern(pattern);
+        Edits.ClearPattern(pattern);
 
         Assert.True(copy[0, 0].Note.IsPlayable);
     }
@@ -143,7 +148,7 @@ public class PatternTests
 
         Assert.True(pattern.Holds(kept, lines, tracks, lanes));
 
-        PatternEdit.ClearPattern(pattern);
+        Edits.ClearPattern(pattern);
         Assert.False(pattern.Holds(kept, lines, tracks, lanes));
 
         int said = 0;
@@ -174,6 +179,10 @@ public class PatternTests
 /// <summary>The edits themselves, which are the only door a pattern is changed through.</summary>
 public class PatternEditTests
 {
+    /// <summary>Every edit to a pattern, so each one lands in the history.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly IPatternEdit Edits = new PatternEdit();
+
     /// <summary>
     /// A cursor at a line and track, so the tests read as positions rather than pairs.
     /// </summary>
@@ -191,8 +200,8 @@ public class PatternEditTests
     {
         var pattern = new Pattern(16, 4);
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), instrument: 3, volume: 40);
-        PatternEdit.EnterNote(pattern, At(0), new Note(62), instrument: 5);
+        Edits.EnterNote(pattern, At(0), new Note(60), instrument: 3, volume: 40);
+        Edits.EnterNote(pattern, At(0), new Note(62), instrument: 5);
 
         Assert.Equal(62, pattern[0, 0].Note.Semitone);
         Assert.Equal(5, pattern[0, 0].Instrument);
@@ -209,11 +218,11 @@ public class PatternEditTests
     {
         var pattern = new Pattern(4, 2);
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), 0);
-        PatternEdit.EnterNote(pattern, At(1), new Note(62), 0);
-        PatternEdit.EnterNote(pattern, At(0, 1), new Note(48), 0);
+        Edits.EnterNote(pattern, At(0), new Note(60), 0);
+        Edits.EnterNote(pattern, At(1), new Note(62), 0);
+        Edits.EnterNote(pattern, At(0, 1), new Note(48), 0);
 
-        PatternEdit.TransposeTrack(pattern, 0, 12);
+        Edits.TransposeTrack(pattern, 0, 12);
 
         Assert.Equal(72, pattern[0, 0].Note.Semitone);
         Assert.Equal(74, pattern[1, 0].Note.Semitone);
@@ -227,10 +236,10 @@ public class PatternEditTests
     {
         var pattern = new Pattern(4, 2);
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), 0);
-        PatternEdit.EnterNote(pattern, At(0, 1), new Note(62), 0);
+        Edits.EnterNote(pattern, At(0), new Note(60), 0);
+        Edits.EnterNote(pattern, At(0, 1), new Note(62), 0);
 
-        PatternEdit.ClearTrack(pattern, 0);
+        Edits.ClearTrack(pattern, 0);
 
         Assert.True(pattern[0, 0].IsEmpty);
         Assert.False(pattern[0, 1].IsEmpty);
@@ -244,10 +253,10 @@ public class PatternEditTests
     {
         var pattern = new Pattern(4, 1);
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), 0);
-        PatternEdit.EnterNote(pattern, At(1), new Note(62), 0);
+        Edits.EnterNote(pattern, At(0), new Note(60), 0);
+        Edits.EnterNote(pattern, At(1), new Note(62), 0);
 
-        PatternEdit.InsertLine(pattern, At(0));
+        Edits.InsertLine(pattern, At(0));
 
         Assert.True(pattern[0, 0].IsEmpty);
         Assert.Equal(60, pattern[1, 0].Note.Semitone);
@@ -260,10 +269,10 @@ public class PatternEditTests
     {
         var pattern = new Pattern(4, 1);
 
-        PatternEdit.EnterNote(pattern, At(0), new Note(60), 0);
-        PatternEdit.EnterNote(pattern, At(1), new Note(62), 0);
+        Edits.EnterNote(pattern, At(0), new Note(60), 0);
+        Edits.EnterNote(pattern, At(1), new Note(62), 0);
 
-        PatternEdit.DeleteLine(pattern, At(0));
+        Edits.DeleteLine(pattern, At(0));
 
         Assert.Equal(62, pattern[0, 0].Note.Semitone);
     }
@@ -277,9 +286,9 @@ public class PatternEditTests
     {
         var pattern = new Pattern(16, 1);
 
-        PatternEdit.EnterNote(pattern, At(3), new Note(60), 0);
+        Edits.EnterNote(pattern, At(3), new Note(60), 0);
 
-        int moved = PatternEdit.Quantize(pattern, 0, grid: 4);
+        int moved = Edits.Quantize(pattern, 0, grid: 4);
 
         Assert.Equal(1, moved);
         Assert.True(pattern[3, 0].IsEmpty);
@@ -305,7 +314,7 @@ public class PatternEditTests
     [InlineData(99, 4, 16, 12)]
     public void A_line_snaps_to_the_nearest_of_the_grid_and_never_off_the_end(
         int line, int grid, int lines, int wanted) =>
-        Assert.Equal(wanted, PatternEdit.SnapLine(line, grid, lines));
+        Assert.Equal(wanted, Edits.SnapLine(line, grid, lines));
 
     /// <summary>
     /// A cursor off the end of the pattern is refused rather than throwing, because a resize can
@@ -316,8 +325,8 @@ public class PatternEditTests
     {
         var pattern = new Pattern(4, 1);
 
-        PatternEdit.EnterNote(pattern, At(99), new Note(60), 0);
-        PatternEdit.EnterNote(pattern, At(0, 99), new Note(60), 0);
+        Edits.EnterNote(pattern, At(99), new Note(60), 0);
+        Edits.EnterNote(pattern, At(0, 99), new Note(60), 0);
 
         Assert.True(pattern[0, 0].IsEmpty);
     }

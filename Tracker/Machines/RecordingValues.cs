@@ -3,6 +3,8 @@ using JingleBox2.Tracker.Synth;
 using System;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -39,6 +41,12 @@ namespace JingleBox2.Tracker.Machines;
 /// </param>
 public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : MachineValues
 {
+    /// <summary>The fader scale, so a level in decibels can be checked without a window.</summary>
+    private readonly IGainScale _gain = new GainScale();
+
+    /// <summary>The filter sweep, so a knob position can be checked without a window.</summary>
+    private readonly IFrequencyScale _hz = new FrequencyScale();
+
     /// <summary>The recording itself, by the path the instrument holds.</summary>
     /// <remarks>
     /// The keys are written out one by one, never built from a name or a loop, so every key in
@@ -192,9 +200,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
         PitchTimeKey => Voice.PitchEnvMs,
         TremoloRateKey => Voice.TremoloRateHz,
         TremoloDepthKey => Voice.TremoloDepth,
-        CutoffKey => UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz),
+        CutoffKey => _hz.ToPosition(Voice.FilterCutoffHz),
         ResonanceKey => Voice.FilterResonance,
-        LevelKey => UI.GainScale.ToDecibels(instrument.Volume),
+        LevelKey => _gain.ToDecibels(instrument.Volume),
         DriveKey => Voice.Drive,
         _ => 0
     };
@@ -230,9 +238,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
             PitchTimeKey => Number(Voice.PitchEnvMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, v => Voice.PitchEnvMs = v),
             TremoloRateKey => Number(Voice.TremoloRateHz, value, SynthPatch.MinRateHz, SynthPatch.MaxRateHz, v => Voice.TremoloRateHz = v),
             TremoloDepthKey => Number(Voice.TremoloDepth, value, SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, v => Voice.TremoloDepth = v),
-            CutoffKey => Number(UI.FrequencyScale.ToPosition(Voice.FilterCutoffHz), value, Least, Most, v => Voice.FilterCutoffHz = UI.FrequencyScale.ToHz(v)),
+            CutoffKey => Number(_hz.ToPosition(Voice.FilterCutoffHz), value, Least, Most, v => Voice.FilterCutoffHz = _hz.ToHz(v)),
             ResonanceKey => Number(Voice.FilterResonance, value, SynthPatch.MinResonance, SynthPatch.MaxResonance, v => Voice.FilterResonance = v),
-            LevelKey => Number(UI.GainScale.ToDecibels(instrument.Volume), value, UI.GainScale.MinimumDecibels, UI.GainScale.MaximumDecibels, v => instrument.Volume = UI.GainScale.ToAmplitude(v)),
+            LevelKey => Number(_gain.ToDecibels(instrument.Volume), value, UI.GainScale.MinimumDecibels, UI.GainScale.MaximumDecibels, v => instrument.Volume = _gain.ToAmplitude(v)),
             DriveKey => Number(Voice.Drive, value, SynthPatch.MinDrive, SynthPatch.MaxDrive, v => Voice.Drive = v),
 
             _ => false,
@@ -278,7 +286,7 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     {
         TakeKey => instrument.FilePath ?? "",
         TakeDetailsKey => shelf?.Details(instrument.FilePath ?? "") ?? "",
-        CutoffTextKey => UI.FrequencyScale.Text(Voice.FilterCutoffHz),
+        CutoffTextKey => _hz.Text(Voice.FilterCutoffHz),
         BaseNoteKey => instrument.BaseNote.ToString(),
         _ => ""
     };

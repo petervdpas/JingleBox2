@@ -9,6 +9,7 @@ using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -23,6 +24,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrumentDesigner
 {
+    /// <summary>The machines this run has, the one instance everything shares.</summary>
+    private readonly IMachineProjects _machines;
+
     /// <summary>
     /// The song's own copy of the instrument, which is what makes this panel different from the
     /// rack's: editing it here changes this song and no other.
@@ -53,6 +57,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     public TrackInstrumentDesigner(
         int track,
         TrackerInstrument instrument,
+        IMachineProjects machines,
         IInstrumentAudition audition,
         Action changed,
         IWaveformService? waveforms = null,
@@ -61,6 +66,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null,
         Midi.Interfaces.IMidiMonitor? keys = null)
     {
+        _machines = machines;
         Track = track;
         _keys = keys;
         _instrument = instrument;
@@ -75,11 +81,11 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         }
 
         Editor = new InstrumentEditorViewModel(
-            track, instrument, changed, waveforms, audition, recordings, note => Play(note));
+            track, instrument, changed, machines, waveforms, audition, recordings, note => Play(note));
 
         Location = new TrackLocationViewModel(tracker);
 
-        Presets = new InstrumentPresets(instrument, Reloaded, Editor?.Takes.Shown, Editor?.Takes);
+        Presets = new InstrumentPresets(instrument, Reloaded, machines, Editor?.Takes.Shown, Editor?.Takes);
 
         Editor?.Kit?.Follow(Sounding);
 

@@ -14,6 +14,8 @@ using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Midi;
 
@@ -32,6 +34,9 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class ControlTargets : IControlTargets
 {
+    /// <summary>The machines this run has.</summary>
+    private readonly IMachineProjects _machines;
+
     private readonly TrackerViewModel _tracker;
     private readonly MachineRackViewModel? _rack;
 
@@ -43,9 +48,15 @@ public sealed class ControlTargets : IControlTargets
     /// Where a controller actually gets laid out, and optional because the tracker alone is a
     /// complete answer for a song that is playing. See <see cref="OnRack"/>.
     /// </param>
-    public ControlTargets(TrackerViewModel tracker, MachineRackViewModel? rack = null)
+    /// <param name="machines">
+    /// The machines this run has, the one instance everything shares. Required rather than
+    /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
+    /// machine missing, without an error anywhere to say why.
+    /// </param>
+    public ControlTargets(TrackerViewModel tracker, IMachineProjects machines, MachineRackViewModel? rack = null)
     {
         _tracker = tracker;
+        _machines = machines;
         _rack = rack;
     }
 
@@ -134,7 +145,7 @@ public sealed class ControlTargets : IControlTargets
 
         string machine = _tracker.MachineOn(track);
 
-        if (machine.Length > 0 && Tracker.Machines.MachineProjects.For(machine) is { } project)
+        if (machine.Length > 0 && _machines.For(machine) is { } project)
         {
             var byKey = project.Parameters.ToDictionary(one => one.Key, StringComparer.Ordinal);
 
@@ -254,7 +265,7 @@ public sealed class ControlTargets : IControlTargets
             && !string.Equals(mapping.Machine, machine, StringComparison.Ordinal))
             return null;
 
-        if (Tracker.Machines.MachineProjects.For(machine) is not { } project) return null;
+        if (_machines.For(machine) is not { } project) return null;
 
         var parameter = project.Parameters.FirstOrDefault(one => one.Key == mapping.Key);
         if (parameter is null) return null;
@@ -298,7 +309,7 @@ public sealed class ControlTargets : IControlTargets
             && !string.Equals(mapping.Machine, machine, StringComparison.Ordinal))
             return null;
 
-        if (Tracker.Machines.MachineProjects.For(machine) is not { } project) return null;
+        if (_machines.For(machine) is not { } project) return null;
 
         string key = mapping.Key.Length > 0
             ? mapping.Key
@@ -454,7 +465,7 @@ public sealed class ControlTargets : IControlTargets
     {
         if (mapping.Key.Length == 0) return null;
 
-        string said = Tracker.Machines.MachineProjects.For(mapping.Machine)?.Name ?? mapping.Machine;
+        string said = _machines.For(mapping.Machine)?.Name ?? mapping.Machine;
 
         return new Target(
             said + " " + mapping.Key.Replace('_', ' '),

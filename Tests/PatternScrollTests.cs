@@ -1,6 +1,8 @@
 using JingleBox2.Tracker;
 using Xunit;
 using JingleBox2.Tracker.Records;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -15,6 +17,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class PatternScrollTests
 {
+    /// <summary>The scroller under test, reached through its contract.</summary>
+    private static readonly IViewportScroller _scroll = new ViewportScroller();
+
     /// <summary>One row, in pixels, as the grid draws it.</summary>
     private const double RowHeight = 20;
 
@@ -33,7 +38,7 @@ public class PatternScrollTests
     /// <summary>How far down the screen a row ends up, measured to the middle of the row.</summary>
     private static double Down(int row, int lines) =>
         Metrics().RowY(row) + RowHeight / 2
-        - ViewportScroller.CentreRow(Viewport, Metrics(), row, lines);
+        - _scroll.CentreRow(Viewport, Metrics(), row, lines);
 
     /// <summary>
     /// The one rule this whole file is about: whichever line the cursor is on, that line is the
@@ -52,7 +57,7 @@ public class PatternScrollTests
     [Fact]
     public void The_first_row_included()
     {
-        Assert.Equal(0, ViewportScroller.CentreRow(Viewport, Metrics(), 0, 64));
+        Assert.Equal(0, _scroll.CentreRow(Viewport, Metrics(), 0, 64));
         Assert.Equal(Viewport / 2, Down(0, 64), 3);
     }
 
@@ -60,7 +65,7 @@ public class PatternScrollTests
     [Fact]
     public void And_the_last()
     {
-        Assert.Equal(63 * RowHeight, ViewportScroller.CentreRow(Viewport, Metrics(), 63, 64), 3);
+        Assert.Equal(63 * RowHeight, _scroll.CentreRow(Viewport, Metrics(), 63, 64), 3);
         Assert.Equal(Viewport / 2, Down(63, 64), 3);
     }
 

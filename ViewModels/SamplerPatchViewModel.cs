@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
 using System;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -18,6 +19,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class SamplerPatchViewModel : ObservableObject
 {
+    /// <summary>The filter sweep, so a knob position can be checked without a window.</summary>
+    private readonly IFrequencyScale _hz = new FrequencyScale();
+
     /// <summary>The patch the song holds, written into in place.</summary>
     private readonly SamplerPatch _patch;
 
@@ -78,13 +82,13 @@ public sealed class SamplerPatchViewModel : ObservableObject
     /// </remarks>
     public double Cutoff
     {
-        get => FrequencyScale.ToPosition(_patch.CutoffHz);
-        set => Set(v => _patch.CutoffHz = FrequencyScale.ToHz(v), FrequencyScale.ToPosition(_patch.CutoffHz), value,
+        get => _hz.ToPosition(_patch.CutoffHz);
+        set => Set(v => _patch.CutoffHz = _hz.ToHz(v), _hz.ToPosition(_patch.CutoffHz), value,
             nameof(Cutoff), nameof(CutoffText));
     }
 
     /// <summary>The cutoff in words, in hertz or kilohertz as its size asks for.</summary>
-    public string CutoffText => FrequencyScale.Text(_patch.CutoffHz);
+    public string CutoffText => _hz.Text(_patch.CutoffHz);
 
     /// <summary>How much the filter rings at the cutoff.</summary>
     public double Resonance

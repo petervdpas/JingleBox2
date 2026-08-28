@@ -1,7 +1,6 @@
-using System;
 using System.Collections.Generic;
 
-namespace JingleBox2.Tracker;
+namespace JingleBox2.Music.Interfaces;
 
 /// <summary>
 /// Sharing a stretch of keyboard out among a number of things that each want a piece of it.
@@ -13,19 +12,19 @@ namespace JingleBox2.Tracker;
 /// differing by more than a key, and the last one reaching the top so nothing above it is
 /// silent.
 /// </remarks>
-public static class KeyRegions
+public interface IKeyRegions
 {
     /// <summary>The keys of a piano, A0 to C8. What a sliced recording is laid across.</summary>
-    public const int PianoLow = 21;
+    int PianoLow { get; }
 
     /// <summary>The top of that same stretch.</summary>
-    public const int PianoHigh = 108;
+    int PianoHigh { get; }
 
     /// <summary>The whole of what a note column can say.</summary>
-    public const int LowestKey = 0;
+    int LowestKey { get; }
 
     /// <summary>And the top of that.</summary>
-    public const int HighestKey = 119;
+    int HighestKey { get; }
 
     /// <summary>
     /// One stretch per piece, in order, covering everything from <paramref name="low"/> to
@@ -37,32 +36,17 @@ public static class KeyRegions
     /// the top answering to nothing, which reads as a broken instrument rather than as
     /// arithmetic.
     /// </remarks>
-    public static IReadOnlyList<(int Low, int High)> Split(int low, int high, int count)
-    {
-        if (count <= 0) return Array.Empty<(int, int)>();
-
-        low = Math.Clamp(low, LowestKey, HighestKey);
-        high = Math.Clamp(high, low, HighestKey);
-
-        int span = high - low + 1;
-        var regions = new List<(int, int)>(count);
-
-        for (int i = 0; i < count; i++)
-        {
-            int from = low + span * i / count;
-
-            int to = i == count - 1 ? high : low + span * (i + 1) / count - 1;
-
-            regions.Add((from, Math.Max(from, to)));
-        }
-
-        return regions;
-    }
+    /// <param name="low">The bottom of the stretch to share out.</param>
+    /// <param name="high">The top of it.</param>
+    /// <param name="count">How many pieces want a share. Nought or fewer is no pieces at all.</param>
+    IReadOnlyList<(int Low, int High)> Split(int low, int high, int count);
 
     /// <summary>The key in the middle of a stretch, which is where a piece of it is rooted.</summary>
     /// <remarks>
     /// Rooting a zone in its own middle keeps the worst transposition down to half its width
     /// either way, which is the best any even split can do.
     /// </remarks>
-    public static int Middle(int low, int high) => (low + high) / 2;
+    /// <param name="low">The bottom of the stretch.</param>
+    /// <param name="high">The top of it.</param>
+    int Middle(int low, int high);
 }

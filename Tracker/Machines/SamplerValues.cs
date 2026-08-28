@@ -4,6 +4,8 @@ using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -41,6 +43,9 @@ public sealed class SamplerValues(
     SamplerPatchViewModel patch,
     Func<SampleZoneViewModel?>? about = null) : MachineValues
 {
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>How loud the zone in hand plays.</summary>
     /// <remarks>
     /// The keys are written out one by one, never built from a name or a loop, so every key in
@@ -336,7 +341,7 @@ public sealed class SamplerValues(
         switch (key)
         {
             case TakeKey:
-                if (FilePaths.Same(zone.Zone.FilePath, value)) return false;
+                if (_paths.Same(zone.Zone.FilePath, value)) return false;
 
                 zone.Take(value);
 

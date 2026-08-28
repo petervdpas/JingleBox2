@@ -9,6 +9,9 @@ using JingleBox2.Machines;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -27,6 +30,12 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class InstrumentPresets : ObservableObject, IMachinePresets
 {
+    /// <summary>The machines this run has.</summary>
+    private readonly IMachineProjects _machines;
+
+    /// <summary>The presets those machines ship with.</summary>
+    private readonly IPresetLibrary _presets;
+
     /// <summary>The instrument a picked preset is poured into.</summary>
     private readonly TrackerInstrument _instrument;
 
@@ -64,12 +73,20 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// The category filter in front of the takes, so a described panel can offer the categories
     /// through the one control it has.
     /// </param>
+    /// <param name="machines">
+    /// The machines this run has, the one instance everything shares. Required rather than
+    /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
+    /// machine missing, without an error anywhere to say why.
+    /// </param>
     public InstrumentPresets(
         TrackerInstrument instrument,
         Action applied,
+        IMachineProjects machines,
         ObservableCollection<Models.Recording>? takes = null,
         TakeFilter? narrowing = null)
     {
+        _machines = machines;
+        _presets = new MachinePresets(machines);
         _instrument = instrument;
         _applied = applied;
         _takes = takes;
@@ -112,7 +129,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     {
         string id = Machine.For(_instrument.Kind).SlotId;
 
-        if (Tracker.Machines.MachineProjects.For(id)?.BrowsesTakes() is { } said) return said;
+        if (_machines.For(id)?.BrowsesTakes() is { } said) return said;
 
         return _instrument.Kind == TrackerInstrumentKind.Sample;
     }
@@ -177,7 +194,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
             }
             else
             {
-                foreach (var preset in MachinePresets.For(_instrument.Machine)) Items.Add(preset);
+                foreach (var preset in _presets.For(_instrument.Machine)) Items.Add(preset);
             }
 
             Selected = null;

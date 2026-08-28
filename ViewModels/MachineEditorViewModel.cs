@@ -14,6 +14,7 @@ using System.Linq;
 using System.IO;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Records;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -30,6 +31,10 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineEditorViewModel : ObservableObject
 {
+    /// <summary>A machine going into a zip and coming back out.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineArchive Crates = new MachineArchive();
+
     /// <summary>
     /// What has been done to the machine being designed, so it can be taken back.
     /// </summary>
@@ -416,7 +421,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         try
         {
-            MachineArchive.Export(project, zipPath);
+            Crates.Export(project, zipPath);
 
             Status = "Exported '" + project.Name + "' to " + zipPath;
         }

@@ -12,39 +12,20 @@ using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
-/// <summary>
-/// A preset written the way the machine is drawn: one small piece of JSON per control.
-/// </summary>
-/// <remarks>
-/// Every knob on a machine names a parameter, and every pad button names itself. So a preset is
-/// those names with values against them, and nothing else. What the machine already says is not
-/// said again: which key a pad answers to is on the button, so it is not in the preset, and
-/// reordering the grid cannot silently move every drum along one the way a list of sixteen could.
-///
-/// It replaces a preset written as a whole instrument. That shape carried a plugin path, a plugin
-/// id and a base note into a drum kit, none of which a kit has, and it keyed its pads by their
-/// place in a list.
-///
-/// The machine's id at the top is what says which shape a file is in. A file without one is the
-/// older kind and is read as an instrument, which is what every preset on the machines that have
-/// not been converted still is.
-///
-/// Three shapes of machine, and one shape of block. A machine may hold a grid of pads, a map of
-/// zones, or nothing but itself, and those are three different machines and are read and written
-/// as three. What they share is what a block of JSON is: a set of names the machine declared,
-/// with the values under them, written through the one adapter that knows what each name means.
-/// So <see cref="Block"/> and <see cref="Line"/> are the whole of the format and everything else
-/// is a question of which things there are.
-///
-/// A preset that will not read is written to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather
-/// than to the application's own area, as everything under this folder is, and comes back as
-/// nothing rather than throwing: a machine with one bad preset in its folder should still open.
-/// </remarks>
-public static class MachinePresetFile
+/// <inheritdoc/>
+/// <param name="paths">
+/// The two questions asked of a recording's path inside a machine. Left out, the ordinary one,
+/// which reads the path rule off this system.
+/// </param>
+public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePresetFile
 {
+    /// <summary>Where a name written inside a machine really is, and back again.</summary>
+    private readonly IMachinePaths _paths = paths ?? new MachinePaths();
+
     /// <summary>What the preset is called on the picker.</summary>
     public const string NameKey = "Name";
 
@@ -72,35 +53,31 @@ public static class MachinePresetFile
     /// </remarks>
     public const string KeyProperty = "key";
 
-    /// <summary>True when that file is written the new way.</summary>
-    public static bool Keyed(JsonNode? read) =>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The five keys are constants as well as answers, since they are facts about the file
+    /// format and a caller that has never held one of these still names them.
+    /// </remarks>
+    string IMachinePresetFile.NameKey => NameKey;
+
+    /// <inheritdoc/>
+    string IMachinePresetFile.MachineKey => MachineKey;
+
+    /// <inheritdoc/>
+    string IMachinePresetFile.BrowseKey => BrowseKey;
+
+    /// <inheritdoc/>
+    string IMachinePresetFile.SettingsProperty => SettingsProperty;
+
+    /// <inheritdoc/>
+    string IMachinePresetFile.KeyProperty => KeyProperty;
+
+    /// <inheritdoc/>
+    public bool Keyed(JsonNode? read) =>
         read is JsonObject held && held.ContainsKey(MachineKey);
 
-    /// <summary>
-    /// Reads one, applying it to a fresh instrument of that machine's kind.
-    /// </summary>
-    /// <remarks>
-    /// The instrument is what the engine plays, so a preset has to become one before it can be
-    /// heard. What this knows that nothing else does is which name goes where: a machine-wide
-    /// key is a setting on the instrument, and a name that stands for one of the machine's things
-    /// is that thing's block.
-    ///
-    /// Which adapter answers a key outside a block and which answers the keys inside one is
-    /// worked out first, and it is the only thing about a preset that depends on what machine it
-    /// is for. A machine with buttons is a kit, one with a map is a sampler, and one with
-    /// neither is whichever of the three plain machines its slot says it is.
-    ///
-    /// How many things a machine holds is not the same question on the two of them. A kit has as
-    /// many pads as the machine declares buttons, which is the only place that number is said,
-    /// and the key each pad answers to is on the button rather than in the preset, so a preset
-    /// saying it too would be a second place for it to be wrong. A sampler has one zone per
-    /// block in the order the file writes them: nothing declares how many zones a sampler has,
-    /// since a piano sampled every fourth key is thirteen of them and the same piano sampled
-    /// once is one, so the preset is where that number comes from.
-    /// </remarks>
-    /// <param name="path">The preset file.</param>
-    /// <param name="machine">The machine it is for, which is what says how it is read.</param>
-    public static TrackerInstrument? Read(string path, MachineProject machine)
+    /// <inheritdoc/>
+    public TrackerInstrument? Read(string path, MachineProject machine)
     {
         try
         {
@@ -211,27 +188,8 @@ public static class MachinePresetFile
         }
     }
 
-    /// <summary>
-    /// Writes one out from an instrument, keyed the way the machine is drawn.
-    /// </summary>
-    /// <remarks>
-    /// Only what the machine declares. A setting the machine has no control for is not written,
-    /// because it is not a thing this machine can be set to, and carrying it would put a base
-    /// note into a drum kit again.
-    ///
-    /// A pad's block is named after the key the pad answers to. That is the one fact about a pad
-    /// that is true outside the machine as well: it is the note that fires it in a pattern, so a
-    /// preset can be read against a keyboard rather than against a list of names somebody
-    /// invented. A zone's block is named after the zone, for the same reason a pad's is not
-    /// numbered: a preset that says what is on "Squeal" can be read, and one that says what is
-    /// on the fourth thing in a list cannot.
-    ///
-    /// A sampler writes the machine's own half first, so the file opens on the filter rather
-    /// than on the eleventh piece of a chop.
-    /// </remarks>
-    /// <param name="sound">The instrument being written down.</param>
-    /// <param name="machine">The machine it came off, which is what says how it is written.</param>
-    public static string Write(TrackerInstrument sound, MachineProject machine)
+    /// <inheritdoc/>
+    public string Write(TrackerInstrument sound, MachineProject machine)
     {
         var held = new JsonObject
         {
@@ -340,7 +298,7 @@ public static class MachinePresetFile
     /// writes a sixth line without this being told about it, and there is one place in the program
     /// that knows what "pad_pan" means.
     /// </remarks>
-    private static JsonObject Block(IMachineValues values, Settings owned, string home)
+    private JsonObject Block(IMachineValues values, Settings owned, string home)
     {
         var block = new JsonObject();
 
@@ -359,7 +317,7 @@ public static class MachinePresetFile
     }
 
     /// <summary>Puts a block back on the thing it is about, by what the machine calls each line.</summary>
-    private static void Apply(IMachineValues values, Settings owned, JsonObject block, string home)
+    private void Apply(IMachineValues values, Settings owned, JsonObject block, string home)
     {
         foreach (var (key, node) in block) Line(values, owned.Numbers, owned.Words, key, node, home);
     }
@@ -372,7 +330,7 @@ public static class MachinePresetFile
     /// a later version of a machine has lines this one has no control for, and a knob turned by a
     /// name nobody recognises is worse than a knob left alone.
     /// </remarks>
-    private static void Line(
+    private void Line(
         IMachineValues values,
         ICollection<string> numbers, ICollection<string> words,
         string key, JsonNode? node, string home)
@@ -511,7 +469,7 @@ public static class MachinePresetFile
     /// the adapter like any other setting. So it has a reader of its own rather than a case in
     /// <see cref="Line"/>.
     /// </remarks>
-    private static void Put(RecordingValues values, TrackerInstrument sound, string key, JsonNode? node, string home)
+    private void Put(RecordingValues values, TrackerInstrument sound, string key, JsonNode? node, string home)
     {
         if (node is JsonValue said && said.TryGetValue(out string? words))
         {
@@ -555,23 +513,16 @@ public static class MachinePresetFile
             : "";
 
     /// <summary>That recording said from the presets folder, so the preset travels with the machine.</summary>
-    private static string Inside(string path, string home)
+    private string Inside(string path, string home)
     {
-        return MachinePaths.Named(path, home) ?? path;
+        return _paths.Named(path, home) ?? path;
     }
 
     /// <summary>And back: where that name really is on this disc.</summary>
-    private static string Outside(string named, string home) => MachinePaths.Outside(named, home);
+    private string Outside(string named, string home) => _paths.Outside(named, home);
 
-    /// <summary>
-    /// The pad buttons the machine declares, with the key each answers to.
-    /// </summary>
-    /// <remarks>
-    /// The count is how many pads a kit built on this machine has, and it is the only place that
-    /// number is said. A machine that draws no grid has none, which is how a kit is told apart
-    /// from every other machine here.
-    /// </remarks>
-    public static List<(string Name, string Key, int Semitone)> Buttons(MachineProject machine)
+    /// <inheritdoc/>
+    public List<(string Name, string Key, int Semitone)> Buttons(MachineProject machine)
     {
         var found = new List<(string, string, int)>();
 

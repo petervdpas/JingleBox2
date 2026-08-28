@@ -1,25 +1,24 @@
-using System;
 using JingleBox2.Tracker.Records;
 
-namespace JingleBox2.Tracker;
+namespace JingleBox2.Music.Interfaces;
 
 /// <summary>
 /// Turns MIDI note numbers and velocities into tracker values. Pure, so the mapping can be
 /// checked without a keyboard plugged in.
 /// </summary>
-public static class MidiNoteInput
+public interface IMidiNoteInput
 {
     /// <summary>MIDI note 60 is middle C, which is C-4 here, and semitones count from C-0.</summary>
-    public const int SemitoneOffset = -12;
+    int SemitoneOffset { get; }
 
     /// <summary>The lowest note number MIDI has.</summary>
-    public const int MinMidiNote = 0;
+    int MinMidiNote { get; }
 
     /// <summary>And the highest, since a note number is seven bits.</summary>
-    public const int MaxMidiNote = 127;
+    int MaxMidiNote { get; }
 
     /// <summary>The hardest a key can be struck, which is seven bits as well.</summary>
-    public const int MaxVelocity = 127;
+    int MaxVelocity { get; }
 
     /// <summary>
     /// The tracker note that MIDI note number means, or false when it falls outside the range.
@@ -28,17 +27,9 @@ public static class MidiNoteInput
     /// Refused rather than clamped, both ends. A note out of range is a keyboard transposed past
     /// what a pattern can hold, and clamping would pile every key beyond the edge onto one note.
     /// </remarks>
-    public static bool TryNote(int midiNote, out Note note)
-    {
-        note = Note.Empty;
-        if (midiNote < MinMidiNote || midiNote > MaxMidiNote) return false;
-
-        int semitone = midiNote + SemitoneOffset;
-        if (semitone < Note.MinSemitone || semitone > Note.MaxSemitone) return false;
-
-        note = new Note(semitone);
-        return true;
-    }
+    /// <param name="midiNote">The note number off the wire.</param>
+    /// <param name="note">The tracker note it means, or <c>Note.Empty</c> when there is none.</param>
+    bool TryNote(int midiNote, out Note note);
 
     /// <summary>Velocity on the cell's 0..64 scale. A keyboard that sends no velocity plays full.</summary>
     /// <remarks>
@@ -46,14 +37,6 @@ public static class MidiNoteInput
     /// rounded is 64 only because the rounding happens to go that way, and a full-strength key
     /// writing 63 is the kind of thing nobody would ever find.
     /// </remarks>
-    public static int VolumeFor(int velocity)
-    {
-        if (velocity <= 0) return 0;
-        if (velocity >= MaxVelocity) return TrackerCell.MaxVolume;
-
-        int volume = (int)Math.Round(velocity * (double)TrackerCell.MaxVolume / MaxVelocity,
-            MidpointRounding.AwayFromZero);
-
-        return Math.Clamp(volume, 0, TrackerCell.MaxVolume);
-    }
+    /// <param name="velocity">How hard the key was struck, 0 to 127.</param>
+    int VolumeFor(int velocity);
 }

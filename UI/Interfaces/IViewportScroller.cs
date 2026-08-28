@@ -1,16 +1,15 @@
-using System;
 using JingleBox2.Tracker.Records;
 
-namespace JingleBox2.Tracker;
+namespace JingleBox2.UI.Interfaces;
 
 /// <summary>
 /// Works out the scroll offset that keeps one item inside a viewport. One axis at a time,
 /// so the same function follows the cursor down the rows and across the tracks.
 /// </summary>
-public static class ViewportScroller
+public interface IViewportScroller
 {
     /// <summary>How much of the neighbouring content to keep in view, in item lengths.</summary>
-    public const double DefaultMarginItems = 2;
+    double DefaultMarginItems { get; }
 
     /// <summary>
     /// The offset to scroll to so the item is visible, or the current offset when it already
@@ -22,36 +21,30 @@ public static class ViewportScroller
     /// that already fits inside it. Both happen: the first is every control before its first
     /// layout, and the second is an ordinary short pattern.
     /// </remarks>
-    public static double KeepVisible(
+    /// <param name="offset">Where the viewport is scrolled to now.</param>
+    /// <param name="viewportLength">How much is seen at once, along this axis.</param>
+    /// <param name="itemStart">Where the item begins, in the content's own measure.</param>
+    /// <param name="itemLength">How long the item is.</param>
+    /// <param name="contentLength">How long everything there is to scroll through.</param>
+    /// <param name="margin">How much room to keep beyond the item at either end.</param>
+    /// <returns>The offset to scroll to, never past either end of the content.</returns>
+    double KeepVisible(
         double offset,
         double viewportLength,
         double itemStart,
         double itemLength,
         double contentLength,
-        double margin = 0)
-    {
-        double maxOffset = Math.Max(0, contentLength - viewportLength);
-
-        if (viewportLength <= 0 || maxOffset <= 0) return 0;
-
-        double wantedStart = itemStart - margin;
-        double wantedEnd = itemStart + itemLength + margin;
-
-        double result = offset;
-
-        if (wantedStart < offset)
-            result = wantedStart;
-        else if (wantedEnd > offset + viewportLength)
-            result = wantedEnd - viewportLength;
-
-        return Math.Clamp(result, 0, maxOffset);
-    }
+        double margin = 0);
 
     /// <summary>Keeps a pattern row in view, with a couple of rows of context around it.</summary>
-    public static double KeepRowVisible(
-        double offset, double viewportHeight, PatternMetrics metrics, int row, int lines) =>
-        KeepVisible(offset, viewportHeight, metrics.RowY(row), metrics.RowHeight,
-            metrics.ContentHeight(lines), metrics.RowHeight * DefaultMarginItems);
+    /// <param name="offset">Where the pattern is scrolled to now.</param>
+    /// <param name="viewportHeight">How much of the pattern is seen at once.</param>
+    /// <param name="metrics">The pattern's measurements.</param>
+    /// <param name="row">The line to keep in view.</param>
+    /// <param name="lines">How many lines the pattern has.</param>
+    /// <returns>The offset to scroll to.</returns>
+    double KeepRowVisible(
+        double offset, double viewportHeight, PatternMetrics metrics, int row, int lines);
 
     /// <summary>
     /// The offset that puts a row on the middle of the screen and leaves it there.
@@ -72,30 +65,22 @@ public static class ViewportScroller
     /// Renoise leaves that room and leaves it empty, which is visible in its own screenshots by
     /// the cursor sitting at the same height on every one of them.
     /// </remarks>
-    public static double CentreRow(
-        double viewportHeight, PatternMetrics metrics, int row, int lines)
-    {
-        double content = metrics.ContentHeight(lines);
-        double maxOffset = Math.Max(0, content - viewportHeight);
-
-        if (viewportHeight <= 0 || maxOffset <= 0) return 0;
-
-        double middle = metrics.RowY(row) + metrics.RowHeight / 2;
-
-        return Math.Clamp(middle - viewportHeight / 2, 0, maxOffset);
-    }
+    /// <param name="viewportHeight">How much of the pattern is seen at once.</param>
+    /// <param name="metrics">The pattern's measurements.</param>
+    /// <param name="row">The line to put on the middle.</param>
+    /// <param name="lines">How many lines the pattern has.</param>
+    /// <returns>The offset to scroll to.</returns>
+    double CentreRow(double viewportHeight, PatternMetrics metrics, int row, int lines);
 
     /// <summary>
     /// Keeps a track in view, including its divider and padding. The line numbers scroll with
     /// the pattern rather than being pinned, so the first track counts the gutter as part of
     /// itself: scrolling back to track 0 should put the row numbers back on screen too.
     /// </summary>
-    public static double KeepTrackVisible(
-        double offset, double viewportWidth, PatternMetrics metrics, int track)
-    {
-        double start = track == 0 ? 0 : metrics.TrackDividerX(track);
-        double length = metrics.TrackDividerX(track + 1) - start;
-
-        return KeepVisible(offset, viewportWidth, start, length, metrics.ContentWidth);
-    }
+    /// <param name="offset">Where the pattern is scrolled to now, across.</param>
+    /// <param name="viewportWidth">How many tracks' worth is seen at once.</param>
+    /// <param name="metrics">The pattern's measurements.</param>
+    /// <param name="track">The track to keep in view.</param>
+    /// <returns>The offset to scroll to.</returns>
+    double KeepTrackVisible(double offset, double viewportWidth, PatternMetrics metrics, int track);
 }

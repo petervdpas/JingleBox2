@@ -10,6 +10,8 @@ using System.Linq;
 using System.Text.Json.Nodes;
 using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -275,6 +277,10 @@ public sealed partial class PresetSection : ObservableObject
 /// </remarks>
 public sealed partial class MachinePresetForm : ObservableObject
 {
+    /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePaths MachineFolder = new MachinePaths();
+
     /// <summary>The preset itself, which every line on the page reads and writes.</summary>
     private readonly JsonObject _held;
 
@@ -590,7 +596,7 @@ public sealed partial class MachinePresetForm : ObservableObject
     {
         if (path.Length == 0 || _home.Length == 0) return path;
 
-        return Tracker.Machines.MachinePaths.Named(path, _home) ?? path;
+        return MachineFolder.Named(path, _home) ?? path;
     }
 }
 

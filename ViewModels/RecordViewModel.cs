@@ -45,6 +45,10 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>Which instruments play a given recording, and how to say so.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISampleUsers Usage = new SampleUsers();
+
     /// <summary>What actually opens the input and writes the file.</summary>
     private readonly IRecordingService _recordingService;
 
@@ -1020,7 +1024,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     public void RefreshUsage()
     {
         foreach (var recording in Recordings)
-            recording.UsedBy = Tracker.SampleUsage.Describe(UsersOf(recording));
+            recording.UsedBy = Usage.Describe(UsersOf(recording));
     }
 
     /// <summary>
@@ -1116,7 +1120,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         if (recording == null) return;
 
         var used = UsersOf(recording);
-        recording.UsedBy = Tracker.SampleUsage.Describe(used);
+        recording.UsedBy = Usage.Describe(used);
 
         if (used.Count > 0)
         {

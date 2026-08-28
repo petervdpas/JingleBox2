@@ -4,6 +4,8 @@ using System;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -22,6 +24,10 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="kit">The kit on the other side, which is the one the editor is already on.</param>
 public sealed class KitPads(DrumKitViewModel kit) : IMachinePads
 {
+    /// <summary>Following a list of things and what each of them says.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineWatch Watching = new MachineWatch();
+
     /// <summary>
     /// Whether the kit is being watched yet.
     /// </summary>
@@ -96,7 +102,7 @@ public sealed class KitPads(DrumKitViewModel kit) : IMachinePads
 
         _listening = true;
 
-        MachineWatch.Items<DrumPadViewModel>(
+        Watching.Items<DrumPadViewModel>(
             kit, kit.Pads, () => kit.Pads, () => _changed?.Invoke(this, EventArgs.Empty));
     }
 

@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
+using JingleBox2.Tracker;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -120,6 +124,14 @@ public sealed class SampleZone
 /// </remarks>
 public sealed class ZoneMap
 {
+    /// <summary>Sharing a stretch of keyboard out among a number of pieces.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IKeyRegions Regions = new KeyRegions();
+
+    /// <summary>What a kit and a map do identically with a chopped recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISlices Pieces = new Slices();
+
     /// <summary>How many zones a map can hold.</summary>
     public const int MaxZones = 32;
 
@@ -165,13 +177,13 @@ public sealed class ZoneMap
         var sounding = Zones.Where(z => z.HasSound).ToList();
         if (sounding.Count == 0) return;
 
-        var regions = KeyRegions.Split(low, high, sounding.Count);
+        var regions = Regions.Split(low, high, sounding.Count);
 
         for (int i = 0; i < sounding.Count; i++)
         {
             sounding[i].Low = regions[i].Low;
             sounding[i].High = regions[i].High;
-            sounding[i].Root = KeyRegions.Middle(regions[i].Low, regions[i].High);
+            sounding[i].Root = Regions.Middle(regions[i].Low, regions[i].High);
         }
     }
 
@@ -196,14 +208,14 @@ public sealed class ZoneMap
 
     /// <summary>The recording the slices come from, or empty when they do not agree on one.</summary>
     [JsonIgnore]
-    public string SlicedFile => Slices.OneFile(Zones.Select(z => z.FilePath));
+    public string SlicedFile => Pieces.OneFile(Zones.Select(z => z.FilePath));
 
     /// <summary>
     /// Where the recording was cut, read back off the zones. One more point than there are
     /// slices: the first is where the sliced region starts, the last where it ends.
     /// </summary>
     public IReadOnlyList<double> SlicePoints() =>
-        IsSliced ? Slices.PointsFrom(Zones.Select(z => z.Shape).ToList()) : Array.Empty<double>();
+        IsSliced ? Pieces.PointsFrom(Zones.Select(z => z.Shape).ToList()) : Array.Empty<double>();
 
     /// <summary>
     /// One recording cut at those points and laid across the keyboard, a piece to each stretch
@@ -238,21 +250,21 @@ public sealed class ZoneMap
         int low = KeyRegions.PianoLow,
         int high = KeyRegions.PianoHigh)
     {
-        int slices = Slices.CountFor(points, MaxZones);
+        int slices = Pieces.CountFor(points, MaxZones);
 
         if (slices == 0) return;
 
         while (Zones.Count > slices) Zones.RemoveAt(Zones.Count - 1);
         while (Zones.Count < slices) Zones.Add(new SampleZone());
 
-        var regions = KeyRegions.Split(low, high, slices);
+        var regions = Regions.Split(low, high, slices);
 
         for (int i = 0; i < slices; i++)
         {
             var zone = Zones[i];
 
             zone.FilePath = filePath;
-            zone.Name = Slices.NameFor(filePath, i);
+            zone.Name = Pieces.NameFor(filePath, i);
 
             zone.Shape ??= new SampleShape();
             zone.Shape.Start = points[i];
@@ -260,7 +272,7 @@ public sealed class ZoneMap
 
             zone.Low = regions[i].Low;
             zone.High = regions[i].High;
-            zone.Root = KeyRegions.Middle(regions[i].Low, regions[i].High);
+            zone.Root = Regions.Middle(regions[i].Low, regions[i].High);
         }
 
         Sliced = true;

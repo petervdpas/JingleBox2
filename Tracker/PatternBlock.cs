@@ -1,5 +1,7 @@
 using System;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -76,10 +78,19 @@ public sealed class PatternBlock
     /// to be recorded like the rest, so it rings that class's own bell on the way in. The bell is
     /// rung before anything is checked, since a paste that turns out to land nowhere leaves no
     /// step of its own but must not swallow the step the pattern was owed.
+    ///
+    /// The editor is handed in rather than made here, and that is not ceremony. The hook lives on
+    /// the editor, so a block holding one of its own would ring a bell nobody had tied to
+    /// anything: the paste would land and leave no step, and undo would go back past it to
+    /// whatever happened before. It was static once and the question could not arise; it can now,
+    /// and the answer is that a paste is an edit by the same editor as every other edit.
     /// </remarks>
-    public PatternSelection Paste(Pattern? pattern, PatternCursor at)
+    /// <param name="edits">The editor the history is listening to. The caller's own, always.</param>
+    /// <param name="pattern">Where it lands. Nothing lands nowhere and leaves no step.</param>
+    /// <param name="at">The top left corner of where it goes.</param>
+    public PatternSelection Paste(IPatternEdit edits, Pattern? pattern, PatternCursor at)
     {
-        if (pattern is not null) PatternEdit.Watching?.Invoke(pattern, "pasting");
+        if (pattern is not null) edits.Watching?.Invoke(pattern, "pasting");
 
         if (pattern == null || IsEmpty) return PatternSelection.None;
         if (!pattern.Contains(at.Line, at.Track)) return PatternSelection.None;

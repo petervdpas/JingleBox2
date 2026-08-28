@@ -6,6 +6,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Machines.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -35,6 +39,13 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public sealed class MachineProject
 {
+    /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePaths Inside = new MachinePaths();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>What the file at the top of a machine's folder is called.</summary>
     /// <remarks>
     /// Written out rather than built, so the one file a machine is recognised by can be found by
@@ -476,7 +487,7 @@ public sealed class MachineProject
                 string suffix = Path.GetExtension(was);
                 string now = Path.Combine(images, ImageStem + (i + 1) + suffix);
 
-                if (FilePaths.Same(was, now)) continue;
+                if (_paths.Same(was, now)) continue;
 
                 File.Move(was, now);
 
@@ -514,7 +525,7 @@ public sealed class MachineProject
             string images = Path.GetFullPath(Path.Combine(Folder, ImagesFolder));
             string wanted = Path.GetFullPath(Path.Combine(Folder, named));
 
-            if (!MachinePaths.Under(wanted, images)) return false;
+            if (!Inside.Under(wanted, images)) return false;
 
             if (!File.Exists(wanted)) return false;
 

@@ -1,33 +1,27 @@
 using System;
 using System.IO;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
-/// <summary>
-/// The two questions asked of every path a machine holds: is it inside the machine, and what is
-/// it called in there.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// A machine travels as a folder, so a recording it carries has to be written down relative to
-/// that folder and with forward slashes, or the machine only works on the computer it was built
-/// on. Reading one back is the same act in reverse, and both were written out separately in four
-/// places, which is four chances for one of them to compare paths the wrong way.
-///
-/// The wrong way is what this exists to settle. Windows treats two paths that differ only in
-/// case as the same path and Linux does not, so a test done with an exact comparison is a test
-/// that says no on Windows for a file that is plainly there. What comes of that is not a crash:
-/// a machine quietly refuses to be removed, or writes an absolute path into a zip that will not
-/// open anywhere else.
+/// The path rule is taken once, when one of these is made, and every test below is a prefix
+/// comparison under it.
 /// </remarks>
-public static class MachinePaths
+/// <param name="paths">
+/// How this system decides two paths are the same. Left out, the rule this system really has,
+/// which is what the application wants; given, whatever a test wants to hold it to.
+/// </param>
+public sealed class MachinePaths(IFilePaths? paths = null) : IMachinePaths
 {
-    /// <summary>True when that path is somewhere inside that folder.</summary>
-    /// <remarks>
-    /// The folder itself does not count as being inside itself, which is what the length test is
-    /// for: a machine cannot be installed over the folder it is being copied from, and a file
-    /// that is the folder is not a file in it.
-    /// </remarks>
-    public static bool Under(string path, string folder)
+    /// <summary>How two paths are compared, which is a fact about the disc and not about here.</summary>
+    private readonly IFilePaths _paths = paths ?? new FilePaths();
+
+    /// <inheritdoc/>
+    public bool Under(string path, string folder)
     {
         if (path.Length == 0 || folder.Length == 0) return false;
 
@@ -36,7 +30,7 @@ public static class MachinePaths
             string full = Path.GetFullPath(path);
             string root = Root(folder);
 
-            return full.StartsWith(root, FilePaths.Comparison) && full.Length > root.Length;
+            return full.StartsWith(root, _paths.Comparison) && full.Length > root.Length;
         }
         catch (Exception)
         {
@@ -44,14 +38,8 @@ public static class MachinePaths
         }
     }
 
-    /// <summary>
-    /// What that path is called inside that folder, or nothing when it is not in there.
-    /// </summary>
-    /// <remarks>
-    /// Forward slashes whatever this system uses, because the answer is going into a file that
-    /// another system will read. <see cref="Outside"/> puts it back.
-    /// </remarks>
-    public static string? Named(string path, string folder)
+    /// <inheritdoc/>
+    public string? Named(string path, string folder)
     {
         if (path.Length == 0 || folder.Length == 0) return null;
 
@@ -60,7 +48,7 @@ public static class MachinePaths
             string full = Path.GetFullPath(path);
             string root = Root(folder);
 
-            if (!full.StartsWith(root, FilePaths.Comparison) || full.Length <= root.Length) return null;
+            if (!full.StartsWith(root, _paths.Comparison) || full.Length <= root.Length) return null;
 
             return full[root.Length..].Replace(Path.DirectorySeparatorChar, '/');
         }
@@ -70,8 +58,8 @@ public static class MachinePaths
         }
     }
 
-    /// <summary>Where a name written down inside a machine really is on this disc.</summary>
-    public static string Outside(string named, string folder)
+    /// <inheritdoc/>
+    public string Outside(string named, string folder)
     {
         if (named.Length == 0 || folder.Length == 0 || Path.IsPathRooted(named)) return named;
 

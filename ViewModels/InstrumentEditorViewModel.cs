@@ -22,6 +22,12 @@ using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Machines.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.UI.Interfaces;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -31,6 +37,27 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>How a preset file is read and written.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePresetFile PresetFiles = new MachinePresetFile();
+
+    /// <summary>Which values adapter reads a given instrument.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineValuesFor ValuesFor = new MachineValuesFor();
+
+    /// <summary>The machines this run has.</summary>
+    private readonly IMachineProjects _machines;
+
+    /// <summary>What a kit and a map do identically with a chopped recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISlices Pieces = new Slices();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
+    /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
+    private readonly IGainScale _gain = new GainScale();
+
     /// <summary>The instrument being edited, written straight through rather than copied.</summary>
     private readonly TrackerInstrument _instrument;
 
@@ -120,15 +147,22 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// one played on the keyboard, so the keyboard moves to it and lights it. Without one, a tap
     /// still sounds, through the audition alone, and nothing on screen moves.
     /// </param>
+    /// <param name="machines">
+    /// The machines this run has, the one instance everything shares. Required rather than
+    /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
+    /// machine missing, without an error anywhere to say why.
+    /// </param>
     public InstrumentEditorViewModel(
         int index,
         TrackerInstrument instrument,
         Action changed,
+        IMachineProjects machines,
         IWaveformService? waveforms = null,
         IInstrumentAudition? audition = null,
         ObservableCollection<Recording>? recordings = null,
         Action<Note>? play = null)
     {
+        _machines = machines;
         Index = index;
         _instrument = instrument;
 
@@ -185,9 +219,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (instrument.IsKit)
         {
-            int declared = Tracker.Machines.MachineProjects.For(Machine.For(instrument.Kind).SlotId)
+            int declared = _machines.For(Machine.For(instrument.Kind).SlotId)
                 is { } project
-                ? Tracker.Machines.MachinePresetFile.Buttons(project).Count
+                ? PresetFiles.Buttons(project).Count
                 : 0;
 
             instrument.Kit ??= DrumKit.Empty(declared > 0 ? declared : DrumKit.PadCount);
@@ -262,9 +296,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     {
         string id = Machine.For(_instrument.Kind).SlotId;
 
-        if (Tracker.Machines.MachineProjects.PanelFor(id) is not { } face) return;
+        if (_machines.PanelFor(id) is not { } face) return;
 
-        if (Tracker.Machines.MachineProjects.For(id) is not { } project) return;
+        if (_machines.For(id) is not { } project) return;
 
         void Moved()
         {
@@ -275,7 +309,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
 
-        if (Tracker.Machines.MachineValuesFor.Instrument(
+        if (ValuesFor.Instrument(
                 _instrument, shelf, Kit, Patch, MonoSynth, Zones, Sampler) is not { } made)
             return;
 
@@ -861,7 +895,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     private void Reread()
     {
         if (_instrument.IsSynth || _instrument.IsPlugin) return;
-        if (Tracker.FilePaths.Same(_instrument.FilePath, _drawn)) return;
+        if (_paths.Same(_instrument.FilePath, _drawn)) return;
 
         _waveform = null;
         _sampleProblem = null;
@@ -975,8 +1009,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// <summary>The same level as a fader reads it: decibels, with unity at zero.</summary>
     public double VolumeDecibels
     {
-        get => GainScale.ToDecibels(_instrument.Volume);
-        set => Volume = GainScale.ToAmplitude(value);
+        get => _gain.ToDecibels(_instrument.Volume);
+        set => Volume = _gain.ToAmplitude(value);
     }
 
     /// <summary>The pitch the file sounds at, which every other note is measured against.</summary>

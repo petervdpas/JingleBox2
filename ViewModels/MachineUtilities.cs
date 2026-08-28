@@ -12,6 +12,9 @@ using System.Text.Json.Nodes;
 using JingleBox2.ViewModels.Enums;
 using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -78,6 +81,17 @@ public sealed partial class WaveLevel : ObservableObject
 /// </remarks>
 public sealed partial class MachineUtilities : ObservableObject
 {
+    /// <summary>The waves a preset names.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IPresetWaves WaveFiles = new PresetWaves();
+
+    /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachinePaths Inside = new MachinePaths();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>
     /// Whichever machine is open in the designer, asked rather than held.
     /// </summary>
@@ -159,7 +173,7 @@ public sealed partial class MachineUtilities : ObservableObject
         OnPropertyChanged(nameof(MachineName));
         OnPropertyChanged(nameof(HasMachine));
 
-        Preset = Presets.FirstOrDefault(one => Tracker.FilePaths.Same(one.Path, was))
+        Preset = Presets.FirstOrDefault(one => _paths.Same(one.Path, was))
                  ?? Presets.FirstOrDefault();
 
         Retool();
@@ -331,7 +345,7 @@ public sealed partial class MachineUtilities : ObservableObject
         {
             if (Preset is not { } one || Home.Length == 0) return "";
 
-            return PresetWaves.Folder(one.Path, Home) is { Length: > 0 } folder
+            return WaveFiles.Folder(one.Path, Home) is { Length: > 0 } folder
                 ? Path.GetFileName(folder)
                 : "none inside the machine";
         }
@@ -399,7 +413,7 @@ public sealed partial class MachineUtilities : ObservableObject
                 return;
             }
 
-            string? folder = PresetWaves.Folder(one.Path, home);
+            string? folder = WaveFiles.Folder(one.Path, home);
 
             if (folder is { Length: > 0 } && Others(folder, one).Count > 0) folder = null;
 
@@ -434,7 +448,7 @@ public sealed partial class MachineUtilities : ObservableObject
 
             Reread();
 
-            Preset = Presets.FirstOrDefault(slot => Tracker.FilePaths.Same(slot.Path, wantedFile)) ?? Preset;
+            Preset = Presets.FirstOrDefault(slot => _paths.Same(slot.Path, wantedFile)) ?? Preset;
 
             Said = folder is { Length: > 0 }
                 ? "Renamed to '" + name + "', recordings and all."
@@ -476,8 +490,8 @@ public sealed partial class MachineUtilities : ObservableObject
 
     /// <summary>The other presets playing out of that folder.</summary>
     private IReadOnlyList<string> Others(string folder, MachinePresetSlot mine) =>
-        PresetWaves.Users(folder, Home, Presets
-            .Where(slot => !Tracker.FilePaths.Same(slot.Path, mine.Path))
+        WaveFiles.Users(folder, Home, Presets
+            .Where(slot => !_paths.Same(slot.Path, mine.Path))
             .Select(slot => slot.Path));
 
     /// <summary>Points every recording in the preset at the folder's new name.</summary>
@@ -488,7 +502,7 @@ public sealed partial class MachineUtilities : ObservableObject
             case JsonObject held:
                 foreach (string key in held.Select(pair => pair.Key).ToList())
                 {
-                    if (held[key] is JsonValue value && value.TryGetValue(out string? said) && PresetWaves.IsWave(said))
+                    if (held[key] is JsonValue value && value.TryGetValue(out string? said) && WaveFiles.IsWave(said))
                     {
                         held[key] = Moved(said!, from, to);
 
@@ -503,7 +517,7 @@ public sealed partial class MachineUtilities : ObservableObject
             case JsonArray list:
                 for (int i = 0; i < list.Count; i++)
                 {
-                    if (list[i] is JsonValue value && value.TryGetValue(out string? said) && PresetWaves.IsWave(said))
+                    if (list[i] is JsonValue value && value.TryGetValue(out string? said) && WaveFiles.IsWave(said))
                     {
                         list[i] = Moved(said!, from, to);
 
@@ -657,7 +671,7 @@ public sealed partial class MachineUtilities : ObservableObject
     /// </remarks>
     private IEnumerable<WaveLevel> Found()
     {
-        var seen = new HashSet<string>(Tracker.FilePaths.Comparer);
+        var seen = new HashSet<string>(_paths.Comparer);
 
         switch (Scope)
         {
@@ -678,7 +692,7 @@ public sealed partial class MachineUtilities : ObservableObject
                              .EnumerateFiles(Folder, "*.wav", SearchOption.AllDirectories)
                              .OrderBy(path => path, StringComparer.Ordinal))
                 {
-                    if (!seen.Add(Tracker.FilePaths.Full(path))) continue;
+                    if (!seen.Add(_paths.Full(path))) continue;
 
                     yield return new WaveLevel(Named(path), path, Peak(path));
                 }
@@ -701,13 +715,13 @@ public sealed partial class MachineUtilities : ObservableObject
 
         if (home.Length == 0) yield break;
 
-        foreach (string named in PresetWaves.Named(preset))
+        foreach (string named in WaveFiles.Named(preset))
         {
-            string full = MachinePaths.Outside(named, home);
+            string full = Inside.Outside(named, home);
 
             if (!File.Exists(full)) continue;
 
-            if (!seen.Add(Tracker.FilePaths.Full(full))) continue;
+            if (!seen.Add(_paths.Full(full))) continue;
 
             yield return new WaveLevel(named, full, Peak(full));
         }
@@ -718,10 +732,10 @@ public sealed partial class MachineUtilities : ObservableObject
     {
         try
         {
-            string root = Tracker.FilePaths.Full(Folder) + Path.DirectorySeparatorChar;
-            string full = Tracker.FilePaths.Full(path);
+            string root = _paths.Full(Folder) + Path.DirectorySeparatorChar;
+            string full = _paths.Full(path);
 
-            return full.StartsWith(root, Tracker.FilePaths.Comparison)
+            return full.StartsWith(root, _paths.Comparison)
                 ? full[root.Length..].Replace(Path.DirectorySeparatorChar, '/')
                 : Path.GetFileName(path);
         }

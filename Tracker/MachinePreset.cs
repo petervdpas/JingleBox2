@@ -3,43 +3,59 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// What each machine comes with: a folder of files, one preset to a file.
-/// </summary>
-/// <remarks>
-/// Files rather than code, so a preset can be added, edited or taken out without a build, and
-/// so an instrument saved off the rack can be dropped straight in as one: a preset file is
-/// an instrument file, the same shape, read by the same reader.
-///
-/// The folder is named after the machine, beside the program. The number a filename starts with
-/// is only there to hold the order they are offered in; the name on the panel is the one inside
-/// the file.
-/// </remarks>
-public static class MachinePresets
+/// <inheritdoc/>
+public sealed class MachinePresets : IPresetLibrary
 {
-    /// <summary>
-    /// What has already been read, by machine name. The folder does not change under us, so a
-    /// machine is walked once a run.
-    /// </summary>
-    private static readonly Dictionary<string, IReadOnlyList<MachinePreset>> Loaded = new();
+    /// <summary>The machines this run has, so a preset can be read against its own machine.</summary>
+    private readonly IMachineProjects _machines;
+
+    /// <summary>How a preset file is read.</summary>
+    private readonly IMachinePresetFile _files;
+
+    /// <summary>Takes the machines this run has, and how to read a preset off the disc.</summary>
+    /// <remarks>
+    /// The machines are required rather than defaulted. A fresh <c>MachineProjects</c> holds
+    /// nothing, so a default would answer that every machine is missing and every preset
+    /// belongs to nothing, with no error raised anywhere to say why the shelf came back empty.
+    /// </remarks>
+    /// <param name="machines">The machines this run has, the one instance everything shares.</param>
+    /// <param name="files">How a preset is read. Left out, the ordinary reader.</param>
+    public MachinePresets(IMachineProjects machines, IMachinePresetFile? files = null)
+    {
+        _machines = machines;
+        _files = files ?? new MachinePresetFile();
+    }
 
     /// <summary>
-    /// What this machine offers. Read once and kept, since the folder does not change under us.
+    /// What has already been read, by machine name. The folder does not change under us, so a
+    /// machine is walked once per library.
     /// </summary>
-    public static IReadOnlyList<MachinePreset> For(Machine? machine)
+    /// <remarks>
+    /// One of these per library and not one per program. As a static it was shared by everything
+    /// in the process and outlived whatever it was about: one test's read decided what the next
+    /// test saw, in whatever order they happened to run, and a machine reinstalled under the
+    /// same name went on offering the presets it used to have until the application was closed.
+    /// </remarks>
+    private readonly Dictionary<string, IReadOnlyList<MachinePreset>> _loaded = new();
+
+    /// <inheritdoc/>
+    public IReadOnlyList<MachinePreset> For(Machine? machine)
     {
         if (machine == null) return Array.Empty<MachinePreset>();
 
-        lock (Loaded)
+        lock (_loaded)
         {
-            if (Loaded.TryGetValue(machine.Name, out var already)) return already;
+            if (_loaded.TryGetValue(machine.Name, out var already)) return already;
 
             var read = Read(machine);
-            Loaded[machine.Name] = read;
+            _loaded[machine.Name] = read;
 
             return read;
         }
@@ -53,7 +69,7 @@ public static class MachinePresets
     /// the panel: the folder may not be there at all, which is ordinary for a machine that
     /// ships without any.
     /// </remarks>
-    private static IReadOnlyList<MachinePreset> Read(Machine machine)
+    private IReadOnlyList<MachinePreset> Read(Machine machine)
     {
         string folder = Folder(machine);
 
@@ -91,8 +107,8 @@ public static class MachinePresets
     /// By id and not by name, because the name is what the machine calls itself and can be
     /// changed by whoever imports a new version of it. The id is what it is.
     /// </remarks>
-    private static string Folder(Machine machine) =>
-        Machines.MachineProjects.For(machine.SlotId) is { Folder.Length: > 0 } project
+    private string Folder(Machine machine) =>
+        _machines.For(machine.SlotId) is { Folder.Length: > 0 } project
             ? Path.Combine(project.Folder, Machines.MachineProject.PresetsFolder)
             : "";
 
@@ -105,7 +121,7 @@ public static class MachinePresets
     /// absolute path is left alone and points wherever it points, which is fine for one you
     /// built out of your own rack and no good for one that ships.
     /// </remarks>
-    private static void Locate(TrackerInstrument sound, string? folder)
+    private void Locate(TrackerInstrument sound, string? folder)
     {
         if (folder == null) return;
 
@@ -142,12 +158,12 @@ public static class MachinePresets
     ///
     /// One unreadable preset is one preset, not the whole folder.
     /// </remarks>
-    private static TrackerInstrument? Load(string path, Machine machine)
+    private TrackerInstrument? Load(string path, Machine machine)
     {
         try
         {
-            if (Machines.MachineProjects.For(machine.SlotId) is { } project
-                && Machines.MachinePresetFile.Read(path, project) is { } keyed)
+            if (_machines.For(machine.SlotId) is { } project
+                && _files.Read(path, project) is { } keyed)
             {
                 if (string.IsNullOrWhiteSpace(keyed.Name))
                     keyed.Name = Path.GetFileNameWithoutExtension(path);

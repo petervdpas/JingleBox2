@@ -1,0 +1,95 @@
+namespace JingleBox2.Tracker.Machines.Interfaces;
+
+/// <summary>
+/// A machine as it travels: one zip of the project folder, and the same folder again on
+/// somebody else's disc.
+/// </summary>
+/// <remarks>
+/// A machine is already a folder with a manifest at the top of it, so there is nothing to
+/// invent here. The zip is that folder, and installing is putting it under
+/// <see cref="IMachineRegistry.Installed"/> in a folder named after the machine's id, which is
+/// the name songs write down and therefore the only name that cannot collide by accident.
+///
+/// Two ways in and one door. A zip somebody was handed is unpacked; a machine the program ships
+/// with is copied off the shelf beside the program. What arrives is different, where it lands is
+/// not, so both go through one install and get the same checking and the same swap.
+///
+/// Everything a bundle says about where its contents go is a claim made by whoever built it, so
+/// none of it is believed: the id has to name a folder and not a path, and a file has to land
+/// inside the folder it is being written into. The rest of the app reads what is on the disc
+/// through <see cref="MachineProject.Open"/>, and this is the one place a stranger's file gets
+/// to put anything there.
+///
+/// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
+/// application's own area, as everything under this folder does. What a bundle was refused for
+/// is the sort of thing somebody goes looking for, and it should not be buried under everything
+/// else the application had to say that session.
+///
+/// A seam rather than a static class, and this is the one where it matters most. Every method
+/// makes folders, unpacks a stranger's zip into them and swaps one folder for another. The
+/// guards against a bundle writing outside its own folder are the whole reason the class exists
+/// and there was no way to put a question to any of them without installing a machine on the
+/// person running the test.
+/// </remarks>
+public interface IMachineArchive
+{
+    /// <summary>Zips the project folder, manifest and sounds and all, into that file.</summary>
+    /// <remarks>
+    /// Throws rather than reporting: this is asked for by somebody who has just pressed Export
+    /// and is waiting to be told either where the file went or what stopped it.
+    ///
+    /// An existing file is overwritten, which is the ordinary case: exporting twice in a row is
+    /// how a machine gets corrected, and being made to delete the old file first would only be
+    /// in the way.
+    /// </remarks>
+    /// <param name="project">The machine to pack, which has to have been saved.</param>
+    /// <param name="zipPath">Where the zip goes, folders made as needed.</param>
+    void Export(MachineProject project, string zipPath);
+
+    /// <summary>
+    /// Unpacks a machine out of that zip and into the installed machines.
+    /// </summary>
+    /// <returns>The machine as it now sits on the disc, or null when the zip held none.</returns>
+    /// <remarks>
+    /// Both shapes of zip are read: the folder's contents at the top, which is what
+    /// <see cref="Export"/> writes, and the folder itself at the top, which is what somebody
+    /// gets who right-clicks the folder and zips that. Refusing the second would only teach
+    /// people that the importer is broken.
+    ///
+    /// Reported rather than thrown, unlike <see cref="Export"/>: a zip somebody was handed can
+    /// be anything at all, and every way it can be wrong ends the same way, with nothing
+    /// installed and a line in the log.
+    /// </remarks>
+    /// <param name="zipPath">The zip somebody was handed.</param>
+    MachineProject? Import(string zipPath);
+
+    /// <summary>
+    /// Takes a machine the program ships with and puts a copy of it among the installed ones.
+    /// </summary>
+    /// <returns>The machine as it now sits in the installed folder, or null when it could not go.</returns>
+    /// <remarks>
+    /// The folder beside the program is a shelf to take from and is never written to, so this is
+    /// a copy in one direction and the shipped machine is left exactly as it was. That is what
+    /// makes removing a machine reversible: the copy goes, the original is still on the shelf.
+    ///
+    /// It ends where <see cref="Import"/> ends, by the same route, because a machine arriving
+    /// from a zip and a machine arriving from the shelf are the same event once the files are in
+    /// hand. Both are checked the same way, both land through the same swap, and both are read
+    /// back off the disc rather than believed.
+    ///
+    /// Copying the installed folder onto itself is refused. That is not adding a machine, and
+    /// the swap that finishes an install would be moving a folder out from under its own source.
+    /// </remarks>
+    /// <param name="fromCrate">The machine on the shelf beside the program.</param>
+    MachineProject? Add(MachineProject fromCrate);
+
+    /// <summary>Deletes an installed machine's folder.</summary>
+    /// <remarks>
+    /// Only one that is installed. The shelf beside the program is what the application ships
+    /// and is never written to, which is exactly what lets this delete freely: a machine that
+    /// ships can be taken again with <see cref="Add"/> the moment it is gone.
+    /// </remarks>
+    /// <param name="project">The machine to delete, which has to be an installed one.</param>
+    /// <returns>True when the folder is gone.</returns>
+    bool Remove(MachineProject project);
+}

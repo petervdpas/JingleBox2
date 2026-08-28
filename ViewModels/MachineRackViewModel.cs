@@ -19,6 +19,7 @@ using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -33,6 +34,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
 {
+    /// <summary>The machines this run has, the one instance everything shares.</summary>
+    private readonly IMachineProjects _machines;
+
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
 
@@ -73,10 +77,12 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     public MachineRackViewModel(
         MachineRack rack,
         IInstrumentAudition audition,
+        IMachineProjects machines,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null)
     {
+        _machines = machines;
         _rack = rack;
         _audition = audition;
         _recordings = recordings;
@@ -455,12 +461,12 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         Editor = value == null
             ? null
             : new InstrumentEditorViewModel(
-                Machines.IndexOf(value), value.Instrument, OnInstrumentEdited,
+                Machines.IndexOf(value), value.Instrument, OnInstrumentEdited, _machines,
                 _waveforms, _audition, _recordings, note => PlayNote(note));
 
         Presets = value == null
             ? null
-            : new InstrumentPresets(value.Instrument, Reloaded, Editor?.Takes.Shown, Editor?.Takes);
+            : new InstrumentPresets(value.Instrument, Reloaded, _machines, Editor?.Takes.Shown, Editor?.Takes);
 
         Editor?.Kit?.Follow(Sounding);
 

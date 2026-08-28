@@ -2,6 +2,9 @@ using System;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Synth.Records;
+using JingleBox2.Music;
+using JingleBox2.Music.Interfaces;
+using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker.Synth;
 
@@ -27,6 +30,34 @@ namespace JingleBox2.Tracker.Synth;
 /// </remarks>
 public sealed class SampleVoice : IVoice
 {
+    /// <summary>Everything that moves a voice off the note it was given.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IPitchMotion Motion = new PitchMotion();
+
+    /// <summary>The drive, applied last on the way out.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly ISaturation Shaper = new Saturation();
+
+    /// <summary>Where in a recording to read next, the window and the loop obeyed.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly ISamplePlayback Windows = new SamplePlayback();
+
+    /// <summary>A note as a playback rate for a recording made at another pitch.</summary>
+    /// <remarks>
+    /// Shared rather than one per voice: it holds nothing, and a voice is made every time a
+    /// key goes down, which is not somewhere to be allocating.
+    /// </remarks>
+    private static readonly IPitchRatio Rate = new PitchRatio();
+
     /// <summary>The take, shared with every other voice playing it and never written to.</summary>
     private readonly SampleData _sample;
 
@@ -158,15 +189,15 @@ public sealed class SampleVoice : IVoice
         _sampleRate = sampleRate <= 0 ? 1 : sampleRate;
         _envelope = new SynthEnvelope(_patch, _sampleRate);
 
-        _window = SamplePlayback.WindowFor(shape, sample.FrameCount);
+        _window = Windows.WindowFor(shape, sample.FrameCount);
         _position = _window.Entry;
         _direction = _window.Direction;
 
         _rateRatio = (double)sample.SampleRate / _sampleRate;
-        _noteRatio = PitchRatio.For(note, baseNote) * PitchMotion.Ratio(PitchMotion.Tuning(_patch));
+        _noteRatio = Rate.For(note, baseNote) * Motion.Ratio(Motion.Tuning(_patch));
 
         _drive = _patch.Drive;
-        _driveMakeup = Saturation.Makeup(_drive);
+        _driveMakeup = Shaper.Makeup(_drive);
 
         _left = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _right = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
@@ -380,11 +411,11 @@ public sealed class SampleVoice : IVoice
             double shared = level * TremoloAt(_time) * Gain;
 
             double shapedLeft = _zampler == null
-                ? _left.Process(Saturation.Apply(a, _drive, _driveMakeup)) * shared
+                ? _left.Process(Shaper.Apply(a, _drive, _driveMakeup)) * shared
                 : _ladderLeft!.Process(a) * shared * _zampler.Volume;
 
             double shapedRight = _zampler == null
-                ? _right.Process(Saturation.Apply(b, _drive, _driveMakeup)) * shared
+                ? _right.Process(Shaper.Apply(b, _drive, _driveMakeup)) * shared
                 : _ladderRight!.Process(b) * shared * _zampler.Volume;
 
             float loudest = (float)Math.Max(Math.Abs(shapedLeft), Math.Abs(shapedRight));
@@ -397,9 +428,9 @@ public sealed class SampleVoice : IVoice
             buffer[index] += (float)outLeft;
             buffer[index + 1] += (float)outRight;
 
-            double speed = _rateRatio * _noteRatio * PitchMotion.Ratio(PitchMotion.MotionAt(_patch, _time));
+            double speed = _rateRatio * _noteRatio * Motion.Ratio(Motion.MotionAt(_patch, _time));
 
-            if (!SamplePlayback.Advance(ref _position, ref _direction, speed, _window))
+            if (!Windows.Advance(ref _position, ref _direction, speed, _window))
             {
                 _ended = true;
                 Level = 0;

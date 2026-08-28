@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Tracker;
 using Xunit;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -11,6 +12,10 @@ namespace JingleBox2.Tests;
 /// </summary>
 public class SongPathTests
 {
+    /// <summary>Recordings written so a song survives its folder moving.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly ISongPaths Portable = new SongPaths();
+
     /// <summary>
     /// A path under the application folder, wherever that folder is on this machine.
     /// </summary>
@@ -26,7 +31,7 @@ public class SongPathTests
     {
         string real = InsideTheAppFolder("recordings", "take.wav");
 
-        Assert.Equal("{app}/recordings/take.wav", SongPaths.Pack(real));
+        Assert.Equal("{app}/recordings/take.wav", Portable.Pack(real));
     }
 
     /// <summary>
@@ -38,7 +43,7 @@ public class SongPathTests
     {
         string real = InsideTheAppFolder("recordings", "take.wav");
 
-        Assert.Equal(real, SongPaths.Unpack(SongPaths.Pack(real)));
+        Assert.Equal(real, Portable.Unpack(Portable.Pack(real)));
     }
 
     /// <summary>
@@ -53,8 +58,8 @@ public class SongPathTests
     {
         string elsewhere = Path.Combine(Path.GetTempPath(), "borrowed.wav");
 
-        Assert.Equal(elsewhere, SongPaths.Pack(elsewhere));
-        Assert.Equal(elsewhere, SongPaths.Unpack(elsewhere));
+        Assert.Equal(elsewhere, Portable.Pack(elsewhere));
+        Assert.Equal(elsewhere, Portable.Unpack(elsewhere));
     }
 
     /// <summary>
@@ -64,9 +69,9 @@ public class SongPathTests
     [Fact]
     public void Nothing_at_all_stays_nothing()
     {
-        Assert.Equal("", SongPaths.Pack(""));
-        Assert.Equal("", SongPaths.Unpack(""));
-        Assert.Equal("", SongPaths.Pack(null!));
+        Assert.Equal("", Portable.Pack(""));
+        Assert.Equal("", Portable.Unpack(""));
+        Assert.Equal("", Portable.Pack(null!));
     }
 
     /// <summary>
@@ -78,7 +83,7 @@ public class SongPathTests
     {
         string inside = Path.Combine(Config.AppFolder.Path() + "-elsewhere", "take.wav");
 
-        Assert.Equal(inside, SongPaths.Pack(inside));
+        Assert.Equal(inside, Portable.Pack(inside));
     }
 
     /// <summary>
@@ -93,10 +98,10 @@ public class SongPathTests
         var instrument = new TrackerInstrument { Name = "Kick", FilePath = real };
         instrument.EnsureId();
 
-        SongPaths.PackInto(instrument);
+        Portable.PackInto(instrument);
         Assert.StartsWith("{app}/", instrument.FilePath);
 
-        SongPaths.UnpackInto(instrument);
+        Portable.UnpackInto(instrument);
         Assert.Equal(real, instrument.FilePath);
     }
 }

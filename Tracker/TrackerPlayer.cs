@@ -15,6 +15,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker;
 
 namespace JingleBox2.Tracker;
 
@@ -33,6 +34,10 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public sealed class TrackerPlayer : ITrackerPlayer
 {
+    /// <summary>What the mix adds up to, mute and solo included.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMixLevels Levels = new MixLevels();
+
     /// <summary>Below this the thread spins instead of sleeping, since sleep is not that precise.</summary>
     private const double SpinThresholdSeconds = 0.002;
 
@@ -1336,9 +1341,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </summary>
     private static (float Gain, float? Pan) WithMix(Song song, int track, float gain, float? pan)
     {
-        float mixed = Math.Clamp(gain * MixLevels.GainFor(song.Mix, track), 0f, MaxGain);
+        float mixed = Math.Clamp(gain * Levels.GainFor(song.Mix, track), 0f, MaxGain);
 
-        return (mixed, pan ?? MixLevels.PanFor(song.Mix, track));
+        return (mixed, pan ?? Levels.PanFor(song.Mix, track));
     }
 
     /// <inheritdoc/>
@@ -1364,9 +1369,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             _synth.Mixer.SetDucking(
                 track,
-                MixLevels.DuckFor(song.Mix, track, song.TrackCount),
-                MixLevels.KeyFor(song.Mix, track, song.TrackCount),
-                MixLevels.DuckReleaseFor(song.Mix, track));
+                Levels.DuckFor(song.Mix, track, song.TrackCount),
+                Levels.KeyFor(song.Mix, track, song.TrackCount),
+                Levels.DuckReleaseFor(song.Mix, track));
         }
 
         var master = song.Master;

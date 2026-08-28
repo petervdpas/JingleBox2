@@ -1,14 +1,12 @@
 using System;
 using System.Globalization;
+using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// The on-disk and on-screen text form of a cell: "C-4 01 40 V20", with ".." and "..." for
-/// blank columns. One place that knows the format, so the editor and the file agree.
-/// </summary>
-public static class TrackerCellText
+/// <inheritdoc/>
+public sealed class TrackerCellText : ITrackerCellText
 {
     /// <summary>How a blank instrument or volume column is written.</summary>
     public const string BlankByte = "..";
@@ -16,16 +14,18 @@ public static class TrackerCellText
     /// <summary>And a blank effect column, which is three characters wide rather than two.</summary>
     public const string BlankEffect = "...";
 
-    /// <summary>One cell as the file and the grid both write it.</summary>
-    public static string Write(TrackerCell cell) =>
+    /// <inheritdoc/>
+    string ITrackerCellText.BlankByte => BlankByte;
+
+    /// <inheritdoc/>
+    string ITrackerCellText.BlankEffect => BlankEffect;
+
+    /// <inheritdoc/>
+    public string Write(TrackerCell cell) =>
         $"{cell.Note} {cell.InstrumentText} {cell.VolumeText} {cell.Effect}";
 
-    /// <summary>Parses what <see cref="Write"/> produced. Returns false on anything malformed.</summary>
-    /// <remarks>
-    /// Blank text is not malformed and gives an empty cell, since a song file only stores the
-    /// cells that hold something and everything else is read as nothing.
-    /// </remarks>
-    public static bool TryRead(string? text, out TrackerCell cell)
+    /// <inheritdoc/>
+    public bool TryRead(string? text, out TrackerCell cell)
     {
         cell = TrackerCell.Empty;
         if (string.IsNullOrWhiteSpace(text)) return true;

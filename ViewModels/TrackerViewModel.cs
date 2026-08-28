@@ -28,6 +28,10 @@ using JingleBox2.Midi.Interfaces;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -45,6 +49,32 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>The machines this run has, the one instance everything shares.</summary>
+    private readonly IMachineProjects _machines;
+
+    /// <summary>Every edit to a pattern, so each one lands in the undo history.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IPatternEdit Edits = new PatternEdit();
+
+    /// <summary>The recordings a packed song carries inside it.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISongSamples Carried = new SongSamples();
+
+    /// <summary>Which instruments play a given recording.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly ISampleUsers Usage = new SampleUsers();
+
+    /// <summary>The machines a song wants that this installation has not got.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMissingMachines Missing = new MissingMachines();
+
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    /// <remarks>
+    /// Shared, because the walk that reports a song's missing recordings is a static helper
+    /// and cannot reach an instance field. The rule holds nothing of its own.
+    /// </remarks>
+    private static readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>The clock, the mixer and everything that makes a sound. One per tracker.</summary>
     private readonly TrackerPlayer _player;
 
@@ -508,8 +538,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var box = new PluginInstrumentViewModel(
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
+            _machines,
             InstrumentEdited,
-            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
+            () => new TrackInstrumentDesigner(track, instrument, _machines, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
             () => ClearTrackInstrument(track));
 
         _instrumentBoxes[track] = box;
@@ -739,7 +770,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     ///
     /// The order the pieces are built in matters, and in one place it has already cost a bug.
     ///
-    /// <see cref="PatternEdit.Watching"/> is pointed at the history here rather than by
+    /// <see cref="IPatternEdit.Watching"/> is pointed at the history here rather than by
     /// <see cref="PatternEdit"/> itself, because a history belongs to the thing being edited
     /// and a pattern has never heard of one. Every edit to any pattern goes through that class
     /// and tells the history before it happens, which is what makes an edit added later
@@ -780,18 +811,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="config">The settings as they stand. Null in a test.</param>
     /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
     /// <param name="waveforms">What draws a recording's shape. Null draws a flat line.</param>
+    /// <param name="machines">
+    /// The machines this run has, the one instance everything shares. Required rather than
+    /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
+    /// machine missing, without an error anywhere to say why.
+    /// </param>
     public TrackerViewModel(
         IAudioEngine audio,
         MachineRack rack,
         ObservableCollection<Recording> recordings,
+        IMachineProjects machines,
         ConfigStore? configStore = null,
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null)
     {
+        _machines = machines;
         _waveforms = waveforms;
 
-        PatternEdit.Watching = History.Taking;
+        Edits.Watching = History.Taking;
 
         _configStore = configStore;
         _config = config;
@@ -1618,7 +1656,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (CurrentPattern == null || _clipboard == null) return;
 
-        PatternEdit.ClearRegion(CurrentPattern, taken);
+        Edits.ClearRegion(CurrentPattern, taken);
         Status = "Cut " + _clipboard.Describe();
     }
 
@@ -1630,7 +1668,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (CurrentPattern == null || _clipboard == null) return;
 
-        var landed = _clipboard.Paste(CurrentPattern, Cursor);
+        var landed = _clipboard.Paste(Edits, CurrentPattern, Cursor);
         if (landed.IsEmpty)
         {
             Status = "Nowhere to paste from here";
@@ -1661,7 +1699,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (CurrentPattern == null || !HasSelection) return;
 
-        int cleared = PatternEdit.ClearRegion(CurrentPattern, Selection);
+        int cleared = Edits.ClearRegion(CurrentPattern, Selection);
 
         Status = cleared == 0
             ? "Nothing to clear in " + Selection.Describe()
@@ -1743,11 +1781,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (HasSelection)
         {
             for (int track = Selection.FirstTrack; track <= Selection.LastTrack; track++)
-                moved += PatternEdit.Quantize(CurrentPattern, track, lines);
+                moved += Edits.Quantize(CurrentPattern, track, lines);
         }
         else
         {
-            moved = PatternEdit.Quantize(CurrentPattern, Cursor.Track, lines);
+            moved = Edits.Quantize(CurrentPattern, Cursor.Track, lines);
         }
 
         Status = moved == 0
@@ -1760,7 +1798,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (CurrentPattern == null) return;
 
-        PatternEdit.ClearTrack(CurrentPattern, Cursor.Track);
+        Edits.ClearTrack(CurrentPattern, Cursor.Track);
         Status = $"Cleared {CursorTrackLabel}";
     }
 
@@ -1769,7 +1807,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (CurrentPattern == null) return;
 
-        PatternEdit.ClearPattern(CurrentPattern);
+        Edits.ClearPattern(CurrentPattern);
         Status = $"Cleared pattern '{CurrentPattern.Name}'";
     }
 
@@ -1783,8 +1821,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (!int.TryParse(volume, NumberStyles.Integer, CultureInfo.InvariantCulture, out int level)) return;
 
         int changed = HasSelection
-            ? PatternEdit.SetRegionVolume(CurrentPattern, Selection, level)
-            : PatternEdit.SetTrackVolume(CurrentPattern, Cursor.Track, level);
+            ? Edits.SetRegionVolume(CurrentPattern, Selection, level)
+            : Edits.SetTrackVolume(CurrentPattern, Cursor.Track, level);
 
         string what = level == TrackerCell.NoVolume
             ? "the instrument's own level"
@@ -1804,8 +1842,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (CurrentPattern == null) return;
         if (!int.TryParse(semitones, NumberStyles.Integer, CultureInfo.InvariantCulture, out int steps)) return;
 
-        if (HasSelection) PatternEdit.TransposeRegion(CurrentPattern, Selection, steps);
-        else PatternEdit.TransposeTrack(CurrentPattern, Cursor.Track, steps);
+        if (HasSelection) Edits.TransposeRegion(CurrentPattern, Selection, steps);
+        else Edits.TransposeTrack(CurrentPattern, Cursor.Track, steps);
 
         Status = $"Transposed {SelectionLabel} by {steps:+0;-0} semitone(s)";
     }
@@ -2057,7 +2095,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         bool moved = false;
 
         foreach (var instrument in Song.Instruments)
-            if (SampleUsage.Repoint(instrument, from, to)) moved = true;
+            if (Usage.Repoint(instrument, from, to)) moved = true;
 
         _player.ReloadInstrument(from);
         _player.ReloadInstrument(to);
@@ -2123,7 +2161,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             _store.Save(Song, path);
 
-            if (!FilePaths.Same(_kept, path))
+            if (!_paths.Same(_kept, path))
             {
                 Drop();
                 _kept = path;
@@ -2239,7 +2277,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
 
-        PatternEdit.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
+        Edits.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
         if (!IsPlaying) StepDown();
     }
 
@@ -2320,7 +2358,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (CurrentPattern == null || !IsRecording) return;
 
-        PatternEdit.EnterNoteOff(CurrentPattern, Cursor);
+        Edits.EnterNoteOff(CurrentPattern, Cursor);
         StepDown();
     }
 
@@ -2334,14 +2372,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public void EnterHexDigit(char digit)
     {
         if (CurrentPattern == null || !IsRecording) return;
-        if (PatternEdit.EnterHexDigit(CurrentPattern, Cursor, digit)) StepDown();
+        if (Edits.EnterHexDigit(CurrentPattern, Cursor, digit)) StepDown();
     }
 
     /// <summary>Types the letter half of an effect, leaving its digits where they are.</summary>
     public void EnterEffectCommand(char command)
     {
         if (CurrentPattern == null || !IsRecording) return;
-        PatternEdit.EnterEffectCommand(CurrentPattern, Cursor, command);
+        Edits.EnterEffectCommand(CurrentPattern, Cursor, command);
     }
 
     /// <summary>
@@ -2362,7 +2400,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return;
         }
 
-        PatternEdit.ClearAtCursor(CurrentPattern, Cursor);
+        Edits.ClearAtCursor(CurrentPattern, Cursor);
         if (IsRecording) StepDown();
     }
 
@@ -2375,13 +2413,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public void InsertLine()
     {
-        if (CurrentPattern != null) PatternEdit.InsertLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null) Edits.InsertLine(CurrentPattern, Cursor);
     }
 
     /// <summary>Pulls the track's cells up over the cursor, which is the other half of it.</summary>
     public void DeleteLine()
     {
-        if (CurrentPattern != null) PatternEdit.DeleteLine(CurrentPattern, Cursor);
+        if (CurrentPattern != null) Edits.DeleteLine(CurrentPattern, Cursor);
     }
 
     /// <summary>Moves the cursor and drops whatever block was drawn, which is the plain case.</summary>
@@ -2887,7 +2925,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public async Task TellOfMissingMachines()
     {
-        var wanted = MissingMachines.For(Song);
+        var wanted = Missing.For(Song);
 
         if (wanted.Count == 0) return;
 
@@ -3014,7 +3052,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _store.Save(Song, path);
 
             RefreshSavedSongs();
-            SelectedSongFile = SavedSongs.FirstOrDefault(f => FilePaths.Same(f.Path, path));
+            SelectedSongFile = SavedSongs.FirstOrDefault(f => _paths.Same(f.Path, path));
 
             IsDirty = false;
 
@@ -3075,14 +3113,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var lost = new List<string>();
         if (song == null) return lost;
 
-        var seen = new HashSet<string>(FilePaths.Comparer);
+        var seen = new HashSet<string>(_paths.Comparer);
 
         foreach (var instrument in song.Instruments)
-            foreach (string path in SampleUsage.Files(instrument))
+            foreach (string path in Usage.Files(instrument))
             {
                 if (string.IsNullOrWhiteSpace(path)) continue;
 
-                string full = FilePaths.Full(path);
+                string full = _paths.Full(path);
 
                 if (!seen.Add(full)) continue;
                 if (File.Exists(full)) continue;
@@ -3110,7 +3148,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _player.CaptureChains(Song);
             foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
 
-            int carried = SongSamples.Wanted(Song).Count;
+            int carried = Carried.Wanted(Song).Count;
 
             _store.Save(Song, path, withSamples: true);
 
@@ -3363,11 +3401,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         try
         {
-            bool wasOpen = FilePaths.Same(file.Path, _store.PathFor(SongName.Trim()));
+            bool wasOpen = _paths.Same(file.Path, _store.PathFor(SongName.Trim()));
 
             _store.Delete(file.Path);
 
-            if (SelectedSongFile != null && FilePaths.Same(SelectedSongFile.Path, file.Path))
+            if (SelectedSongFile != null && _paths.Same(SelectedSongFile.Path, file.Path))
                 SelectedSongFile = null;
 
             RefreshSavedSongs();
@@ -3410,7 +3448,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         RestockSongs();
 
-        SelectedSongFile = SavedSongs.FirstOrDefault(f => FilePaths.Same(f.Path, keep));
+        SelectedSongFile = SavedSongs.FirstOrDefault(f => _paths.Same(f.Path, keep));
     }
 
     /// <summary>

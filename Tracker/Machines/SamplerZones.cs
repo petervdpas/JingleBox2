@@ -3,6 +3,8 @@ using JingleBox2.ViewModels;
 using System;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -21,6 +23,10 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="map">The map on the other side, which is the one the editor is already on.</param>
 public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
 {
+    /// <summary>Following a list of things and what each of them says.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineWatch Watching = new MachineWatch();
+
     /// <summary>
     /// Whether the map is being watched yet.
     /// </summary>
@@ -116,7 +122,7 @@ public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
 
         _listening = true;
 
-        MachineWatch.Items<SampleZoneViewModel>(
+        Watching.Items<SampleZoneViewModel>(
             map, map.Zones, () => map.Zones, () => _changed?.Invoke(this, EventArgs.Empty));
     }
 

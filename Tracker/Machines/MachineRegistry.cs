@@ -4,70 +4,70 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
-/// <summary>
-/// What machines this installation has.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// A machine is a project: a folder with a manifest in it. This reads the folders and hands
-/// what it finds to <see cref="Machine.Register"/>, so what the rack shows, what the panels are
-/// painted with and what a song writes down all come off the machines themselves rather than
-/// out of the application's own code.
-///
-/// Two folders, and only one of them is this installation's. Beside the program is what the
-/// application ships: a source to take a machine from, never written to and never read as the
-/// answer to what is on the rack. Under the app folder is what this installation actually has,
-/// and that one alone decides. The point of the split is that removing a machine is not losing
-/// it: the shipped copy stays where it was and the machine can be taken again.
-///
-/// The one moment the two touch is the first run, when there is no installation folder at all
-/// and it is filled from what ships. An installation folder that exists and is empty is not the
-/// same thing: that is somebody who took every machine out, and filling it again would be
-/// undoing what they did.
-///
-/// A machine the app has no engine for is read and ignored for now. That is the piece the
-/// contract still needs, and until it lands, importing one would put a box on the rack that
-/// cannot make a sound.
-///
-/// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
-/// application's own area, as everything under this folder does. What machines were found and
-/// which of them could not be read is a whole half of the program, and reading it out of
-/// everything the application did at startup is exactly what nobody wants on the day a machine
-/// comes back missing its picture.
+/// The two folders are worked out on each reading rather than kept, since the app folder is
+/// pointed elsewhere by a test and by the portable build and neither of those asks anybody's
+/// permission.
 /// </remarks>
-public static class MachineRegistry
+public sealed class MachineRegistry : IMachineRegistry
 {
+    /// <summary>How two paths are compared, which is a fact about the disc and not about here.</summary>
+    private readonly IFilePaths _paths;
+
+    /// <summary>Who puts a machine's files where the machine goes.</summary>
+    private readonly IMachineArchive _archive;
+
+    /// <summary>
+    /// Takes the two things this needs, or makes the ordinary ones.
+    /// </summary>
+    /// <remarks>
+    /// The registry and the archive each need the other: an archive installs into the folder the
+    /// registry names, and the registry hands the archive every shipped machine it has not yet
+    /// offered. Made without one, each builds the other and hands itself over, so the pair is
+    /// built once and there is no third instance to go looking for.
+    /// </remarks>
+    /// <param name="archive">
+    /// Who unpacks and copies machines into the installed folder. Left out, the ordinary one,
+    /// pointed back at this registry.
+    /// </param>
+    /// <param name="paths">
+    /// How this system decides two paths are the same. Left out, the rule this system really
+    /// has; given, whatever a test wants to hold it to.
+    /// </param>
+    public MachineRegistry(IMachineArchive? archive = null, IFilePaths? paths = null)
+    {
+        _paths = paths ?? new FilePaths();
+        _archive = archive ?? new MachineArchive(this, new MachinePaths(_paths));
+    }
+
     /// <summary>What the folder holding the machines is called, in both places it appears.</summary>
     /// <remarks>
     /// Written out rather than built, so the one folder name this depends on can be found by
-    /// looking for it.
+    /// looking for it. Kept as a constant as well as answered as a property, since it is a fact
+    /// about the layout on disc and callers that have never held a registry still name it.
     /// </remarks>
     public const string FolderName = "machines";
 
-    /// <summary>Where the machines that ship with the program live.</summary>
-    public static string Shipped =>
+    /// <inheritdoc/>
+    string IMachineRegistry.FolderName => FolderName;
+
+    /// <inheritdoc/>
+    public string Shipped =>
         Path.Combine(AppContext.BaseDirectory, FolderName);
 
-    /// <summary>And where the ones this installation has live.</summary>
-    public static string Installed =>
+    /// <inheritdoc/>
+    public string Installed =>
         Path.Combine(Config.AppFolder.Path(), FolderName);
 
-    /// <summary>
-    /// True when a file is one the program ships, and so is on every installation there is.
-    /// </summary>
-    /// <remarks>
-    /// Asked by a song about to be packed for somebody else. A machine's own presets are
-    /// installed with the application, so putting them in the file would be sending a person a
-    /// copy of something they already have, once per song. What is worth carrying is what only
-    /// this machine has: the user's own takes.
-    ///
-    /// Answered by looking, not by where the path points. Both folders hold machines and the
-    /// installed one holds the user's as well, so the only honest test is whether the same file
-    /// is also in the folder beside the program.
-    /// </remarks>
-    public static bool Ships(string path)
+    /// <inheritdoc/>
+    public bool Ships(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
 
@@ -76,7 +76,7 @@ public static class MachineRegistry
             string installed = Path.GetFullPath(Installed);
             string full = Path.GetFullPath(path);
 
-            if (!full.StartsWith(installed + Path.DirectorySeparatorChar, FilePaths.Comparison))
+            if (!full.StartsWith(installed + Path.DirectorySeparatorChar, _paths.Comparison))
                 return false;
 
             return File.Exists(Path.Combine(Shipped, full.Substring(installed.Length + 1)));
@@ -87,15 +87,8 @@ public static class MachineRegistry
         }
     }
 
-    /// <summary>
-    /// Reads the machines this installation has and takes them into the list the app works from.
-    /// </summary>
-    /// <remarks>
-    /// Everything read last time is forgotten first. A machine thrown out in SETTINGS has to be
-    /// gone from the list the moment it is rebuilt, not at the next start.
-    /// </remarks>
-    /// <returns>What was taken, for the log and for the settings page to show.</returns>
-    public static IReadOnlyList<MachineProject> Load()
+    /// <inheritdoc/>
+    public IReadOnlyList<MachineProject> Load()
     {
         Seed();
 
@@ -116,20 +109,16 @@ public static class MachineRegistry
         return taken;
     }
 
-    /// <summary>The machines that ship and are not installed here, which are the ones on offer.</summary>
-    public static IReadOnlyList<MachineProject> Available()
+    /// <inheritdoc/>
+    public IReadOnlyList<MachineProject> Available()
     {
         var here = new HashSet<string>(In(Installed).Select(p => p.Id), StringComparer.Ordinal);
 
         return In(Shipped).Where(p => !here.Contains(p.Id)).ToList();
     }
 
-    /// <summary>The projects in that folder, or none when there is no folder.</summary>
-    /// <remarks>
-    /// A folder that will not read is nothing rather than a fault: this is called on the way to
-    /// drawing the rack, and one unreadable folder should not take the rack with it.
-    /// </remarks>
-    public static IReadOnlyList<MachineProject> In(string folder)
+    /// <inheritdoc/>
+    public IReadOnlyList<MachineProject> In(string folder)
     {
         if (!Directory.Exists(folder)) return Array.Empty<MachineProject>();
 
@@ -182,7 +171,7 @@ public static class MachineRegistry
     /// a machine this installation has still been offered, and trying again on every start would
     /// only write the same fault into the log for ever.
     /// </remarks>
-    private static void Seed()
+    private void Seed()
     {
         try
         {
@@ -216,7 +205,7 @@ public static class MachineRegistry
 
             moved = true;
 
-            if (MachineArchive.Add(project) != null) continue;
+            if (_archive.Add(project) != null) continue;
 
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                 () => "machine " + project.Id + " could not be taken from " + project.Folder);
@@ -275,7 +264,7 @@ public static class MachineRegistry
     /// holds now is what it counts as having been offered: nothing at all in the first case,
     /// which is what puts every shipped machine on a new rack.
     /// </remarks>
-    private static HashSet<string> Offered()
+    private HashSet<string> Offered()
     {
         string file = Path.Combine(Installed, OfferedName);
 
@@ -299,7 +288,7 @@ public static class MachineRegistry
     /// than one going missing.
     /// </remarks>
     /// <param name="offered">Every machine id this installation has now been offered.</param>
-    private static void Remember(IEnumerable<string> offered)
+    private void Remember(IEnumerable<string> offered)
     {
         try
         {

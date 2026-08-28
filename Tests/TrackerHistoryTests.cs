@@ -4,6 +4,7 @@ using JingleBox2.Tracker;
 using Xunit;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -24,6 +25,10 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class TrackerHistoryTests : IDisposable
 {
+    /// <summary>Every edit to a pattern, so each one lands in the history.</summary>
+    /// <remarks>One per test class, so nothing one test does reaches another.</remarks>
+    private static readonly IPatternEdit Edits = new PatternEdit();
+
     /// <summary>The history under test, hooked to <see cref="PatternEdit"/> for the run.</summary>
     private readonly TrackerHistory _history = new();
 
@@ -37,7 +42,7 @@ public class TrackerHistoryTests : IDisposable
     /// </summary>
     public TrackerHistoryTests()
     {
-        PatternEdit.Watching = _history.Taking;
+        Edits.Watching = _history.Taking;
 
         _song.Normalize();
         _song.Instruments.Add(new TrackerInstrument { Name = "One" });
@@ -46,8 +51,17 @@ public class TrackerHistoryTests : IDisposable
         foreach (var one in _song.Instruments) one.EnsureId();
     }
 
-    /// <summary>Unhooks the static watcher, which is process wide and outlives the test.</summary>
-    public void Dispose() => PatternEdit.Watching = null;
+    /// <summary>
+    /// Nothing to unhook. Kept as a method that does nothing so the shape of the class does not
+    /// change, and as the place this note can live.
+    /// </summary>
+    /// <remarks>
+    /// The watcher used to be static, so a test that hooked it hooked it for the whole process:
+    /// forgetting this line left the next test class writing into a history that had been thrown
+    /// away, and the failure turned up somewhere else entirely. The editor is an instance now and
+    /// this class holds its own, so there is nothing that outlives the test to put back.
+    /// </remarks>
+    public void Dispose() { }
 
     /// <summary>The song's first pattern, which is the one every pattern test types into.</summary>
     private Pattern First => _song.PatternAt(0)!;
@@ -122,7 +136,7 @@ public class TrackerHistoryTests : IDisposable
 
         lane.Put(0, 0.25);
 
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
         Assert.True(_history.Undo());
 
         Assert.Single(First.Lanes);
@@ -145,7 +159,7 @@ public class TrackerHistoryTests : IDisposable
     public void Every_note_typed_is_a_step()
     {
         for (int line = 0; line < 3; line++)
-            PatternEdit.EnterNote(First, At(line), new Note(60 + line), 0);
+            Edits.EnterNote(First, At(line), new Note(60 + line), 0);
 
         int steps = 0;
         while (_history.CanUndo) { _history.Undo(); steps++; }
@@ -158,8 +172,8 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void Undo_takes_the_last_one_and_leaves_the_rest()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
-        PatternEdit.EnterNote(First, At(1), new Note(62), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(1), new Note(62), 0);
 
         _history.Undo();
 
@@ -171,7 +185,7 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void Redo_puts_it_back()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
 
         _history.Undo();
         Assert.False(First[0, 0].Note.IsPlayable);
@@ -187,12 +201,12 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void Doing_something_new_makes_what_was_undone_unreachable()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
         _history.Undo();
 
         Assert.True(_history.CanRedo);
 
-        PatternEdit.EnterNote(First, At(1), new Note(62), 0);
+        Edits.EnterNote(First, At(1), new Note(62), 0);
 
         Assert.False(_history.CanRedo);
     }
@@ -208,12 +222,12 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void An_edit_that_changed_nothing_leaves_no_step()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
 
-        PatternEdit.ClearAtCursor(First, At(8));
-        PatternEdit.ClearAtCursor(First, At(9));
+        Edits.ClearAtCursor(First, At(8));
+        Edits.ClearAtCursor(First, At(9));
 
-        PatternEdit.EnterNote(First, At(1), new Note(62), 0);
+        Edits.EnterNote(First, At(1), new Note(62), 0);
 
         int steps = 0;
         while (_history.CanUndo) { _history.Undo(); steps++; }
@@ -228,7 +242,7 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void A_step_knows_which_pattern_it_is_about()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
 
         Assert.Same(First, _history.UndoIsAbout);
     }
@@ -240,7 +254,7 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void Taking_an_instrument_out_renumbers_the_patterns_and_undo_puts_both_back()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), instrument: 1);
+        Edits.EnterNote(First, At(0), new Note(60), instrument: 1);
         Assert.Equal(1, First[0, 0].Instrument);
 
         Changing("taking an instrument out");
@@ -267,7 +281,7 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void And_the_note_underneath_it_can_still_be_undone_afterwards()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), instrument: 1);
+        Edits.EnterNote(First, At(0), new Note(60), instrument: 1);
 
         Changing("taking an instrument out");
         _song.RemoveInstrumentAt(0);
@@ -406,7 +420,7 @@ public class TrackerHistoryTests : IDisposable
     [Fact]
     public void Forgetting_empties_it()
     {
-        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Edits.EnterNote(First, At(0), new Note(60), 0);
 
         _history.Forget();
 

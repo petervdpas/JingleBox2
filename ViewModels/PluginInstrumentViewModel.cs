@@ -5,6 +5,8 @@ using System;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
+using JingleBox2.Tracker.Machines;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -22,6 +24,13 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PluginInstrumentViewModel : ObservableObject
 {
+    /// <summary>Which values adapter reads a given instrument.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IMachineValuesFor ValuesFor = new MachineValuesFor();
+
+    /// <summary>The machines this run has.</summary>
+    private readonly IMachineProjects _machines;
+
     /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
 
@@ -61,13 +70,20 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// Takes it off the track, or null where there is no track to take it off, which is what
     /// makes the cross on the block appear at all.
     /// </param>
+    /// <param name="machines">
+    /// The machines this run has, the one instance everything shares. Required rather than
+    /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
+    /// machine missing, without an error anywhere to say why.
+    /// </param>
     public PluginInstrumentViewModel(
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
+        IMachineProjects machines,
         Action? changed = null,
         Func<TrackInstrumentDesigner>? designer = null,
         Action? remove = null)
     {
+        _machines = machines;
         _instrument = instrument;
         _live = live;
         _changed = changed;
@@ -193,8 +209,8 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
         if (_instrument.IsPlugin) return found;
 
-        if (Tracker.Machines.MachineProjects.For(_instrument.Machine.SlotId) is not { } project) return found;
-        if (Tracker.Machines.MachineValuesFor.Instrument(_instrument) is not { } values) return found;
+        if (_machines.For(_instrument.Machine.SlotId) is not { } project) return found;
+        if (ValuesFor.Instrument(_instrument) is not { } values) return found;
 
         foreach (string key in JingleBox2.Machines.PanelOrder.Of(project.Panel))
         {

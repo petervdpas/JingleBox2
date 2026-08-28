@@ -1,21 +1,11 @@
 using System;
 using JingleBox2.Tracker.Synth.Enums;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
-/// <summary>
-/// A per sample ADSR. Linear segments: at these timescales the shape matters far less than
-/// getting the lengths right, and linear keeps the stage boundaries exact.
-/// </summary>
-/// <remarks>
-/// One per voice, and for Zampler two: the loudness and the brightness are not the same shape,
-/// so the filter runs a second one of these and only differs in what it does with the answer.
-///
-/// <see cref="Next"/> is called once per sample per voice on the audio thread. It allocates
-/// nothing and takes no lock, because the envelope belongs to the voice being rendered and to
-/// nobody else.
-/// </remarks>
-public sealed class SynthEnvelope
+/// <inheritdoc/>
+public sealed class SynthEnvelope : ISynthEnvelope
 {
     private readonly double _attackPerSample;
     private readonly double _decayPerSample;
@@ -45,6 +35,8 @@ public sealed class SynthEnvelope
     /// A zero length stage is a jump, not a division by zero: an attack of no length arrives at
     /// full on the first sample, which is what a drum patch asks for.
     /// </remarks>
+    /// <param name="patch">The instrument whose four times the envelope is built from.</param>
+    /// <param name="sampleRate">The rate the voice is rendered at, which the times are turned into steps against.</param>
     public SynthEnvelope(SynthPatch patch, int sampleRate)
     {
         double rate = sampleRate <= 0 ? 1 : sampleRate;
@@ -62,16 +54,16 @@ public sealed class SynthEnvelope
         Stage = EnvelopeStage.Attack;
     }
 
-    /// <summary>Which segment it is in, which is how a voice knows a key is still being held.</summary>
+    /// <inheritdoc/>
     public EnvelopeStage Stage { get; private set; }
 
-    /// <summary>Silent and done, so the voice holding this can be dropped.</summary>
+    /// <inheritdoc/>
     public bool IsFinished => Stage == EnvelopeStage.Finished;
 
-    /// <summary>Where it stands now, without moving it on.</summary>
+    /// <inheritdoc/>
     public double Level => _level;
 
-    /// <summary>Advances one sample and returns the level to multiply that sample by.</summary>
+    /// <inheritdoc/>
     public double Next()
     {
         switch (Stage)
@@ -115,14 +107,7 @@ public sealed class SynthEnvelope
         return _level;
     }
 
-    /// <summary>
-    /// Releases from wherever the level happens to be, so a key up never clicks. A shorter
-    /// release can be forced, which is how a retrigger cuts the voice it replaces.
-    /// </summary>
-    /// <remarks>
-    /// There is nothing to hold at nought, so a patch with no sustain ends on its decay and a
-    /// note off that arrives after that finds the envelope already finished and does nothing.
-    /// </remarks>
+    /// <inheritdoc/>
     public void NoteOff(double? releaseSeconds = null)
     {
         if (Stage == EnvelopeStage.Release || Stage == EnvelopeStage.Finished) return;
@@ -142,7 +127,7 @@ public sealed class SynthEnvelope
         Stage = EnvelopeStage.Release;
     }
 
-    /// <summary>Cuts the voice dead, for a stop button rather than a note off.</summary>
+    /// <inheritdoc/>
     public void Kill()
     {
         _level = 0;

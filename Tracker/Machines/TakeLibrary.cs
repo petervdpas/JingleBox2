@@ -7,6 +7,8 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Files;
+using JingleBox2.Files.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -26,6 +28,9 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public sealed class TakeLibrary : IMachineTakes
 {
+    /// <summary>Whether two paths are one file, by this machine's rules.</summary>
+    private readonly IFilePaths _paths = new FilePaths();
+
     /// <summary>What the panel says when the file a take points at is not there any more.</summary>
     /// <remarks>The instrument editor's words, so the same fault reads the same in both places.</remarks>
     public const string MissingText = "The file this instrument plays is missing.";
@@ -123,7 +128,7 @@ public sealed class TakeLibrary : IMachineTakes
 
         foreach (var recording in _shelf ?? (IReadOnlyList<Recording>)Array.Empty<Recording>())
         {
-            if (FilePaths.Same(recording.FilePath, take) ||
+            if (_paths.Same(recording.FilePath, take) ||
                 string.Equals(recording.Name, take, StringComparison.Ordinal))
             {
                 return recording.Name.Length > 0 ? recording.Name : Path.GetFileNameWithoutExtension(recording.FilePath);
