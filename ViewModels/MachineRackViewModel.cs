@@ -12,6 +12,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -24,7 +29,7 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.IPlaysNotes
+public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
 {
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
@@ -192,11 +197,11 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
-    public Machines.IMachineLocation? MachineLocation =>
+    public Machines.Interfaces.IMachineLocation? MachineLocation =>
         _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
 
     /// <inheritdoc cref="MachineLocation"/>
-    private Machines.IMachineLocation? _place;
+    private Machines.Interfaces.IMachineLocation? _place;
 
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     /// <remarks>
@@ -348,7 +353,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     private IMachineKeys? _machineKeys;
 
     /// <summary>Which keys are down, which is the application's one monitor of the notes.</summary>
-    public Midi.IMidiMonitor? MidiKeys { get; set; }
+    public Midi.Interfaces.IMidiMonitor? MidiKeys { get; set; }
 
     /// <summary>One note from the panel's own keyboard.</summary>
     public void Play(Note note, int volume) => PlayNote(note, volume);

@@ -1,11 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              x:Class="JingleBox2.Views.InstrumentPanel"
              x:Name="Root"
-             x:DataType="vm:IInstrumentDesigner"
+             x:DataType="vmi:IInstrumentDesigner"
              Foreground="{DynamicResource TextPrimaryBrush}"
              Padding="2">
 

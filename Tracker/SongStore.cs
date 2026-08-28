@@ -5,6 +5,10 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -371,7 +375,7 @@ public sealed class SongStore : ISongStore
         }
         catch (Exception bad)
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () => "history: a step will not read back: " + bad.Message);
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () => "history: a step will not read back: " + bad.Message);
 
             return null;
         }
@@ -824,7 +828,7 @@ public sealed class SongStore : ISongStore
         public int Track { get; set; }
 
         /// <summary>What kind of thing is moved: the instrument, an insert, or the strip.</summary>
-        public Midi.ControlKind Kind { get; set; } = Midi.ControlKind.Instrument;
+        public Midi.Enums.ControlKind Kind { get; set; } = Midi.Enums.ControlKind.Instrument;
 
         /// <summary>How it gets from one point to the next.</summary>
         public AutomationPlay Play { get; set; } = AutomationPlay.Lines;
@@ -845,7 +849,7 @@ public sealed class SongStore : ISongStore
         public uint Parameter { get; set; }
 
         /// <summary>Which strip control, read only for a lane about the mix.</summary>
-        public Midi.MixControl Mix { get; set; } = Midi.MixControl.Volume;
+        public Midi.Enums.MixControl Mix { get; set; } = Midi.Enums.MixControl.Volume;
 
         /// <summary>One entry per point, as "time=value". The time is in lines.</summary>
         public List<string> Points { get; set; } = new();

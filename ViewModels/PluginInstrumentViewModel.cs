@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Tracker;
 using System;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using JingleBox2.Tracker;
 using Xunit;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Tests;
 
@@ -88,8 +89,8 @@ public class TrackerHistoryTests : IDisposable
 
         var link = new Midi.ControlMapping
         {
-            Kind = Midi.ControlKind.Instrument,
-            Scope = Midi.ControlScope.Focused,
+            Kind = Midi.Enums.ControlKind.Instrument,
+            Scope = Midi.Enums.ControlScope.Focused,
             Machine = "zampler",
             Key = "cutoff"
         };
@@ -115,7 +116,7 @@ public class TrackerHistoryTests : IDisposable
     {
         var lane = First.Lane(new AutomationLane
         {
-            Kind = Midi.ControlKind.Instrument, Machine = "zampler", Key = "cutoff"
+            Kind = Midi.Enums.ControlKind.Instrument, Machine = "zampler", Key = "cutoff"
         });
 
         lane.Put(0, 0.25);

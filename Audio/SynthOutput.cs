@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using JingleBox2.Tracker.Synth;
 using ManagedBass;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 
@@ -177,7 +179,7 @@ public sealed class SynthOutput : ISynthOutput
             {
                 if (Bass.ChannelIsActive(_handle) == PlaybackState.Playing) return;
 
-                Diagnostics.Log.Write(Diagnostics.LogArea.Audio, "the synth stream had gone; opening another");
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, "the synth stream had gone; opening another");
 
                 StopMixingAhead();
 
@@ -198,7 +200,7 @@ public sealed class SynthOutput : ISynthOutput
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
                     ? "the synth stream would not open: " + Bass.LastError
                     : "the synth stream is open at " + SampleRate + " Hz");
@@ -269,7 +271,7 @@ public sealed class SynthOutput : ISynthOutput
 
         if (_cushion <= 0)
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Audio, "the mixer runs in step with the sound card");
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, "the mixer runs in step with the sound card");
             return;
         }
 
@@ -291,7 +293,7 @@ public sealed class SynthOutput : ISynthOutput
 
         _ahead.Start();
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
             "the mixer runs " + _aheadMilliseconds + " ms ahead of the sound card (" + _cushion + " frames)");
     }
 
@@ -344,7 +346,7 @@ public sealed class SynthOutput : ISynthOutput
             }
             catch (Exception error)
             {
-                Diagnostics.Log.Fault(Diagnostics.LogArea.Audio, "mixing ahead", error);
+                Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Audio, "mixing ahead", error);
                 Array.Clear(_aheadScratch, 0, AheadChunkFrames * Channels);
             }
 
@@ -399,13 +401,13 @@ public sealed class SynthOutput : ISynthOutput
             Array.Clear(into, got, samples - got);
             _short += (samples - got) / Channels;
 
-            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && Environment.TickCount64 - _complained > 1000)
+            if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio) && Environment.TickCount64 - _complained > 1000)
             {
                 _complained = Environment.TickCount64;
 
                 long missing = _short;
 
-                Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                     "the cushion ran dry: " + missing + " frame(s) of silence so far. " +
                     "A bigger one in SETTINGS is what this is asking for.");
             }
@@ -431,7 +433,7 @@ public sealed class SynthOutput : ISynthOutput
         int samples = length / sizeof(float);
         if (samples <= 0) return 0;
 
-        if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && (samples < _smallest || samples > _largest || _largest == 0))
+        if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio) && (samples < _smallest || samples > _largest || _largest == 0))
         {
             if (_smallest == 0 || samples < _smallest) _smallest = samples;
             if (samples > _largest) _largest = samples;
@@ -439,7 +441,7 @@ public sealed class SynthOutput : ISynthOutput
             int low = _smallest / Channels;
             int high = _largest / Channels;
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 low == high
                     ? "the synth stream is asking for " + low + " frames at a time"
                     : "the synth stream is asking for between " + low + " and " + high + " frames at a time");

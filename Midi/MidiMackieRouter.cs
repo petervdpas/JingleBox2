@@ -1,5 +1,8 @@
 using System;
 using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
 

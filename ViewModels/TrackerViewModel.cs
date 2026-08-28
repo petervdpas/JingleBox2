@@ -18,6 +18,15 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -30,10 +39,10 @@ namespace JingleBox2.ViewModels;
 /// reach through, which is why it answers to five interfaces rather than one: what a panel wants
 /// (<see cref="ITrackerPanel"/>) is not what the transport bar wants
 /// (<see cref="ITransportDeck"/>), and neither is what a MIDI keyboard wants
-/// (<see cref="Midi.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
+/// (<see cref="Midi.Interfaces.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
 /// is how this one implementation does it.
 /// </remarks>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.IPlaysNotes, Shortcuts.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>The clock, the mixer and everything that makes a sound. One per tracker.</summary>
     private readonly TrackerPlayer _player;
@@ -220,7 +229,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// the pattern for the same reason its chain is: that one follows the cursor, and the
     /// master is not somewhere the cursor can be.
     /// </remarks>
-    public void UseAutomation(Midi.IControlTargets targets)
+    public void UseAutomation(Midi.Interfaces.IControlTargets targets)
     {
         _player.Automation = new AutomationPlayer(targets);
 
@@ -249,10 +258,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// and the keystroke walks outwards until something takes it, so it reaches
     /// <see cref="MainViewModel"/> and saves the song exactly as it did before.
     /// </remarks>
-    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) => action switch
     {
-        Shortcuts.ShortcutAction.Undo => History.CanUndo,
-        Shortcuts.ShortcutAction.Redo => History.CanRedo,
+        Shortcuts.Enums.ShortcutAction.Undo => History.CanUndo,
+        Shortcuts.Enums.ShortcutAction.Redo => History.CanRedo,
         _ => false
     };
 
@@ -261,12 +270,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// A step knows which pattern it is about, so both go through <see cref="TakeBack"/>, which
     /// goes there first rather than changing a pattern behind your back.
     /// </remarks>
-    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
         switch (action)
         {
-            case Shortcuts.ShortcutAction.Undo: TakeBack(History.UndoIsAbout, History.Undo); break;
-            case Shortcuts.ShortcutAction.Redo: TakeBack(History.RedoIsAbout, History.Redo); break;
+            case Shortcuts.Enums.ShortcutAction.Undo: TakeBack(History.UndoIsAbout, History.Undo); break;
+            case Shortcuts.Enums.ShortcutAction.Redo: TakeBack(History.RedoIsAbout, History.Redo); break;
         }
     }
 
@@ -932,7 +941,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The application's one monitor of the notes. Held here rather than looked up, because an
     /// instrument's window is built by this and there is nowhere else for it to come from.
     /// </remarks>
-    public Midi.IMidiMonitor? MidiKeys { get; set; }
+    public Midi.Interfaces.IMidiMonitor? MidiKeys { get; set; }
 
     /// <summary>The clock is running and the pattern is moving under the cursor.</summary>
     public bool IsPlaying => Transport == TrackerTransportState.Playing;
@@ -2282,7 +2291,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The engine is brought up first, so the first note played is not the one that waits for
     /// the plugin to open.
     /// </remarks>
-    public Audio.Plugins.IPluginInstrument? PluginFor(TrackerInstrument instrument)
+    public Audio.Plugins.Interfaces.IPluginInstrument? PluginFor(TrackerInstrument instrument)
     {
         if (instrument == null || !instrument.IsPlugin) return null;
 

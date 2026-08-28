@@ -3,6 +3,7 @@ using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker.Machines;
 

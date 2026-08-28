@@ -1,63 +1,7 @@
 using System;
+using JingleBox2.Tracker.Synth.Enums;
 
 namespace JingleBox2.Tracker.Synth;
-
-/// <summary>
-/// Which of the two shapes the oscillator makes.
-/// </summary>
-/// <remarks>
-/// Two rather than six, because this is one oscillator into a filter and the filter is where
-/// the tone comes from. The numbers are written down in songs, so they are fixed rather than
-/// implied by the order.
-/// </remarks>
-public enum MonoSynthWave
-{
-    /// <summary>A ramp: everything the harmonic series has, which is what a filter wants.</summary>
-    Saw = 0,
-
-    /// <summary>A square whose two halves are uneven, and can be moved while the note sounds.</summary>
-    Pulse = 1
-}
-
-/// <summary>Where a modulation comes from.</summary>
-public enum ModSource
-{
-    /// <summary>The note's own envelope, so the modulation has the shape of the note.</summary>
-    Envelope = 0,
-
-    /// <summary>The low frequency oscillator, so it keeps going as long as the note does.</summary>
-    Lfo = 1
-}
-
-/// <summary>What the oscillator's modulation lands on.</summary>
-public enum VcoModTarget
-{
-    /// <summary>The pitch, which is vibrato at a low rate and something else entirely at a high one.</summary>
-    Frequency = 0,
-
-    /// <summary>How wide the pulse is, which moves the tone without moving the note.</summary>
-    PulseWidth = 1
-}
-
-/// <summary>Which end of the filter is open.</summary>
-public enum FilterMode
-{
-    /// <summary>Everything below the cutoff, which is what a filter usually means.</summary>
-    LowPass = 0,
-
-    /// <summary>Everything above it, for taking the body out of something.</summary>
-    HighPass = 1
-}
-
-/// <summary>The shape the low frequency oscillator makes.</summary>
-public enum LfoWave
-{
-    /// <summary>Up and down evenly, which is a wobble.</summary>
-    Triangle = 0,
-
-    /// <summary>One end or the other and nothing between, which is a trill.</summary>
-    Square = 1
-}
 
 /// <summary>
 /// Ouroboros: one oscillator, one filter, one envelope, and two places to send modulation.

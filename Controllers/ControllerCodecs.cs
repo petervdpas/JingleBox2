@@ -6,6 +6,11 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Midi;
 using JingleBox2.Scripting;
 using MoonSharp.Interpreter;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.Scripting.Interfaces;
 
 namespace JingleBox2.Controllers;
 

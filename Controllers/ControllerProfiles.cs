@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using JingleBox2.Diagnostics;
 using JingleBox2.Midi;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Controllers;
 

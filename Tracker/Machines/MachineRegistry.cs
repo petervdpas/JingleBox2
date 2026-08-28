@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -29,7 +30,7 @@ namespace JingleBox2.Tracker.Machines;
 /// contract still needs, and until it lands, importing one would put a box on the rack that
 /// cannot make a sound.
 ///
-/// Everything here writes to <see cref="Diagnostics.LogArea.Machines"/> rather than to the
+/// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
 /// application's own area, as everything under this folder does. What machines were found and
 /// which of them could not be read is a whole half of the program, and reading it out of
 /// everything the application did at startup is exactly what nobody wants on the day a machine
@@ -107,7 +108,7 @@ public static class MachineRegistry
 
             taken.Add(project);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                 () => "machine " + project.Id + " from " + project.Folder);
         }
 
@@ -141,7 +142,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machines could not be read from " + folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machines could not be read from " + folder, ex);
 
             return Array.Empty<MachineProject>();
         }
@@ -188,7 +189,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machines folder could not be made at " + Installed, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machines folder could not be made at " + Installed, ex);
 
             return;
         }
@@ -216,7 +217,7 @@ public static class MachineRegistry
 
             if (MachineArchive.Add(project) != null) continue;
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                 () => "machine " + project.Id + " could not be taken from " + project.Folder);
         }
 
@@ -254,14 +255,14 @@ public static class MachineRegistry
 
                 File.Copy(from, to, overwrite: true);
 
-                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                     () => "machine " + named + " brought up to date in " + installed);
             }
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Fault(
-                Diagnostics.LogArea.Machines, "A machine could not be brought up to date from " + shipped, ex);
+                Diagnostics.Enums.LogArea.Machines, "A machine could not be brought up to date from " + shipped, ex);
         }
     }
 
@@ -284,7 +285,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The machines already offered could not be read", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The machines already offered could not be read", ex);
         }
 
         return new HashSet<string>(In(Installed).Select(project => project.Id), StringComparer.Ordinal);
@@ -305,7 +306,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The machines already offered could not be written", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The machines already offered could not be written", ex);
         }
     }
 }

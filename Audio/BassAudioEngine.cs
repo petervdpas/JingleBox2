@@ -5,6 +5,10 @@ using System.Threading;
 using JingleBox2.Config;
 using JingleBox2.Models;
 using ManagedBass;
+using JingleBox2.Audio.Enums;
+using JingleBox2.Config.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio;
 
@@ -50,7 +54,7 @@ public sealed class BassAudioEngine : IAudioEngine
     private readonly SyncProcedure _endSync;
 
     /// <summary>Effects on pads, and the BASS handles that run them.</summary>
-    private Plugins.IAudioInsert?[] _padInserts;
+    private Plugins.Interfaces.IAudioInsert?[] _padInserts;
 
     /// <summary>The hook each effect is hung on, or 0 where nothing is hung.</summary>
     private int[] _padDsp;
@@ -89,7 +93,7 @@ public sealed class BassAudioEngine : IAudioEngine
         _endSync = OnChannelEnd;
         _dspProcedure = OnPadDsp;
 
-        _padInserts = new Plugins.IAudioInsert?[padCount];
+        _padInserts = new Plugins.Interfaces.IAudioInsert?[padCount];
         _padDsp = new int[padCount];
         _padScratch = new float[padCount][];
         _padChannels = new int[padCount];
@@ -616,7 +620,7 @@ public sealed class BassAudioEngine : IAudioEngine
     /// Hung on whatever that pad is playing now. A pad with nothing loaded gets it when its next
     /// stream is made.
     /// </remarks>
-    public void SetPadInsert(int padIndex, Plugins.IAudioInsert? insert)
+    public void SetPadInsert(int padIndex, Plugins.Interfaces.IAudioInsert? insert)
     {
         lock (_lock)
         {
@@ -633,7 +637,7 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <inheritdoc/>
-    public Plugins.IAudioInsert? GetPadInsert(int padIndex)
+    public Plugins.Interfaces.IAudioInsert? GetPadInsert(int padIndex)
     {
         lock (_lock) return InRange(padIndex) ? _padInserts[padIndex] : null;
     }
@@ -761,7 +765,7 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <param name="frames">How many frames this piece holds.</param>
     /// <param name="channels">How many channels the pad's stream carries.</param>
     private static unsafe bool ProcessPadBlock(
-        Plugins.IAudioInsert insert,
+        Plugins.Interfaces.IAudioInsert insert,
         float[] scratch,
         IntPtr buffer,
         int start,
@@ -829,7 +833,7 @@ public sealed class BassAudioEngine : IAudioEngine
             _padLoops = new bool[newPadCount];
             _padFadeIn = new double[newPadCount];
             _padFadeOut = new double[newPadCount];
-            _padInserts = new Plugins.IAudioInsert?[newPadCount];
+            _padInserts = new Plugins.Interfaces.IAudioInsert?[newPadCount];
             _padDsp = new int[newPadCount];
             _padScratch = new float[newPadCount][];
             _padChannels = new int[newPadCount];

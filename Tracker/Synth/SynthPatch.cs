@@ -1,4 +1,5 @@
 using System;
+using JingleBox2.Tracker.Synth.Enums;
 
 namespace JingleBox2.Tracker.Synth;
 

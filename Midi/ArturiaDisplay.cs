@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
 

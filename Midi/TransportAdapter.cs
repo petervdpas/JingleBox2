@@ -1,5 +1,7 @@
 using JingleBox2.Diagnostics;
 using JingleBox2.ViewModels;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
 

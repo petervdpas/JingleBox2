@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.UI;
 using System;
 using System.Linq;
+using JingleBox2.UI.Enums;
 
 namespace JingleBox2.ViewModels;
 

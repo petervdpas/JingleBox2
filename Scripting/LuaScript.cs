@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using JingleBox2.Diagnostics;
 using MoonSharp.Interpreter;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Scripting.Interfaces;
 
 namespace JingleBox2.Scripting;
 

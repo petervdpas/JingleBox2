@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -983,7 +985,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
             for (int index = 0; index < _watched.Length; index++) _seen[index] = ValueOf(_watched[index]);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 "watching " + _watched!.Length + " knobs on " + Info.Name + ", which read " + Reading());
 
             return;

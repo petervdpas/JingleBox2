@@ -9,6 +9,9 @@ using JingleBox2.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Linq;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -85,7 +88,7 @@ public static class PanelPreview
             {
                 pretend.Add(new Midi.ControlMapping
                 {
-                    Kind = Midi.ControlKind.Instrument,
+                    Kind = Midi.Enums.ControlKind.Instrument,
                     Machine = PreviewApp.Wanted.SlotId,
                     Key = parameter.Key
                 });

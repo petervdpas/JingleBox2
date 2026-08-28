@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Tracker.Synth;
 using System.Text.Json;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 

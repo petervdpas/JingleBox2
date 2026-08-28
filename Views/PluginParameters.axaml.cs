@@ -7,6 +7,7 @@ using JingleBox2.Machines.Ui;
 using JingleBox2.ViewModels;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Views;
 
@@ -101,8 +102,8 @@ public partial class PluginParameters : UserControl
 
         link.Offer(new Midi.ControlMapping
         {
-            Kind = Midi.ControlKind.Insert,
-            Scope = Midi.ControlScope.Focused,
+            Kind = Midi.Enums.ControlKind.Insert,
+            Scope = Midi.Enums.ControlScope.Focused,
             Plugin = controls.Plugin.Info.Id,
             Parameter = parameter.Id,
             Name = controls.Plugin.Info.Name + " " + parameter.Name

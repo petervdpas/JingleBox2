@@ -13,6 +13,13 @@ using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using JingleBox2.Machines;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -20,7 +27,7 @@ namespace JingleBox2.ViewModels;
 /// The instrument currently open in the editor. A sample and a synth share a name and a
 /// level; the rest of the page shows whichever half applies.
 /// </summary>
-public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.IShortcutContext
+public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>The instrument being edited, written straight through rather than copied.</summary>
     private readonly TrackerInstrument _instrument;
@@ -52,10 +59,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
     /// <inheritdoc/>
     /// <remarks>Undo and redo only. Everything else on this page is a control rather than a key.</remarks>
-    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) => action switch
     {
-        Shortcuts.ShortcutAction.Undo => History.CanUndo,
-        Shortcuts.ShortcutAction.Redo => History.CanRedo,
+        Shortcuts.Enums.ShortcutAction.Undo => History.CanUndo,
+        Shortcuts.Enums.ShortcutAction.Redo => History.CanRedo,
         _ => false
     };
 
@@ -65,12 +72,12 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// the one case it cannot notice for itself, so it is told to read itself again. The same thing
     /// a preset landing on the instrument does.
     /// </remarks>
-    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
         bool walked = action switch
         {
-            Shortcuts.ShortcutAction.Undo => History.Undo(_instrument),
-            Shortcuts.ShortcutAction.Redo => History.Redo(_instrument),
+            Shortcuts.Enums.ShortcutAction.Undo => History.Undo(_instrument),
+            Shortcuts.Enums.ShortcutAction.Redo => History.Redo(_instrument),
             _ => false
         };
 
@@ -720,7 +727,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     }
 
     /// <summary>The plugin this editor is showing, when it is showing one.</summary>
-    private Audio.Plugins.IPluginInstrument? _plugin;
+    private Audio.Plugins.Interfaces.IPluginInstrument? _plugin;
 
     /// <summary>Set when a knob has moved and the patch has not been read back yet.</summary>
     private bool _patchStale;

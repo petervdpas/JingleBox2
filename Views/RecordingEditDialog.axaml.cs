@@ -9,6 +9,7 @@ using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
 using JingleBox2.Machines.Ui;
+using JingleBox2.Waveform.Enums;
 
 namespace JingleBox2.Views;
 

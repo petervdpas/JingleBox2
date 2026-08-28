@@ -6,6 +6,7 @@ using Avalonia.Media;
 using System;
 using System.Globalization;
 using System.Windows.Input;
+using JingleBox2.Machines.Ui.Enums;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -676,33 +677,4 @@ public class PushButton : ThemedControl
 
         return geometry;
     }
-}
-
-/// <summary>What a push button's cap is moulded as.</summary>
-public enum ButtonShape
-{
-    /// <summary>The ordinary one: a rounded oblong, as wide as what is written on it.</summary>
-    Oblong = 0,
-
-    /// <summary>A disc, for the button a panel wants you to find without looking.</summary>
-    Round = 1,
-
-    /// <summary>A triangle, which points at what pressing it does.</summary>
-    Triangle = 2
-}
-
-/// <summary>Which way a triangular cap points.</summary>
-public enum Pointing
-{
-    /// <summary>The default, since a triangle on a panel is usually a next or a play.</summary>
-    Right = 0,
-
-    /// <summary>Back, or previous.</summary>
-    Left = 1,
-
-    /// <summary>Up, which on a panel is usually more of something.</summary>
-    Up = 2,
-
-    /// <summary>And down, less of it.</summary>
-    Down = 3
 }

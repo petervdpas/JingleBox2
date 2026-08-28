@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Controllers;
 

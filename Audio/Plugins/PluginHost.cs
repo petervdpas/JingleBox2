@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -66,20 +69,20 @@ public static class PluginHost
     {
         if (plugin == null) return null;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             $"Opening {plugin.Name} ({plugin.FormatName}), Isolated={Isolated}, InstrumentMode={asInstrument}");
 
         if (Isolated)
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using isolated (out-of-process) loading");
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => "Using isolated (out-of-process) loading");
             return BridgedPlugin.Load(plugin, sampleRate, maxFrames, asInstrument);
         }
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using in-process loading");
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => "Using in-process loading");
 
         if (PluginCrashGuard.IsLoadBlocked(plugin))
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => $"Plugin blocked by crash guard");
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => $"Plugin blocked by crash guard");
             return null;
         }
 
@@ -87,7 +90,7 @@ public static class PluginHost
 
         try
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 $"Loading {plugin.Format} plugin at {plugin.Path}");
 
             object? result;
@@ -100,7 +103,7 @@ public static class PluginHost
                 result = ClapEffect.Load(plugin.Path, plugin.Id, sampleRate, maxFrames);
             }
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 result != null ? $"Successfully loaded {plugin.Name}" : $"Failed to load {plugin.Name}");
 
             return result;

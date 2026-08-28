@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 
@@ -86,7 +88,7 @@ public sealed class RecordingCategories : IRecordingCategories
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Audio, "Categories could not be read", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Audio, "Categories could not be read", ex);
         }
     }
 
@@ -103,7 +105,7 @@ public sealed class RecordingCategories : IRecordingCategories
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Audio, "Categories could not be written", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Audio, "Categories could not be written", ex);
         }
     }
 }

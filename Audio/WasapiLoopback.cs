@@ -2,6 +2,7 @@ using ManagedBass.Wasapi;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 

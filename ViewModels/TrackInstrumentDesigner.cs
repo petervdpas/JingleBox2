@@ -4,6 +4,10 @@ using JingleBox2.Audio;
 using JingleBox2.Machines;
 using JingleBox2.Tracker;
 using System;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -54,7 +58,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         ITrackerPanel? tracker = null,
         MachineRack? rack = null,
         System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null,
-        Midi.IMidiMonitor? keys = null)
+        Midi.Interfaces.IMidiMonitor? keys = null)
     {
         Track = track;
         _keys = keys;
@@ -219,10 +223,10 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// showed nothing for a key on the hardware, since that key never touches a panel: it goes
     /// to whoever the notes are being played on.
     /// </remarks>
-    public Midi.IMidiMonitor? MidiKeys => _keys;
+    public Midi.Interfaces.IMidiMonitor? MidiKeys => _keys;
 
     /// <summary>The monitor, or null on a panel built without one.</summary>
-    private readonly Midi.IMidiMonitor? _keys;
+    private readonly Midi.Interfaces.IMidiMonitor? _keys;
 
 
     /// <summary>
@@ -280,11 +284,11 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
     /// <inheritdoc/>
     /// <remarks>Built the first time a described face asks for it, since most do not.</remarks>
-    public Machines.IMachineLocation? MachineLocation =>
+    public Machines.Interfaces.IMachineLocation? MachineLocation =>
         _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
 
     /// <summary>Built the first time a machine's face asks for the lamps.</summary>
-    private Machines.IMachineLocation? _place;
+    private Machines.Interfaces.IMachineLocation? _place;
 
     /// <summary>Plays C at the panel's own octave, which is what the TEST cap does.</summary>
     private void Test() => Play(Note.FromOctave(0, Octave));

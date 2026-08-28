@@ -4,6 +4,7 @@ using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.ViewModels;
 using Xunit;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tests;
 

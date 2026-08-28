@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

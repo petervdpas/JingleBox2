@@ -5,6 +5,7 @@ using Avalonia.Media;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Tracker;
 using System;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Views;
 

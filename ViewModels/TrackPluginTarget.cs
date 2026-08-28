@@ -1,5 +1,6 @@
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Tracker;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -26,7 +27,7 @@ namespace JingleBox2.Tracker.Machines;
 /// through <see cref="MachineProject.Open"/>, and this is the one place a stranger's file gets
 /// to put anything there.
 ///
-/// Everything here writes to <see cref="Diagnostics.LogArea.Machines"/> rather than to the
+/// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
 /// application's own area, as everything under this folder does. What a bundle was refused for
 /// is the sort of thing somebody goes looking for, and it should not be buried under everything
 /// else the application had to say that session.
@@ -106,7 +107,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be imported from " + zipPath, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machine could not be imported from " + zipPath, ex);
 
             return null;
         }
@@ -147,7 +148,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be taken from " + fromCrate.Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machine could not be taken from " + fromCrate.Folder, ex);
 
             return null;
         }
@@ -174,13 +175,13 @@ public static class MachineArchive
 
             Directory.Delete(folder, recursive: true);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Machines, () => "machine removed from " + folder);
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines, () => "machine removed from " + folder);
 
             return true;
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be removed from " + project.Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machine could not be removed from " + project.Folder, ex);
 
             return false;
         }
@@ -294,7 +295,7 @@ public static class MachineArchive
 
             if (installed != null)
             {
-                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                     () => "machine " + installed.Id + " installed into " + installed.Folder);
             }
 
@@ -359,7 +360,7 @@ public static class MachineArchive
 
             if (!MachinePaths.Under(full, into))
             {
-                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines,
                     () => "machine zip refused: " + entry.FullName + " lands outside " + into);
 
                 return false;
@@ -423,7 +424,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Half an imported machine is left in " + staging, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Half an imported machine is left in " + staging, ex);
         }
     }
 

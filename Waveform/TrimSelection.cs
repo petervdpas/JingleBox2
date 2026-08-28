@@ -1,20 +1,8 @@
 using JingleBox2.Machines.Ui;
 using System;
+using JingleBox2.Waveform.Enums;
 
 namespace JingleBox2.Waveform;
-
-/// <summary>Which end of the region a gesture has hold of.</summary>
-public enum TrimHandle
-{
-    /// <summary>Neither, which is what a click away from both handles means.</summary>
-    None,
-
-    /// <summary>The handle at the start of the region.</summary>
-    Start,
-
-    /// <summary>The handle at the end of it.</summary>
-    End
-}
 
 /// <summary>
 /// The region of a recording marked to keep, as fractions of the whole file. Holds the rules

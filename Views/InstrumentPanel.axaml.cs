@@ -12,6 +12,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -196,13 +199,13 @@ public partial class InstrumentPanel : UserControl
     /// The machine and the key, and no track. A knob is pointed at Zampler's cutoff rather than
     /// at track three's, so the same link works on every track that plays a Zampler and follows
     /// you as you move between them. What names a track is the mixer, which is a different kind
-    /// of mapping for a different reason: see <see cref="Midi.ControlScope"/>.
+    /// of mapping for a different reason: see <see cref="Midi.Enums.ControlScope"/>.
     /// </remarks>
     private void Offer(object? sender, string key)
     {
         if (Midi.ControlLink.Current is not { IsLinking: true } link)
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
                 "panel: pointer on '" + key + "' but "
                 + (Midi.ControlLink.Current is null ? "THERE IS NO LINK" : "the mode is off"));
 
@@ -211,7 +214,7 @@ public partial class InstrumentPanel : UserControl
 
         if (Designer?.Editor is not { } editor)
         {
-            Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
                 "panel: pointer on '" + key + "' but THERE IS NO EDITOR behind the panel, so nothing is offered");
 
             return;
@@ -219,8 +222,8 @@ public partial class InstrumentPanel : UserControl
 
         link.Offer(new Midi.ControlMapping
         {
-            Kind = Midi.ControlKind.Instrument,
-            Scope = Midi.ControlScope.Focused,
+            Kind = Midi.Enums.ControlKind.Instrument,
+            Scope = Midi.Enums.ControlScope.Focused,
             Machine = editor.MachineId,
             Key = key,
             Name = editor.MachineName + " " + key
@@ -257,11 +260,11 @@ public partial class InstrumentPanel : UserControl
 
         link.Offer(new Midi.ControlMapping
         {
-            Kind = Midi.ControlKind.Action,
-            Scope = Midi.ControlScope.Focused,
+            Kind = Midi.Enums.ControlKind.Action,
+            Scope = Midi.Enums.ControlScope.Focused,
             Machine = editor.MachineId,
             Key = action,
-            Pickup = Midi.ControlPickup.Jump,
+            Pickup = Midi.Enums.ControlPickup.Jump,
             Name = editor.MachineName + " " + action.Replace('_', ' ')
         }, InSong);
     }

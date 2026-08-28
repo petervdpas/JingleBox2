@@ -1,5 +1,6 @@
 using ManagedBass;
 using System;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 

@@ -9,6 +9,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
+using JingleBox2.ViewModels.Enums;
 
 namespace JingleBox2.ViewModels;
 
@@ -74,19 +75,6 @@ public sealed record UtilityTool(string Key, string Name, string Blurb)
 
     /// <summary>The name, which is what a list with no template shows.</summary>
     public override string ToString() => Name;
-}
-
-/// <summary>Which recordings the level tool is looking at.</summary>
-public enum WaveScope
-{
-    /// <summary>The ones the picked preset plays.</summary>
-    Preset,
-
-    /// <summary>Every recording this machine's presets play.</summary>
-    Machine,
-
-    /// <summary>Whatever is in a folder somewhere on the disc.</summary>
-    Folder,
 }
 
 /// <summary>

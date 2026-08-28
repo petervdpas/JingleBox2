@@ -6,6 +6,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Shortcuts.Interfaces;
 
 namespace JingleBox2.Shortcuts;
 

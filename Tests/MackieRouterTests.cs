@@ -1,5 +1,6 @@
 using JingleBox2.Midi;
 using Xunit;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Tests;
 

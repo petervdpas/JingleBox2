@@ -7,6 +7,10 @@ using JingleBox2.Audio.Plugins.Bridge;
 using JingleBox2.Diagnostics;
 using System;
 using System.Collections.ObjectModel;
+using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -147,7 +151,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// and taking the last of those as what you meant would point your knob at whatever
     /// happened to be reported last.
     ///
-    /// The link is <see cref="Midi.ControlScope.Focused"/>, so one knob pointed at a plugin's
+    /// The link is <see cref="Midi.Enums.ControlScope.Focused"/>, so one knob pointed at a plugin's
     /// cutoff is the cutoff on whichever strip you last touched rather than a link per track.
     /// </remarks>
     private void Offer(uint id)
@@ -168,8 +172,8 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         link.Offer(new Midi.ControlMapping
         {
-            Kind = Midi.ControlKind.Insert,
-            Scope = Midi.ControlScope.Focused,
+            Kind = Midi.Enums.ControlKind.Insert,
+            Scope = Midi.Enums.ControlScope.Focused,
             Plugin = Plugin.Info.Id,
             Parameter = id,
             Name = Plugin.Info.Name + " " + (parameter?.Name ?? id.ToString())

@@ -6,6 +6,8 @@ using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 

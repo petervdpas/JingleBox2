@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker.Synth;
 using System;
+using JingleBox2.Tracker.Synth.Enums;
 
 namespace JingleBox2.ViewModels;
 

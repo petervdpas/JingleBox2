@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -583,7 +584,7 @@ internal static unsafe class PluginRunLoop
 
         if (timers == 0 && watches == 0) return;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the window took " + timers + " timers and " + watches + " watched files with it");
     }
 
@@ -729,7 +730,7 @@ internal static unsafe class PluginRunLoop
                 return Vst3Abi.ResultOk;
             }
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                 "the plugin asked for a timer every " + interval + "ms, handler " + ((nint)handler).ToString("X"));
 
             Timers.Add(new Timer
@@ -750,7 +751,7 @@ internal static unsafe class PluginRunLoop
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterTimer(void* self, void* handler)
     {
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the plugin gave back timer " + ((nint)handler).ToString("X"));
 
         lock (Calling)
@@ -774,7 +775,7 @@ internal static unsafe class PluginRunLoop
     {
         if (handler == null) return Vst3Abi.NoInterface;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the plugin asked to have file " + file + " watched, handler " + ((nint)handler).ToString("X"));
 
         lock (Gate) Watches.Add(new Watch { Handler = (nint)handler, File = file, Asked = _asked++ });
@@ -789,7 +790,7 @@ internal static unsafe class PluginRunLoop
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterEventHandler(void* self, void* handler)
     {
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the plugin gave back the watch on handler " + ((nint)handler).ToString("X"));
 
         lock (Calling)

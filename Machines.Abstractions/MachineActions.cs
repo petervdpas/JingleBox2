@@ -1,3 +1,4 @@
+
 namespace JingleBox2.Machines;
 
 /// <summary>

@@ -1,6 +1,9 @@
 using JingleBox2.Audio.Plugins;
 using System;
 using System.Collections.Generic;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Synth;
 
@@ -960,7 +963,7 @@ public sealed class TrackMixer : ITrackMixer
 
         lock (_lock)
         {
-            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio) && Environment.TickCount64 - _said > 1000)
+            if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio) && Environment.TickCount64 - _said > 1000)
             {
                 _said = Environment.TickCount64;
 
@@ -968,7 +971,7 @@ public sealed class TrackMixer : ITrackMixer
                 int played = _instrumentCount;
                 int inserts = _insertCount;
 
-                Diagnostics.Log.Write(Diagnostics.LogArea.Audio, () =>
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                     "the mixer has " + voices + " voices, " + played + " plugin instruments and " +
                     inserts + " tracks with something inserted");
 
@@ -1304,7 +1307,7 @@ public sealed class TrackMixer : ITrackMixer
                 Array.Clear(bus, 0, samples);
             }
 
-            if (Diagnostics.Log.On(Diagnostics.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
+            if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
 
             Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
         }
@@ -1363,7 +1366,7 @@ public sealed class TrackMixer : ITrackMixer
             var bus = _busses[track];
             if (bus == null) continue;
 
-            bool watching = Diagnostics.Log.On(Diagnostics.LogArea.Audio);
+            bool watching = Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio);
             int samples = frames * 2;
             float before = watching ? Peak(bus, samples) : 0f;
 
@@ -1551,7 +1554,7 @@ public sealed class TrackMixer : ITrackMixer
             float pan = _instrumentPan[number];
             float meter = _trackLevels[number];
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
                 "track " + number + ": " +
                 (seen.Instrument == null ? "no plugin playing it" :
                     seen.Instrument + " played " + seen.Blocks + " blocks, peak " + seen.PlayedPeak.ToString("F4") +

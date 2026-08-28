@@ -3,6 +3,8 @@ using System;
 using JingleBox2.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Midi;
 
@@ -197,7 +199,7 @@ public sealed class ControlLink
         _offered = what;
         _offeredToSong = keep;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Midi, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
             what == null
                 ? "link: nothing offered"
                 : "link: offering " + what.Kind + " " + (what.Name.Length > 0 ? what.Name : what.Key)

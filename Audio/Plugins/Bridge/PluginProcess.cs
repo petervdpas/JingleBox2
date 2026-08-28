@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
+using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -367,13 +369,13 @@ internal sealed class PluginProcess : IDisposable
         start.ArgumentList.Add(maxFrames.ToString(System.Globalization.CultureInfo.InvariantCulture));
         start.ArgumentList.Add(asInstrument ? "instrument" : "effect");
 
-        if (Diagnostics.Log.On(Diagnostics.LogArea.Plugins))
+        if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Plugins))
         {
             start.Environment[PluginBridge.TraceVariable] = "1";
             start.Environment[PluginBridge.LogFolderVariable] = System.IO.Path.GetDirectoryName(Diagnostics.Log.Path) ?? "";
         }
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "starting a process for " + plugin.Name + " (" + plugin.FormatName + ") at " + plugin.Path);
 
         try
@@ -603,7 +605,7 @@ internal sealed class PluginProcess : IDisposable
 
         try { _answered.Release(); } catch (SemaphoreFullException) { }
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             _stopping ? "a plugin process was closed on purpose" : "a plugin process " + _epitaph);
 
         if (!_stopping) Died?.Invoke();

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using JingleBox2.Diagnostics;
 using JingleBox2.Tracker;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.ViewModels;
 

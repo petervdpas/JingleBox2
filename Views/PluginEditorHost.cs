@@ -4,6 +4,8 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using JingleBox2.Audio.Plugins;
 using System;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -90,7 +92,7 @@ public sealed class PluginEditorHost : NativeControlHost
     {
         _active = active;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the window says " + (active ? "active" : "not active") +
             "; the plugin is " + (_attached ? "in it" : "not in it yet"));
 
@@ -111,7 +113,7 @@ public sealed class PluginEditorHost : NativeControlHost
     {
         if (!_attached || _handle == 0) return;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "telling the plugin the window is " + (active ? "active" : "not active"));
 
         XEmbed.Activated(_handle, active);
@@ -331,7 +333,7 @@ public sealed class PluginEditorHost : NativeControlHost
 
         bool active = (TopLevel.GetTopLevel(this) as Window)?.IsActive == true || _active;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
             "the plugin is in its window, and the window is " +
             (active ? "active" : "not active"));
 

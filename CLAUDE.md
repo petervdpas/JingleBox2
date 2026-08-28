@@ -295,11 +295,27 @@ is where the prose lives, not whether the prose exists.
 What does get one: anything that holds state, talks to hardware, touches a file, or is reached by
 something else. Those are the places a test needs to stand.
 
-An interface lives in a file of its own, named after it. It is the half a reader is meant to open
-first and the half everything else names, so it does not sit at the top of the class that happens
-to implement it: two implementations would then leave the contract living inside one of them, and
-a reader who wants to know what they are holding should not have to open somebody's plumbing to
-find out.
+An interface lives in a file of its own, named after it, in an `Interfaces` folder beside the
+code it is the contract for: `Audio/Interfaces/IAudioEngine.cs` is `JingleBox2.Audio.Interfaces`,
+and `BassAudioEngine.cs` stays in `Audio/`. It is the half a reader is meant to open first and the
+half everything else names, so it does not sit at the top of the class that happens to implement
+it: two implementations would then leave the contract living inside one of them, and a reader who
+wants to know what they are holding should not have to open somebody's plumbing to find out.
+
+Beside the area rather than one folder at the root, because a contract belongs to the thing it is
+about. `Audio/Interfaces` is a list of what the audio can be asked to do, which is worth opening;
+fifty four files in one place at the root would be an alphabet, and it would put the machine
+assembly's contracts in a namespace rooted in the application, which is the one thing that
+assembly is kept clear of.
+
+Enums go the same way, in an `Enums` folder beside their area. An enum is a closed set of names
+and nothing else: it is what several classes agree to say, so it belongs to none of them, and it
+was living wherever the first class to need it happened to be. `Midi/ControlMapping.cs` held five
+of them.
+
+Neither folder holds anything else. A record or a class that arrived beside an interface because
+it is that interface's vocabulary gets its own file in the area itself: `PadPlaybackChanged` is
+data and is in `Audio/`, not in `Audio/Interfaces/`.
 
 ### There are no line comments
 

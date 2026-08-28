@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 

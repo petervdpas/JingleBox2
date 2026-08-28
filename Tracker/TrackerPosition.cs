@@ -1,4 +1,5 @@
 using System;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker;
 
@@ -17,19 +18,6 @@ public readonly record struct TrackerPosition(int OrderIndex, int Line)
 
     /// <summary>Order and line, both two digits, as the status line shows it.</summary>
     public override string ToString() => $"{OrderIndex:00}:{Line:00}";
-}
-
-/// <summary>What a step asks of a track. Three, because a cell's columns are independently blank.</summary>
-public enum TrackerEventKind
-{
-    /// <summary>Start a voice on this track.</summary>
-    Trigger,
-
-    /// <summary>Stop whatever this track is playing.</summary>
-    Stop,
-
-    /// <summary>Change the running voice without retriggering it.</summary>
-    Adjust
 }
 
 /// <summary>One thing to do to one track on one step.</summary>

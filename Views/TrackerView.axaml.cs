@@ -11,6 +11,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Reactive;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Views;
 

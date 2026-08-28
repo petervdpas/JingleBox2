@@ -14,6 +14,15 @@ using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Machines.Ui;
+using JingleBox2.Config.Enums;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Routing.Interfaces;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -31,7 +40,7 @@ namespace JingleBox2.ViewModels;
 /// than on a page view model of their own, because two pages show them: PADS is where they are
 /// laid out and FIRE is where they are played.
 /// </remarks>
-public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcutContext
+public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
@@ -207,7 +216,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// So the window hands off to the page rather than the page waiting to be found. Anything
     /// that does have focus is still asked first and still wins.
     /// </remarks>
-    private Shortcuts.IShortcutContext? Page => SelectedTab switch
+    private Shortcuts.Interfaces.IShortcutContext? Page => SelectedTab switch
     {
         RecordTab => Record,
         TrackerTab => Tracker,
@@ -226,14 +235,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// deck is, so a page added later has to say what saving on it means instead of quietly
     /// inheriting somebody else's answer.
     /// </remarks>
-    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) => action switch
     {
         _ when Page?.Can(action) == true => true,
 
-        Shortcuts.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
+        Shortcuts.Enums.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
 
-        Shortcuts.ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
-        Shortcuts.ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
+        Shortcuts.Enums.ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
+        Shortcuts.Enums.ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
 
         _ => false
     };
@@ -254,7 +263,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// page is asked whether it can before being asked to, since an action it declines has to
     /// reach the answer below rather than being swallowed by whoever was offered it first.
     /// </remarks>
-    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
         if (Page is { } page && page.Can(action))
         {
@@ -265,15 +274,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         switch (action)
         {
-            case Shortcuts.ShortcutAction.Save when SelectedTab == TrackerTab:
+            case Shortcuts.Enums.ShortcutAction.Save when SelectedTab == TrackerTab:
                 Tracker.SaveCommand.Execute(null);
                 break;
 
-            case Shortcuts.ShortcutAction.Undo when OnThePads:
+            case Shortcuts.Enums.ShortcutAction.Undo when OnThePads:
                 PadsBack(PadHistory.Undo());
                 break;
 
-            case Shortcuts.ShortcutAction.Redo when OnThePads:
+            case Shortcuts.Enums.ShortcutAction.Redo when OnThePads:
                 PadsBack(PadHistory.Redo());
                 break;
         }
@@ -578,14 +587,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// </summary>
     /// <remarks>
     /// Built from the areas the log itself knows about rather than from a list written out
-    /// here, so an area added to <see cref="Diagnostics.LogArea"/> turns up on the page without
+    /// here, so an area added to <see cref="Diagnostics.Enums.LogArea"/> turns up on the page without
     /// anybody being told to add it.
     /// </remarks>
     public System.Collections.ObjectModel.ObservableCollection<LogAreaViewModel> LogParts { get; } = new();
 
     /// <summary>The areas the settings ask for, with nothing said meaning all of them.</summary>
-    private Diagnostics.LogArea Written =>
-        _cfg.LogAreas == 0 ? Diagnostics.LogArea.Everything : (Diagnostics.LogArea)_cfg.LogAreas;
+    private Diagnostics.Enums.LogArea Written =>
+        _cfg.LogAreas == 0 ? Diagnostics.Enums.LogArea.Everything : (Diagnostics.Enums.LogArea)_cfg.LogAreas;
 
     /// <summary>
     /// Builds the tick boxes from the areas the log knows about, once, while starting.
@@ -617,12 +626,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// <param name="part">Which box was ticked, which is not read: they are all gathered.</param>
     private void LogPartChanged(LogAreaViewModel part)
     {
-        var wanted = Diagnostics.LogArea.None;
+        var wanted = Diagnostics.Enums.LogArea.None;
 
         foreach (var one in LogParts)
             if (one.Writes) wanted |= one.Area;
 
-        if (wanted == Diagnostics.LogArea.None)
+        if (wanted == Diagnostics.Enums.LogArea.None)
         {
             WriteLog = false;
 

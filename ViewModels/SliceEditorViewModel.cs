@@ -10,6 +10,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

@@ -5,6 +5,9 @@ using JingleBox2.Audio.Plugins;
 using JingleBox2.Diagnostics;
 using System;
 using System.Collections.ObjectModel;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

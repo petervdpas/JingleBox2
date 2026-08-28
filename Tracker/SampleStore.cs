@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 

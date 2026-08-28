@@ -16,6 +16,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Routing.Interfaces;
+using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.Tracker.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -35,7 +42,7 @@ namespace JingleBox2.ViewModels;
 /// anybody wanted it. Only this session's deletions are offered back: putting back a take from
 /// last week is a filing cabinet, not undo.
 /// </remarks>
-public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.IShortcutContext
+public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What actually opens the input and writes the file.</summary>
     private readonly IRecordingService _recordingService;
@@ -1175,14 +1182,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// RECORD straight after clicking a button in a dialog is exactly that, and it silently did
     /// nothing.
     /// </remarks>
-    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) =>
-        action == Shortcuts.ShortcutAction.Undo && CanUnbin;
+    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) =>
+        action == Shortcuts.Enums.ShortcutAction.Undo && CanUnbin;
 
     /// <inheritdoc/>
     /// <remarks>Only undo is answered, and only while there is something in the bin.</remarks>
-    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
-        if (action == Shortcuts.ShortcutAction.Undo) Unbin();
+        if (action == Shortcuts.Enums.ShortcutAction.Undo) Unbin();
     }
 
     /// <summary>Where a deleted take waits, beside the recordings rather than inside them.</summary>
@@ -1237,7 +1244,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _binned.Push((recording.Name, from, to));
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "recordings: '" + recording.Name + "' went into the bin");
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () => "recordings: '" + recording.Name + "' went into the bin");
     }
 
     /// <summary>
@@ -1278,7 +1285,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             Status = $"'{name}' is back.";
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "recordings: '" + name + "' came back out of the bin");
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () => "recordings: '" + name + "' came back out of the bin");
 
             return true;
         }

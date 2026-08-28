@@ -1,6 +1,7 @@
 using JingleBox2.Midi;
 using System.Collections.Generic;
 using Xunit;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Tests;
 

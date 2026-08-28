@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using JingleBox2.Machines;
 using System;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Machines.Ui;
 

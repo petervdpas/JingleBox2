@@ -7,6 +7,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
 

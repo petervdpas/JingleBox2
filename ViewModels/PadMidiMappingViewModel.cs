@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Midi;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.ViewModels;
 

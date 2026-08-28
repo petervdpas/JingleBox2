@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
 using System.Collections.ObjectModel;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

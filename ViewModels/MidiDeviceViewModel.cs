@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.ViewModels;
 

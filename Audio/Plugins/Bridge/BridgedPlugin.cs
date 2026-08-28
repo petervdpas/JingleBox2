@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -336,7 +338,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         var process = _process;
         if (process?.Alive != true) return;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
             Info.Name + " note on " + semitone + " at " + velocity.ToString("0.##"));
 
         process.Block.Queue(BridgeEvent.NoteOn, (uint)Math.Clamp(semitone, 0, 127), velocity);
@@ -362,7 +364,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         var process = _process;
         if (process?.Alive != true) return;
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () => Info.Name + " all notes off");
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () => Info.Name + " all notes off");
 
         process.Block.Queue(BridgeEvent.AllNotesOff, 0, 0);
     }

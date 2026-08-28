@@ -8,6 +8,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -35,7 +38,7 @@ namespace JingleBox2.Tracker.Machines;
 /// So <see cref="Block"/> and <see cref="Line"/> are the whole of the format and everything else
 /// is a question of which things there are.
 ///
-/// A preset that will not read is written to <see cref="Diagnostics.LogArea.Machines"/> rather
+/// A preset that will not read is written to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather
 /// than to the application's own area, as everything under this folder is, and comes back as
 /// nothing rather than throwing: a machine with one bad preset in its folder should still open.
 /// </remarks>
@@ -201,7 +204,7 @@ public static class MachinePresetFile
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "A preset could not be read: " + path, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "A preset could not be read: " + path, ex);
 
             return null;
         }

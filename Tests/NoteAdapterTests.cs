@@ -2,6 +2,7 @@ using JingleBox2.Midi;
 using JingleBox2.Tracker;
 using System.Collections.Generic;
 using Xunit;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Tests;
 

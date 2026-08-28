@@ -1,40 +1,10 @@
 using JingleBox2.Tracker.Synth;
 using System;
 using System.Text.Json.Serialization;
+using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker;
-
-/// <summary>
-/// Which machine an instrument is on, as the number every song and instrument file already
-/// holds.
-/// </summary>
-/// <remarks>
-/// These numbers are in people's files, so they do not move and none is ever reused. The
-/// readable side of the same fact, what the machine is called and what it is for, is
-/// <see cref="Machine"/>: an instrument of a kind whose machine is not installed here still
-/// sounds and still has to be named, and what it is named is the engine rather than a machine
-/// that is not there.
-/// </remarks>
-public enum TrackerInstrumentKind
-{
-    /// <summary>One of your recordings, pitched by resampling.</summary>
-    Sample = 0,
-
-    /// <summary>Generated on the fly from a patch, so it needs no file at all.</summary>
-    Synth = 1,
-
-    /// <summary>A plugin doing the playing: Serum, Vital, anything that takes notes.</summary>
-    Plugin = 2,
-
-    /// <summary>Ouroboros: one oscillator, a filter that sweeps, and glide between notes.</summary>
-    MonoSynth = 3,
-
-    /// <summary>BongaBong: a kit, one recording to a key, none of them transposed.</summary>
-    Kit = 4,
-
-    /// <summary>Zampler: recordings laid across the keyboard, each transposed from its root.</summary>
-    Sampler = 5
-}
 
 /// <summary>
 /// A playable voice: either a recording played back at a pitch, or a synth built from a patch.
@@ -103,7 +73,7 @@ public sealed class TrackerInstrument
     public string PluginId { get; set; } = "";
 
     /// <summary>VST3 or CLAP, since the host loads the two differently.</summary>
-    public Audio.Plugins.PluginFormat PluginFormat { get; set; } = Audio.Plugins.PluginFormat.Clap;
+    public Audio.Plugins.Enums.PluginFormat PluginFormat { get; set; } = Audio.Plugins.Enums.PluginFormat.Clap;
 
     /// <summary>Kept so a plugin that is no longer installed can be named rather than blank.</summary>
     public string PluginName { get; set; } = "";

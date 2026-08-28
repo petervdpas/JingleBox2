@@ -1,6 +1,7 @@
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
 using Xunit;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -350,7 +351,7 @@ public class MixerIsolationTests
     }
 
     /// <summary>An effect that listens and passes the audio through untouched.</summary>
-    private sealed class Listener : JingleBox2.Audio.Plugins.IAudioInsert
+    private sealed class Listener : JingleBox2.Audio.Plugins.Interfaces.IAudioInsert
     {
         /// <summary>The loudest sample it has ever been handed, over every block.</summary>
         public float Loudest { get; private set; }
@@ -364,7 +365,7 @@ public class MixerIsolationTests
     }
 
     /// <summary>An effect that does nothing, so it can be recognised rather than heard.</summary>
-    private sealed class Marker : JingleBox2.Audio.Plugins.IAudioInsert
+    private sealed class Marker : JingleBox2.Audio.Plugins.Interfaces.IAudioInsert
     {
         /// <inheritdoc/>
         public void Process(float[] buffer, int frames) { }

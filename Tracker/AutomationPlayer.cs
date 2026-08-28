@@ -1,6 +1,9 @@
 using JingleBox2.Diagnostics;
 using JingleBox2.Midi;
 using System.Collections.Generic;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
 

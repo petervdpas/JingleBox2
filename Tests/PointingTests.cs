@@ -3,6 +3,7 @@ using JingleBox2.Midi;
 using JingleBox2.Views;
 using System;
 using Xunit;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Tests;
 

@@ -2,18 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using JingleBox2.Audio.Plugins.Enums;
 
 namespace JingleBox2.Audio.Plugins;
-
-/// <summary>What the host was doing with a plugin when everything stopped.</summary>
-public enum PluginStage
-{
-    /// <summary>Opening or closing the plugin's own window.</summary>
-    Window = 0,
-
-    /// <summary>Loading the plugin at all, before any audio or any window.</summary>
-    Load = 1
-}
 
 /// <summary>One plugin that took the application down, and when.</summary>
 public sealed class PluginCrash

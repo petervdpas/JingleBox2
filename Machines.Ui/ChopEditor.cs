@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using JingleBox2.Machines;
 using System.ComponentModel;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Machines.Ui;
 

@@ -9,18 +9,13 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge;
 using JingleBox2.Tracker.Synth;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;
-
-/// <summary>What the clock does when it reaches the end of a pattern.</summary>
-public enum TrackerPlayMode
-{
-    /// <summary>Walk the order list to the end.</summary>
-    Song,
-
-    /// <summary>Stay on one pattern.</summary>
-    Pattern
-}
 
 /// <inheritdoc/>
 /// <remarks>
@@ -50,7 +45,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private readonly ISampleStore _samples = new SampleStore();
 
     /// <summary>The one stream everything sounds through, and the mixer behind it.</summary>
-    private readonly Audio.ISynthOutput _synth = new Audio.SynthOutput();
+    private readonly Audio.Interfaces.ISynthOutput _synth = new Audio.SynthOutput();
 
     /// <summary>Guards the song and its sequencer, which are replaced whole when a pass starts.</summary>
     private readonly object _lock = new();
@@ -628,7 +623,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         _synth.Mixer.MoveTrack(from, to);
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
             "track " + from + " moved to " + to + ", with its plugin, its effects and its levels");
     }
 
@@ -1268,7 +1263,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </remarks>
     private void Where(int track, int addressed, TrackerInstrument? instrument, Song song, string went)
     {
-        if (!Diagnostics.Log.On(Diagnostics.LogArea.Tracker) || track < 0 || track >= _lastAddressed.Length) return;
+        if (!Diagnostics.Log.On(Diagnostics.Enums.LogArea.Tracker) || track < 0 || track >= _lastAddressed.Length) return;
 
         _lastAddressed[track] = addressed;
         _lastWent[track] = went;
@@ -1294,7 +1289,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             var boundTo = bound >= 0 ? song.InstrumentAt(bound) : null;
             var wantedTo = number == track ? instrument : song.InstrumentAt(wanted);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Tracker, () =>
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
                 "track " + number + ": " + count + " notes in the last second, the last one asking for " +
                 "instrument " + wanted.ToString("00") + " (" + (wantedTo?.Name ?? "none") + "), " + ending +
                 "; this track's own instrument is " +
@@ -1448,7 +1443,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </remarks>
     private void Muster()
     {
-        if (!Diagnostics.Log.On(Diagnostics.LogArea.Tracker)) return;
+        if (!Diagnostics.Log.On(Diagnostics.Enums.LogArea.Tracker)) return;
 
         try
         {
@@ -1467,7 +1462,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
                 if (account.Length == 0) continue;
 
                 int number = track;
-                Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "track " + number + " holds " + account);
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => "track " + number + " holds " + account);
             }
 
             foreach (var pair in processes)
@@ -1475,7 +1470,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
                 if (!pair.Value.Contains(','.ToString())) continue;
 
                 var shared = pair;
-                Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () =>
                     "process " + shared.Key + " is serving " + shared.Value +
                     "  <-- THESE ARE NOT ISOLATED FROM EACH OTHER");
             }

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Midi;
 

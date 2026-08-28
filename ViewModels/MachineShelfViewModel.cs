@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.ViewModels;
 
@@ -179,7 +180,7 @@ public sealed partial class MachineShelfViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machine import failed", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.App, "Machine import failed", ex);
 
             Status = "Could not read " + Path.GetFileName(zipPath) + ".";
 

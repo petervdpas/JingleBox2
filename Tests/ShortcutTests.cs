@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Avalonia.Input;
 using JingleBox2.Shortcuts;
 using Xunit;
+using JingleBox2.Shortcuts.Enums;
 
 namespace JingleBox2.Tests;
 

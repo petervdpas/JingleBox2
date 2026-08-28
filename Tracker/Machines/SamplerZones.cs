@@ -2,6 +2,7 @@ using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 

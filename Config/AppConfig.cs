@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using JingleBox2.Midi;
+using JingleBox2.Config.Enums;
+using JingleBox2.Config.Interfaces;
 
 namespace JingleBox2.Config;
 
@@ -214,7 +216,7 @@ public sealed class AppConfig
     public bool WriteLog { get; set; }
 
     /// <summary>
-    /// Which parts of the app write to it, as the flags of <see cref="Diagnostics.LogArea"/>.
+    /// Which parts of the app write to it, as the flags of <see cref="Diagnostics.Enums.LogArea"/>.
     /// </summary>
     /// <remarks>
     /// Everything, unless somebody has narrowed it. Narrowing matters because the areas are not

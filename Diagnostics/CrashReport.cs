@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Diagnostics;
 
@@ -197,7 +199,7 @@ public static class CrashReport
             foreach (var mark in marks)
             {
                 report.Append("  ").Append(mark.Name)
-                    .Append("  (").Append(mark.Stage == Audio.Plugins.PluginStage.Load ? "loading" : "opening its window").Append(")  ")
+                    .Append("  (").Append(mark.Stage == Audio.Plugins.Enums.PluginStage.Load ? "loading" : "opening its window").Append(")  ")
                     .Append(mark.Path).Append('\n');
             }
 

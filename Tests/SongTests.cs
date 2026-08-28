@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Tracker;
 using Xunit;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tests;
 
@@ -134,7 +136,7 @@ public class SongTests
 
         song.Patterns[0].Lane(new AutomationLane
         {
-            Track = 0, Kind = Midi.ControlKind.Mix, Mix = Midi.MixControl.Volume
+            Track = 0, Kind = Midi.Enums.ControlKind.Mix, Mix = Midi.Enums.MixControl.Volume
         });
 
         Assert.True(song.MoveTrack(0, 2));

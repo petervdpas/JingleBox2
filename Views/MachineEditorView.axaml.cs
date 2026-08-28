@@ -8,6 +8,8 @@ using System.IO;
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
+using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Shortcuts.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -22,7 +24,7 @@ namespace JingleBox2.Views;
 /// The pickers belong to the window, so they are opened here and only the answer goes to the
 /// view model, the same arrangement the recordings importer uses.
 /// </remarks>
-public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
+public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;
@@ -236,12 +238,12 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// dispatcher walks outwards from whatever has the keyboard and takes the first thing that
     /// says yes, so this is reached while the editor is on screen and not otherwise.
     /// </remarks>
-    bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
+    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) => action switch
     {
-        Shortcuts.ShortcutAction.Save => Editor?.Project != null,
-        Shortcuts.ShortcutAction.Delete => Editor?.RemoveElementCommand.CanExecute(null) == true,
-        Shortcuts.ShortcutAction.Undo => Editor?.History.CanUndo == true,
-        Shortcuts.ShortcutAction.Redo => Editor?.History.CanRedo == true,
+        Shortcuts.Enums.ShortcutAction.Save => Editor?.Project != null,
+        Shortcuts.Enums.ShortcutAction.Delete => Editor?.RemoveElementCommand.CanExecute(null) == true,
+        Shortcuts.Enums.ShortcutAction.Undo => Editor?.History.CanUndo == true,
+        Shortcuts.Enums.ShortcutAction.Redo => Editor?.History.CanRedo == true,
         _ => false
     };
 
@@ -254,25 +256,25 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// a moment ago; hanging them off the tree again is what makes the panel show what the
     /// machine now says.
     /// </remarks>
-    void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
+    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
     {
         if (Editor is not { } editor) return;
 
         switch (action)
         {
-            case Shortcuts.ShortcutAction.Save:
+            case Shortcuts.Enums.ShortcutAction.Save:
                 Save_Click(this, new RoutedEventArgs());
                 break;
 
-            case Shortcuts.ShortcutAction.Delete:
+            case Shortcuts.Enums.ShortcutAction.Delete:
                 editor.RemoveElementCommand.Execute(null);
                 break;
 
-            case Shortcuts.ShortcutAction.Undo when editor.History.Undo(editor.Project):
+            case Shortcuts.Enums.ShortcutAction.Undo when editor.History.Undo(editor.Project):
                 editor.Rewrap();
                 break;
 
-            case Shortcuts.ShortcutAction.Redo when editor.History.Redo(editor.Project):
+            case Shortcuts.Enums.ShortcutAction.Redo when editor.History.Redo(editor.Project):
                 editor.Rewrap();
                 break;
         }

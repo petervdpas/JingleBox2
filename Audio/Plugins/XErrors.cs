@@ -2,6 +2,7 @@ using JingleBox2.Diagnostics;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Audio.Plugins;
 

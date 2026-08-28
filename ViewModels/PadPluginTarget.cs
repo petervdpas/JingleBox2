@@ -1,6 +1,8 @@
 using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
 using System.Globalization;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

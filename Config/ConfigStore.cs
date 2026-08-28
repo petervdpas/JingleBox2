@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using JingleBox2.Midi;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Config.Interfaces;
 
 namespace JingleBox2.Config;
 

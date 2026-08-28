@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -28,7 +29,7 @@ namespace JingleBox2.Tracker.Machines;
 /// inside a song, with your own name and settings and its own id, and two of those can come off
 /// one of these.
 ///
-/// What goes wrong here is written to <see cref="Diagnostics.LogArea.Machines"/> rather than to
+/// What goes wrong here is written to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to
 /// the application's own area, as everything under this folder is.
 /// </remarks>
 public sealed class MachineProject
@@ -190,7 +191,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine project could not be read", ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "Machine project could not be read", ex);
 
             return null;
         }
@@ -317,7 +318,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The presets could not be read from " + folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The presets could not be read from " + folder, ex);
         }
 
         if (StartsFrom.Length == 0) return null;
@@ -418,7 +419,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The pictures could not be swept in " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The pictures could not be swept in " + Folder, ex);
         }
 
         return gone;
@@ -483,7 +484,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The pictures could not be renumbered in " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The pictures could not be renumbered in " + Folder, ex);
         }
 
         return moved;
@@ -518,13 +519,13 @@ public sealed class MachineProject
 
             File.Delete(wanted);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.Machines, () => "machine picture removed: " + wanted);
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines, () => "machine picture removed: " + wanted);
 
             return true;
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "A picture could not be removed from " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "A picture could not be removed from " + Folder, ex);
 
             return false;
         }

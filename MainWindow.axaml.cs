@@ -11,6 +11,10 @@ using JingleBox2.ViewModels;
 using System;
 using System.Reflection;
 using System.Threading.Tasks;
+using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Routing.Interfaces;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2;
 
@@ -146,7 +150,7 @@ public partial class MainWindow : Window
         var cfg = _store.LoadOrCreateDefault();
 
         Diagnostics.Log.Open(Config.AppFolder.Path(), cfg.WriteLog, Areas(cfg));
-        Diagnostics.Log.Write(Diagnostics.LogArea.App, () =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
 
         Diagnostics.CrashReport.Watch(Config.AppFolder.Path());
@@ -156,7 +160,7 @@ public partial class MainWindow : Window
 
         Tracker.Machines.MachineProjects.Keep(machines);
 
-        Diagnostics.Log.Write(Diagnostics.LogArea.App,
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
 
         _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
@@ -199,8 +203,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// Which parts of the app the settings ask for, with nothing said meaning all of them.
     /// </summary>
-    private static Diagnostics.LogArea Areas(Config.AppConfig cfg) =>
-        cfg.LogAreas == 0 ? Diagnostics.LogArea.Everything : (Diagnostics.LogArea)cfg.LogAreas;
+    private static Diagnostics.Enums.LogArea Areas(Config.AppConfig cfg) =>
+        cfg.LogAreas == 0 ? Diagnostics.Enums.LogArea.Everything : (Diagnostics.Enums.LogArea)cfg.LogAreas;
 
     /// <summary>
     /// The two keys the window answers itself: space works the transport, Ctrl+R records.

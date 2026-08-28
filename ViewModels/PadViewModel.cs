@@ -9,6 +9,9 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Models;
+using JingleBox2.Audio.Enums;
+using JingleBox2.Config.Enums;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

@@ -4,6 +4,9 @@ using JingleBox2.ViewModels;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
+using JingleBox2.Midi.Enums;
+using JingleBox2.Tracker.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Tests;
 
