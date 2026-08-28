@@ -10,7 +10,7 @@ namespace JingleBox2.Converters;
 /// A colour written as text, as something that can be painted with.
 /// </summary>
 /// <remarks>
-/// The machines' colours live on <see cref="Tracker.Machine"/>, which knows nothing about
+/// The machines' colours live on <see cref="Tracker.Records.Machine"/>, which knows nothing about
 /// drawing and should not: a colour is part of what a machine is, the way its name is. This is
 /// the one place that turns those strings into brushes, so the rack, the picker, the panel and
 /// the song's list all read the same fact the same way.

@@ -1,5 +1,6 @@
 using JingleBox2.Machines.Ui;
 using Xunit;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Tests;
 

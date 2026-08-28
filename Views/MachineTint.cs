@@ -6,6 +6,9 @@ using System;
 using System.Linq;
 using JingleBox2.Machines;
 using JingleBox2.Machines.Ui;
+using JingleBox2.Machines.Records;
+using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Views.Records;
 
 namespace JingleBox2.Views;
 
@@ -75,7 +78,7 @@ public static class MachineTint
     /// Taken off first in every case, so what shows through when a machine says nothing is the
     /// application's own colour and not the last machine's.
     /// </remarks>
-    public static void Apply(Control panel, Machines.MachineTheme? machine)
+    public static void Apply(Control panel, Machines.Records.MachineTheme? machine)
     {
         Clear(panel);
 
@@ -101,7 +104,7 @@ public static class MachineTint
     /// the whole of the feedback while somebody is moving the colour about, so the panel is
     /// told outright.
     /// </remarks>
-    public static void Repaint(Control panel, Machines.MachineTheme? machine)
+    public static void Repaint(Control panel, Machines.Records.MachineTheme? machine)
     {
         Apply(panel, machine);
 
@@ -119,7 +122,7 @@ public static class MachineTint
     /// Whatever the face turned out to be, the lettering has to be readable on it: a pale machine
     /// gets dark lettering the same way a dark one gets pale.
     /// </remarks>
-    public static MachineShades? Shades(Machines.MachineTheme? machine)
+    public static MachineShades? Shades(Machines.Records.MachineTheme? machine)
     {
         if (machine == null) return null;
 

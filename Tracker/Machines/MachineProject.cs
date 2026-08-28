@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Machines.Records;
 
 namespace JingleBox2.Tracker.Machines;
 

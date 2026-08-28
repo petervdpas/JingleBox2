@@ -10,6 +10,8 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using JingleBox2.ViewModels.Enums;
+using JingleBox2.Tracker.Records;
+using JingleBox2.ViewModels.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -59,22 +61,6 @@ public sealed partial class WaveLevel : ObservableObject
     public string GainText => Math.Abs(Gain - 1) < MachineUtilities.SmallestMove
         ? "stays"
         : Normalization.ToDecibels(Gain).ToString("+0.0;-0.0", CultureInfo.InvariantCulture) + " dB";
-}
-
-/// <summary>One of the jobs the page offers.</summary>
-/// <param name="Key">Which one it is. Declared, not made up, so the page can be read.</param>
-/// <param name="Name">What it is called in the list.</param>
-/// <param name="Blurb">One line under the name, for somebody choosing between them.</param>
-public sealed record UtilityTool(string Key, string Name, string Blurb)
-{
-    /// <summary>Renaming a preset, and everything named after it.</summary>
-    public const string Rename = "rename";
-
-    /// <summary>Putting a set of recordings on one level.</summary>
-    public const string Level = "level";
-
-    /// <summary>The name, which is what a list with no template shows.</summary>
-    public override string ToString() => Name;
 }
 
 /// <summary>

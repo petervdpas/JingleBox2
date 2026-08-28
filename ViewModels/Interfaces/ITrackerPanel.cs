@@ -2,6 +2,7 @@ using JingleBox2.Tracker;
 using System;
 using System.ComponentModel;
 using JingleBox2.ViewModels;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels.Interfaces;
 

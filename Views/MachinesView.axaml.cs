@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using JingleBox2.Models;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Views;
 
@@ -113,7 +114,7 @@ public partial class MachinesView : UserControl
     /// </summary>
     private void NewFromPlugin_Click(object? sender, RoutedEventArgs e)
     {
-        if (ViewModel != null && PluginPicker.SelectedItem is JingleBox2.Audio.Plugins.PluginInfo plugin)
+        if (ViewModel != null && PluginPicker.SelectedItem is JingleBox2.Audio.Plugins.Records.PluginInfo plugin)
             ViewModel.NewFromPluginCommand.Execute(plugin);
     }
 

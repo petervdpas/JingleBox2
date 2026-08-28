@@ -6,6 +6,7 @@ using System.IO;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins;
 

@@ -9,6 +9,7 @@ using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio;
 

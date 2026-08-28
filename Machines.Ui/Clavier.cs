@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows.Input;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
 

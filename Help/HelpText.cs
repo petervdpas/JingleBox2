@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Help.Records;
 
 namespace JingleBox2.Help;
 

@@ -17,6 +17,8 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -537,9 +539,9 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// host knows how to play. An effect is not offered, and neither is an instrument in a
     /// format that would load and then be silent.
     /// </summary>
-    public System.Collections.Generic.IReadOnlyList<Audio.Plugins.PluginInfo> AvailablePlugins =>
+    public System.Collections.Generic.IReadOnlyList<Audio.Plugins.Records.PluginInfo> AvailablePlugins =>
         _plugins == null
-            ? System.Array.Empty<Audio.Plugins.PluginInfo>()
+            ? System.Array.Empty<Audio.Plugins.Records.PluginInfo>()
             : _plugins.Plugins.Where(Audio.Plugins.PluginHost.CanPlay).ToList();
 
     /// <summary>True when there is any plugin worth offering, so the menu can be hidden.</summary>
@@ -550,11 +552,11 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// Always enabled. A plugin that cannot be played here is refused with a reason in the status
     /// line, which is more use than a greyed row nobody can ask about.
     /// </remarks>
-    public IRelayCommand<Audio.Plugins.PluginInfo> NewFromPluginCommand =>
-        new RelayCommand<Audio.Plugins.PluginInfo>(NewFromPlugin);
+    public IRelayCommand<Audio.Plugins.Records.PluginInfo> NewFromPluginCommand =>
+        new RelayCommand<Audio.Plugins.Records.PluginInfo>(NewFromPlugin);
 
     /// <summary>Makes an instrument on that plugin, or says why it cannot be one.</summary>
-    private void NewFromPlugin(Audio.Plugins.PluginInfo? plugin)
+    private void NewFromPlugin(Audio.Plugins.Records.PluginInfo? plugin)
     {
         if (plugin == null)
         {

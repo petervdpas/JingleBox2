@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins;
 

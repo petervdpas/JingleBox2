@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using JingleBox2.Midi;
 using JingleBox2.Config.Enums;
 using JingleBox2.Config.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Config;
 
@@ -171,7 +172,7 @@ public sealed class AppConfig
     /// library again to ask, which is seconds a plugin and is why a scan is a thing you press
     /// rather than something that happens on the way in.
     /// </remarks>
-    public List<Audio.Plugins.PluginInfo> KnownPlugins { get; set; } = new();
+    public List<Audio.Plugins.Records.PluginInfo> KnownPlugins { get; set; } = new();
 
     /// <summary>
     /// Which input to record from, by name.

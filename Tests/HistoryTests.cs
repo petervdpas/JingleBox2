@@ -8,6 +8,7 @@ using JingleBox2.Tracker.Machines;
 using JingleBox2.ViewModels;
 using Xunit;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tests;
 

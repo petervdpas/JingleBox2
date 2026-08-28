@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins;
 

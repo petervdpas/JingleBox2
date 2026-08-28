@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 

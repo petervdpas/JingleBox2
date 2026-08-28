@@ -1,5 +1,6 @@
 using System;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio.Interfaces;
 

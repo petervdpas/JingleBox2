@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using JingleBox2.Help;
+using JingleBox2.Help.Records;
 
 namespace JingleBox2.Views;
 

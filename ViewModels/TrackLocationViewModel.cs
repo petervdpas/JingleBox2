@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
 

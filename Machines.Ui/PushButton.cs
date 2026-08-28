@@ -7,6 +7,7 @@ using System;
 using System.Globalization;
 using System.Windows.Input;
 using JingleBox2.Machines.Ui.Enums;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
 

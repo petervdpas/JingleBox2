@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using JingleBox2.Audio.Plugins.Enums;
+using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Audio.Plugins;
 

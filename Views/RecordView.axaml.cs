@@ -12,6 +12,7 @@ using JingleBox2.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Linq;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Views;
 

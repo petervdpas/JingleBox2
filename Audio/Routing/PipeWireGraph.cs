@@ -2,21 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Audio.Routing.Enums;
+using JingleBox2.Audio.Routing.Records;
 
 namespace JingleBox2.Audio.Routing;
-
-/// <summary>One end of a connection: a node, and one port on it.</summary>
-/// <param name="Node">The node's name, which is the program or the device the audio belongs to.</param>
-/// <param name="Port">
-/// The port's own name. The channel is in it, which is what pairs a source with the capture:
-/// see <see cref="PipeWireGraph.Channel"/>.
-/// </param>
-public readonly record struct PipeWirePort(string Node, string Port);
-
-/// <summary>One connection in the graph, in the direction the audio actually travels.</summary>
-/// <param name="From">The port giving the audio.</param>
-/// <param name="To">The port taking it.</param>
-public readonly record struct PipeWireLink(PipeWirePort From, PipeWirePort To);
 
 /// <summary>
 /// Reads what the PipeWire tools print. Kept apart from running them, so the parsing can be

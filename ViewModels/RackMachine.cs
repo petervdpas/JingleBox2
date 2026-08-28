@@ -3,6 +3,8 @@ using Avalonia.Media;
 using JingleBox2.Tracker;
 using JingleBox2.Machines;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Machines.Records;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
 

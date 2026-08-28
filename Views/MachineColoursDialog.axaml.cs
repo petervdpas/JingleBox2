@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
+using JingleBox2.Machines.Records;
 
 namespace JingleBox2.Views;
 

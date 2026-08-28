@@ -1,4 +1,5 @@
 using JingleBox2.Machines;
+using JingleBox2.Machines.Records;
 
 namespace JingleBox2.Machines.Interfaces;
 

@@ -6,6 +6,7 @@ using System.Text.Json;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Config.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Config;
 

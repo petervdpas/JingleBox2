@@ -13,6 +13,7 @@ using System.Globalization;
 using System.Linq;
 using System.IO;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Machines.Records;
 
 namespace JingleBox2.ViewModels;
 

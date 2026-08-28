@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Views;
 
@@ -68,7 +69,7 @@ public partial class SongDialog : Window
     private async void Delete_Click(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not ViewModels.TrackerViewModel tracker) return;
-        if (sender is not Control button || button.DataContext is not Tracker.SongFile file) return;
+        if (sender is not Control button || button.DataContext is not Tracker.Records.SongFile file) return;
 
         e.Handled = true;
 

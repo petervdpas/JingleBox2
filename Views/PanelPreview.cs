@@ -12,6 +12,7 @@ using System.Linq;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Views;
 

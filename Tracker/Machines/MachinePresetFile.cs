@@ -11,6 +11,7 @@ using System.Text.Json.Nodes;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker.Machines;
 

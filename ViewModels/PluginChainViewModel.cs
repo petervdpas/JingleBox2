@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.ViewModels;
 

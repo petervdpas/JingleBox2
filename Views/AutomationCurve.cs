@@ -6,6 +6,8 @@ using JingleBox2.Machines.Ui;
 using JingleBox2.Tracker;
 using System;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Views;
 

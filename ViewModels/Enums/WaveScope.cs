@@ -1,3 +1,5 @@
+using JingleBox2.Tracker.Records;
+
 namespace JingleBox2.ViewModels.Enums;
 
 /// <summary>Which recordings the level tool is looking at.</summary>

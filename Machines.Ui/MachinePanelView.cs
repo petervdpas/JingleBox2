@@ -15,6 +15,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
 

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using JingleBox2.Audio.Routing.Interfaces;
+using JingleBox2.Audio.Routing.Records;
 
 namespace JingleBox2.Audio.Routing;
 

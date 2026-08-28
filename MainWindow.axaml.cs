@@ -15,6 +15,7 @@ using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2;
 

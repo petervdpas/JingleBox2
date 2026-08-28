@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Media;
 using System;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
 

@@ -1,3 +1,5 @@
+using JingleBox2.Tracker.Records;
+
 namespace JingleBox2.Midi.Enums;
 
 /// <summary>The kinds of message this application reads. Everything else is dropped at the wire.</summary>

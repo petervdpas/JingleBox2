@@ -4,6 +4,8 @@ using JingleBox2.Machines;
 using JingleBox2.Views;
 using System;
 using System.Runtime.CompilerServices;
+using JingleBox2.Machines.Records;
+using JingleBox2.Views.Records;
 
 namespace JingleBox2.ViewModels;
 

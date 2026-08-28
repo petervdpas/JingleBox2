@@ -94,7 +94,7 @@ public sealed partial class MachineShelfViewModel : ObservableObject
     /// The two things somebody has to be told before they use this list.
     /// </summary>
     /// <remarks>
-    /// <see cref="Tracker.Machine.Register"/> runs once, at startup, and everything downstream of
+    /// <see cref="Tracker.Records.Machine.Register"/> runs once, at startup, and everything downstream of
     /// it, the rack, the panels and the names songs are read with, is built from what it took. A
     /// machine registered half way through a session would be missing from all of that, so adding
     /// stops at the disc and the page says so instead of pretending otherwise.

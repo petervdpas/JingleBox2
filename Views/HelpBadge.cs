@@ -5,6 +5,7 @@ using Avalonia.Media;
 using JingleBox2.Help;
 using System.Globalization;
 using JingleBox2.Machines.Ui;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Views;
 

@@ -14,6 +14,7 @@ using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 

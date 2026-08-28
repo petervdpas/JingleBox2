@@ -10,6 +10,7 @@ using System;
 using System.ComponentModel;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Waveform.Enums;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Views;
 

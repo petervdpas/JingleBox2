@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
 using System.Collections.ObjectModel;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.ViewModels.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -128,7 +130,7 @@ public sealed partial class PluginDeviceViewModel : ObservableObject
     /// saying not to show it, and its own bypass is something the host offers in its own way,
     /// on the block already.
     /// </remarks>
-    private System.Collections.Generic.IEnumerable<JingleBox2.Audio.Plugins.PluginParameter> Wanted()
+    private System.Collections.Generic.IEnumerable<JingleBox2.Audio.Plugins.Records.PluginParameter> Wanted()
     {
         int taken = 0;
 

@@ -23,6 +23,7 @@ using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Audio.Routing.Records;
 
 namespace JingleBox2.ViewModels;
 

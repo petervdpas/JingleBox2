@@ -5,6 +5,7 @@ using System;
 using System.Globalization;
 using JingleBox2.Machines.Ui;
 using JingleBox2.UI.Enums;
+using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Views;
 

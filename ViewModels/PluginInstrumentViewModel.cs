@@ -3,6 +3,8 @@ using JingleBox2.Audio.Plugins;
 using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Tracker.Records;
+using JingleBox2.ViewModels.Records;
 
 namespace JingleBox2.ViewModels;
 

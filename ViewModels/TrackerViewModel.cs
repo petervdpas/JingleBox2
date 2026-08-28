@@ -27,6 +27,7 @@ using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
 

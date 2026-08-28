@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.ViewModels;
 

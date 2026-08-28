@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
         xmlns:tracker="clr-namespace:JingleBox2.Tracker"
+        xmlns:trackerr="clr-namespace:JingleBox2.Tracker.Records"
         x:Class="JingleBox2.Views.SongDialog"
         x:DataType="vm:TrackerViewModel"
         Title="Open song"
@@ -40,7 +41,7 @@
              SelectedItem="{Binding SelectedSongFile}"
              DoubleTapped="Songs_DoubleTapped">
       <ListBox.ItemTemplate>
-        <DataTemplate x:DataType="tracker:SongFile">
+        <DataTemplate x:DataType="trackerr:SongFile">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <StackPanel Grid.Column="0" Spacing="2">
               <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />

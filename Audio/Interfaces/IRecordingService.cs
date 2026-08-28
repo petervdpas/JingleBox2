@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using JingleBox2.Audio;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio.Interfaces;
 

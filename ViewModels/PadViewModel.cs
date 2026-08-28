@@ -12,6 +12,7 @@ using JingleBox2.Models;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.ViewModels;
 

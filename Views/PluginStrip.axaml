@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.PluginStrip"
              x:DataType="vm:PluginChainViewModel">
@@ -8,7 +9,7 @@
   <UserControl.Resources>
     <!-- One control and its reading. The same row whether the block is a plugin or one of our
          machines, because to a track they are the same thing. -->
-    <DataTemplate x:Key="Reading" x:DataType="vm:DeviceReading">
+    <DataTemplate x:Key="Reading" x:DataType="vmr:DeviceReading">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
         <TextBlock Grid.Column="0" Classes="deviceKey" Text="{Binding Name}" />
         <TextBlock Grid.Column="1" Classes="deviceValue" Text="{Binding Text}" />

@@ -1,5 +1,6 @@
 using JingleBox2.Tracker;
 using System;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
 

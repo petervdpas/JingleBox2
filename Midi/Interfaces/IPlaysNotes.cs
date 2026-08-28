@@ -1,5 +1,6 @@
 using JingleBox2.Tracker;
 using JingleBox2.Midi;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Midi.Interfaces;
 

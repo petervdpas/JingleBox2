@@ -308,14 +308,26 @@ fifty four files in one place at the root would be an alphabet, and it would put
 assembly's contracts in a namespace rooted in the application, which is the one thing that
 assembly is kept clear of.
 
-Enums go the same way, in an `Enums` folder beside their area. An enum is a closed set of names
-and nothing else: it is what several classes agree to say, so it belongs to none of them, and it
-was living wherever the first class to need it happened to be. `Midi/ControlMapping.cs` held five
-of them.
+Enums and records go the same way, in `Enums` and `Records` folders beside their area, one type
+to a file named after it. The reason is the same for both: a closed set of names, or a shape with
+no behaviour, is what several classes agree to say, so it belongs to none of them, and it was
+living wherever the first class to need one happened to be. `Midi/ControlMapping.cs` held five
+enums and `Tracker/Synth/MonoSynthPatch.cs` another five; `TrackerPosition.cs` held two records
+and an enum.
 
-Neither folder holds anything else. A record or a class that arrived beside an interface because
-it is that interface's vocabulary gets its own file in the area itself: `PadPlaybackChanged` is
-data and is in `Audio/`, not in `Audio/Interfaces/`.
+`Records` holds records and record structs together. Every one of them is a record, and whether it
+is also a struct is a decision about copying rather than a statement about what the type is:
+splitting on that would put `Note` and `SongFile` in different folders for a reason nobody reading
+the song's data cares about. There are no plain structs here at all.
+
+So the whole of a public type surface is in one of the three, and what is left in an area's own
+folder is the classes: the things that do something.
+
+**A record referred to by a view has to be told about twice.** XAML names a type through a
+`clr-namespace`, so moving one breaks an `x:DataType` in a way only the Avalonia compiler catches,
+and only on a build that is not incremental. Four views needed a second `xmlns` for this:
+`HelpWindow`, `MachineEditorView`, `PluginStrip` and `SongDialog`. Nothing in XAML names an enum
+or an interface but `InstrumentPanel`, which is bound to `IInstrumentDesigner`.
 
 ### There are no line comments
 

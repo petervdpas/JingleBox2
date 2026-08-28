@@ -2,6 +2,7 @@ using JingleBox2.Midi;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 

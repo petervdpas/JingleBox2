@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:machines="clr-namespace:JingleBox2.Machines;assembly=JingleBox2.Machines.Abstractions"
              xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
@@ -667,7 +668,7 @@
           <ListBox ItemsSource="{Binding MachineEditor.PresetDesk.Presets}"
                    SelectedItem="{Binding MachineEditor.PresetDesk.Picked, Mode=TwoWay}">
             <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:MachinePresetSlot">
+              <DataTemplate x:DataType="vmr:MachinePresetSlot">
                 <StackPanel Spacing="1" Margin="0,2">
                   <TextBlock Text="{Binding Name}" />
                   <TextBlock Classes="cardHint" Text="{Binding FileName}" />
@@ -846,7 +847,7 @@
 
             <ItemsControl ItemsSource="{Binding MachineEditor.Utilities.Tools}" Margin="0,4,0,0">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:UtilityTool">
+                <DataTemplate x:DataType="vmr:UtilityTool">
                   <Button Classes="tool" HorizontalAlignment="Stretch" Margin="0,3"
                           HorizontalContentAlignment="Left"
                           Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.Utilities.OpenCommand}"

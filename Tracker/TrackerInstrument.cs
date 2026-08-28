@@ -3,6 +3,8 @@ using System;
 using System.Text.Json.Serialization;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Tracker.Enums;
+using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;
 
@@ -204,13 +206,13 @@ public sealed class TrackerInstrument
 
     /// <summary>What the plugin is, in the shape the host loads from.</summary>
     [JsonIgnore]
-    public Audio.Plugins.PluginInfo? Plugin =>
+    public Audio.Plugins.Records.PluginInfo? Plugin =>
         string.IsNullOrWhiteSpace(PluginPath)
             ? null
-            : new Audio.Plugins.PluginInfo(PluginId, PluginName, "", "", PluginPath, PluginFormat, IsInstrument: true);
+            : new Audio.Plugins.Records.PluginInfo(PluginId, PluginName, "", "", PluginPath, PluginFormat, IsInstrument: true);
 
     /// <summary>An instrument that is a plugin, at whatever the plugin opens with.</summary>
-    public static TrackerInstrument CreatePlugin(string name, Audio.Plugins.PluginInfo plugin)
+    public static TrackerInstrument CreatePlugin(string name, Audio.Plugins.Records.PluginInfo plugin)
     {
         return new TrackerInstrument
         {

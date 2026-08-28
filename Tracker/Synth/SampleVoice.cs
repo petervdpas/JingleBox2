@@ -1,5 +1,7 @@
 using System;
 using JingleBox2.Tracker.Synth.Interfaces;
+using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Synth.Records;
 
 namespace JingleBox2.Tracker.Synth;
 

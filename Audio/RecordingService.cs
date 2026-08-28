@@ -5,6 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio;
 
