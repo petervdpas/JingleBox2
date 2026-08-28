@@ -40,6 +40,17 @@ public sealed class ControlTargets : IControlTargets
 
         int track = mapping.Scope == ControlScope.Fixed ? mapping.Track : _tracker.FocusedTrack;
 
+        // The master is a strip without being a track, so it is the one thing that answers from
+        // outside the track numbers. Only the mixer kinds: nothing is played on it, so it has no
+        // machine and no instrument's plugin to be pointed at.
+        if (track == Tracker.TrackerPlayer.MasterStrip)
+            return mapping.Kind switch
+            {
+                ControlKind.Mix => OnStrip(mapping, track),
+                ControlKind.Insert => OnPlugin(mapping, track),
+                _ => null
+            };
+
         if (track < 0 || track >= _tracker.Song.TrackCount) return null;
 
         var found = mapping.Kind switch
@@ -85,6 +96,17 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     public IEnumerable<ControlChoice> On(int track)
     {
+        // The master has a strip and nothing else: no machine plays through it and no
+        // instrument's plugin sits on it, because everything has been played by the time it is
+        // reached. Its own inserts are offered, since those are the one thing it does have.
+        if (track == Tracker.TrackerPlayer.MasterStrip)
+        {
+            foreach (var choice in OnInserts(track)) yield return choice;
+            foreach (var choice in OnMixer(track)) yield return choice;
+
+            yield break;
+        }
+
         if (track < 0 || track >= _tracker.Song.TrackCount) yield break;
 
         string machine = _tracker.MachineOn(track);
@@ -113,38 +135,55 @@ public sealed class ControlTargets : IControlTargets
             }
         }
 
-        if (_tracker.InsertsOn(track) is { } chain)
+        foreach (var choice in OnInserts(track)) yield return choice;
+
+        foreach (var choice in OnMixer(track)) yield return choice;
+    }
+
+    /// <summary>Every parameter of every plugin on a strip's chain, in the order they run.</summary>
+    /// <remarks>
+    /// A plugin's read-only parameters are left out: a compressor's gain reduction meter reports
+    /// rather than accepts, and a lane pointed at one would write into a value the plugin
+    /// overwrites on the next block.
+    /// </remarks>
+    private IEnumerable<ControlChoice> OnInserts(int track)
+    {
+        if (_tracker.InsertsOn(track) is not { } chain) yield break;
+
+        int slot = 0;
+
+        foreach (var device in chain.Devices)
         {
-            int slot = 0;
+            if (device.Insert is not IPluginParameters plugin) continue;
 
-            foreach (var device in chain.Devices)
+            foreach (var parameter in plugin.Parameters())
             {
-                if (device.Insert is not IPluginParameters plugin) continue;
+                if (parameter.IsReadOnly) continue;
 
-                foreach (var parameter in plugin.Parameters())
-                {
-                    if (parameter.IsReadOnly) continue;
-
-                    yield return new ControlChoice(
-                        new ControlMapping
-                        {
-                            Kind = ControlKind.Insert,
-                            Scope = ControlScope.Fixed,
-                            Track = track,
-                            Plugin = plugin.Info.Id,
-                            Slot = slot,
-                            Parameter = parameter.Id,
-                            Ordinal = -1
-                        },
-                        plugin.Info.Name,
-                        parameter.Name,
-                        parameter.Units);
-                }
-
-                slot++;
+                yield return new ControlChoice(
+                    new ControlMapping
+                    {
+                        Kind = ControlKind.Insert,
+                        Scope = ControlScope.Fixed,
+                        Track = track,
+                        Plugin = plugin.Info.Id,
+                        Slot = slot,
+                        Parameter = parameter.Id,
+                        Ordinal = -1
+                    },
+                    plugin.Info.Name,
+                    parameter.Name,
+                    parameter.Units);
             }
+
+            slot++;
         }
 
+    }
+
+    /// <summary>The handful of things every strip has, the master included.</summary>
+    private IEnumerable<ControlChoice> OnMixer(int track)
+    {
         foreach (var (control, said) in new[]
                  {
                      (MixControl.Volume, "Level"), (MixControl.Pan, "Pan"),
@@ -339,7 +378,12 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     private IControlTarget? OnStrip(ControlMapping mapping, int track)
     {
-        var strip = _tracker.Strips.FirstOrDefault(one => one.Track == track);
+        // The master is kept apart from the tracks rather than on the end of them, so it is
+        // asked for by name. See TrackerViewModel.MasterStrip for why.
+        var strip = track == Tracker.TrackerPlayer.MasterStrip
+            ? _tracker.MasterStrip
+            : _tracker.Strips.FirstOrDefault(one => one.Track == track);
+
         if (strip is null) return null;
 
         var (name, min, max, read, write) = mapping.Mix switch

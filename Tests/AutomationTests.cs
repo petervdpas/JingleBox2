@@ -198,6 +198,82 @@ public class AutomationTests
         Assert.Equal(1, pattern.Lanes[0].Track);
     }
 
+    /// <remarks>
+    /// The master is a strip without being a track, so a lane can be about it: it has a level, a
+    /// pan and a chain, all of which move. Nothing else about it is a track, which is why the
+    /// number is below nought rather than one past the end.
+    /// </remarks>
+    [Fact]
+    public void A_lane_can_be_about_the_master()
+    {
+        var pattern = new Pattern(64, 4);
+
+        var made = AutomationLane.For(
+            new ControlMapping { Kind = ControlKind.Mix, Mix = MixControl.Volume },
+            TrackerPlayer.MasterStrip);
+
+        Assert.NotNull(made);
+
+        var lane = pattern.Lane(made!);
+
+        Assert.True(lane.IsMaster);
+        Assert.Equal(TrackerPlayer.MasterStrip, lane.Track);
+    }
+
+    /// <remarks>
+    /// And it stays when the tracks are taken away, because it is not one of them and no count
+    /// of them reaches it.
+    /// </remarks>
+    [Fact]
+    public void And_survives_the_tracks_being_cut_down()
+    {
+        var pattern = new Pattern(64, 8);
+
+        pattern.Lane(AutomationLane.For(
+            new ControlMapping { Kind = ControlKind.Mix, Mix = MixControl.Volume },
+            TrackerPlayer.MasterStrip)!);
+
+        pattern.Lane(Cutoff(6));
+
+        pattern.SetTrackCount(4);
+
+        var left = Assert.Single(pattern.Lanes);
+
+        Assert.True(left.IsMaster);
+    }
+
+    [Fact]
+    public void And_stays_put_when_the_tracks_are_moved()
+    {
+        var pattern = new Pattern(64, 4);
+
+        pattern.Lane(AutomationLane.For(
+            new ControlMapping { Kind = ControlKind.Mix, Mix = MixControl.Volume },
+            TrackerPlayer.MasterStrip)!);
+
+        pattern.MoveTrack(0, 3);
+
+        Assert.Equal(TrackerPlayer.MasterStrip, pattern.Lanes[0].Track);
+    }
+
+    [Fact]
+    public void A_master_lane_is_written_down_and_read_back_like_any_other()
+    {
+        var song = Made();
+
+        var lane = song.Patterns[0].Lane(AutomationLane.For(
+            new ControlMapping { Kind = ControlKind.Mix, Mix = MixControl.Pan },
+            TrackerPlayer.MasterStrip)!);
+
+        lane.Put(8, 0.75);
+
+        var back = SongStore.Uncopy(SongStore.Copy(song))!.Patterns[0].Lanes[0];
+
+        Assert.True(back.IsMaster);
+        Assert.Equal(MixControl.Pan, back.Mix);
+        Assert.Equal(0.75, back.Points[0].Value);
+    }
+
     [Fact]
     public void A_lane_written_down_and_read_back_is_the_same_lane()
     {
@@ -644,7 +720,8 @@ public class AutomationListTests
 
         while (song.Mix.Count < song.TrackCount) song.Mix.Add(new TrackMix());
 
-        var strip = new AutomationViewModel(new Rack(), () => song, () => song.Patterns[0]);
+        var strip = new AutomationViewModel(
+            new Rack(), () => song, () => song.Patterns[0], () => 4, () => -1);
         strip.Show(track);
 
         return (strip, song);

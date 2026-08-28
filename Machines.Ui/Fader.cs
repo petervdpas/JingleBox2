@@ -173,9 +173,11 @@ public class Fader : ThemedControl
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
             UnitProperty, FormatProperty, TrackLengthProperty, TicksProperty, ShowTickLabelsProperty);
 
+        // The ends are in here because they decide how long a reading can be, and the value is
+        // not, because it no longer decides anything about the width. See Reading.
         AffectsMeasure<Fader>(
             LabelProperty, UnitProperty, FormatProperty, TrackLengthProperty,
-            TicksProperty, ShowTickLabelsProperty);
+            TicksProperty, ShowTickLabelsProperty, MinimumProperty, MaximumProperty);
     }
 
     public Fader()
@@ -275,7 +277,13 @@ public class Fader : ThemedControl
         // gives it the whole area anyway, whatever was asked for.
         double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
 
-        double width = Math.Max(CapWidth, Math.Max(label.Width, value.Width)) + ScaleWidth();
+        // Measured at the longest the reading can be rather than at what it says, so the control
+        // does not change width as the value moves. See NumericInput.Widest for what that cost.
+        var widest = BuildText(
+            NumericInput.Widest(Value, Minimum, Maximum, Format, Unit),
+            ValueFontSize, PatternFont.Family, Brushes.Black);
+
+        double width = Math.Max(CapWidth, Math.Max(label.Width, widest.Width)) + ScaleWidth();
         double height = label.Height + TextGap + throwLength + CapHeight + TextGap + value.Height;
 
         return new Size(width, height);

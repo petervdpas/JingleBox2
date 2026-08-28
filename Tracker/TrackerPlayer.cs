@@ -373,8 +373,14 @@ public sealed class TrackerPlayer : IDisposable
 
     /// <summary>
     /// How loud a track is right now, both sides, for the mixer's meters. Zero for a track that
-    /// is not sounding, and for every track when nothing is playing.
+    /// is not sounding, and zero for every track before there is a mixer at all.
     /// </summary>
+    /// <remarks>
+    /// Bounded by how many tracks a song can have rather than by <c>_noteGain</c>, which is the
+    /// volume column's memory and is only made when a pass starts. Asking it how many tracks
+    /// there are answered nought until somebody pressed play, so a note played by hand moved
+    /// the master's meter, which does not go through here, and no track's.
+    /// </remarks>
     public (float Left, float Right) LevelFor(int track)
     {
         // Asked several times a second by the meters, and before anything has played there is
@@ -385,7 +391,7 @@ public sealed class TrackerPlayer : IDisposable
         // only meter on the page measuring the thing you actually hear.
         if (track == MasterStrip) return _synth.Mixer.MasterLevel;
 
-        if (track < 0 || track >= _noteGain.Length) return (0, 0);
+        if (track < 0 || track >= Song.MaxTrackCount) return (0, 0);
 
         var (left, right) = _synth.Mixer.LevelFor(track);
 

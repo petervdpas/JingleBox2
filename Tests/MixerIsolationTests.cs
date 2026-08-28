@@ -269,6 +269,46 @@ public class MixerIsolationTests
         Assert.False(TrackMixer.Fresh(TrackMixer.MeterHoldMs + 1));
     }
 
+    /// <remarks>
+    /// And the meters are polled for as long as something is sounding rather than for as long
+    /// as the transport is running. Both faults the user found came from the second rule: the
+    /// master sat lit after a pass ended, because the last reading taken was true and no further
+    /// one was ever taken, and a note played by hand with the transport stopped moved nothing at
+    /// all, because nothing was reading.
+    /// </remarks>
+    [Fact]
+    public void Meters_are_read_for_as_long_as_something_is_sounding()
+    {
+        // A pass between two notes is silent and is not over.
+        Assert.True(TrackMixer.Sounding(playing: true, loudest: 0f));
+
+        // A note played by hand needs no pass.
+        Assert.True(TrackMixer.Sounding(playing: false, loudest: 0.2f));
+
+        // And this is the only case where there is nothing to read.
+        Assert.False(TrackMixer.Sounding(playing: false, loudest: 0f));
+    }
+
+    /// <remarks>
+    /// A track's meter was bounded by the volume column's memory, which is only made when a pass
+    /// starts, so before anybody pressed play there were nought tracks to report on and every
+    /// strip read silent. The master does not go through that door, which is why a note played
+    /// by hand moved the master's meter and no track's.
+    /// </remarks>
+    [Fact]
+    public void A_tracks_meter_reads_before_anything_has_been_played()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Loud(), new Note(60), 1f, 1.0, "by hand", 1);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        // The mixer answers for every track a song can have, played or not.
+        Assert.True(mixer.LevelFor(1).Left > 0);
+        Assert.Equal(0, mixer.LevelFor(JingleBox2.Tracker.Song.MaxTrackCount - 1).Left);
+        Assert.Equal(0, mixer.LevelFor(JingleBox2.Tracker.Song.MaxTrackCount).Left);
+    }
+
     /// <summary>An effect that listens and passes the audio through untouched.</summary>
     private sealed class Listener : JingleBox2.Audio.Plugins.IAudioInsert
     {

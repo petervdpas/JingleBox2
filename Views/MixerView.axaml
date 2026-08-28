@@ -44,6 +44,15 @@
           <views:HelpBadge Topic="mixer.strips" />
         </StackPanel>
 
+        <!-- What the master makes move over the pattern. Under the mixer rather than under the
+             pattern, because the master is not a track and the panel down there is about the
+             track the cursor is in. -->
+        <views:FoldStrip DockPanel.Dock="Bottom" Title="master automation"
+                         IsOpen="{Binding ShowsMasterLanes, Mode=TwoWay}"
+                         StripHeight="{Binding MasterLanesHeight, Mode=TwoWay}">
+          <views:AutomationStrip DataContext="{Binding MasterLanes}" />
+        </views:FoldStrip>
+
         <!-- What the whole mix goes through, under the strips it is the sum of. The same strip
              the pattern page puts under a track, because a chain is a chain: what differs is
              only which of them it is about. -->
@@ -66,7 +75,7 @@
                         Content="{Binding MasterStrip}">
           <ContentControl.ContentTemplate>
             <DataTemplate x:DataType="vm:TrackStripViewModel">
-              <Border Classes="inset" Width="120">
+              <Border Classes="inset" Width="134">
                 <DockPanel>
             <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
               <Border Classes="badge" HorizontalAlignment="Center"
@@ -77,14 +86,14 @@
               <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
                           Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                           HorizontalAlignment="Center"
-                          views:Pointable.Offers="{x:Static midi:MixLinks.Pan}"
+                          views:Pointable.Offers="{x:Static midi:MixLinks.MasterPan}"
                           views:Pointable.InSong="True"
                           Value="{Binding Pan}" />
 
               <!-- Mute and no solo. Soloing the master would mean soloing everything, which is
                    what it is already doing. -->
               <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                            views:Pointable.Offers="{x:Static midi:MixLinks.Mute}"
+                            views:Pointable.Offers="{x:Static midi:MixLinks.MasterMute}"
                             views:Pointable.InSong="True"
                             ToolTip.Tip="Silence the whole mix" />
             </StackPanel>
@@ -95,7 +104,7 @@
                            Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                            TrackLength="0"
                            Ticks="6,0,-6,-12,-24,-40,-60"
-                           views:Pointable.Offers="{x:Static midi:MixLinks.Level}"
+                           views:Pointable.Offers="{x:Static midi:MixLinks.MasterLevel}"
                            views:Pointable.InSong="True"
                            ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
                            Value="{Binding VolumeDecibels}" />
@@ -130,7 +139,7 @@
                      the mixer enough: everything pointed at a strip follows the track you are
                      on, and this is how you say which that is. Tunnelled, so taking hold of a
                      fader picks its strip on the way past rather than instead of moving it. -->
-                <Border Classes="inset" Width="120"
+                <Border Classes="inset" Width="134"
                         Classes.selected="{Binding IsSelected}">
                   <!-- The fader and the meter take whatever height is left, so the strips
                        grow with the page instead of leaving a hole under the buttons. -->

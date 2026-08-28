@@ -146,11 +146,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         _player.Automation = new AutomationPlayer(targets);
 
-        Lanes = new AutomationViewModel(targets, () => Song, () => CurrentPattern)
+        Lanes = new AutomationViewModel(
+            targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
             Taking = History.Taking,
             Dirtied = MarkDirty
         };
+
+        // The same panel again, pointed at the strip that is not a track. Its own rather than
+        // the one under the pattern, for the same reason its chain is: that one follows the
+        // cursor, and the master is not somewhere the cursor can be.
+        MasterLanes = new AutomationViewModel(
+            targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
+        {
+            Taking = History.Taking,
+            Dirtied = MarkDirty
+        };
+
+        MasterLanes.Show(TrackerPlayer.MasterStrip);
     }
 
     /// <summary>
@@ -909,8 +922,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         InstrumentBoxFor(track)?.Designer?.Editor?.Values;
 
     /// <summary>The plugins inserted on a track, for something that wants to move one's knob.</summary>
+    /// <summary>
+    /// What is inserted on a strip, the master included.
+    /// </summary>
+    /// <remarks>
+    /// The master answers here because its chain is a chain like any other; it is only the
+    /// tracks that have to be counted, and it is not one of them.
+    /// </remarks>
     public Audio.Plugins.PluginChain? InsertsOn(int track) =>
-        track >= 0 && track < Song.TrackCount ? _player.ChainFor(track) : null;
+        track == TrackerPlayer.MasterStrip || (track >= 0 && track < Song.TrackCount)
+            ? _player.ChainFor(track)
+            : null;
 
     /// <summary>
     /// Throws away the song that is open, as it stands on disc. What is on the screen stays
@@ -1031,10 +1053,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = "Stopped";
     }
 
+    /// <summary>Both automation panels follow the playing line, so their pictures show it.</summary>
+    private void Running()
+    {
+        Lanes?.Running();
+        MasterLanes?.Running();
+    }
+
     private void OnPositionChanged(object? sender, TrackerPosition position) =>
         Dispatcher.UIThread.Post(() =>
         {
             PlayingLine = position.Line;
+
+            Running();
+
             if (position.OrderIndex != OrderIndex)
             {
                 OrderIndex = position.OrderIndex;
@@ -1059,19 +1091,49 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 Automation.Stopped();
             }
 
-            if (state == TrackerTransportState.Playing) _meters.Start();
-            else StopMeters();
+            // Started here and never stopped here. What the meters are about is whether
+            // anything is sounding, and a pass ending is not that: a release tail outlives the
+            // stop and a note played by hand does not need a pass at all. See ReadMeters.
+            if (state == TrackerTransportState.Playing) Meters();
         });
 
+    /// <summary>
+    /// Polls the meters, for anything that is about to make a sound.
+    /// </summary>
+    /// <remarks>
+    /// Told from wherever the sound was asked for, which is not always the drawing thread: a
+    /// panel's keyboard is, a MIDI key on its way to the pattern is not, and a timer belongs to
+    /// the thread that owns it.
+    /// </remarks>
+    private void Meters()
+    {
+        if (_meters.IsEnabled) return;
+
+        if (Dispatcher.UIThread.CheckAccess()) _meters.Start();
+        else Dispatcher.UIThread.Post(() => _meters.Start());
+    }
+
     /// <summary>Reads what each track is sounding and hands it to its strip and instruments.</summary>
+    /// <remarks>
+    /// Polling ends when there is nothing left to read rather than when the transport says so,
+    /// which are two different moments. Stopping on the transport is what left the master lit:
+    /// the last thing the timer did was read a level that was still true, and the first thing it
+    /// did not do was read it again, so the reading stayed on screen for ever. It also meant a
+    /// note played by hand with the transport stopped moved no meter at all, since nothing was
+    /// reading them.
+    /// </remarks>
     private void ReadMeters()
     {
+        float loudest = 0;
+
         foreach (var strip in Strips)
         {
             var (left, right) = _player.LevelFor(strip.Track);
 
             strip.Left = left;
             strip.Right = right;
+
+            loudest = Math.Max(loudest, Math.Max(left, right));
         }
 
         if (MasterStrip is { } master)
@@ -1080,6 +1142,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             master.Left = left;
             master.Right = right;
+
+            loudest = Math.Max(loudest, Math.Max(left, right));
         }
 
         foreach (var instrument in Instruments)
@@ -1089,10 +1153,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             var (left, right) = _player.LevelFor(instrument.Track);
             instrument.Level = Math.Max(left, right);
         }
+
+        if (!Tracker.Synth.TrackMixer.Sounding(IsPlaying, loudest)) Quiet();
     }
 
-    /// <summary>Stops polling and empties the meters, so none is left holding a level.</summary>
-    private void StopMeters()
+    /// <summary>Stops polling and empties every meter, so none is left holding a level.</summary>
+    private void Quiet()
     {
         _meters.Stop();
 
@@ -1100,6 +1166,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             strip.Left = 0;
             strip.Right = 0;
+        }
+
+        if (MasterStrip is { } master)
+        {
+            master.Left = 0;
+            master.Right = 0;
         }
 
         foreach (var instrument in Instruments)
@@ -1484,6 +1556,30 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     private AutomationViewModel? _lanes;
 
+    /// <summary>What the master makes move over this pattern, and what else on it could.</summary>
+    public AutomationViewModel? MasterLanes
+    {
+        get => _masterLanes;
+        private set
+        {
+            _masterLanes = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private AutomationViewModel? _masterLanes;
+
+    /// <summary>True while the master's automation is unfolded under the mixer.</summary>
+    [ObservableProperty] private bool showsMasterLanes;
+
+    /// <summary>How tall it stands while it is open. See the strips under the pattern.</summary>
+    [ObservableProperty] private double masterLanesHeight = 120;
+
+    partial void OnShowsMasterLanesChanged(bool value)
+    {
+        if (value) MasterLanes?.Show(TrackerPlayer.MasterStrip);
+    }
+
     /// <summary>
     /// True while the automation strip is open under the pattern.
     /// </summary>
@@ -1703,6 +1799,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // that track plays rather than through an audition copy of its own.
         double held = _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
 
+        // A note played by hand is that track playing, so its strip and the master move for it
+        // exactly as they do for a pass.
+        Meters();
+
         // And said out loud, so a panel's keyboard lights for a note played by hand the same as
         // for one the pattern played. Only the pattern used to say anything, which is why a MIDI
         // key sounded and nothing on screen moved.
@@ -1755,8 +1855,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Sounds one note on any instrument, for the rack's auditioning. The engine lives
     /// here, so the rack borrows it rather than opening a second one.
     /// </summary>
-    public double Audition(TrackerInstrument instrument, Note note, int volume) =>
-        _player.Preview(instrument, note, GainFor(volume));
+    public double Audition(TrackerInstrument instrument, Note note, int volume)
+    {
+        // No track, so no strip moves for it, but everything reaches the card through the
+        // master and the master's meter is the one measuring what you actually hear.
+        Meters();
+
+        return _player.Preview(instrument, note, GainFor(volume));
+    }
 
     /// <summary>Lets go of one note played by hand, which is what a key coming up means.</summary>
     public void Let(TrackerInstrument instrument, Note note) => _player.LetPreview(instrument, note);

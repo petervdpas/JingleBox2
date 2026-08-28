@@ -4,11 +4,13 @@ using JingleBox2.ViewModels;
 namespace JingleBox2.Views;
 
 /// <summary>
-/// One track's automation, under the pattern.
+/// One strip's automation: a track's under the pattern, the master's under the mixer.
 /// </summary>
 /// <remarks>
-/// The only behaviour here is carrying the picture's two announcements to the view model, which
-/// a binding cannot do: an edit on a drawn control is an event and not a property.
+/// Shows whichever <see cref="AutomationViewModel"/> it is given rather than reaching through
+/// to the tracker for one, which is what makes the same strip serve both. The only behaviour
+/// here is carrying the picture's two announcements, which a binding cannot do: an edit on a
+/// drawn control is an event and not a property.
 /// </remarks>
 public partial class AutomationStrip : UserControl
 {
@@ -23,17 +25,12 @@ public partial class AutomationStrip : UserControl
         // this application follows.
         curve.Editing += what =>
         {
-            if (DataContext is TrackerViewModel tracker && tracker.CurrentPattern is { } pattern)
-                tracker.History.Taking(pattern, what);
+            if (DataContext is AutomationViewModel lanes) lanes.Editing(what);
         };
 
         curve.Edited += () =>
         {
-            if (DataContext is TrackerViewModel tracker)
-            {
-                tracker.CurrentPattern?.LaneChanged();
-                tracker.Lanes?.Touched();
-            }
+            if (DataContext is AutomationViewModel lanes) lanes.Edited();
         };
     }
 }

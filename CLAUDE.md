@@ -86,6 +86,55 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   says nothing once it is older than `MeterHoldMs`, which is gone whichever way the music
   stopped. A track's meter needs none of that: it is worked out from the voices that are
   sounding, so it falls on its own
+- And that only made the reading truthful; it did not make anybody ask for it again. The meters
+  are polled by a timer that ran while the transport did, so the last thing the timer did was
+  read a level that was true and the first thing it did not do was read it again: the master sat
+  lit at whatever had last played, for ever. The same rule meant a note played by hand with the
+  transport stopped moved no meter at all, since nothing was reading them. `TrackMixer.Sounding`
+  is the rule now, polling while anything is sounding and only then while a pass runs, since a
+  pass between two notes is silent and is not over. Auditioning starts the timer and the timer
+  stops itself when everything reads nought. The mixer was never wrong here: a preview carrying
+  a track already moved that track's meter and the master's, which `Tests/MixerIsolationTests.cs`
+  has said for a while. Both faults were in what was asking
+- A track's meter read nought until somebody pressed play, and the reason was a bound written
+  against the wrong array. `TrackerPlayer.LevelFor` asked whether the track number was inside
+  `_noteGain`, which is the volume column's memory and is made when a pass starts, so before one
+  there were no tracks to report on at all. Bounded by how many tracks a song can have now. The
+  master went through its own branch above that line, which is why a note played by hand moved
+  the master's meter and no track's, and why it looked like the tracks were not isolated when
+  what was really happening is that nobody was asking them
+- A fader was as wide as the number under it. `MeasureOverride` measured the current reading, so
+  "-10.0 dB" came out a character wider than "0.0 dB", two of the mixer's strips were wider
+  inside than the other two, and the meter beside the wide ones was pushed into the strip's own
+  border and drawn through it. `NumericInput.Widest` is the rule: the longest a reading can be
+  over the range, since a format widens with magnitude and with the minus sign and both are at
+  their worst at an end. The value is still in it, because nothing stops a control being handed
+  one from outside its own ends, and it is the longest string rather than the widest, which is
+  the same thing in the monospaced font readings are drawn in. `Value` is deliberately not in
+  `AffectsMeasure` and now does not need to be. With every strip honest about its width the
+  cards had to grow from 120 to 134, which is what the contents always needed
+- The peak mark on a meter would not come down. The fall is in `MeterScale.DecayPeak` and always
+  was, held for a moment and then twenty decibels a second, but it is worked out while the meter
+  draws and a meter draws when a value changes. So the bar emptied when the last level arrived
+  and the mark hung where the loudest moment had left it, for the rest of the session.
+  `LevelMeter` asks for another frame while the mark is above the bar, through
+  `TopLevel.RequestAnimationFrame` rather than a timer of its own, so it runs at the window's
+  own rate and costs nothing once the mark is on the floor. It reaches the floor exactly, since
+  `MeterScale.Decibels` clamps there, which is what ends the asking
+- The master is automated the same way a track is, and can be, because a lane names a strip
+  rather than a track: `ControlTargets` answers for strip minus one, `AutomationLane.For` allows
+  it, and the file reads it back. Its own panel on the mixer rather than the one under the
+  pattern, which follows the cursor, and the master is not somewhere a cursor can be. A master
+  lane stays when tracks are removed and does not shift when they are moved, since no count of
+  tracks reaches it
+- `AutomationStrip` shows whichever `AutomationViewModel` it is given rather than reaching
+  through to the tracker for one, which is what lets the same strip serve a track and the
+  master. It used to take the pattern and the history off the tracker itself, so it could only
+  ever be the pattern's; the panel answers for those now, and the strip knows only what it shows
+- A knob pointed at the master's own fader is `ControlScope.Fixed` on strip minus one, not the
+  tracks' `Focused`. There is only ever one master, so a knob pointed at its fader means that
+  fader wherever you are; given the tracks' template it would have driven whichever track was
+  selected, which is a knob doing something other than what you pointed it at
 - `TrackMixer` (Tracker/Synth/): The song's tracks, summed. A bus, a level, a pan, an insert
   chain, a ducker and an instrument apiece, and one voice per track the tracker way: a new note
   cuts the one still ringing. Auditions carry no track at all and pile up, which is why a

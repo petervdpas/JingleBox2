@@ -299,8 +299,9 @@ public sealed class Pattern
         TrackCount = newTracks;
 
         // The same rule the cells follow: keep whatever still fits. A pattern made shorter
-        // drops the points past its end, and tracks taken off take their lanes with them.
-        _lanes.RemoveAll(one => one.Track >= newTracks);
+        // drops the points past its end, and tracks taken off take their lanes with them. The
+        // master's stays: it is not one of the tracks and there is no count that removes it.
+        _lanes.RemoveAll(one => !one.IsMaster && one.Track >= newTracks);
         foreach (var lane in _lanes) lane.FitTo(newLines);
 
         Changed?.Invoke(this, EventArgs.Empty);

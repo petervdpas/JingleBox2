@@ -1155,6 +1155,17 @@ public sealed class TrackMixer
     /// </remarks>
     public static bool Fresh(double ageMs) => ageMs <= MeterHoldMs;
 
+    /// <summary>Whether the meters are still worth reading, for whatever is polling them.</summary>
+    /// <remarks>
+    /// About what is sounding, and only then about the transport. Reading them while a pass runs
+    /// and not otherwise is the mistake that has now been made twice: it leaves the master lit
+    /// at whatever the last thing to play was, since the reading that stays on screen is a true
+    /// one that is never taken again, and it shows nothing at all for a note played by hand with
+    /// the transport stopped. The transport is in it only because a pass between two notes is
+    /// silent and is not over.
+    /// </remarks>
+    public static bool Sounding(bool playing, float loudest) => playing || loudest > 0;
+
     /// <summary>
     /// What is leaving, for the meter beside the master fader.
     /// </summary>
@@ -1475,7 +1486,7 @@ public sealed class TrackMixer
     /// </summary>
     public (float Left, float Right) LevelFor(int track)
     {
-        if (track < 0) return (0, 0);
+        if (track < 0 || track >= MaxTracks) return (0, 0);
 
         float left = 0;
         float right = 0;

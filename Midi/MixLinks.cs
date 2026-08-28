@@ -27,10 +27,35 @@ public static class MixLinks
 
     public static readonly ControlMapping Release = Strip(MixControl.Release, "Duck release");
 
+    /// <summary>
+    /// The same handful again, on the one strip that is always the same strip.
+    /// </summary>
+    /// <remarks>
+    /// Fixed rather than following the cursor, and that is the whole difference. Every other
+    /// strip is one of many and a knob pointed at one means "the track I am on"; there is only
+    /// ever one master, and a knob pointed at its fader means that fader wherever you are. Given
+    /// the tracks' templates it would have driven whichever track happened to be selected, which
+    /// is a knob doing something other than what you pointed it at.
+    /// </remarks>
+    public static readonly ControlMapping MasterLevel = Master(MixControl.Volume, "Master level");
+
+    public static readonly ControlMapping MasterPan = Master(MixControl.Pan, "Master pan");
+
+    public static readonly ControlMapping MasterMute = Master(MixControl.Mute, "Master mute");
+
     private static ControlMapping Strip(MixControl what, string said) => new()
     {
         Kind = ControlKind.Mix,
         Scope = ControlScope.Focused,
+        Mix = what,
+        Name = said
+    };
+
+    private static ControlMapping Master(MixControl what, string said) => new()
+    {
+        Kind = ControlKind.Mix,
+        Scope = ControlScope.Fixed,
+        Track = Tracker.TrackerPlayer.MasterStrip,
         Mix = what,
         Name = said
     };

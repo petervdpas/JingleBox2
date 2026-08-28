@@ -172,7 +172,11 @@ public sealed class AutomationLane
     /// <summary>The lane a mapping would make, for a track, with nothing in it yet.</summary>
     public static AutomationLane? For(ControlMapping mapping, int track)
     {
-        if (mapping is null || track < 0 || !Automatable(mapping.Kind)) return null;
+        if (mapping is null || !Automatable(mapping.Kind)) return null;
+
+        // The master is a strip without being a track, and it is the only thing below nought
+        // that means anything. Anything else there is a mistake rather than a place.
+        if (track < 0 && track != TrackerPlayer.MasterStrip) return null;
 
         // A link that names no parameter means the third knob on whatever face is in front of
         // you, which is a fact about a hand and not about a song. There is nothing to write
@@ -268,6 +272,9 @@ public sealed class AutomationLane
 
         return before.Value + (next.Value - before.Value) * how;
     }
+
+    /// <summary>True for a lane about the whole mix rather than about one track.</summary>
+    public bool IsMaster => Track == TrackerPlayer.MasterStrip;
 
     /// <summary>Takes away every point at or past a line, for a pattern that got shorter.</summary>
     public void FitTo(int lines)

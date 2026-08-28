@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using JingleBox2.UI;
@@ -56,6 +57,9 @@ public class LevelMeter : ThemedControl
     private double _rightPeak;
     private double _leftPeakAt;
     private double _rightPeakAt;
+
+    /// <summary>Whether a frame has already been asked for, so one is not asked for twice.</summary>
+    private bool _waiting;
 
     static LevelMeter()
     {
@@ -136,6 +140,39 @@ public class LevelMeter : ThemedControl
             DrawBar(context, palette, new Rect(0, 0, width, each), left, _leftPeak);
             DrawBar(context, palette, new Rect(0, each + gap, width, each), right, _rightPeak);
         }
+
+        if (Falling(left, _leftPeak) || (Stereo && Falling(right, _rightPeak))) NextFrame();
+    }
+
+    /// <summary>Whether the mark is above the bar, and so has somewhere left to fall to.</summary>
+    private bool Falling(double level, double peak) =>
+        ShowPeak
+        && MeterScale.Position(peak, MinimumDecibels) > MeterScale.Position(level, MinimumDecibels);
+
+    /// <summary>
+    /// Asks to be drawn once more, because the mark is still coming down.
+    /// </summary>
+    /// <remarks>
+    /// Everything else here is drawn because a value changed. The fall is the one thing that
+    /// happens while nothing changes, and it is worked out during the drawing, so a meter that
+    /// nobody invalidates simply stops: the bar empties when the last level arrives and the mark
+    /// hangs where the loudest moment left it, for the rest of the session. That is what it
+    /// looks like when a meter "does not go down".
+    ///
+    /// A frame rather than a timer of its own, so the fall runs at whatever rate the window is
+    /// drawing at and costs nothing at all once the mark is on the floor.
+    /// </remarks>
+    private void NextFrame()
+    {
+        if (_waiting || TopLevel.GetTopLevel(this) is not { } top) return;
+
+        _waiting = true;
+
+        top.RequestAnimationFrame(_ =>
+        {
+            _waiting = false;
+            InvalidateVisual();
+        });
     }
 
     /// <summary>Follows the level up at once, and back down at a readable rate.</summary>

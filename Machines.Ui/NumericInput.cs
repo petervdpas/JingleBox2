@@ -31,4 +31,35 @@ public static class NumericInput
 
     public static string Format(double value, string? format) =>
         value.ToString(string.IsNullOrEmpty(format) ? "0" : format, CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// The longest a reading can be anywhere in a range, so a control can be measured by what it
+    /// might say rather than by what it happens to say.
+    /// </summary>
+    /// <remarks>
+    /// A control measured off its current reading is as wide as the number under it. Two faders
+    /// of the same kind then come out different widths, and whatever stands beside one moves
+    /// when the value does: on the mixer, "-10.0 dB" is one character wider than "0.0 dB", and
+    /// the two strips turned down far enough to need it had their meters pushed into the card's
+    /// own border.
+    ///
+    /// The ends are the candidates because a format widens with magnitude and with the minus
+    /// sign, and both of those are at their worst at a limit. The value itself is in it too,
+    /// since nothing stops a control being handed one from outside its own ends.
+    ///
+    /// The longest string rather than the widest one, which is the same thing only in a
+    /// monospaced font. That is what readings are drawn in here, and it saves laying out three
+    /// pieces of text on every measure.
+    /// </remarks>
+    public static string Widest(double value, double minimum, double maximum, string? format, string? unit)
+    {
+        string longest = Format(value, format);
+        string low = Format(minimum, format);
+        string high = Format(maximum, format);
+
+        if (low.Length > longest.Length) longest = low;
+        if (high.Length > longest.Length) longest = high;
+
+        return longest + (unit ?? "");
+    }
 }

@@ -28,12 +28,22 @@ public sealed partial class AutomationViewModel : ObservableObject
     private readonly Func<Song?> _song;
     private readonly Func<Pattern?> _pattern;
 
-    public AutomationViewModel(IControlTargets targets, Func<Song?> song, Func<Pattern?> pattern)
+    public AutomationViewModel(IControlTargets targets, Func<Song?> song, Func<Pattern?> pattern,
+                               Func<int> beat, Func<int> playing)
     {
         _targets = targets;
         _song = song;
         _pattern = pattern;
+        _beat = beat;
+        _playing = playing;
     }
+
+    private readonly Func<int> _beat;
+
+    private readonly Func<int> _playing;
+
+    /// <summary>The playing line moved, so the picture can show where the song has got to.</summary>
+    public void Running() => OnPropertyChanged(nameof(PlayingLine));
 
     /// <summary>Told before a lane is added or taken away, so undo has somewhere to go.</summary>
     public Action<Pattern, string>? Taking;
@@ -66,6 +76,21 @@ public sealed partial class AutomationViewModel : ObservableObject
 
     public bool HasChosen => Chosen is not null;
 
+    /// <summary>
+    /// What the picture is drawn against: the pattern's length, its beat, and where it has got
+    /// to.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the panel rather than of the tracker, so the strip that draws it needs to know
+    /// nothing but which panel it is showing. Told when they move, since a pattern changed
+    /// underneath is a different grid.
+    /// </remarks>
+    public int Lines => _pattern()?.Lines ?? 0;
+
+    public int LinesPerBeat => _beat();
+
+    public int PlayingLine => _playing();
+
     /// <summary>Which track and which pattern, since a lane belongs to both.</summary>
     /// <remarks>
     /// The pattern is not on the screen when the mixer is, so it is said. A panel that quietly
@@ -78,7 +103,9 @@ public sealed partial class AutomationViewModel : ObservableObject
             var pattern = _pattern();
             if (pattern is null) return "";
 
-            string track = "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
+            string track = Track == Tracker.TrackerPlayer.MasterStrip
+                ? "MASTER"
+                : "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
             if (pattern.Name.Length > 0) return track + "  ·  pattern " + pattern.Name;
 
@@ -97,7 +124,9 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// <summary>Points the panel at a track and reads it.</summary>
     public void Show(int track)
     {
-        Track = Math.Max(0, track);
+        // Below nought is the master, which is a strip without being a track. Anything else out
+        // of range is a mistake and lands on the first track, as it always did.
+        Track = track < 0 && track != Tracker.TrackerPlayer.MasterStrip ? 0 : track;
 
         Restock();
     }
@@ -144,6 +173,8 @@ public sealed partial class AutomationViewModel : ObservableObject
         OnPropertyChanged(nameof(HasAny));
         OnPropertyChanged(nameof(About));
         OnPropertyChanged(nameof(Nothing));
+        OnPropertyChanged(nameof(Lines));
+        OnPropertyChanged(nameof(LinesPerBeat));
     }
 
     partial void OnChosenChanged(AutomationRow? value) => OnPropertyChanged(nameof(HasChosen));
@@ -214,6 +245,27 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// arrives per mouse move. Rebuilding forty rows and re-resolving every target forty times a
     /// second to change one number would be paying a list's price for a point.
     /// </remarks>
+    /// <summary>
+    /// A gesture on the picture is starting. Told before it happens, like every other edit.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in the strip that draws it, so the strip needs to know nothing but the
+    /// panel it is showing. It was reaching through to the tracker for the pattern and the
+    /// history, which meant it could only ever be the pattern's panel and never the master's.
+    /// </remarks>
+    public void Editing(string what)
+    {
+        if (_pattern() is { } pattern) Taking?.Invoke(pattern, what);
+    }
+
+    /// <summary>And it has happened: the pattern has changed and the row has to read itself again.</summary>
+    public void Edited()
+    {
+        _pattern()?.LaneChanged();
+
+        Touched();
+    }
+
     internal void Touched()
     {
         Chosen?.Reread();

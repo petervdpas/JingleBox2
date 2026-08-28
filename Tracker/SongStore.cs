@@ -738,7 +738,7 @@ public sealed class SongStore : ISampleUsage
             var pattern = new Pattern(Lines, trackCount) { Name = Name };
 
             foreach (var lane in Lanes)
-                if (lane.ToLane() is { } made && made.Track < trackCount)
+                if (lane.ToLane() is { } made && (made.IsMaster || made.Track < trackCount))
                     pattern.Lane(made);
 
             foreach (var entry in Cells)
@@ -809,7 +809,11 @@ public sealed class SongStore : ISampleUsage
 
         public AutomationLane? ToLane()
         {
-            if (Track < 0 || !AutomationLane.Automatable(Kind)) return null;
+            if (!AutomationLane.Automatable(Kind)) return null;
+
+            // The master is a strip without being a track, and it is the only thing below
+            // nought that means anything. Anything else there is a hand-edited file.
+            if (Track < 0 && Track != TrackerPlayer.MasterStrip) return null;
 
             var lane = new AutomationLane
             {

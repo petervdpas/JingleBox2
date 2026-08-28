@@ -312,7 +312,7 @@
             <views:FoldStrip Grid.Row="2" Title="automation"
                              IsOpen="{Binding ShowsLanes, Mode=TwoWay}"
                              StripHeight="{Binding LanesHeight, Mode=TwoWay}">
-              <views:AutomationStrip />
+              <views:AutomationStrip DataContext="{Binding Lanes}" />
             </views:FoldStrip>
           </Grid>
 

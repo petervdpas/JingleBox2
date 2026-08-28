@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.AutomationStrip"
-             x:DataType="vm:TrackerViewModel">
+             x:DataType="vm:AutomationViewModel">
 
   <UserControl.Styles>
     <!-- The same block the chain under the pattern is built out of, and deliberately: a block
@@ -98,9 +98,9 @@
                  on the tab, on the status line and in the pattern itself. The chain beside it
                  had its own badge taken off for the same reason. -->
             <ComboBox HorizontalAlignment="Stretch" FontSize="11"
-                      IsVisible="{Binding Lanes.HasAny}"
-                      ItemsSource="{Binding Lanes.Parameters}"
-                      SelectedItem="{Binding Lanes.Chosen}"
+                      IsVisible="{Binding HasAny}"
+                      ItemsSource="{Binding Parameters}"
+                      SelectedItem="{Binding Chosen}"
                       ToolTip.Tip="Which of this track's parameters you are working on.">
               <ComboBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:AutomationRow">
@@ -118,7 +118,7 @@
 
             <!-- A machine has a dozen parameters and needs no finding. A plugin can have two
                  hundred, and a picker that long is not one anybody can use. -->
-            <TextBox Text="{Binding Lanes.Search}" FontSize="11" Padding="6,2"
+            <TextBox Text="{Binding Search}" FontSize="11" Padding="6,2"
                      PlaceholderText="Find a parameter" />
           </StackPanel>
         </Grid>
@@ -127,33 +127,33 @@
       <!-- The part itself: what it is, what it reads, and what its lane holds. The room in
            the middle is where the curve goes when it is drawn, which is why it is left rather
            than filled with anything. -->
-      <Border Grid.Column="1" Classes="device" IsVisible="{Binding Lanes.HasChosen}">
+      <Border Grid.Column="1" Classes="device" IsVisible="{Binding HasChosen}">
         <!-- What it is takes what its name needs and no more, so the picture starts as far
              left as it can. Capped as well as floored: a plugin parameter can be called
              something very long, and a name is not worth a third of the curve. -->
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="8,6">
           <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center"
                       MinWidth="76" MaxWidth="150">
-            <TextBlock Classes="deviceName" Text="{Binding Lanes.Chosen.Name}" />
+            <TextBlock Classes="deviceName" Text="{Binding Chosen.Name}" />
 
-            <TextBlock Classes="deviceValue" Text="{Binding Lanes.Chosen.Reads}" />
+            <TextBlock Classes="deviceValue" Text="{Binding Chosen.Reads}" />
 
             <TextBlock Classes="deviceKey"
-                       Text="{Binding Lanes.Chosen.Says}"
-                       IsVisible="{Binding Lanes.Chosen.HasLane}" />
+                       Text="{Binding Chosen.Says}"
+                       IsVisible="{Binding Chosen.HasLane}" />
 
             <TextBlock Classes="deviceKey" Text="Not automated"
-                       IsVisible="{Binding !Lanes.Chosen.HasLane}" />
+                       IsVisible="{Binding !Chosen.HasLane}" />
           </StackPanel>
 
           <!-- The lane itself. Nothing to draw until there is a lane, and the room is left
                empty rather than filled with a picture of nothing. -->
           <views:AutomationCurve Grid.Column="1" x:Name="Curve"
                                  MinHeight="58"
-                                 IsVisible="{Binding Lanes.Chosen.HasLane}"
-                                 Lane="{Binding Lanes.Chosen.Lane}"
-                                 Zero="{Binding Lanes.Chosen.Zero}"
-                                 Lines="{Binding PatternLines}"
+                                 IsVisible="{Binding Chosen.HasLane}"
+                                 Lane="{Binding Chosen.Lane}"
+                                 Zero="{Binding Chosen.Zero}"
+                                 Lines="{Binding Lines}"
                                  LinesPerBeat="{Binding LinesPerBeat}"
                                  PlayingLine="{Binding PlayingLine}"
                                  ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away." />
@@ -164,20 +164,20 @@
           <Grid Grid.Column="2" MinWidth="52">
             <Button Classes="small" Content="Automate"
                     VerticalAlignment="Center" HorizontalAlignment="Right"
-                    IsVisible="{Binding !Lanes.Chosen.HasLane}"
-                    Command="{Binding Lanes.Chosen.AddCommand}"
+                    IsVisible="{Binding !Chosen.HasLane}"
+                    Command="{Binding Chosen.AddCommand}"
                     ToolTip.Tip="Give it a lane holding where it stands now, for the whole of this pattern. Or arm Record knob movements in the pattern menu and turn a knob while the song plays." />
 
             <Button Classes="clear" Content="✕"
                     VerticalAlignment="Top" HorizontalAlignment="Right"
-                    IsVisible="{Binding Lanes.Chosen.HasLane}"
-                    Command="{Binding Lanes.Chosen.ForgetCommand}"
+                    IsVisible="{Binding Chosen.HasLane}"
+                    Command="{Binding Chosen.ForgetCommand}"
                     ToolTip.Tip="Take the lane away. The parameter stops moving and stays where it was left." />
 
-            <Button Classes="small" Content="{Binding Lanes.Chosen.How}"
+            <Button Classes="small" Content="{Binding Chosen.How}"
                     VerticalAlignment="Bottom" HorizontalAlignment="Right"
-                    IsVisible="{Binding Lanes.Chosen.HasLane}"
-                    Command="{Binding Lanes.Chosen.NextCommand}"
+                    IsVisible="{Binding Chosen.HasLane}"
+                    Command="{Binding Chosen.NextCommand}"
                     ToolTip.Tip="Sweeps goes straight from one point to the next. Steps holds each value until the next point." />
           </Grid>
         </Grid>
@@ -185,8 +185,8 @@
 
       <TextBlock Grid.Column="1" Classes="deviceKey" VerticalAlignment="Center"
                  TextWrapping="Wrap"
-                 IsVisible="{Binding !Lanes.HasAny}"
-                 Text="{Binding Lanes.Nothing}" />
+                 IsVisible="{Binding !HasAny}"
+                 Text="{Binding Nothing}" />
     </Grid>
   </Border>
 
