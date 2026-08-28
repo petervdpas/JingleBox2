@@ -1226,7 +1226,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             string line = "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture);
             string track = CursorTrackLabel;
 
-            var playing = Song.Instruments.ElementAtOrDefault(SelectedInstrument);
+            // What the track under the cursor plays, not what is picked out in the list. The bar
+            // says where you are, and where you are is the track: it read the list instead and
+            // so named an instrument on a track that had none.
+            var playing = Song.InstrumentAt(Song.GetTrackInstrument(Cursor.Track));
             string sound = playing == null ? "no instrument" : playing.Name;
 
             return song + "  ·  " + line + "  ·  " + track + "  ·  " + sound;
@@ -1904,7 +1907,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : $"Moved track {from + 1:00} to {to + 1:00}, '{moved.Name}' with it";
     }
 
-    /// <summary>Clears a track's default so it falls back to the selected instrument.</summary>
+    /// <summary>Takes the instrument off a track, which leaves the track with no sound source.</summary>
+    /// <remarks>
+    /// Nothing, rather than something else. It used to fall back to whichever instrument was
+    /// picked out in the list, which is how a track with nothing on it came to make a sound.
+    /// </remarks>
     public void ClearTrackInstrument(int track)
     {
         Changing("taking an instrument off a track");
@@ -1921,11 +1928,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The instrument a note typed on this track should carry: the track's own if it has one,
     /// otherwise whatever is selected in the instrument list.
     /// </summary>
-    private int InstrumentForTrack(int track)
-    {
-        int assigned = Song.GetTrackInstrument(track);
-        return assigned == TrackerCell.NoInstrument ? SelectedInstrument : assigned;
-    }
+    /// <summary>
+    /// What a track plays, and nothing when it plays nothing.
+    /// </summary>
+    /// <remarks>
+    /// The track's own instrument and never the one picked out in the list beside the pattern.
+    /// Those are two different questions and answering the first with the second is what made a
+    /// track with no sound source play somebody else's: the keyboard sounded an instrument the
+    /// track had not got, and typing wrote that instrument's number into a cell on it. A track
+    /// with nothing on it makes no sound, playing or stopped, and a note typed into it goes in
+    /// with the instrument column blank, which is what the sequencer already understands as
+    /// "whatever this track last played", and that is nothing either.
+    ///
+    /// Which one is picked in the list is about the list: it is what a new track would be given
+    /// and what the rack is showing, and it has never been a fact about this track.
+    /// </remarks>
+    private int InstrumentForTrack(int track) => Song.GetTrackInstrument(track);
 
     private void StepDown()
     {

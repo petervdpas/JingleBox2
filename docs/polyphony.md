@@ -24,7 +24,7 @@ One note, and the code says so in three places.
 
 ```
 Pattern             TrackerCell[line * TrackCount + track]      one cell per track per line
-SynthMixer.NoteOn   Cut(track) before the new voice is added    "one voice per track"
+TrackMixer.NoteOn   Cut(track) before the new voice is added    "one voice per track"
 PluginNoteOn        instrument.AllNotesOff() before NoteOn      "one note a track"
 ```
 

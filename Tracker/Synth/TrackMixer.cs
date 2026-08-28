@@ -5,15 +5,23 @@ using System.Collections.Generic;
 namespace JingleBox2.Tracker.Synth;
 
 /// <summary>
-/// Every sounding synth voice, summed into one buffer. One voice per track, the tracker way:
-/// a new note cuts the one still ringing there. Auditions sit outside that and simply pile up.
+/// The song's tracks, summed into one buffer: a bus, a level, a pan, an insert chain, a ducker
+/// and an instrument apiece.
 /// </summary>
 /// <remarks>
+/// One voice per track, the tracker way: a new note cuts the one still ringing there. Auditions
+/// sit outside that, carry no track at all and simply pile up, which is why a panel's keyboard
+/// cannot be heard on a strip or turned down by one.
+///
+/// It was called SynthMixer, which was true when it summed synth voices and nothing else. It
+/// grew a bus and a level and a ducker and a plugin slot for every track and went on wearing the
+/// old name, which said the wrong thing about the one class the whole mix goes through.
+///
 /// Rendering happens on the audio callback thread while notes are started from the clock and
 /// from the UI, so the voice list is behind a lock. The critical sections are a few list
 /// operations long; the sample loops themselves run on a snapshot.
 /// </remarks>
-public sealed class SynthMixer
+public sealed class TrackMixer
 {
     /// <summary>Past this, the oldest voice is taken rather than growing the mix forever.</summary>
     public const int MaxVoices = 48;
@@ -99,7 +107,7 @@ public sealed class SynthMixer
     private readonly DuckSetting[] _ducked = new DuckSetting[MaxTracks];
     private int _noiseSeed;
 
-    public SynthMixer(int sampleRate)
+    public TrackMixer(int sampleRate)
     {
         SampleRate = sampleRate;
 

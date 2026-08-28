@@ -81,7 +81,7 @@ public sealed class SynthOutput : IDisposable
 
     private long _complained;
 
-    private SynthMixer? _mixer;
+    private TrackMixer? _mixer;
     private int _wanted = FollowDevice;
 
     /// <summary>
@@ -94,7 +94,7 @@ public sealed class SynthOutput : IDisposable
     /// The mixer, built the first time anything asks for it. Late on purpose: until the audio
     /// device has been opened there is no way to know what rate to build it for.
     /// </summary>
-    public SynthMixer Mixer => _mixer ??= new SynthMixer(SampleRate);
+    public TrackMixer Mixer => _mixer ??= new TrackMixer(SampleRate);
 
     /// <summary>True once the mixer exists, so a meter can ask without building one.</summary>
     public bool HasMixer => _mixer != null;

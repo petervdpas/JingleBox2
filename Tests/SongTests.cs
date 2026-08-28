@@ -27,6 +27,152 @@ public class SongTests
 
     private static PatternCursor At(int line, int track = 0) => new() { Line = line, Track = track };
 
+    /// <summary>
+    /// What a track plays is the track's own business and nobody else's.
+    /// </summary>
+    /// <remarks>
+    /// The tracker used to answer this with whichever instrument was picked out in the list
+    /// beside the pattern when a track had none of its own, so a track with no sound source
+    /// sounded somebody else's instrument from the keyboard and wrote its number into cells.
+    /// Two different questions, and only one of them is about the track.
+    /// </remarks>
+    [Fact]
+    public void A_track_with_nothing_on_it_plays_nothing()
+    {
+        var song = Made();
+
+        Assert.Equal(TrackerCell.NoInstrument, song.GetTrackInstrument(1));
+        Assert.Null(song.InstrumentAt(song.GetTrackInstrument(1)));
+    }
+
+    [Fact]
+    public void And_a_track_with_something_on_it_plays_that()
+    {
+        var song = Made();
+
+        song.SetTrackInstrument(1, 1);
+
+        Assert.Equal(1, song.GetTrackInstrument(1));
+        Assert.Equal("Two", song.InstrumentAt(song.GetTrackInstrument(1))!.Name);
+    }
+
+    /// <remarks>
+    /// An instrument taken out of the song leaves the track it was on with nothing, rather than
+    /// with a number pointing past the end of the list.
+    /// </remarks>
+    [Fact]
+    public void A_track_pointed_past_the_end_plays_nothing()
+    {
+        var song = Made();
+
+        song.SetTrackInstrument(1, 9);
+
+        Assert.Equal(TrackerCell.NoInstrument, song.GetTrackInstrument(1));
+    }
+
+    /// <summary>
+    /// A strip belongs to its track and to no other.
+    /// </summary>
+    /// <remarks>
+    /// The cheapest way for a mixer to be wrong is for two tracks to be handed the same object,
+    /// and it is the kind of wrong that looks like magic: two faders that move together.
+    /// </remarks>
+    [Fact]
+    public void Every_track_has_a_strip_of_its_own()
+    {
+        var song = Made();
+
+        song.Mix[0].Volume = 0.25;
+        song.Mix[1].Volume = 1.75;
+
+        Assert.Equal(0.25, song.Mix[0].Volume);
+        Assert.Equal(1.75, song.Mix[1].Volume);
+        Assert.NotSame(song.Mix[0], song.Mix[1]);
+    }
+
+    /// <remarks>
+    /// Everything a track has moves with it. The notes are the obvious half; the mix, the
+    /// instrument and the automation are the half that would quietly stay behind and leave the
+    /// track playing somebody else's settings.
+    /// </remarks>
+    [Fact]
+    public void A_track_moved_takes_everything_it_owns_with_it()
+    {
+        var song = Made();
+
+        song.SetTrackInstrument(0, 0);
+        song.SetTrackInstrument(1, 1);
+
+        song.Mix[0].Volume = 0.25;
+        song.Mix[1].Volume = 1.75;
+
+        song.Patterns[0].Lane(new AutomationLane
+        {
+            Track = 0, Kind = Midi.ControlKind.Mix, Mix = Midi.MixControl.Volume
+        });
+
+        Assert.True(song.MoveTrack(0, 2));
+
+        // What was track 0 is now track 2, with its instrument, its level and its lane.
+        Assert.Equal(0, song.GetTrackInstrument(2));
+        Assert.Equal(0.25, song.Mix[2].Volume);
+        Assert.Equal(2, song.Patterns[0].Lanes[0].Track);
+
+        // And what it passed over slid up one place, keeping its own.
+        Assert.Equal(1, song.GetTrackInstrument(0));
+        Assert.Equal(1.75, song.Mix[0].Volume);
+    }
+
+    /// <remarks>
+    /// A side chain names the track that pushes it down by number, and those numbers change
+    /// under it when a track moves. Left alone it would duck from whatever slid into the place.
+    /// </remarks>
+    [Fact]
+    public void A_side_chain_follows_the_track_it_listens_to()
+    {
+        var song = Made();
+
+        song.Mix[3].DuckFrom = 0;
+
+        song.MoveTrack(0, 2);
+
+        Assert.Equal(2, song.Mix[3].DuckFrom);
+    }
+
+    [Fact]
+    public void And_one_listening_to_nothing_goes_on_listening_to_nothing()
+    {
+        var song = Made();
+
+        song.Mix[3].DuckFrom = TrackMix.NoKey;
+
+        song.MoveTrack(0, 2);
+
+        Assert.Equal(TrackMix.NoKey, song.Mix[3].DuckFrom);
+    }
+
+    /// <remarks>
+    /// A track taken off and put back is a new track, not the old one returning: it has no
+    /// instrument, no level anybody set and no lane. Undo is what brings the old one back.
+    /// </remarks>
+    [Fact]
+    public void A_track_taken_off_does_not_leave_its_settings_behind_for_the_next_one()
+    {
+        var song = Made();
+
+        song.Mix[3].Volume = 0.1;
+        song.SetTrackInstrument(3, 1);
+
+        song.TrackCount = 3;
+        song.Normalize();
+
+        song.TrackCount = 4;
+        song.Normalize();
+
+        Assert.Equal(new TrackMix().Volume, song.Mix[3].Volume);
+        Assert.Equal(TrackerCell.NoInstrument, song.GetTrackInstrument(3));
+    }
+
     [Fact]
     public void A_song_written_down_and_read_back_is_the_same_song()
     {

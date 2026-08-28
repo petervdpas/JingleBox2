@@ -44,7 +44,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - **Playback**: PadViewModel → BassAudioEngine → BASS library → PadPlaybackChanged event → UI update
 - **Config**: PadViewModel property change → MainViewModel → ConfigStore.Save() → JSON file
 - **MIDI**: MidiService.MessageReceived → MidiDispatcher → (MidiRouter → PadTriggerAdapter → PadViewModel.TogglePlayCommand) or (MidiNoteRouter → TrackerNoteAdapter → TrackerViewModel)
-- **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (TrackerSampleBank) or synth voices (SynthMixer → SynthOutput → one BASS stream)
+- **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (TrackerSampleBank) or voices and plugins (TrackMixer → SynthOutput → one BASS stream)
 
 ### Key Classes
 
@@ -63,7 +63,15 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
-- `SynthMixer` (Tracker/Synth/): Every sounding synth voice, summed; one voice per track
+- `TrackMixer` (Tracker/Synth/): The song's tracks, summed. A bus, a level, a pan, an insert
+  chain, a ducker and an instrument apiece, and one voice per track the tracker way: a new note
+  cuts the one still ringing. Auditions carry no track at all and pile up, which is why a
+  panel's keyboard cannot be heard on a strip or turned down by one. It was called `SynthMixer`,
+  which was true when it summed synth voices and nothing else; it grew all of the above and went
+  on wearing the old name, which said the wrong thing about the one class the whole mix goes
+  through. `Tests/MixerIsolationTests.cs` plays a note on one track and asks what every other
+  track is sounding, because everything in here is indexed by track number and indexed things go
+  wrong quietly
 - `MachineRack` (Tracker/): What you have, in `%APPDATA%/JingleBox2/instruments/`, one file
   each. The machines, one apiece under their own names, and the plugins you have added. Nothing
   else: anything that is neither is moved to `instruments/retired/` on the next open, since
@@ -295,6 +303,14 @@ because that exact thing was wrong once.
   grabbing a fader picks the strip on the way past rather than instead of moving it, and it goes
   through the pattern cursor rather than a second answer beside it: the mixer, the pattern, the
   chain and the automation then agree without being told about each other
+- What a track plays is the track's own instrument and never the one picked out in the list
+  beside the pattern. Those are two questions and the tracker answered the first with the second
+  whenever a track had none of its own: the keyboard sounded an instrument the track had not
+  got, playing or stopped, typing wrote that instrument's number into a cell on it, and the
+  status bar named it. A track with nothing on it makes no sound and a note typed into it goes
+  in with the instrument column blank, which the sequencer already reads as "whatever this track
+  last played", and that is nothing either. Which one is picked in the list is about the list:
+  what a new track would be given, and what the rack is showing
 - What "the track you are on" means is the instrument window in front when there is one, and
   the pattern cursor otherwise. Two panels open in their own windows and the cursor is on
   neither of them, so a knob would drive whichever track the pattern last happened to be on.
@@ -799,7 +815,7 @@ because that exact thing was wrong once.
   nothing, since a track is one voice already
 - The audio engine runs whenever a track has a chain, not only while something is playing. A
   plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
-  and cannot tell the host what its own window did. `SynthMixer` therefore does not rest while
+  and cannot tell the host what its own window did. `TrackMixer` therefore does not rest while
   any track has an insert, and does not skip a silent track that has one
 - Changing the output device calls `Bass.Free()`, which takes the tracker's stream with it.
   `SynthOutput.EnsureStarted` checks the stream is really still running rather than trusting its
