@@ -1,10 +1,16 @@
-# Every push and every pull request. The release workflow only ever ran on a tag, which is the
-# last moment anybody wants to hear that something is broken.
+# Every branch but master, and every pull request. The release workflow only ever ran on a tag,
+# which is the last moment anybody wants to hear that something is broken.
+#
+# Master is left out because it is already covered twice over and neither of those is here. A
+# change arriving by pull request is tested on the branch and again on the merge; a change pushed
+# straight to master is tested when it is released, since release.yml runs the same tests itself
+# and every job that makes an artefact waits on them. What this skips is a third run of the same
+# tests on the same commit, which is the one that fires alongside the release on a tagged push.
 name: ci
 
 on:
   push:
-    branches: ["**"]
+    branches-ignore: ["master"]
   pull_request:
   workflow_dispatch:
 
