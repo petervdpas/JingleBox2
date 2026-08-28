@@ -14,6 +14,10 @@
     </Style>
   </UserControl.Styles>
 
+  <!-- The page, with the picture of whatever is being dragged laid over it. The canvas takes
+       no clicks, so it changes nothing about what is under it. -->
+  <Panel>
+
   <DockPanel Margin="0,6">
 
     <!-- Transport -->
@@ -381,4 +385,8 @@
 
     </Grid>
   </DockPanel>
+
+  <Canvas x:Name="GhostLayer" IsHitTestVisible="False" />
+
+  </Panel>
 </UserControl>

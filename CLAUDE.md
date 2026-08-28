@@ -191,6 +191,35 @@ because that exact thing was wrong once.
   empty, which is visible in its own screenshots by the cursor sitting at the same height on
   every one of them. Faded as a whole rather than by choosing paler colours, because picking the
   muted colour for every cell made a neighbouring pattern look exactly like an empty one
+- `Views/DragGhost.cs` is the picture of whatever is in the hand, on a canvas laid over a page
+  that takes no clicks. Both places here that drag things want one and neither can have the
+  toolkit's: the machine designer follows the pointer itself and so was never offered one, and
+  the tracker uses the toolkit's own drag and drop, which draws nothing at all on X11. Told what
+  to draw rather than what is being carried, since a part of a machine and an instrument going
+  onto a track have nothing in common except that somebody is holding one. The picture is the
+  same as the thing that was picked up, which is what makes it read as the thing rather than as
+  a label about it: an instrument keeps its machine's colour down the side and the sentence under
+  its name, exactly as its row has them
+- The tracker puts the ghost down in the `finally` of the await on `DoDragDropAsync` rather than
+  on the drop, because a drag is just as often abandoned: let go over the order list or off the
+  window and no drop is ever raised. It is drawn once and then only moved, and not taken away
+  when the pointer leaves the grid for the header, or crossing the line between them would blink
+  it. Followed in the page's own coordinates, since that is where the layer is
+- Where it cannot land it turns red and gets more solid rather than fading, and the whole page
+  takes a drop so that it keeps following the hand at all. The first version drew it only over
+  the grid and the header, so leaving them made the picture vanish at the same moment the pointer
+  became a barred circle, and two things changing at once read as the drag having failed rather
+  than as the place being the wrong one. `OnPageDragOver` is reached only when neither of those
+  two has already marked the event handled, which is exactly the places where letting go would do
+  nothing. `DragGhost.Paint` clears the border and background rather than setting them to null,
+  because the card is a style and a local null is a value like any other: it would win, and the
+  picture would lose the background the theme gave it. The refused look is that one method if it
+  wants changing
+- The designer answers the same question the same way, and it already had the answer: its release
+  refuses a drop that landed on neither the machine's picture nor the list of what is on it, and
+  that test is now `Takes`, asked while the hand is still moving so the picture can say it rather
+  than leaving it to be found out by letting go. One method for both, because two spellings of it
+  would eventually disagree and the way that fails is a ghost promising a drop the release refuses
 - A song can also be packed, which is Pack in the TRACKER bar: the same `.jibx` with the
   recordings inside it, written where you choose and never to the songs folder. Saving does not
   do this, because a song built on a long take is tens of megabytes and the open song is written

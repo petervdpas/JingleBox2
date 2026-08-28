@@ -1,8 +1,12 @@
 using System;
+using System.Globalization;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Reactive;
 using JingleBox2.Tracker;
@@ -33,9 +37,14 @@ public partial class TrackerView : UserControl
         set => SetValue(InstrumentsProperty, value);
     }
 
+    /// <summary>What is in the hand while something is being dragged. See <see cref="DragGhost"/>.</summary>
+    private readonly DragGhost _ghost;
+
     public TrackerView()
     {
         InitializeComponent();
+
+        _ghost = new DragGhost(GhostLayer);
 
         Grid.CursorMoved += (_, cursor) => ViewModel?.SetCursor(cursor);
         AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
@@ -137,6 +146,32 @@ public partial class TrackerView : UserControl
         Grid.AddHandler(DragDrop.DragOverEvent, OnGridDragOver);
         Grid.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         Grid.AddHandler(DragDrop.DropEvent, OnGridDrop);
+
+        // And the whole page, so the picture in the hand keeps following it over the order
+        // list, the instruments and the bar at the bottom. Nothing lands here: this only runs
+        // where neither of the two above has already answered, which is exactly the places
+        // where letting go would do nothing.
+        DragDrop.SetAllowDrop(this, true);
+        AddHandler(DragDrop.DragOverEvent, OnPageDragOver);
+    }
+
+    /// <summary>
+    /// The hand is somewhere on this page that will not take what it is holding.
+    /// </summary>
+    /// <remarks>
+    /// Reached only when the grid and the header have both let the event past, since each of
+    /// them marks it handled. Without it the picture would simply stop being drawn the moment
+    /// the pointer left the pattern, which reads as the drag having failed rather than as the
+    /// place being the wrong one.
+    /// </remarks>
+    private void OnPageDragOver(object? sender, DragEventArgs e)
+    {
+        Carry(e);
+
+        _ghost.Refused = true;
+        ShowDropTarget(-1);
+
+        e.DragEffects = DragDropEffects.None;
     }
 
     private async void OnInstrumentPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -146,7 +181,28 @@ public partial class TrackerView : UserControl
 
         // Releasing without moving simply ends the drag with no effect, so this does not get
         // in the way of clicking a row to select it.
-        await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
+        }
+        finally
+        {
+            LetGo();
+        }
+    }
+
+    /// <summary>
+    /// The drag is over, however it ended.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than on the drop, because a drag is just as often abandoned: let go over the
+    /// order list, or off the window entirely, and no drop is ever raised. The await above ends
+    /// either way, which is the one moment that is always true.
+    /// </remarks>
+    private void LetGo()
+    {
+        _ghost.Hide();
+        ShowDropTarget(-1);
     }
 
     /// <summary>
@@ -160,14 +216,99 @@ public partial class TrackerView : UserControl
         int track = Header.TrackAtPoint(e.GetPosition(Header));
         if (track < 0) return;
 
-        await DragDrop.DoDragDropAsync(e, TrackDragData.For(track), DragDropEffects.Move);
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, TrackDragData.For(track), DragDropEffects.Move);
+        }
+        finally
+        {
+            LetGo();
+        }
     }
 
-    private void OnHeaderDragOver(object? sender, DragEventArgs e) =>
+    private void OnHeaderDragOver(object? sender, DragEventArgs e)
+    {
+        Carry(e);
         HandleDragOver(e, Header.TrackAtPoint(e.GetPosition(Header)));
+    }
 
-    private void OnGridDragOver(object? sender, DragEventArgs e) =>
+    private void OnGridDragOver(object? sender, DragEventArgs e)
+    {
+        Carry(e);
         HandleDragOver(e, Grid.TrackAtPoint(e.GetPosition(Grid)));
+    }
+
+    /// <summary>
+    /// Keeps the picture of what is being dragged under the hand.
+    /// </summary>
+    /// <remarks>
+    /// In the page's own coordinates, since that is where the layer is, rather than the header's
+    /// or the grid's: a drag crosses from one to the other and the picture must not jump when it
+    /// does. Drawn once and then only moved, and not taken away when the pointer leaves either
+    /// surface, or crossing the line between them would blink it.
+    /// </remarks>
+    private void Carry(DragEventArgs e)
+    {
+        if (!_ghost.IsShowing)
+        {
+            if (Carried(e) is not { } picture) return;
+
+            _ghost.Show(picture);
+        }
+
+        _ghost.MoveTo(e.GetPosition(this));
+    }
+
+    /// <summary>What to draw in the hand, or null for a drag from somewhere else entirely.</summary>
+    /// <remarks>
+    /// The same picture as the thing that was picked up, which is what makes it read as the
+    /// thing rather than as a label about it: an instrument keeps its machine's colour down the
+    /// side and the sentence under its name, exactly as its row in the list has them.
+    /// </remarks>
+    private Control? Carried(DragEventArgs e)
+    {
+        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+
+        if (moving >= 0)
+            return Picture("Track " + (moving + 1).ToString("00", CultureInfo.InvariantCulture), "", "");
+
+        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        if (instrument < 0) return null;
+
+        var slot = ViewModel?.Instruments.FirstOrDefault(s => s.Index == instrument);
+
+        return slot == null ? null : Picture(slot.Name, slot.DetailText, slot.Colour);
+    }
+
+    private static Control Picture(string name, string detail, string colour)
+    {
+        var lines = new StackPanel { Spacing = 1 };
+
+        lines.Children.Add(new TextBlock { Text = name, FontWeight = FontWeight.SemiBold });
+
+        if (detail.Length > 0)
+            lines.Children.Add(new TextBlock { Text = detail, FontSize = 11, Opacity = 0.75 });
+
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+        };
+
+        if (MachineTint.Hue(colour, out var hue))
+        {
+            row.Children.Add(new Border
+            {
+                Width = 3,
+                CornerRadius = new CornerRadius(2),
+                Background = new SolidColorBrush(hue),
+            });
+        }
+
+        row.Children.Add(lines);
+
+        return row;
+    }
 
     private void OnHeaderDrop(object? sender, DragEventArgs e) =>
         HandleDrop(e, Header.TrackAtPoint(e.GetPosition(Header)));
@@ -186,6 +327,8 @@ public partial class TrackerView : UserControl
             // Both surfaces light up together, so the header names the column being targeted.
             ShowDropTarget(somewhere ? track : -1);
 
+            _ghost.Refused = !somewhere;
+
             e.DragEffects = somewhere ? DragDropEffects.Move : DragDropEffects.None;
             e.Handled = true;
             return;
@@ -195,6 +338,8 @@ public partial class TrackerView : UserControl
         bool valid = instrument >= 0 && track >= 0;
 
         ShowDropTarget(valid ? track : -1);
+
+        _ghost.Refused = !valid;
 
         e.DragEffects = valid ? DragDropEffects.Link : DragDropEffects.None;
         e.Handled = true;

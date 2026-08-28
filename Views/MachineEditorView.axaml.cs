@@ -24,9 +24,14 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 {
+    /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
+    private readonly DragGhost _ghost;
+
     public MachineEditorView()
     {
         InitializeComponent();
+
+        _ghost = new DragGhost(GhostLayer);
 
         // A take is picked the way it is picked everywhere else in the app, by the dialog with
         // the categories and the search in it. The panel only says which setting wants one.
@@ -468,6 +473,10 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         MoveGhost(at);
 
+        // The same question the release asks, asked while the hand is still moving so the
+        // picture can say the answer instead of leaving it to be found out by letting go.
+        _ghost.Refused = !Takes(at);
+
         var (onPanel, onList) = Under(at);
 
         Mark(onPanel, onList);
@@ -510,7 +519,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         // Let go over neither the machine nor the list, so nothing was aimed at. The drop is off:
         // a part that quietly went to the root because the hand was over the parameters would be
         // a part somebody has to find and take out again.
-        if (!Within(landed, PanelCanvas) && !Within(landed, PanelTree))
+        if (!Takes(at))
         {
             editor.Status = "Dropped nowhere, so nothing moved.";
 
@@ -527,6 +536,22 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         if (carrying.Kind is { } kind) editor.Drop(kind, into, place);
         else if (carrying.Element is { } moved) editor.MoveInto(moved.Element, into, place);
+    }
+
+    /// <summary>
+    /// True where letting go would put the part somewhere: the machine's own picture, or the
+    /// list of what is on it.
+    /// </summary>
+    /// <remarks>
+    /// One test, asked twice: while the hand moves, so the picture in it can say whether this
+    /// will land, and again when it is let go. Two spellings of it would eventually disagree,
+    /// and the way that fails is a ghost promising a drop that the release then refuses.
+    /// </remarks>
+    private bool Takes(Point at)
+    {
+        var landed = this.InputHitTest(at) as Visual;
+
+        return Within(landed, PanelCanvas) || Within(landed, PanelTree);
     }
 
     /// <summary>What the hand is over: an element on the panel, or a line of the list.</summary>
@@ -592,27 +617,10 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
             inside = row;
         }
 
-        _ghost = new Border
-        {
-            Classes = { "card" },
-            Padding = new Thickness(6),
-            Opacity = 0.85,
-            Child = inside,
-        };
-
-        GhostLayer.Children.Add(_ghost);
+        _ghost.Show(inside);
     }
 
-    private Border? _ghost;
-
-    /// <summary>Below and right of the hand, so what is being aimed at is not under the picture.</summary>
-    private void MoveGhost(Point at)
-    {
-        if (_ghost == null) return;
-
-        Canvas.SetLeft(_ghost, at.X + 12);
-        Canvas.SetTop(_ghost, at.Y + 12);
-    }
+    private void MoveGhost(Point at) => _ghost.MoveTo(at);
 
     /// <summary>The same point, said in the panel's own coordinates.</summary>
     /// <remarks>
@@ -623,14 +631,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     private Point Inside(Point at) =>
         this.TranslatePoint(at, PanelCanvas) ?? at;
 
-    private void HideGhost()
-    {
-        if (_ghost == null) return;
-
-        GhostLayer.Children.Remove(_ghost);
-
-        _ghost = null;
-    }
+    private void HideGhost() => _ghost.Hide();
 
 
     /// <summary>Outlines what would take the part, on the panel and on the list at once.</summary>
