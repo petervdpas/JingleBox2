@@ -65,6 +65,96 @@ public sealed class ControlTargets : IControlTargets
     }
 
     /// <summary>
+    /// What a track has on it that a lane could be about, in the order the eye reads it.
+    /// </summary>
+    /// <remarks>
+    /// The machine first, then the inserts in the order they are in the chain, then the strip.
+    /// That is the order a track is read in on the screen, and a list in any other order would
+    /// be a list somebody has to search rather than scan.
+    ///
+    /// A machine's parameters come in panel order rather than file order, the same rule the
+    /// default layout follows, so the third one down this list is the third knob your eye lands
+    /// on rather than the third line somebody happened to type. The ones the machine says are
+    /// not part of the sound are left out: how much of the wave the picture shows is a knob and
+    /// turns like the others, and a lane driving it would be a song insisting on somebody's
+    /// zoom level.
+    ///
+    /// A plugin's read-only parameters are left out for a harder reason: a compressor's gain
+    /// reduction meter is a parameter that reports rather than accepts, and a lane pointed at
+    /// one would write into a value the plugin overwrites on the next block.
+    /// </remarks>
+    public IEnumerable<ControlMapping> On(int track)
+    {
+        if (track < 0 || track >= _tracker.Song.TrackCount) yield break;
+
+        string machine = _tracker.MachineOn(track);
+
+        if (machine.Length > 0 && Tracker.Machines.MachineProjects.For(machine) is { } project)
+        {
+            var byKey = project.Parameters.ToDictionary(one => one.Key, StringComparer.Ordinal);
+
+            foreach (var key in Machines.PanelOrder.Of(project.Panel))
+            {
+                if (!byKey.TryGetValue(key, out var parameter) || !parameter.Saved) continue;
+
+                yield return new ControlMapping
+                {
+                    Kind = ControlKind.Instrument,
+                    Scope = ControlScope.Fixed,
+                    Track = track,
+                    Machine = machine,
+                    Key = key,
+                    Ordinal = -1
+                };
+            }
+        }
+
+        if (_tracker.InsertsOn(track) is { } chain)
+        {
+            int slot = 0;
+
+            foreach (var device in chain.Devices)
+            {
+                if (device.Insert is not IPluginParameters plugin) continue;
+
+                foreach (var parameter in plugin.Parameters())
+                {
+                    if (parameter.IsReadOnly) continue;
+
+                    yield return new ControlMapping
+                    {
+                        Kind = ControlKind.Insert,
+                        Scope = ControlScope.Fixed,
+                        Track = track,
+                        Plugin = plugin.Info.Id,
+                        Slot = slot,
+                        Parameter = parameter.Id,
+                        Ordinal = -1
+                    };
+                }
+
+                slot++;
+            }
+        }
+
+        foreach (var control in new[]
+                 {
+                     MixControl.Volume, MixControl.Pan, MixControl.Mute,
+                     MixControl.Solo, MixControl.Duck
+                 })
+        {
+            yield return new ControlMapping
+            {
+                Kind = ControlKind.Mix,
+                Scope = ControlScope.Fixed,
+                Track = track,
+                Mix = control,
+                Ordinal = -1
+            };
+        }
+    }
+
+    /// <summary>
     /// The same knob on the machine open on the rack, when no track answered for it.
     /// </summary>
     /// <remarks>

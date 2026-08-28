@@ -798,6 +798,17 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             Layout);
         ControlLink.UseThis();
 
+        // The clock's half of the same door: what a lane says is written through the targets a
+        // knob writes through, so a machine only answers on a track that plays it and an insert
+        // is found by what it is rather than where it sits, without any of that being said twice.
+        Tracker.UseAutomation(targets);
+
+        // And the hand's half. Every value the router writes is offered to the recorder, which
+        // does nothing at all unless somebody armed it and the song is playing. Subscribed here
+        // rather than beside the controller screen below, because that one only exists for a
+        // device with a display and this has to happen for every controller there is.
+        controlRouter.Moved += (mapping, target, value) => Tracker.Automation.Moved(mapping, target, value);
+
         // A song keeps its own layout and takes it with it. What the link is handed is the
         // list and a way of saying it moved; where the list lives is the tracker's business.
         ControlLink.Song = () => Tracker.Song?.Controls;

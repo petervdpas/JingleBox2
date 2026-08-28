@@ -47,6 +47,61 @@ public class TrackerHistoryTests : IDisposable
 
     // ---- patterns ------------------------------------------------------------------------
 
+    /// <remarks>
+    /// The lanes had to be part of a pattern step or undo would put the notes back and leave the
+    /// movement where it was, which is the shape of failure this codebase has met twice: doing
+    /// nothing looks exactly like working.
+    /// </remarks>
+    [Fact]
+    public void Undo_takes_back_a_recorded_lane()
+    {
+        var recorder = new AutomationRecorder(
+            () => _song, () => true, () => new TrackerPosition(0, 4), () => 0)
+        {
+            Armed = true,
+            Taking = _history.Taking
+        };
+
+        var link = new Midi.ControlMapping
+        {
+            Kind = Midi.ControlKind.Instrument,
+            Scope = Midi.ControlScope.Focused,
+            Machine = "zampler",
+            Key = "cutoff"
+        };
+
+        recorder.Moved(link, new Knob(0.5, 0, 1), 0.75);
+
+        Assert.Single(First.Lanes);
+
+        Assert.True(_history.Undo());
+        Assert.Empty(First.Lanes);
+
+        Assert.True(_history.Redo());
+        Assert.Equal(0.75, First.Lanes[0].Points[0].Value);
+    }
+
+    /// <remarks>
+    /// And the other direction: a note typed after a sweep was recorded must not take the sweep
+    /// with it. A step holding the live lane rather than a copy of it would do exactly that.
+    /// </remarks>
+    [Fact]
+    public void Undoing_a_note_leaves_the_movement_alone()
+    {
+        var lane = First.Lane(new AutomationLane
+        {
+            Kind = Midi.ControlKind.Instrument, Machine = "zampler", Key = "cutoff"
+        });
+
+        lane.Put(0, 0.25);
+
+        PatternEdit.EnterNote(First, At(0), new Note(60), 0);
+        Assert.True(_history.Undo());
+
+        Assert.Single(First.Lanes);
+        Assert.Equal(0.25, First.Lanes[0].Points[0].Value);
+    }
+
     [Fact]
     public void A_fresh_history_has_nothing_to_walk()
     {

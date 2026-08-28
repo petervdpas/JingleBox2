@@ -129,6 +129,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public TrackerHistory History { get; } = new();
 
     /// <summary>
+    /// What writes a turned knob into a lane. Always here, and does nothing until armed.
+    /// </summary>
+    public AutomationRecorder Automation { get; private set; } = null!;
+
+    /// <summary>
+    /// Gives the clock the door it needs to write a lane through.
+    /// </summary>
+    /// <remarks>
+    /// Handed in from outside because resolving a lane means knowing the whole program, and
+    /// the thing that knows it is built after this is. Called once, on the way up. A tracker
+    /// nobody calls it on plays songs exactly as it did before automation existed, which is
+    /// what every test that makes one relies on.
+    /// </remarks>
+    public void UseAutomation(Midi.IControlTargets targets)
+    {
+        _player.Automation = new AutomationPlayer(targets);
+    }
+
+    /// <summary>
     /// Undo and redo, when the tracker is what you are looking at.
     /// </summary>
     /// <remarks>
@@ -400,11 +419,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Typed notes are written into the pattern only while this is on.</summary>
     [ObservableProperty] private bool isRecording;
 
+    /// <summary>
+    /// A knob turned while the song plays is written into a lane only while this is on.
+    /// </summary>
+    /// <remarks>
+    /// Its own switch rather than the one above, because they arm two different hands. Typing a
+    /// note is deliberate and a controller nudged on a desk is not, and a person mixing while a
+    /// song loops would otherwise be editing it by leaning on the furniture.
+    /// </remarks>
+    [ObservableProperty] private bool isAutomating;
+
     /// <summary>Set by every edit, cleared by a save. Nothing here is on disk until then.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsSaving))]
     [NotifyPropertyChangedFor(nameof(CanRevertSong))]
     private bool isDirty;
+
+    /// <summary>The switch and the recorder are one thing said twice, so they are kept in step.</summary>
+    partial void OnIsAutomatingChanged(bool value)
+    {
+        Automation.Armed = value;
+
+        // Disarming ends the pass. Otherwise a knob touched after it was switched off and on
+        // again would go on adding to the step the earlier pass took.
+        if (!value) Automation.Stopped();
+    }
 
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
     [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
@@ -504,6 +543,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // happens. Set here rather than by PatternEdit itself, because a history belongs to the
         // thing being edited and a pattern has never heard of one.
         PatternEdit.Watching = History.Taking;
+
+        // The same door for a recorded sweep. A lane written into is a pattern edit like any
+        // other, and it goes through the history the same way, one step per lane per pass.
+        Automation = new AutomationRecorder(
+            () => Song,
+            () => Transport == TrackerTransportState.Playing,
+            () => _player.Position,
+            () => FocusedTrack,
+            work => Dispatcher.UIThread.Post(work))
+        {
+            Taking = History.Taking,
+            Dirtied = MarkDirty
+        };
 
         _configStore = configStore;
         _config = config;
@@ -913,7 +965,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Dispatcher.UIThread.Post(() =>
         {
             Transport = state;
-            if (state == TrackerTransportState.Stopped) PlayingLine = -1;
+            if (state == TrackerTransportState.Stopped)
+            {
+                PlayingLine = -1;
+
+                // The pass is over, so the next one takes its own steps rather than adding to
+                // the last one's. Stopping and starting again is two things a person did.
+                Automation.Stopped();
+            }
 
             if (state == TrackerTransportState.Playing) _meters.Start();
             else StopMeters();

@@ -266,11 +266,32 @@ because that exact thing was wrong once.
   one list showing both with a word beside each row reads as a leak whatever the word says.
   Moving a link between the layers was built and taken out again: what anybody actually wants
   is a new song that starts with a layout already on it, which is a song template
-- Automation is not built. `docs/automation.md` is the plan: lanes rather than more effect
-  commands, one per parameter per track per pattern, values normalised 0 to 1 and converted
-  through `IControlTarget`, which is the same interface remote control writes through. Recording
-  a lane from a knob that is already linked is nearly free; the editor is all of the work
-- Polyphony is not built either, and it is two features sharing a word. `docs/polyphony.md` is
+- Automation is lanes rather than more effect commands, one per parameter per track per pattern,
+  values normalised 0 to 1 and converted through `IControlTarget`, which is the same interface
+  remote control writes through: the clock arriving at line 32 and a knob writing from CC 74 are
+  one act, so `AutomationPlayer` reaches a parameter exactly as `MidiControlRouter` does and
+  everything that made a link resolve makes a lane resolve. The shape is Renoise's, read off its
+  own schema rather than inferred (`PatternTrack/Automations/Envelopes/Envelope`, each a device,
+  a parameter and an envelope). Renoise keeps two ways of moving a parameter, effect commands and
+  envelopes, and ships an icon warning you when a parameter has both: that is a conflict
+  indicator rather than a design, and it is not copied. One storage here, and the two ways of
+  editing it are views. `docs/automation.md` is what is built and what is next
+- A point's time is a double although nothing produces a fraction. Renoise quantises to 256
+  units per line and says what that unit is, "a time of 1.5 means line 1 with a note column
+  delay of 128", so sub-line automation and a delay column are one grid and this codebase has
+  neither. The file writes what it is given and reads back what it finds, so the day one appears
+  the format does not have to move
+- Recording a lane cost hours because everything under it was already there. The instant is read
+  on the MIDI thread and only the write is handed to the drawing thread: posted whole, a fast
+  hand would pile several values onto whichever line the drawing thread woke on. A pass leaves
+  one undo step per lane and not one per point, which is the same rule the instrument knobs use
+  and arrived at from the same direction. Lanes are part of a pattern's undo step, because left
+  out, undo would put the notes back and leave the movement where it was
+- The editors are not built, either of them, so a lane can be recorded and played and not looked
+  at. The drawn one is a DAW import and the honest split is by the nature of the data: deliberate
+  changes want a typed parameter column, which shares its whole foundation with note columns, and
+  recorded gestures want a curve because no column can display a hundred values a second
+- Polyphony is not built, and it is two features sharing a word. `docs/polyphony.md` is
   the plan. A new note action (what happens to the voice a new note lands on) is a setting and
   two methods `SynthVoice` already has, `Cut` being a 4ms fade and `NoteOff` the patch's own
   release, so it costs a day and the only real work in it is per-note offs for plugins, which

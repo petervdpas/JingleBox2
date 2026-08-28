@@ -85,11 +85,35 @@ public sealed class TrackerHistory
         public int Lines;
         public int TrackCount;
 
-        public override long Bytes => Cells.LongLength * 24;
+        /// <summary>
+        /// And the movement, which is part of the pattern and had to be part of the step.
+        /// </summary>
+        /// <remarks>
+        /// Kept beside the cells rather than folded into them because it is a different shape,
+        /// and counted separately in <see cref="Bytes"/> because it can be the larger of the
+        /// two: a pattern of empty cells with a sweep recorded across it is mostly points.
+        ///
+        /// A pattern with no lanes carries an empty list here, which is what almost every step
+        /// will be, and it costs the list and nothing else.
+        /// </remarks>
+        public List<AutomationLane> Lanes = new();
+
+        public override long Bytes => Cells.LongLength * 24 + Points * 16;
+
+        private long Points
+        {
+            get
+            {
+                long count = 0;
+                foreach (var lane in Lanes) count += lane.Points.Count;
+
+                return count;
+            }
+        }
 
         public override bool Put()
         {
-            Pattern.Restore(Cells, Lines, TrackCount);
+            Pattern.Restore(Cells, Lines, TrackCount, Lanes);
 
             return true;
         }
@@ -102,6 +126,7 @@ public sealed class TrackerHistory
             Cells = pattern.Cells(),
             Lines = pattern.Lines,
             TrackCount = pattern.TrackCount,
+            Lanes = pattern.LaneCopy(),
             What = what
         };
     }
@@ -169,7 +194,7 @@ public sealed class TrackerHistory
         if (_done.Count > 0
             && _done[^1] is PatternStep last
             && ReferenceEquals(last.Pattern, pattern)
-            && pattern.Holds(last.Cells, last.Lines, last.TrackCount))
+            && pattern.Holds(last.Cells, last.Lines, last.TrackCount, last.Lanes))
         {
             last.What = what;
 

@@ -113,6 +113,17 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>Instrument files that could not be loaded, for reporting after a take.</summary>
     public System.Collections.Generic.IReadOnlyCollection<string> FailedInstruments => _samples.FailedPaths;
 
+    /// <summary>
+    /// What writes the lanes, when there is anything for them to write through.
+    /// </summary>
+    /// <remarks>
+    /// Handed in rather than made here, because resolving a lane means knowing the whole
+    /// program: which machine a track plays, which plugins are in its chain, where its fader is.
+    /// The player knows the clock and the voices and deliberately nothing else. Null is
+    /// ordinary and means a song plays exactly as it did before any of this existed.
+    /// </remarks>
+    public AutomationPlayer? Automation { get; set; }
+
     public void Play(Song song, TrackerPosition from, TrackerPlayMode mode = TrackerPlayMode.Song)
     {
         ArgumentNullException.ThrowIfNull(song);
@@ -129,6 +140,11 @@ public sealed class TrackerPlayer : IDisposable
             Mode = mode;
             Position = from;
         }
+
+        // The parameters have been moved by hand since the last pass, so what was written last
+        // time is no longer what they hold, and a lane comparing against it would decline to
+        // write the first line.
+        Automation?.Reset();
 
         _samples.Preload(song.Instruments);
 
@@ -998,6 +1014,11 @@ public sealed class TrackerPlayer : IDisposable
         while (!token.IsCancellationRequested)
         {
             if (generation != Volatile.Read(ref _generation)) return;
+
+            // Before the notes, and that is the whole of the ordering question: a note landing
+            // on a line where the filter also moves should be played through the filter as the
+            // line leaves it, not as the line before it left it.
+            Automation?.Play(song, position);
 
             ApplyEvents(sequencer.EventsFor(song, position), song);
             Position = position;

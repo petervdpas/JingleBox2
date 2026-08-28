@@ -1,0 +1,351 @@
+using JingleBox2.Midi;
+using System;
+using System.Collections.Generic;
+
+namespace JingleBox2.Tracker;
+
+/// <summary>How a lane gets from one point to the next.</summary>
+/// <remarks>
+/// Renoise's set, minus the one that is not built. Its third is <c>CURVES</c>, a cubic through
+/// the points, and its <c>LINES</c> carries a per-point scaling that bends each segment. Both
+/// are additions to the same points and neither changes what is stored, so they go on the end
+/// of this when somebody draws them. Deliberately not declared before then: a song saying
+/// curves and playing straight lines is the kind of silence that looks like it is working.
+/// </remarks>
+public enum AutomationPlay
+{
+    /// <summary>Holds the last value until the next point is reached. A stepped change.</summary>
+    Points,
+
+    /// <summary>Straight between the surrounding points. A sweep.</summary>
+    Lines
+}
+
+/// <summary>
+/// One point in a lane: when, and how far.
+/// </summary>
+/// <remarks>
+/// The time is in lines and is a double rather than an int, which is the only forward looking
+/// decision in this type and costs nothing to make now. Renoise quantises a point to 256 units
+/// per line and says what that unit is: "a time of 1.5 means line 1 with a note column delay of
+/// 128". There is no delay column here yet, so nothing produces a fraction, but the file writes
+/// what it is given and reads back whatever it finds, so the day a fraction appears the format
+/// does not have to move.
+///
+/// The value is normalised, nought to one, and always. A lane does not know whether it is
+/// driving hertz or decibels: <see cref="IControlTarget"/> carries the range and converts. That
+/// also means a lane survives a machine widening a parameter in a later version.
+/// </remarks>
+public readonly record struct AutomationPoint(double Time, double Value)
+{
+    public AutomationPoint Clamped() =>
+        new(Math.Max(0, Time), Math.Clamp(Value, 0, 1));
+}
+
+/// <summary>
+/// The movement of one parameter, across one track, within one pattern.
+/// </summary>
+/// <remarks>
+/// It names its destination the way a <see cref="ControlMapping"/> names one, and for the same
+/// reason: the clock writing at line 32 and a knob writing from CC 74 are the same act against
+/// the same interface, so they should be resolved by the same code. <see cref="Mapping"/> is
+/// that correspondence, and it is the only place that knows it. What a lane does not carry is
+/// the other half of a mapping, the device and the controller number, because those say where a
+/// value came from and a lane is only about where one is going.
+///
+/// The scope is always fixed. A link means "the track you are looking at" and a lane cannot:
+/// it is written down inside a pattern beside the notes of one particular track.
+///
+/// Per pattern, per track, one lane per parameter, which is Renoise's shape read off its own
+/// schema (<c>PatternTrack/Automations/Envelopes/Envelope</c>, each one a device, a parameter
+/// and an envelope). Copying a pattern copies its movement with it, which is the only behaviour
+/// that makes sense in a pattern sequencer.
+/// </remarks>
+public sealed class AutomationLane
+{
+    /// <summary>Which track's parameter this is about, counted from zero.</summary>
+    public int Track { get; set; }
+
+    public AutomationPlay Play { get; set; } = AutomationPlay.Lines;
+
+    /// <summary>
+    /// What kind of thing is being moved. Only the three that are values.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ControlKind.Action"/> is a button, which is a thing done rather than a value
+    /// held, and there is nothing for a curve between two lines to mean. <see cref="Automatable"/>
+    /// is where that is said once.
+    /// </remarks>
+    public ControlKind Kind { get; set; } = ControlKind.Instrument;
+
+    /// <summary>The machine, by its slot id, for a parameter on the track's instrument.</summary>
+    public string Machine { get; set; } = "";
+
+    /// <summary>Which parameter of it, by the key it is stored under rather than its name.</summary>
+    public string Key { get; set; } = "";
+
+    /// <summary>The plugin, by the id the scanner gave it, for a parameter on an insert.</summary>
+    public string Plugin { get; set; } = "";
+
+    /// <summary>Which insert, counted from zero, for a chain where the plugin is not named.</summary>
+    public int Slot { get; set; }
+
+    /// <summary>Which parameter of it, as the plugin numbers them.</summary>
+    public uint Parameter { get; set; }
+
+    /// <summary>Which strip control, for <see cref="ControlKind.Mix"/>.</summary>
+    public MixControl Mix { get; set; } = MixControl.Volume;
+
+    /// <summary>
+    /// The points, in time order and with no two at one time.
+    /// </summary>
+    /// <remarks>
+    /// Both of those are Renoise's rules and both are worth keeping. Sorted, because the
+    /// evaluator walks them and a scan for the surrounding pair would otherwise be a search.
+    /// One per time, because a point at a time that already has one is somebody moving that
+    /// point: there is nowhere for a second to go and no way to draw them apart.
+    ///
+    /// Kept private so those two facts cannot be broken from outside. <see cref="Put"/> is the
+    /// only way in.
+    /// </remarks>
+    private readonly List<AutomationPoint> _points = new();
+
+    public IReadOnlyList<AutomationPoint> Points => _points;
+
+    public bool IsEmpty => _points.Count == 0;
+
+    /// <summary>Which kinds can be a lane at all.</summary>
+    public static bool Automatable(ControlKind kind) =>
+        kind is ControlKind.Instrument or ControlKind.Insert or ControlKind.Mix;
+
+    /// <summary>
+    /// The mapping this lane would be, so the ordinary resolution can answer it.
+    /// </summary>
+    /// <remarks>
+    /// Built per call rather than kept. It is asked once when a lane starts playing and again
+    /// when the song changes underneath it, never per line, and a kept one would be a second
+    /// copy of these fields with nothing keeping the two in step.
+    /// </remarks>
+    public ControlMapping Mapping() => new()
+    {
+        Kind = Kind,
+        Scope = ControlScope.Fixed,
+        Track = Track,
+        Machine = Machine,
+        Key = Key,
+        Plugin = Plugin,
+        Slot = Slot,
+        Parameter = Parameter,
+        Mix = Mix,
+        Ordinal = -1
+    };
+
+    /// <summary>True when this lane and that mapping are about the same parameter.</summary>
+    /// <remarks>
+    /// Which is how a knob turned while recording finds the lane it belongs in, and how a
+    /// second lane for one parameter is stopped from being made. The controller half of the
+    /// mapping is not looked at: two knobs pointed at one parameter write into one lane, since
+    /// what is being written down is the parameter's movement and not the hand's.
+    /// </remarks>
+    public bool About(ControlMapping mapping, int track)
+    {
+        if (mapping is null || mapping.Kind != Kind || track != Track) return false;
+
+        return Kind switch
+        {
+            ControlKind.Instrument =>
+                string.Equals(mapping.Machine, Machine, StringComparison.Ordinal)
+                && string.Equals(mapping.Key, Key, StringComparison.Ordinal)
+                && Key.Length > 0,
+
+            ControlKind.Insert =>
+                string.Equals(mapping.Plugin, Plugin, StringComparison.Ordinal)
+                && mapping.Parameter == Parameter
+                && (Plugin.Length > 0 || mapping.Slot == Slot),
+
+            ControlKind.Mix => mapping.Mix == Mix,
+
+            _ => false
+        };
+    }
+
+    /// <summary>The lane a mapping would make, for a track, with nothing in it yet.</summary>
+    public static AutomationLane? For(ControlMapping mapping, int track)
+    {
+        if (mapping is null || track < 0 || !Automatable(mapping.Kind)) return null;
+
+        // A link that names no parameter means the third knob on whatever face is in front of
+        // you, which is a fact about a hand and not about a song. There is nothing to write
+        // down: the face will be a different one tomorrow.
+        if (mapping.Kind == ControlKind.Instrument && mapping.Key.Length == 0) return null;
+
+        return new AutomationLane
+        {
+            Track = track,
+            Kind = mapping.Kind,
+            Machine = mapping.Machine,
+            Key = mapping.Key,
+            Plugin = mapping.Plugin,
+            Slot = mapping.Slot,
+            Parameter = mapping.Parameter,
+            Mix = mapping.Mix
+        };
+    }
+
+    /// <summary>
+    /// Puts a point at a time, replacing whatever was there.
+    /// </summary>
+    /// <remarks>
+    /// Replacing rather than adding beside, because there is no room for two: the list holds
+    /// one per time on purpose. What that costs is that the value which was there is gone, and
+    /// getting it back is the history's job rather than the lane's.
+    /// </remarks>
+    public void Put(double time, double value)
+    {
+        var point = new AutomationPoint(time, value).Clamped();
+
+        int at = IndexOf(point.Time);
+        if (at >= 0)
+        {
+            if (_points[at].Value == point.Value) return;
+
+            _points[at] = point;
+            return;
+        }
+
+        _points.Insert(~at, point);
+    }
+
+    /// <summary>Takes the point at a time away. False when there was not one.</summary>
+    public bool Remove(double time)
+    {
+        int at = IndexOf(time);
+        if (at < 0) return false;
+
+        _points.RemoveAt(at);
+        return true;
+    }
+
+    /// <summary>Takes away every point in [from, to), which is how a range is cleared.</summary>
+    public int RemoveRange(double from, double to)
+    {
+        int gone = _points.RemoveAll(one => one.Time >= from && one.Time < to);
+
+        return gone;
+    }
+
+    public void Clear() => _points.Clear();
+
+    /// <summary>
+    /// Where the parameter should be at a time, or null when the lane says nothing.
+    /// </summary>
+    /// <remarks>
+    /// Null only for a lane with no points at all. A lane with one point says that value for
+    /// the whole pattern, and a time before the first point or after the last reads as the
+    /// nearest one rather than as silence: an envelope is a statement about the whole of the
+    /// time it covers, and a hole at the top of the pattern would let whatever the knob happened
+    /// to be at play through it.
+    /// </remarks>
+    public double? ValueAt(double time)
+    {
+        if (_points.Count == 0) return null;
+        if (time <= _points[0].Time) return _points[0].Value;
+
+        var last = _points[^1];
+        if (time >= last.Time) return last.Value;
+
+        int after = 0;
+        while (after < _points.Count && _points[after].Time <= time) after++;
+
+        var before = _points[after - 1];
+        if (Play == AutomationPlay.Points) return before.Value;
+
+        var next = _points[after];
+        double span = next.Time - before.Time;
+        if (span <= 0) return before.Value;
+
+        double how = (time - before.Time) / span;
+
+        return before.Value + (next.Value - before.Value) * how;
+    }
+
+    /// <summary>Takes away every point at or past a line, for a pattern that got shorter.</summary>
+    public void FitTo(int lines)
+    {
+        _points.RemoveAll(one => one.Time >= lines);
+    }
+
+    public AutomationLane Clone()
+    {
+        var copy = new AutomationLane
+        {
+            Track = Track,
+            Play = Play,
+            Kind = Kind,
+            Machine = Machine,
+            Key = Key,
+            Plugin = Plugin,
+            Slot = Slot,
+            Parameter = Parameter,
+            Mix = Mix
+        };
+
+        copy._points.AddRange(_points);
+
+        return copy;
+    }
+
+    /// <summary>True when that lane is this one, point for point. For a history to compare.</summary>
+    public bool Same(AutomationLane? other)
+    {
+        if (other is null) return false;
+
+        if (other.Track != Track || other.Play != Play || other.Kind != Kind) return false;
+        if (other.Slot != Slot || other.Parameter != Parameter || other.Mix != Mix) return false;
+
+        if (!string.Equals(other.Machine, Machine, StringComparison.Ordinal)) return false;
+        if (!string.Equals(other.Key, Key, StringComparison.Ordinal)) return false;
+        if (!string.Equals(other.Plugin, Plugin, StringComparison.Ordinal)) return false;
+
+        if (other._points.Count != _points.Count) return false;
+
+        for (int at = 0; at < _points.Count; at++)
+            if (other._points[at] != _points[at]) return false;
+
+        return true;
+    }
+
+    /// <summary>Puts a list of points in, sorted and deduplicated, for a file being read.</summary>
+    public void TakePoints(IEnumerable<AutomationPoint> points)
+    {
+        _points.Clear();
+
+        foreach (var point in points)
+        {
+            var one = point.Clamped();
+
+            int at = IndexOf(one.Time);
+            if (at >= 0) _points[at] = one;
+            else _points.Insert(~at, one);
+        }
+    }
+
+    /// <summary>The point at a time, or the complement of where it would go.</summary>
+    private int IndexOf(double time)
+    {
+        int low = 0;
+        int high = _points.Count - 1;
+
+        while (low <= high)
+        {
+            int middle = (low + high) / 2;
+            double at = _points[middle].Time;
+
+            if (at == time) return middle;
+            if (at < time) low = middle + 1;
+            else high = middle - 1;
+        }
+
+        return ~low;
+    }
+}

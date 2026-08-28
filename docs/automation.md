@@ -1,7 +1,32 @@
 # Automation lanes
 
-Not built. This is the plan, written down while the reasoning was fresh, so that whoever
-picks it up does not start from the beginning.
+The core is built. What is not built is either editor, which means a lane can be recorded and
+played and cannot yet be looked at.
+
+Checked against the Renoise 3.5.4 install on this machine on 2026-08-28, and revised where the
+first draft had guessed. What changed is at the end of each section.
+
+## Where it stands
+
+Built, on 2026-08-28:
+
+```
+Tracker/AutomationLane.cs       the lane, its points, and what it says at a time
+Tracker/AutomationPlayer.cs     the clock writing it, through IControlTargets
+Tracker/AutomationRecorder.cs   a turned knob writing it down
+Pattern.Lanes                   held by the pattern, moved, cleared, copied, undone
+SongStore.LaneDocument          in and out of song.json
+IControlTargets.On(track)       what a track has on it that could be automated
+```
+
+Reachable from Record knob movements in the pattern menu, which arms the recorder. Off by
+default, and it does nothing at all unless the song is playing.
+
+Not built: the parameter list panel, the typed view, the drawn view. So a lane is made by
+recording one and there is no other way, and once made it can be heard and not seen.
+
+Forty five tests, in `Tests/AutomationTests.cs` and two in `Tests/TrackerHistoryTests.cs`. The
+file format is the half tested hardest, for the reason at the end of this page.
 
 ## Why lanes and not more effect commands
 
@@ -14,21 +39,36 @@ most rows do not use.
 A lane costs nothing until a track has one, and it is the shape the rest of the application
 already fits.
 
-## What Renoise does, which is worth copying
+## What Renoise stores, which is the plan already
 
-From `renoise/song/pattern/automation.lua` in the 3.5.4 install:
+The Lua API is the description; the schema is the file. `Schemas/RenoiseSong67.xsd:5378`:
 
 ```
-renoise.PatternTrackAutomation   graphical automation of a device parameter within a pattern track
-
-PatternTrack.automation[]        one lane per automated parameter, per pattern, per track
-EnvelopePoint                    time in lines, plus a 1/256 sub-line grid; value 0..1; scaling
-PlayMode                         Points | Lines | Curves
-find_automation / create_automation / delete_automation
-length                           always fits the pattern's length
+PatternTrack
+  Lines                     the cells
+  Automations               PatternTrackAutomation
+    Envelopes
+      Envelope              PatternTrackEnvelope
+        DeviceIndex
+        ParameterIndex
+        Envelope
 ```
 
-Two decisions there are already made for us and should be taken as they stand.
+One envelope per device parameter, per track, per pattern, addressed by a pair of numbers. That
+is the storage this plan describes, so the storage half is not borrowed from a DAW. It is what a
+tracker's own file looks like.
+
+`Scripts/Types/renoise/library/renoise/song/pattern/automation.lua` fills in the rest:
+
+```
+EnvelopePoint    time in lines, value 0..1, scaling
+Playmode         POINTS = 1, LINES = 2, CURVES = 3
+length           read-only, always fits the pattern's length
+points           unsorted allowed, no two points at one time
+add_point_at / remove_point_at / clear_range / copy_from / has_point_at
+```
+
+Three decisions there are already made for us and should be taken as they stand.
 
 **Values are normalised, 0 to 1.** A lane does not know whether it is driving hertz or decibels,
 and does not have to: `IControlTarget` carries `Min` and `Max` and converts. It also means a
@@ -37,6 +77,61 @@ lane survives a machine changing a parameter's range in a later version.
 **Automation belongs to the pattern, not to a song timeline.** Copying a pattern copies its
 movement with it, which is the only behaviour that makes sense in a pattern sequencer, and it
 is why a lane's length is the pattern's length rather than a number of its own.
+
+**No two points at one time.** Which settles the recording question below, since a point at a
+time that already has one is a replacement and there is nowhere for a second to go.
+
+Corrected from the first draft: `scaling` belongs to `LINES`, not to `CURVES`. The API says it
+plainly, "used in 'lines' playback mode only, 0.0 is linear", and the wiki agrees: a line
+segment's handle bends it and controls its easing. `CURVES` is a cubic through the points and
+needs no per-point field. So the cheap first implementation is `POINTS` and linear `LINES` with
+scaling at zero, and the handles come later without a change to what is stored.
+
+Also worth knowing before pricing sub-line time: Renoise quantises a point's time to 256 units
+per line, and says what that unit is. "A time of 1.5 means: line 1 with a note column delay of
+128." Sub-line automation and the delay column are one grid. `TrackerCell` here is note,
+instrument, volume and effect, with no delay column, so both are missing together and either one
+introduces the unit for the other.
+
+## What Renoise does that we should not copy
+
+Renoise has two ways to move a parameter and keeps both. The Automation List carries a small
+icon per parameter saying which is in use, effect commands or envelopes **or both**, and the
+skin has one bitmap for each: `Skin/Icons/Automation_Pattern.bmp` and `Automation_Envelope.bmp`.
+Which of the two a recording lands in is a setting in the pattern editor's control panel rather
+than a property of the parameter.
+
+Those are two separate places in the file that both write one parameter and can disagree. The
+"both" icon is a conflict indicator, which is what you build when the decision was not made. Do
+not copy that part.
+
+## One storage, two views
+
+So: the points are the storage, and there is exactly one of them. How they are edited is a
+separate question with two answers, and both are views onto the same list.
+
+**The drawn view.** An envelope area under the pattern, points dragged with the mouse. This is
+the only view that can show a recorded gesture, because a hand on a fader arrives at about a
+hundred values a second and no column can hold or display that. It is also the one that costs
+days.
+
+**The typed view.** A parameter column in the pattern itself: a column whose header names the
+target once, with values in the cells under it. That is what `TrackerCell.Volume` already is, a
+byte whose meaning comes from which column it sits in. Line resolution, keyboard entry, select
+a range and interpolate, copied and undone by the pattern's own machinery.
+
+This is not Renoise's shape and should not be presented as if it were. Renoise's pattern-side
+method is general effect commands carrying the device and parameter inside the command, which is
+the width cost rejected at the top of this page. A column whose identity names the target pays
+that cost once, in a header.
+
+The reason it matters to sequencing rather than only to taste: a parameter column and a note
+column are the same axis. Both make a track's column count variable, both change the pattern's
+stride from `TrackCount` to a per track total, both need `"line:track:column:cell"` in the file,
+both need `PatternMetrics.TrackWidth` per track and `TrackAt` as a walk rather than a division,
+both move the selection's corners to flat columns, and both need `TrackerHistory` taught the new
+shape. `docs/polyphony.md` prices that at five to six days as the cost of chords. It is the
+foundation under two features.
 
 ## What is already in place
 
@@ -51,45 +146,123 @@ ControlTargets.Find     (machine, key) or (plugin, parameter), resolved against 
 The clock writing into a target at line 32 and a knob writing into it from CC 74 are the same
 act against the same interface. A lane is that resolution plus a list of points.
 
+What is not in place, and was missed in the first draft: nothing here can list the targets on a
+track. `IControlTargets` has only `Find(mapping)`, deliberately asked per message because what a
+mapping names moves underneath it. Renoise's Automation List is every parameter of every device
+on the active track, searchable, with an "automated only" filter, and it is how a parameter gets
+a lane in the first place. The parts exist a layer down, `MachineProject.Parameters` and a
+plugin's own parameter list, so this is a new door on that interface rather than new knowledge.
+
 ## The pieces
 
-**The lane, and the song that holds it.** A type on `Pattern`, one per automated parameter per
-track, naming what a `ControlMapping` names: machine and key, or plugin and parameter number.
-Serialised into `song.json` the way cells already are, one string per lane, so a song stays
-readable and diffable. See `SongStore.PatternDocument`.
+**The lane, and the song that holds it.** Built. A type on `Pattern`, one per automated
+parameter per track, naming what a `ControlMapping` names: machine and key, or plugin and
+parameter number. `AutomationLane.Mapping()` is that correspondence and is the only place that
+knows it, so the clock resolves a destination through the same code a knob does.
 
-**The sequencer.** At each line, and at sub-line resolution where a lane has points between
-lines, evaluate every lane on the track and write through the target. Interpolation for `Lines`
-is a lerp between the surrounding points; `Points` holds the last value; `Curves` needs the
-scaling field.
+The first draft said one string per lane, the way a cell is one string. That turned out to be
+the wrong half of the file to copy. A lane's header is half a dozen unlike fields, three of
+which are only read for one kind of destination, and packing those into a string would mean
+optional fields and a plugin id that must never contain the separator. Its points are the
+opposite: hundreds of one identical shape, where a line each would make a recorded sweep a page
+long. So the header is named fields and a point is `"time=value"`, which is compact where
+compactness is worth having and legible where it is not. See `SongStore.LaneDocument`.
 
-**Recording, which is nearly free.** A knob that is already linked, with the transport armed,
-appends a point at the playing line instead of only setting the value. `ControlSense` has
-already worked out what kind of control it is, and takeover already stops the value lurching
-when playback crosses an existing point. This is the part that will feel like magic for the
-effort it costs, and it should be built early rather than last.
+**The sequencer.** Built, as `AutomationPlayer`, called from the clock immediately before the
+notes of the same line. That ordering is the whole of the question and it only has one answer: a
+note landing on a line where the filter also moves should be played through the filter as the
+line leaves it, not as the line before it left it.
 
-**The editor, which is all of the work.** A lane area under the pattern: choosing which
-parameter a lane is about, drawing and dragging points, selecting a range, showing which
-parameters already have lanes, and the play mode switch. None of it is deep and there is a lot
-of it.
+`POINTS` holds the last value; `LINES` is a lerp between the surrounding points, with the
+scaling field left at zero until the handles are built. Two things it does not do, both for the
+same reason, which is that a write to a plugin is a round trip to another process: a value that
+has not moved is not written again, and a lane's mapping is built once rather than per line.
+The first line of a pass is written whatever the parameter holds, because where a hand left it
+is not something a lane is entitled to assume.
+
+**Recording, which was nearly free.** Built, as `AutomationRecorder`, hung on the one event
+`MidiControlRouter` already raised for every value it writes. Everything it needed was there:
+the link resolves the parameter, takeover has already stopped the value lurching when the hand
+arrives, and the sensing has already worked out whether the control reports a position or a
+movement. What was left was to put the number somewhere.
+
+Two things it had to decide that the plan did not mention. The instant is read on the MIDI
+thread and only the writing is handed to the drawing thread, because which line the song is on
+has to be read as the message lands: posted whole, a fast hand would pile several values onto
+whichever line the drawing thread woke up on. And a pass leaves one undo step per lane rather
+than one per point, since a hand sweeping a filter across a pattern is one thing a person did
+and a hundred and twenty points.
+
+**The parameter list.** Half built. `IControlTargets.On(track)` answers what a track has on it
+that could be automated: the machine's parameters in panel order, then each insert's, then the
+strip, which is the order a track is read in on the screen. The machine's own unsaved parameters
+are left out, since a lane driving how much of the wave the picture shows would be a song
+insisting on somebody's zoom level, and a plugin's read-only ones are left out because a gain
+reduction meter reports rather than accepts.
+
+What is missing is the panel that shows the list. Neither view can create a lane without it, so
+until it exists the only way to make a lane is to record one.
+
+**The typed view.** A parameter column, riding on the column axis described above. Cheap once
+the axis exists, and the axis is note columns' bill.
+
+**The drawn view.** A lane area under the pattern: drawing and dragging points, selecting a
+range, and the play mode switch. None of it is deep and there is a lot of it.
 
 ## Effort
 
 ```
-lane type, storage, sequencer     about a day
-recording from a linked knob      hours, on top of the above
-the editor                        three to five days, and it is all interface
+lane type, storage, sequencer                     done
+target enumeration                                done; the panel that shows it is not
+recording from a linked knob                      done
+the typed view, given the column axis             a day
+the drawn view                                    three to five days, and it is all interface
 ```
+
+The column axis itself is not counted here. It is in `docs/polyphony.md` and it is two days plus
+the interface work around it, spent once for note columns and parameter columns together.
+
+## Order
+
+Storage, sequencer, enumeration and recording are done, and that is the point at which movement
+plays back with no editor at all. `docs/scratch-machine.md` was the reason to reach it early:
+that machine records itself now that a knob's stream can be captured, and it is the only thing
+here that makes the drawn view unavoidable rather than merely nice.
+
+Next, and in this order: the parameter list panel, so a lane can be made by choosing rather than
+only by recording; the column axis, which is `docs/polyphony.md`'s bill and serves both features;
+the typed view on top of it; then note columns, which by then is mostly entry rules and the
+mixer's per column cut. The drawn view last, when there is recorded material that no column can
+display.
 
 ## Decided already
 
 - Lanes, not more effect commands. The column is out of room.
-- Per pattern, per track, one lane per parameter. Renoise's shape, for Renoise's reason.
+- Per pattern, per track, one lane per parameter. Renoise's shape, for Renoise's reason, and
+  confirmed against its schema rather than inferred.
 - Values normalised 0 to 1, converted through the target's own range.
 - A lane names a machine and a parameter key, exactly as a `ControlMapping` does, so the same
   resolution serves both and a lane keeps working when a track's instrument is swapped for
   another of the same machine.
+- One storage and two views, not two storages. Renoise has two and ships an icon to warn you
+  when they overlap.
+- `POINTS` and linear `LINES` first. `scaling` and `CURVES` are additions to the same points.
+- No zooming out past the current pattern. It is the feature that makes people believe
+  automation is a song timeline, it is display work with no model behind it, and it is the first
+  thing to leave out.
+
+## Answered by building it
+
+- Recording overwrites rather than adds beside: the list holds one point per time, which is
+  Renoise's rule, so a point where one already is replaces it. What that costs is the value that
+  was there, and getting it back is the history's job. It does that: a pass is one step per lane.
+- A lane belongs to a pattern and moves with its track. `Pattern.MoveTrack` renumbers them,
+  `ClearTrack` takes them with the notes, a pattern made shorter drops the points past its end,
+  and a track taken off takes its lane. All of that fell out of putting them on the pattern
+  rather than beside it.
+- Lanes had to be part of a pattern's undo step, and are. Left out, undo would have put the
+  notes back and left the movement where it was, which is this codebase's recurring failure:
+  doing nothing looks exactly like working.
 
 ## Still open
 
@@ -98,5 +271,12 @@ the editor                        three to five days, and it is all interface
 - What happens to a lane when the track's machine changes to a different one. The parameter key
   will not resolve, which is the same silence a link gets. Probably right, probably worth
   saying out loud on the page rather than leaving to be noticed.
-- Whether recording overwrites points under the playhead or adds beside them. Overwriting is
-  what a hand expects; adding is what an undo can survive.
+- Whether a recorded pass should clear what it played over rather than only replacing the lines
+  it touched. As built, a second pass across a lane leaves any point the hand did not land on
+  exactly where it was, which is right for correcting a phrase and wrong for replacing one. The
+  answer is probably a choice and not a rule, and neither can be offered without an editor.
+- Whether sub-line points are worth having before there is a delay column, given that they are
+  one grid and 256 units per line.
+- Whether a lane is a column when both views exist. A parameter with a typed column and dragged
+  points is one list of points seen twice, which is the point of the design, but the cursor has
+  to be somewhere and two carets on one datum is a real interface question nobody has answered.

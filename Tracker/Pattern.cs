@@ -1,5 +1,7 @@
+using JingleBox2.Midi;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace JingleBox2.Tracker;
 
@@ -21,6 +23,23 @@ public sealed class Pattern
     public const int DefaultLines = 64;
 
     private TrackerCell[] _cells;
+
+    /// <summary>
+    /// The parameters that move over this pattern, one lane apiece.
+    /// </summary>
+    /// <remarks>
+    /// Beside the cells rather than among them, because they are a different shape: a cell is a
+    /// value type at a fixed place in a grid and a lane is a sparse list of points that most
+    /// tracks do not have at all. A pattern with no automation carries an empty list and pays
+    /// nothing for it.
+    ///
+    /// In the pattern rather than in the song, which is Renoise's arrangement and the only one
+    /// that makes sense here: copying a pattern has to copy its movement, and a lane's length is
+    /// the pattern's length rather than a number of its own.
+    /// </remarks>
+    private readonly List<AutomationLane> _lanes = new();
+
+    public IReadOnlyList<AutomationLane> Lanes => _lanes;
 
     public string Name { get; set; } = "";
     public int Lines { get; private set; }
@@ -64,14 +83,70 @@ public sealed class Pattern
     public void Clear()
     {
         Array.Fill(_cells, TrackerCell.Empty);
+        _lanes.Clear();
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Empties a track: its notes and the movement of its parameters both.</summary>
+    /// <remarks>
+    /// Both, because a lane is as much a part of what a track plays as its notes are. Clearing
+    /// the notes and leaving the filter still sweeping would be a track that had been emptied
+    /// and went on making a noise.
+    /// </remarks>
     public void ClearTrack(int track)
     {
         for (int line = 0; line < Lines; line++)
             this[line, track] = TrackerCell.Empty;
+
+        if (_lanes.RemoveAll(one => one.Track == track) > 0)
+            Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>The lane about that parameter on that track, if there is one.</summary>
+    public AutomationLane? LaneFor(ControlMapping mapping, int track) =>
+        _lanes.FirstOrDefault(one => one.About(mapping, track));
+
+    /// <summary>Every lane on a track, in the order they were made.</summary>
+    public IEnumerable<AutomationLane> LanesOn(int track) =>
+        _lanes.Where(one => one.Track == track);
+
+    /// <summary>
+    /// Puts a lane in, or hands back the one already there.
+    /// </summary>
+    /// <remarks>
+    /// One lane per parameter per track, so this is the only way one is made: asking twice for
+    /// the same parameter gets the same lane, and a second one for it cannot be created by
+    /// accident. Renoise's rule, and what stops two envelopes fighting over one knob.
+    /// </remarks>
+    public AutomationLane Lane(AutomationLane wanted)
+    {
+        var already = _lanes.FirstOrDefault(one => one.About(wanted.Mapping(), wanted.Track));
+        if (already is not null) return already;
+
+        wanted.FitTo(Lines);
+        _lanes.Add(wanted);
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        return wanted;
+    }
+
+    /// <summary>Takes a lane out. The parameter stops moving and stays where it was left.</summary>
+    public bool RemoveLane(AutomationLane? lane)
+    {
+        if (lane is null || !_lanes.Remove(lane)) return false;
+
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        return true;
+    }
+
+    /// <summary>Says a lane's points moved, since the lane itself cannot reach the pattern.</summary>
+    /// <remarks>
+    /// A lane is edited through its own methods and knows nothing about who holds it, which is
+    /// what keeps it testable on its own. So the one call that has to be made afterwards is
+    /// here, and it is made by whoever did the editing.
+    /// </remarks>
+    public void LaneChanged() => Changed?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// Takes a track out of where it is and puts it back in at another position, sliding the
@@ -100,6 +175,15 @@ public sealed class Pattern
 
         for (int line = 0; line < Lines; line++) _cells[line * TrackCount + to] = column[line];
 
+        // The lanes slide with the cells. A lane belongs to a track by number, so a track moved
+        // and its automation left behind would be somebody else's filter sweeping.
+        foreach (var lane in _lanes)
+        {
+            if (lane.Track == from) lane.Track = to;
+            else if (step > 0 && lane.Track > from && lane.Track <= to) lane.Track--;
+            else if (step < 0 && lane.Track >= to && lane.Track < from) lane.Track++;
+        }
+
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -115,6 +199,7 @@ public sealed class Pattern
     {
         var copy = new Pattern(Lines, TrackCount) { Name = Name };
         Array.Copy(_cells, copy._cells, _cells.Length);
+        copy._lanes.AddRange(_lanes.Select(one => one.Clone()));
         return copy;
     }
 
@@ -132,14 +217,31 @@ public sealed class Pattern
         return kept;
     }
 
+    /// <summary>
+    /// The lanes, copied, to be kept beside the cells.
+    /// </summary>
+    /// <remarks>
+    /// Clones and not the lanes themselves. A lane is a reference type and is edited in place,
+    /// so a step holding the live one would hold whatever it became rather than what it was,
+    /// and undo would put the present back.
+    /// </remarks>
+    public List<AutomationLane> LaneCopy() =>
+        _lanes.Select(one => one.Clone()).ToList();
+
     /// <summary>True when what it holds now is exactly that.</summary>
-    public bool Holds(TrackerCell[]? cells, int lines, int trackCount)
+    public bool Holds(TrackerCell[]? cells, int lines, int trackCount, IReadOnlyList<AutomationLane>? lanes)
     {
         if (cells is null || lines != Lines || trackCount != TrackCount) return false;
         if (cells.Length != _cells.Length) return false;
 
         for (int at = 0; at < _cells.Length; at++)
             if (_cells[at] != cells[at]) return false;
+
+        int had = lanes?.Count ?? 0;
+        if (had != _lanes.Count) return false;
+
+        for (int at = 0; at < _lanes.Count; at++)
+            if (!_lanes[at].Same(lanes![at])) return false;
 
         return true;
     }
@@ -152,7 +254,8 @@ public sealed class Pattern
     /// happened however many cells it touched. Going through the indexer would raise the event a
     /// couple of hundred times and redraw the grid as many.
     /// </remarks>
-    public void Restore(TrackerCell[] cells, int lines, int trackCount)
+    public void Restore(TrackerCell[] cells, int lines, int trackCount,
+                        IReadOnlyList<AutomationLane>? lanes)
     {
         if (cells is null) return;
 
@@ -163,6 +266,13 @@ public sealed class Pattern
 
         _cells = new TrackerCell[cells.Length];
         Array.Copy(cells, _cells, cells.Length);
+
+        // Copied again on the way back in, for the same reason they were copied on the way out:
+        // the step is kept and may be put back more than once, and handing over its own lanes
+        // would let the next edit reach into the history and change it.
+        _lanes.Clear();
+        if (lanes is not null)
+            foreach (var lane in lanes) _lanes.Add(lane.Clone());
 
         Lines = newLines;
         TrackCount = newTracks;
@@ -187,6 +297,11 @@ public sealed class Pattern
         _cells = replacement;
         Lines = newLines;
         TrackCount = newTracks;
+
+        // The same rule the cells follow: keep whatever still fits. A pattern made shorter
+        // drops the points past its end, and tracks taken off take their lanes with them.
+        _lanes.RemoveAll(one => one.Track >= newTracks);
+        foreach (var lane in _lanes) lane.FitTo(newLines);
 
         Changed?.Invoke(this, EventArgs.Empty);
     }

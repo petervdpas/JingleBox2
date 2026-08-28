@@ -682,6 +682,9 @@ public sealed class SongStore : ISampleUsage
         /// <summary>One entry per used cell, as "line:track:cell". Blank cells are not stored.</summary>
         public List<string> Cells { get; set; } = new();
 
+        /// <summary>One entry per automated parameter. Empty for almost every pattern.</summary>
+        public List<LaneDocument> Lanes { get; set; } = new();
+
         public static PatternDocument From(Pattern pattern)
         {
             var document = new PatternDocument { Name = pattern.Name, Lines = pattern.Lines };
@@ -695,12 +698,19 @@ public sealed class SongStore : ISampleUsage
                     document.Cells.Add($"{line}:{track}:{TrackerCellText.Write(cell)}");
                 }
 
+            foreach (var lane in pattern.Lanes)
+                document.Lanes.Add(LaneDocument.From(lane));
+
             return document;
         }
 
         public Pattern ToPattern(int trackCount)
         {
             var pattern = new Pattern(Lines, trackCount) { Name = Name };
+
+            foreach (var lane in Lanes)
+                if (lane.ToLane() is { } made && made.Track < trackCount)
+                    pattern.Lane(made);
 
             foreach (var entry in Cells)
             {
@@ -716,5 +726,106 @@ public sealed class SongStore : ISampleUsage
 
             return pattern;
         }
+    }
+
+    /// <summary>
+    /// One automation lane as the file holds it.
+    /// </summary>
+    /// <remarks>
+    /// Named fields for the header and one compact string per point, which is the split the two
+    /// halves ask for. What a lane is about is half a dozen unlike things, three of which are
+    /// only read for one kind of destination, and packing those into one string would mean a
+    /// format with optional fields and a plugin id that must never contain the separator. The
+    /// points are the opposite: hundreds of one identical shape, where a line each would make a
+    /// recorded sweep a page long and a diff unreadable.
+    ///
+    /// The enums are written as numbers, which is what a settings file here already does, so
+    /// adding a play mode or a kind on the end leaves what is stored meaning what it meant.
+    /// </remarks>
+    private sealed class LaneDocument
+    {
+        public int Track { get; set; }
+        public Midi.ControlKind Kind { get; set; } = Midi.ControlKind.Instrument;
+        public AutomationPlay Play { get; set; } = AutomationPlay.Lines;
+        public string Machine { get; set; } = "";
+        public string Key { get; set; } = "";
+        public string Plugin { get; set; } = "";
+        public int Slot { get; set; }
+        public uint Parameter { get; set; }
+        public Midi.MixControl Mix { get; set; } = Midi.MixControl.Volume;
+
+        /// <summary>One entry per point, as "time=value". The time is in lines.</summary>
+        public List<string> Points { get; set; } = new();
+
+        public static LaneDocument From(AutomationLane lane)
+        {
+            var document = new LaneDocument
+            {
+                Track = lane.Track,
+                Kind = lane.Kind,
+                Play = lane.Play,
+                Machine = lane.Machine,
+                Key = lane.Key,
+                Plugin = lane.Plugin,
+                Slot = lane.Slot,
+                Parameter = lane.Parameter,
+                Mix = lane.Mix
+            };
+
+            foreach (var point in lane.Points)
+                document.Points.Add(Said(point.Time) + "=" + Said(point.Value));
+
+            return document;
+        }
+
+        public AutomationLane? ToLane()
+        {
+            if (Track < 0 || !AutomationLane.Automatable(Kind)) return null;
+
+            var lane = new AutomationLane
+            {
+                Track = Track,
+                Kind = Kind,
+                Play = Play,
+                Machine = Machine,
+                Key = Key,
+                Plugin = Plugin,
+                Slot = Slot,
+                Parameter = Parameter,
+                Mix = Mix
+            };
+
+            var points = new List<AutomationPoint>();
+
+            foreach (var entry in Points)
+            {
+                int at = entry.IndexOf('=');
+                if (at <= 0) continue;
+
+                if (!double.TryParse(entry[..at], NumberStyles.Float,
+                                     CultureInfo.InvariantCulture, out double time)) continue;
+
+                if (!double.TryParse(entry[(at + 1)..], NumberStyles.Float,
+                                     CultureInfo.InvariantCulture, out double value)) continue;
+
+                points.Add(new AutomationPoint(time, value));
+            }
+
+            lane.TakePoints(points);
+
+            return lane;
+        }
+
+        /// <summary>
+        /// A number as the file should hold it.
+        /// </summary>
+        /// <remarks>
+        /// Six places, which is finer than any controller can send: the most a MIDI message
+        /// carries is fourteen bits, and one part in sixteen thousand is five places. Invariant,
+        /// so a song written in a country that spells a decimal point with a comma opens
+        /// everywhere else.
+        /// </remarks>
+        private static string Said(double value) =>
+            value.ToString("0.######", CultureInfo.InvariantCulture);
     }
 }

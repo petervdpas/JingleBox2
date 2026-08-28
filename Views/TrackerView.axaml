@@ -272,6 +272,14 @@
                             IsChecked="{Binding RecordNoteOffs}"
                             ToolTip.Tip="Letting a key up on a MIDI keyboard writes OFF where the cursor is, the way Renoise does. Remembered between runs." />
 
+                  <!-- The third hand a pattern can be written by, and the one nobody is holding
+                       on purpose: a knob leant on while a song loops would edit it. So it is
+                       armed deliberately, like the two above, and off unless somebody said. -->
+                  <MenuItem Header="Record knob movements"
+                            ToggleType="CheckBox"
+                            IsChecked="{Binding IsAutomating}"
+                            ToolTip.Tip="While the song plays, a controller knob pointed at a parameter writes its movement into the pattern." />
+
                   <Separator />
 
                   <MenuItem Header="Clear track" Command="{Binding ClearTrackCommand}" />

@@ -54,4 +54,25 @@ public interface IControlTarget
 public interface IControlTargets
 {
     IControlTarget? Find(ControlMapping mapping);
+
+    /// <summary>
+    /// Everything on a track that could be pointed at, as the mappings that would name them.
+    /// </summary>
+    /// <remarks>
+    /// The other direction, and it exists for automation rather than for hardware. A link is
+    /// made by pointing at a control and touching a knob, so nothing ever had to produce a list;
+    /// a lane is made by choosing a parameter from one, which means the program has to be able
+    /// to say what a track has on it.
+    ///
+    /// Mappings rather than targets, because a target is resolved against this second and a
+    /// list is looked at for as long as somebody is reading it. What comes back is what to ask
+    /// for, and <see cref="Find"/> is still how you ask.
+    ///
+    /// It answers nothing unless a class means it to. Every implementation but one here is a
+    /// test standing in for the program, and a stand-in listing nothing is the truthful answer
+    /// for it. The one that means it is <c>ControlTargets</c>, which is the only class that
+    /// knows what a track is playing.
+    /// </remarks>
+    System.Collections.Generic.IEnumerable<ControlMapping> On(int track) =>
+        System.Array.Empty<ControlMapping>();
 }

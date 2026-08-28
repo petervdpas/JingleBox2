@@ -123,7 +123,7 @@ public sealed class Song
             if (at < Patterns.Count)
             {
                 Patterns[at].Name = wanted.Name;
-                Patterns[at].Restore(wanted.Cells(), wanted.Lines, wanted.TrackCount);
+                Patterns[at].Restore(wanted.Cells(), wanted.Lines, wanted.TrackCount, wanted.LaneCopy());
             }
             else
             {
