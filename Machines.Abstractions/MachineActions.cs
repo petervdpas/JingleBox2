@@ -35,4 +35,17 @@ public static class MachineActions
 
     /// <summary>Lays every zone that has a recording out evenly across the keyboard.</summary>
     public const string SpreadZones = "spread_zones";
+
+    /// <summary>The preset before this one on the shelf.</summary>
+    /// <remarks>
+    /// These two are not named by a machine's file, which every other action here is. They are
+    /// what the preset picker itself offers, because a shelf of presets is not a parameter: it
+    /// is a list, and what a hand wants of a list is the next one and the one before. Pointing
+    /// at the left of the picker offers the first and at the right the second, which is where
+    /// its two arrows are.
+    /// </remarks>
+    public const string PresetPrevious = "preset_previous";
+
+    /// <summary>And the one after it.</summary>
+    public const string PresetNext = "preset_next";
 }

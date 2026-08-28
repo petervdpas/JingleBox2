@@ -359,6 +359,9 @@ public sealed class ControlTargets : IControlTargets
             MixControl.Duck => ("Duck", TrackMix.MinDuck, TrackMix.MaxDuck,
                 () => strip.Duck, value => strip.Duck = value),
 
+            MixControl.Release => ("Duck release", TrackMix.MinDuckReleaseMs, TrackMix.MaxDuckReleaseMs,
+                () => strip.DuckReleaseMs, value => strip.DuckReleaseMs = value),
+
             _ => ("", 0.0, 0.0, () => 0.0, (Action<double>)(_ => { }))
         };
 

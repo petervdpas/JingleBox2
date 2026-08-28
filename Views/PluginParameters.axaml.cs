@@ -29,12 +29,12 @@ public partial class PluginParameters : UserControl
         AddHandler(PointerMovedEvent, Offers, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Pressed, RoutingStrategies.Tunnel);
 
-        // There is something to point at while this is on screen, which is what makes
-        // Ctrl+Shift+M mean anything. See LinkKey.
+        // One of the views a controller may be laid out from, which is what makes Ctrl+Shift+M
+        // mean anything here. See LinkKey.
+        LinkKey.Watch(this);
+
         AttachedToVisualTree += (_, _) =>
         {
-            LinkKey.Showing();
-
             if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
 
             ShowLinks();
@@ -42,8 +42,6 @@ public partial class PluginParameters : UserControl
 
         DetachedFromVisualTree += (_, _) =>
         {
-            LinkKey.Gone();
-
             if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
         };
     }

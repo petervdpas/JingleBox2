@@ -323,6 +323,26 @@
             </Setter>
         </Style>
 
+        <!-- The one control the pointer is offering to a controller. A knob and a fader paint
+             their own ring, because they paint everything else about themselves; a control made
+             of a template cannot, so it wears this instead. The colour is the panel's own link
+             red, which is the part that has to match: plainly not a colour anything on the page
+             is wearing for its own reasons. -->
+        <Style Selector="ToggleButton.strip.offered /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#FF2D2D" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="Background" Value="#33FF2D2D" />
+        </Style>
+
+        <!-- The strip the mixer is about, which is the track everything pointed at a strip
+             follows. Its own edge rather than a fill, so the meters and the fader inside it
+             read exactly as they do on every other strip. -->
+        <Style Selector="Border.inset.selected">
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.75" />
+            </Setter>
+        </Style>
+
         <Style Selector="Border.foldBar">
             <Setter Property="CornerRadius" Value="4" />
             <Setter Property="Padding" Value="8,3" />

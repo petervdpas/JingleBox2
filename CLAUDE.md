@@ -255,6 +255,46 @@ because that exact thing was wrong once.
   or a take picker cannot, and does not glow. `MidiControlRouter` works out from three messages
   whether a control is a button, a knob or an encoder, since a CC says nothing about what sent
   it, and parks a control against an end until the stream turns round
+- Pointing is a thing any control can do now, not a thing a machine panel does. `Views/Pointable.cs`
+  is an attached property: hang a `ControlMapping` on a control with `Pointable.Offers` and
+  resting the pointer on it offers that mapping, wherever the control lives. The panel keeps its
+  own, rightly, since it is drawn rather than built and only it knows what element is under the
+  pointer; everything else was copying the same handful of lines. What is hung is a template and
+  it is copied before it is offered, because `ControlLink.Handle` fills the controller's half
+  into the object it was given and then keeps it: one shared instance would have every link
+  overwriting the last. Tunnel and bubble both, since a knob takes the move to be dragged
+- Ctrl+Shift+M did nothing on the mixer because `LinkKey` counted machine panels rather than
+  things that can be pointed at. A pointable control joins the same tally when it comes on
+  screen and leaves it when it goes, so the mixer counts and so will anything else that opts in.
+  The gesture is a plain toggle and works in the three places there is something to point at:
+  a machine's preview, an instrument's dialog, and now the mixer
+- The gesture used to be guarded by a flag saying the key was down, cleared by the key coming
+  up, and a key can come up somewhere else: focus moves while it is held, the release goes to
+  whatever took it, and the flag stays set for ever. Every press after that was swallowed and
+  the mode stuck in whatever state it was left. It is a clock now, which cannot be stranded, and
+  `LinkKey.Answers` is the rule on its own so it can be put a question to without a keyboard
+- What can be pointed at on a machine's face is decided by two tests and not by what the control
+  looks like: a button offers an action, and anything else offers a parameter if it names one
+  that has a value. So `Knob`, `Fader`, `Switch`, `Number` and `Choice` are all linkable and
+  always were, and `Label`, `Take`, `Meter`, `Image` and the rest are not, because they name a
+  thing rather than a value and a link pointed at one would reach nothing
+- A shelf of presets is a list and not a parameter, so pointing a knob at it and asking for
+  "preset 0.62" means nothing. The picker offers two actions instead, the one before and the one
+  after, and which of them depends on which side of it the pointer is on, because that is where
+  its own two arrows are. `PresetStep` is the pair of decisions on their own so both can be
+  asked without a window: which side, and where a step lands. It stops at the ends rather than
+  coming round, since a button held down that wrapped would carry you past the one you were
+  looking for
+- `Midi/MixLinks.cs` is what a mixer strip offers: Level, Pan, Mute, Solo, Duck and the ducking
+  release, which was missing until the strip was gone over control by control: every other value
+  had a name for a link to use and that one had none. Not the Duck from picker, which names a
+  track rather than a value, for the same reason a take picker cannot be pointed at. A mixer link
+  is the song's rather than the desk's, because a track only exists in a song. Every one is
+  `ControlScope.Focused`, so one knob pointed at Level is the level of whichever strip you last
+  touched rather than a link per track. Touching a strip anywhere picks its track, tunnelled so
+  grabbing a fader picks the strip on the way past rather than instead of moving it, and it goes
+  through the pattern cursor rather than a second answer beside it: the mixer, the pattern, the
+  chain and the automation then agree without being told about each other
 - What "the track you are on" means is the instrument window in front when there is one, and
   the pattern cursor otherwise. Two panels open in their own windows and the cursor is on
   neither of them, so a knob would drive whichever track the pattern last happened to be on.

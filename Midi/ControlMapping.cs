@@ -35,7 +35,18 @@ public enum MixControl
     Pan,
     Mute,
     Solo,
-    Duck
+    Duck,
+
+    /// <summary>
+    /// How long the ducking takes to come back up.
+    /// </summary>
+    /// <remarks>
+    /// Last, so a mapping saved before this existed still reads as the control it was given. It
+    /// was missing rather than left out: every other value on a strip could be pointed at and
+    /// this one had no name for a link to use, so the knob beside Duck was the one thing on the
+    /// mixer a controller could not reach.
+    /// </remarks>
+    Release
 }
 
 /// <summary>

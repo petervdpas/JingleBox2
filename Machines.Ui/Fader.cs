@@ -165,6 +165,10 @@ public class Fader : ThemedControl
         MinimumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
         MaximumProperty.Changed.AddClassHandler<Fader>(EndsMoved);
 
+        // The glow is painted by the control itself, so the flag that turns it on has to
+        // bring it back round to paint again. See LinkGlow.
+        AffectsRender<Fader>(LinkGlow.LitProperty);
+
         AffectsRender<Fader>(
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
             UnitProperty, FormatProperty, TrackLengthProperty, TicksProperty, ShowTickLabelsProperty);
@@ -293,6 +297,10 @@ public class Fader : ThemedControl
         context.DrawText(value, new Point(
             (Bounds.Width - value.Width) / 2,
             trackTop + trackLength + CapHeight / 2 + TextGap));
+
+        // Last, over everything else it drew: while a controller is being laid out, the one
+        // being offered says so itself. See LinkGlow.
+        if (LinkGlow.GetLit(this)) LinkGlow.Paint(context, new Rect(Bounds.Size));
     }
 
     private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop, double trackLength)

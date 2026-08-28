@@ -674,6 +674,7 @@ public class MachinePanelView : Decorator
         // A panel rebuilt is a panel whose controls are new objects, so what the pointer was
         // resting on is gone whether or not it looks the same.
         _offered = null;
+        _offeredAction = "";
 
         ShowSelection();
         ShowLinks();
@@ -2867,7 +2868,7 @@ public class MachinePanelView : Decorator
         // A button first: it names an action rather than a parameter, so it would fail the test
         // below and be passed over, and pointing a hardware button at one is the whole reason
         // this exists.
-        if (OffersAction(under)) return;
+        if (OffersAction(under, e.GetPosition(this))) return;
 
         if (under.Parameter.Length == 0 || !_values.ContainsKey(under.Parameter)) return;
 
@@ -2887,19 +2888,47 @@ public class MachinePanelView : Decorator
     /// A separate walk from <see cref="Offers"/> because a button is found a different way: it
     /// names an action rather than a parameter, and the two are looked up in different places.
     /// </remarks>
-    private bool OffersAction(MachineElement under)
+    private bool OffersAction(MachineElement under, Point at)
     {
-        if (Text(under, "action") is not { Length: > 0 } action) return false;
+        string action = Text(under, "action") is { Length: > 0 } named ? named : Stepping(under, at);
 
-        if (ReferenceEquals(under, _offered)) return true;
+        if (action.Length == 0) return false;
+
+        // By the action as well as by the element, because the picker is one element offering
+        // two of them and moving from its left half to its right has to be a new offer.
+        if (ReferenceEquals(under, _offered) && string.Equals(action, _offeredAction, StringComparison.Ordinal))
+            return true;
 
         _offered = under;
+        _offeredAction = action;
 
         ShowLinks();
 
         LinkActionWanted?.Invoke(this, action);
 
         return true;
+    }
+
+    /// <summary>Which action the offered element is about, for a picker that offers two.</summary>
+    private string _offeredAction = "";
+
+    /// <summary>
+    /// The preset picker, which offers the one before and the one after rather than a value.
+    /// </summary>
+    /// <remarks>
+    /// A shelf of presets is a list and not a parameter: pointing a knob at it and asking for
+    /// "preset 0.62" means nothing, and what a hand wants of a list is the next one and the one
+    /// before. So it offers two actions, and which one depends on which side of the picker the
+    /// pointer is on, because that is where its two arrows are. Nobody has to be told that; it
+    /// is where they were reaching anyway.
+    /// </remarks>
+    private string Stepping(MachineElement under, Point at)
+    {
+        if (under.Element != MachineElementKinds.Preset) return "";
+
+        if (!_frames.TryGetValue(under, out var built) || Placed(built) is not { } area) return "";
+
+        return PresetStep.Side(at.X, area.Center.X);
     }
 
     /// <summary>Puts the glow where the pointer is and a quiet ring on everything already taken.</summary>

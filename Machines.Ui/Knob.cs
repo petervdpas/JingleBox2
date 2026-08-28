@@ -142,6 +142,10 @@ public class Knob : ThemedControl
 
         AffectsMeasure<Knob>(LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty);
 
+        // The glow is painted by the control itself, so the flag that turns it on has to
+        // bring it back round to paint again. See LinkGlow.
+        AffectsRender<Knob>(LinkGlow.LitProperty);
+
         AffectsRender<Knob>(
             LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty,
             ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
@@ -389,6 +393,10 @@ public class Knob : ThemedControl
 
         DrawDial(context, palette, centerX, middle, radius);
         DrawText(context, palette, middle + radius + 1 + TickReach);
+
+        // Last, over everything else it drew: while a controller is being laid out, the one
+        // being offered says so itself. See LinkGlow.
+        if (LinkGlow.GetLit(this)) LinkGlow.Paint(context, new Rect(Bounds.Size));
     }
 
     private void DrawDial(DrawingContext context, ThemePalette palette, double centerX, double centerY, double radius)

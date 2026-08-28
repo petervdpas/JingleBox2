@@ -23,6 +23,58 @@ public sealed class LinkGlow : Control
     /// <summary>The one under the pointer. Hot, and not any machine's accent.</summary>
     private static readonly Color Hot = Color.FromRgb(0xFF, 0x2D, 0x2D);
 
+    /// <summary>
+    /// True on the one control the pointer is offering, so it can light itself.
+    /// </summary>
+    /// <remarks>
+    /// A panel draws the ring for its own elements because they are rectangles it knows and not
+    /// controls at all. Everything else on the screen is a real control, and a control knows
+    /// where it is: it lights itself in <c>Render</c> and no layer above it has to be told where
+    /// it stands or kept in step when it moves.
+    ///
+    /// Here rather than beside the pointing, because this is the file that knows what the glow
+    /// looks like, and the flag and the look should not be able to drift apart.
+    /// </remarks>
+    public static readonly AttachedProperty<bool> LitProperty =
+        AvaloniaProperty.RegisterAttached<LinkGlow, Control, bool>("Lit");
+
+    public static bool GetLit(Control control) => control.GetValue(LitProperty);
+
+    public static void SetLit(Control control, bool value) => control.SetValue(LitProperty, value);
+
+    /// <summary>
+    /// The ring, on a control that is drawing itself.
+    /// </summary>
+    /// <remarks>
+    /// Drawn inside the control rather than spreading beyond it, which is the one difference
+    /// from the panel's version and it is forced: a control has no room outside itself that it
+    /// is allowed to paint. So the rings run inward, and the innermost is the brightest.
+    /// </remarks>
+    public static void Paint(DrawingContext context, Rect area)
+    {
+        if (area.Width <= 0 || area.Height <= 0) return;
+
+        for (int ring = Rings; ring >= 1; ring--)
+        {
+            double fade = 0.30 * (Rings - ring + 1) / Rings;
+            double inset = ring * 1.5;
+
+            if (area.Width <= inset * 2 || area.Height <= inset * 2) continue;
+
+            context.DrawRectangle(
+                null,
+                new Pen(new SolidColorBrush(Hot, fade), 2),
+                area.Deflate(inset),
+                4, 4);
+        }
+
+        context.DrawRectangle(
+            new SolidColorBrush(Hot, 0.14),
+            new Pen(new SolidColorBrush(Hot), 1.5),
+            area.Deflate(0.75),
+            4, 4);
+    }
+
     /// <summary>How far the rings spread beyond the control.</summary>
     private const int Rings = 4;
 

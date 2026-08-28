@@ -53,12 +53,12 @@ public partial class InstrumentPanel : UserControl
         DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
         UI.ThemeManager.Changed += Later;
 
-        // There is something to point at while this is on screen, which is what makes
-        // Ctrl+Shift+M mean anything. See LinkKey.
+        // One of the views a controller may be laid out from, which is what makes Ctrl+Shift+M
+        // mean anything here. See LinkKey.
+        LinkKey.Watch(this);
+
         AttachedToVisualTree += (_, _) =>
         {
-            LinkKey.Showing();
-
             if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
 
             // A hardware button pressed comes out here, and this panel does it if it is the
@@ -70,8 +70,6 @@ public partial class InstrumentPanel : UserControl
 
         DetachedFromVisualTree += (_, _) =>
         {
-            LinkKey.Gone();
-
             UI.ThemeManager.Changed -= Later;
 
             if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
@@ -147,7 +145,35 @@ public partial class InstrumentPanel : UserControl
                 Designer?.Editor?.Zones?.SpreadCommand.Execute(null);
 
                 break;
+
+            case Machines.MachineActions.PresetPrevious:
+                Step(-1);
+
+                break;
+
+            case Machines.MachineActions.PresetNext:
+                Step(1);
+
+                break;
         }
+    }
+
+    /// <summary>
+    /// Moves along the shelf of presets, the way the picker's own arrows do.
+    /// </summary>
+    /// <remarks>
+    /// Through the shelf rather than the picker, because the shelf is what a preset being picked
+    /// really means and the control on the panel is one way of saying it. Stopping at the ends
+    /// rather than coming round: a list of presets has a first and a last, and a button held
+    /// down that wrapped would take you past the one you were looking for without a pause.
+    /// </remarks>
+    private void Step(int by)
+    {
+        if (MachineFace.Presets is not { } shelf) return;
+
+        int wanted = Machines.PresetStep.Moved(shelf.Picked, shelf.Names.Count, by);
+
+        if (wanted != shelf.Picked) shelf.Picked = wanted;
     }
 
     /// <summary>The designer whose editor is being watched, so it is let go of again.</summary>

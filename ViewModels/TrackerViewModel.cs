@@ -314,6 +314,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect.Target = new TrackPluginTarget(_player, track);
         TrackEffect.Instrument = InstrumentBoxFor(track);
 
+        // And the mixer says which one it is about, since it is the one page where the cursor
+        // is not on the screen to say it for itself.
+        foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
+
         // The automation under the chain is about the same track the chain is, and for the same
         // reason: both are what the column the cursor is in has on it. Only while it is open,
         // since reading it costs a walk over the track's machine and every plugin on it.
@@ -803,6 +807,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>An instrument's window came to the front, so that is the track being worked on.</summary>
     public void PanelInFront(int track) => _panelTrack = track;
+
+    /// <summary>
+    /// A track was picked somewhere other than the pattern, which is the mixer.
+    /// </summary>
+    /// <remarks>
+    /// Through the cursor rather than a second answer beside it, so there is one place that
+    /// says which track you are on and the mixer, the pattern, the chain under it and the
+    /// automation under that all agree without being told about each other. Coming back from the
+    /// mixer leaves the cursor on the track you were mixing, which is where a hand would have
+    /// put it anyway.
+    ///
+    /// A panel in front still wins, since that is a window somebody is looking at.
+    /// </remarks>
+    public void PickTrack(int track)
+    {
+        if (track < 0 || track >= Song.TrackCount || track == Cursor.Track) return;
+
+        Cursor = Cursor with { Track = track };
+    }
 
     /// <summary>
     /// And has gone. The cursor says where you are again.
@@ -1965,7 +1988,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
             Strips.Add(new TrackStripViewModel(
-                track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount, OnMixChanged));
+                track, Song.Mix[track], instrument?.Name ?? "", Song.TrackCount, OnMixChanged)
+            {
+                IsSelected = track == Cursor.Track
+            });
         }
 
         MixShown?.Invoke();
