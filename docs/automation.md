@@ -1,7 +1,7 @@
 # Automation lanes
 
-The core is built. What is not built is either editor, which means a lane can be recorded and
-played and cannot yet be looked at.
+The core is built, and so is the list panel. What is not built is either editor, so a lane can be
+made, recorded and played, and its points cannot yet be looked at.
 
 Checked against the Renoise 3.5.4 install on this machine on 2026-08-28, and revised where the
 first draft had guessed. What changed is at the end of each section.
@@ -11,21 +11,25 @@ first draft had guessed. What changed is at the end of each section.
 Built, on 2026-08-28:
 
 ```
-Tracker/AutomationLane.cs       the lane, its points, and what it says at a time
-Tracker/AutomationPlayer.cs     the clock writing it, through IControlTargets
-Tracker/AutomationRecorder.cs   a turned knob writing it down
-Pattern.Lanes                   held by the pattern, moved, cleared, copied, undone
-SongStore.LaneDocument          in and out of song.json
-IControlTargets.On(track)       what a track has on it that could be automated
+Tracker/AutomationLane.cs         the lane, its points, and what it says at a time
+Tracker/AutomationPlayer.cs       the clock writing it, through IControlTargets
+Tracker/AutomationRecorder.cs     a turned knob writing it down
+Pattern.Lanes                     held by the pattern, moved, cleared, copied, undone
+SongStore.LaneDocument            in and out of song.json
+IControlTargets.On(track)         what a track has on it that could be automated
+ViewModels/AutomationViewModel    one track's automation, and adding and clearing a lane
+Views/AutomationStrip.axaml       the strip under the mixer's tracks
 ```
 
-Reachable from Record knob movements in the pattern menu, which arms the recorder. Off by
-default, and it does nothing at all unless the song is playing.
+Two ways in. AUTO on a mixer strip opens that track's automation below the row, where a head
+block chooses the parameter and the room after it is that parameter's. Record knob movements in
+the pattern menu arms the recorder, which is off by default and does nothing unless the song is
+playing.
 
-Not built: the parameter list panel, the typed view, the drawn view. So a lane is made by
-recording one and there is no other way, and once made it can be heard and not seen.
+Not built: the typed view and the drawn view. So a lane's points can be created, counted and
+cleared, and cannot be seen or moved one at a time.
 
-Forty five tests, in `Tests/AutomationTests.cs` and two in `Tests/TrackerHistoryTests.cs`. The
+Fifty four tests, in `Tests/AutomationTests.cs` and two in `Tests/TrackerHistoryTests.cs`. The
 file format is the half tested hardest, for the reason at the end of this page.
 
 ## Why lanes and not more effect commands
@@ -193,15 +197,44 @@ whichever line the drawing thread woke up on. And a pass leaves one undo step pe
 than one per point, since a hand sweeping a filter across a pattern is one thing a person did
 and a hundred and twenty points.
 
-**The parameter list.** Half built. `IControlTargets.On(track)` answers what a track has on it
-that could be automated: the machine's parameters in panel order, then each insert's, then the
-strip, which is the order a track is read in on the screen. The machine's own unsaved parameters
-are left out, since a lane driving how much of the wave the picture shows would be a song
-insisting on somebody's zoom level, and a plugin's read-only ones are left out because a gain
-reduction meter reports rather than accepts.
+**The parameter list.** Built. `IControlTargets.On(track)` answers what a track has on it that
+could be automated: the machine's parameters in panel order, then each insert's, then the strip,
+which is the order a track is read in on the screen. The machine's own unsaved parameters are
+left out, since a lane driving how much of the wave the picture shows would be a song insisting
+on somebody's zoom level, and a plugin's read-only ones are left out because a gain reduction
+meter reports rather than accepts.
 
-What is missing is the panel that shows the list. Neither view can create a lane without it, so
-until it exists the only way to make a lane is to record one.
+It answers `ControlChoice` rather than a bare mapping: the device, the parameter's own name, and
+what to ask `Find` for. The naming is worked out there while the machine and the plugin are in
+hand, and asking again later would give a target's name, which is written for a status line and
+ends in the track it is on. Forty rows all ending in the same three words is a list nobody can
+scan.
+
+It is a strip under the mixer's tracks, opened per track from an AUTO button on the track's own
+strip, and it is the same shape as the chain under the pattern: a block at the head saying which
+part you are working on, and the room after it given to that part. There the head is the
+instrument and what follows is its effects; here the head is the parameter and what follows is
+its lane. A person who has used one already knows where to look on the other, and the room to
+the right of the head block is where the curve goes when there is one to draw.
+
+Under the mixer because that is where a track's settings are, and automation is a track's
+settings moving. One button per strip and one panel below them all, so pressing another track's
+button moves the panel rather than opening a second one, and pressing the lit one is the way
+back. Hidden until asked for, unlike the chain, which is always there because a track always has
+a chain: automation a track has not got is nothing to look at.
+
+The head block says which track and which pattern, because the pattern is not on the screen when
+the mixer is and a lane belongs to one as much as to a track. It carries a search box as well,
+which a machine's dozen parameters do not need and a plugin's two hundred make unavoidable.
+
+Adding a lane gives it one point, holding where the parameter stands. Renoise does the same and
+it is the only useful answer: an empty lane says nothing, so the parameter would be listed as
+automated and would not move.
+
+It was a page first, listing every parameter of a track with a button on each row. That was
+wrong twice over: a page is somewhere you go instead of the mixer rather than a thing you open
+beside it, and a list of forty rows with a button on each is a form to fill in rather than an
+instrument to work on.
 
 **The typed view.** A parameter column, riding on the column axis described above. Cheap once
 the axis exists, and the axis is note columns' bill.
@@ -213,7 +246,7 @@ range, and the play mode switch. None of it is deep and there is a lot of it.
 
 ```
 lane type, storage, sequencer                     done
-target enumeration                                done; the panel that shows it is not
+target enumeration and the list panel             done
 recording from a linked knob                      done
 the typed view, given the column axis             a day
 the drawn view                                    three to five days, and it is all interface
@@ -229,11 +262,10 @@ plays back with no editor at all. `docs/scratch-machine.md` was the reason to re
 that machine records itself now that a knob's stream can be captured, and it is the only thing
 here that makes the drawn view unavoidable rather than merely nice.
 
-Next, and in this order: the parameter list panel, so a lane can be made by choosing rather than
-only by recording; the column axis, which is `docs/polyphony.md`'s bill and serves both features;
-the typed view on top of it; then note columns, which by then is mostly entry rules and the
-mixer's per column cut. The drawn view last, when there is recorded material that no column can
-display.
+Next, and in this order: the column axis, which is `docs/polyphony.md`'s bill and serves both
+features; the typed view on top of it; then note columns, which by then is mostly entry rules and
+the mixer's per column cut. The drawn view last, when there is recorded material that no column
+can display.
 
 ## Decided already
 
@@ -265,6 +297,10 @@ display.
   doing nothing looks exactly like working.
 
 ## Still open
+
+- Whether the strip should follow the song while it is open rather than being read when it is
+  opened. It is read on the way in and stays as it was found, and it shuts itself when the
+  strips are rebuilt, which is what a song being opened or the track count changing does.
 
 - Whether a lane can address a track's insert plugin as well as its instrument. The addressing
   supports it; the editor has to offer it, and a chain can be rearranged under a lane.

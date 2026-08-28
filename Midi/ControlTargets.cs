@@ -83,7 +83,7 @@ public sealed class ControlTargets : IControlTargets
     /// reduction meter is a parameter that reports rather than accepts, and a lane pointed at
     /// one would write into a value the plugin overwrites on the next block.
     /// </remarks>
-    public IEnumerable<ControlMapping> On(int track)
+    public IEnumerable<ControlChoice> On(int track)
     {
         if (track < 0 || track >= _tracker.Song.TrackCount) yield break;
 
@@ -97,15 +97,19 @@ public sealed class ControlTargets : IControlTargets
             {
                 if (!byKey.TryGetValue(key, out var parameter) || !parameter.Saved) continue;
 
-                yield return new ControlMapping
-                {
-                    Kind = ControlKind.Instrument,
-                    Scope = ControlScope.Fixed,
-                    Track = track,
-                    Machine = machine,
-                    Key = key,
-                    Ordinal = -1
-                };
+                yield return new ControlChoice(
+                    new ControlMapping
+                    {
+                        Kind = ControlKind.Instrument,
+                        Scope = ControlScope.Fixed,
+                        Track = track,
+                        Machine = machine,
+                        Key = key,
+                        Ordinal = -1
+                    },
+                    project.Name,
+                    parameter.Name.Length > 0 ? parameter.Name : parameter.Key,
+                    parameter.Unit);
             }
         }
 
@@ -121,36 +125,44 @@ public sealed class ControlTargets : IControlTargets
                 {
                     if (parameter.IsReadOnly) continue;
 
-                    yield return new ControlMapping
-                    {
-                        Kind = ControlKind.Insert,
-                        Scope = ControlScope.Fixed,
-                        Track = track,
-                        Plugin = plugin.Info.Id,
-                        Slot = slot,
-                        Parameter = parameter.Id,
-                        Ordinal = -1
-                    };
+                    yield return new ControlChoice(
+                        new ControlMapping
+                        {
+                            Kind = ControlKind.Insert,
+                            Scope = ControlScope.Fixed,
+                            Track = track,
+                            Plugin = plugin.Info.Id,
+                            Slot = slot,
+                            Parameter = parameter.Id,
+                            Ordinal = -1
+                        },
+                        plugin.Info.Name,
+                        parameter.Name,
+                        parameter.Units);
                 }
 
                 slot++;
             }
         }
 
-        foreach (var control in new[]
+        foreach (var (control, said) in new[]
                  {
-                     MixControl.Volume, MixControl.Pan, MixControl.Mute,
-                     MixControl.Solo, MixControl.Duck
+                     (MixControl.Volume, "Level"), (MixControl.Pan, "Pan"),
+                     (MixControl.Mute, "Mute"), (MixControl.Solo, "Solo"),
+                     (MixControl.Duck, "Duck")
                  })
         {
-            yield return new ControlMapping
-            {
-                Kind = ControlKind.Mix,
-                Scope = ControlScope.Fixed,
-                Track = track,
-                Mix = control,
-                Ordinal = -1
-            };
+            yield return new ControlChoice(
+                new ControlMapping
+                {
+                    Kind = ControlKind.Mix,
+                    Scope = ControlScope.Fixed,
+                    Track = track,
+                    Mix = control,
+                    Ordinal = -1
+                },
+                "Mixer",
+                said);
         }
     }
 

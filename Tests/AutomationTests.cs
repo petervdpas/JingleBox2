@@ -1,5 +1,7 @@
 using JingleBox2.Midi;
 using JingleBox2.Tracker;
+using JingleBox2.ViewModels;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
@@ -590,5 +592,186 @@ public class AutomationPlaybackTests
 
         Assert.False(recorder.Moved(press, new Knob(), 1));
         Assert.Empty(song.Patterns[0].Lanes);
+    }
+}
+
+/// <summary>The strip under the mixer: what it offers, what it narrows to, and what it makes.</summary>
+public class AutomationListTests
+{
+    private sealed class Rack : IControlTargets
+    {
+        private readonly Dictionary<string, Knob> _knobs = new();
+
+        public IControlTarget? Find(ControlMapping mapping) =>
+            _knobs.TryGetValue(Key(mapping), out var knob) ? knob : null;
+
+        public IEnumerable<ControlChoice> On(int track)
+        {
+            foreach (var key in new[] { "cutoff", "resonance" })
+            {
+                var mapping = new ControlMapping
+                {
+                    Kind = ControlKind.Instrument,
+                    Scope = ControlScope.Fixed,
+                    Track = track,
+                    Machine = "zampler",
+                    Key = key
+                };
+
+                _knobs[Key(mapping)] = new Knob(0.25, 0, 1);
+
+                yield return new ControlChoice(mapping, "Zampler", key == "cutoff" ? "Cutoff" : "Resonance");
+            }
+
+            var level = new ControlMapping
+            {
+                Kind = ControlKind.Mix, Scope = ControlScope.Fixed, Track = track, Mix = MixControl.Volume
+            };
+
+            _knobs[Key(level)] = new Knob(0.8, 0, 1);
+
+            yield return new ControlChoice(level, "Mixer", "Level");
+        }
+
+        private static string Key(ControlMapping one) =>
+            one.Kind + ":" + one.Track + ":" + one.Machine + ":" + one.Key + ":" + one.Mix;
+    }
+
+    private static (AutomationViewModel Strip, Song Song) Made(int track = 0)
+    {
+        var song = new Song();
+        song.Normalize();
+
+        while (song.Mix.Count < song.TrackCount) song.Mix.Add(new TrackMix());
+
+        var strip = new AutomationViewModel(new Rack(), () => song, () => song.Patterns[0]);
+        strip.Show(track);
+
+        return (strip, song);
+    }
+
+    [Fact]
+    public void Every_parameter_on_the_track_is_offered_in_panel_order()
+    {
+        var (strip, _) = Made();
+
+        Assert.Equal(new[] { "Cutoff", "Resonance", "Level" }, strip.Parameters.Select(one => one.Name));
+        Assert.Equal("Zampler  \u00b7  Cutoff", strip.Parameters[0].Said);
+    }
+
+    /// <remarks>
+    /// The head block is about one parameter, so there is always one being worked on. Opening a
+    /// strip that offered nothing to choose from would be a strip with nothing under it either.
+    /// </remarks>
+    [Fact]
+    public void One_is_being_worked_on_from_the_moment_it_opens()
+    {
+        var (strip, _) = Made();
+
+        Assert.True(strip.HasChosen);
+        Assert.Equal("Cutoff", strip.Chosen!.Name);
+    }
+
+    [Fact]
+    public void It_is_about_the_track_whose_button_was_pressed()
+    {
+        var (strip, _) = Made(2);
+
+        Assert.Equal(2, strip.Track);
+        Assert.StartsWith("TR-03", strip.About);
+    }
+
+    [Fact]
+    public void Searching_narrows_by_the_parameter_and_by_the_device()
+    {
+        var (strip, _) = Made();
+
+        strip.Search = "reso";
+        Assert.Single(strip.Parameters);
+        Assert.Equal("Resonance", strip.Parameters[0].Name);
+
+        strip.Search = "mixer";
+        Assert.Single(strip.Parameters);
+        Assert.Equal("Level", strip.Parameters[0].Name);
+    }
+
+    [Fact]
+    public void Automating_a_parameter_gives_it_a_lane_holding_where_it_stands()
+    {
+        var (strip, song) = Made();
+
+        var row = strip.Chosen!;
+        Assert.False(row.HasLane);
+
+        row.AddCommand.Execute(null);
+
+        var lane = Assert.Single(song.Patterns[0].Lanes);
+
+        Assert.Equal("cutoff", lane.Key);
+
+        var point = Assert.Single(lane.Points);
+
+        Assert.Equal(0, point.Time);
+        Assert.Equal(0.25, point.Value);
+    }
+
+    /// <remarks>
+    /// The rows are made again after every edit, so what was being worked on has to be found
+    /// again by what it names. Thrown back to the first parameter after every click, the strip
+    /// would be unusable.
+    /// </remarks>
+    [Fact]
+    public void What_is_being_worked_on_survives_an_edit_to_it()
+    {
+        var (strip, _) = Made();
+
+        strip.Chosen = strip.Parameters[1];
+        strip.Chosen!.AddCommand.Execute(null);
+
+        Assert.Equal("Resonance", strip.Chosen!.Name);
+        Assert.True(strip.Chosen!.HasLane);
+    }
+
+    [Fact]
+    public void Clearing_takes_the_lane_off_again()
+    {
+        var (strip, song) = Made();
+
+        strip.Chosen!.AddCommand.Execute(null);
+        Assert.Single(song.Patterns[0].Lanes);
+
+        strip.Chosen!.ForgetCommand.Execute(null);
+
+        Assert.Empty(song.Patterns[0].Lanes);
+        Assert.False(strip.Chosen!.HasLane);
+    }
+
+    [Fact]
+    public void The_shape_can_be_switched_between_sweeping_and_stepping()
+    {
+        var (strip, song) = Made();
+
+        strip.Chosen!.AddCommand.Execute(null);
+
+        Assert.Equal("Sweeps", strip.Chosen!.How);
+
+        strip.Chosen!.NextCommand.Execute(null);
+
+        Assert.Equal(AutomationPlay.Points, song.Patterns[0].Lanes[0].Play);
+        Assert.Equal("Steps", strip.Chosen!.How);
+    }
+
+    [Fact]
+    public void A_lane_is_added_and_taken_off_through_the_history()
+    {
+        var (strip, _) = Made();
+
+        int steps = 0;
+        strip.Taking = (_, _) => steps++;
+
+        strip.Chosen!.AddCommand.Execute(null);
+        strip.Chosen!.ForgetCommand.Execute(null);
+
+        Assert.Equal(2, steps);
     }
 }

@@ -287,10 +287,27 @@ because that exact thing was wrong once.
   one undo step per lane and not one per point, which is the same rule the instrument knobs use
   and arrived at from the same direction. Lanes are part of a pattern's undo step, because left
   out, undo would put the notes back and leave the movement where it was
-- The editors are not built, either of them, so a lane can be recorded and played and not looked
-  at. The drawn one is a DAW import and the honest split is by the nature of the data: deliberate
-  changes want a typed parameter column, which shares its whole foundation with note columns, and
-  recorded gestures want a curve because no column can display a hundred values a second
+- AUTO on a mixer strip opens that track's automation under the row of tracks, and it is the
+  same shape as the chain under the pattern: a block at the head saying which part you are
+  working on, and the room after it given to that part. There the head is the instrument and
+  what follows is its effects; here it is the parameter and its lane, and the room to the right
+  is where the curve goes. Under the mixer because that is where a track's settings are and
+  automation is a track's settings moving. One button per strip and one panel below them all, so
+  another track's button moves it and the lit one shuts it. The head block says which track and
+  which pattern, since the pattern is not on screen when the mixer is. It was a page first, a
+  list of forty rows with a button on each, which was somewhere you went instead of the mixer
+  rather than a thing you opened beside it
+- `IControlTargets.On` answers a `ControlChoice`, the device and the parameter's own name beside
+  the mapping: the machine's parameters in panel order, then each insert's, then the strip. Named
+  there rather than asked for later, because a target's name is written for a status line and
+  ends in the track it is on, and forty rows ending in the same three words is a list nobody can
+  scan. Adding a lane gives it one point holding where the parameter stands, since an empty lane
+  would list as automated and not move
+- The editors are not built, either of them, so a lane's points can be counted and cleared and
+  not seen or moved one at a time. The drawn one is a DAW import and the honest split is by the
+  nature of the data: deliberate changes want a typed parameter column, which shares its whole
+  foundation with note columns, and recorded gestures want a curve because no column can display
+  a hundred values a second
 - Polyphony is not built, and it is two features sharing a word. `docs/polyphony.md` is
   the plan. A new note action (what happens to the voice a new note lands on) is a setting and
   two methods `SynthVoice` already has, `Cut` being a 4ms fade and `NoteOff` the patch's own

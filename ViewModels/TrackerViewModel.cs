@@ -145,6 +145,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public void UseAutomation(Midi.IControlTargets targets)
     {
         _player.Automation = new AutomationPlayer(targets);
+
+        Lanes = new AutomationViewModel(targets, () => Song, () => CurrentPattern)
+        {
+            Taking = History.Taking,
+            Dirtied = MarkDirty
+        };
     }
 
     /// <summary>
@@ -1372,6 +1378,59 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public bool ShowsControls => Page == ControlsPage;
 
+    /// <summary>
+    /// One track's automation, which exists only once something has told the tracker how to
+    /// resolve a parameter. See <see cref="UseAutomation"/>.
+    /// </summary>
+    public AutomationViewModel? Lanes
+    {
+        get => _lanes;
+        private set
+        {
+            _lanes = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private AutomationViewModel? _lanes;
+
+    /// <summary>
+    /// True while the automation strip is open under the mixer's tracks.
+    /// </summary>
+    /// <remarks>
+    /// Hidable and hidden by default, because it is about one track at a time and the mixer is
+    /// about all of them. The same reasoning as the chain under the pattern, which is always
+    /// there because a track always has a chain; automation a track has not got is nothing to
+    /// look at.
+    /// </remarks>
+    [ObservableProperty] private bool showsLanes;
+
+    /// <summary>
+    /// Opens the automation strip on a track, or shuts it when that track's is already open.
+    /// </summary>
+    /// <remarks>
+    /// One button per strip and one strip below them, so pressing another track's button moves
+    /// the panel rather than opening a second one. Pressing the lit one is the way back, which
+    /// is what the tracker's own page buttons do and so what a hand here already expects.
+    ///
+    /// Read when it is opened rather than kept in step while it is shut. Everything on it moves
+    /// underneath it, an instrument swapped, a plugin taken off a chain, a pattern changed to,
+    /// and following all of that would be a subscription per kind for a panel that is usually
+    /// not on the screen.
+    /// </remarks>
+    public IRelayCommand<int> ShowAutomationCommand => new RelayCommand<int>(track =>
+    {
+        if (Lanes is not { } lanes) return;
+
+        bool same = ShowsLanes && lanes.Track == track;
+
+        ShowsLanes = !same;
+
+        if (ShowsLanes) lanes.Show(track);
+
+        foreach (var strip in Strips) strip.IsAutomating = ShowsLanes && strip.Track == track;
+    });
+
     /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
     /// <remarks>
     /// Handed in rather than built here, because the same list narrowed differently is what
@@ -1884,6 +1943,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private void RefreshStrips()
     {
         Song.Normalize();
+
+        // Shut, because the strips are rebuilt when the song or the track count changes and the
+        // track it was open on may not be there any more. Left open, it would go on showing the
+        // last song's parameters with no button lit to say which track they were about.
+        ShowsLanes = false;
 
         Strips.Clear();
         for (int track = 0; track < Song.TrackCount && track < Song.Mix.Count; track++)

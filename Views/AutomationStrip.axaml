@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.AutomationStrip"
+             x:DataType="vm:TrackerViewModel">
+
+  <UserControl.Styles>
+    <!-- The same block the chain under the pattern is built out of, and deliberately: a block
+         at the head saying which part you are working on, and the room after it given to that
+         part. A person who has used one already knows where to look on the other. -->
+    <Style Selector="Border.device">
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="70" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.Border}" />
+      </Setter>
+    </Style>
+
+    <Style Selector="TextBlock.deviceName">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.deviceWhat">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.6" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.deviceKey">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="TextBlock.deviceValue">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontFamily" Value="monospace" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style Selector="Button.small">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Button.clear">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="5,0" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="CornerRadius" Value="2" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground">
+        <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+      </Setter>
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Danger}" Opacity="0.18" />
+      </Setter>
+    </Style>
+  </UserControl.Styles>
+
+  <!--
+    One height, always, and the same reasoning the chain uses: what is in here changes as you
+    move between parameters, and a strip that grew and shrank with it would push the mixer above
+    it up and down while you were reading it.
+  -->
+  <Border Classes="inset" MinHeight="96" Margin="0,10,0,0">
+    <!-- The head block takes what it needs and the part takes the rest, which is the shape the
+         curve wants when there is one to draw: the whole width of the strip, against the lines
+         of the pattern. -->
+    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+
+      <!-- The head block: which part you are working on. Everything to the right of it is that
+           part. -->
+      <Border Grid.Column="0" Classes="device" Width="280">
+        <Grid ColumnDefinitions="4,*">
+          <Border Grid.Column="0" CornerRadius="3,0,0,3">
+            <Border.Background>
+              <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Border.Background>
+          </Border>
+
+          <StackPanel Grid.Column="1" Margin="8,6" Spacing="4">
+            <!-- Which track and which pattern. The pattern is not on the screen when the mixer
+                 is, and a lane belongs to one as much as to a track. -->
+            <TextBlock Classes="deviceWhat" Text="{Binding Lanes.About}" />
+
+            <ComboBox HorizontalAlignment="Stretch" FontSize="11"
+                      IsVisible="{Binding Lanes.HasAny}"
+                      ItemsSource="{Binding Lanes.Parameters}"
+                      SelectedItem="{Binding Lanes.Chosen}"
+                      ToolTip.Tip="Which of this track's parameters you are working on.">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:AutomationRow">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Text="{Binding Said}"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <!-- Only for the ones that have a lane, so the picker says at a glance
+                         what this track already moves. -->
+                    <TextBlock Grid.Column="1" Classes="deviceKey" Text="{Binding Says}" />
+                  </Grid>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <!-- A machine has a dozen parameters and needs no finding. A plugin can have two
+                 hundred, and a picker that long is not one anybody can use. -->
+            <TextBox Text="{Binding Lanes.Search}" FontSize="11" Padding="6,2"
+                     Watermark="Find a parameter" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- The part itself: what it is, what it reads, and what its lane holds. The room in
+           the middle is where the curve goes when it is drawn, which is why it is left rather
+           than filled with anything. -->
+      <Border Grid.Column="1" Classes="device" IsVisible="{Binding Lanes.HasChosen}">
+        <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="10" Margin="8,6">
+          <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Classes="deviceName" Text="{Binding Lanes.Chosen.Name}" />
+
+            <TextBlock Classes="deviceValue" Text="{Binding Lanes.Chosen.Reads}" />
+
+            <TextBlock Classes="deviceKey"
+                       Text="{Binding Lanes.Chosen.Says}"
+                       IsVisible="{Binding Lanes.Chosen.HasLane}" />
+
+            <TextBlock Classes="deviceKey" Text="Not automated"
+                       IsVisible="{Binding !Lanes.Chosen.HasLane}" />
+          </StackPanel>
+
+          <!-- The buttons in a gutter down the right, the same place the chain's blocks keep
+               the two of theirs that are not settings. -->
+          <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+            <Button Classes="small" Content="Automate"
+                    IsVisible="{Binding !Lanes.Chosen.HasLane}"
+                    Command="{Binding Lanes.Chosen.AddCommand}"
+                    ToolTip.Tip="Give it a lane holding where it stands now, for the whole of this pattern. Or arm Record knob movements in the pattern menu and turn a knob while the song plays." />
+
+            <Button Classes="small" Content="{Binding Lanes.Chosen.How}"
+                    IsVisible="{Binding Lanes.Chosen.HasLane}"
+                    Command="{Binding Lanes.Chosen.NextCommand}"
+                    ToolTip.Tip="Sweeps goes straight from one point to the next. Steps holds each value until the next point." />
+
+            <Button Classes="clear" Content="Clear"
+                    IsVisible="{Binding Lanes.Chosen.HasLane}"
+                    Command="{Binding Lanes.Chosen.ForgetCommand}"
+                    ToolTip.Tip="Take the lane away. The parameter stops moving and stays where it was left." />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <TextBlock Grid.Column="1" Classes="deviceKey" VerticalAlignment="Center"
+                 TextWrapping="Wrap"
+                 IsVisible="{Binding !Lanes.HasAny}"
+                 Text="{Binding Lanes.Nothing}" />
+    </Grid>
+  </Border>
+
+</UserControl>
