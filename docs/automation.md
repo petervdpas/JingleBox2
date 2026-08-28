@@ -1,7 +1,8 @@
 # Automation lanes
 
-The core is built, and so is the list panel. What is not built is either editor, so a lane can be
-made, recorded and played, and its points cannot yet be looked at.
+Built: the lanes, the clock that plays them, recording one off a knob, the strip that holds them
+and the curve you draw on. What is not built is the typed view, which is a parameter column in
+the pattern and waits on the column axis.
 
 Checked against the Renoise 3.5.4 install on this machine on 2026-08-28, and revised where the
 first draft had guessed. What changed is at the end of each section.
@@ -26,11 +27,13 @@ block chooses the parameter and the room after it is that parameter's. Record kn
 the pattern menu arms the recorder, which is off by default and does nothing unless the song is
 playing.
 
-Not built: the typed view and the drawn view. So a lane's points can be created, counted and
-cleared, and cannot be seen or moved one at a time.
+Not built: the typed view, which is a parameter column in the pattern and shares its foundation
+with note columns.
 
 Fifty four tests, in `Tests/AutomationTests.cs` and two in `Tests/TrackerHistoryTests.cs`. The
-file format is the half tested hardest, for the reason at the end of this page.
+file format is the half tested hardest, for the reason at the end of this page. The curve is not
+among them: it is a Render pass and three pointer handlers, and what it draws is either right in
+front of you or it is not.
 
 ## Why lanes and not more effect commands
 
@@ -239,8 +242,32 @@ instrument to work on.
 **The typed view.** A parameter column, riding on the column axis described above. Cheap once
 the axis exists, and the axis is note columns' bill.
 
-**The drawn view.** A lane area under the pattern: drawing and dragging points, selecting a
-range, and the play mode switch. None of it is deep and there is a lot of it.
+**The drawn view.** Built, as `AutomationCurve`, in the room to the right of the head block. An
+Avalonia control drawn in `Render`, like the pattern grid and the knobs, and reading its colours
+through `ThemePalette` so a theme swap lands at once.
+
+Time runs left to right although the pattern above it runs downwards, which looks like a
+contradiction and is not: Renoise draws its automation the same way round. A curve is read as a
+shape, and a shape a hand recognises rises and falls left to right. Turned on its side to match
+the pattern it would be a shape nobody has ever read.
+
+Click to add a point or take hold of one, drag to move it, right click to take one away, which
+is the button this application already uses for taking a thing off a picture. Time snaps to
+lines, since there is no finer grid to snap to; the value is free. A point dragged onto a line
+that already has one is refused the move and keeps its change of value, because a lane holds one
+point per time and a drag that swallowed its neighbours on the way past would destroy work while
+going somewhere else. A gesture is one undo step and not one per movement, which is the rule the
+recorder and the instrument knobs already follow.
+
+The shape rests on the parameter's own nought rather than on the floor. A level runs from
+silence upwards and its nothing is the floor; a pan runs from one side to the other and its
+nothing is the middle, so a pan drawn as a level reads as hard left the whole way with a bump in
+it, which is the opposite of what it says. Worked out from the target's own range rather than
+from a list of which parameters are which, so a machine's pitch gets it without anybody saying
+so.
+
+Not on it: selecting a range of points, and dragging the handle between two points to bend that
+segment, which is what `LINES` mode's scaling field is for.
 
 ## Effort
 
@@ -249,7 +276,7 @@ lane type, storage, sequencer                     done
 target enumeration and the list panel             done
 recording from a linked knob                      done
 the typed view, given the column axis             a day
-the drawn view                                    three to five days, and it is all interface
+the drawn view                                    done, less the range and the segment handles
 ```
 
 The column axis itself is not counted here. It is in `docs/polyphony.md` and it is two days plus
@@ -262,10 +289,10 @@ plays back with no editor at all. `docs/scratch-machine.md` was the reason to re
 that machine records itself now that a knob's stream can be captured, and it is the only thing
 here that makes the drawn view unavoidable rather than merely nice.
 
-Next, and in this order: the column axis, which is `docs/polyphony.md`'s bill and serves both
-features; the typed view on top of it; then note columns, which by then is mostly entry rules and
-the mixer's per column cut. The drawn view last, when there is recorded material that no column
-can display.
+Next, and in this order: the range and the segment handles on the curve, which are the two
+things it is missing and are hours apiece; then the column axis, which is `docs/polyphony.md`'s
+bill and serves both features; the typed view on top of it; then note columns, which by then is
+mostly entry rules and the mixer's per column cut.
 
 ## Decided already
 

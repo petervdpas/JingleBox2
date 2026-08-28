@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.AutomationStrip"
              x:DataType="vm:TrackerViewModel">
 
@@ -56,6 +57,7 @@
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Padding" Value="5,0" />
       <Setter Property="FontSize" Value="11" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="CornerRadius" Value="2" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Foreground">
@@ -126,8 +128,12 @@
            the middle is where the curve goes when it is drawn, which is why it is left rather
            than filled with anything. -->
       <Border Grid.Column="1" Classes="device" IsVisible="{Binding Lanes.HasChosen}">
-        <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="10" Margin="8,6">
-          <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+        <!-- What it is takes what its name needs and no more, so the picture starts as far
+             left as it can. Capped as well as floored: a plugin parameter can be called
+             something very long, and a name is not worth a third of the curve. -->
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" Margin="8,6">
+          <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center"
+                      MinWidth="76" MaxWidth="150">
             <TextBlock Classes="deviceName" Text="{Binding Lanes.Chosen.Name}" />
 
             <TextBlock Classes="deviceValue" Text="{Binding Lanes.Chosen.Reads}" />
@@ -140,24 +146,40 @@
                        IsVisible="{Binding !Lanes.Chosen.HasLane}" />
           </StackPanel>
 
-          <!-- The buttons in a gutter down the right, the same place the chain's blocks keep
-               the two of theirs that are not settings. -->
-          <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+          <!-- The lane itself. Nothing to draw until there is a lane, and the room is left
+               empty rather than filled with a picture of nothing. -->
+          <views:AutomationCurve Grid.Column="1" x:Name="Curve"
+                                 MinHeight="58"
+                                 IsVisible="{Binding Lanes.Chosen.HasLane}"
+                                 Lane="{Binding Lanes.Chosen.Lane}"
+                                 Zero="{Binding Lanes.Chosen.Zero}"
+                                 Lines="{Binding PatternLines}"
+                                 LinesPerBeat="{Binding LinesPerBeat}"
+                                 PlayingLine="{Binding PlayingLine}"
+                                 ToolTip.Tip="Click to add a point or take hold of one, drag to move it, right click to take one away." />
+
+          <!-- A gutter down the right, drawn the way the chain's blocks draw theirs: the way
+               out as a red cross at the top, the setting under it. Words for both would be two
+               labels beside a picture, which is one more thing than the picture is worth. -->
+          <Grid Grid.Column="2" MinWidth="52">
             <Button Classes="small" Content="Automate"
+                    VerticalAlignment="Center" HorizontalAlignment="Right"
                     IsVisible="{Binding !Lanes.Chosen.HasLane}"
                     Command="{Binding Lanes.Chosen.AddCommand}"
                     ToolTip.Tip="Give it a lane holding where it stands now, for the whole of this pattern. Or arm Record knob movements in the pattern menu and turn a knob while the song plays." />
 
-            <Button Classes="small" Content="{Binding Lanes.Chosen.How}"
-                    IsVisible="{Binding Lanes.Chosen.HasLane}"
-                    Command="{Binding Lanes.Chosen.NextCommand}"
-                    ToolTip.Tip="Sweeps goes straight from one point to the next. Steps holds each value until the next point." />
-
-            <Button Classes="clear" Content="Clear"
+            <Button Classes="clear" Content="✕"
+                    VerticalAlignment="Top" HorizontalAlignment="Right"
                     IsVisible="{Binding Lanes.Chosen.HasLane}"
                     Command="{Binding Lanes.Chosen.ForgetCommand}"
                     ToolTip.Tip="Take the lane away. The parameter stops moving and stays where it was left." />
-          </StackPanel>
+
+            <Button Classes="small" Content="{Binding Lanes.Chosen.How}"
+                    VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                    IsVisible="{Binding Lanes.Chosen.HasLane}"
+                    Command="{Binding Lanes.Chosen.NextCommand}"
+                    ToolTip.Tip="Sweeps goes straight from one point to the next. Steps holds each value until the next point." />
+          </Grid>
         </Grid>
       </Border>
 

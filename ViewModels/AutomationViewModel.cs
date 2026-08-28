@@ -206,6 +206,44 @@ public sealed partial class AutomationViewModel : ObservableObject
         Restock();
     }
 
+    /// <summary>
+    /// A point was dragged on the picture. Says so, without reading the whole list again.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="Restock"/>, which is what every other edit here ends at, because this one
+    /// arrives per mouse move. Rebuilding forty rows and re-resolving every target forty times a
+    /// second to change one number would be paying a list's price for a point.
+    /// </remarks>
+    internal void Touched()
+    {
+        Chosen?.Reread();
+
+        Dirtied?.Invoke();
+    }
+
+    /// <summary>
+    /// Where the parameter's own nought sits, nought to one, for the picture to rest on.
+    /// </summary>
+    /// <remarks>
+    /// A level runs from silence upwards and its nothing is the floor. A pan runs from one side
+    /// to the other and its nothing is the middle, so a pan curve drawn as a level would read as
+    /// hard left all the way along with a bump in it, which is the opposite of what it says.
+    ///
+    /// Worked out from the target's own range rather than by knowing which parameters are which:
+    /// a range that has nought inside it has a middle, and one that starts at nought has a
+    /// floor. That is as true of a machine's pitch, which runs either side of nought, as it is
+    /// of pan, and nobody has to list them.
+    /// </remarks>
+    internal double ZeroOf(ControlChoice choice)
+    {
+        if (_targets.Find(choice.Mapping) is not { } target) return 0;
+
+        double span = target.Max - target.Min;
+        if (span <= 0) return 0;
+
+        return Math.Clamp((0 - target.Min) / span, 0, 1);
+    }
+
     internal string Reading(ControlChoice choice)
     {
         if (_targets.Find(choice.Mapping) is not { } target) return "";
@@ -219,7 +257,7 @@ public sealed partial class AutomationViewModel : ObservableObject
 }
 
 /// <summary>One parameter of one track, and the lane it has or has not got.</summary>
-public sealed class AutomationRow
+public sealed class AutomationRow : ObservableObject
 {
     private readonly AutomationViewModel _owner;
 
@@ -248,6 +286,9 @@ public sealed class AutomationRow
     /// <summary>Where the parameter stands as the list was read.</summary>
     public string Reads => _owner.Reading(Choice);
 
+    /// <summary>Where its nought sits on the picture: the floor for a level, the middle for a pan.</summary>
+    public double Zero => _owner.ZeroOf(Choice);
+
     public bool HasLane => Lane is not null;
 
     /// <summary>How much is written down, so a lane with nothing in it is not mistaken for one.</summary>
@@ -273,6 +314,14 @@ public sealed class AutomationRow
         {
             _ => string.Equals(other.Said, Said, StringComparison.Ordinal)
         };
+
+    /// <summary>Reads its own lane again, for when the picture changed it underneath.</summary>
+    public void Reread()
+    {
+        OnPropertyChanged(nameof(Says));
+        OnPropertyChanged(nameof(How));
+        OnPropertyChanged(nameof(Reads));
+    }
 
     public IRelayCommand AddCommand => new RelayCommand(() => _owner.Add(this));
 

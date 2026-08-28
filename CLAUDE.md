@@ -83,6 +83,19 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   back off the pieces, and sharing a stretch of keyboard out among them
 - `SliceEditorViewModel` / `SliceEditor` (ViewModels/, Views/): One take, its picture and its
   boundaries, used by both machines that hold pieces
+- A knob was measured the way it is not drawn, and the difference came out as a hole. `Knob`
+  puts the name above the dial or below it, and its `MeasureOverride` only ever described the
+  first: name room, then dial, then value. With the name underneath, which is every knob written
+  in XAML rather than described by a machine, the room for a name at the top was reserved and
+  never used, and the control ended up half a line taller than what it drew, with the slack
+  under the value. It showed as a gap under the mixer's pan and as a squeeze on its ducking
+  knobs. Measured per case now. The tick ring cost two more of the same kind: its reach was left
+  below the dial and not above, and not at either side at all, so a name-below knob drew its top
+  marks into whatever was over it and two side by side had their rings almost touching however
+  much spacing the panel between them asked for. The marks are drawn outwards from the rim in
+  every direction, so the room is left in every direction. Machine panels set `LabelAbove` and
+  were unaffected by the height; the width moves every knob everywhere by nine pixels a side,
+  which their grids absorb
 - `Knob` / `Fader` / `NumberField` (Machines.Ui/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field. They live in the machine UI assembly because a machine bought from somebody else is built out of the same controls the app's own machines are
 - `WaveformView` (Machines.Ui/): A recording's shape, with the window and the loop draggable on the picture
 - `MachinePanelView` (Machines.Ui/): A machine's face, built from what the machine says it looks like. Designing, every element can be picked and none can be turned; off, it is an ordinary panel
@@ -303,11 +316,21 @@ because that exact thing was wrong once.
   ends in the track it is on, and forty rows ending in the same three words is a list nobody can
   scan. Adding a lane gives it one point holding where the parameter stands, since an empty lane
   would list as automated and not move
-- The editors are not built, either of them, so a lane's points can be counted and cleared and
-  not seen or moved one at a time. The drawn one is a DAW import and the honest split is by the
-  nature of the data: deliberate changes want a typed parameter column, which shares its whole
-  foundation with note columns, and recorded gestures want a curve because no column can display
-  a hundred values a second
+- `Views/AutomationCurve.cs` is the picture, in the room to the right of the head block, and an
+  ordinary Avalonia control drawn in `Render` like the pattern grid and the knobs: the pattern's
+  lines across with the beats picked out, nought to one up, click to add a point or take hold of
+  one, drag to move it, right click to take it away. Time runs left to right although the
+  pattern runs downwards, which is what Renoise does and for the reason that a shape a hand
+  recognises rises and falls left to right. Time snaps to lines since there is no finer grid; a
+  point dragged onto an occupied line keeps its old time and moves only its value, because a
+  lane holds one per time and a drag that ate its neighbours would destroy work on the way past.
+  One gesture is one undo step. The shape rests on the parameter's own nought, worked out from
+  the target's range: the floor for a level, the middle for a pan or a pitch, since a pan drawn
+  as a level reads as hard left the whole way with a bump in it. Not on it yet: a range
+  selection, and the handle that bends a segment, which is what `LINES` mode's scaling is for
+- The typed view is not built: a parameter column in the pattern, which shares its whole
+  foundation with note columns. The split is by the nature of the data, deliberate changes typed
+  and recorded gestures drawn, because no column can display a hundred values a second
 - Polyphony is not built, and it is two features sharing a word. `docs/polyphony.md` is
   the plan. A new note action (what happens to the voice a new note lands on) is a setting and
   two methods `SynthVoice` already has, `Cut` being a 4ms fade and `NoteOff` the patch's own

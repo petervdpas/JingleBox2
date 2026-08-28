@@ -110,7 +110,7 @@
                          hand is on one and the eye is on the other. Zero track length means
                          both take whatever height is left in the strip. -->
                     <StackPanel Orientation="Horizontal" Spacing="8"
-                                HorizontalAlignment="Center" Margin="0,10,0,0">
+                                HorizontalAlignment="Center" Margin="0,2,0,0">
                       <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
                                    Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                    TrackLength="0"

@@ -316,8 +316,20 @@ public class Knob : ThemedControl
 
     /// <summary>The room the name is given, however much of it the name actually uses.</summary>
     private double LabelRoom(FormattedText label) =>
-        Math.Max(HeadRoom > 0 ? HeadRoom - TextGap : 0,
+        Math.Max(HeadSpace,
                  Math.Max(label.Height, LabelFontSize * 1.35 * Math.Max(1, LabelLines)));
+
+    /// <summary>
+    /// What is kept clear above the dial when the name is not up there.
+    /// </summary>
+    /// <remarks>
+    /// Only what <see cref="HeadRoom"/> asks for, which is a knob being pushed down to stand on
+    /// the same line as a switch beside it. A knob whose name is underneath it needs nothing
+    /// else up there, and reserving the name's height as well is what left a hole under every
+    /// one of them: the room was measured at the top, the text was drawn at the bottom, and the
+    /// difference came out as empty space below the value.
+    /// </remarks>
+    private double HeadSpace => HeadRoom > 0 ? Math.Max(0, HeadRoom - TextGap) : 0;
 
     public string ValueText =>
         string.IsNullOrEmpty(Display) ? NumericInput.Format(Value, Format) + Unit : Display;
@@ -329,8 +341,19 @@ public class Knob : ThemedControl
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black, _room);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
-        double width = Math.Max(DialSize, Math.Max(label.Width, value.Width));
-        double height = LabelRoom(label) + TextGap + TickReach + DialSize + TickReach + TextGap + value.Height;
+        // The reach counts across as well as down. The marks are drawn outwards from the rim
+        // in every direction, so a knob measured as its dial alone is measured too narrow, and
+        // two of them side by side end up with their tick rings almost touching however much
+        // spacing the panel between them asks for.
+        double width = Math.Max(DialSize + TickReach * 2, Math.Max(label.Width, value.Width));
+
+        // Measured the way it is drawn, and the two are not the same shape. With the name above,
+        // the order down the control is name, dial, value. With it below, which is the ordinary
+        // knob, it is dial, name, value, and nothing at all goes over the dial.
+        double height = LabelAbove
+            ? LabelRoom(label) + TextGap + TickReach + DialSize + TickReach + TextGap + value.Height
+            : HeadSpace + TickReach + DialSize + TickReach + TextGap + label.Height
+              + TextGap + value.Height;
 
         return new Size(width, height);
     }
@@ -360,10 +383,12 @@ public class Knob : ThemedControl
             return;
         }
 
-        double middle = radius + 1;
+        // The marks reach past the dial at both ends, so the room for the top ones is left
+        // above it rather than being drawn over whatever is up there.
+        double middle = HeadSpace + TickReach + radius + 1;
 
         DrawDial(context, palette, centerX, middle, radius);
-        DrawText(context, palette, middle + radius + 1);
+        DrawText(context, palette, middle + radius + 1 + TickReach);
     }
 
     private void DrawDial(DrawingContext context, ThemePalette palette, double centerX, double centerY, double radius)
