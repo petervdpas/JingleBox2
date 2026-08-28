@@ -238,7 +238,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fedora: [41, 43]
+        fedora: [43, 44]
     container:
       image: fedora:${{ matrix.fedora }}
 
@@ -340,16 +340,19 @@ jobs:
           RPMTOP="/github/home/rpmbuild"
           rpmbuild -ba "$RPMTOP/SPECS/jinglebox2.spec" --define "_topdir ${RPMTOP}"
 
-      - name: Sanity-check RPM dependencies (Fedora 43 must not require liblttng-ust.so.0)
+      # Every Fedora here, not the newest one by name. The tracepoint provider is removed
+      # from the payload unconditionally a few steps up, so the check belongs on every build
+      # that fix is applied to. Named after one release it becomes a check that silently stops
+      # covering the version most likely to need it: the next one, which is the one that drops
+      # the old liblttng-ust from its repositories.
+      - name: Sanity-check RPM dependencies (must not require liblttng-ust.so.0)
         shell: bash
         run: |
           set -euo pipefail
 
-          if [ "${{ matrix.fedora }}" = "43" ]; then
-            if rpm -qpR /github/home/rpmbuild/RPMS/*/*.rpm | grep -q 'liblttng-ust\.so\.0'; then
-              echo "ERROR: Fedora 43 RPM still requires liblttng-ust.so.0"
-              exit 1
-            fi
+          if rpm -qpR /github/home/rpmbuild/RPMS/*/*.rpm | grep -q 'liblttng-ust\.so\.0'; then
+            echo "ERROR: the Fedora ${{ matrix.fedora }} RPM still requires liblttng-ust.so.0"
+            exit 1
           fi
 
       - name: Verify machines inside the RPM
