@@ -471,7 +471,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             ? null
             : new InstrumentEditorViewModel(
                 Machines.IndexOf(value), value.Instrument, OnInstrumentEdited, _machines,
-                _waveforms, _audition, _recordings, note => PlayNote(note));
+                _waveforms, _audition, _recordings, note => PlayNote(note), MidiKeys);
 
         Presets = value == null
             ? null

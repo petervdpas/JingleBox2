@@ -432,11 +432,50 @@
                 <SolidColorBrush Color="{DynamicResource Color.TextMuted}" />
             </Setter>
         </Style>
+        <!-- The page you are on wears the accent rather than being written in it.
+
+             It used to be the accent as text against the same background the other two have,
+             which is two shades of the same colour a few pixels apart: a difference nobody can
+             see without comparing, on the one control on this bar where being certain matters.
+             Filled, it reads at a glance and from across the room.
+
+             Inverse rather than a colour of its own, and that is what makes it work in all
+             twelve themes without a key being added to any of them. Every palette here puts its
+             background at the far end from its accent, dark against a light accent and light
+             against a dark one, so swapping the two is contrast by construction. -->
         <Style Selector="Button.page.active">
-            <Setter Property="Foreground">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Through the template, because a button's background lives on the presenter inside
+             it: set on the button itself it is replaced the moment a pointer crosses it, and the
+             page you are on would go back to looking like the two you are not. The three states
+             say the same thing for that reason. -->
+        <Style Selector="Button.page.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background">
                 <SolidColorBrush Color="{DynamicResource Color.Accent}" />
             </Setter>
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Background}" />
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.page.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Background}" />
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.page.active:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Background}" />
+            </Setter>
         </Style>
 
         <Style Selector="Button.armed">

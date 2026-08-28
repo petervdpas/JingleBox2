@@ -22,7 +22,12 @@ namespace JingleBox2.Tracker.Machines;
 /// first time a note was played, and what is being watched here moves on every note.
 /// </remarks>
 /// <param name="kit">The kit on the other side, which is the one the editor is already on.</param>
-public sealed class KitPads(DrumKitViewModel kit) : IMachinePads
+/// <param name="keys">
+/// What is watching the notes going past, so a pad held down lights its key the way the same
+/// note held on the drawn keyboard does. Left out, a pad still sounds and still lights itself,
+/// and the keyboard stays dark: that is what a preview has, since there is no hand on it.
+/// </param>
+public sealed class KitPads(DrumKitViewModel kit, Midi.Interfaces.IMidiMonitor? keys = null) : IMachinePads
 {
     /// <summary>Following a list of things and what each of them says.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -68,6 +73,23 @@ public sealed class KitPads(DrumKitViewModel kit) : IMachinePads
     /// <inheritdoc/>
     /// <remarks>Through the pad's own tap command, so a panel's press and a key press are one act.</remarks>
     public void Hit(int at) => Pad(at)?.TapCommand.Execute(null);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Straight to the monitor rather than through the pad, because this is the light and not
+    /// the sound: the monitor is what every drawn keyboard reads itself from, and telling it is
+    /// the whole of what a key going down means here.
+    /// </remarks>
+    public void Held(int at)
+    {
+        if (Pad(at) is { } pad && pad.Pad.Note.IsPlayable) keys?.Pressed(pad.Pad.Note.Semitone);
+    }
+
+    /// <inheritdoc/>
+    public void Let(int at)
+    {
+        if (Pad(at) is { } pad && pad.Pad.Note.IsPlayable) keys?.Released(pad.Pad.Note.Semitone);
+    }
 
     /// <inheritdoc/>
     /// <remarks>

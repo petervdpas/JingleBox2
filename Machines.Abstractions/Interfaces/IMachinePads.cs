@@ -44,6 +44,34 @@ public interface IMachinePads
     /// <summary>Hits it, which is what pressing a pad on a drum machine has always done.</summary>
     void Hit(int at);
 
+    /// <summary>
+    /// A hand has gone down on it, and has not come up yet.
+    /// </summary>
+    /// <remarks>
+    /// A pad has two halves like any other key, and for a long time this contract only had the
+    /// one: <see cref="Hit"/>, which is the moment it sounds. So a pad hit lit the pad and
+    /// sounded the note and left the drawn keyboard dark, while clicking the very same note on
+    /// that keyboard lit it. The two are one act and should look like one.
+    ///
+    /// This half is the light and nothing else. What sounds a pad is still <see cref="Hit"/>,
+    /// on the way back up, so sliding off a pad is still how you change your mind about a press
+    /// you have begun: the key lights while the hand is down and goes out again with nothing
+    /// having sounded.
+    /// </remarks>
+    ///
+    /// <remarks>
+    /// Answered with nothing by default, and that is not laziness. This contract is published:
+    /// an outside machine implements it, so a member added without one is every existing
+    /// machine refusing to compile against the next version over a light. A kit that says
+    /// nothing here sounds and lights its own pads exactly as it did, and only the drawn
+    /// keyboard is quieter than it could be.
+    /// </remarks>
+    void Held(int at) { }
+
+    /// <summary>The hand has come up, so whatever <see cref="Held"/> lit goes out.</summary>
+    /// <remarks>Nothing by default, for the reason <see cref="Held"/> gives.</remarks>
+    void Let(int at) { }
+
     /// <summary>Told when any of the above has moved.</summary>
     event EventHandler? Changed;
 }

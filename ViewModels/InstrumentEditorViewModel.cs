@@ -150,6 +150,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// one played on the keyboard, so the keyboard moves to it and lights it. Without one, a tap
     /// still sounds, through the audition alone, and nothing on screen moves.
     /// </param>
+    /// <param name="keys">
+    /// What is watching the notes going past, so a pad held down lights its own key on the
+    /// drawn keyboard exactly as that key held down would. Without one the pads still sound and
+    /// the keyboard stays dark, which is what a preview wants.
+    /// </param>
     /// <param name="machines">
     /// The machines this run has, the one instance everything shares. Required rather than
     /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
@@ -163,8 +168,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         IWaveformService? waveforms = null,
         IInstrumentAudition? audition = null,
         ObservableCollection<Recording>? recordings = null,
-        Action<Note>? play = null)
+        Action<Note>? play = null,
+        Midi.Interfaces.IMidiMonitor? keys = null)
     {
+        _keys = keys;
         _machines = machines;
         Index = index;
         _instrument = instrument;
@@ -295,6 +302,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// rebuilt: rebuilding would answer that and would also throw away the pad grid the press just
     /// landed on.
     /// </remarks>
+    /// <summary>
+    /// What is watching the notes going past, so a pad lights its key the way that key does.
+    /// </summary>
+    /// <remarks>
+    /// Kept rather than passed on, because the pads are built in <see cref="Describe"/>, which
+    /// runs again whenever the instrument under this changes.
+    /// </remarks>
+    private readonly Midi.Interfaces.IMidiMonitor? _keys;
+
     private void Describe(IWaveformService? waveforms)
     {
         string id = Machine.For(_instrument.Kind).SlotId;
@@ -322,7 +338,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (IsKit && Kit is { } kit)
         {
-            MachinePads = new Tracker.Machines.KitPads(kit);
+            MachinePads = new Tracker.Machines.KitPads(kit, _keys);
             MachineSlices = Slices;
 
             kit.PropertyChanged += (_, e) =>

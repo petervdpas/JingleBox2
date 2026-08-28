@@ -1,3 +1,5 @@
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
@@ -271,6 +273,10 @@ public class PadGrid : Decorator
 
             cap.Pressed += (_, _) => Struck(held);
 
+            cap.AddHandler(InputElement.PointerPressedEvent, (_, _) => Down(held), RoutingStrategies.Tunnel);
+            cap.AddHandler(InputElement.PointerReleasedEvent, (_, _) => Up(held), RoutingStrategies.Tunnel);
+            cap.AddHandler(InputElement.PointerCaptureLostEvent, (_, _) => Up(held), RoutingStrategies.Tunnel);
+
             Grid.SetColumn(cap, held % across);
             Grid.SetRow(cap, held / across);
 
@@ -298,6 +304,27 @@ public class PadGrid : Decorator
 
         Refresh();
     }
+
+    /// <summary>
+    /// A hand has gone down on a pad, so its key lights on whatever keyboard is drawn.
+    /// </summary>
+    /// <remarks>
+    /// The light and nothing else. What sounds a pad is still its own press, which fires on the
+    /// way back up, so sliding off is still how a press is changed one's mind about: the key
+    /// lights while the hand is down and goes out again with nothing having sounded.
+    ///
+    /// Heard on the way down rather than bubbling, because the cap marks a press handled: it
+    /// captures nothing and answers on the release, which is the whole of how sliding off works.
+    /// </remarks>
+    private void Down(int at) => Pads?.Held(at);
+
+    /// <summary>The hand has come up, so the key goes out again.</summary>
+    /// <remarks>
+    /// Losing the pointer counts as coming up. A press that ends because the window went away or
+    /// something else grabbed the mouse never gets a release, and a key lit by a hand that is no
+    /// longer there stays lit for the rest of the session.
+    /// </remarks>
+    private void Up(int at) => Pads?.Let(at);
 
     /// <summary>
     /// Tells every pad what it says and whether it is lit, without rebuilding one.
