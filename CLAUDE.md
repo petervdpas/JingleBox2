@@ -113,6 +113,95 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   the same thing in the monospaced font readings are drawn in. `Value` is deliberately not in
   `AffectsMeasure` and now does not need to be. With every strip honest about its width the
   cards had to grow from 120 to 134, which is what the contents always needed
+- What a drawn keyboard lights is a monitor of the notes going past, whatever produced them.
+  `Midi/MidiMonitor.cs` is that monitor: one for the application, standing in front of the half
+  that plays the notes and passing every one on untouched, wired at startup and never taken off.
+  `IMidiMonitor` is what a keyboard reads, so a keyboard can be put a question to without a port,
+  a window or a hand. Keys, not sound: a key is an event with two halves and a sound is a thing
+  with a length, which is the question a kit's pads answer, and a cymbal rings for four seconds
+  after the key that started it came up
+- It had been the other way round twice, and both were wrong for the same reason. A panel that
+  kept a record of the presses it had heard showed nothing for a key on the hardware, since that
+  key never touches a panel: it goes to whoever the notes are being played on. Patching that up
+  panel by panel then meant a keyboard that listened only while its page was in front, or only
+  while the cursor was on its track, and went on being wrong in quieter ways. One monitor and
+  every keyboard reading it: a window opened mid-chord shows the chord, and two panels open at
+  once agree, because a key is down or it is not
+- The three producers reach it differently and that difference is the whole of what the type
+  says. A key on the hardware arrives through `INoteTrigger` on its way past to being played. A
+  mouse on a drawn key and a letter on the computer keyboard say so through `Pressed` and
+  `Released`, because the panel they are on sounds them itself and putting those back into the
+  stream would sound everything twice. `IMachineKeys` lost `Down` and `Up` again as a result:
+  they were a door for "played somewhere else" and the monitor is that door
+- A buffer off a MIDI port is not one message, and reading it as one is what hung keys. `Read`
+  took the first message and the rest of the delivery was dropped. The traffic hid it perfectly:
+  a hand does not put three fingers down at one instant, so a chord pressed arrives as three
+  deliveries a millisecond or two apart and every press was read, while lifting a hand is one
+  movement, so the three note offs arrive together and two of the three vanished. From every
+  point in the program above it that reads as "the release is never sent". Two keys left lit out
+  of a three note chord is the shape of it, and it is exactly what was reported. `Read` says how
+  many bytes it took now, and the port's delivery is walked to its end. `Tests/MidiDeliveryTests.cs`
+  is that walk: a chord released in one delivery, in running status and out, a press and its
+  release together, a clock byte threaded between two messages, a message cut short, and a
+  system exclusive message with a note behind it in the same breath
+- The log had nothing to say about it, and that was the second fault. The two routers that read
+  buttons and ignore notes wrote a line per note; the router that plays notes wrote nothing, so
+  a log taken while a key hung showed every press and had no way of showing that the release
+  never arrived. `MidiNoteRouter` says both halves now, and `TrackerNoteAdapter` says which half
+  of the application each went to and whether the release went where the press did
+- A key press is one thing with two halves, and the half that hears the second has to be the
+  one that heard the first. `TrackerNoteAdapter` asked which half was in front twice, once per
+  half of the press, and the answer can differ the second time: leave the rack, open a song or
+  close one with a finger still on a key and the release went to the pattern while the rack was
+  still holding the note and drawing its key lit, with nothing left to tell either of them the
+  hand had gone. It remembers where it sent each key now, per note, and sends the release after
+  it; a release nobody remembers still goes to the half in front, since that is what a device
+  already holding a note when the program starts sends. The adapter takes `IPlaysNotes` rather
+  than two view models, which is the whole reason the awkward cases can be put a question to
+  without a window
+- The path a key takes is tested end to end in three pieces, and each piece is somewhere a
+  stuck light could have come from. `Tests/NotePathTests.cs` plays raw bytes through
+  `MidiService.Read` and the router into an `INoteTrigger`: both spellings of a release, running
+  status, a chord, and aftertouch, which shares a note's shape and must not be read as a key
+  coming up. `Tests/NoteAdapterTests.cs` is the half-choosing above. `Tests/MachineKeysTests.cs`
+  presses keys on a real `DesignerKeys` through `IMachineKeys` and reads what is lit. That last
+  one found a fault the moment it existed: `Play` no longer refused a key that was already down,
+  so a letter held on the computer keyboard retriggered the machine on every repeat
+- `IMachineKeys.Down` and `Up` are that light on its own, for a note that was played elsewhere:
+  a key on the hardware has already been sounded by whoever the notes are going to, and playing
+  it again there would sound everything twice. `TrackerNoteAdapter` also stopped dropping the
+  release for the rack: a note-off has nothing to be written into there, which was the reason,
+  but it is also the moment a light goes out and a sound is let go, and dropped, the two halves
+  of one key press went to different places. A one-shot is safe, because `LetAudition` already
+  refuses to follow a key on one
+- Nothing is added from code to a machine's face. Where there is a design, the design is the
+  panel: what it does not draw, nobody draws. Three things were being filled in behind the
+  machine's back, all with the same well meant reasoning, that a panel missing an obvious control
+  should be given one. The keyboard at the foot, a preset picker in the header, and the line
+  saying which recording is playing. A machine that had never asked for any of them grew all
+  three, and the only way to be rid of one was to draw it yourself so the page's would stand
+  down. `IsDescribed` is the whole test now, in the three places that used to ask a narrower
+  question. A plugin is not a machine and is not edited in the designer: the panel there is this
+  program's own drawing, so its keyboard, its picker and its source line are parts of that panel
+  rather than additions to somebody's
+- The keyboard at the foot of a panel is gone from every machine, and it was not a keyboard
+  problem: the page was adding a part to somebody's design. A machine's face is what the machine
+  says it is, keyboard included, and the old rule added one wherever the description did not, so
+  a machine that had never asked for a keyboard grew one and the only way to be rid of it was to
+  draw a second keyboard so the first would stand down. `ShowsSharedKeys` asks `IsDescribed` now
+  rather than looking for a `Keys` element. The one exception is the panel this program draws
+  itself, which is what a plugin instrument gets: a plugin is not edited in the designer, so
+  there is no design there to decide anything and the keyboard is part of the panel rather than
+  an addition to one. Nothing was added to any machine on the way past: a machine that wants a
+  keyboard gets a Keys part dropped on it in the designer, by hand, like every other part
+- The instrument window hears the same two halves through `MidiKeyDown` and `MidiKeyUp` on the
+  tracker, which are beside `NotePlayed` rather than folded into it because they answer different
+  questions: what is sounding is what a kit's pads show and what a playhead runs on, and where a
+  hand is is what a keyboard shows. A note goes on sounding long after its key came up. Only the
+  hardware raises them, deliberately: the drawn keyboard hears its own presses, and a letter
+  typed into the pattern has no key coming up at all, so a light lit from one would stay lit for
+  the rest of the session. The up carries no track, since the cursor can move between the press
+  and the release and a light filtered by where the release landed would never go out
 - The peak mark on a meter would not come down. The fall is in `MeterScale.DecayPeak` and always
   was, held for a moment and then twenty decibels a second, but it is worked out while the meter
   draws and a meter draws when a value changes. So the bar emptied when the last level arrived
@@ -524,6 +613,12 @@ because that exact thing was wrong once.
   the guard inside `Log.Write` is checked after the caller has already allocated it. Everywhere
   else still writes without asking, because a line written when something is decided costs
   nothing worth counting
+- `LogArea.Machines` is the sixth area, and everything under `Tracker/Machines/` writes to it
+  rather than to the app's. It is a whole half of this program and it says almost nothing while
+  nothing is wrong; the day a machine draws an empty panel or comes back from a zip missing a
+  picture, the last thing anybody wants is to read that out of everything the application did at
+  startup. The tick box in SETTINGS appeared on its own, since that page is built from
+  `Log.Everywhere`
 - The log switch is per area everywhere now. Ten places gated on `Log.IsOn`, which is any area at
   all, and then wrote to one: two of them on the audio thread, so switching MIDI logging on made
   the mixer do census work per block that nothing would ever print

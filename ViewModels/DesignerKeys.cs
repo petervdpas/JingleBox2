@@ -1,10 +1,10 @@
+using Avalonia.Threading;
 using JingleBox2.Machines;
+using JingleBox2.Midi;
 using JingleBox2.Tracker;
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 
@@ -24,36 +24,56 @@ namespace JingleBox2.ViewModels;
 /// outlines its key and hitting a key lights its pad, and neither of those is arranged anywhere:
 /// they are the same fact read twice.
 ///
-/// It follows rather than copies. What is sounding is the designer's own set, what is on the
-/// pads is the kit's own list, and this holds neither: a second copy would be wrong the first
-/// time a note was played.
+/// It follows rather than copies. What is on the pads is the kit's own list and which keys are
+/// down is the monitor's, and this holds neither: a second copy would be wrong the first time a
+/// note was played.
 /// </remarks>
-public sealed class DesignerKeys : IMachineKeys
+public sealed class DesignerKeys : IMachineKeys, IDisposable
 {
     private readonly IInstrumentDesigner _designer;
+
+    /// <summary>
+    /// Which keys are down, from every producer there is.
+    /// </summary>
+    /// <remarks>
+    /// The monitor rather than a set of this keyboard's own, because a keyboard drawn on a panel
+    /// is a picture of the keys and not a record of the presses this particular panel happened
+    /// to hear. A panel that kept its own showed nothing for the hardware, which reaches the
+    /// stream and never reaches a panel; one that listened only while its page was in front, or
+    /// only while the cursor was on its track, would go on being wrong in quieter ways.
+    ///
+    /// Its own when nobody hands one over, so a panel on the bench and a panel in a test are
+    /// keyboards like any other.
+    /// </remarks>
+    private readonly IMidiMonitor _keys;
 
     private DrumKitViewModel? _watching;
 
     public DesignerKeys(IInstrumentDesigner designer)
     {
         _designer = designer;
+        _keys = designer.MidiKeys ?? new MidiMonitor();
 
-        // The notes sounding move on every note, and the keys light off them.
-        _designer.Sounding.Lit.CollectionChanged += Moved;
+        Read();
+
+        _keys.Changed += Moved;
     }
 
     /// <summary>
-    /// The keys a hand is on: what the keyboard lights.
+    /// The keys with a hand on them: what the keyboard lights.
     /// </summary>
     /// <remarks>
-    /// Not what is sounding, which is what the pads light and is a different question. A cymbal
-    /// rings on under the snare that follows it and both its pad stays lit; the key that started
-    /// it went up a tenth of a second after it went down. A keyboard lit by the sounding notes
-    /// lags behind every single thing you do on it.
+    /// Keys, not sound. A note is an event with two halves and a sound is a thing with a length,
+    /// and this is a picture of the first: what is sounding is the question a kit's pads answer,
+    /// and a cymbal rings for four seconds after the key that started it came up.
+    ///
+    /// One collection for the life of this, written into rather than replaced, because both
+    /// keyboards watch it for changes and a fresh list on every read is a list nothing can
+    /// watch.
     /// </remarks>
-    public IEnumerable Lit => _held;
+    public IEnumerable Lit => _lit;
 
-    private readonly ObservableCollection<int> _held = new();
+    private readonly ObservableCollection<int> _lit = new();
 
     /// <summary>
     /// The keys with something on them, which on anything but a kit is none of them.
@@ -99,43 +119,104 @@ public sealed class DesignerKeys : IMachineKeys
         }
     }
 
-    /// <summary>Plays it, and remembers that a hand is on it.</summary>
+    /// <summary>Plays it, and says so, which is what clicking a key has always done.</summary>
     /// <remarks>
-    /// A key already down is not pressed again. Holding one on the computer keyboard repeats it
+    /// A key already down is not played again. Holding one on the computer keyboard repeats it
     /// for as long as it is held, and a machine retriggered forty times a second is not what
     /// anybody meant by leaning on a key.
     /// </remarks>
     public void Play(int semitone)
     {
-        if (_held.Contains(semitone)) return;
+        if (_keys.Holds(semitone)) return;
 
-        _held.Add(semitone);
-
-        Changed?.Invoke(this, EventArgs.Empty);
+        _keys.Pressed(semitone);
 
         _designer.Play(new Note(semitone), TrackerCell.NoVolume);
     }
 
-    /// <summary>Says it is up again, which is what puts its light out.</summary>
+    /// <summary>
+    /// Says it is up again, and lets the note go.
+    /// </summary>
     /// <remarks>
-    /// The light goes out and the note is let go, which is the same thing a pattern's OFF does
-    /// to a track: it goes into its release rather than stopping dead, so a sound with a long
-    /// tail keeps its tail.
+    /// The release and not a stop: what was started goes into its release the way it does when a
+    /// pattern reaches an OFF, so a sound with a long tail keeps its tail.
     /// </remarks>
     public void Let(int semitone)
     {
-        if (!_held.Remove(semitone)) return;
+        if (!_keys.Holds(semitone)) return;
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        _keys.Released(semitone);
 
-        // And the note itself is let go, which is the same thing a pattern's OFF does to a
-        // track. A key coming up is not a stop button: what it started goes into its release.
         _designer.Let(new Note(semitone));
     }
 
     public event EventHandler? Changed;
 
+    /// <summary>Stops listening, for a panel nobody can reach any more.</summary>
+    /// <remarks>
+    /// The monitor outlives every panel, so a window closed with nothing taken off it would go
+    /// on being told about keys for the rest of the session.
+    /// </remarks>
+    public void Dispose() => _keys.Changed -= Moved;
+
     private DrumKitViewModel? Kit => _designer.Editor?.Kit;
+
+    /// <summary>
+    /// A key went down or came up somewhere.
+    /// </summary>
+    /// <remarks>
+    /// On whichever thread the note arrived on, which for the hardware is not the drawing one,
+    /// so what it moves is moved over there.
+    /// </remarks>
+    private void Moved(object? sender, EventArgs e)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) Read();
+        else Dispatcher.UIThread.Post(Read);
+    }
+
+    /// <summary>
+    /// Reads the monitor, and moves the keyboard if a key is down that it cannot show.
+    /// </summary>
+    /// <remarks>
+    /// Only the differences are written: this runs on every half of every key, and a collection
+    /// that emptied and refilled itself would redraw a keyboard on which one key had changed.
+    /// </remarks>
+    private void Read()
+    {
+        var down = _keys.Down;
+
+        bool moved = false;
+
+        for (int at = _lit.Count - 1; at >= 0; at--)
+        {
+            if (down.Contains(_lit[at])) continue;
+
+            _lit.RemoveAt(at);
+            moved = true;
+        }
+
+        foreach (int semitone in down)
+        {
+            if (_lit.Contains(semitone)) continue;
+
+            _lit.Add(semitone);
+            moved = true;
+
+            // A keyboard that cannot show the key it is lighting is showing nothing.
+            Reveal(semitone);
+        }
+
+        if (moved) Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Moves the octaves on show if a key landed outside them.</summary>
+    private void Reveal(int semitone)
+    {
+        var note = new Note(semitone);
+        if (!note.IsPlayable) return;
+
+        Octave = PanelKeyboard.Reveal(note, Octave);
+    }
 
     /// <summary>
     /// Listens to whichever kit is in front of it now.
@@ -159,7 +240,4 @@ public sealed class DesignerKeys : IMachineKeys
     }
 
     private void Moved(object? sender, PropertyChangedEventArgs e) => Changed?.Invoke(this, EventArgs.Empty);
-
-    private void Moved(object? sender, NotifyCollectionChangedEventArgs e) =>
-        Changed?.Invoke(this, EventArgs.Empty);
 }

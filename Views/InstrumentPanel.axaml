@@ -95,7 +95,7 @@
                    recording machine with no recording on it has no settings worth shipping.
                    Either way the name, the id and the level stay: this is still the same
                    instrument, given a different sound to make. -->
-              <StackPanel Classes="entry" IsVisible="{Binding !Editor.DescribesPreset}">
+              <StackPanel Classes="entry" IsVisible="{Binding !Editor.IsDescribed}">
                 <TextBlock Classes="field" Text="{Binding Presets.Caption}" />
 
                 <!-- One control, not three: the arrows, the name and how far through you are
@@ -119,9 +119,11 @@
 
             </WrapPanel>
 
+            <!-- What it is playing, for the panel this program draws itself. A described
+                 machine says it where it wants it said, with a Take part, or does not say it. -->
             <TextBlock Classes="cardHint"
                        Text="{Binding Editor.SourceText}"
-                       IsVisible="{Binding Editor.SourceText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       IsVisible="{Binding !Editor.IsDescribed}"
                        TextTrimming="CharacterEllipsis" />
 
 

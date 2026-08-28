@@ -92,7 +92,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machine could not be imported from " + zipPath, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be imported from " + zipPath, ex);
 
             return null;
         }
@@ -131,7 +131,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machine could not be taken from " + fromCrate.Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be taken from " + fromCrate.Folder, ex);
 
             return null;
         }
@@ -157,13 +157,13 @@ public static class MachineArchive
 
             Directory.Delete(folder, recursive: true);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "machine removed from " + folder);
+            Diagnostics.Log.Write(Diagnostics.LogArea.Machines, () => "machine removed from " + folder);
 
             return true;
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machine could not be removed from " + project.Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine could not be removed from " + project.Folder, ex);
 
             return false;
         }
@@ -262,7 +262,7 @@ public static class MachineArchive
 
             if (installed != null)
             {
-                Diagnostics.Log.Write(Diagnostics.LogArea.App,
+                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
                     () => "machine " + installed.Id + " installed into " + installed.Folder);
             }
 
@@ -318,7 +318,7 @@ public static class MachineArchive
 
             if (!MachinePaths.Under(full, into))
             {
-                Diagnostics.Log.Write(Diagnostics.LogArea.App,
+                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
                     () => "machine zip refused: " + entry.FullName + " lands outside " + into);
 
                 return false;
@@ -374,7 +374,7 @@ public static class MachineArchive
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Half an imported machine is left in " + staging, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Half an imported machine is left in " + staging, ex);
         }
     }
 

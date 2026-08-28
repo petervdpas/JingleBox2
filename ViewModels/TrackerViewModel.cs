@@ -25,7 +25,7 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
-public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Shortcuts.IShortcutContext
+public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.IPlaysNotes, Shortcuts.IShortcutContext
 {
     private readonly TrackerPlayer _player;
     private readonly SongStore _store;
@@ -408,7 +408,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
             InstrumentEdited,
-            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings),
+            () => new TrackInstrumentDesigner(track, instrument, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
             () => ClearTrackInstrument(track));
 
         _instrumentBoxes[track] = box;
@@ -743,6 +743,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>The track the cursor is in, for the header to pick out.</summary>
     public int SelectedTrack => Cursor.Track;
+
+    /// <summary>
+    /// Which keys are down, handed to every panel this page opens.
+    /// </summary>
+    /// <remarks>
+    /// The application's one monitor of the notes. Held here rather than looked up, because an
+    /// instrument's window is built by this and there is nowhere else for it to come from.
+    /// </remarks>
+    public Midi.IMidiMonitor? MidiKeys { get; set; }
 
     public bool IsPlaying => Transport == TrackerTransportState.Playing;
     public bool IsPaused => Transport == TrackerTransportState.Paused;

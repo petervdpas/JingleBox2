@@ -351,48 +351,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     public bool IsDescribed => Described != null;
 
     /// <summary>
-    /// True when the machine describes its own picker, so the page should not add one.
+    /// True when the keyboard at the foot of the panel is the one to show, which is only where
+    /// there is no described panel at all.
     /// </summary>
     /// <remarks>
-    /// The page fills in what a machine does not say. Where the machine puts a picker on its own
-    /// panel, a second one in the header is the same control twice, showing the same list, one
-    /// of which is in the wrong place.
-    /// </remarks>
-    public bool DescribesPreset => Described?.Panel.Root is { } root && Holds(root, MachineElementKinds.Preset);
-
-    /// <summary>
-    /// True when the machine draws its own keyboard, so the page should not add one.
-    /// </summary>
-    /// <remarks>
-    /// The keyboard used to be the same on every panel and stood at the foot of all of them. It
-    /// is not the same on a kit: which keys have drums on them and which one is in hand are
-    /// things only the machine's own keyboard can show, so where a machine draws one, the shared
-    /// keyboard would be a second keyboard saying less.
+    /// A machine's face is what the machine says it is, keyboard included. The page used to add
+    /// one wherever the description did not, which meant a machine that had never asked for a
+    /// keyboard grew one, and the only way to be rid of it was to draw a second keyboard so the
+    /// first would stand down. Where there is a design, the design decides.
     ///
-    /// Asked of the description rather than of which machine this is, so a machine somebody else
-    /// built gets the same answer for the same reason.
+    /// What is left is the panel this program draws itself, which is what a plugin instrument
+    /// gets: there is no description there to decide anything, so the keyboard is part of the
+    /// panel rather than an addition to somebody's.
     /// </remarks>
-    public bool DescribesKeys => Described?.Panel.Root is { } root && Holds(root, MachineElementKinds.Keys);
-
-    /// <summary>
-    /// True when the keyboard at the foot of the panel is the one to show.
-    /// </summary>
-    /// <remarks>
-    /// It is there unless the machine's own description already put one on the panel, which a
-    /// kit does: hitting a key and watching its pad answer is one glance, so a kit's keyboard
-    /// belongs beside its pads rather than at the foot of the page.
-    /// </remarks>
-    public bool ShowsSharedKeys => !DescribesKeys;
-
-    private static bool Holds(MachineElement element, string kind)
-    {
-        if (element.Element == kind) return true;
-
-        foreach (var child in element.Children)
-            if (Holds(child, kind)) return true;
-
-        return false;
-    }
+    public bool ShowsSharedKeys => !IsDescribed;
 
     /// <summary>Everything the page reads off the instrument, after a described panel moved one.</summary>
     /// <remarks>

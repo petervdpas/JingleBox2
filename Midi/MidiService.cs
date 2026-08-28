@@ -309,9 +309,51 @@ public sealed class MidiService : IMidiService
     public static bool SameName(string? left, string? right) =>
         string.Equals((left ?? "").Trim(), (right ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// What one delivery from a port holds, which is one message or several.
+    /// </summary>
+    /// <remarks>
+    /// Several is the case that was missed, and it is not a rare one: a hand coming off a chord
+    /// sends three note offs at the same instant and the port hands them over together. Only the
+    /// first was read, so two keys were left sounding and lit with nothing left able to stop
+    /// them. Every press arrived on its own, a millisecond or two apart, which is why the fault
+    /// looked like the releases were not being sent at all.
+    ///
+    /// A message that takes none of the buffer is the system exclusive gatherer handing a byte
+    /// back to be read as the start of something else. It is read again once, when nothing is
+    /// being gathered; refusing twice would be a loop, so it stops.
+    /// </remarks>
     private void OnMessageReceived(string device, MidiReceivedEventArgs e)
     {
-        var msg = Read(device, e.Data, e.Start, e.Length);
+        if (e.Data == null) return;
+
+        int at = e.Start;
+        int end = Math.Min(e.Start + e.Length, e.Data.Length);
+        bool again = false;
+
+        while (at < end)
+        {
+            var one = Read(device, e.Data, at, end - at, out int used);
+
+            if (used <= 0)
+            {
+                if (again) return;
+
+                again = true;
+                continue;
+            }
+
+            again = false;
+
+            Delivered(device, one, e.Data, at, used);
+
+            at += used;
+        }
+    }
+
+    /// <summary>One message read out of a delivery, said out loud or accounted for.</summary>
+    private void Delivered(string device, MidiMessage? msg, byte[] data, int start, int length)
+    {
 
         // The first hop of all, and only for what is thrown away here. A message that is
         // understood goes on to say for itself what it did; one dropped at the wire is silent
@@ -324,9 +366,9 @@ public sealed class MidiService : IMidiService
             // The clock and active sensing arrive dozens of times a second on any device with a
             // sequencer in it, and a piece of a system exclusive message arrives whenever one is
             // long. Reporting either as unread would drown the very lines this log is kept for.
-            if (!Chatter(e.Data, e.Start, e.Length))
+            if (!Chatter(data, start, length))
                 Log.Write(LogArea.Midi, () =>
-                    "port: '" + device + "' sent " + Bytes(e.Data, e.Start, e.Length)
+                    "port: '" + device + "' sent " + Bytes(data, start, length)
                     + " which is not a kind read here, so it is dropped");
 
             return;
@@ -447,8 +489,13 @@ public sealed class MidiService : IMidiService
     /// does while it answers an identity request. Any other byte with the top bit set means the
     /// sender abandoned the message part way, which is what a cable being pulled looks like.
     /// </remarks>
-    private MidiMessage? Gather(string device, byte[] data, int at, int end)
+    private MidiMessage? Gather(string device, byte[] data, int at, int end, out int used)
     {
+        int from = at;
+
+        // Everything left, unless it finds the end of the message inside it.
+        used = end - from;
+
         lock (_lock)
         {
             // Whatever run of messages was going, this ended it.
@@ -468,8 +515,9 @@ public sealed class MidiService : IMidiService
                     so.Clear();
 
                     // A fresh one starting is the common way to see this, and it is not a
-                    // fault: the piece before it was simply never finished.
-                    if (b != 0xF0) { _building.Remove(device); return null; }
+                    // fault: the piece before it was simply never finished. The byte is handed
+                    // back rather than eaten, because it is the start of whatever comes next.
+                    if (b != 0xF0) { _building.Remove(device); used = at - from; return null; }
                 }
 
                 so.Add(b);
@@ -479,6 +527,10 @@ public sealed class MidiService : IMidiService
                     var whole = so.ToArray();
                     _building.Remove(device);
 
+                    // The message ends here, and anything after it in the buffer is the next
+                    // one's business.
+                    used = at + 1 - from;
+
                     return new MidiMessage
                     {
                         Device = device, Type = MidiMessageType.SystemExclusive,
@@ -486,7 +538,7 @@ public sealed class MidiService : IMidiService
                     };
                 }
 
-                if (so.Count > TooLong) { _building.Remove(device); return null; }
+                if (so.Count > TooLong) { _building.Remove(device); used = at + 1 - from; return null; }
             }
         }
 
@@ -501,8 +553,27 @@ public sealed class MidiService : IMidiService
     /// Public because it holds the running status state and is the one piece here with a rule
     /// subtle enough to be worth testing on its own, away from any hardware.
     /// </remarks>
-    public MidiMessage? Read(string device, byte[] data, int start, int length)
+    public MidiMessage? Read(string device, byte[] data, int start, int length) =>
+        Read(device, data, start, length, out _);
+
+    /// <summary>
+    /// The same, saying how many of those bytes it took.
+    /// </summary>
+    /// <remarks>
+    /// A buffer off the wire is not one message. It is whatever the port had ready, and a hand
+    /// coming off a chord puts three note offs into it at one instant. Reading the first and
+    /// dropping the rest is what left keys sounding and lit with nothing able to stop them:
+    /// pressing a chord arrives as three separate deliveries a millisecond or two apart and is
+    /// read whole, and letting go of one arrives as a single delivery of which only the first
+    /// note came out.
+    ///
+    /// So whoever is reading walks the buffer, and this is what tells them where the next
+    /// message starts.
+    /// </remarks>
+    public MidiMessage? Read(string device, byte[] data, int start, int length, out int used)
     {
+        used = 0;
+
         if (data == null || length <= 0 || start < 0 || start >= data.Length) return null;
 
         int at = start;
@@ -511,7 +582,7 @@ public sealed class MidiService : IMidiService
         byte status;
 
         // The one message with no length, and so the one that can arrive in pieces.
-        if (data[at] == 0xF0 || Building(device)) return Gather(device, data, at, end);
+        if (data[at] == 0xF0 || Building(device)) return Gather(device, data, at, end, out used);
 
         if (data[at] >= 0x80)
         {
@@ -523,13 +594,18 @@ public sealed class MidiService : IMidiService
             // the clock and active sensing, which arrive dozens of times a second and say
             // nothing this application acts on.
             if (status >= 0xF8)
+            {
+                used = 1;
+
                 return status is Started or Continued or Stopped
                     ? new MidiMessage { Device = device, Type = MidiMessageType.Realtime, Channel = 0, Value = status, Data = 0, IsOn = false }
                     : null;
+            }
 
             if (status >= 0xF0)
             {
                 lock (_lock) _running.Remove(device);
+                used = 1;
                 return null;
             }
 
@@ -542,7 +618,9 @@ public sealed class MidiService : IMidiService
             // nothing at all, and only the very first move of the very first knob is heard.
             lock (_lock)
             {
-                if (!_running.TryGetValue(device, out status)) return null;
+                // Nothing to read it against, so the byte is stepped over rather than read
+                // again for ever.
+                if (!_running.TryGetValue(device, out status)) { used = 1; return null; }
             }
         }
 
@@ -554,10 +632,15 @@ public sealed class MidiService : IMidiService
         // that message. Nothing here wants either of them, but running status means a wrong
         // length is not a wrong message, it is every message after it.
         int wants = type is 0xC0 or 0xD0 ? 1 : 2;
-        if (at + wants > end) return null;
+
+        // Half a message. Nothing here splits one across two deliveries, so what is left is not
+        // going to be completed by anything: it is taken and dropped rather than read again.
+        if (at + wants > end) { used = end - start; return null; }
 
         byte d1 = data[at];
         byte d2 = wants > 1 ? data[at + 1] : (byte)0;
+
+        used = at + wants - start;
 
         return type switch
         {

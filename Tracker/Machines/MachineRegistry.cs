@@ -94,7 +94,7 @@ public static class MachineRegistry
 
             taken.Add(project);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.App,
+            Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
                 () => "machine " + project.Id + " from " + project.Folder);
         }
 
@@ -124,7 +124,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machines could not be read from " + folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machines could not be read from " + folder, ex);
 
             return Array.Empty<MachineProject>();
         }
@@ -163,7 +163,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machines folder could not be made at " + Installed, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machines folder could not be made at " + Installed, ex);
 
             return;
         }
@@ -197,7 +197,7 @@ public static class MachineRegistry
 
             if (MachineArchive.Add(project) != null) continue;
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.App,
+            Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
                 () => "machine " + project.Id + " could not be taken from " + project.Folder);
         }
 
@@ -233,14 +233,14 @@ public static class MachineRegistry
 
                 File.Copy(from, to, overwrite: true);
 
-                Diagnostics.Log.Write(Diagnostics.LogArea.App,
+                Diagnostics.Log.Write(Diagnostics.LogArea.Machines,
                     () => "machine " + named + " brought up to date in " + installed);
             }
         }
         catch (Exception ex)
         {
             Diagnostics.Log.Fault(
-                Diagnostics.LogArea.App, "A machine could not be brought up to date from " + shipped, ex);
+                Diagnostics.LogArea.Machines, "A machine could not be brought up to date from " + shipped, ex);
         }
     }
 
@@ -256,7 +256,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The machines already offered could not be read", ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The machines already offered could not be read", ex);
         }
 
         // No file, so this installation is either brand new or older than the file. Whatever it
@@ -273,7 +273,7 @@ public static class MachineRegistry
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The machines already offered could not be written", ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The machines already offered could not be written", ex);
         }
     }
 }

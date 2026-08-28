@@ -158,7 +158,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "Machine project could not be read", ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "Machine project could not be read", ex);
 
             return null;
         }
@@ -265,7 +265,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The presets could not be read from " + folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The presets could not be read from " + folder, ex);
         }
 
         if (StartsFrom.Length == 0) return null;
@@ -364,7 +364,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The pictures could not be swept in " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The pictures could not be swept in " + Folder, ex);
         }
 
         return gone;
@@ -428,7 +428,7 @@ public sealed class MachineProject
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "The pictures could not be renumbered in " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The pictures could not be renumbered in " + Folder, ex);
         }
 
         return moved;
@@ -462,13 +462,13 @@ public sealed class MachineProject
 
             File.Delete(wanted);
 
-            Diagnostics.Log.Write(Diagnostics.LogArea.App, () => "machine picture removed: " + wanted);
+            Diagnostics.Log.Write(Diagnostics.LogArea.Machines, () => "machine picture removed: " + wanted);
 
             return true;
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "A picture could not be removed from " + Folder, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "A picture could not be removed from " + Folder, ex);
 
             return false;
         }

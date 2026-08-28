@@ -22,7 +22,15 @@ namespace JingleBox2.Machines;
 /// </remarks>
 public interface IMachineKeys
 {
-    /// <summary>The semitones sounding now, as absolute note numbers.</summary>
+    /// <summary>
+    /// The semitones held down now, as absolute note numbers.
+    /// </summary>
+    /// <remarks>
+    /// A monitor of the notes going past, and not a record of what this panel heard. A key on
+    /// the hardware never touches a panel: it goes to whoever the notes are being played on, and
+    /// a keyboard that only knew about its own presses showed nothing for the one keyboard
+    /// people actually play.
+    /// </remarks>
     IEnumerable Lit { get; }
 
     /// <summary>

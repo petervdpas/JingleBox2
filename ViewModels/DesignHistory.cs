@@ -94,7 +94,7 @@ public sealed class DesignHistory
             _undone.Clear();
             _now = _saved;
 
-            Log.Write(LogArea.App, () => "design: threw away the changes to " + project.Name);
+            Log.Write(LogArea.Machines, () => "design: threw away the changes to " + project.Name);
 
             return true;
         }
@@ -185,7 +185,7 @@ public sealed class DesignHistory
 
             _now = wanted;
 
-            Log.Write(LogArea.App, () => "design: " + said + " a change to " + project.Name);
+            Log.Write(LogArea.Machines, () => "design: " + said + " a change to " + project.Name);
 
             return true;
         }
@@ -207,7 +207,7 @@ public sealed class DesignHistory
         }
         catch (Exception bad)
         {
-            Log.Write(LogArea.App, () => "design: cannot keep a step: " + bad.Message);
+            Log.Write(LogArea.Machines, () => "design: cannot keep a step: " + bad.Message);
 
             return "";
         }
@@ -247,7 +247,7 @@ public sealed class DesignHistory
         }
         catch (Exception bad)
         {
-            Log.Write(LogArea.App, () => "design: cannot put a step back: " + bad.Message);
+            Log.Write(LogArea.Machines, () => "design: cannot put a step back: " + bad.Message);
 
             return false;
         }

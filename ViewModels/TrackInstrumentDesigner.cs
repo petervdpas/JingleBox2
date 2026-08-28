@@ -33,9 +33,11 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         IWaveformService? waveforms = null,
         ITrackerPanel? tracker = null,
         MachineRack? rack = null,
-        System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null)
+        System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null,
+        Midi.IMidiMonitor? keys = null)
     {
         Track = track;
+        _keys = keys;
         _instrument = instrument;
         _audition = audition;
         _changed = changed;
@@ -164,6 +166,11 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
     private IMachineKeys? _machineKeys;
 
+    /// <summary>Which keys are down, which is the application's one monitor of the notes.</summary>
+    public Midi.IMidiMonitor? MidiKeys => _keys;
+
+    private readonly Midi.IMidiMonitor? _keys;
+
 
     /// <summary>
     /// A note went to a track. If it went to this one, the keyboard shows it.
@@ -250,6 +257,9 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
 
         Sounding.Silence();
         Location?.Dispose();
+
+        // The monitor outlives this window, so its keyboard has to come off it.
+        (_machineKeys as IDisposable)?.Dispose();
     }
 
     /// <summary>The instrument's name may have been typed into; the strip shows it.</summary>

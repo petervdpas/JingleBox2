@@ -61,6 +61,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// panels, plugin panels and mixer strips alike, and the mode has to mean the same thing
     /// wherever the pointer happens to be. Ctrl+Shift+M turns it on and off.
     /// </remarks>
+    /// <summary>Which keys are down, for anything drawing a keyboard. See MidiMonitor.</summary>
+    public Midi.MidiMonitor? Keys { get; private set; }
+
     public Midi.ControlLink ControlLink { get; private set; } = null!;
 
     /// <summary>What the controller is pointed at, for the list in SETTINGS.</summary>
@@ -779,7 +782,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         // MIDI routing: global, profile-independent mapping. Which controller reaches which
         // half of the app is decided by the roles in SETTINGS, not here.
         var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
-        var noteRouter = new MidiNoteRouter(new TrackerNoteAdapter(Tracker, Machines));
+        // One monitor of the notes going past, in front of the half that plays them, wired here
+        // and never taken off. What a drawn keyboard shows is read from this rather than from
+        // whatever that panel happened to hear: a key on the hardware never touches a panel.
+        Keys = new MidiMonitor(new TrackerNoteAdapter(Tracker, Machines));
+
+        Machines.MidiKeys = Keys;
+        Tracker.MidiKeys = Keys;
+
+        var noteRouter = new MidiNoteRouter(Keys);
 
         // Knobs and faders. The router knows the mappings and the adapter knows the program,
         // as with the two above, and the link is what puts a mapping there in the first place.

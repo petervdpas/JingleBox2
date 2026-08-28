@@ -34,7 +34,19 @@ public enum LogArea
     /// <summary>MIDI in and where it is routed.</summary>
     Midi = 1 << 4,
 
-    Everything = App | Audio | Plugins | Tracker | Midi
+    /// <summary>
+    /// The machines: what is installed, what is read off a machine's own folder, and what a
+    /// machine's face is built from.
+    /// </summary>
+    /// <remarks>
+    /// Its own area rather than part of the app's, because it is a whole half of this program
+    /// and it says almost nothing while nothing is wrong. What it is for is the day a machine
+    /// draws an empty panel or comes back from a zip missing a picture, and on that day the
+    /// last thing anybody wants is to read it out of everything the application did at startup.
+    /// </remarks>
+    Machines = 1 << 5,
+
+    Everything = App | Audio | Plugins | Tracker | Midi | Machines
 }
 
 /// <summary>
@@ -406,7 +418,8 @@ public static class Log
         [LogArea.Audio] = "audio",
         [LogArea.Plugins] = "plugin",
         [LogArea.Tracker] = "tracker",
-        [LogArea.Midi] = "midi"
+        [LogArea.Midi] = "midi",
+        [LogArea.Machines] = "machines"
     };
 
     private static string Short(LogArea area) => Names.TryGetValue(area, out var name) ? name : "log";

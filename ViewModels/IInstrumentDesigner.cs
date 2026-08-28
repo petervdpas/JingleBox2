@@ -96,6 +96,16 @@ public interface IInstrumentDesigner
     IMachineKeys MachineKeys { get; }
 
     /// <summary>
+    /// Which keys are down, from every producer, or nothing for a panel standing on its own.
+    /// </summary>
+    /// <remarks>
+    /// One of these for the application, wired to the note stream at startup. A panel is handed
+    /// it rather than watching the notes itself, because what a keyboard shows has nothing to do
+    /// with which panel heard which note.
+    /// </remarks>
+    Midi.IMidiMonitor? MidiKeys => null;
+
+    /// <summary>
     /// Somewhere to start: the instruments the shelf already holds on this same machine.
     /// </summary>
     /// <remarks>

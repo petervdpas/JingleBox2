@@ -1,3 +1,4 @@
+using JingleBox2.Diagnostics;
 using JingleBox2.Tracker;
 
 namespace JingleBox2.Midi;
@@ -31,6 +32,16 @@ public sealed class MidiNoteRouter
     {
         if (msg is null || msg.Type != MidiMessageType.Note) return;
         if (!MidiNoteInput.TryNote(msg.Value, out var note)) return;
+
+        // Both halves, said out loud. The two routers that read buttons and ignore notes were
+        // the noisy ones and the one that plays them said nothing at all, so a log taken while
+        // a key hung showed every press and had no way of showing that its release never
+        // arrived. A key press is tens of messages a minute, not thousands, so this is asked
+        // rather than counted.
+        if (Log.On(LogArea.Midi))
+            Log.Write(LogArea.Midi, () =>
+                "note: '" + msg.Device + "' " + (msg.IsOn ? "down " : "up ") + note
+                + " (" + msg.Value + ") velocity " + msg.Data);
 
         if (msg.IsOn) _notes.TriggerNote(note, MidiNoteInput.VolumeFor(msg.Data));
         else _notes.ReleaseNote(note);

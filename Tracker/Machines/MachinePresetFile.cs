@@ -199,7 +199,7 @@ public static class MachinePresetFile
         }
         catch (Exception ex)
         {
-            Diagnostics.Log.Fault(Diagnostics.LogArea.App, "A preset could not be read: " + path, ex);
+            Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "A preset could not be read: " + path, ex);
 
             return null;
         }

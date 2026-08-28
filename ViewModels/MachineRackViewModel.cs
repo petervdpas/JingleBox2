@@ -24,7 +24,7 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner
+public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.IPlaysNotes
 {
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
@@ -223,7 +223,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
             retired++;
 
-            Log.Write(LogArea.App, () => "retired '" + name + "' from the rack");
+            Log.Write(LogArea.Machines, () => "retired '" + name + "' from the rack");
         }
 
         foreach (var machine in Machine.Installed)
@@ -244,9 +244,20 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
-    /// <summary>A note from a MIDI keyboard, which arrives on the MIDI thread.</summary>
+    /// <summary>
+    /// A note from a MIDI keyboard, which arrives on the MIDI thread.
+    /// </summary>
+    /// <remarks>
+    /// The key is shown down as well as played. A hand on the hardware is a hand on a key, and
+    /// the panel's keyboard is where you look to see which one: it has lit for a mouse and for
+    /// the computer keyboard since it stopped lighting from what was sounding, and the hardware
+    /// was the one door into it that was never told.
+    /// </remarks>
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => PlayNote(note, volume));
+
+    /// <summary>And that key coming up, which lets the note go.</summary>
+    public void ReleaseMidiNote(Note note) => Dispatcher.UIThread.Post(() => Let(note));
 
     /// <summary>
     /// Somewhere to start: the shelf's other instruments on this same machine.
@@ -292,6 +303,9 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     public IMachineKeys MachineKeys => _machineKeys ??= new DesignerKeys(this);
 
     private IMachineKeys? _machineKeys;
+
+    /// <summary>Which keys are down, which is the application's one monitor of the notes.</summary>
+    public Midi.IMidiMonitor? MidiKeys { get; set; }
 
 
     /// <summary>One note from the panel's own keyboard.</summary>
