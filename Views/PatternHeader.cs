@@ -14,26 +14,38 @@ namespace JingleBox2.Views;
 /// pattern's scroll area so it stays put vertically, and takes the horizontal scroll offset
 /// so it stays aligned with the columns it names.
 /// </summary>
+/// <remarks>
+/// The square above the line numbers names no track, which makes it the one place in this row
+/// where something that is not a thing you touch can sit. The pattern's help badge is laid over
+/// it for exactly that reason.
+/// </remarks>
 public sealed class PatternHeader : ThemedControl
 {
+    /// <summary>How many tracks are named, which is how many the pattern has.</summary>
     public static readonly StyledProperty<int> TrackCountProperty =
         AvaloniaProperty.Register<PatternHeader, int>(nameof(TrackCount), Song.DefaultTrackCount);
 
+    /// <summary>Which one the cursor is in, drawn picked out from the rest.</summary>
     public static readonly StyledProperty<int> SelectedTrackProperty =
         AvaloniaProperty.Register<PatternHeader, int>(nameof(SelectedTrack));
 
+    /// <inheritdoc cref="CharWidth"/>
     public static readonly StyledProperty<double> CharWidthProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(CharWidth), 8);
 
+    /// <inheritdoc cref="ScrollOffset"/>
     public static readonly StyledProperty<double> ScrollOffsetProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(ScrollOffset));
 
+    /// <summary>The pattern's own row height, which the header's height and lettering follow.</summary>
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(RowHeight), 18);
 
+    /// <inheritdoc cref="DropTargetTrack"/>
     public static readonly StyledProperty<int> DropTargetTrackProperty =
         AvaloniaProperty.Register<PatternHeader, int>(nameof(DropTargetTrack), -1);
 
+    /// <summary>Only the row height changes the room asked for; the rest only changes the paint.</summary>
     static PatternHeader()
     {
         AffectsRender<PatternHeader>(TrackCountProperty, SelectedTrackProperty,
@@ -41,12 +53,14 @@ public sealed class PatternHeader : ThemedControl
         AffectsMeasure<PatternHeader>(RowHeightProperty);
     }
 
+    /// <inheritdoc cref="TrackCountProperty"/>
     public int TrackCount
     {
         get => GetValue(TrackCountProperty);
         set => SetValue(TrackCountProperty, value);
     }
 
+    /// <inheritdoc cref="SelectedTrackProperty"/>
     public int SelectedTrack
     {
         get => GetValue(SelectedTrackProperty);
@@ -67,6 +81,7 @@ public sealed class PatternHeader : ThemedControl
         set => SetValue(ScrollOffsetProperty, value);
     }
 
+    /// <inheritdoc cref="RowHeightProperty"/>
     public double RowHeight
     {
         get => GetValue(RowHeightProperty);
@@ -90,13 +105,33 @@ public sealed class PatternHeader : ThemedControl
         return x < Metrics.GutterWidth ? -1 : Metrics.TrackAt(x);
     }
 
+    /// <summary>Above and below the names, so the tabs stand off the pattern under them.</summary>
     private const double VerticalPadding = 5;
 
+    /// <summary>
+    /// The same layout the grid uses, built from the same character width so the two cannot
+    /// drift apart.
+    /// </summary>
+    /// <remarks>
+    /// Without the pattern's padding, since the header has no lines above or below it: it is one
+    /// row standing outside the scroll area.
+    /// </remarks>
     private PatternMetrics Metrics => new(CharWidth, RowHeight, TrackCount);
 
+    /// <summary>
+    /// One row tall, and no width of its own: the header is stretched to whatever the pattern
+    /// beneath it is being seen through, and the tabs are placed inside that by the transform.
+    /// </summary>
     protected override Size MeasureOverride(Size availableSize) =>
         new(0, RowHeight + VerticalPadding * 2);
 
+    /// <summary>
+    /// A tab per track, in the pattern's own columns.
+    /// </summary>
+    /// <remarks>
+    /// Everything is shifted by the pattern's sideways scroll, so a name stays over the column it
+    /// names rather than over whichever column happens to be at that place on screen.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         if (TrackCount <= 0 || CharWidth <= 0) return;
@@ -113,8 +148,6 @@ public sealed class PatternHeader : ThemedControl
         var selectedFill = palette.AccentTint(56);
         var idleFill = palette.RowShade(0x12);
 
-        // Everything shifts with the pattern's horizontal scroll so the labels stay over
-        // their own columns.
         using var _ = context.PushTransform(Matrix.CreateTranslation(-ScrollOffset, 0));
 
         double fontSize = Math.Max(9, RowHeight - 6);
@@ -145,6 +178,12 @@ public sealed class PatternHeader : ThemedControl
         }
     }
 
+    /// <summary>
+    /// A click on a tab puts the cursor in that track.
+    /// </summary>
+    /// <remarks>
+    /// A click over the line number gutter does nothing, since that square names no track.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -152,7 +191,7 @@ public sealed class PatternHeader : ThemedControl
         if (TrackCount <= 0) return;
 
         double x = e.GetPosition(this).X + ScrollOffset;
-        if (x < Metrics.GutterWidth) return; // the line number gutter names no track
+        if (x < Metrics.GutterWidth) return;
 
         TrackClicked?.Invoke(this, Metrics.TrackAt(x));
         e.Handled = true;

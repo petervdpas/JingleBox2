@@ -12,7 +12,7 @@ namespace JingleBox2.ViewModels;
 /// What was done to a machine being designed, so it can be undone.
 /// </summary>
 /// <remarks>
-/// The same principle as <see cref="Tracker.PatternHistory"/> and a different mechanism, because
+/// The same principle as <see cref="Tracker.TrackerHistory"/> and a different mechanism, because
 /// the document is a different shape. A pattern is one array of value types and a step is a
 /// memory copy. A machine is a tree of elements, a list of parameters and a dozen fields beside
 /// them, and copying that by hand means a clone method that will be right on the day it is
@@ -33,11 +33,31 @@ public sealed class DesignHistory
     /// <summary>How many steps are kept, and how much they may come to.</summary>
     public const int MostSteps = 100;
 
+    /// <summary>
+    /// The most the kept steps may come to before the oldest are let go.
+    /// </summary>
+    /// <remarks>
+    /// A count on its own is not enough. A machine with a large picture on it is many times the
+    /// size of a plain one, so a hundred steps is two megabytes for one machine and far more for
+    /// another. The last step is always kept whatever it weighs, since a history of nothing is
+    /// worse than a history that is over its allowance.
+    /// </remarks>
     private const long MostBytes = 32L * 1024 * 1024;
 
+    /// <summary>
+    /// How a step is written down, which is the reader and writer's own defaults.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately plain: a step is never read by anybody, so indenting it would double what a
+    /// hundred of them weigh and buy nothing.
+    /// </remarks>
     private static readonly JsonSerializerOptions Layout = new();
 
+    /// <summary>The states left behind, oldest first, each the machine as its file would hold it.</summary>
     private readonly List<string> _done = new();
+
+    /// <summary>The states walked back out of, so redo has somewhere to go.</summary>
+    /// <remarks>Emptied by the next real edit: there is one past and it has just been rewritten.</remarks>
     private readonly List<string> _undone = new();
 
     /// <summary>The machine as it stands, so a change has something to compare against.</summary>
@@ -51,14 +71,19 @@ public sealed class DesignHistory
     /// </remarks>
     private string _saved = "";
 
+    /// <summary>What the two lists come to, kept as they are added to rather than counted.</summary>
     private long _bytes;
 
     /// <summary>True while a step is being put back, so putting one back is not itself a step.</summary>
     private bool _walking;
 
+    /// <summary>Raised whenever the answers below could have moved, so the buttons follow.</summary>
     public event Action? Changed;
 
+    /// <summary>True when there is something to take back.</summary>
     public bool CanUndo => _done.Count > 0;
+
+    /// <summary>True when something has been taken back and not yet put again.</summary>
     public bool CanRedo => _undone.Count > 0;
 
     /// <summary>True when what is on screen is not what is in the folder.</summary>
@@ -109,6 +134,10 @@ public sealed class DesignHistory
     /// <summary>
     /// A machine was opened. This is where it started, and nothing before it can be undone.
     /// </summary>
+    /// <remarks>
+    /// What was just opened is the machine as its folder holds it, so saved starts equal to now:
+    /// there is nothing to save and nothing to cancel until somebody does something.
+    /// </remarks>
     public void Opened(MachineProject? project)
     {
         _done.Clear();
@@ -116,8 +145,6 @@ public sealed class DesignHistory
         _bytes = 0;
         _now = Said(project);
 
-        // A machine just opened is a machine as its folder holds it, so there is nothing to save
-        // and nothing to cancel.
         _saved = _now;
 
         Changed?.Invoke();
@@ -166,6 +193,19 @@ public sealed class DesignHistory
     /// <summary>Puts back the last thing undone.</summary>
     public bool Redo(MachineProject? project) => Walk(_undone, _done, project, "did again");
 
+    /// <summary>
+    /// Moves one step from one list to the other and puts the machine where that step says.
+    /// </summary>
+    /// <remarks>
+    /// Undo and redo are the same walk in opposite directions, written once so the two cannot
+    /// drift apart. The walking flag is up throughout, since putting a step back sets every field
+    /// on the project and the editor reports each of those as an edit.
+    /// </remarks>
+    /// <param name="from">The list the step is taken off, done for undo and undone for redo.</param>
+    /// <param name="onto">The list where the machine as it stands now is put, so the walk can be reversed.</param>
+    /// <param name="project">The machine being designed, poured into in place rather than replaced.</param>
+    /// <param name="said">The word for the log, which is the only difference between the two.</param>
+    /// <returns>True when a step was taken, false when there was nothing to take or no project to put it on.</returns>
     private bool Walk(List<string> from, List<string> onto, MachineProject? project, string said)
     {
         if (project is null || from.Count == 0) return false;
@@ -197,6 +237,14 @@ public sealed class DesignHistory
         }
     }
 
+    /// <summary>
+    /// The machine written down, which is what a step is.
+    /// </summary>
+    /// <remarks>
+    /// An empty string for a machine that will not serialise, and for no machine at all. Both are
+    /// then refused by <see cref="Take"/> rather than being put back as an empty machine, which is
+    /// the difference between an undo that does nothing and an undo that loses the work.
+    /// </remarks>
     private static string Said(MachineProject? project)
     {
         if (project is null) return "";

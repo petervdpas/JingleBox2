@@ -14,30 +14,53 @@ namespace JingleBox2.Tracker.Synth;
 ///
 /// The attack is fixed and fast. A slow duck attack leaves the first part of the key note
 /// fighting the track it is meant to be clearing room for, which is the one thing this is for.
+///
+/// One per strip, and <see cref="Next"/> runs on the audio thread once per frame. Nothing here
+/// allocates or takes a lock; <see cref="ReleaseMs"/> is written from the block that is about
+/// to render, which is why it is a property that works its coefficient out on the spot rather
+/// than something the mixer has to rebuild.
 /// </remarks>
 public sealed class Ducker
 {
     /// <summary>Fast enough to be out of the way before a kick has finished its click.</summary>
     public const double AttackMs = 5;
 
+    /// <summary>
+    /// Below this the duck is inaudible and is treated as gone.
+    /// </summary>
+    /// <remarks>
+    /// A one pole follower approaches nought and never arrives, so left alone it keeps a track
+    /// very slightly down for ever, for no reason anyone can hear.
+    /// </remarks>
+    private const double Gone = 0.0001;
+
     private readonly double _sampleRate;
     private readonly double _attack;
 
+    /// <summary>The release, as a share of the distance moved per sample.</summary>
     private double _release;
+
+    /// <summary>Where the follower stands: what the key track is doing, smoothed.</summary>
     private double _follower;
 
+    /// <summary>
+    /// Sets up a side chain at the strip's release, for a mixer running at that rate.
+    /// </summary>
+    /// <remarks>
+    /// The release is set outright rather than through the property. A value that happens to
+    /// match the one the field starts on is not a change, and the coefficient would stay at
+    /// nought, which is a duck that goes down and never comes back up.
+    /// </remarks>
     public Ducker(double releaseMs, int sampleRate)
     {
         _sampleRate = sampleRate <= 0 ? 44100 : sampleRate;
         _attack = CoefficientFor(AttackMs);
 
-        // Set outright rather than through the property: a value that happens to match the
-        // one the field starts on is not a change, and the coefficient would stay at zero,
-        // which is a duck that goes down and never comes back up.
         _releaseMs = Clamp(releaseMs);
         _release = CoefficientFor(_releaseMs);
     }
 
+    /// <summary>What the strip's release knob says, kept so the property can tell a real change.</summary>
     private double _releaseMs;
 
     /// <summary>How long the ducked track takes to come back up. Settable while it runs.</summary>
@@ -68,9 +91,7 @@ public sealed class Ducker
 
         _follower += (target - _follower) * coefficient;
 
-        // Under this it is inaudible, and letting it crawl towards zero forever keeps a track
-        // very slightly down for no reason anyone can hear.
-        if (_follower < 0.0001) _follower = 0;
+        if (_follower < Gone) _follower = 0;
 
         return _follower;
     }
@@ -79,12 +100,17 @@ public sealed class Ducker
     public void Reset() => _follower = 0;
 
     /// <summary>What to multiply the ducked track by, given where the follower is.</summary>
+    /// <remarks>
+    /// Static, and holding nothing, so the mixer can ask what a depth and a follower come to
+    /// without a side chain of its own and a test can ask without an audio device.
+    /// </remarks>
     public static float GainFor(double follower, double depth)
     {
         double amount = Math.Clamp(depth, 0, 1) * Math.Clamp(follower, 0, 1);
         return (float)Math.Clamp(1 - amount, 0, 1);
     }
 
+    /// <summary>A release that is not a number at all reads as the strip's default.</summary>
     private static double Clamp(double milliseconds) =>
         double.IsNaN(milliseconds)
             ? TrackMix.DefaultDuckReleaseMs

@@ -13,15 +13,25 @@ namespace JingleBox2.Tests;
 /// The keystroke itself needs a window and a keyboard. The rule inside it needs neither, which
 /// is why it is a method of its own: everything above it is Avalonia and everything below it is
 /// a decision.
+///
+/// Four groups, in this order: when Ctrl+Shift+M is answered, what a mixer strip offers a knob,
+/// the two actions a preset picker offers instead of a value, and the rule that what is offered
+/// is a copy.
 /// </remarks>
 public class PointingTests
 {
+    /// <summary>The mode is offered where there is at least one thing on screen to point at.</summary>
+    /// <remarks>
+    /// A pointable control joins the tally when it comes on screen and leaves it when it goes,
+    /// so the mixer counts and so does a machine's panel.
+    /// </remarks>
     [Fact]
     public void The_gesture_is_answered_where_there_is_something_to_point_at()
     {
         Assert.True(LinkKey.Answers(true, TimeSpan.FromSeconds(1)));
     }
 
+    /// <summary>And refused on a page with nothing pointable on it.</summary>
     /// <remarks>
     /// A keystroke that does nothing here may mean something to whatever is in front of you, so
     /// it is refused rather than swallowed.
@@ -32,6 +42,7 @@ public class PointingTests
         Assert.False(LinkKey.Answers(false, TimeSpan.FromSeconds(1)));
     }
 
+    /// <summary>A repeat arriving too soon after the last one is not a second gesture.</summary>
     /// <remarks>
     /// A key leant on repeats at about thirty a second, and a mode flapping thirty times a
     /// second is a mode nobody can put where they want it.
@@ -42,6 +53,7 @@ public class PointingTests
         Assert.False(LinkKey.Answers(true, TimeSpan.FromMilliseconds(30)));
     }
 
+    /// <summary>And a press after the gap has gone by turns the mode over again.</summary>
     /// <remarks>
     /// This is the half that was wrong. It used to be a flag saying the key was down, cleared
     /// by the key coming up, and the key can come up somewhere else: focus moves while it is
@@ -55,6 +67,11 @@ public class PointingTests
         Assert.True(LinkKey.Answers(true, TimeSpan.FromMilliseconds(LinkKey.AgainMs)));
     }
 
+    /// <summary>A strip's level is offered for whichever track you last touched.</summary>
+    /// <remarks>
+    /// Focused rather than a track number, so one knob pointed at Level is the level of the
+    /// strip in hand rather than one link per track.
+    /// </remarks>
     [Fact]
     public void A_strip_offers_the_track_you_are_on_rather_than_a_numbered_one()
     {
@@ -63,6 +80,7 @@ public class PointingTests
         Assert.Equal(MixControl.Volume, MixLinks.Level.Mix);
     }
 
+    /// <summary>Pan, mute, solo and duck each name their own value rather than sharing one.</summary>
     [Fact]
     public void Every_control_on_a_strip_names_its_own_thing()
     {
@@ -72,6 +90,7 @@ public class PointingTests
         Assert.Equal(MixControl.Duck, MixLinks.Duck.Mix);
     }
 
+    /// <summary>The ducking release has a name for a link to use.</summary>
     /// <remarks>
     /// It was the one value on a strip a controller could not reach: every other control had a
     /// name for a link to use and the release time had none.
@@ -83,6 +102,7 @@ public class PointingTests
         Assert.Equal(ControlScope.Focused, MixLinks.Release.Scope);
     }
 
+    /// <summary>A shelf of presets is a list, so the picker offers two actions and no value.</summary>
     /// <remarks>
     /// The left half offers the one before and the right half the one after, because that is
     /// where the picker's own two arrows are.
@@ -94,6 +114,7 @@ public class PointingTests
         Assert.Equal(MachineActions.PresetNext, PresetStep.Side(90, 50));
     }
 
+    /// <summary>A step moves one place along the shelf, either way.</summary>
     [Fact]
     public void A_step_walks_the_shelf()
     {
@@ -101,6 +122,7 @@ public class PointingTests
         Assert.Equal(1, PresetStep.Moved(2, 20, -1));
     }
 
+    /// <summary>The first and the last preset are where the walking stops.</summary>
     /// <remarks>
     /// Stopping rather than coming round. A button held down that wrapped would carry you past
     /// the one you were looking for without a pause to notice it.
@@ -112,6 +134,7 @@ public class PointingTests
         Assert.Equal(19, PresetStep.Moved(19, 20, 1));
     }
 
+    /// <summary>With no preset picked, either direction lands on the first one.</summary>
     [Fact]
     public void A_step_with_nothing_picked_takes_the_first()
     {
@@ -119,12 +142,14 @@ public class PointingTests
         Assert.Equal(0, PresetStep.Moved(-1, 20, -1));
     }
 
+    /// <summary>A shelf with nothing on it keeps whatever index it was holding.</summary>
     [Fact]
     public void And_an_empty_shelf_is_left_alone()
     {
         Assert.Equal(4, PresetStep.Moved(4, 0, 1));
     }
 
+    /// <summary>Offering a mapping hands out a copy and leaves the template as it shipped.</summary>
     /// <remarks>
     /// What is offered has to be a copy, because a link fills the controller's half into the
     /// object it was given and then keeps it. Handing out the template would have every link

@@ -39,11 +39,25 @@ public sealed class PluginEditorHost : NativeControlHost
     /// <summary>How long to wait for the window to appear before giving the plugin it anyway.</summary>
     private const int SettleRounds = 120;
 
+    /// <summary>
+    /// The size the plugin asked for, which is what this control measures at.
+    /// </summary>
+    /// <remarks>
+    /// Nought until a plugin has said, and set again whenever it asks for a different size, which
+    /// is what happens when a panel folds out.
+    /// </remarks>
     private int _width;
+
+    /// <inheritdoc cref="_width"/>
     private int _height;
 
+    /// <summary>Avalonia's native child window, and nought while there is not one.</summary>
     private nint _handle;
+
+    /// <summary>Whether the plugin has really been let into that window.</summary>
     private bool _attached;
+
+    /// <summary>The wait for the window to be up at its full size. See <see cref="Settle"/>.</summary>
     private DispatcherTimer? _settling;
 
     /// <summary>
@@ -54,6 +68,7 @@ public sealed class PluginEditorHost : NativeControlHost
     /// <summary>Watches who has the keyboard while the plugin is in its window.</summary>
     private IDisposable? _watching;
 
+    /// <inheritdoc cref="EditorProperty"/>
     public IPluginEditor? Editor
     {
         get => GetValue(EditorProperty);
@@ -73,8 +88,6 @@ public sealed class PluginEditorHost : NativeControlHost
     /// </remarks>
     public void WindowActivated(bool active)
     {
-        // Written down whether or not there is anybody to tell yet. The window is active long
-        // before the plugin is in it, and this is the only record of that.
         _active = active;
 
         Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
@@ -118,6 +131,9 @@ public sealed class PluginEditorHost : NativeControlHost
     /// So the keyboard is followed rather than the window's events, and the plugin is told
     /// again every time it comes back. See <see cref="XEmbed.WatchFocus"/>, which does the
     /// asking on a thread of its own.
+    ///
+    /// The answer is checked against the window it was asked about: the window may have gone, or
+    /// been given to a different plugin, between the asking and the answering.
     /// </remarks>
     private void Watch()
     {
@@ -130,14 +146,26 @@ public sealed class PluginEditorHost : NativeControlHost
 
         _watching = XEmbed.WatchFocus(watched, inside => Dispatcher.UIThread.Post(() =>
         {
-            // The window may have gone, or been given to a different plugin, between the
-            // asking and the answering.
             if (!_attached || _handle != watched) return;
 
             Tell(inside || (TopLevel.GetTopLevel(this) as Window)?.IsActive == true);
         }));
     }
 
+    /// <summary>
+    /// Lets go of the plugin that was in the window and takes up the one arriving.
+    /// </summary>
+    /// <remarks>
+    /// Whatever was in the window is not in it any more: a plugin that has been started again is
+    /// a different plugin with the same name, and it has never seen this window.
+    ///
+    /// The control is measured at the new plugin's own size from the start, so that the window it
+    /// is eventually handed is already the size it asked for.
+    ///
+    /// An editor that arrives after the window was made has to be let in from here. Only the
+    /// first one ever came through <see cref="CreateNativeControlCore"/>, so without that last
+    /// line a plugin started again after a crash gets a window it is never given.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -146,8 +174,6 @@ public sealed class PluginEditorHost : NativeControlHost
 
         if (change.OldValue is IPluginEditor leaving) leaving.ResizeRequested -= OnResizeRequested;
 
-        // Whatever was in the window is not in it any more. A plugin that has been started
-        // again is a different plugin with the same name, and it has never seen this window.
         _attached = false;
 
         _watching?.Dispose();
@@ -157,8 +183,6 @@ public sealed class PluginEditorHost : NativeControlHost
 
         arriving.ResizeRequested += OnResizeRequested;
 
-        // Asked for at the plugin's own size from the start, so that the window it is
-        // eventually handed is already the size it asked for.
         var wanted = arriving.Size;
 
         if (wanted.Width > 0 && wanted.Height > 0)
@@ -169,9 +193,6 @@ public sealed class PluginEditorHost : NativeControlHost
             InvalidateMeasure();
         }
 
-        // An editor that arrives after the window was made has to be let in now. Only the
-        // first one ever came through CreateNativeControlCore, so without this a plugin
-        // started again after a crash gets a window it is never given.
         if (_handle != 0) Settle();
     }
 
@@ -179,11 +200,14 @@ public sealed class PluginEditorHost : NativeControlHost
     /// The plugin wants a different size, which is what happens when a panel folds out. The
     /// control is made that size and Avalonia resizes the native window under it.
     /// </summary>
+    /// <remarks>
+    /// Put onto the drawing thread, because a plugin may ask from inside a call of its own, on
+    /// whichever thread that was.
+    /// </remarks>
     private void OnResizeRequested(int width, int height)
     {
         if (width <= 0 || height <= 0) return;
 
-        // A plugin may ask from inside a call of its own, on whichever thread that was.
         Dispatcher.UIThread.Post(() =>
         {
             _width = width;
@@ -195,10 +219,15 @@ public sealed class PluginEditorHost : NativeControlHost
         });
     }
 
+    /// <summary>
+    /// Whatever size the plugin asked for, and only the base's answer when it has not asked.
+    /// </summary>
+    /// <remarks>
+    /// The window is sized to the plugin rather than the other way round: a plugin's interface is
+    /// a picture at a size it chose, not a layout.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
-        // The window is sized to the plugin rather than the other way round: a plugin's
-        // interface is a picture at a size it chose, not a layout.
         if (_width > 0 && _height > 0) return new Size(_width, _height);
 
         var wanted = Editor?.Size ?? (0, 0);
@@ -208,10 +237,16 @@ public sealed class PluginEditorHost : NativeControlHost
             : base.MeasureOverride(availableSize);
     }
 
+    /// <summary>
+    /// Takes Avalonia's own child window, made the way this platform makes one, and starts
+    /// waiting for it to be worth handing over.
+    /// </summary>
+    /// <remarks>
+    /// Whatever the platform calls it, the plugin is told the same handle, but not yet: at this
+    /// point the window is one pixel square and not on screen.
+    /// </remarks>
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
-        // Avalonia's own child window, made the way this platform makes one. Whatever the
-        // platform calls it, the plugin is told the same handle, but not yet.
         var handle = base.CreateNativeControlCore(parent);
 
         _handle = handle.Handle;
@@ -258,6 +293,26 @@ public sealed class PluginEditorHost : NativeControlHost
         _settling.Start();
     }
 
+    /// <summary>
+    /// Hands the window over, and tells the plugin the two things it cannot find out for itself.
+    /// </summary>
+    /// <remarks>
+    /// A plugin that will not take the window is a plugin without an interface, not an
+    /// application without a window, so a throw leaves the host empty rather than going upwards.
+    ///
+    /// It is told whether the window is active at once. The window is up, and on a desktop that
+    /// gives a new window the focus it is already active well before this, since the handover
+    /// waits for the window to be really on screen at its full size. So the activation Avalonia
+    /// raised when the window opened reached a host with nothing in it and went nowhere, and
+    /// XEMBED never says anything twice. A plugin that misses it draws from its own timers and
+    /// ignores everything clicked on it, which is a window that looks perfectly alive and answers
+    /// nothing. The watch started after it reports where the keyboard is as soon as it starts, so
+    /// a window that was not active a moment ago is put right without waiting for anything to
+    /// change.
+    ///
+    /// And it is told its size once it is in place. Some plugins lay themselves out here rather
+    /// than when they were attached, and stay blank until they are asked.
+    /// </remarks>
     private void Show()
     {
         var editor = Editor;
@@ -269,35 +324,21 @@ public sealed class PluginEditorHost : NativeControlHost
         }
         catch (Exception)
         {
-            // A plugin that will not take the window is a plugin without an interface, not an
-            // application without a window.
             _attached = false;
         }
 
         if (!_attached) return;
 
-        // Told at once whether the window it has just been let into is the one being used.
-        //
-        // The window is up, and on a desktop that gives a new window the focus it is already
-        // active, well before this: the handover waits for the window to be really on screen
-        // at its full size. So the activation Avalonia raised when the window opened reached a
-        // host with nothing in it and went nowhere, and XEMBED never says anything twice. A
-        // plugin that misses it draws from its own timers and ignores everything clicked on
-        // it, which is a window that looks perfectly alive and answers nothing.
         bool active = (TopLevel.GetTopLevel(this) as Window)?.IsActive == true || _active;
 
         Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
             "the plugin is in its window, and the window is " +
             (active ? "active" : "not active"));
 
-        // The watch reports where the keyboard is as soon as it starts, so a window that was
-        // not active a moment ago is put right without waiting for anything to change.
         if (active) Tell(true);
 
         Watch();
 
-        // Told its size once it is in place. Some plugins lay themselves out here rather than
-        // when they were attached, and stay blank until they are asked.
         var settled = editor.Size;
 
         if (settled.Width <= 0 || settled.Height <= 0) return;
@@ -310,6 +351,13 @@ public sealed class PluginEditorHost : NativeControlHost
         InvalidateMeasure();
     }
 
+    /// <summary>
+    /// Takes the plugin out before the window goes.
+    /// </summary>
+    /// <remarks>
+    /// That order is the whole of it: a plugin still drawing into a window that has been
+    /// destroyed is a crash inside its own toolkit.
+    /// </remarks>
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
         _settling?.Stop();
@@ -320,8 +368,6 @@ public sealed class PluginEditorHost : NativeControlHost
 
         _handle = 0;
 
-        // The plugin comes out before the window goes: a plugin still drawing into a window
-        // that has been destroyed is a crash inside its own toolkit.
         if (_attached)
         {
             _attached = false;

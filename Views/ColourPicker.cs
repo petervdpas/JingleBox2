@@ -29,6 +29,7 @@ public class ColourPicker : Control
             Color.FromRgb(0x7B, 0x83, 0x8C),
             defaultBindingMode: BindingMode.TwoWay);
 
+    /// <inheritdoc cref="ColourProperty"/>
     public Color Colour
     {
         get => GetValue(ColourProperty);
@@ -41,11 +42,13 @@ public class ColourPicker : Control
     /// <summary>And how far it stands off the field above it.</summary>
     private const double Gap = 8;
 
+    /// <summary>The rounding on the field and the strip, so they read as parts of one control.</summary>
     private const double Corner = 3;
 
     /// <summary>How big the ring around the picked shade is.</summary>
     private const double RingRadius = 6;
 
+    /// <summary>Sets the smallest the picture is worth drawing at, and the crosshair over it.</summary>
     public ColourPicker()
     {
         MinWidth = 140;
@@ -57,13 +60,16 @@ public class ColourPicker : Control
     /// <summary>Hue in degrees, and how far along the field the shade sits.</summary>
     private double _hue = 210;
 
+    /// <summary>How far across the field the shade sits, nought at the pale edge.</summary>
     private double _saturation;
 
+    /// <summary>How far down it sits, one at the top and nought in the black.</summary>
     private double _value = 0.55;
 
     /// <summary>True while this control is writing the colour, so it does not answer itself.</summary>
     private bool _writing;
 
+    /// <summary>Follows a colour set from outside, and ignores the ones this control wrote itself.</summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -75,7 +81,13 @@ public class ColourPicker : Control
         InvalidateVisual();
     }
 
-    /// <summary>Where a colour handed to us from outside puts the two markers.</summary>
+    /// <summary>
+    /// Where a colour handed to us from outside puts the two markers.
+    /// </summary>
+    /// <remarks>
+    /// Black and grey have no hue to read, so the one already showing is kept: it is the hue
+    /// whose column the hand is standing in, and the only one that is not a guess.
+    /// </remarks>
     private void Read(Color colour)
     {
         var hsv = colour.ToHsv();
@@ -83,8 +95,6 @@ public class ColourPicker : Control
         _saturation = hsv.S;
         _value = hsv.V;
 
-        // Black and grey have no hue to read, so the one already showing is kept: it is the hue
-        // whose column the hand is standing in, and the only one that is not a guess.
         if (hsv.S > 0.0001 && hsv.V > 0.0001) _hue = hsv.H;
     }
 
@@ -94,6 +104,10 @@ public class ColourPicker : Control
     /// <summary>The strip of hues, along the bottom.</summary>
     private Rect Bar => new(0, Math.Max(0, Bounds.Height - BarHeight), Bounds.Width, BarHeight);
 
+    /// <summary>
+    /// Draws the field as the pure hue washed towards white across and towards black down, with
+    /// the ring on the shade, and the strip of hues under it with a marker in it.
+    /// </summary>
     public override void Render(DrawingContext context)
     {
         var field = Field;
@@ -141,8 +155,10 @@ public class ColourPicker : Control
         context.DrawEllipse(null, Glint, at, RingRadius, RingRadius);
     }
 
+    /// <summary>The dark half of every marker, drawn wide and under the pale one.</summary>
     private static readonly IPen Shadow = new Pen(new SolidColorBrush(Color.FromArgb(0xAA, 0, 0, 0)), 3);
 
+    /// <summary>And the pale half, drawn thin over it.</summary>
     private static readonly IPen Glint = new Pen(Brushes.White, 1.6);
 
     /// <summary>The hue washed out to the left, which is saturation.</summary>
@@ -172,6 +188,7 @@ public class ColourPicker : Control
     /// <summary>Every hue there is, left to right, ending where it started.</summary>
     private static readonly IBrush Hues = Wheel();
 
+    /// <summary>Seven stops sixty degrees apart, so red is at both ends and the strip has no seam.</summary>
     private static IBrush Wheel()
     {
         var brush = new LinearGradientBrush
@@ -196,8 +213,16 @@ public class ColourPicker : Control
         Hue,
     }
 
+    /// <summary>What the hand took hold of, and nothing while it is off the control.</summary>
     private Held _held;
 
+    /// <summary>
+    /// Takes hold of whichever of the two the press landed in, and moves it there at once.
+    /// </summary>
+    /// <remarks>
+    /// The pointer is captured, so a hand that runs off the side of the control while dragging
+    /// keeps the marker rather than dropping it wherever it left.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -214,6 +239,7 @@ public class ColourPicker : Control
         e.Handled = true;
     }
 
+    /// <summary>Moves whatever was taken hold of, and nothing at all if it was neither.</summary>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -225,6 +251,7 @@ public class ColourPicker : Control
         e.Handled = true;
     }
 
+    /// <summary>Lets go of the marker and of the pointer.</summary>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);

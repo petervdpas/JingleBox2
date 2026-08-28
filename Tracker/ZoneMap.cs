@@ -46,6 +46,7 @@ public sealed class SampleZone
     /// <summary>Which part of the recording plays, and how it repeats.</summary>
     public SampleShape? Shape { get; set; }
 
+    /// <summary>True when something has been put on this zone. An empty zone makes no sound.</summary>
     [JsonIgnore]
     public bool HasSound => FilePath.Length > 0;
 
@@ -56,9 +57,11 @@ public sealed class SampleZone
     [JsonIgnore]
     public string RangeText => new Note(Low) + " - " + new Note(High);
 
+    /// <summary>How the root reads on a panel: the note the recording plays untouched at.</summary>
     [JsonIgnore]
     public string RootText => new Note(Root).ToString();
 
+    /// <summary>A copy nothing else is holding, for a preset landing on a map already in use.</summary>
     public SampleZone Clone() => new()
     {
         Name = Name,
@@ -72,13 +75,21 @@ public sealed class SampleZone
         Shape = Shape?.Clone()
     };
 
+    /// <summary>
+    /// Brings a zone read off disc back inside its ends: keys a note column can say, a level, a
+    /// place and a tuning that are numbers.
+    /// </summary>
+    /// <remarks>
+    /// A range the wrong way round answers to nothing at all, which reads as a broken zone
+    /// rather than an empty one, so it is turned round rather than refused. Everything else is
+    /// clamped for the same reason: a reading nobody can explain would be a zone that goes
+    /// quiet with nothing said.
+    /// </remarks>
     public void Clamp()
     {
         Low = Math.Clamp(Low, 0, 119);
         High = Math.Clamp(High, 0, 119);
 
-        // A range the wrong way round answers to nothing at all, which reads as a broken zone
-        // rather than an empty one. Turned round rather than refused.
         if (High < Low) (Low, High) = (High, Low);
 
         Root = Math.Clamp(Root, 0, 119);
@@ -111,6 +122,11 @@ public sealed class ZoneMap
     /// <summary>How many zones a map can hold.</summary>
     public const int MaxZones = 32;
 
+    /// <summary>
+    /// The zones, asked in order, so a narrow one above a wide one carves an exception out of
+    /// it. A chop lays its pieces here, which is where <see cref="SlicePoints"/> reads the cuts
+    /// back off.
+    /// </summary>
     public List<SampleZone> Zones { get; set; } = new();
 
     /// <summary>A map with one empty zone across the whole keyboard.</summary>
@@ -251,6 +267,7 @@ public sealed class ZoneMap
         Clamp();
     }
 
+    /// <summary>A map nothing else is holding, zones and all, for a preset or a history step.</summary>
     public ZoneMap Clone()
     {
         var map = new ZoneMap { Sliced = Sliced };

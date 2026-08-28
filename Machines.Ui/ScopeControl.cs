@@ -19,12 +19,17 @@ public abstract class ScopeControl : ThemedControl
     /// <summary>Fast enough to look continuous without asking much of the UI thread.</summary>
     private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(16);
 
+    /// <summary>Backs <see cref="Trigger"/>.</summary>
     public static readonly StyledProperty<int> TriggerProperty =
         AvaloniaProperty.Register<ScopeControl, int>(nameof(Trigger));
 
+    /// <summary>Wakes the drawing while a note is running, and is stopped the moment it is not.</summary>
     private readonly DispatcherTimer _frames;
+
+    /// <summary>How far into the note the picture has got, in real time rather than in frames.</summary>
     private readonly Stopwatch _clock = new();
 
+    /// <summary>Builds the frame timer. It is not started until something plays.</summary>
     protected ScopeControl()
     {
         _frames = new DispatcherTimer { Interval = FrameInterval };
@@ -47,6 +52,7 @@ public abstract class ScopeControl : ThemedControl
     /// <summary>How long the animation lasts. Override to follow the sound.</summary>
     protected virtual double AnimationSeconds => 1.0;
 
+    /// <summary>Starts the picture again whenever <see cref="Trigger"/> moves.</summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -54,14 +60,21 @@ public abstract class ScopeControl : ThemedControl
         if (change.Property == TriggerProperty) Start();
     }
 
+    /// <summary>
+    /// Stops the clock and the timer on the way off the tree.
+    /// </summary>
+    /// <remarks>
+    /// A timer left running on a page nobody is looking at is heat and nothing else, and this
+    /// wakes sixty times a second.
+    /// </remarks>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
 
-        // A timer left running on a page nobody is looking at is just heat.
         Stop();
     }
 
+    /// <summary>Puts the clock back to nought and runs the frames from there.</summary>
     private void Start()
     {
         _clock.Restart();
@@ -69,12 +82,21 @@ public abstract class ScopeControl : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>Ends the animation, leaving the last frame on screen.</summary>
     private void Stop()
     {
         _frames.Stop();
         _clock.Reset();
     }
 
+    /// <summary>
+    /// One frame: draw, and stop once the note has run its length.
+    /// </summary>
+    /// <remarks>
+    /// The check comes before the draw so that the last frame is painted with the clock stopped,
+    /// which is what leaves the picture resting at the end of the note rather than one frame
+    /// short of it.
+    /// </remarks>
     private void Advance()
     {
         if (ElapsedSeconds > AnimationSeconds) Stop();

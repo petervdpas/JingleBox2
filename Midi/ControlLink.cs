@@ -27,7 +27,10 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class ControlLink
 {
+    /// <summary>The desk's own layout: the settings' list, held live rather than copied.</summary>
     private readonly List<ControlMapping> _mappings;
+
+    /// <summary>How to say the settings have moved, so they are written down.</summary>
     private readonly Action _changed;
 
     /// <summary>
@@ -40,6 +43,8 @@ public sealed class ControlLink
     /// </remarks>
     private readonly object _lock = new();
 
+    /// <param name="mappings">The desk's layout, from the settings, edited in place.</param>
+    /// <param name="changed">Told whenever that list moves, so the settings are saved.</param>
     public ControlLink(List<ControlMapping> mappings, Action changed)
     {
         _mappings = mappings;
@@ -78,9 +83,16 @@ public sealed class ControlLink
     /// <summary>True when there is a song open for a link to be kept in or moved to.</summary>
     public bool HasSong => Song?.Invoke() is not null;
 
+    /// <summary>Whether the panels are being laid out rather than played.</summary>
     private bool _linking;
 
-    /// <summary>Whether the pointer is laying out the controller rather than playing.</summary>
+    /// <summary>
+    /// Whether the pointer is laying out the controller rather than playing.
+    /// </summary>
+    /// <remarks>
+    /// Leaving the mode clears whatever was being offered, because an offer is about where the
+    /// pointer was resting in a mode that has been left.
+    /// </remarks>
     public bool IsLinking
     {
         get => _linking;
@@ -92,7 +104,6 @@ public sealed class ControlLink
 
             Log.Write(LogArea.Midi, () => "link: pointing mode " + (_linking ? "on" : "off"));
 
-            // An offer is about where the pointer was in a mode that has been left.
             if (!_linking) _offered = null;
 
             Say(() => Changed?.Invoke());
@@ -125,7 +136,7 @@ public sealed class ControlLink
     /// from the controller, which arrives on the MIDI thread, and everything listening to this
     /// is a panel or a list: an observable collection rebuilt from a MIDI callback is a throw
     /// at best, and at worst a list that is quietly half rebuilt. Raised through
-    /// <see cref="Say"/> for that reason and no other.
+    /// <c>Say</c> for that reason and no other.
     /// </remarks>
     public event Action? Changed;
 
@@ -170,6 +181,10 @@ public sealed class ControlLink
     /// parameter, whether it follows the cursor. What is missing is the half only the hardware
     /// can say, and that is what <see cref="Handle"/> fills in.
     /// </remarks>
+    /// <param name="what">
+    /// What the pointer is resting on, as a mapping with its controller half still empty, or
+    /// null when the pointer has left and there is nothing on offer.
+    /// </param>
     /// <param name="keep">
     /// True when this belongs to the song being worked on: an instrument on a track. False for
     /// the machine itself on the rack, which is about the machine and not about any song.
@@ -207,14 +222,26 @@ public sealed class ControlLink
     /// is the confirmation, and it is a better one than any light: the thing you pointed at
     /// moves. A knob already linked moves its parameter in this mode too, which is how you
     /// check what a controller is wired to without leaving the mode to find out.
+    ///
+    /// Nothing is said in the log for a message that arrives while nothing is being pointed at.
+    /// That is the state the application is in almost always, and saying so per message would be
+    /// a log about itself rather than about what happened.
+    ///
+    /// One knob does one thing, when a knob is learned, so both lists are asked to give up what
+    /// this displaces. Two things are displaced: whatever was on this control, and whatever was
+    /// on this target, because pointing a second knob at a filter is saying you want that one on
+    /// it and not that you want two. The second of those is also the only thing that ever takes
+    /// a link off a controller that is not plugged in. The router will happily drive two things
+    /// from one control and that is a real arrangement, but it is one to build on purpose in the
+    /// list rather than one to arrive at by forgetting the first was taken.
+    ///
+    /// The offer is held rather than made again afterwards: wiggling the same knob twice is one
+    /// link, and the second wiggle must not make a second mapping out of the same offer.
     /// </remarks>
     public ControlMapping? Handle(MidiMessage message)
     {
         if (message is null) return null;
 
-        // Nothing said for either of these. Not pointing at anything is the state the
-        // application is in almost always, and saying so on every message is a log about
-        // itself rather than about what happened.
         if (!_linking) return null;
 
         if (message.Type != MidiMessageType.ControlChange) return null;
@@ -225,17 +252,6 @@ public sealed class ControlLink
         wanted.Channel = message.Channel;
         wanted.Cc = message.Value;
 
-        // One knob does one thing, when a knob is learned. The router will happily drive two
-        // things from one control and that is a real arrangement, but it is one to build on
-        // purpose in the list, not one to arrive at by pointing at a second knob and forgetting
-        // the first was taken.
-        // Two things are displaced by this, and both lists are asked, because a link on the
-        // desk and a link in the song are both things a new one can be replacing.
-        //
-        // What was on this control, so one knob does one thing. And what was on this target,
-        // so one knob on the screen answers to one knob on the desk: pointing a second at a
-        // filter is saying you want that one on it, not that you want two. Which is also the
-        // only thing that ever displaces a mapping whose controller is not plugged in.
         Changing();
 
         Displace(Song?.Invoke(), wanted);
@@ -252,8 +268,6 @@ public sealed class ControlLink
             lock (_lock) _mappings.Add(wanted);
         }
 
-        // Held rather than offered again. Wiggling the same knob twice is one link, and the
-        // second wiggle should not make a second mapping out of the same offer.
         _offered = null;
 
         _changed();
@@ -345,8 +359,13 @@ public sealed class ControlLink
     /// </remarks>
     private IReadOnlyList<ControlMapping>? _merged;
 
+    /// <summary>The song's list the merge was built from, compared by reference.</summary>
     private List<ControlMapping>? _songWas;
+
+    /// <summary>How long it was then, since a song edits its own list in place.</summary>
     private int _songCount = -1;
+
+    /// <summary>What <see cref="_edits"/> stood at then, which covers the desk's half.</summary>
     private int _deskWas = -1;
 
     /// <summary>How many times either list has been edited through this.</summary>
@@ -410,7 +429,9 @@ public sealed class ControlLink
     /// different parameter of the same machine still replaces, which is the case the rule was
     /// protecting: that really would be two jobs on one knob and both would fire.
     ///
-    /// A link naming no machine answers for all of them, so it is never apart from anything.
+    /// A link naming no machine answers for all of them, so it is never apart from anything, and
+    /// neither is a mixer link: a strip has no machine to tell two of them apart, so both would
+    /// answer the same message.
     /// </remarks>
     private static bool Apart(ControlMapping one, ControlMapping wanted)
     {
@@ -426,7 +447,6 @@ public sealed class ControlLink
                 one.Plugin.Length > 0 && wanted.Plugin.Length > 0
                 && !string.Equals(one.Plugin, wanted.Plugin, StringComparison.Ordinal),
 
-            // A strip has no machine to tell two of them apart, so both would answer.
             _ => false
         };
     }

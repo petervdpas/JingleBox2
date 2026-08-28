@@ -27,25 +27,37 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class InstrumentPanel : UserControl
 {
+    /// <summary>
+    /// Builds the panel and takes on everything a machine's own drawing cannot do for itself.
+    /// </summary>
+    /// <remarks>
+    /// Everything on a machine is a setting except the few things that are not, and those are
+    /// what these subscriptions are. A button that clears a pad or loads a folder of samples
+    /// onto a kit goes to the same handlers the hand written panels use, so there is one way of
+    /// doing each and not two. The shelf of takes is the application's, and a control drawn from
+    /// a description knows nothing about where recordings are kept. Laying out a controller is
+    /// the third: the panel says what the pointer is resting on and what was pressed, and where
+    /// a hardware knob comes from is none of a drawing's business.
+    ///
+    /// The panel is painted in the machine's own shades, so it is repainted when the machine
+    /// changes under it and mixed again when the theme moves under both.
+    ///
+    /// <see cref="LinkKey"/>.Watch puts it in the tally of places worth entering the other mouse
+    /// mode for, which is what makes Ctrl+Shift+M mean anything here.
+    ///
+    /// A hardware button that has been pointed at something comes out through
+    /// <see cref="Midi.ControlActions"/>, and this panel does it if it is the machine that was
+    /// pointed at. Listened to only while the panel is on screen, so a panel nobody can see
+    /// answers nothing.
+    /// </remarks>
     public InstrumentPanel()
     {
         InitializeComponent();
 
-        // The panel is painted in the machine's own shades, so it has to be repainted when the
-        // machine changes under it, and mixed again when the theme moves under both.
-        // What a described panel cannot do for itself. Everything on a machine is a setting
-        // except the few things that are not: taking a recording off a pad, and loading a folder
-        // of samples onto a kit. Those go to the same handlers the hand written panel uses, so
-        // there is one way of doing each and not two.
         MachineFace.ActionWanted += Asked;
 
-        // The other thing a described panel cannot do for itself: the shelf of takes is the
-        // app's, and the control that asks for one is drawn from a description that knows
-        // nothing about where recordings are kept.
         MachineFace.TakeWanted += PickTake;
 
-        // Laying out a controller. The panel says what the pointer is resting on and what was
-        // pressed; where a hardware knob comes from is none of a drawing's business.
         MachineFace.LinkWanted += Offer;
         MachineFace.LinkActionWanted += OfferAction;
         MachineFace.UnlinkWanted += Drop;
@@ -53,16 +65,12 @@ public partial class InstrumentPanel : UserControl
         DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
         UI.ThemeManager.Changed += Later;
 
-        // One of the views a controller may be laid out from, which is what makes Ctrl+Shift+M
-        // mean anything here. See LinkKey.
         LinkKey.Watch(this);
 
         AttachedToVisualTree += (_, _) =>
         {
             if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
 
-            // A hardware button pressed comes out here, and this panel does it if it is the
-            // machine that was pointed at.
             Midi.ControlActions.Current.Fired += Do;
 
             ShowLinks();
@@ -84,6 +92,10 @@ public partial class InstrumentPanel : UserControl
     /// <remarks>
     /// The same shelf, in the same dialog, as the take picker on the hand written panels: one
     /// place a recording comes from, however the panel that asked for it was drawn.
+    ///
+    /// Everything on the panel that was showing the old one has to hear about the change, and so
+    /// does whatever is drawing the recording underneath, which is what the second announcement
+    /// is for: setting the text alone moves the value and leaves the picture.
     /// </remarks>
     private async void PickTake(object? sender, string key)
     {
@@ -95,8 +107,6 @@ public partial class InstrumentPanel : UserControl
 
         values.SetText(key, take.FilePath);
 
-        // Everything on the panel that was showing the old one has to hear about it, and so does
-        // whatever is drawing the recording underneath.
         editor.SaidAgain();
     }
 
@@ -236,6 +246,9 @@ public partial class InstrumentPanel : UserControl
     /// A knob points at a parameter, which lives on the instrument and can be written by
     /// anything. A button points at something to be done, and only a panel knows how to do it:
     /// see <see cref="Midi.ControlActions"/>.
+    ///
+    /// The pickup is a jump, because a press is a press: there is nothing to work out and
+    /// nothing to pick up from.
     /// </remarks>
     private void OfferAction(object? sender, string action)
     {
@@ -248,20 +261,21 @@ public partial class InstrumentPanel : UserControl
             Scope = Midi.ControlScope.Focused,
             Machine = editor.MachineId,
             Key = action,
-
-            // A press, so there is nothing to work out and nothing to pick up from.
             Pickup = Midi.ControlPickup.Jump,
             Name = editor.MachineName + " " + action.Replace('_', ' ')
         }, InSong);
     }
 
     /// <summary>Does what a mapped hardware button asked for, if it asked this machine.</summary>
+    /// <remarks>
+    /// Handed to the drawing thread, because the message arrives on the MIDI thread and what
+    /// these actions do is open dialogs and rebuild grids.
+    /// </remarks>
     private void Do(string machine, string action)
     {
         if (Designer?.Editor is not { } editor) return;
         if (!string.Equals(machine, editor.MachineId, StringComparison.Ordinal)) return;
 
-        // On the drawing thread, because what these do is open dialogs and rebuild grids.
         Avalonia.Threading.Dispatcher.UIThread.Post(() => Asked(this, action));
     }
 
@@ -290,6 +304,13 @@ public partial class InstrumentPanel : UserControl
             : link.ActionsOn(showing.MachineId);
     }
 
+    /// <summary>
+    /// Listens to whichever designer the panel has been given, and lets go of the one before.
+    /// </summary>
+    /// <remarks>
+    /// Without the letting go the panel would be subscribed to every designer it had ever
+    /// shown, and a machine picked on the rack would repaint the panel several times over.
+    /// </remarks>
     private void Watch()
     {
         if (_watched != null) _watched.PropertyChanged -= OnDesignerChanged;
@@ -301,9 +322,16 @@ public partial class InstrumentPanel : UserControl
         Retint();
     }
 
+    /// <summary>
+    /// Repaints when the instrument behind the designer changes.
+    /// </summary>
+    /// <remarks>
+    /// Watched rather than taken off the data context, because the rack keeps the same designer
+    /// and swaps the instrument inside it: the panel is never given a new designer and would
+    /// otherwise go on wearing the last machine's colours.
+    /// </remarks>
     private void OnDesignerChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // The rack keeps the same designer and swaps the instrument inside it.
         if (e.PropertyName == nameof(IInstrumentDesigner.Editor)) Retint();
     }
 
@@ -317,10 +345,16 @@ public partial class InstrumentPanel : UserControl
     /// </remarks>
     private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
 
+    /// <summary>Paints the panel in the machine's own colours, mixed against the current theme.</summary>
     private void Retint() => MachineTint.Apply(this, Editor?.Theme);
 
+    /// <summary>The instrument being worked on, or nothing when the designer has none.</summary>
     private InstrumentEditorViewModel? Editor => (DataContext as IInstrumentDesigner)?.Editor;
 
+    /// <summary>
+    /// What this panel is standing in: the rack, or a track's own window. See
+    /// <see cref="InSong"/> for why the difference matters.
+    /// </summary>
     private IInstrumentDesigner? Designer => DataContext as IInstrumentDesigner;
 
     /// <summary>Whatever window this panel is in, since that is where the keys arrive.</summary>
@@ -346,6 +380,10 @@ public partial class InstrumentPanel : UserControl
         _keySource?.AddHandler(KeyUpEvent, OnKeyUp, RoutingStrategies.Tunnel);
     }
 
+    /// <summary>
+    /// Gives the window's keys back. Held on to nothing afterwards, since the next attach may
+    /// be into a different window.
+    /// </summary>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -355,22 +393,31 @@ public partial class InstrumentPanel : UserControl
         _keySource = null;
     }
 
+    /// <summary>
+    /// A letter on the computer keyboard plays the machine, in the tracker's piano layout.
+    /// </summary>
+    /// <remarks>
+    /// A panel on a tab nobody is looking at must not answer for the one they are, which is why
+    /// the visibility is asked as well as whether there is anything to play. Typing a name is
+    /// typing a name and not playing a tune, so a text box anywhere in the window takes the key
+    /// instead, and anything with a modifier on it is somebody else's shortcut.
+    ///
+    /// Played through the keyboard's own set rather than sounded directly, so a key held down
+    /// repeats nothing and the key on screen lights for exactly as long as the one under your
+    /// finger is down.
+    /// </remarks>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         var designer = Designer;
 
-        // A panel on a tab nobody is looking at must not answer for the one they are.
         if (designer?.Editor == null || !IsEffectivelyVisible) return;
 
-        // Typing a name is typing a name, not playing a tune.
         if (e.Source is TextBox) return;
         if (_keySource?.FocusManager?.GetFocusedElement() is TextBox) return;
         if (e.KeyModifiers != KeyModifiers.None) return;
 
         if (KeyboardNoteMap.NoteFor(e.Key.ToString(), designer.Octave) is not Note note) return;
 
-        // Through the keyboard's own set, so a key held down repeats nothing and the key on
-        // screen lights for exactly as long as the one under your finger is down.
         designer.MachineKeys.Play(note.Semitone);
 
         e.Handled = true;
@@ -483,6 +530,11 @@ public partial class InstrumentPanel : UserControl
         Designer?.Editor?.Kit?.Selected?.Take(null);
 
     /// <summary>The plugin instrument this stands for, opened in the same window a chain uses.</summary>
+    /// <remarks>
+    /// The instrument is held in <see cref="_openEditor"/> so the same handler can be taken off
+    /// again when another one is opened. A local function would make a new delegate every time
+    /// and they would pile up, each closing a window that had already gone.
+    /// </remarks>
     private void OpenPluginWindow_Click(object? sender, RoutedEventArgs e)
     {
         var editor = Editor;
@@ -490,8 +542,6 @@ public partial class InstrumentPanel : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
-        // Held so the same handler can be taken off again. A local function would make a new
-        // delegate every time and pile them up.
         if (_openEditor != null) _openEditor.Closing -= CloseOpenEditor;
 
         _openEditor = editor;
@@ -503,6 +553,10 @@ public partial class InstrumentPanel : UserControl
     /// <summary>The instrument whose plugin window this designer opened, if any.</summary>
     private InstrumentEditorViewModel? _openEditor;
 
+    /// <summary>
+    /// Puts the plugin's window away when the instrument behind it is let go of, which is the
+    /// one case a window would otherwise be left drawing into a plugin that has been disposed.
+    /// </summary>
     private void CloseOpenEditor()
     {
         var editor = _openEditor;

@@ -17,6 +17,7 @@ namespace JingleBox2.Diagnostics;
 [Flags]
 public enum LogArea
 {
+    /// <summary>Nothing is written, which is what the log is unless somebody asked.</summary>
     None = 0,
 
     /// <summary>Starting up, settings, files.</summary>
@@ -46,6 +47,7 @@ public enum LogArea
     /// </remarks>
     Machines = 1 << 5,
 
+    /// <summary>Every area there is, which is what <c>JB_LOG=1</c> and the settings tick ask for.</summary>
     Everything = App | Audio | Plugins | Tracker | Midi | Machines
 }
 
@@ -82,13 +84,39 @@ public static class Log
     /// <summary>How big the file gets before it is rolled over.</summary>
     private const long RollBytes = 4 * 1024 * 1024;
 
+    /// <summary>How long the writing thread waits to be told before looking anyway.</summary>
+    /// <remarks>
+    /// A wake-up can be missed while the last batch is being written, and a line that sits in
+    /// the queue until the next one arrives is a line missing from the log of a run that hung.
+    /// </remarks>
+    private const int WakeMs = 250;
+
+    /// <summary>Guards the settings and the folder, which are read from every thread that writes.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>
+    /// How the file is encoded: UTF-8, and deliberately without the byte order mark.
+    /// </summary>
+    /// <remarks>
+    /// This is a file people open in a text editor and paste out of, not one anything parses,
+    /// and a mark at the front of it is three bytes of rubbish in whatever they paste.
+    /// </remarks>
     private static readonly UTF8Encoding Text = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>Which areas are being written, and none of them when the log is off.</summary>
     private static LogArea _areas;
+
+    /// <summary>Where the file goes, which is empty until somebody has said.</summary>
     private static string _folder = "";
+
+    /// <summary>Whether the line naming the build has been written, so it is written once.</summary>
     private static bool _started;
+
+    /// <summary>Whether the handler that writes out what is waiting at the end is on.</summary>
+    /// <remarks>
+    /// Its own flag rather than hooking in <see cref="Open"/> unconditionally, since Open is
+    /// called again every time the setting is changed and one handler is enough.
+    /// </remarks>
     private static bool _hooked;
 
     /// <summary>
@@ -105,8 +133,10 @@ public static class Log
     /// </remarks>
     private static readonly ConcurrentQueue<string> Waiting = new();
 
+    /// <summary>How the writing thread is told there is something to write.</summary>
     private static readonly AutoResetEvent Knock = new(false);
 
+    /// <summary>The one thread that writes, made the first time there is a line to write.</summary>
     private static Thread? _writer;
 
     /// <summary>
@@ -118,6 +148,7 @@ public static class Log
     /// </remarks>
     private const int MostWaiting = 40000;
 
+    /// <summary>How many lines went unwritten, said once in the file rather than per line.</summary>
     private static int _lost;
 
     /// <summary>Which areas are being written. None means the log is off.</summary>
@@ -153,15 +184,17 @@ public static class Log
     /// whenever the setting is changed.
     /// </summary>
     /// <remarks>
-    /// The environment variable wins over the setting, so a build that will not start far
-    /// enough to reach its settings can still be made to talk.
+    /// The environment variable wins over the setting, and says which areas as well as whether,
+    /// so a build that will not start far enough to reach its settings can still be made to
+    /// talk, and a run nobody can start is exactly the run worth narrowing by hand.
+    ///
+    /// Whatever is still waiting when the process ends is written before it goes. A log that
+    /// loses its last lines loses exactly the ones anybody wanted.
     /// </remarks>
     public static void Open(string folder, bool on, LogArea areas = LogArea.Everything)
     {
         var asked = Asked(Environment.GetEnvironmentVariable(Variable));
 
-        // The variable beats the settings, and says which areas as well as whether. A run that
-        // will not reach its settings is exactly the run worth narrowing by hand.
         if (asked != LogArea.None) areas = asked;
 
         lock (Gate)
@@ -169,8 +202,6 @@ public static class Log
             _folder = folder ?? "";
             _areas = on || asked != LogArea.None ? areas : LogArea.None;
 
-            // Whatever is still waiting when this stops is written before it does. A log that
-            // loses its last lines loses exactly the ones anybody wanted.
             if (!_hooked)
             {
                 _hooked = true;
@@ -191,6 +222,11 @@ public static class Log
         Flush();
     }
 
+    /// <summary>Writes the line saying what is being logged and by which build, once a run.</summary>
+    /// <remarks>
+    /// It is the first thing anybody reading a log wants and the last thing they would think to
+    /// ask for, since a log from a version nobody can name says nothing about the version.
+    /// </remarks>
     private static void Announce()
     {
         if (_started) return;
@@ -239,6 +275,14 @@ public static class Log
         Put(area, what + ": " + (error?.ToString() ?? "no reason given"));
     }
 
+    /// <summary>
+    /// Forms the line and hands it over. Nothing here waits for a disc.
+    /// </summary>
+    /// <remarks>
+    /// The time, the area and the process go on the front: the process because plugins run in
+    /// their own and write here too, so their account of what happened sits beside the
+    /// application's in the order it happened.
+    /// </remarks>
     private static void Put(LogArea area, string message)
     {
         string folder;
@@ -289,13 +333,18 @@ public static class Log
         }
     }
 
+    /// <summary>
+    /// The writing thread's whole life: wait to be told, write what is waiting, wait again.
+    /// </summary>
+    /// <remarks>
+    /// Woken by a line, and looked at anyway every quarter of a second in case a wake-up was
+    /// missed while the last batch was being written.
+    /// </remarks>
     private static void Writing()
     {
         while (true)
         {
-            // Woken by a line, and looked at anyway now and then in case a wake-up was missed
-            // while the last batch was being written.
-            Knock.WaitOne(250);
+            Knock.WaitOne(WakeMs);
 
             Flush();
         }
@@ -308,6 +357,9 @@ public static class Log
     /// A batch rather than a line at a time: opening and closing the file is most of the cost
     /// of writing to it, and a busy second produces hundreds of lines that all belong in the
     /// same open.
+    ///
+    /// A file that cannot be written is passed over in silence. A log is not worth an exception
+    /// in the thing it is a log of.
     /// </remarks>
     public static void Flush()
     {
@@ -342,13 +394,10 @@ public static class Log
 
             Roll(path);
 
-            // Without the byte order mark: this is a file people open in a text editor and
-            // paste out of, not one anything parses.
             File.AppendAllText(path, batch.ToString(), Text);
         }
         catch (Exception)
         {
-            // A log that cannot be written is not worth an exception in the thing being logged.
         }
     }
 
@@ -412,6 +461,11 @@ public static class Log
     /// </remarks>
     public static IReadOnlyDictionary<LogArea, string> Everywhere => Names;
 
+    /// <summary>The word each area is written under, in the file and in the environment variable.</summary>
+    /// <remarks>
+    /// One list for both, so a name that can be typed is a name that appears in the log and a
+    /// switch on the settings page, and none of the three can drift from the other two.
+    /// </remarks>
     private static readonly Dictionary<LogArea, string> Names = new()
     {
         [LogArea.App] = "app",
@@ -422,5 +476,6 @@ public static class Log
         [LogArea.Machines] = "machines"
     };
 
+    /// <summary>The word an area is written under, or a plain one for a line about several.</summary>
     private static string Short(LogArea area) => Names.TryGetValue(area, out var name) ? name : "log";
 }

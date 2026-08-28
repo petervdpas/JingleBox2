@@ -17,8 +17,15 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 internal sealed class Struck(Action<int> hit) : ICommand
 {
+    /// <inheritdoc/>
     public bool CanExecute(object? parameter) => true;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The parameter is the semitone the key stands for. Anything else is ignored rather than
+    /// throwing, since a command can be run by anybody and a keyboard is not the place to argue
+    /// about it.
+    /// </remarks>
     public void Execute(object? parameter)
     {
         if (parameter is int semitone) hit(semitone);

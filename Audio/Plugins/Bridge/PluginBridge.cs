@@ -41,6 +41,12 @@ internal static class PluginBridge
     public const string LogFolderVariable = "JB_LOG_DIR";
 
     /// <summary>Written at the top of the shared block, so a stale file is spotted rather than played.</summary>
+    /// <remarks>
+    /// The four bytes spell JBAG. A block file left behind by a process that was killed still
+    /// exists and still maps, so the child reads this first and refuses anything that is not
+    /// ours: mapping somebody else's file and playing whatever is in it is a noise nobody
+    /// should have to hear twice.
+    /// </remarks>
     public const int Magic = 0x4A424147;
 
     /// <summary>Every plugin here is stereo in and stereo out.</summary>
@@ -50,9 +56,18 @@ internal static class PluginBridge
     public const int MaxEvents = 1024;
 
     /// <summary>One event: what kind, which parameter or note, and how much.</summary>
+    /// <remarks>
+    /// Sixteen bytes, four fields of four: the kind, the id of the parameter or the number of
+    /// the note, the value as a float, and one spare integer. Fixed size on purpose, since the
+    /// reader works out where a slot is by multiplying rather than by walking to it.
+    /// </remarks>
     public const int EventSize = 16;
 
     /// <summary>Where the events start, past the header.</summary>
+    /// <remarks>
+    /// Sixty four bytes of header, of which the magic, the frame count, the channel count and
+    /// the ring's two indexes are what is used. See <see cref="BridgeBlock"/> for the offsets.
+    /// </remarks>
     public const int EventsOffset = 64;
 
     /// <summary>Where the audio starts, past the events.</summary>
@@ -96,6 +111,12 @@ internal static class PluginBridge
     public const int StartTimeoutMilliseconds = 30000;
 
     /// <summary>How big the shared block has to be for this many frames.</summary>
+    /// <remarks>
+    /// The header and the events, then the audio twice over: the input and the output are two
+    /// separate stretches, so nothing has to be copied out of the way before the plugin writes
+    /// its answer. A block asked for with nothing in it is still given room for one frame,
+    /// since a mapping of nought bytes is not a mapping.
+    /// </remarks>
     public static long BlockBytes(int maxFrames) =>
         AudioOffset + (long)Math.Max(1, maxFrames) * Channels * sizeof(float) * 2;
 
@@ -109,6 +130,7 @@ internal static class PluginBridge
 /// <summary>What one message is about. Both processes read from this same list.</summary>
 internal enum BridgeCall : byte
 {
+    /// <summary>Not a message. Nothing sends this; a zero here is a header nobody filled in.</summary>
     None = 0,
 
     /// <summary>Child to parent, once, when the plugin is loaded and the answer is known.</summary>
@@ -190,10 +212,19 @@ internal enum BridgeCall : byte
 /// <summary>What one queued event is. Written into the shared block before a block is asked for.</summary>
 internal enum BridgeEvent : int
 {
+    /// <summary>Not an event. A slot nobody has written reads as this.</summary>
     None = 0,
+
+    /// <summary>A parameter moved: the id says which, the value says where to.</summary>
     ParameterValue = 1,
+
+    /// <summary>A key pressed: the id is the note number, the value is how hard.</summary>
     NoteOn = 2,
+
+    /// <summary>That key let go. The value is unused.</summary>
     NoteOff = 3,
+
+    /// <summary>Everything sounding is to stop, which is the transport stopping or a track going away.</summary>
     AllNotesOff = 4
 }
 
@@ -207,17 +238,46 @@ internal enum BridgeEvent : int
 /// </remarks>
 internal sealed class BridgeLink : IDisposable
 {
+    /// <summary>The socket this link speaks over. A process has two: one for audio, one for the rest.</summary>
     private readonly Socket _socket;
+
+    /// <summary>
+    /// Held while a message is written, since anything may send: the drawing thread asking a
+    /// question, the plugin's own thread reporting a knob. Two sends interleaving would put
+    /// half of one message inside the other and there is no recovering from that.
+    /// </summary>
     private readonly object _write = new();
+
+    /// <summary>
+    /// The five header bytes, read into again for every message.
+    /// </summary>
+    /// <remarks>
+    /// Only the one reader thread ever touches this, which is what makes reusing it safe. The
+    /// writer builds a header of its own inside the lock rather than sharing this one, because
+    /// a send can come from any thread while a read is in progress.
+    /// </remarks>
     private readonly byte[] _header = new byte[5];
 
+    /// <summary>Wraps a socket that is already connected to the other half.</summary>
     public BridgeLink(Socket socket) => _socket = socket;
 
+    /// <summary>
+    /// The socket underneath. The audio path reads and writes its own eight bytes rather than
+    /// going through a message, so it needs the socket itself.
+    /// </summary>
     public Socket Socket => _socket;
 
     /// <summary>True while the other end is still there.</summary>
     public bool Connected => _socket.Connected;
 
+    /// <summary>
+    /// Writes one message: four bytes of length, then one byte saying what it is, then the body.
+    /// </summary>
+    /// <remarks>
+    /// A socket takes as much as it feels like taking, so the write is looped until all of it
+    /// has gone. A socket that has closed underneath throws, deliberately: the caller is the
+    /// one that knows whether that means the plugin has died or the process is shutting down.
+    /// </remarks>
     public void Send(BridgeCall call, byte[]? payload = null)
     {
         int length = payload?.Length ?? 0;
@@ -238,6 +298,11 @@ internal sealed class BridgeLink : IDisposable
     }
 
     /// <summary>Waits for the next message. Null when the other end has gone.</summary>
+    /// <remarks>
+    /// A length that is negative or beyond sixty four megabytes is read as the wire having gone
+    /// wrong rather than as an enormous message, and the link is treated as closed. The biggest
+    /// honest payload here is a plugin's own patch, which runs to hundreds of kilobytes.
+    /// </remarks>
     public (BridgeCall Call, byte[] Payload)? Receive()
     {
         if (!ReadAll(_header, 5)) return null;
@@ -254,6 +319,7 @@ internal sealed class BridgeLink : IDisposable
         return (call, payload);
     }
 
+    /// <summary>Writes the whole buffer, in as many goes as the socket wants to take it.</summary>
     private void SendAll(byte[] buffer, int count)
     {
         int sent = 0;
@@ -266,6 +332,11 @@ internal sealed class BridgeLink : IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads exactly that many bytes, or answers false because there is nobody left to read
+    /// from. A socket that has been disposed underneath a waiting read is the ordinary way this
+    /// ends, so that is an answer rather than an exception.
+    /// </summary>
     private bool ReadAll(byte[] buffer, int count)
     {
         int read = 0;
@@ -294,6 +365,11 @@ internal sealed class BridgeLink : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Shuts the socket down both ways and lets it go. Both halves are wrapped, since a socket
+    /// whose other end has already died throws on the way out and there is nothing to do about
+    /// it that is not being done.
+    /// </summary>
     public void Dispose()
     {
         try { _socket.Shutdown(SocketShutdown.Both); } catch (Exception) { }
@@ -304,6 +380,12 @@ internal sealed class BridgeLink : IDisposable
 /// <summary>Builds and reads the bodies of messages, so both sides agree on the order of things.</summary>
 internal static class BridgeBody
 {
+    /// <summary>A list of strings: the count, then each one in turn.</summary>
+    /// <remarks>
+    /// Used for everything wordy the bridge carries, which is a plugin's greeting, a value read
+    /// as the plugin words it, and the reason something failed. A null string goes down as an
+    /// empty one, so the count on the wire always matches what follows it.
+    /// </remarks>
     public static byte[] Words(params string[] words)
     {
         using var stream = new MemoryStream();
@@ -315,6 +397,7 @@ internal static class BridgeBody
         return stream.ToArray();
     }
 
+    /// <summary>Reads back what <see cref="Words"/> wrote.</summary>
     public static string[] ReadWords(byte[] payload)
     {
         using var stream = new MemoryStream(payload);
@@ -328,6 +411,10 @@ internal static class BridgeBody
         return words;
     }
 
+    /// <summary>
+    /// A parameter's id and a value: twelve bytes, the id first. Most of the traffic on this
+    /// wire is one of these.
+    /// </summary>
     public static byte[] Number(uint id, double value)
     {
         var payload = new byte[12];
@@ -338,16 +425,26 @@ internal static class BridgeBody
         return payload;
     }
 
+    /// <summary>
+    /// Reads back what <see cref="Number"/> wrote. A payload too short to hold one reads as
+    /// nought rather than throwing: a message that arrived damaged should cost the message.
+    /// </summary>
     public static (uint Id, double Value) ReadNumber(byte[] payload) =>
         payload.Length < 12
             ? (0u, 0d)
             : (BitConverter.ToUInt32(payload, 0), BitConverter.ToDouble(payload, 4));
 
+    /// <summary>One number on its own, which is what a value asked for comes back as.</summary>
     public static byte[] Double(double value) => BitConverter.GetBytes(value);
 
+    /// <summary>Reads back what <see cref="Double"/> wrote, or nought from a short payload.</summary>
     public static double ReadDouble(byte[] payload) =>
         payload.Length < 8 ? 0d : BitConverter.ToDouble(payload, 0);
 
+    /// <summary>
+    /// Two numbers, which on this wire is always a width and a height: a window's size going
+    /// out, and the size the plugin settled on coming back.
+    /// </summary>
     public static byte[] Pair(int first, int second)
     {
         var payload = new byte[8];
@@ -358,9 +455,14 @@ internal static class BridgeBody
         return payload;
     }
 
+    /// <summary>Reads back what <see cref="Pair"/> wrote, or a pair of noughts from a short payload.</summary>
     public static (int First, int Second) ReadPair(byte[] payload) =>
         payload.Length < 8 ? (0, 0) : (BitConverter.ToInt32(payload, 0), BitConverter.ToInt32(payload, 4));
 
+    /// <summary>
+    /// Three numbers: a window's width, its height, and whether the plugin will follow it being
+    /// dragged bigger. The answer to opening a plugin's own interface.
+    /// </summary>
     public static byte[] Three(int first, int second, int third)
     {
         var payload = new byte[12];
@@ -372,13 +474,19 @@ internal static class BridgeBody
         return payload;
     }
 
+    /// <summary>Reads back what <see cref="Three"/> wrote, or three noughts from a short payload.</summary>
     public static (int First, int Second, int Third) ReadThree(byte[] payload) =>
         payload.Length < 12
             ? (0, 0, 0)
             : (BitConverter.ToInt32(payload, 0), BitConverter.ToInt32(payload, 4), BitConverter.ToInt32(payload, 8));
 
+    /// <summary>
+    /// A window handle, always as eight bytes whatever the machine's own pointer is, so the two
+    /// halves cannot disagree about how long a handle is.
+    /// </summary>
     public static byte[] Handle(nint window) => BitConverter.GetBytes((long)window);
 
+    /// <summary>Reads back what <see cref="Handle"/> wrote. Nought means no window.</summary>
     public static nint ReadHandle(byte[] payload) =>
         payload.Length < 8 ? 0 : (nint)BitConverter.ToInt64(payload, 0);
 
@@ -408,6 +516,15 @@ internal static class BridgeBody
         return stream.ToArray();
     }
 
+    /// <summary>
+    /// Reads back what <see cref="Parameters"/> wrote, field for field in the same order.
+    /// </summary>
+    /// <remarks>
+    /// This and its other half are the one place on this wire where a field added to one side
+    /// and not the other would be read as nonsense rather than as a message that is too short:
+    /// every parameter after the changed one would be read from the wrong place. They are kept
+    /// next to each other for that reason.
+    /// </remarks>
     public static PluginParameter[] ReadParameters(byte[] payload)
     {
         using var stream = new MemoryStream(payload);
@@ -445,14 +562,36 @@ internal static class BridgeBody
 /// A file rather than a name, because a named shared mapping is a Windows idea and this has to
 /// work on Linux first. The file lives where the system keeps things that are not really files,
 /// so it never touches a disk.
+///
+/// The layout, from the start of the block: the magic at 0, the frames a block may hold at 4,
+/// the channel count at 8, the ring's write index at 16 and its read index at 20. The events
+/// begin at <see cref="PluginBridge.EventsOffset"/>, the input audio at
+/// <see cref="PluginBridge.InputOffset"/>, and the output audio after it at
+/// <see cref="PluginBridge.OutputOffset"/>. Both sides work these out from the same constants,
+/// so the layout is agreed rather than negotiated.
 /// </remarks>
 internal sealed unsafe class BridgeBlock : IDisposable
 {
+    /// <summary>The mapping itself, held so it stays mapped.</summary>
     private readonly MemoryMappedFile _file;
+
+    /// <summary>The window onto it, which is where the pointer comes from.</summary>
     private readonly MemoryMappedViewAccessor _view;
+
+    /// <summary>
+    /// The file behind the mapping, for the side that made it, and null for the side that only
+    /// opened it. Whoever holds a path is the one who takes the file away again.
+    /// </summary>
     private readonly string? _path;
+
+    /// <summary>
+    /// The start of the block, taken once and held. Everything here is pointer arithmetic off
+    /// this: the audio thread copies a stereo block in and out sixty times a second, and going
+    /// through the accessor's own read and write methods for that is not affordable.
+    /// </summary>
     private byte* _base;
 
+    /// <summary>Wraps a mapping that is already open and takes a pointer to the start of it.</summary>
     private BridgeBlock(MemoryMappedFile file, MemoryMappedViewAccessor view, string? path, int maxFrames)
     {
         _file = file;
@@ -464,19 +603,40 @@ internal sealed unsafe class BridgeBlock : IDisposable
         _view.SafeMemoryMappedViewHandle.AcquirePointer(ref _base);
     }
 
+    /// <summary>
+    /// The most frames one crossing may carry. Both sides were built for this number, so a
+    /// longer block is broken into several rather than being sent whole.
+    /// </summary>
     public int MaxFrames { get; }
 
+    /// <summary>The start of the block, for anything that wants to read the header itself.</summary>
     public byte* Base => _base;
 
+    /// <summary>Where the audio going into the plugin is written, interleaved stereo.</summary>
     public float* Input => (float*)(_base + PluginBridge.InputOffset);
 
+    /// <summary>Where what came out of the plugin is read, in the same shape.</summary>
     public float* Output => (float*)(_base + PluginBridge.OutputOffset(MaxFrames));
 
+    /// <summary>
+    /// How many events have ever been queued, at offset 16. It counts up and is never wrapped:
+    /// the slot is worked out from it, so the difference between the two indexes is how many
+    /// are waiting.
+    /// </summary>
     private int* WriteIndex => (int*)(_base + 16);
 
+    /// <summary>How many have ever been taken, at offset 20, counted the same way.</summary>
     private int* ReadIndex => (int*)(_base + 20);
 
     /// <summary>Makes the block and the file behind it. The parent does this.</summary>
+    /// <remarks>
+    /// It goes in /dev/shm where there is one, which is memory wearing a file's clothes, and in
+    /// the temporary folder where there is not. The name carries this process's number and a
+    /// fresh identifier, so two plugins, or two copies of the application, cannot land on the
+    /// same file. The header is filled in last, which is what makes the magic worth checking.
+    /// </remarks>
+    /// <param name="maxFrames">The most frames one crossing carries, which is what sizes the block.</param>
+    /// <param name="path">Where the file was put, to be handed to the child.</param>
     public static BridgeBlock Create(int maxFrames, out string path)
     {
         long size = PluginBridge.BlockBytes(maxFrames);
@@ -505,6 +665,13 @@ internal sealed unsafe class BridgeBlock : IDisposable
     }
 
     /// <summary>Opens a block somebody else made. The child does this.</summary>
+    /// <remarks>
+    /// The magic and the frame count are read before anything else is believed. A block file
+    /// left behind by a process that was killed still exists and still maps, and playing
+    /// whatever happens to be inside one is a noise nobody should hear twice. Anything that
+    /// fails the check is let go and answered as null, which the child reports as the block not
+    /// being there.
+    /// </remarks>
     public static BridgeBlock? Open(string path)
     {
         if (!File.Exists(path)) return null;
@@ -561,9 +728,20 @@ internal sealed unsafe class BridgeBlock : IDisposable
         }
     }
 
+    /// <summary>
+    /// Held while a slot is filled in. There is one reader and it is in another process, but
+    /// there are several writers here: notes come from the tracker's thread and parameters
+    /// from whoever moved one.
+    /// </summary>
     private readonly object _writers = new();
 
     /// <summary>Everything queued since last time, and the queue emptied.</summary>
+    /// <remarks>
+    /// Read by the other process just before it runs a block, so what is applied is everything
+    /// that arrived while the last block was in flight. The count is clamped to the size of the
+    /// ring: a writer that has run right round has overwritten what it passed, and reading more
+    /// than a ring's worth would be reading the same slots twice.
+    /// </remarks>
     public (BridgeEvent Kind, uint Id, float Value, int Extra)[] Take()
     {
         int read = *ReadIndex;
@@ -588,6 +766,15 @@ internal sealed unsafe class BridgeBlock : IDisposable
         return events;
     }
 
+    /// <summary>
+    /// Lets the mapping go, and the file with it for the side that made it.
+    /// </summary>
+    /// <remarks>
+    /// The parent made the file and the parent takes it away. The child only ever opened one,
+    /// so it holds no path and deletes nothing, and a file both processes have mapped stays
+    /// mapped until they have both let go: deleting it is a name being removed rather than
+    /// memory being pulled out from underneath anybody.
+    /// </remarks>
     public void Dispose()
     {
         try { _view.SafeMemoryMappedViewHandle.ReleasePointer(); } catch (Exception) { }
@@ -595,8 +782,6 @@ internal sealed unsafe class BridgeBlock : IDisposable
         _view.Dispose();
         _file.Dispose();
 
-        // The parent made the file and the parent takes it away. The child only ever opened it,
-        // and a file both processes have mapped stays mapped until they have both let go.
         if (_path != null)
         {
             try { File.Delete(_path); } catch (Exception) { }

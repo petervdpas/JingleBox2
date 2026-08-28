@@ -12,6 +12,9 @@ namespace JingleBox2.Tests;
 /// fader that wide pushed the meter beside it into the strip's own border. The rule is here
 /// rather than in the control because it is a fact about text, and the control is a fact about
 /// Avalonia.
+///
+/// With every strip honest about its width the mixer's cards had to grow from 120 to 134, which
+/// is what the contents always needed.
 /// </remarks>
 public class ReadingWidthTests
 {
@@ -50,6 +53,10 @@ public class ReadingWidthTests
         Assert.Equal("1000ms", NumericInput.Widest(20, 20, 1000, "0", "ms"));
     }
 
+    /// <summary>
+    /// A unit is optional and a missing one is not the string "null": both spellings of "no
+    /// unit" have to come back as the bare number.
+    /// </summary>
     [Fact]
     public void A_reading_with_no_unit_is_just_the_number()
     {

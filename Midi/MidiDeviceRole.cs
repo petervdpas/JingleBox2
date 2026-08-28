@@ -7,8 +7,13 @@ namespace JingleBox2.Midi;
 [System.Flags]
 public enum MidiDeviceRole
 {
+    /// <summary>Nothing at all, which is what a controller is until somebody says otherwise.</summary>
     None = 0,
+
+    /// <summary>The pads on FIRE and PADS, through <see cref="MidiRouter"/>.</summary>
     Pads = 1,
+
+    /// <summary>Notes into the tracker, which is a keyboard playing an instrument.</summary>
     Tracker = 2,
 
     /// <summary>
@@ -43,6 +48,9 @@ public enum MidiDeviceRole
 /// </summary>
 public sealed class MidiDeviceBinding
 {
+    /// <summary>The port's own name, trimmed, since ALSA pads them to a fixed width.</summary>
     public string Device { get; set; } = "";
+
+    /// <summary>What it drives. Never None in a stored list: a binding for nothing is dropped.</summary>
     public MidiDeviceRole Role { get; set; } = MidiDeviceRole.None;
 }

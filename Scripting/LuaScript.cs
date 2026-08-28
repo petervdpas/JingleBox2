@@ -6,38 +6,14 @@ using MoonSharp.Interpreter;
 
 namespace JingleBox2.Scripting;
 
-/// <summary>
-/// One Lua file, loaded, fenced in, and answering for itself when it goes wrong.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// Why a language at all, when this application has spent its life describing things in JSON
-/// instead: because the JSON stops working at exactly the point hardware support begins. A
-/// machine's face is a fixed vocabulary of knobs and groups and the host draws what it is told.
-/// A controller is not like that. One device assembles a fader out of two messages, another
-/// wants a checksum, a third changes what nine of its controls mean when a button is pressed,
-/// and a fourth counts its encoder backwards. Every DAW that has tried this arrived at the same
-/// answer and none of them stayed declarative: Reason writes codecs in Lua, Ableton in Python,
-/// Bitwig in Java and then JavaScript. A description format that has to cover that grows a
-/// field per device until it is a programming language with no debugger.
-///
-/// So: JSON for what a device has, and this for what a device does, and the second one only
-/// when the first is not enough.
-///
-/// Fenced in three ways, because a script arrives from somebody else and a person adding a
-/// controller should not have to be trusted with the filesystem to do it.
-///
-/// <list type="bullet">
-/// <item>The library it gets is written out below rather than named as a preset, so what a
-/// script can reach is one list in one place. No io, no os, no require, no loading more code.</item>
-/// <item>An error switches the script off rather than being caught and shrugged at. A codec
-/// that throws is producing wrong MIDI, and a hundred messages a second means a hundred
-/// identical lines of log a second.</item>
-/// <item>A call that takes too long switches it off as well. There is no way to interrupt a
-/// script mid-loop from outside, so the only defence is to refuse it the next message. It is
-/// after the fact by one call, which is the difference between a hitch and a hang.</item>
-/// </list>
+/// MoonSharp, which is Lua 5.2 and runs in this process. The fence is three things in this
+/// class and nothing anywhere else: <see cref="Allowed"/> is what a script may reach,
+/// <see cref="TooLong"/> is how long one call may take, and <see cref="Working"/> is the switch
+/// that goes off and stays off.
 /// </remarks>
-public sealed class LuaScript
+public sealed class LuaScript : ILuaScript
 {
     /// <summary>
     /// Everything a script is allowed to touch, written out rather than named as a preset.
@@ -66,21 +42,31 @@ public sealed class LuaScript
     /// </remarks>
     private static readonly TimeSpan TooLong = TimeSpan.FromMilliseconds(20);
 
+    /// <summary>The interpreter and everything the file has put in it, for this file alone.</summary>
+    /// <remarks>
+    /// One per file rather than one shared: two codecs that could see each other's globals
+    /// would be two codecs that could break each other, and there is nothing they want to say
+    /// to one another.
+    /// </remarks>
     private readonly Script _script = new(Allowed);
+
+    /// <summary>How long the last call took, which is the only thing the budget can be measured with.</summary>
     private readonly Stopwatch _clock = new();
 
+    /// <summary>Made by <see cref="Open"/> once the file has been read, and no other way.</summary>
     private LuaScript(string path)
     {
         Path = path;
         Name = System.IO.Path.GetFileName(path);
     }
 
+    /// <inheritdoc/>
     public string Path { get; }
 
-    /// <summary>The file name, which is what a message about it should say.</summary>
+    /// <inheritdoc/>
     public string Name { get; }
 
-    /// <summary>False once it has misbehaved. It is not asked again until it is reloaded.</summary>
+    /// <inheritdoc/>
     public bool Working { get; private set; }
 
     /// <summary>
@@ -108,13 +94,18 @@ public sealed class LuaScript
         }
     }
 
+    /// <summary>The file's text, read on the way in and kept until <see cref="Start"/> runs it.</summary>
+    /// <remarks>
+    /// Read and run are two steps because the things the script is given have to be in place
+    /// before its own body runs.
+    /// </remarks>
     private string _source = "";
 
-    /// <summary>Puts something in the script's reach, under a name it can call.</summary>
+    /// <inheritdoc/>
     public void Give(string name, Func<ScriptExecutionContext, CallbackArguments, DynValue> what) =>
         _script.Globals[name] = DynValue.NewCallback(new CallbackFunction(what, name));
 
-    /// <summary>Runs the file's own body. False when it will not even parse.</summary>
+    /// <inheritdoc/>
     public bool Start()
     {
         try
@@ -136,16 +127,19 @@ public sealed class LuaScript
         }
     }
 
-    /// <summary>True when the file defines a function of that name.</summary>
+    /// <inheritdoc/>
     public bool Has(string function) =>
         Working && _script.Globals.Get(function).Type == DataType.Function;
 
-    /// <summary>Reads a global the file set, for the table a controller describes itself with.</summary>
+    /// <inheritdoc/>
     public DynValue Read(string name) => _script.Globals.Get(name);
 
-    /// <summary>
-    /// Calls one of the file's functions. Null when it is not there, or when it just broke.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The budget is checked after the call rather than during it, since MoonSharp offers no
+    /// way in from outside once a script is running. A call that overruns is allowed to finish
+    /// and the script is switched off behind it.
+    /// </remarks>
     public DynValue? Call(string function, params DynValue[] with)
     {
         if (!Working) return null;
@@ -190,6 +184,6 @@ public sealed class LuaScript
         }
     }
 
-    /// <summary>A table to hand to a script, built against this script's own heap.</summary>
+    /// <inheritdoc/>
     public DynValue NewTable() => DynValue.NewTable(_script);
 }

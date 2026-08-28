@@ -13,31 +13,26 @@ namespace JingleBox2.Shortcuts;
 /// </remarks>
 public sealed class ShortcutBinding
 {
+    /// <summary>Which action, by the name of the enum member rather than its number.</summary>
     public string Action { get; set; } = "";
 
     /// <summary>As a person writes it: "Ctrl+S", "Ctrl+Shift+Z".</summary>
     public string Keys { get; set; } = "";
 }
 
-/// <summary>
-/// Which key does what. One object, so there is one place to change it from.
-/// </summary>
-/// <remarks>
-/// Apart from the dispatcher on purpose. What a key means is a setting, and settings are edited,
-/// stored and shown; what happens when it is pressed is plumbing. Keeping them apart is what
-/// makes a page that edits shortcuts a list bound to this and nothing else, rather than a page
-/// that has to know how keys are delivered.
-///
-/// Only ever holds what somebody changed. A shortcut left alone is not written down, so the
-/// defaults can be improved later and will reach anybody who never had an opinion about them.
-/// </remarks>
-public sealed class ShortcutMap
+/// <inheritdoc/>
+public sealed class ShortcutMap : IShortcutMap
 {
+    /// <summary>What each action is on, and nothing at all for one somebody took off.</summary>
+    /// <remarks>
+    /// A dictionary of four, walked rather than indexed by keystroke: see <see cref="Match"/>.
+    /// </remarks>
     private readonly Dictionary<ShortcutAction, KeyGesture> _held = new();
 
+    /// <summary>A map on the defaults, which is what it is until something is stored into it.</summary>
     public ShortcutMap() => Reset();
 
-    /// <summary>Puts every one back to what it ships as.</summary>
+    /// <inheritdoc/>
     public void Reset()
     {
         _held.Clear();
@@ -46,16 +41,14 @@ public sealed class ShortcutMap
             if (Read(keys) is { } gesture) _held[action] = gesture;
     }
 
-    /// <summary>What that action is on.</summary>
+    /// <inheritdoc/>
     public KeyGesture? For(ShortcutAction action) =>
         _held.TryGetValue(action, out var gesture) ? gesture : null;
 
-    /// <summary>What that action is on, as a person would write it.</summary>
+    /// <inheritdoc/>
     public string Said(ShortcutAction action) => For(action)?.ToString() ?? "";
 
-    /// <summary>
-    /// Which action a keystroke asks for, or nothing.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Walked rather than looked up, because there are four of them and a dictionary keyed on a
     /// key and its modifiers is more machinery than the thing is worth.
@@ -68,14 +61,7 @@ public sealed class ShortcutMap
         return null;
     }
 
-    /// <summary>
-    /// Puts an action on a key, and takes that key off whatever else had it.
-    /// </summary>
-    /// <remarks>
-    /// One key does one thing. Two actions on one keystroke is a state a settings page should
-    /// never be able to leave somebody in, since only one of them could ever happen and which
-    /// would be an accident of the order they are stored in.
-    /// </remarks>
+    /// <inheritdoc/>
     public void Set(ShortcutAction action, KeyGesture? gesture)
     {
         if (gesture is null)
@@ -94,7 +80,7 @@ public sealed class ShortcutMap
         _held[action] = gesture;
     }
 
-    /// <summary>Reads what was stored, leaving anything it does not recognise alone.</summary>
+    /// <inheritdoc/>
     public void Take(IEnumerable<ShortcutBinding>? saved)
     {
         Reset();
@@ -106,14 +92,13 @@ public sealed class ShortcutMap
             if (one is null) continue;
             if (!Enum.TryParse(one.Action, ignoreCase: true, out ShortcutAction action)) continue;
 
-            // Nothing at all is a shortcut somebody deliberately took off.
             if (one.Keys.Length == 0) { _held.Remove(action); continue; }
 
             if (Read(one.Keys) is { } gesture) Set(action, gesture);
         }
     }
 
-    /// <summary>Only what differs from the defaults, so improving one still reaches people.</summary>
+    /// <inheritdoc/>
     public List<ShortcutBinding> Given()
     {
         var written = new List<ShortcutBinding>();
@@ -135,6 +120,13 @@ public sealed class ShortcutMap
         return written;
     }
 
+    /// <summary>
+    /// A keystroke as a person writes it, or nothing when it is not one this understands.
+    /// </summary>
+    /// <remarks>
+    /// A shortcut nobody can parse is a shortcut that does nothing, which is better than a
+    /// start that fails over one line in a settings file.
+    /// </remarks>
     private static KeyGesture? Read(string keys)
     {
         if (string.IsNullOrWhiteSpace(keys)) return null;
@@ -145,8 +137,6 @@ public sealed class ShortcutMap
         }
         catch (Exception)
         {
-            // A shortcut nobody can parse is a shortcut that does nothing, which is better than
-            // a start that fails over a line in a settings file.
             Log.Write(LogArea.App, () => "shortcuts: '" + keys + "' is not a keystroke this understands");
 
             return null;

@@ -4,24 +4,21 @@ using System.Collections.Generic;
 
 namespace JingleBox2.Tracker.Synth;
 
-/// <summary>
-/// The song's tracks, summed into one buffer: a bus, a level, a pan, an insert chain, a ducker
-/// and an instrument apiece.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// One voice per track, the tracker way: a new note cuts the one still ringing there. Auditions
-/// sit outside that, carry no track at all and simply pile up, which is why a panel's keyboard
-/// cannot be heard on a strip or turned down by one.
+/// Everything here is indexed by track and sized for as many tracks as a song can have, so a
+/// strip always has a bus, a ducker and an instrument slot of its own whether or not the song
+/// currently reaches that far. Indexed things go wrong quietly, which is why
+/// <c>Tests/MixerIsolationTests.cs</c> plays a note on one track and asks what every other
+/// track is sounding.
 ///
-/// It was called SynthMixer, which was true when it summed synth voices and nothing else. It
-/// grew a bus and a level and a ducker and a plugin slot for every track and went on wearing the
-/// old name, which said the wrong thing about the one class the whole mix goes through.
-///
-/// Rendering happens on the audio callback thread while notes are started from the clock and
-/// from the UI, so the voice list is behind a lock. The critical sections are a few list
-/// operations long; the sample loops themselves run on a snapshot.
+/// The voice list is behind a lock and the render runs off a snapshot of it. The critical
+/// sections are a few list operations long, and the arrays the render works from are filled
+/// rather than made afresh: copying them out was two allocations per block on the audio thread,
+/// forty thousand a second between them, all of it garbage somebody has to collect while the
+/// next block is waiting.
 /// </remarks>
-public sealed class TrackMixer
+public sealed class TrackMixer : ITrackMixer
 {
     /// <summary>Past this, the oldest voice is taken rather than growing the mix forever.</summary>
     public const int MaxVoices = 48;
@@ -34,6 +31,11 @@ public sealed class TrackMixer
     public const float MasterGain = 0.9f;
 
     /// <summary>As many tracks as a song can have, so a strip always has a bus of its own.</summary>
+    /// <remarks>
+    /// Sized for the largest song rather than for the one that is open, so nothing has to be
+    /// rebuilt when a track is added and no index can walk off an array that shrank underneath
+    /// it.
+    /// </remarks>
     private const int MaxTracks = Song.MaxTrackCount;
 
     /// <summary>
@@ -51,15 +53,27 @@ public sealed class TrackMixer
     /// </remarks>
     private float _masterGain = 1f;
 
+    /// <summary>Where the whole mix sits, -1 hard left to 1 hard right.</summary>
     private float _masterPan;
 
+    /// <summary>The one effect the whole song goes through, if there is one.</summary>
     private IAudioInsert? _masterInsert;
 
+    /// <summary>What left on each side in the last block, before it was stamped and aged.</summary>
     private float _masterLeft;
 
     private float _masterRight;
 
+    /// <summary>Every voice sounding, on a track or not. Only ever touched under the lock.</summary>
     private readonly List<IVoice> _voices = new();
+
+    /// <summary>
+    /// What guards everything the audio thread reads and the other threads write.
+    /// </summary>
+    /// <remarks>
+    /// Held for a few list or array operations and never while somebody else's code runs: a
+    /// plugin being rendered or told to stop is outside it, always.
+    /// </remarks>
     private readonly object _lock = new();
 
     /// <summary>One buffer per track, so a track can be measured and moved on its own.</summary>
@@ -68,10 +82,25 @@ public sealed class TrackMixer
     /// <summary>Auditions and anything else with no track of its own.</summary>
     private float[] _loose = Array.Empty<float>();
 
+    /// <summary>
+    /// Which tracks are worth rendering this block.
+    /// </summary>
+    /// <remarks>
+    /// A track sounds if it has a voice, a plugin, or something inserted on it. The last is the
+    /// one that looks wrong and is not: see the remarks on <see cref="ITrackMixer"/>.
+    /// </remarks>
     private readonly bool[] _sounding = new bool[MaxTracks];
+
+    /// <summary>What each strip's side chain is set to.</summary>
     private readonly DuckSetting[] _ducking = new DuckSetting[MaxTracks];
+
+    /// <summary>The follower per strip, made the first time a strip is actually ducked.</summary>
     private readonly Ducker?[] _duckers = new Ducker[MaxTracks];
+
+    /// <summary>Where each strip's duck ended the last block, for the knob's own read-out.</summary>
     private readonly float[] _duckGain = new float[MaxTracks];
+
+    /// <summary>The peak off each track's bus in the last block, measured after its insert.</summary>
     private readonly float[] _trackLevels = new float[MaxTracks];
 
     /// <summary>What each track's audio passes through before the mix, if anything.</summary>
@@ -100,19 +129,46 @@ public sealed class TrackMixer
     /// </summary>
     private IPluginInstrument? _preview;
 
+    /// <summary>
+    /// Where the audition plugin renders before being added to the loose bus.
+    /// </summary>
+    /// <remarks>
+    /// A plugin fills a buffer rather than adding to one, and the loose bus may already have
+    /// another audition in it, so it cannot render straight into it. Kept and regrown rather
+    /// than made per block, since this is the audio thread.
+    /// </remarks>
     private float[] _previewScratch = Array.Empty<float>();
+
+    /// <summary>How loud the audition plays, which is applied as its scratch is added in.</summary>
     private float _previewGain = 1f;
 
     /// <summary>When the audition lets go of its note. Zero while nothing is being auditioned.</summary>
     private long _previewUntil;
 
+    /// <summary>How long the last block was, so the busses are only rebuilt when it changes.</summary>
     private int _bufferFrames;
 
     /// <summary>What one strip's side chain is set to.</summary>
+    /// <param name="Depth">How far down the strip goes when the key is at full scale, 0 to 1.</param>
+    /// <param name="Key">The track doing the pushing, or <see cref="TrackMix.NoKey"/>.</param>
+    /// <param name="ReleaseMs">How long it takes to come back up.</param>
     private readonly record struct DuckSetting(double Depth, int Key, double ReleaseMs);
 
+    /// <summary>
+    /// The voices as they stood when the lock was taken, which is what the block renders.
+    /// </summary>
+    /// <remarks>
+    /// Grown when it has to be and reused when it does not, so a run of notes does not leave an
+    /// array behind for every one of them. Nothing is cleared past
+    /// <see cref="_voiceCount"/>: the tail is whatever the last, longer block held, and the
+    /// count is what says where to stop.
+    /// </remarks>
     private IVoice[] _snapshot = Array.Empty<IVoice>();
+
+    /// <summary>How much of <see cref="_snapshot"/> is this block's, the rest being stale.</summary>
     private int _voiceCount;
+
+    /// <summary>Something has been added or reaped, so the snapshot is worth taking again.</summary>
     private bool _snapshotStale = true;
 
     /// <summary>
@@ -127,9 +183,19 @@ public sealed class TrackMixer
     /// </remarks>
     private readonly IPluginInstrument?[] _live = new IPluginInstrument[MaxTracks];
 
+    /// <summary>The side chains as they stood when the lock was taken. Filled, never made.</summary>
     private readonly DuckSetting[] _ducked = new DuckSetting[MaxTracks];
+
+    /// <summary>Counts up, one per voice, so two noise hits are never the same noise.</summary>
     private int _noiseSeed;
 
+    /// <summary>
+    /// Sets up a mix for a card running at that rate, with every strip open and unducked.
+    /// </summary>
+    /// <remarks>
+    /// The busses are not made here. A track gets one the first time it sounds, so a song using
+    /// four tracks does not carry twenty-eight empty buffers about with it.
+    /// </remarks>
     public TrackMixer(int sampleRate)
     {
         SampleRate = sampleRate;
@@ -142,18 +208,10 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Points one strip's side chain at another track. Depth of zero, or no key, is a strip
-    /// that plays at its own level.
-    /// </summary>
-    /// <summary>
-    /// How far through its recording the newest sounding sample voice is, or -1 for none.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// A track's own voice and a voice auditioned by hand both answer, because a panel showing
-    /// a cursor wants the piece that is playing and does not care which of the two started it.
-    /// Newest first: playing a second key while the first still rings should move the cursor to
-    /// what was just asked for.
+    /// Walked backwards, which is what makes it the newest: the list is in the order the notes
+    /// started. Only sample voices have a position at all, so everything else is stepped over.
     /// </remarks>
     public double SamplePosition(int track)
     {
@@ -173,6 +231,7 @@ public sealed class TrackMixer
         return -1;
     }
 
+    /// <inheritdoc/>
     public void SetDucking(int track, double depth, int key, double releaseMs)
     {
         if (track < 0 || track >= MaxTracks) return;
@@ -180,10 +239,11 @@ public sealed class TrackMixer
         lock (_lock) _ducking[track] = new DuckSetting(Math.Clamp(depth, 0, 1), key, releaseMs);
     }
 
-    /// <summary>
-    /// Puts an effect in a track's path, or takes one out with null. The track is rendered on
-    /// its own bus, so what the effect sees is that track and nothing else.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The running total is kept here rather than counted per block, because the render asks
+    /// whether anything is inserted anywhere before it decides it may rest.
+    /// </remarks>
     public void SetInsert(int track, IAudioInsert? insert)
     {
         if (track < 0 || track >= MaxTracks) return;
@@ -225,16 +285,34 @@ public sealed class TrackMixer
     /// </remarks>
     private struct TrackCensus
     {
+        /// <summary>How many blocks the track's plugin was asked for over the second.</summary>
         public int Blocks;
+
+        /// <summary>The loudest the plugin came out over the second, before the columns.</summary>
         public float PlayedPeak;
+
+        /// <summary>The loudest that went into the insert.</summary>
         public float BeforeInsert;
+
+        /// <summary>And the loudest that came back out, which is how an effect eating a track shows.</summary>
         public float AfterInsert;
+
+        /// <summary>How many of the blocks came out silent, which separates quiet from not running.</summary>
         public int SilentBlocks;
+
+        /// <summary>What the last fault said, since one line cannot carry all of them.</summary>
         public string? Fault;
+
+        /// <summary>How many there were, which is what says whether one was a one-off.</summary>
         public int Faults;
+
+        /// <summary>What is playing the track, by type name. Written once and then left alone.</summary>
         public string? Instrument;
+
+        /// <summary>And what is inserted on it.</summary>
         public string? Insert;
 
+        /// <summary>Takes note of one block a plugin played. On the audio thread: comparisons only.</summary>
         public void Played(float peak, IPluginInstrument instrument)
         {
             Blocks++;
@@ -243,6 +321,7 @@ public sealed class TrackMixer
             Instrument ??= instrument.GetType().Name;
         }
 
+        /// <summary>Takes note of what one insert was given and what it gave back.</summary>
         public void Inserted(float before, float after, IAudioInsert insert)
         {
             if (before > BeforeInsert) BeforeInsert = before;
@@ -250,14 +329,17 @@ public sealed class TrackMixer
             Insert ??= insert.GetType().Name;
         }
 
+        /// <summary>Takes note of a plugin or an insert that threw, keeping the last message.</summary>
         public void Note(string fault)
         {
             Faults++;
             Fault = fault;
         }
 
+        /// <summary>Whether this track did anything worth a line, so silent tracks say nothing.</summary>
         public bool Worth => Blocks > 0 || Insert != null || Faults > 0;
 
+        /// <summary>Starts the next second from nothing, once the line has been written.</summary>
         public void Clear()
         {
             Blocks = 0;
@@ -292,17 +374,19 @@ public sealed class TrackMixer
         return peak;
     }
 
+    /// <inheritdoc/>
     public IAudioInsert? InsertOn(int track) =>
         track >= 0 && track < MaxTracks ? _inserts[track] : null;
 
-    /// <summary>Gets the current audio level (0-1) for a track, for UI display.</summary>
+    /// <inheritdoc/>
     public float GetTrackLevel(int track) =>
         track >= 0 && track < MaxTracks ? _trackLevels[track] : 0f;
 
-    /// <summary>
-    /// Puts a plugin on a track, or takes one off with null. Whatever was there is told to
-    /// stop first, or it carries on playing into a bus nobody renders.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The one leaving is told to stop outside the lock, since that is somebody else's code
+    /// and it has no business running inside it.
+    /// </remarks>
     public void SetInstrument(int track, IPluginInstrument? instrument)
     {
         if (track < 0 || track >= MaxTracks) return;
@@ -328,19 +412,10 @@ public sealed class TrackMixer
         leaving?.AllNotesOff();
     }
 
-    /// <summary>
-    /// Moves everything a track is holding to another position: its plugin, its effects, its
-    /// side chain and the columns riding its bus.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The song is reordered by the view; this is the live half of the same move. Without it
-    /// the notes would arrive at their new track and the plugin would still be answering on
-    /// the old one, so every track would play somebody else's sound.
-    ///
-    /// Voices are cut rather than carried across. A voice remembers the track it was started
-    /// on, and there is no sound reason to hear a note go on playing on a track that is no
-    /// longer where it was. A cut is a short fade, so this costs a note ending rather than a
-    /// click.
+    /// The busses themselves are not moved. They hold the last block and nothing else, and the
+    /// next block fills them again from whatever is now on each track.
     /// </remarks>
     public void MoveTrack(int from, int to)
     {
@@ -357,7 +432,6 @@ public sealed class TrackMixer
             Shift(_ducking, from, to);
             Shift(_trackLevels, from, to);
 
-            // A side chain names the track that keys it, and those numbers have just moved.
             for (int track = 0; track < MaxTracks; track++)
             {
                 var setting = _ducking[track];
@@ -366,14 +440,12 @@ public sealed class TrackMixer
                 _ducking[track] = setting with { Key = Song.WhereTrackWent(setting.Key, from, to) };
             }
 
-            // The duckers hold a level worked out from the old arrangement, so they start again.
             for (int track = 0; track < MaxTracks; track++)
             {
                 _duckGain[track] = 1f;
                 _duckers[track]?.Reset();
             }
 
-            // Cut rather than released: a short fade, so a reorder mid-play does not click.
             foreach (var voice in _voices) voice.Cut();
 
             _snapshotStale = true;
@@ -391,7 +463,7 @@ public sealed class TrackMixer
         values[to] = moved;
     }
 
-    /// <summary>Puts a plugin in the audition slot, or takes one out with null.</summary>
+    /// <inheritdoc/>
     public void SetPreviewInstrument(IPluginInstrument? instrument)
     {
         IPluginInstrument? leaving;
@@ -408,15 +480,18 @@ public sealed class TrackMixer
         leaving?.AllNotesOff();
     }
 
+    /// <inheritdoc/>
     public IPluginInstrument? PreviewInstrument
     {
         get { lock (_lock) return _preview; }
     }
 
-    /// <summary>
-    /// Plays a note on the audition plugin, letting go of it after a while. There is no key to
-    /// release when a note is played by clicking on it, so it releases itself.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The hold is a wall clock instant rather than a count of samples, and the render checks
+    /// it once a block. A twentieth of a second is the shortest it will honour, since anything
+    /// less would be let go of in the same block it started in.
+    /// </remarks>
     public void PreviewPlugin(Note note, float gain, double holdSeconds)
     {
         if (!note.IsPlayable) return;
@@ -442,15 +517,7 @@ public sealed class TrackMixer
     /// <summary>Reused, because this runs on the audio thread and must not make work for the collector.</summary>
     private readonly List<IPluginInstrument> _letting = new(MaxTracks);
 
-    /// <summary>
-    /// Plays a note by hand on the plugin a track is already playing, letting go of it after a
-    /// while.
-    /// </summary>
-    /// <remarks>
-    /// The track's own copy rather than the audition one, deliberately. It is the copy whose
-    /// window is open and whose knobs have just been turned; a second copy would be a second
-    /// sound, playing whatever the song was last saved with.
-    /// </remarks>
+    /// <inheritdoc/>
     public void PreviewOnTrack(int track, Note note, float gain, double holdSeconds)
     {
         if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
@@ -471,10 +538,16 @@ public sealed class TrackMixer
         instrument.NoteOn(note.Semitone, 1f);
     }
 
+    /// <inheritdoc/>
     public IPluginInstrument? InstrumentOn(int track) =>
         track >= 0 && track < MaxTracks ? _instruments[track] : null;
 
-    /// <summary>Starts a note on a track's plugin. The volume column rides its bus after.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The plugin is played at full and the volume column is applied to its bus afterwards,
+    /// because a plugin's own velocity is part of its patch and turning a note down with it
+    /// would change the sound rather than the level.
+    /// </remarks>
     public void PluginNoteOn(int track, Note note, float gain, float pan)
     {
         if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
@@ -489,13 +562,11 @@ public sealed class TrackMixer
 
         if (instrument == null) return;
 
-        // One note a track, as a tracker has always worked. The note that was there is let go
-        // rather than cut off, so a plugin plays its own release instead of clicking.
         instrument.AllNotesOff();
         instrument.NoteOn(note.Semitone, 1f);
     }
 
-    /// <summary>Lets go of whatever a track's plugin is holding.</summary>
+    /// <inheritdoc/>
     public void PluginNoteOff(int track)
     {
         if (track < 0 || track >= MaxTracks) return;
@@ -506,7 +577,7 @@ public sealed class TrackMixer
         instrument?.AllNotesOff();
     }
 
-    /// <summary>Follows the volume and pan columns while a plugin note holds.</summary>
+    /// <inheritdoc/>
     public void SetPluginLevels(int track, float gain, float? pan)
     {
         if (track < 0 || track >= MaxTracks) return;
@@ -518,17 +589,21 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>How far a track is being pushed down right now, 1 being not at all.</summary>
+    /// <inheritdoc/>
     public float DuckGainFor(int track) =>
         track >= 0 && track < MaxTracks ? _duckGain[track] : 1f;
 
+    /// <inheritdoc/>
     public int SampleRate { get; }
 
+    /// <inheritdoc/>
     public int VoiceCount
     {
         get { lock (_lock) return _voices.Count; }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>The voice is built outside the lock, since making one is the expensive half.</remarks>
     public void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan)
     {
         if (patch is null || !note.IsPlayable) return;
@@ -542,13 +617,10 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Starts a note on Ouroboros, sliding from whatever the track was sounding.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The note before is what glide glides from, and this is the only place that knows what
-    /// it was. Read before the old voice is cut, because cutting it is what makes it stop
-    /// being the note before.
+    /// The one note-on built inside the lock rather than outside it, because what it slides
+    /// from is read off the voice list and has to be read before that voice is cut.
     /// </remarks>
     public void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan)
     {
@@ -584,15 +656,7 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
-    /// <param name="track">
-    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
-    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
-    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
-    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
-    /// its level and its meter, which is what makes an audition tell you what the part will
-    /// actually sound like.
-    /// </param>
+    /// <inheritdoc/>
     public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition,
                         int track = SynthVoice.NoTrack)
     {
@@ -608,19 +672,8 @@ public sealed class TrackMixer
         lock (_lock) Add(voice);
     }
 
-    /// <summary>The same, on Ouroboros, for a note played while building the sound.</summary>
-    /// <remarks>
-    /// No glide: an audition has no note before it to slide from. It belongs to no track
-    /// either, so it piles up with the other auditions rather than cutting one.
-    /// </remarks>
-    /// <param name="track">
-    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
-    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
-    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
-    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
-    /// its level and its meter, which is what makes an audition tell you what the part will
-    /// actually sound like.
-    /// </param>
+    /// <inheritdoc/>
+    /// <remarks>Nothing is handed in for the note before, which is what switches the glide off.</remarks>
     public void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition,
                         int track = MonoSynthVoice.NoTrack)
     {
@@ -637,10 +690,7 @@ public sealed class TrackMixer
         lock (_lock) Add(voice);
     }
 
-    /// <summary>
-    /// Sounds a recording on a track, under the same rules: the track's last note is cut, and
-    /// the voice takes its place. The caller brings the audio, so the mixer never reads a file.
-    /// </summary>
+    /// <inheritdoc/>
     public void NoteOn(int track, TrackerInstrument instrument, SampleData sample, Note note, float gain, float pan)
     {
         if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
@@ -663,19 +713,9 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Fires one pad of a kit: its own recording, at its own pitch, over whatever else is
-    /// already sounding on the track.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The one place in this engine where a track's last note is not cut. Everywhere else one
-    /// voice to a track is the rule and glide, legato and the tracker's own habits are built on
-    /// it; a kit is the exception, because a crash has to go on ringing under the snare that
-    /// follows it. The only thing that stops a pad is another pad in its choke group.
-    ///
-    /// The pad's own note is passed as the base note as well, so the ratio comes out at one and
-    /// nothing is resampled. That is the machine: a key chooses which recording sounds, not how
-    /// fast to read one.
+    /// A choke group of nought is no group at all, so nothing is walked and nothing is cut.
     /// </remarks>
     public void NoteOn(int track, DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, float pan)
     {
@@ -703,16 +743,11 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Plays one zone of a map: its recording, read at whatever speed the key asks for.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The kit's method with one word changed. There the played note goes in as the root, so
-    /// the ratio comes out at one; here the zone's own root goes in, so the note decides how
-    /// fast to read. That one word is the whole difference between BongaBong and Zampler.
-    ///
-    /// And unlike a kit, the track's last note is cut: this is an instrument rather than a rack
-    /// of them, and one voice to a track is how the tracker has always played one.
+    /// A fresh empty <see cref="SynthPatch"/> goes in beside Zampler's own, because the shared
+    /// voice takes both: the plain path's shaping is left doing nothing and the four pole
+    /// filters do the work instead.
     /// </remarks>
     public void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain, float pan)
     {
@@ -729,16 +764,7 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
-    /// <returns>How long the note will sound, or zero if it did not start.</returns>
-    /// <param name="track">
-    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
-    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
-    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
-    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
-    /// its level and its meter, which is what makes an audition tell you what the part will
-    /// actually sound like.
-    /// </param>
+    /// <inheritdoc/>
     public double Preview(
         SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
@@ -762,16 +788,8 @@ public sealed class TrackMixer
         return held;
     }
 
-    /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
-    /// <returns>How long the note will sound, or zero if it did not start.</returns>
-    /// <param name="track">
-    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
-    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
-    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
-    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
-    /// its level and its meter, which is what makes an audition tell you what the part will
-    /// actually sound like.
-    /// </param>
+    /// <inheritdoc/>
+    /// <remarks>An audition carries its choke group, so two pads that cannot both ring still cannot.</remarks>
     public double Preview(
         DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
@@ -796,16 +814,7 @@ public sealed class TrackMixer
         return held;
     }
 
-    /// <summary>A recording sounded once, for auditioning while editing.</summary>
-    /// <returns>How long the note will sound, or zero if it did not start.</returns>
-    /// <param name="track">
-    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
-    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
-    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
-    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
-    /// its level and its meter, which is what makes an audition tell you what the part will
-    /// actually sound like.
-    /// </param>
+    /// <inheritdoc/>
     public double Preview(
         TrackerInstrument instrument, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
@@ -840,13 +849,7 @@ public sealed class TrackMixer
     private static double Held(SampleVoice voice, double asked) =>
         voice.WindowSeconds > 0 ? Math.Max(asked, voice.WindowSeconds) : asked;
 
-    /// <summary>
-    /// Stops what this instrument was sounding by hand, for one that plays one note at a time.
-    /// </summary>
-    /// <remarks>
-    /// A short fade rather than a release, the same as a track retriggering itself: the next
-    /// note starts now, and a full release would still be running underneath it.
-    /// </remarks>
+    /// <inheritdoc/>
     public void CutAuditions(string audition)
     {
         if (string.IsNullOrEmpty(audition)) return;
@@ -860,17 +863,7 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Lets go of one auditioned note, the way a pattern's OFF lets go of a track's.
-    /// </summary>
-    /// <remarks>
-    /// The release and not the cut, because a key coming up is not a stop button: what was
-    /// started goes into its release the way it does when a pattern reaches an OFF, so a sound
-    /// with a long tail keeps its tail.
-    ///
-    /// One note, not every note this instrument is sounding by hand. Two keys held on a kit are
-    /// two drums, and letting go of one must not silence the other.
-    /// </remarks>
+    /// <inheritdoc/>
     public void LetAudition(string audition, int semitone)
     {
         if (string.IsNullOrEmpty(audition)) return;
@@ -879,9 +872,6 @@ public sealed class TrackMixer
         {
             foreach (var voice in _voices)
             {
-                // A hit runs its own length. The mouse coming up is not a stop button on a
-                // recording that has an end of its own, and a click lasts a few milliseconds:
-                // following the key there would turn every drum into a tick.
                 if (voice.OneShot) continue;
 
                 if (voice.Track == SynthVoice.NoTrack
@@ -892,6 +882,7 @@ public sealed class TrackMixer
         }
     }
 
+    /// <inheritdoc/>
     public void NoteOff(int track)
     {
         if (track < 0) return;
@@ -905,7 +896,11 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>Follows the volume and pan columns while a note holds.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every voice on the track, not the newest, because a kit can have several sounding at
+    /// once and the column is about the track rather than about one drum.
+    /// </remarks>
     public void SetLevels(int track, float gain, float? pan)
     {
         if (track < 0) return;
@@ -922,7 +917,7 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>Silence, now. Used by the transport rather than by a note off.</summary>
+    /// <inheritdoc/>
     public void StopAll()
     {
         lock (_lock)
@@ -936,10 +931,17 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>
-    /// Fills an interleaved stereo buffer with everything playing. Always writes the whole
-    /// buffer: the audio callback has no way to say "nothing this time".
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Once a second, and only while the audio log is on, it says what it is holding and each
+    /// track says what it did: see <see cref="Census"/>. Off, that costs a comparison and does
+    /// not build the line, which matters because a line of the log is a file opened, written
+    /// and closed, and doing that from inside a block is the audio thread waiting on a disk.
+    ///
+    /// A plugin is never told anything with the lock held. What has to be let go of is
+    /// collected under it into <see cref="_letting"/>, which is kept rather than made, and
+    /// emptied outside.
+    /// </remarks>
     public void Render(float[] buffer, int frames)
     {
         int samples = frames * 2;
@@ -953,8 +955,6 @@ public sealed class TrackMixer
         IPluginInstrument? releasing = null;
         float previewGain;
 
-        // Collected under the lock and let go of outside it: a plugin being told to stop is
-        // somebody else's code, and it has no business running with our lock held.
         var letting = _letting;
         letting.Clear();
 
@@ -983,14 +983,10 @@ public sealed class TrackMixer
 
             if (_snapshotStale)
             {
-                // Grown when it has to be and reused when it does not, so a run of notes
-                // does not leave an array behind for every one of them.
                 if (_snapshot.Length < _voices.Count) _snapshot = new IVoice[Math.Max(_voices.Count, 16)];
 
                 _voices.CopyTo(_snapshot);
 
-                // Nothing is cleared past the count: the tail is whatever the last, longer
-                // block held, and the count is what says where to stop.
                 _voiceCount = _voices.Count;
                 _snapshotStale = false;
             }
@@ -1004,14 +1000,12 @@ public sealed class TrackMixer
             preview = _preview;
             previewGain = _previewGain;
 
-            // An audition has no key to let go of, so it lets go of itself.
             if (_previewUntil != 0 && Environment.TickCount64 >= _previewUntil)
             {
                 _previewUntil = 0;
                 releasing = preview;
             }
 
-            // And the same for a note played by hand on a track's own plugin.
             for (int track = 0; track < MaxTracks; track++)
             {
                 if (_heldUntil[track] == 0 || Environment.TickCount64 < _heldUntil[track]) continue;
@@ -1024,9 +1018,6 @@ public sealed class TrackMixer
             ducking = _ducked;
         }
 
-        // Each track is rendered on its own before anything is summed. Ducking needs one
-        // track to be measurable while another is being moved by it, and once everything is
-        // added together there is nothing left to measure.
         releasing?.AllNotesOff();
 
         foreach (var held in letting) held.AllNotesOff();
@@ -1035,8 +1026,6 @@ public sealed class TrackMixer
 
         RenderBusses(playing, sounding, instruments, preview, previewGain, frames, samples);
 
-        // Inserts run on the bus, before the side chains: what keys a duck is the track as it
-        // sounds, effects included, which is what anyone listening would call the track.
         ApplyInserts(frames);
 
         for (int track = 0; track < MaxTracks; track++)
@@ -1059,8 +1048,14 @@ public sealed class TrackMixer
     /// its one job; then the saturation, which is the last thing before the card and has to be,
     /// or the fader could put the mix outside it again.
     ///
+    /// Applied where the fixed <see cref="MasterGain"/> always was, so a song written before
+    /// there was a master strip opens at unity with nothing across it and sounds exactly as it
+    /// did.
+    ///
     /// Measured after all of that rather than before, so the meter beside the fader reads what
-    /// is actually leaving.
+    /// is actually leaving. A plugin across the master that throws costs the block it threw in
+    /// and nothing else: the mix carries on without it, which is the same bargain a track's
+    /// chain makes.
     /// </remarks>
     private void Master(float[] buffer, int samples)
     {
@@ -1083,8 +1078,6 @@ public sealed class TrackMixer
             }
             catch
             {
-                // A plugin that throws on the audio thread takes the application with it. The
-                // mix carries on without it, which is the same bargain a track's chain makes.
             }
         }
 
@@ -1114,7 +1107,7 @@ public sealed class TrackMixer
         _masterAt = Environment.TickCount64;
     }
 
-    /// <summary>Moves the master fader, which is the last thing between the mix and the card.</summary>
+    /// <inheritdoc/>
     public void SetMaster(float gain, float? pan)
     {
         lock (_lock)
@@ -1125,13 +1118,13 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>Puts an effect across the whole mix, or takes one off with null.</summary>
+    /// <inheritdoc/>
     public void SetMasterInsert(IAudioInsert? insert)
     {
         lock (_lock) _masterInsert = insert;
     }
 
-    /// <summary>What is across the whole mix, if anything.</summary>
+    /// <inheritdoc/>
     public IAudioInsert? MasterInsert
     {
         get { lock (_lock) return _masterInsert; }
@@ -1166,26 +1159,18 @@ public sealed class TrackMixer
     /// </remarks>
     public static bool Sounding(bool playing, float loudest) => playing || loudest > 0;
 
-    /// <summary>
-    /// What is leaving, for the meter beside the master fader.
-    /// </summary>
-    /// <remarks>
-    /// A peak measured off the last buffer, and therefore only true while buffers are being
-    /// asked for. A track's meter is worked out from the voices that are sounding, so it falls
-    /// on its own the moment they stop; this one would sit at whatever the last thing to play
-    /// was until something asked for another buffer, and nothing does when the stream is not
-    /// running. So it is stamped when it is taken and goes out on its own if nothing renews it.
-    ///
-    /// Aged rather than cleared where the rendering stops, because there are several ways for it
-    /// to stop and only one of them passes through this class.
-    /// </remarks>
+    /// <inheritdoc/>
     public (float Left, float Right) MasterLevel =>
         Fresh(Environment.TickCount64 - _masterAt) ? (_masterLeft, _masterRight) : (0f, 0f);
 
     /// <summary>When the master's reading was taken, so an old one can be seen to be old.</summary>
     private long _masterAt;
 
-    /// <summary>Lets go of every note on every plugin, for a stop.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The array is copied under the lock and the plugins are told outside it, which is the one
+    /// place here a copy is worth its allocation: this is a stop, not a block.
+    /// </remarks>
     public void AllPluginNotesOff()
     {
         IPluginInstrument?[] instruments;
@@ -1203,7 +1188,6 @@ public sealed class TrackMixer
         preview?.AllNotesOff();
     }
 
-    /// <summary>Nothing is playing: the side chains fall back open rather than staying shut.</summary>
     /// <summary>
     /// Nothing to render: the duckers let go and every meter falls to nothing.
     /// </summary>
@@ -1227,7 +1211,27 @@ public sealed class TrackMixer
         _masterRight = 0f;
     }
 
-    /// <summary>Puts every voice on its own track's bus, auditions aside.</summary>
+    /// <summary>
+    /// Puts every voice on its own track's bus, auditions aside.
+    /// </summary>
+    /// <remarks>
+    /// Three things make a track sound. A voice, which is the ordinary case. A plugin, always,
+    /// because it holds its own notes and its own release and there is no voice here to say
+    /// whether it is still ringing. And something inserted on it, playing or not: an effect has
+    /// to be given its audio whether or not anything is going through it, since a delay has a
+    /// tail to finish after the last note and a plugin only ever hands the host what its own
+    /// window did at the end of a block it was given. A track that goes quiet and stops being
+    /// processed is a plugin switched off without being told, and a knob turned in its window
+    /// then reaches nothing and nobody.
+    ///
+    /// Plugins render before voices, because a plugin fills its track's bus rather than adding
+    /// to it and anything else on that track has to land on top of what it played. The audition
+    /// plugin is the same problem on the loose bus, which may already hold another audition, so
+    /// it goes through a scratch buffer and is added in.
+    ///
+    /// A plugin that throws costs that block and no more: the bus it was filling is cleared and
+    /// the fault is counted for the log rather than allowed off the audio thread.
+    /// </remarks>
     private void RenderBusses(
         IVoice[] playing, int sounding, IPluginInstrument?[] instruments,
         IPluginInstrument? preview, float previewGain, int frames, int samples)
@@ -1242,19 +1246,11 @@ public sealed class TrackMixer
             if (track >= 0 && track < MaxTracks) _sounding[track] = true;
         }
 
-        // A track with a plugin on it always sounds. The plugin holds its own notes and its
-        // own release, and there is no voice here to say whether it is still ringing.
         for (int track = 0; track < MaxTracks; track++)
         {
             if (instruments[track] != null) _sounding[track] = true;
         }
 
-        // And so does a track with something inserted on it, playing or not. An effect has to
-        // be given its audio whether or not anything is going through it: a delay has a tail
-        // to finish after the last note, and a plugin only ever hands the host what its own
-        // window did at the end of a block it was given. A track that goes quiet and stops
-        // being processed is a plugin switched off without being told, and a knob turned in
-        // its window then reaches nothing and nobody.
         lock (_lock)
         {
             for (int track = 0; track < MaxTracks; track++)
@@ -1265,8 +1261,6 @@ public sealed class TrackMixer
 
         Array.Clear(_loose, 0, samples);
 
-        // An audition is added to the loose bus rather than written over it: a plugin fills a
-        // buffer, and the loose bus may already have another audition in it.
         if (preview != null)
         {
             if (_previewScratch.Length < samples) _previewScratch = new float[samples];
@@ -1292,8 +1286,6 @@ public sealed class TrackMixer
             Array.Clear(_busses[track]!, 0, samples);
         }
 
-        // Plugins first: one fills its track's bus, and anything else on that track adds on
-        // top of what it played.
         for (int track = 0; track < MaxTracks; track++)
         {
             var instrument = instruments[track];
@@ -1308,13 +1300,10 @@ public sealed class TrackMixer
             }
             catch (Exception error)
             {
-                // A managed fault in a plugin costs that block, not the audio thread.
                 _census[track].Note(error.Message);
                 Array.Clear(bus, 0, samples);
             }
 
-            // Only when somebody is reading. Scanning the block to see how loud it came out is
-            // a pass over every sample on the audio thread, and off it must cost nothing.
             if (Diagnostics.Log.On(Diagnostics.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
 
             Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
@@ -1348,7 +1337,18 @@ public sealed class TrackMixer
         }
     }
 
-    /// <summary>Runs each sounding track's audio through whatever is inserted on it.</summary>
+    /// <summary>
+    /// Runs each sounding track's audio through whatever is inserted on it.
+    /// </summary>
+    /// <remarks>
+    /// Before the side chains, so what keys a duck is the track as it sounds, effects included,
+    /// which is what anyone listening would call the track. What went in and what came out are
+    /// measured only while the audio log is on: two passes over every sample of every track is
+    /// not something the audio thread should pay for when nobody is reading.
+    ///
+    /// An insert that throws costs that block and no more; the bus is left holding whatever the
+    /// plugin managed before it gave up.
+    /// </remarks>
     private void ApplyInserts(int frames)
     {
         for (int track = 0; track < MaxTracks; track++)
@@ -1373,7 +1373,6 @@ public sealed class TrackMixer
             }
             catch (Exception error)
             {
-                // A managed fault in an insert costs that block, not the audio thread.
                 _census[track].Note(error.Message);
             }
 
@@ -1386,6 +1385,11 @@ public sealed class TrackMixer
     /// before it is itself ducked, so two tracks keying each other cannot chase each other
     /// down into silence.
     /// </summary>
+    /// <remarks>
+    /// The follower runs even when the track itself is silent. Left standing it would keep
+    /// whatever gain the last note ducked it to, and the first note after a rest would come in
+    /// at that instead of at its own level.
+    /// </remarks>
     private void MixTrack(float[] buffer, int track, DuckSetting setting, int frames, int samples)
     {
         var source = _sounding[track] ? _busses[track] : null;
@@ -1430,8 +1434,6 @@ public sealed class TrackMixer
             double magnitude = key == null ? 0 : Math.Max(Math.Abs(key[i]), Math.Abs(key[i + 1]));
             gain = Ducker.GainFor(ducker.Next(magnitude), setting.Depth);
 
-            // The follower still has to run for a silent track, or the first note after a
-            // rest would come in at whatever gain the duck was left at.
             if (source == null) continue;
 
             buffer[i] += source[i] * gain;
@@ -1441,6 +1443,14 @@ public sealed class TrackMixer
         _duckGain[track] = gain;
     }
 
+    /// <summary>
+    /// Makes sure every bus is as long as the block being asked for.
+    /// </summary>
+    /// <remarks>
+    /// Only tracks that have sounded have a bus at all; the rest are made where they are first
+    /// needed. The block length rarely changes, so this is a comparison per block and an
+    /// allocation only when the card asks for something a different size.
+    /// </remarks>
     private void EnsureBusses(int frames)
     {
         int samples = frames * 2;
@@ -1451,7 +1461,6 @@ public sealed class TrackMixer
 
         for (int track = 0; track < MaxTracks; track++)
         {
-            // Only tracks that have sounded have a bus; the rest are made when they are needed.
             if (_busses[track] != null) _busses[track] = new float[samples];
         }
     }
@@ -1480,10 +1489,13 @@ public sealed class TrackMixer
         return value < 0 ? -shaped : shaped;
     }
 
-    /// <summary>
-    /// How loud a track is sounding, for a meter. Taken from the voices rather than from the
-    /// mixed buffer: the voices are already summed together by the time that exists.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Bounded by how many tracks a song can have, deliberately. It once asked whether the
+    /// track number was inside the volume column's own memory, which is made when a pass
+    /// starts, so before one there were no tracks to report on at all and every track meter
+    /// read nought until somebody pressed play.
+    /// </remarks>
     public (float Left, float Right) LevelFor(int track)
     {
         if (track < 0 || track >= MaxTracks) return (0, 0);
@@ -1563,9 +1575,15 @@ public sealed class TrackMixer
         }
     }
 
+    /// <summary>
+    /// Puts a voice on the list, taking the oldest away if there is no room.
+    /// </summary>
+    /// <remarks>
+    /// Oldest first, so voice stealing takes the one that has been ringing longest rather than
+    /// the one somebody just asked for. Held under the lock by its callers.
+    /// </remarks>
     private void Add(IVoice voice)
     {
-        // Oldest first, so voice stealing takes the one that has been ringing longest.
         while (_voices.Count >= MaxVoices)
             _voices.RemoveAt(0);
 

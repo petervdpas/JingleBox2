@@ -10,6 +10,10 @@ public sealed class PluginDeviceConfig
     /// <summary>The file it came from. Found again by id first, since a path moves.</summary>
     public string Path { get; set; } = "";
 
+    /// <summary>
+    /// The plugin's own identity, its CLAP id or its VST3 class id. Tried before the path,
+    /// because a bundle moves between machines and an id does not.
+    /// </summary>
     public string Id { get; set; } = "";
 
     /// <summary>
@@ -21,6 +25,10 @@ public sealed class PluginDeviceConfig
     /// <summary>Kept so a missing plugin can be named rather than silently dropped.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// Whether the effect was switched out of circuit. Kept with the chain rather than in the
+    /// parameters, since it is a fact about the slot rather than about the plugin.
+    /// </summary>
     public bool Bypassed { get; set; }
 
     /// <summary>
@@ -49,10 +57,16 @@ public sealed class PluginDeviceConfig
 /// <summary>A saved chain: the devices, in the order the audio went through them.</summary>
 public sealed class PluginChainConfig
 {
+    /// <summary>The devices, first to last, which is the order the audio goes through them.</summary>
     public List<PluginDeviceConfig> Devices { get; set; } = new();
 
+    /// <summary>True for a track with nothing on it, which is most tracks.</summary>
     public bool IsEmpty => Devices.Count == 0;
 
+    /// <summary>
+    /// A copy nothing is shared with, except the patches, which are treated as immutable: a lump
+    /// read off a plugin is never written into afterwards, only replaced.
+    /// </summary>
     public PluginChainConfig Clone()
     {
         var copy = new PluginChainConfig();
@@ -112,6 +126,14 @@ public static class PluginChainState
     /// Whether to ask each plugin for its own state as well as its parameters. Off by default
     /// because the cheap half answers most questions.
     /// </param>
+    /// <summary>
+    /// Reads a running chain into something that can be written down.
+    /// </summary>
+    /// <remarks>
+    /// The patch is read last, because it is the expensive half and there is no point paying for
+    /// it on a plugin whose parameters could not be read either.
+    /// </remarks>
+    /// <param name="chain">The chain to read, or null for a track with nothing on it.</param>
     public static PluginChainConfig Capture(PluginChain? chain, bool patches = false)
     {
         var config = new PluginChainConfig();
@@ -136,8 +158,6 @@ public static class PluginChainState
                     effect.ValueOf(parameter.Id);
             }
 
-            // Last, because it is the expensive one and there is no point paying for it on a
-            // plugin whose parameters could not be read either.
             if (patches) saved.State = effect.SaveState();
 
             config.Devices.Add(saved);
@@ -171,6 +191,21 @@ public static class PluginChainState
     /// Rebuilds a chain from what was saved. Whatever is in the chain now goes first, so this
     /// is also how a chain is replaced when another song is opened.
     /// </summary>
+    /// <remarks>
+    /// Each plugin is built with the name it was saved under, so anything the host has to say
+    /// about it later calls it what the user calls it rather than by its id.
+    ///
+    /// The lump goes in first and the knobs after it. A patch moves every parameter at once, so
+    /// writing the values afterwards is either agreement or the correction for a plugin whose
+    /// state did not come back whole. The other order would be a preset landing on top of the
+    /// values and quietly winning.
+    ///
+    /// The values are handed over at once rather than on the next block, or a chain that is not
+    /// being played would sit at the plugin's defaults until somebody pressed play.
+    ///
+    /// A plugin that will not load is a song made on another machine, or one since uninstalled.
+    /// It is named and stepped over: the rest of the chain is still worth having.
+    /// </remarks>
     /// <returns>The names of plugins that could not be loaded, for reporting.</returns>
     public static IReadOnlyList<string> Restore(
         PluginChain chain,
@@ -191,23 +226,15 @@ public static class PluginChainState
 
         foreach (var saved in config.Devices)
         {
-            // Built with the name it was saved under, so anything the host has to say about
-            // this plugin later can call it what the user calls it.
             var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format);
             var effect = PluginHost.Load(described, sampleRate, maxFrames);
 
             if (effect == null)
             {
-                // A song made on another machine, or a plugin since uninstalled. The rest of
-                // the chain is still worth having.
                 missing.Add(string.IsNullOrWhiteSpace(saved.Name) ? saved.Id : saved.Name);
                 continue;
             }
 
-            // The lump first and the knobs after it. A patch moves every parameter at once, so
-            // writing the values afterwards is either agreement or the correction for a plugin
-            // whose state did not come back whole. The other order would be a preset landing on
-            // top of the values and quietly winning.
             if (saved.State is { Length: > 0 }) effect.LoadState(saved.State);
 
             foreach (var (id, value) in saved.Parameters)
@@ -219,8 +246,6 @@ public static class PluginChainState
                 }
             }
 
-            // Handed over now rather than on the next block: a chain that is not being played
-            // would otherwise sit at the plugin's defaults until it was.
             effect.FlushParameters();
 
             var added = chain.Add(effect);

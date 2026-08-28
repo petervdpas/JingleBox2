@@ -9,43 +9,33 @@ using MoonSharp.Interpreter;
 
 namespace JingleBox2.Controllers;
 
-/// <summary>
-/// The scripts that stand between a controller and the rest of the program.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// A codec is one file per controller, and its whole job is to turn what a device actually
-/// sends into something this application already understands. It sits after the wire and before
-/// the routing, so everything downstream carries on knowing nothing about any particular
-/// hardware, which is the property worth protecting: a device nobody has written a file for
-/// still works, because a message nothing translates is passed through untouched.
-///
-/// That is the point of doing it here rather than inside the routers. A codec cannot add a
-/// feature and cannot take one away. It can only say that these bytes mean those bytes, which
-/// is a small enough thing to hand to a stranger's file.
-///
-/// Two folders, as machines have two: beside the program is what ships and is never written to,
-/// under the application folder is what this installation has. The first run fills the second
-/// from the first. Somebody who deletes a codec has deleted it, and can take it again.
-///
-/// Matched on the port's name for now. Identity is the better key, since a MiniLab answers a
-/// universal identity request with the same eleven bytes on every operating system while its
-/// port is called something different on each, and moving the match onto that is the next thing
-/// this wants. See docs/hardware-integration.md.
+/// One <see cref="LuaScript"/> per file, matched to a port by pattern and remembered per device
+/// so the list is not walked per message. The folder is watched, so saving a file is all it
+/// takes to try the change.
 /// </remarks>
-public sealed class ControllerCodecs : IDisposable
+public sealed class ControllerCodecs : IControllerCodecs
 {
     /// <summary>Where a controller's files live. Shared with the profiles beside them.</summary>
     public static string Installed => ControllerFolder.Installed;
 
+    /// <summary>Where a script's bytes go when it answers a device rather than reading one.</summary>
     private readonly IMidiService _midi;
+
+    /// <summary>Guards the codecs and what has been decided, which are read on the MIDI thread.</summary>
     private readonly object _lock = new();
+
+    /// <summary>Every codec this installation has, in the order the files were read.</summary>
     private readonly List<Codec> _codecs = new();
 
     /// <summary>What was decided for a device, so the list is not walked per message.</summary>
     private readonly Dictionary<string, Codec?> _decided = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>What tells this that a file was saved. Null when the folder cannot be watched.</summary>
     private FileSystemWatcher? _watch;
 
+    /// <summary>Fills the folder if this is a first run, reads what is in it, and watches it.</summary>
     public ControllerCodecs(IMidiService midi)
     {
         _midi = midi;
@@ -58,23 +48,20 @@ public sealed class ControllerCodecs : IDisposable
     /// <summary>One file, and the device it turned out to be about.</summary>
     private sealed class Codec
     {
-        public LuaScript Script = null!;
+        /// <summary>The file, loaded and fenced in.</summary>
+        public ILuaScript Script = null!;
+
+        /// <summary>What the script calls itself, or its file name when it does not say.</summary>
         public string Called = "";
+
+        /// <summary>The port names it is for, as a pattern.</summary>
         public string Matches = "";
 
         /// <summary>The port it is answering for at this moment, for anything it sends back.</summary>
         public string Device = "";
     }
 
-    /// <summary>
-    /// Reads every codec again, from scratch.
-    /// </summary>
-    /// <remarks>
-    /// Called at startup and on every save of a file in the folder, which is the difference
-    /// between writing one of these and enjoying writing one of these. A person adding a
-    /// controller should edit, touch the knob, and see. Not edit, restart, replug, remember
-    /// what they were testing.
-    /// </remarks>
+    /// <inheritdoc/>
     public void Reload()
     {
         var found = new List<Codec>();
@@ -100,7 +87,19 @@ public sealed class ControllerCodecs : IDisposable
         Log.Write(LogArea.Midi, () => "codecs: " + found.Count + " loaded from '" + Installed + "'");
     }
 
-    /// <summary>Loads one file and asks it what it is about.</summary>
+    /// <summary>
+    /// Loads one file, gives it what it may reach, and asks it what it is about.
+    /// </summary>
+    /// <remarks>
+    /// Two things are put in the script's reach and no more: <c>log</c>, so somebody writing one
+    /// can see what it is doing, and <c>send</c>, so it can answer the device. Bytes go back to
+    /// whichever port this codec is answering for at that moment, taken from the codec rather
+    /// than from the script, because a script that could name a port could write down somebody
+    /// else's.
+    ///
+    /// What it is about comes from a global table called <c>controller</c>, and a file that sets
+    /// none is taken to be for ports named after itself.
+    /// </remarks>
     private Codec? Take(string path)
     {
         var script = LuaScript.Open(path);
@@ -116,9 +115,6 @@ public sealed class ControllerCodecs : IDisposable
             return DynValue.Nil;
         });
 
-        // Bytes back to whichever port this codec is answering for at the moment. Taken from
-        // the codec rather than from the script, because a script that could name a port could
-        // write down somebody else's.
         script.Give("send", (_, args) =>
         {
             if (codec.Device.Length == 0) return DynValue.False;
@@ -151,6 +147,11 @@ public sealed class ControllerCodecs : IDisposable
     }
 
     /// <summary>A list of numbers, or one table of them, as bytes.</summary>
+    /// <remarks>
+    /// Both spellings, because both are what a person writes without thinking about it, and a
+    /// codec refused for calling <c>send</c> the other way is a codec whose author is reading
+    /// the log to find out why nothing happened.
+    /// </remarks>
     private static byte[]? Bytes(CallbackArguments args)
     {
         if (args.Count == 1 && args[0].Type == DataType.Table)
@@ -175,13 +176,7 @@ public sealed class ControllerCodecs : IDisposable
         return one;
     }
 
-    /// <summary>
-    /// What the application should read instead of what arrived. Null when it was swallowed.
-    /// </summary>
-    /// <remarks>
-    /// The message itself when nothing translates it, which is the ordinary case and the one
-    /// that must stay free. A device with no codec pays one dictionary lookup.
-    /// </remarks>
+    /// <inheritdoc/>
     public MidiMessage? Read(MidiMessage message)
     {
         if (message is null) return null;
@@ -203,11 +198,8 @@ public sealed class ControllerCodecs : IDisposable
 
         var answer = codec.Script.Call("midi", told);
 
-        // Nothing said, or the script is not interested: it stands as it arrived. This is the
-        // path a codec takes for every message it does not care about, so it is the cheap one.
         if (answer is null || answer.IsNilOrNan()) return message;
 
-        // Said so in as many words: true keeps it, false eats it.
         if (answer.Type == DataType.Boolean) return answer.Boolean ? message : null;
 
         if (answer.Type != DataType.Table) return message;
@@ -216,6 +208,13 @@ public sealed class ControllerCodecs : IDisposable
     }
 
     /// <summary>A message built from what the script handed back, with the rest left alone.</summary>
+    /// <remarks>
+    /// A kind this does not know leaves the message exactly as it arrived, rather than being
+    /// read as some default: a typo in a script should cost the one message it is about.
+    ///
+    /// A pitch bend is never on, whatever the script said. It is a position and not a press, and
+    /// a bend that arrived claiming to be pressed would be read as one by the routers above.
+    /// </remarks>
     private static MidiMessage? Made(MidiMessage was, Table table)
     {
         string kind = table.Get("type").CastToString() ?? Word(was.Type);
@@ -249,9 +248,16 @@ public sealed class ControllerCodecs : IDisposable
         };
     }
 
+    /// <summary>A number the script set, or what the message already had.</summary>
     private static int Number(Table table, string key, int otherwise) =>
         table.Get(key).CastToNumber() is { } number ? (int)number : otherwise;
 
+    /// <summary>What a script calls a kind of message, which is a short word rather than a number.</summary>
+    /// <remarks>
+    /// Only the three a codec can produce have words. Everything else is <c>other</c>, which a
+    /// script may read and cannot write, since a codec that could turn a note into a clock byte
+    /// would be a codec that could break the transport.
+    /// </remarks>
     private static string Word(MidiMessageType type) => type switch
     {
         MidiMessageType.Note => "note",
@@ -309,14 +315,21 @@ public sealed class ControllerCodecs : IDisposable
         }
     }
 
+    /// <summary>When the folder was last acted on, for the gathering below.</summary>
     private DateTime _last = DateTime.MinValue;
 
+    /// <summary>How close together two of these count as one save still happening.</summary>
+    /// <remarks>
+    /// An editor writing a file makes several of them: a create, a write, a rename off a
+    /// temporary. Reloading on each would read half-written files and say so in the log.
+    /// </remarks>
+    private static readonly TimeSpan SameSave = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>Something in the folder was written, so everything in it is read again.</summary>
     private void OnFolderChanged(object? sender, FileSystemEventArgs e)
     {
-        // An editor saving a file makes several of these. Anything inside a moment of the last
-        // one is the same save still happening.
         var now = DateTime.UtcNow;
-        if (now - _last < TimeSpan.FromMilliseconds(250)) return;
+        if (now - _last < SameSave) return;
         _last = now;
 
         try
@@ -330,6 +343,8 @@ public sealed class ControllerCodecs : IDisposable
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Stops the watching. The scripts themselves hold nothing that has to be let go.</remarks>
     public void Dispose()
     {
         _watch?.Dispose();

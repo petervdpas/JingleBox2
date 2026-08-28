@@ -10,13 +10,23 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed partial class MidiDeviceViewModel : ObservableObject
 {
+    /// <summary>Told when a job was ticked or unticked, so the settings can be written.</summary>
     private readonly Action<MidiDeviceViewModel> _roleChanged;
+
+    /// <summary>Told to drop the device altogether, or null where forgetting is not offered.</summary>
     private readonly Action<MidiDeviceViewModel>? _forget;
 
-    // The checkboxes are set from the stored role while the row is being built, and that must
-    // not read back as the user changing something.
+    /// <summary>
+    /// False until the constructor has finished, so the stored jobs are not reported as changes.
+    /// </summary>
+    /// <remarks>
+    /// The tick boxes are set from the stored role while the row is being built, and that must not
+    /// read back as somebody changing something: without this, opening SETTINGS would write the
+    /// settings once per device and each write would say only what was already there.
+    /// </remarks>
     private readonly bool _loaded;
 
+    /// <summary>The port's own name, as the operating system offers it.</summary>
     public string Name { get; }
 
     /// <summary>False for a device that is bound but not plugged in right now.</summary>
@@ -39,7 +49,10 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     /// <summary>True when there is something to say about this port.</summary>
     public bool HasProfile => PortIs.Length > 0;
 
+    /// <summary>Whether this device's notes and buttons fire pads.</summary>
     [ObservableProperty] private bool drivesPads;
+
+    /// <summary>Whether this device's notes are typed and played into the tracker.</summary>
     [ObservableProperty] private bool drivesTracker;
 
     /// <summary>
@@ -64,6 +77,12 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private bool drivesTransport;
 
+    /// <summary>Builds one row, with the jobs set to what the settings say and nothing announced.</summary>
+    /// <param name="name">The port's own name.</param>
+    /// <param name="isConnected">False for a device that is remembered but not plugged in.</param>
+    /// <param name="role">The jobs it already has.</param>
+    /// <param name="roleChanged">Called when somebody moves one of the tick boxes.</param>
+    /// <param name="forget">Called to drop the device, where forgetting is offered.</param>
     public MidiDeviceViewModel(string name, bool isConnected, MidiDeviceRole role,
                                Action<MidiDeviceViewModel> roleChanged,
                                Action<MidiDeviceViewModel>? forget = null)
@@ -96,17 +115,26 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     public CommunityToolkit.Mvvm.Input.IRelayCommand ForgetCommand =>
         new CommunityToolkit.Mvvm.Input.RelayCommand(() => _forget?.Invoke(this));
 
+    /// <summary>The four tick boxes as the one value the settings hold.</summary>
     public MidiDeviceRole Role =>
         (DrivesPads ? MidiDeviceRole.Pads : MidiDeviceRole.None) |
         (DrivesTracker ? MidiDeviceRole.Tracker : MidiDeviceRole.None) |
         (DrivesControls ? MidiDeviceRole.Controls : MidiDeviceRole.None) |
         (DrivesTransport ? MidiDeviceRole.Transport : MidiDeviceRole.None);
 
+    /// <summary>Any of the four moving is one thing as far as the settings are concerned.</summary>
     partial void OnDrivesPadsChanged(bool value) => NotifyRoleChanged();
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesTrackerChanged(bool value) => NotifyRoleChanged();
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesControlsChanged(bool value) => NotifyRoleChanged();
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesTransportChanged(bool value) => NotifyRoleChanged();
 
+    /// <summary>Passes a change of the jobs on, unless it is the row being built.</summary>
     private void NotifyRoleChanged()
     {
         if (_loaded) _roleChanged(this);

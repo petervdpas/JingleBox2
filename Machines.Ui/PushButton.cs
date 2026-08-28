@@ -24,17 +24,46 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class PushButton : ThemedControl
 {
+    /// <summary>The air between the lamp and the cap, and between the cap and the writing under it.</summary>
     private const double LampGap = 2;
+
+    /// <inheritdoc cref="LampGap"/>
     private const double LabelGap = 2;
 
+    /// <summary>
+    /// How far the triangle is drawn inside the cap it fills.
+    /// </summary>
+    /// <remarks>
+    /// A geometry drawn on the cap's own edge has half its outline clipped away by the control's
+    /// bounds, which reads as a triangle with two thin sides and one thick one.
+    /// </remarks>
+    private const double TriangleInset = 1;
+
+    /// <summary>
+    /// How bright a cap has to be before what is written on it turns from white to black.
+    /// </summary>
+    /// <remarks>
+    /// Weighted for how the eye reads the three channels, not a plain average, or a saturated
+    /// green cap would come out darker than a blue one of the same brightness and take the wrong
+    /// ink. Out of 255.
+    /// </remarks>
+    private const double CapTextFlipsAt = 140;
+
+    /// <summary>Backs <see cref="Label"/>, what is written under the cap.</summary>
     public static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<PushButton, string?>(nameof(Label));
 
-    /// <summary>What is written on the cap itself, when that reads better than under it.</summary>
+    /// <summary>
+    /// Backs <see cref="CapText"/>: what is written on the cap itself, when that reads better
+    /// than under it.
+    /// </summary>
     public static readonly StyledProperty<string?> CapTextProperty =
         AvaloniaProperty.Register<PushButton, string?>(nameof(CapText));
 
-    /// <summary>Stays down when pressed rather than coming back up.</summary>
+    /// <summary>
+    /// Backs <see cref="IsLatching"/>: the cap stays down when pressed rather than coming back
+    /// up.
+    /// </summary>
     public static readonly StyledProperty<bool> IsLatchingProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(IsLatching));
 
@@ -48,22 +77,53 @@ public class PushButton : ThemedControl
     public static readonly StyledProperty<bool> IsSelectedProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(IsSelected));
 
+    /// <summary>
+    /// Backs <see cref="IsChecked"/>, which is where a latching button holds whether it is down.
+    /// </summary>
+    /// <remarks>
+    /// Two way, because a button is pressed by hand and whatever it is bound to has to hear
+    /// about it. Meaningless on a momentary button, which is down only while a finger is on it.
+    /// </remarks>
     public static readonly StyledProperty<bool> IsCheckedProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(IsChecked), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
-    /// <summary>Whether the lamp is lit. Follows the button when it latches and nothing says otherwise.</summary>
+    /// <summary>
+    /// Backs <see cref="Lit"/>: whether the lamp burns, and null to let it follow the button.
+    /// </summary>
+    /// <remarks>
+    /// Nullable so that "nobody has said" is a different answer from "off". A latching button
+    /// lights its own lamp, which is right for a mute; a transport button's lamp is driven by
+    /// whether the thing is actually running, which is not the same as whether it was pressed.
+    /// </remarks>
     public static readonly StyledProperty<bool?> LitProperty =
         AvaloniaProperty.Register<PushButton, bool?>(nameof(Lit));
 
-    /// <summary>True when this button has a lamp at all. A transport button has one; a step does not.</summary>
+    /// <summary>
+    /// Backs <see cref="HasLamp"/>: whether there is a lamp at all. A transport button has one;
+    /// a step does not.
+    /// </summary>
+    /// <remarks>
+    /// Kept apart from <see cref="Lit"/> because the lamp takes room whether or not it is
+    /// burning, and a row of buttons where only the lit ones were the right height would be a
+    /// row that moved as it was used.
+    /// </remarks>
     public static readonly StyledProperty<bool> HasLampProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(HasLamp));
 
-    /// <summary>How tall the cap is. Its width follows what is on it unless one is given.</summary>
+    /// <summary>
+    /// Backs <see cref="CapHeight"/>. The width follows what is on the cap unless one is given.
+    /// </summary>
     public static readonly StyledProperty<double> CapHeightProperty =
         AvaloniaProperty.Register<PushButton, double>(nameof(CapHeight), 22.0);
 
-    /// <summary>A width to hold to. Zero measures it from what is written on the cap.</summary>
+    /// <summary>
+    /// Backs <see cref="CapWidth"/>: a width to hold to, and zero measures it from what is
+    /// written on the cap.
+    /// </summary>
+    /// <remarks>
+    /// A row of buttons whose captions are different lengths is a row of different sized caps,
+    /// which no panel is built with. Giving them all one width puts them back in a row.
+    /// </remarks>
     public static readonly StyledProperty<double> CapWidthProperty =
         AvaloniaProperty.Register<PushButton, double>(nameof(CapWidth));
 
@@ -78,7 +138,10 @@ public class PushButton : ThemedControl
     public static readonly StyledProperty<ButtonShape> ShapeProperty =
         AvaloniaProperty.Register<PushButton, ButtonShape>(nameof(Shape));
 
-    /// <summary>Which way a triangular cap points. Ignored by the other shapes.</summary>
+    /// <summary>
+    /// Backs <see cref="Points"/>: which way a triangular cap points, ignored by the other
+    /// shapes.
+    /// </summary>
     public static readonly StyledProperty<Pointing> PointsProperty =
         AvaloniaProperty.Register<PushButton, Pointing>(nameof(Points), Pointing.Right);
 
@@ -92,9 +155,18 @@ public class PushButton : ThemedControl
     public static readonly StyledProperty<Color> ColourProperty =
         AvaloniaProperty.Register<PushButton, Color>(nameof(Colour), Colors.Transparent);
 
+    /// <summary>
+    /// Backs <see cref="FontSize"/>, which sizes what is on the cap and what is under it alike.
+    /// </summary>
+    /// <remarks>
+    /// One size for both, because a cap's caption and its label are the same word said in two
+    /// places and a panel never prints them at two sizes. It also sets the padding either side
+    /// of a caption, so a button made bigger gets wider as well as taller.
+    /// </remarks>
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<PushButton, double>(nameof(FontSize), 10.0);
 
+    /// <summary>Backs <see cref="LampSize"/>, the diameter of the lamp.</summary>
     public static readonly StyledProperty<double> LampSizeProperty =
         AvaloniaProperty.Register<PushButton, double>(nameof(LampSize), 5.0);
 
@@ -110,24 +182,55 @@ public class PushButton : ThemedControl
     public static readonly StyledProperty<bool> LampBelowProperty =
         AvaloniaProperty.Register<PushButton, bool>(nameof(LampBelow));
 
-    /// <summary>What colour the lamp burns. Red unless a panel says otherwise.</summary>
+    /// <summary>
+    /// Backs <see cref="LampColour"/>, red unless a panel says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Not the theme's alarm colour, deliberately: this is what colour the lamp is moulded in,
+    /// which is a fact about the hardware being drawn rather than about the page it is on.
+    /// </remarks>
     public static readonly StyledProperty<Color> LampColourProperty =
         AvaloniaProperty.Register<PushButton, Color>(nameof(LampColour), Color.FromRgb(0xE5, 0x39, 0x35));
 
+    /// <summary>
+    /// Backs <see cref="Command"/>, for a panel put together in XAML where a command is what
+    /// there is to bind.
+    /// </summary>
+    /// <remarks>
+    /// Beside <see cref="Pressed"/> rather than instead of it: a panel built from a description
+    /// has no bindings and only wants to be told.
+    /// </remarks>
     public static readonly StyledProperty<ICommand?> CommandProperty =
         AvaloniaProperty.Register<PushButton, ICommand?>(nameof(Command));
 
+    /// <summary>Backs <see cref="CommandParameter"/>, which says which button of a row this is.</summary>
     public static readonly StyledProperty<object?> CommandParameterProperty =
         AvaloniaProperty.Register<PushButton, object?>(nameof(CommandParameter));
 
+    /// <summary>
+    /// Backs <see cref="Pressed"/>, raised when the button has actually been worked.
+    /// </summary>
+    /// <remarks>
+    /// Bubbling, so a grid of pads can listen once at the top rather than wiring every cap it
+    /// builds.
+    /// </remarks>
     public static readonly RoutedEvent<RoutedEventArgs> PressedEvent =
         RoutedEvent.Register<PushButton, RoutedEventArgs>(nameof(Pressed), RoutingStrategies.Bubble);
 
+    /// <summary>Whether a finger is on the cap now, which is not the same as a latch being down.</summary>
     private bool _down;
 
     /// <summary>Whether the focus this holds arrived by tabbing rather than by being clicked.</summary>
     private bool _byKeyboard;
 
+    /// <summary>
+    /// Says which properties change the picture and which change the size, and makes a button
+    /// take the keyboard.
+    /// </summary>
+    /// <remarks>
+    /// Focusable is overridden rather than set in the constructor so a style can still take it
+    /// back off a button that is only there to be looked at.
+    /// </remarks>
     static PushButton()
     {
         AffectsRender<PushButton>(
@@ -143,66 +246,77 @@ public class PushButton : ThemedControl
         FocusableProperty.OverrideDefaultValue<PushButton>(true);
     }
 
+    /// <summary>What is written under the cap.</summary>
     public string? Label
     {
         get => GetValue(LabelProperty);
         set => SetValue(LabelProperty, value);
     }
 
+    /// <inheritdoc cref="CapTextProperty"/>
     public string? CapText
     {
         get => GetValue(CapTextProperty);
         set => SetValue(CapTextProperty, value);
     }
 
+    /// <inheritdoc cref="IsLatchingProperty"/>
     public bool IsLatching
     {
         get => GetValue(IsLatchingProperty);
         set => SetValue(IsLatchingProperty, value);
     }
 
+    /// <inheritdoc cref="IsSelectedProperty"/>
     public bool IsSelected
     {
         get => GetValue(IsSelectedProperty);
         set => SetValue(IsSelectedProperty, value);
     }
 
+    /// <inheritdoc cref="IsCheckedProperty"/>
     public bool IsChecked
     {
         get => GetValue(IsCheckedProperty);
         set => SetValue(IsCheckedProperty, value);
     }
 
+    /// <inheritdoc cref="LitProperty"/>
     public bool? Lit
     {
         get => GetValue(LitProperty);
         set => SetValue(LitProperty, value);
     }
 
+    /// <inheritdoc cref="HasLampProperty"/>
     public bool HasLamp
     {
         get => GetValue(HasLampProperty);
         set => SetValue(HasLampProperty, value);
     }
 
+    /// <summary>How tall the cap is, and how wide too for the shapes that are square.</summary>
     public double CapHeight
     {
         get => GetValue(CapHeightProperty);
         set => SetValue(CapHeightProperty, value);
     }
 
+    /// <inheritdoc cref="CapWidthProperty"/>
     public double CapWidth
     {
         get => GetValue(CapWidthProperty);
         set => SetValue(CapWidthProperty, value);
     }
 
+    /// <inheritdoc cref="ShapeProperty"/>
     public ButtonShape Shape
     {
         get => GetValue(ShapeProperty);
         set => SetValue(ShapeProperty, value);
     }
 
+    /// <inheritdoc cref="PointsProperty"/>
     public Pointing Points
     {
         get => GetValue(PointsProperty);
@@ -212,48 +326,62 @@ public class PushButton : ThemedControl
     /// <summary>True for the shapes that are as wide as they are tall.</summary>
     private bool Square => Shape is ButtonShape.Round or ButtonShape.Triangle;
 
+    /// <inheritdoc cref="ColourProperty"/>
     public Color Colour
     {
         get => GetValue(ColourProperty);
         set => SetValue(ColourProperty, value);
     }
 
+    /// <inheritdoc cref="FontSizeProperty"/>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
     }
 
+    /// <summary>How wide across the lamp is.</summary>
     public double LampSize
     {
         get => GetValue(LampSizeProperty);
         set => SetValue(LampSizeProperty, value);
     }
 
+    /// <inheritdoc cref="LampBelowProperty"/>
     public bool LampBelow
     {
         get => GetValue(LampBelowProperty);
         set => SetValue(LampBelowProperty, value);
     }
 
+    /// <inheritdoc cref="LampColourProperty"/>
     public Color LampColour
     {
         get => GetValue(LampColourProperty);
         set => SetValue(LampColourProperty, value);
     }
 
+    /// <inheritdoc cref="CommandProperty"/>
     public ICommand? Command
     {
         get => GetValue(CommandProperty);
         set => SetValue(CommandProperty, value);
     }
 
+    /// <summary>Handed to the command, which is how one handler serves a whole row of caps.</summary>
     public object? CommandParameter
     {
         get => GetValue(CommandParameterProperty);
         set => SetValue(CommandParameterProperty, value);
     }
 
+    /// <summary>
+    /// The button was worked: released inside its own bounds, or driven from the keyboard.
+    /// </summary>
+    /// <remarks>
+    /// Raised before the command is run, so a listener that reads state set up by the command
+    /// has to use the command instead.
+    /// </remarks>
     public event EventHandler<RoutedEventArgs> Pressed
     {
         add => AddHandler(PressedEvent, value);
@@ -263,8 +391,24 @@ public class PushButton : ThemedControl
     /// <summary>True while the cap is down, whether held or latched.</summary>
     private bool Down => _down || (IsLatching && IsChecked);
 
+    /// <summary>
+    /// Whether the lamp burns: what it was told, or the latch when nothing has told it.
+    /// </summary>
+    /// <remarks>
+    /// A momentary button nobody drives has an unlit lamp, which is right: it is down for a
+    /// tenth of a second and a lamp that flickered with the finger would say nothing.
+    /// </remarks>
     private bool Lamp => Lit ?? (IsLatching && IsChecked);
 
+    /// <summary>
+    /// Room for the lamp, the cap, and whatever is written under it.
+    /// </summary>
+    /// <remarks>
+    /// A round or triangular cap is as wide as it is tall, since neither shape means anything
+    /// stretched. An oblong is the wider of what it was told to be and what its caption needs
+    /// with a little padding either side, and never narrower than thirty, which is the width
+    /// below which a cap stops reading as something to press.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
         var cap = Text(CapText, Brushes.Black);
@@ -283,6 +427,23 @@ public class PushButton : ThemedControl
         return new Size(width, height);
     }
 
+    /// <summary>
+    /// Paints the lamp, the moulded cap, and the writing on and under it.
+    /// </summary>
+    /// <remarks>
+    /// The cap is lit from above when it is up and from below when it is down, so a pressed cap
+    /// sits in its own shadow. That is the whole of what makes a button look pressed, and it is
+    /// worked out from whatever colour the cap is moulded in rather than painted over it, so a
+    /// red cap is lit as a red cap.
+    ///
+    /// A ring round the cap means this is the one being worked on. Focus draws one too, but only
+    /// when the keyboard put it there: a button that kept a ring because it was clicked once
+    /// looked like a selection nobody made, and beside a real selection it read as two.
+    ///
+    /// What is written on the cap is black or white by how bright the cap is, and it drops half
+    /// a pixel while the cap is down, which is the writing going down with the moulding it is
+    /// printed on.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
@@ -301,8 +462,6 @@ public class PushButton : ThemedControl
 
         var seat = Colour.A == 0 ? palette.Surface : Colour;
 
-        // Lit from above when it is up, from below when it is down: a pressed cap sits in its
-        // own shadow, which is the whole of what makes a button look pressed.
         var moulding = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
@@ -320,9 +479,6 @@ public class PushButton : ThemedControl
                 }
         };
 
-        // A ring means this is the one being worked on. Focus draws one too, but only when the
-        // keyboard put it there: a button that keeps a ring because it was clicked once looks
-        // like a selection nobody made, and next to a real selection it reads as two.
         bool ringed = IsSelected || (IsFocused && _byKeyboard);
 
         var edge = ringed ? palette.Accent : ThemePalette.Shade(seat, -0.35);
@@ -346,7 +502,7 @@ public class PushButton : ThemedControl
 
         if (!string.IsNullOrEmpty(CapText))
         {
-            var bright = seat.R * 0.299 + seat.G * 0.587 + seat.B * 0.114 > 140;
+            var bright = seat.R * 0.299 + seat.G * 0.587 + seat.B * 0.114 > CapTextFlipsAt;
             var text = Text(CapText, new SolidColorBrush(bright ? Colors.Black : Colors.White));
             context.DrawText(text,
                 new Point(middle - text.Width / 2, cap.Center.Y - text.Height / 2 + (Down ? 0.5 : 0)));
@@ -368,6 +524,13 @@ public class PushButton : ThemedControl
         }
     }
 
+    /// <summary>
+    /// Remembers how the focus arrived, because only a tab draws a ring.
+    /// </summary>
+    /// <remarks>
+    /// Directional counts as the keyboard too: arrowing around a grid of pads is somebody
+    /// navigating, and the ring is what tells them where they have got to.
+    /// </remarks>
     protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
@@ -376,6 +539,7 @@ public class PushButton : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>Takes the ring away with the focus.</summary>
     protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
@@ -384,6 +548,14 @@ public class PushButton : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Puts the cap down.
+    /// </summary>
+    /// <remarks>
+    /// Nothing happens yet: a button fires on the release, so that sliding off it is how you
+    /// change your mind. The pointer is deliberately not captured, since the release has to be
+    /// able to land somewhere else for that to work.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -397,6 +569,13 @@ public class PushButton : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Lets the cap up, and works the button if the release landed on it.
+    /// </summary>
+    /// <remarks>
+    /// Only a release inside the button counts, so sliding off it is how you change your mind
+    /// about a press you have already begun.
+    /// </remarks>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -406,12 +585,19 @@ public class PushButton : ThemedControl
         _down = false;
         InvalidateVisual();
 
-        // Only a release inside the button counts, so sliding off is how you change your mind.
         if (new Rect(Bounds.Size).Contains(e.GetPosition(this))) Fire();
 
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Space and enter work the button.
+    /// </summary>
+    /// <remarks>
+    /// The cap is not drawn down for these: a key press has no length worth animating, and a cap
+    /// that flashed would be a frame nobody sees. Any other key is left unhandled and carries on
+    /// out to the panel.
+    /// </remarks>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -422,6 +608,15 @@ public class PushButton : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// The button was worked: throw the latch if it has one, tell whoever is listening, run the
+    /// command if there is one.
+    /// </summary>
+    /// <remarks>
+    /// Both the event and the command, and in that order. A panel built in XAML binds a command
+    /// and a panel built from a description listens, and one control serves both rather than
+    /// there being two spellings of a button.
+    /// </remarks>
     private void Fire()
     {
         if (IsLatching) IsChecked = !IsChecked;
@@ -431,6 +626,7 @@ public class PushButton : ThemedControl
         if (Command?.CanExecute(CommandParameter) == true) Command.Execute(CommandParameter);
     }
 
+    /// <summary>A piece of text laid out at the button's own size, for the cap or for the label.</summary>
     private FormattedText Text(string? text, IBrush brush) =>
         new(text ?? "", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default), FontSize, brush);
@@ -438,8 +634,7 @@ public class PushButton : ThemedControl
     /// <summary>A triangle filling the cap, with its point in the direction asked for.</summary>
     private static StreamGeometry Triangle(Rect cap, Pointing points)
     {
-        // Slightly inside the cap, so the outline is not clipped by the control's own bounds.
-        var box = cap.Deflate(1);
+        var box = cap.Deflate(TriangleInset);
 
         var geometry = new StreamGeometry();
 
@@ -481,7 +676,6 @@ public class PushButton : ThemedControl
 
         return geometry;
     }
-
 }
 
 /// <summary>What a push button's cap is moulded as.</summary>
@@ -500,8 +694,15 @@ public enum ButtonShape
 /// <summary>Which way a triangular cap points.</summary>
 public enum Pointing
 {
+    /// <summary>The default, since a triangle on a panel is usually a next or a play.</summary>
     Right = 0,
+
+    /// <summary>Back, or previous.</summary>
     Left = 1,
+
+    /// <summary>Up, which on a panel is usually more of something.</summary>
     Up = 2,
+
+    /// <summary>And down, less of it.</summary>
     Down = 3
 }

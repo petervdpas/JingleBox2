@@ -11,13 +11,16 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public sealed class Song
 {
+    /// <summary>A song of one track, which is as narrow as one can be.</summary>
     public const int MinTrackCount = 1;
 
     /// <summary>Two digits is as wide as the track badges and headers are built for.</summary>
     public const int MaxTrackCount = 32;
 
+    /// <summary>What a new song opens with, which is enough to start and not a wall of empty columns.</summary>
     public const int DefaultTrackCount = 4;
 
+    /// <summary>What the song is called, which is also what its file is called.</summary>
     public string Name { get; set; } = "untitled";
 
     /// <summary>
@@ -31,7 +34,10 @@ public sealed class Song
     /// </remarks>
     public string Description { get; set; } = "";
 
+    /// <summary>Beats a minute. Held to its range by <see cref="Normalize"/> on the way in.</summary>
     public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
+
+    /// <summary>Steps to a beat, which is how finely the beat can be written rather than a tempo.</summary>
     public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
 
     /// <summary>
@@ -44,13 +50,32 @@ public sealed class Song
     /// written two octaves down is a property of the work, not of the bass.
     /// </remarks>
     public int KeyboardOctave { get; set; } = 4;
+
+    /// <summary>
+    /// How many tracks every pattern in the song has.
+    /// </summary>
+    /// <remarks>
+    /// One number for the whole song rather than one per pattern, because the tracks are what
+    /// the mixer, the instruments and the order are all indexed by, and a pattern with a width
+    /// of its own would make every one of those an answer that depends on where the playhead is.
+    /// </remarks>
     public int TrackCount { get; set; } = DefaultTrackCount;
 
+    /// <summary>The patterns themselves, which the order list points into by index.</summary>
     public List<Pattern> Patterns { get; set; } = new();
 
     /// <summary>Indexes into <see cref="Patterns"/>, in playing order.</summary>
     public List<int> Order { get; set; } = new();
 
+    /// <summary>
+    /// The song's own instruments, which are its copies and not the rack's.
+    /// </summary>
+    /// <remarks>
+    /// A song owns what it plays: your name, your settings, its own id, stored here. Two of them
+    /// can come off one machine, and improving one in a song changes that song and nothing else.
+    /// Cells point into this list by index, which is why <see cref="RemoveInstrumentAt"/> has to
+    /// renumber every one of them.
+    /// </remarks>
     public List<TrackerInstrument> Instruments { get; set; } = new();
 
     /// <summary>
@@ -146,9 +171,15 @@ public sealed class Song
         }
     }
 
+    /// <summary>The tempo and the resolution as one thing, for anything working out lengths.</summary>
+    /// <remarks>
+    /// Not written to the file, since both halves of it already are and a third copy would be a
+    /// third thing that could disagree.
+    /// </remarks>
     [JsonIgnore]
     public TrackerTiming Timing => new(Bpm, LinesPerBeat);
 
+    /// <summary>A new song: one pattern, once in the order, and nothing else.</summary>
     public static Song CreateDefault()
     {
         var song = new Song();
@@ -157,6 +188,13 @@ public sealed class Song
         return song;
     }
 
+    /// <summary>
+    /// The pattern that order slot plays, or null when the slot or what it names is not there.
+    /// </summary>
+    /// <remarks>
+    /// Asked by the slot rather than by the pattern, because the same pattern can be in a song
+    /// twice and where the playhead is has to be one answer.
+    /// </remarks>
     public Pattern? PatternAt(int orderIndex)
     {
         if (orderIndex < 0 || orderIndex >= Order.Count) return null;
@@ -165,6 +203,7 @@ public sealed class Song
         return patternIndex >= 0 && patternIndex < Patterns.Count ? Patterns[patternIndex] : null;
     }
 
+    /// <summary>One instrument by index, or null for anything outside the list.</summary>
     public TrackerInstrument? InstrumentAt(int index) =>
         index >= 0 && index < Instruments.Count ? Instruments[index] : null;
 
@@ -207,6 +246,7 @@ public sealed class Song
         TrackInstruments[track] = value;
     }
 
+    /// <summary>Takes an instrument off every track it is on, which is at most one of them.</summary>
     private void ClearInstrumentFromTracks(int instrument)
     {
         for (int track = 0; track < TrackInstruments.Count; track++)
@@ -256,13 +296,16 @@ public sealed class Song
     /// instruments by index, so deleting one without renumbering would silently repoint every
     /// note above it at the wrong sample.
     /// </summary>
+    /// <remarks>
+    /// The track defaults point at instruments by index too, so they are renumbered alongside
+    /// the cells. A track that held the one being removed is left holding nothing.
+    /// </remarks>
     public bool RemoveInstrumentAt(int index)
     {
         if (index < 0 || index >= Instruments.Count) return false;
 
         Instruments.RemoveAt(index);
 
-        // Track defaults point at instruments by index too, so they renumber alongside cells.
         for (int track = 0; track < TrackInstruments.Count; track++)
         {
             if (TrackInstruments[track] == index) TrackInstruments[track] = TrackerCell.NoInstrument;
@@ -364,6 +407,10 @@ public sealed class Song
     /// reorder that took the notes and left the instrument behind would put every track's
     /// sound on somebody else's notes, which is the same trap as a cell naming one instrument
     /// while its track is bound to another.
+    ///
+    /// A side chain names the track that pushes it down, by number, and those numbers have just
+    /// changed under it. Remapped rather than cleared: the strip is still keyed off the same
+    /// track, and that track is still in the song, only somewhere else.
     /// </remarks>
     public bool MoveTrack(int from, int to)
     {
@@ -378,9 +425,6 @@ public sealed class Song
         Shift(TrackInstruments, from, to);
         Shift(Mix, from, to);
 
-        // A side chain names the track that pushes it down, by number, and those numbers have
-        // just changed under it. Remapped rather than cleared: the strip is still keyed off
-        // the same track, and that track is still in the song, only somewhere else.
         foreach (var strip in Mix)
         {
             if (strip.DuckFrom == TrackMix.NoKey) continue;
@@ -392,11 +436,16 @@ public sealed class Song
     }
 
     /// <summary>Where a track number ends up once one track has been moved to another place.</summary>
+    /// <remarks>
+    /// Everything the moved track passed over slides one place the other way to fill the gap it
+    /// left, and everything outside the stretch between the two positions does not move at all.
+    /// Public because a duck's key track and anything else naming a track by number has to be
+    /// able to ask the same question and get the same answer.
+    /// </remarks>
     public static int WhereTrackWent(int track, int from, int to)
     {
         if (track == from) return to;
 
-        // Everything the moved track passed over slides one place the other way to fill in.
         if (from < to) return track > from && track <= to ? track - 1 : track;
 
         return track >= to && track < from ? track + 1 : track;
@@ -423,6 +472,7 @@ public sealed class Song
         EnsureMix();
     }
 
+    /// <summary>How long the whole song lasts, every slot of the order counted in turn.</summary>
     public TimeSpan Duration =>
         TimeSpan.FromSeconds(Timing.SecondsPerLine *
             Enumerable.Range(0, Order.Count).Sum(i => PatternAt(i)?.Lines ?? 0));
@@ -431,6 +481,17 @@ public sealed class Song
     /// Brings a loaded song back to a state the player can trust: sane tempo, patterns all
     /// the same width, and no order entry pointing at a pattern that is not there.
     /// </summary>
+    /// <remarks>
+    /// A song file is text anybody can edit, so everything here is a repair rather than a check:
+    /// nothing throws, and what cannot be made sense of is replaced with what a new song would
+    /// have had.
+    ///
+    /// Three of the repairs are worth naming. A patch that is missing or out of range would build
+    /// a voice that is either a crash or a noise nobody asked for. A track pointed at an
+    /// instrument that is not in the list, including a junk negative, becomes "none", so nothing
+    /// invalid is ever written back out. And one instrument put on two tracks is a mapping this
+    /// song does not have: the first track keeps it.
+    /// </remarks>
     public void Normalize()
     {
         Bpm = Math.Clamp(Bpm, TrackerTiming.MinBpm, TrackerTiming.MaxBpm);
@@ -447,8 +508,6 @@ public sealed class Song
         if (Order.Count == 0)
             Order.Add(0);
 
-        // A hand-edited file can leave a patch missing or out of range, and a voice built from
-        // one of those is either a crash or a noise nobody asked for.
         foreach (var instrument in Instruments)
         {
             instrument.Patch ??= new Synth.SynthPatch();
@@ -463,15 +522,12 @@ public sealed class Song
         {
             int instrument = TrackInstruments[track];
 
-            // Anything outside the instrument list becomes "none", including junk negatives
-            // from a hand-edited file, so nothing invalid is ever written back out.
             if (instrument < 0 || instrument >= Instruments.Count)
             {
                 TrackInstruments[track] = TrackerCell.NoInstrument;
                 continue;
             }
 
-            // A hand-edited file can put one instrument on two tracks. The first keeps it.
             for (int later = track + 1; later < TrackInstruments.Count; later++)
                 if (TrackInstruments[later] == instrument)
                     TrackInstruments[later] = TrackerCell.NoInstrument;

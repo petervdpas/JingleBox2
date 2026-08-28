@@ -18,6 +18,15 @@ namespace JingleBox2.Tracker;
 /// is the readable side of the same fact: what the machine is called, what it is for, and what
 /// it needs from the panel that shows it.
 /// </remarks>
+/// <param name="Kind">Which engine is behind it, which is what a song's own file says.</param>
+/// <param name="Name">What it calls itself, read off its project rather than written here.</param>
+/// <param name="Summary">The sentence under its name on the rack, in the machine's own words.</param>
+/// <param name="IsOurs">
+/// True for a machine of this application's, false for the plugin heading. What
+/// <see cref="Forget"/> clears, since the plugin heading is written down here and everything
+/// else comes off disc.
+/// </param>
+/// <param name="Theme">The colours it is painted in, its own and not the app's.</param>
 public sealed record Machine(
     TrackerInstrumentKind Kind,
     string Name,
@@ -88,13 +97,16 @@ public sealed record Machine(
     /// The one entry written out here, because there is nothing to read it from: a plugin is
     /// somebody else's, sitting wherever they put it, and what the rack shows for one is a
     /// heading rather than a machine's face. Everything else on the list comes off disc.
+    ///
+    /// Grey, and deliberately: a plugin is somebody else's box on the rack, and giving it a
+    /// colour of its own would say it was one of ours.
     /// </remarks>
     public static readonly Machine Plugin = new(
         TrackerInstrumentKind.Plugin,
         "Plugin",
         "A VST3 or CLAP instrument, playing in a process of its own.",
         false,
-        new MachineTheme("#7B838C")); // Grey, and deliberately: a plugin is somebody else's box on the rack.
+        new MachineTheme("#7B838C"));
 
     /// <summary>
     /// The order machines stand in, which is the app's and not any machine's.
@@ -216,5 +228,6 @@ public sealed record Machine(
         Registered.FirstOrDefault(one => one.Kind == kind)
         ?? new Machine(kind, Engine(kind), "Not installed here.", kind != TrackerInstrumentKind.Plugin, Bare);
 
+    /// <summary>Its name, so a machine can be dropped straight into a list or a status line.</summary>
     public override string ToString() => Name;
 }

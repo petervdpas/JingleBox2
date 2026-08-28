@@ -22,6 +22,12 @@ namespace JingleBox2.Controllers;
 /// </remarks>
 public static class ControllerProfiles
 {
+    /// <summary>How a profile is read: forgivingly, since these are files people write by hand.</summary>
+    /// <remarks>
+    /// Comments and a trailing comma are allowed and the casing of a field is not held against
+    /// anybody, because the alternative is a file that is refused for a reason nobody can see
+    /// and a controller that quietly loses its names.
+    /// </remarks>
     private static readonly JsonSerializerOptions Reading = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -29,7 +35,10 @@ public static class ControllerProfiles
         AllowTrailingCommas = true
     };
 
+    /// <summary>Guards everything below, which is read from the MIDI thread and written from others.</summary>
     private static readonly object Lock = new();
+
+    /// <summary>Every profile this installation has, in the order the files were read.</summary>
     private static readonly List<ControllerProfile> Held = new();
 
     /// <summary>Which profile answers for a port, worked out once and kept.</summary>
@@ -40,9 +49,18 @@ public static class ControllerProfiles
     private static readonly Dictionary<string, string> Running =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Whether the folder has been read at all, so the first question reads it.</summary>
     private static bool _read;
 
-    /// <summary>Reads every profile again, from scratch.</summary>
+    /// <summary>
+    /// Reads every profile again, from scratch.
+    /// </summary>
+    /// <remarks>
+    /// Called at startup and whenever a file in the folder is saved, which is what makes writing
+    /// one of these a matter of editing and touching a knob rather than editing and restarting.
+    /// Everything worked out from the old files is thrown away with them: what was decided about
+    /// a port, which program a device was believed to be in, and what a number implied.
+    /// </remarks>
     public static void Reload()
     {
         var found = new List<ControllerProfile>();
@@ -76,6 +94,13 @@ public static class ControllerProfiles
         Log.Write(LogArea.Midi, () => "profiles: " + found.Count + " read from '" + ControllerFolder.Installed + "'");
     }
 
+    /// <summary>Reads one file, or says in the log why it did not.</summary>
+    /// <remarks>
+    /// A profile that will not read costs its device its names and nothing else, which is why
+    /// this is a line in the log rather than anything louder. A file with no name is skipped for
+    /// the same reason: a device called nothing is worse in every list than a device called by
+    /// its port.
+    /// </remarks>
     private static ControllerProfile? Take(string path)
     {
         try
@@ -96,13 +121,12 @@ public static class ControllerProfiles
         }
         catch (Exception bad)
         {
-            // A profile that will not read costs its device its names and nothing else, which is
-            // why this is a line in the log rather than anything louder.
             Log.Write(LogArea.Midi, () => "profiles: '" + Path.GetFileName(path) + "' will not read: " + bad.Message);
             return null;
         }
     }
 
+    /// <summary>Reads the folder if nobody has yet, so nothing has to be started in any order.</summary>
     private static void Ready()
     {
         lock (Lock) if (_read) return;
@@ -184,6 +208,13 @@ public static class ControllerProfiles
     /// </remarks>
     private static readonly Dictionary<(string Device, int Channel, int Cc), string?> Implied = new();
 
+    /// <summary>
+    /// Which program a number belongs to, or nothing when it belongs to none or to several.
+    /// </summary>
+    /// <remarks>
+    /// A number found in two programs at once says nothing about which of them is running, so it
+    /// is thrown away rather than resolved by whichever was walked first.
+    /// </remarks>
     private static string? Implies(ControllerProfile profile, string device, int channel, int cc)
     {
         var asked = (device, channel, cc);
@@ -202,7 +233,6 @@ public static class ControllerProfiles
 
             if (!has) continue;
 
-            // In two programs at once, so it says nothing about which of them is running.
             if (only is not null) { only = null; break; }
 
             only = program.Name;
@@ -238,6 +268,12 @@ public static class ControllerProfiles
     /// Answering nothing is the common case and is not a failure. Everywhere this is asked has
     /// something perfectly good to fall back on, which is the number itself, and a list that
     /// says `CC 89 ch 1` is a list that works.
+    ///
+    /// Three questions in order: the program that is running, where that is known; then anything
+    /// true whatever program the device is in; and failing those, any program at all, but only
+    /// when they agree. Before a device has said anything there is no way to tell its programs
+    /// apart, and a name from the wrong one is worse than a number, since a number is merely
+    /// unhelpful and a wrong name is a lie.
     /// </remarks>
     public static string Named(string? device, int channel, int cc)
     {
@@ -245,20 +281,15 @@ public static class ControllerProfiles
 
         string program = ProgramOn(device);
 
-        // The program that is running, when that is known.
         if (program.Length > 0
             && profile.Programs.FirstOrDefault(one => string.Equals(one.Name, program, StringComparison.Ordinal))
                 is { } current
             && current.Controls.FirstOrDefault(one => Answers(one, channel, cc)) is { } named)
             return named.Name;
 
-        // Then anything true whatever program it is in.
         if (profile.Controls.FirstOrDefault(one => Answers(one, channel, cc)) is { } common)
             return common.Name;
 
-        // And failing that, any program at all, but only when they agree. Before a device has
-        // said anything there is no way to tell its programs apart, and a name from the wrong
-        // one is worse than a number: a number is merely unhelpful, a wrong name is a lie.
         var across = profile.Programs
             .SelectMany(one => one.Controls)
             .Where(one => Answers(one, channel, cc))
@@ -340,14 +371,15 @@ public static class ControllerProfiles
     /// Nothing is claimed for an encoder in a program that counts notches. Which of the two
     /// conventions it counts in is not in the file and getting it wrong throws the parameter
     /// across its range, so that one is left to be watched rather than assumed.
+    ///
+    /// Asked on every message, so the answer is worked out once per control per program and
+    /// looked up after that. It cannot change without the program changing, and the program is
+    /// part of the question.
     /// </remarks>
     public static ControlPickup? Pickup(string? device, int channel, int cc)
     {
         if (device is null || For(device) is not { } profile) return null;
 
-        // Asked on every message, so the answer is worked out once per control per program and
-        // looked up after that. It cannot change without the program changing, and the program
-        // is part of the question.
         string program = ProgramOn(device);
         var asked = (device, channel, cc, program);
 
@@ -364,6 +396,20 @@ public static class ControllerProfiles
     /// <summary>What was decided about a control, per program, so it is decided once.</summary>
     private static readonly Dictionary<(string Device, int Channel, int Cc, string Program), ControlPickup?> Decided2 = new();
 
+    /// <summary>
+    /// What the file says a control should be read as, before anything is remembered about it.
+    /// </summary>
+    /// <remarks>
+    /// A knob is a fader that happens to be round: a pot with ends, reporting where it is.
+    /// Measured on an MPD218, whose six are sold as 360 degree potentiometers and are nothing of
+    /// the kind: one turned steadily walked 35 to 127 in two seconds and then sat at 127 for
+    /// another seven while it was still being turned. So 360 degree describes the absence of a
+    /// detent rather than the behaviour of the value.
+    ///
+    /// Nothing is claimed for a knob in a program that counts notches, because a knob's type is
+    /// settable in Akai's own editor and one set that way, read as a position, would do nothing
+    /// whatever.
+    /// </remarks>
     private static ControlPickup? Work(ControllerProfile profile, string device, int channel, int cc, string program)
     {
         var control = Control(device, channel, cc);
@@ -378,13 +424,6 @@ public static class ControllerProfiles
         {
             "encoder" when sends == "absolute" => ControlPickup.Endless,
             "fader" or "strip" => ControlPickup.Takeover,
-
-            // A knob is a fader that is round: a pot with ends, reporting where it is. Measured
-            // on an MPD218, whose six are sold as 360 degree and are nothing of the kind: one
-            // walked 35 to 127 in two seconds and then sat at 127 for another seven while it was
-            // still being turned. Nothing claimed when the program counts notches, because a
-            // knob's type is settable in Akai's own editor and one set that way, read as a
-            // position, would do nothing whatever.
             "knob" when sends != "relative" => ControlPickup.Takeover,
             "button" or "pad" => ControlPickup.Jump,
             _ => null
@@ -407,6 +446,12 @@ public static class ControllerProfiles
         return profile.Controls.FirstOrDefault(one => Answers(one, channel, cc));
     }
 
+    /// <summary>Whether that control is the one that sent this.</summary>
+    /// <remarks>
+    /// A channel of nought or less means any, which is what almost every control in every file
+    /// is: a device that sends its knobs on one channel says so once, and the few controls that
+    /// are pinned to a channel of their own are the exceptions worth writing down.
+    /// </remarks>
     private static bool Answers(ControllerControl one, int channel, int cc) =>
         one.Cc == cc && (one.Channel <= 0 || one.Channel == channel);
 }

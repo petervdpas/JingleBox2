@@ -18,8 +18,17 @@ namespace JingleBox2.Tracker;
 /// That is the difference the shelf could not express. An instrument seeded into the rack
 /// is one more thing to scroll past, to rename by accident, and to wonder whether you made.
 /// </remarks>
+/// <param name="Name">
+/// What it is called in the picker, which is the name inside the file rather than the file's
+/// own. A filename starts with a number only to hold the order they are offered in.
+/// </param>
+/// <param name="Sound">
+/// The settings, as a whole instrument, because a preset file is an instrument file: the same
+/// shape, read by the same reader, so one saved off the rack can be dropped straight in.
+/// </param>
 public sealed record MachinePreset(string Name, TrackerInstrument Sound)
 {
+    /// <summary>Its name, so a preset can be dropped straight into a picker.</summary>
     public override string ToString() => Name;
 }
 
@@ -37,6 +46,10 @@ public sealed record MachinePreset(string Name, TrackerInstrument Sound)
 /// </remarks>
 public static class MachinePresets
 {
+    /// <summary>
+    /// What has already been read, by machine name. The folder does not change under us, so a
+    /// machine is walked once a run.
+    /// </summary>
     private static readonly Dictionary<string, IReadOnlyList<MachinePreset>> Loaded = new();
 
     /// <summary>
@@ -57,6 +70,14 @@ public static class MachinePresets
         }
     }
 
+    /// <summary>
+    /// Walks the machine's presets folder, in filename order.
+    /// </summary>
+    /// <remarks>
+    /// A machine whose presets cannot be read is a machine with none, not a crash on the way to
+    /// the panel: the folder may not be there at all, which is ordinary for a machine that
+    /// ships without any.
+    /// </remarks>
     private static IReadOnlyList<MachinePreset> Read(Machine machine)
     {
         string folder = Folder(machine);
@@ -79,8 +100,6 @@ public static class MachinePresets
         }
         catch (Exception)
         {
-            // A machine whose presets cannot be read is a machine with none, not a crash on
-            // the way to the panel.
             return Array.Empty<MachinePreset>();
         }
     }
@@ -133,13 +152,25 @@ public static class MachinePresets
             sound.FilePath = Path.GetFullPath(Path.Combine(folder, sound.FilePath));
     }
 
+    /// <summary>
+    /// One preset file, in whichever of the two shapes it was written.
+    /// </summary>
+    /// <remarks>
+    /// The newer shape is written the way the machine is drawn, if that machine has been
+    /// converted: one small piece of JSON per control, keyed by what the control is called. The
+    /// older shape is a whole instrument, which is what every unconverted machine's presets
+    /// still are, and it is what the reader falls back to.
+    ///
+    /// A file in a machine's folder is that machine's, whatever it says inside, so the kind is
+    /// overwritten on the way past: dropping an instrument in as a preset should not need it
+    /// edited first.
+    ///
+    /// One unreadable preset is one preset, not the whole folder.
+    /// </remarks>
     private static TrackerInstrument? Load(string path, Machine machine)
     {
         try
         {
-            // Written the way the machine is drawn, if that machine has been converted: one small
-            // piece of JSON per control, keyed by what the control is called. The older shape is
-            // a whole instrument, which is what every unconverted machine's presets still are.
             if (Machines.MachineProjects.For(machine.SlotId) is { } project
                 && Machines.MachinePresetFile.Read(path, project) is { } keyed)
             {
@@ -152,8 +183,6 @@ public static class MachinePresets
             var sound = JsonSerializer.Deserialize<TrackerInstrument>(File.ReadAllText(path));
             if (sound == null) return null;
 
-            // A file in a machine's folder is that machine's, whatever it says inside: dropping
-            // an instrument in as a preset should not need it edited first.
             sound.Kind = machine.Kind;
             sound.Patch.Clamp();
             sound.MonoSynth?.Clamp();
@@ -170,7 +199,6 @@ public static class MachinePresets
         }
         catch (Exception)
         {
-            // One unreadable preset is one preset, not the whole folder.
             return null;
         }
     }

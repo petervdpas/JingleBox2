@@ -28,9 +28,20 @@ namespace JingleBox2.Tracker.Machines;
 /// A machine the app has no engine for is read and ignored for now. That is the piece the
 /// contract still needs, and until it lands, importing one would put a box on the rack that
 /// cannot make a sound.
+///
+/// Everything here writes to <see cref="Diagnostics.LogArea.Machines"/> rather than to the
+/// application's own area, as everything under this folder does. What machines were found and
+/// which of them could not be read is a whole half of the program, and reading it out of
+/// everything the application did at startup is exactly what nobody wants on the day a machine
+/// comes back missing its picture.
 /// </remarks>
 public static class MachineRegistry
 {
+    /// <summary>What the folder holding the machines is called, in both places it appears.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the one folder name this depends on can be found by
+    /// looking for it.
+    /// </remarks>
     public const string FolderName = "machines";
 
     /// <summary>Where the machines that ship with the program live.</summary>
@@ -77,13 +88,15 @@ public static class MachineRegistry
     /// <summary>
     /// Reads the machines this installation has and takes them into the list the app works from.
     /// </summary>
+    /// <remarks>
+    /// Everything read last time is forgotten first. A machine thrown out in SETTINGS has to be
+    /// gone from the list the moment it is rebuilt, not at the next start.
+    /// </remarks>
     /// <returns>What was taken, for the log and for the settings page to show.</returns>
     public static IReadOnlyList<MachineProject> Load()
     {
         Seed();
 
-        // Everything read last time goes first. A machine thrown out in SETTINGS has to be gone
-        // from the list the moment it is rebuilt, not at the next start.
         Machine.Forget();
 
         var taken = new List<MachineProject>();
@@ -110,6 +123,10 @@ public static class MachineRegistry
     }
 
     /// <summary>The projects in that folder, or none when there is no folder.</summary>
+    /// <remarks>
+    /// A folder that will not read is nothing rather than a fault: this is called on the way to
+    /// drawing the rack, and one unreadable folder should not take the rack with it.
+    /// </remarks>
     public static IReadOnlyList<MachineProject> In(string folder)
     {
         if (!Directory.Exists(folder)) return Array.Empty<MachineProject>();
@@ -154,6 +171,14 @@ public static class MachineRegistry
     /// An installation from before this file existed is taken to have been offered whatever it
     /// currently holds. That is right for everything anybody kept and wrong once for anything
     /// they had already removed: it comes back a single time, and stays gone after that.
+    ///
+    /// A machine already offered is not frozen: it is this installation's to keep or throw out,
+    /// but a machine that ships is the machine, and one edited in its own project has to reach
+    /// the rack without anybody copying folders about by hand. That is <see cref="Refresh"/>.
+    ///
+    /// The offer is recorded whether or not the copy went in. A machine that cannot be copied is
+    /// a machine this installation has still been offered, and trying again on every start would
+    /// only write the same fault into the log for ever.
     /// </remarks>
     private static void Seed()
     {
@@ -178,9 +203,6 @@ public static class MachineRegistry
         {
             if (project.Id.Length == 0) continue;
 
-            // Already offered, so it is this installation's to keep or throw out. What it is not
-            // is frozen: a machine that ships is the machine, and one edited in its own project
-            // has to reach the rack without anybody copying folders about by hand.
             if (offered.Contains(project.Id))
             {
                 if (here.TryGetValue(project.Id, out string? mine)) Refresh(project.Folder, mine);
@@ -188,9 +210,6 @@ public static class MachineRegistry
                 continue;
             }
 
-            // Recorded whether or not it went in. A machine that cannot be copied is a machine
-            // this installation has still been offered, and trying again on every start would
-            // only write the same fault into the log for ever.
             offered.Add(project.Id);
 
             moved = true;
@@ -216,6 +235,8 @@ public static class MachineRegistry
     /// is bumped when somebody remembers and a machine being worked on changes twenty times
     /// between two of them. A file nobody has touched is copied over nothing.
     /// </remarks>
+    /// <param name="shipped">The machine's folder beside the program.</param>
+    /// <param name="installed">And this installation's copy of it.</param>
     private static void Refresh(string shipped, string installed)
     {
         try
@@ -244,7 +265,14 @@ public static class MachineRegistry
         }
     }
 
-    /// <summary>Which shipped machines this installation has already been offered.</summary>
+    /// <summary>
+    /// Which shipped machines this installation has already been offered.
+    /// </summary>
+    /// <remarks>
+    /// No file means this installation is either brand new or older than the file. Whatever it
+    /// holds now is what it counts as having been offered: nothing at all in the first case,
+    /// which is what puts every shipped machine on a new rack.
+    /// </remarks>
     private static HashSet<string> Offered()
     {
         string file = Path.Combine(Installed, OfferedName);
@@ -259,12 +287,16 @@ public static class MachineRegistry
             Diagnostics.Log.Fault(Diagnostics.LogArea.Machines, "The machines already offered could not be read", ex);
         }
 
-        // No file, so this installation is either brand new or older than the file. Whatever it
-        // holds now is what it has been offered: nothing at all in the first case, which is what
-        // puts every shipped machine on a new rack.
         return new HashSet<string>(In(Installed).Select(project => project.Id), StringComparer.Ordinal);
     }
 
+    /// <summary>Writes the offer down, so the next start does not make it again.</summary>
+    /// <remarks>
+    /// A write that fails is logged and let go. The worst that comes of it is every shipped
+    /// machine being offered once more on the next start, which is a machine coming back rather
+    /// than one going missing.
+    /// </remarks>
+    /// <param name="offered">Every machine id this installation has now been offered.</param>
     private static void Remember(IEnumerable<string> offered)
     {
         try

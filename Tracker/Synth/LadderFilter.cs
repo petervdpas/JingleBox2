@@ -15,12 +15,17 @@ namespace JingleBox2.Tracker.Synth;
 /// chip gave. Cascading the sweeping filter rather than writing a ladder keeps one filter in
 /// the codebase rather than two, and the ear cannot tell a cascaded pair from a ladder without
 /// the ladder's own distortion, which is a separate thing to add and not this.
+///
+/// One per side of one voice, run on the audio thread. It holds only the two stages' own
+/// state, allocates nothing per sample and takes no lock: a voice belongs to whichever thread
+/// is rendering it.
 /// </remarks>
 public sealed class LadderFilter
 {
     private readonly SweepFilter _first;
     private readonly SweepFilter _second;
 
+    /// <summary>Both stages start wide open, so a voice is never born filtered by accident.</summary>
     public LadderFilter(int sampleRate)
     {
         _first = new SweepFilter(sampleRate);
@@ -41,9 +46,11 @@ public sealed class LadderFilter
         _second.Set(cutoffHz, 0);
     }
 
+    /// <summary>One sample through both stages, out of the low end.</summary>
     public double Process(double input) =>
         _second.Process(_first.Process(input, FilterMode.LowPass), FilterMode.LowPass);
 
+    /// <summary>Forgets what both stages were ringing with, for a voice being started again.</summary>
     public void Reset()
     {
         _first.Reset();

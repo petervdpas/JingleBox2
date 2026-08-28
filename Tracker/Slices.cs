@@ -61,6 +61,10 @@ public static class Slices
     /// Either the recording's own name, or the recording's name and which piece of it this is,
     /// which is what a chop calls its pieces. Both are the app talking to itself, and both
     /// should be replaced when another take lands. Anything else is yours and is kept.
+    ///
+    /// A piece's name is the take's name, a space, and a number: "Countdown 3". That shape is
+    /// what the tail is measured against, so a take called "Countdown" and a piece somebody
+    /// renamed "Countdown intro" are told apart.
     /// </remarks>
     public static bool Auto(string name, string wasCalled)
     {
@@ -68,7 +72,6 @@ public static class Slices
         if (wasCalled.Length == 0) return false;
         if (string.Equals(name, wasCalled, StringComparison.Ordinal)) return true;
 
-        // "Countdown 3": the take's name, a space, and a number.
         if (!name.StartsWith(wasCalled + " ", StringComparison.Ordinal)) return false;
 
         string tail = name[(wasCalled.Length + 1)..];

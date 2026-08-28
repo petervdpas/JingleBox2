@@ -22,13 +22,38 @@ public sealed partial class StatusViewModel : ObservableObject
     /// <summary>Twenty a second: fast enough to look alive, slow enough to cost nothing.</summary>
     private const int MeterMs = 50;
 
+    /// <summary>
+    /// How far a meter is allowed to drop in one tick, which is the whole scale in about a
+    /// fifth of a second.
+    /// </summary>
+    private const double FallPerTick = 0.25;
+
+    /// <summary>Where everything in the app says what it has just done, and where you are.</summary>
     private readonly StatusBus _bus;
+
+    /// <summary>
+    /// Counts a message down, and runs only while one is standing in front of the context.
+    /// </summary>
     private readonly DispatcherTimer _clock;
+
+    /// <summary>
+    /// Reads the two levels, and runs whether or not anything is happening.
+    /// </summary>
+    /// <remarks>
+    /// That is the difference between this and <see cref="_clock"/>: a meter that only moved
+    /// when something was said would be telling you about the past. It is started only when
+    /// somebody handed a meter in, since with neither there is nothing to read.
+    /// </remarks>
     private readonly DispatcherTimer _meters;
 
+    /// <summary>What is coming in, asked afresh on every meter tick.</summary>
     private readonly Func<double> _input;
+
+    /// <summary>And what is going out.</summary>
     private readonly Func<double> _output;
 
+    /// <summary>Wires the bar to the bus and, where there is one, to the sound.</summary>
+    /// <param name="bus">Where every page says what it has to say, which is what the bar repeats.</param>
     /// <param name="input">What is coming in, 0 to 1.</param>
     /// <param name="output">What is going out, 0 to 1.</param>
     /// <remarks>
@@ -47,9 +72,6 @@ public sealed partial class StatusViewModel : ObservableObject
         _bus.Posted += (_, _) => Dispatcher.UIThread.Post(Arrived);
         _bus.ContextChanged += (_, _) => Dispatcher.UIThread.Post(Settle);
 
-        // The meters run whether or not anything is happening, which is the difference between
-        // them and the message clock: a meter that only moved when something was said would be
-        // telling you about the past.
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(MeterMs) };
         _meters.Tick += (_, _) => Read();
 
@@ -78,6 +100,15 @@ public sealed partial class StatusViewModel : ObservableObject
         OutputLevel = Fall(OutputLevel, Safe(_output));
     }
 
+    /// <summary>
+    /// One reading, brought inside 0 to 1, with nought for anything that went wrong.
+    /// </summary>
+    /// <remarks>
+    /// A meter is not worth a crash, and an engine being torn down under it is an ordinary
+    /// state rather than a fault: the device is changed from SETTINGS while the bar is still
+    /// asking what is playing. A reading that comes back as a NaN is nought for the same
+    /// reason, since a NaN put into the bar would stay there.
+    /// </remarks>
     private static double Safe(Func<double> read)
     {
         try
@@ -88,13 +119,16 @@ public sealed partial class StatusViewModel : ObservableObject
         }
         catch (Exception)
         {
-            // A meter is not worth a crash, and an engine being torn down under it is normal.
             return 0;
         }
     }
 
+    /// <summary>
+    /// Where the bar goes next: straight to a louder reading, and down by at most
+    /// <see cref="FallPerTick"/>.
+    /// </summary>
     private static double Fall(double showing, double read) =>
-        read >= showing ? read : Math.Max(read, showing - 0.25);
+        read >= showing ? read : Math.Max(read, showing - FallPerTick);
 
     /// <summary>The line itself.</summary>
     [ObservableProperty] private string text = "";
@@ -106,6 +140,13 @@ public sealed partial class StatusViewModel : ObservableObject
     public string History =>
         string.Join(Environment.NewLine, _bus.Recent.Reverse().Select(m => m.ToString()));
 
+    /// <summary>
+    /// Something was said: show it, and start the clock that will take it away again.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="History"/> is told by hand because it is worked out from the bus rather than
+    /// held here, so nothing else would ever say it had changed.
+    /// </remarks>
     private void Arrived()
     {
         Settle();
@@ -115,6 +156,15 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(History));
     }
 
+    /// <summary>
+    /// Works out what the bar should say now: the last message while it is still standing, the
+    /// context otherwise.
+    /// </summary>
+    /// <remarks>
+    /// The clock is stopped here rather than anywhere else, because this is the one place that
+    /// finds out the message has fallen away: back to the context and there is nothing left to
+    /// count down.
+    /// </remarks>
     private void Settle()
     {
         var last = _bus.Last;
@@ -123,7 +173,6 @@ public sealed partial class StatusViewModel : ObservableObject
         Text = holding ? last!.Text : _bus.Context;
         Kind = holding ? last!.Kind : StatusKind.Context;
 
-        // Back to the context and nothing left to count down.
         if (!holding && _clock.IsEnabled) _clock.Stop();
     }
 }

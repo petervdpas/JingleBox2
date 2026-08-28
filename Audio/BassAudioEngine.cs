@@ -1,6 +1,3 @@
-// ===============================
-// Audio/BassAudioEngine.cs
-// ===============================
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,26 +8,51 @@ using ManagedBass;
 
 namespace JingleBox2.Audio;
 
+/// <inheritdoc/>
+/// <remarks>
+/// Through BASS, and everything about it is per pad and held in an array indexed by pad number:
+/// the arrays are swapped as a set by <see cref="Resize"/> and by nothing else, which is what
+/// lets the audio thread read them without the lock.
+/// </remarks>
 public sealed class BassAudioEngine : IAudioEngine
 {
+    /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
+    /// <summary>Which output BASS was opened on, or -1 before it has been opened at all.</summary>
     private int _currentDeviceId = -1;
 
+    /// <summary>The BASS channel each pad is playing on, or 0 for one that is not open.</summary>
     private int[] _padStreams;
+
+    /// <summary>What kind of thing each pad plays.</summary>
     private PadSourceKind[] _padKinds;
+
+    /// <summary>The file or the address each pad plays, or null for a pad with nothing on it.</summary>
     private string?[] _padSources;
+
+    /// <summary>How loud each pad is, 0 to 1.</summary>
     private float[] _padVolumes;
+
+    /// <summary>Whether each pad goes round again at the end.</summary>
     private bool[] _padLoops;
+
+    /// <summary>How long each pad takes to come up, in seconds.</summary>
     private double[] _padFadeIn;
+
+    /// <summary>How long each pad takes to go down, in seconds.</summary>
     private double[] _padFadeOut;
 
-    // ManagedBass sync must be kept alive
+    /// <summary>
+    /// What BASS calls when a pad reaches its end, kept here because BASS holds the pointer and
+    /// a collected delegate is a crash rather than a silence.
+    /// </summary>
     private readonly SyncProcedure _endSync;
 
     /// <summary>Effects on pads, and the BASS handles that run them.</summary>
     private Plugins.IAudioInsert?[] _padInserts;
 
+    /// <summary>The hook each effect is hung on, or 0 where nothing is hung.</summary>
     private int[] _padDsp;
 
     /// <summary>Kept alive for as long as any pad has an effect: BASS holds the pointer.</summary>
@@ -42,10 +64,18 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>How many channels each pad's stream carries, read when the effect is hung on.</summary>
     private int[] _padChannels;
 
+    /// <inheritdoc/>
     public int PadCount { get { lock (_lock) return _padStreams.Length; } }
 
+    /// <inheritdoc/>
     public event EventHandler<PadPlaybackChanged>? PadPlaybackChanged;
 
+    /// <summary>An engine with room for a number of pads, playing none of them.</summary>
+    /// <remarks>
+    /// BASS is not opened here. It is opened when something is first played, so a machine with no
+    /// sound card can still start the application and look at it.
+    /// </remarks>
+    /// <param name="padCount">How many pads there are, which <see cref="Resize"/> can change.</param>
     public BassAudioEngine(int padCount = 8)
     {
         _padStreams = new int[padCount];
@@ -76,6 +106,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public bool IsPadPlaying(int padIndex)
     {
         lock (_lock)
@@ -90,6 +121,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public double GetPadProgress(int padIndex)
     {
         lock (_lock)
@@ -105,6 +137,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public float GetPadLevel(int padIndex)
     {
         lock (_lock)
@@ -126,14 +159,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
-    /// <summary>
-    /// The loudest thing the pads are putting out, 0 to 1, or nought when none of them is.
-    /// </summary>
-    /// <remarks>
-    /// Half of what the status bar's output meter shows. The other half is the tracker's own
-    /// stream, which is a different BASS channel and belongs to a different object; whoever
-    /// wants the main output takes the louder of the two.
-    /// </remarks>
+    /// <inheritdoc/>
     public float GetOutputLevel()
     {
         lock (_lock)
@@ -163,6 +189,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public float GetPadChannelVolume(int padIndex)
     {
         lock (_lock)
@@ -176,6 +203,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<OutputDevice> GetOutputDevices()
     {
         var list = new List<OutputDevice>();
@@ -191,6 +219,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
     IEnumerable<OutputDevice> IAudioEngine.GetOutputDevices() => GetOutputDevices();
 
+    /// <inheritdoc/>
     public void SetOutputDevice(int deviceId)
     {
         lock (_lock)
@@ -211,6 +240,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public void SetPadSource(int padIndex, PadSourceKind kind, string? source)
     {
         lock (_lock)
@@ -225,6 +255,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public void SetPadVolume(int padIndex, float volume)
     {
         lock (_lock)
@@ -240,6 +271,11 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Whether a stream loops is decided when it is made, so the pad's stream is let go and the
+    /// next play builds a new one with the right flag.
+    /// </remarks>
     public void SetPadLoop(int padIndex, bool loop)
     {
         lock (_lock)
@@ -248,11 +284,11 @@ public sealed class BassAudioEngine : IAudioEngine
 
             _padLoops[padIndex] = loop;
 
-            // Free the existing stream so it's recreated with the correct loop flag on next play
             FreeStreamLocked(padIndex);
         }
     }
 
+    /// <inheritdoc/>
     public void SetPadFadeIn(int padIndex, double seconds)
     {
         lock (_lock)
@@ -262,6 +298,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public void SetPadFadeOut(int padIndex, double seconds)
     {
         lock (_lock)
@@ -271,6 +308,13 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The stream is made as float, so a plugin on this pad meets the samples as they are rather
+    /// than through a conversion each way, and it keeps whatever effect the pad has across
+    /// whatever it plays next. Only a stream that does not loop is watched for its end, since one
+    /// that loops never reaches one.
+    /// </remarks>
     public void PlaySample(int padIndex, string filePath, float volume)
     {
         lock (_lock)
@@ -296,8 +340,6 @@ public sealed class BassAudioEngine : IAudioEngine
 
             if (handle == 0)
             {
-                // Float, so a plugin on this pad gets the samples as they are rather than
-                // through a conversion each way.
                 var flags = BassFlags.Prescan | BassFlags.Float
                     | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default);
 
@@ -307,10 +349,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
                 _padStreams[padIndex] = handle;
 
-                // A pad keeps its effect across whatever it plays next.
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
-                // Only register end-sync for non-looping streams; looping streams never end
                 if (!_padLoops[padIndex])
                     Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
             }
@@ -336,6 +376,14 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A Mixcloud page is refused by name. It is a page rather than audio, so BASS opens it and
+    /// then plays nothing, which reads as a broken pad; the address of a file on their own CDN is
+    /// still allowed. Browser headers go with the request because some CDNs answer nothing
+    /// without them. A stream reaching its end means the connection dropped or the station went
+    /// off, which is why one is watched for its end whether it loops or not.
+    /// </remarks>
     public void PlayStream(int padIndex, string url, float volume)
     {
         lock (_lock)
@@ -349,7 +397,6 @@ public sealed class BassAudioEngine : IAudioEngine
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 throw new InvalidOperationException("Stream URL must start with http:// or https://");
 
-            // If you want to block Mixcloud *pages* but allow audiocdn.mixcloud.com mp3:
             if (uri.Host.Contains("mixcloud.com", StringComparison.OrdinalIgnoreCase) &&
                 !uri.Host.Contains("audiocdn.mixcloud.com", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Mixcloud page links are not direct audio streams.");
@@ -370,7 +417,6 @@ public sealed class BassAudioEngine : IAudioEngine
 
             if (handle == 0)
             {
-                // Browser-ish headers. Some CDNs require these.
                 var urlWithHeaders =
                     url + "\r\n" +
                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" +
@@ -386,7 +432,6 @@ public sealed class BassAudioEngine : IAudioEngine
 
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
-                // For streams, "end" can occur if connection drops or stream closes.
                 Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
             }
 
@@ -409,6 +454,14 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A pad with a fade out is left playing and taken down over that time, and tidied up
+    /// afterwards by a timer, which checks the handle is still the one it started on: a pad
+    /// played again during its own fade has a new stream by then, and stopping that would silence
+    /// the press somebody has just made. A stream is let go rather than stopped, so the next play
+    /// makes a fresh connection instead of carrying on from a stale one.
+    /// </remarks>
     public void StopSample(int padIndex)
     {
         lock (_lock)
@@ -435,7 +488,6 @@ public sealed class BassAudioEngine : IAudioEngine
                     {
                         try
                         {
-                            // Only clean up if the handle hasn't been replaced by a new PlaySample call
                             if (_padStreams.Length > capturedIndex && _padStreams[capturedIndex] == capturedHandle)
                             {
                                 if (capturedIsStream)
@@ -457,7 +509,6 @@ public sealed class BassAudioEngine : IAudioEngine
                 return;
             }
 
-            // For streams: free completely so a fresh connection is made on next play
             if (isStream)
             {
                 FreeStreamLocked(padIndex);
@@ -470,14 +521,21 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <summary>A pad has reached its end, on BASS's own thread.</summary>
+    /// <remarks>
+    /// A stream is made to free itself, and BASS lets the handle go once this returns, so the
+    /// reference to it is dropped here rather than being kept and reused after it is dead.
+    /// </remarks>
+    /// <param name="handle">The sync this came from.</param>
+    /// <param name="channel">The channel that ended.</param>
+    /// <param name="data">Unused.</param>
+    /// <param name="user">Which pad it was, as it was handed over when the sync was set.</param>
     private void OnChannelEnd(int handle, int channel, int data, IntPtr user)
     {
         var padIndex = user.ToInt32();
 
         lock (_lock)
         {
-            // For AutoFree streams, BASS frees the handle after this callback.
-            // Clear our reference so we don't try to reuse a dead handle.
             if (InRange(padIndex) && _padStreams[padIndex] == handle)
                 _padStreams[padIndex] = 0;
         }
@@ -485,11 +543,13 @@ public sealed class BassAudioEngine : IAudioEngine
         Raise(padIndex, PadPlaybackState.Stopped);
     }
 
+    /// <summary>Tells whoever is listening that a pad started, stopped or went wrong.</summary>
     private void Raise(int padIndex, PadPlaybackState state, string? message = null)
     {
         PadPlaybackChanged?.Invoke(this, new PadPlaybackChanged(padIndex, state, message));
     }
 
+    /// <summary>Whether there is a pad by that number.</summary>
     private bool InRange(int padIndex) =>
         padIndex >= 0 && padIndex < _padStreams.Length;
 
@@ -503,15 +563,13 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </remarks>
     private void LoadPlugins() => BassPlugins.Load();
 
-    /// <summary>
-    /// Brings BASS up if nothing has yet. The tracker plays through the same device as the
-    /// pads, so it calls this rather than running an init of its own.
-    /// </summary>
+    /// <inheritdoc/>
     public void EnsureInitialized()
     {
         lock (_lock) EnsureInitLocked();
     }
 
+    /// <summary>Opens BASS on the default output if nothing has. Called holding the lock.</summary>
     private void EnsureInitLocked()
     {
         if (_currentDeviceId >= 0) return;
@@ -523,6 +581,12 @@ public sealed class BassAudioEngine : IAudioEngine
         LoadPlugins();
     }
 
+    /// <summary>Stops a pad and lets its stream go. Called holding the lock.</summary>
+    /// <remarks>
+    /// The effect stays with the pad, but the hook it is hung on belongs to the stream that is
+    /// going. BASS may have freed the handle already, since a stream frees itself at its end, so
+    /// it is asked what state the channel is in rather than being told to stop regardless.
+    /// </remarks>
     private void FreeStreamLocked(int padIndex)
     {
         var handle = _padStreams[padIndex];
@@ -530,10 +594,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
         _padStreams[padIndex] = 0;
 
-        // The effect stays with the pad, but its hook belongs to the stream that is going.
         _padDsp[padIndex] = 0;
 
-        // Check if BASS still knows about this handle (may be auto-freed already)
         var state = Bass.ChannelIsActive(handle);
         if (state != PlaybackState.Stopped)
             Bass.ChannelStop(handle);
@@ -542,12 +604,18 @@ public sealed class BassAudioEngine : IAudioEngine
         Raise(padIndex, PadPlaybackState.Stopped);
     }
 
+    /// <summary>Stops every pad and lets every stream go. Called holding the lock.</summary>
     private void StopAllAndFreeStreamsLocked()
     {
         for (int i = 0; i < _padStreams.Length; i++)
             FreeStreamLocked(i);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Hung on whatever that pad is playing now. A pad with nothing loaded gets it when its next
+    /// stream is made.
+    /// </remarks>
     public void SetPadInsert(int padIndex, Plugins.IAudioInsert? insert)
     {
         lock (_lock)
@@ -559,23 +627,18 @@ public sealed class BassAudioEngine : IAudioEngine
             int handle = _padStreams[padIndex];
             if (handle == 0) return;
 
-            // The effect is hung on whatever that pad is playing now. A pad with nothing
-            // loaded gets it when its next stream is made.
             if (insert == null) RemoveDspLocked(padIndex, handle);
             else AttachDspLocked(padIndex, handle);
         }
     }
 
+    /// <inheritdoc/>
     public Plugins.IAudioInsert? GetPadInsert(int padIndex)
     {
         lock (_lock) return InRange(padIndex) ? _padInserts[padIndex] : null;
     }
 
-    /// <summary>
-    /// The rate a pad's audio runs at. A plugin works out its filters from the rate it was
-    /// given, so it has to be told the rate of the thing it is actually processing, which for
-    /// a pad is the file's own rate rather than the device's.
-    /// </summary>
+    /// <inheritdoc/>
     public int PadSampleRate(int padIndex)
     {
         lock (_lock)
@@ -619,6 +682,7 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </summary>
     private const int MaxDspFrames = 8192;
 
+    /// <summary>Takes the effect's hook off a pad's stream. Called holding the lock.</summary>
     private void RemoveDspLocked(int padIndex, int handle)
     {
         if (_padDsp[padIndex] == 0) return;
@@ -635,15 +699,25 @@ public sealed class BassAudioEngine : IAudioEngine
     /// created as float for exactly this reason: a 16 bit stream would mean converting a
     /// buffer twice per block for no reason. A mono pad is widened into a stereo scratch and
     /// folded back afterwards, because an effect is a stereo thing.
+    ///
+    /// Nothing here takes the lock. This runs on the audio thread while another thread may be
+    /// holding it inside a BASS call, and BASS waits for this callback to return: waiting for
+    /// that lock here is a deadlock. The arrays are only ever swapped by a resize, which stops
+    /// everything first, so a local copy of each reference is enough.
+    ///
+    /// The audio is worked through in pieces and never skipped. The first block BASS asks for is
+    /// the whole playback buffer, half a second of it, which is far more than the working buffer
+    /// holds, and a block passed over would be the start of every pad playing dry.
     /// </remarks>
+    /// <param name="handle">The hook this came from.</param>
+    /// <param name="channel">The channel being played.</param>
+    /// <param name="buffer">The samples, changed where they lie.</param>
+    /// <param name="length">How many bytes of them there are.</param>
+    /// <param name="user">Which pad it is, as it was handed over when the hook was hung.</param>
     private void OnPadDsp(int handle, int channel, IntPtr buffer, int length, IntPtr user)
     {
         int padIndex = user.ToInt32();
 
-        // Read without taking the lock. This runs on the audio thread while the UI thread may
-        // be holding the lock inside a BASS call, and BASS waits for this callback to return.
-        // Waiting for that lock here is a deadlock; the arrays are only ever swapped by a
-        // resize, which stops everything first, so a local copy of the reference is enough.
         var inserts = _padInserts;
         var scratchpads = _padScratch;
         var counts = _padChannels;
@@ -666,9 +740,6 @@ public sealed class BassAudioEngine : IAudioEngine
 
         int most = scratch.Length / 2;
 
-        // In pieces, never skipped. The first block BASS asks for is the whole playback
-        // buffer, half a second of it, which is far more than the working buffer holds; a
-        // block passed over would be the start of every pad playing dry.
         for (int start = 0; start < frames; start += most)
         {
             int take = Math.Min(most, frames - start);
@@ -680,6 +751,15 @@ public sealed class BassAudioEngine : IAudioEngine
     /// One piece of a block: out of the channel's buffer, through the effect, and back in.
     /// Returns false when the effect fell over, which costs the rest of that block only.
     /// </summary>
+    /// <remarks>
+    /// More than two channels on a pad is unusual and the ones past the second are left alone.
+    /// </remarks>
+    /// <param name="insert">The effect.</param>
+    /// <param name="scratch">The stereo buffer to work in, which is the pad's own.</param>
+    /// <param name="buffer">The channel's samples.</param>
+    /// <param name="start">Which frame of them this piece begins at.</param>
+    /// <param name="frames">How many frames this piece holds.</param>
+    /// <param name="channels">How many channels the pad's stream carries.</param>
     private static unsafe bool ProcessPadBlock(
         Plugins.IAudioInsert insert,
         float[] scratch,
@@ -713,7 +793,6 @@ public sealed class BassAudioEngine : IAudioEngine
         }
         catch (Exception)
         {
-            // A managed fault in an effect costs this block, not the pad.
             return false;
         }
 
@@ -724,7 +803,6 @@ public sealed class BassAudioEngine : IAudioEngine
         }
         else
         {
-            // More than two channels on a pad is unusual; the rest are left alone.
             for (int frame = 0; frame < frames; frame++)
             {
                 audio[frame * channels] = scratch[frame * 2];
@@ -735,6 +813,7 @@ public sealed class BassAudioEngine : IAudioEngine
         return true;
     }
 
+    /// <inheritdoc/>
     public void Resize(int newPadCount)
     {
         lock (_lock)
@@ -768,6 +847,7 @@ public sealed class BassAudioEngine : IAudioEngine
         }
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         lock (_lock)

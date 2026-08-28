@@ -27,27 +27,36 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;
 
+    /// <summary>
+    /// Builds the page and wires the panel preview, the drag, and the tinting.
+    /// </summary>
+    /// <remarks>
+    /// A take is picked the way it is picked everywhere else in the application, by the dialog
+    /// with the categories and the search in it. The panel only says which setting wants one.
+    ///
+    /// A handle dragged on the panel writes the size onto the machine itself, so the rest of the
+    /// page has to hear about it: the property rows are showing the size it used to be.
+    ///
+    /// The drag is this page's own from press to release, which is why the moving and the
+    /// letting go are watched here rather than left to the toolkit's drag and drop. See
+    /// <see cref="Carry"/> for the three reasons.
+    ///
+    /// The preview is painted in the machine's own colours, so it is repainted whenever another
+    /// machine is opened and mixed again when the theme moves under both.
+    /// </remarks>
     public MachineEditorView()
     {
         InitializeComponent();
 
         _ghost = new DragGhost(GhostLayer);
 
-        // A take is picked the way it is picked everywhere else in the app, by the dialog with
-        // the categories and the search in it. The panel only says which setting wants one.
         PanelCanvas.TakeWanted += PickTake;
 
-        // A handle dragged on the panel writes the size onto the machine itself, so the rest of
-        // the page has to hear about it: the property rows are showing the size it used to be.
         PanelCanvas.Resized += (_, element) => Editor?.Resized(element);
 
-        // The drag is ours from press to release, so the moving and the letting go are watched
-        // here rather than left to the system's own drag and drop.
         AddHandler(PointerMovedEvent, Carrying_PointerMoved, RoutingStrategies.Tunnel);
         AddHandler(PointerReleasedEvent, Carrying_PointerReleased, RoutingStrategies.Tunnel);
 
-        // The preview is painted in the machine's own colours, so it is repainted whenever
-        // another machine is opened, and mixed again when the theme moves under both.
         DataContextChanged += (_, _) => Watch();
         UI.ThemeManager.Changed += Later;
         DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
@@ -56,6 +65,10 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// <summary>What the tint is following, so it can stop following the machine before it.</summary>
     private System.ComponentModel.INotifyPropertyChanged? _watched;
 
+    /// <summary>
+    /// Listens to whichever editor the page has been given, and lets go of the one before, so
+    /// the tint follows the machine that is open rather than every machine ever opened.
+    /// </summary>
     private void Watch()
     {
         if (_watched != null) _watched.PropertyChanged -= OnEditorChanged;
@@ -67,15 +80,28 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         Retint();
     }
 
+    /// <summary>
+    /// Repaints the preview when the machine changes, or when its colour does.
+    /// </summary>
+    /// <remarks>
+    /// The colour as well as the machine, because the colour is picked here: the panel beside
+    /// the picker is the whole of the feedback, and a panel that only recoloured on opening
+    /// would mean choosing a colour by saving and looking.
+    /// </remarks>
     private void OnEditorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        // The colour as well as the machine, because the colour is picked here: the panel beside
-        // the picker is the whole of the feedback, and a panel that only recoloured on opening
-        // would mean choosing a colour by saving and looking.
         if (e.PropertyName is nameof(MachineEditorViewModel.Project)
             or nameof(MachineEditorViewModel.Accent)) Retint();
     }
 
+    /// <summary>
+    /// Repainted after the theme swap has settled rather than during it.
+    /// </summary>
+    /// <remarks>
+    /// The shades are mixed against the theme's own colours, and read in the middle of the swap
+    /// those are still the old theme's: the preview came out of a light theme still wearing
+    /// light cards on a dark page.
+    /// </remarks>
     private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
 
     /// <summary>Puts the machine's colours on the plate, so it looks like the box it is.</summary>
@@ -185,8 +211,13 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     }
 
 
+    /// <summary>
+    /// The machine being built, reached through the application's view model because this page
+    /// is shown inside it rather than given an editor of its own.
+    /// </summary>
     private MachineEditorViewModel? Editor => (DataContext as MainViewModel)?.MachineEditor;
 
+    /// <summary>Opens a machine project, which is a folder on somebody's disc.</summary>
     private async void Open_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { } editor) return;
@@ -214,6 +245,15 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         _ => false
     };
 
+    /// <summary>
+    /// Does what the keyboard asked of the machine editor.
+    /// </summary>
+    /// <remarks>
+    /// Undo and redo put the step back into the project that is already open rather than
+    /// replacing it, so every wrapper on screen is still pointed at the elements that were there
+    /// a moment ago; hanging them off the tree again is what makes the panel show what the
+    /// machine now says.
+    /// </remarks>
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
         if (Editor is not { } editor) return;
@@ -228,9 +268,6 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
                 editor.RemoveElementCommand.Execute(null);
                 break;
 
-            // The step goes back into the project that is open, so every wrapper on screen is
-            // still pointed at the elements that were there a moment ago. Hanging them off the
-            // tree again is what makes the panel show what the machine now says.
             case Shortcuts.ShortcutAction.Undo when editor.History.Undo(editor.Project):
                 editor.Rewrap();
                 break;
@@ -252,6 +289,14 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// </remarks>
     private void Machine_Changed(object? sender, RoutedEventArgs e) => Editor?.Redraw();
 
+    /// <summary>
+    /// Reads the machine back off the disc as it was last saved, asked first.
+    /// </summary>
+    /// <remarks>
+    /// The undo history goes with it, which the question says, because the steps are the
+    /// machine's own JSON and putting one back after the file has been reread would restore a
+    /// version of a machine nobody is looking at any more.
+    /// </remarks>
     private async void Cancel_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { } editor || !editor.CanCancelChanges) return;
@@ -265,6 +310,13 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         if (confirmed) editor.CancelChanges();
     }
 
+    /// <summary>
+    /// Writes the machine to its folder, asking for one the first time.
+    /// </summary>
+    /// <remarks>
+    /// The asking is why saving is answered by the view rather than by the view model: a machine
+    /// that has never had a folder has to be asked where to go, and asking is a window's job.
+    /// </remarks>
     private async void Save_Click(object? sender, RoutedEventArgs e)
     {
         if (Editor is not { } editor || editor.Project == null) return;
@@ -427,9 +479,14 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// </remarks>
     private sealed record Carrying(string? Kind, MachineElementViewModel? Element, Point From)
     {
+        /// <summary>
+        /// Set once the hand has travelled far enough for this to be a drag. Mutable on a
+        /// record because the answer changes during one gesture and the rest of it does not.
+        /// </summary>
         public bool Moved { get; set; }
     }
 
+    /// <summary>What the hand has hold of, or nothing when it has hold of nothing.</summary>
     private Carrying? _carrying;
 
     /// <summary>How far the hand has to move before it is carrying something rather than pressing it.</summary>
@@ -453,6 +510,18 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     }
 
     /// <summary>The ghost follows the hand, and whatever it is over is marked.</summary>
+    /// <remarks>
+    /// A press that has not really moved is still a press: starting the ghost on the first pixel
+    /// would mean a click on a part flashing a picture of itself across the page. See
+    /// <see cref="Threshold"/>.
+    ///
+    /// Whether letting go here would land is asked while the hand is still moving, so the
+    /// picture can say the answer rather than leaving it to be found out by letting go. It is
+    /// the same <see cref="Takes"/> the release asks.
+    ///
+    /// The line the panel draws is where among the others the part would go, which is the whole
+    /// of how somebody says "after that one".
+    /// </remarks>
     private void Carrying_PointerMoved(object? sender, PointerEventArgs e)
     {
         if (_carrying is not { } carrying) return;
@@ -461,8 +530,6 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         if (!carrying.Moved)
         {
-            // A press that has not really moved is a press. Starting the ghost on the first
-            // pixel would mean a click on a part flashing a picture of itself across the page.
             if (Math.Abs(at.X - carrying.From.X) < Threshold &&
                 Math.Abs(at.Y - carrying.From.Y) < Threshold) return;
 
@@ -473,19 +540,28 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         MoveGhost(at);
 
-        // The same question the release asks, asked while the hand is still moving so the
-        // picture can say the answer instead of leaving it to be found out by letting go.
         _ghost.Refused = !Takes(at);
 
         var (onPanel, onList) = Under(at);
 
         Mark(onPanel, onList);
 
-        // The line between two parts, which is the whole of how somebody says "after that one".
         PanelCanvas.Landing(Within(this.InputHitTest(at) as Visual, PanelCanvas) ? Inside(at) : null);
     }
 
     /// <summary>Puts down what was being carried, wherever the hand let go.</summary>
+    /// <remarks>
+    /// Let go without ever moving, a part out of the library is added where the selection is,
+    /// which is how one gets added without aiming; something already on the machine stays exactly
+    /// where it is, since the press was somebody picking it to work on.
+    ///
+    /// Let go over neither the machine nor the list, the drop is off. A part that quietly went to
+    /// the root because the hand was over the parameters would be a part somebody has to find and
+    /// take out again, so it says so instead.
+    ///
+    /// On the panel the hand says where among the others, which is what the line was showing. On
+    /// the list it says which container, and the part goes at the end of it.
+    /// </remarks>
     private void Carrying_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (_carrying is not { } carrying) return;
@@ -504,9 +580,6 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         var at = e.GetPosition(this);
         var (onPanel, onList) = Under(at);
 
-        // Let go without ever moving. A part out of the library is added where the selection is,
-        // which is how one gets added without aiming; something already on the machine stays
-        // exactly where it is, since the press was somebody picking it to work on.
         if (!carrying.Moved)
         {
             if (carrying.Kind is { } picked) editor.AddElementCommand.Execute(picked);
@@ -516,9 +589,6 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         var landed = this.InputHitTest(at) as Visual;
 
-        // Let go over neither the machine nor the list, so nothing was aimed at. The drop is off:
-        // a part that quietly went to the root because the hand was over the parameters would be
-        // a part somebody has to find and take out again.
         if (!Takes(at))
         {
             editor.Status = "Dropped nowhere, so nothing moved.";
@@ -526,8 +596,6 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
             return;
         }
 
-        // On the panel the hand says where among the others, which is what the line was showing.
-        // On the list it says which container, and the part goes at the end of it.
         var (into, place) = Within(landed, PanelCanvas)
             ? PanelCanvas.Where(Inside(at))
             : (onList?.Element, -1);
@@ -555,6 +623,10 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     }
 
     /// <summary>What the hand is over: an element on the panel, or a line of the list.</summary>
+    /// <remarks>
+    /// Over the panel but over nothing in particular means the machine itself, which is where a
+    /// part let go over open space goes.
+    /// </remarks>
     private (Machines.MachineElement?, ViewModels.MachineElementViewModel?) Under(Point at)
     {
         var hit = this.InputHitTest(at) as Visual;
@@ -563,13 +635,19 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         if (Row(hit) is { } row) return (null, row);
 
-        // Over the panel but over nothing in particular means the machine itself, which is where
-        // a part let go over open space goes.
         if (Within(hit, PanelCanvas)) return (PanelCanvas.ElementAt(hit) ?? Editor?.Project?.Panel.Root, null);
 
         return (null, null);
     }
 
+    /// <summary>
+    /// Whether one visual is inside another, walked up the tree.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than hit-testing the holder directly, because what is under the pointer is a
+    /// knob or a row deep inside the panel, and the question being asked is which of the two
+    /// surfaces it belongs to.
+    /// </remarks>
     private static bool Within(Visual? at, Visual holder)
     {
         for (; at != null; at = Avalonia.VisualTree.VisualExtensions.GetVisualParent(at))
@@ -620,6 +698,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
         _ghost.Show(inside);
     }
 
+    /// <summary>Moves the picture in the hand, in the page's own coordinates, where the layer is.</summary>
     private void MoveGhost(Point at) => _ghost.MoveTo(at);
 
     /// <summary>The same point, said in the panel's own coordinates.</summary>
@@ -631,6 +710,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     private Point Inside(Point at) =>
         this.TranslatePoint(at, PanelCanvas) ?? at;
 
+    /// <summary>Takes the picture out of the hand, whether the drag landed or was abandoned.</summary>
     private void HideGhost() => _ghost.Hide();
 
 
@@ -703,6 +783,9 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     /// after an afternoon of anything else is a folder with no machines in it and three levels
     /// to climb out of. So it starts beside the machine already open, which is the folder the
     /// others are in, and at the installed machines when there is none.
+    ///
+    /// Where the machine landed is remembered, so a second machine opened out of somebody else's
+    /// folder does not send you back to this one.
     /// </remarks>
     private async System.Threading.Tasks.Task<string?> PickFolder(string title)
     {
@@ -719,14 +802,17 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
 
         string? landed = picked.Count == 0 ? null : picked[0].TryGetLocalPath();
 
-        // Where the next one starts, so a second machine opened out of somebody else's folder
-        // does not send you back to this one.
         if (landed is { Length: > 0 } && Path.GetDirectoryName(landed) is { Length: > 0 } home) _lastHome = home;
 
         return landed;
     }
 
     /// <summary>Where machines were last seen: beside the one open, or the installed ones.</summary>
+    /// <remarks>
+    /// Tried in turn, and a path the platform will not make a folder of is a path to pass over,
+    /// since the next one may work. None of them working leaves the system's own last folder,
+    /// which is where this started.
+    /// </remarks>
     private async System.Threading.Tasks.Task<IStorageFolder?> Among(IStorageProvider storage)
     {
         foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Tracker.Machines.MachineRegistry.Installed })
@@ -737,12 +823,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
             {
                 if (await storage.TryGetFolderFromPathAsync(home) is { } folder) return folder;
             }
-            catch (Exception)
-            {
-                // A path the platform will not make a folder of is a path to pass over, and the
-                // next one may work. None of them working is the system's own last folder, which
-                // is where this started.
-            }
+            catch (Exception) { }
         }
 
         return null;
@@ -752,5 +833,9 @@ public partial class MachineEditorView : UserControl, Shortcuts.IShortcutContext
     private static string? Beside(string? machine) =>
         machine is { Length: > 0 } ? Path.GetDirectoryName(machine) : null;
 
+    /// <summary>
+    /// The folder the last machine was opened out of, which is where the next one starts. Not
+    /// stored: it is about this session's afternoon rather than about the installation.
+    /// </summary>
     private string? _lastHome;
 }

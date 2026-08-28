@@ -16,8 +16,10 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MixerIsolationTests
 {
+    /// <summary>The sample rate everything here is rendered at.</summary>
     private const int Rate = 44100;
 
+    /// <summary>One block, in frames. Long enough for a level to be worth reading off.</summary>
     private const int Frames = 512;
 
     /// <summary>A patch that certainly makes a noise: on at once and staying on.</summary>
@@ -29,6 +31,11 @@ public class MixerIsolationTests
         ReleaseMs = 500
     };
 
+    /// <summary>
+    /// A mixer with one note sounding on one track, one block in, so the meters have something
+    /// to say. Every test that asks about isolation starts from this and then asks about the
+    /// other tracks.
+    /// </summary>
     private static TrackMixer Playing(int track)
     {
         var mixer = new TrackMixer(Rate);
@@ -39,6 +46,9 @@ public class MixerIsolationTests
         return mixer;
     }
 
+    /// <summary>
+    /// A note lands on the strip it was aimed at, which is the easy half of the question.
+    /// </summary>
     [Fact]
     public void A_note_on_one_track_sounds_on_that_track()
     {
@@ -47,6 +57,7 @@ public class MixerIsolationTests
         Assert.True(mixer.LevelFor(0).Left > 0);
     }
 
+    /// <summary>And on no other strip, which is the half that goes wrong quietly.</summary>
     /// <remarks>
     /// The whole question. A voice carries the track it belongs to, and every buffer, level and
     /// ducker is indexed by that number; one off anywhere and a note would be heard on the wrong
@@ -64,6 +75,7 @@ public class MixerIsolationTests
         }
     }
 
+    /// <summary>A fader on one strip does not reach the audio of another.</summary>
     /// <remarks>
     /// A level belongs to its own track. Turning another one down used to be the cheapest way to
     /// find out it did not, and now it is a test instead.
@@ -80,6 +92,10 @@ public class MixerIsolationTests
         Assert.True(mixer.LevelFor(2).Left > 0);
     }
 
+    /// <summary>
+    /// And a fader pulled to nothing does silence its own track, so the test above it is not
+    /// passing by accident.
+    /// </summary>
     [Fact]
     public void And_turning_this_one_down_silences_it()
     {
@@ -96,6 +112,7 @@ public class MixerIsolationTests
         Assert.Equal(0, loudest, 4);
     }
 
+    /// <summary>A preview that names no track moves no strip's meter.</summary>
     /// <remarks>
     /// A note played by hand belongs to nobody's track. It carries no track number at all, so a
     /// panel's keyboard cannot be heard on a strip, and a strip's fader cannot turn it down.
@@ -112,6 +129,7 @@ public class MixerIsolationTests
             Assert.Equal(0, mixer.LevelFor(track).Left);
     }
 
+    /// <summary>The master fader is heard in what leaves the mixer.</summary>
     /// <remarks>
     /// The master is the last thing between the mix and the card, so what it is set to has to be
     /// audible in what leaves rather than in what any one track is doing.
@@ -132,6 +150,7 @@ public class MixerIsolationTests
         Assert.Equal(0, loudest, 4);
     }
 
+    /// <summary>And it is not a strip: a track's own meter is untouched by it.</summary>
     /// <remarks>
     /// And it is not a track: turning the master down does not turn a track down, which is what
     /// the strip's own meter would show if the two were the same thing.
@@ -147,6 +166,9 @@ public class MixerIsolationTests
         Assert.True(mixer.LevelFor(0).Left > 0);
     }
 
+    /// <summary>
+    /// The master's meter follows the master's fader, since it measures the mix after it.
+    /// </summary>
     [Fact]
     public void The_master_meter_reads_what_is_leaving()
     {
@@ -163,6 +185,9 @@ public class MixerIsolationTests
         Assert.Equal(0, mixer.MasterLevel.Left, 4);
     }
 
+    /// <summary>
+    /// An insert on the master is handed the summed mix, and is the one the mixer holds.
+    /// </summary>
     /// <remarks>
     /// The effect goes before the fader, because a limiter across the mix is put there to catch
     /// what the music does rather than what the hand on the fader does.
@@ -180,12 +205,15 @@ public class MixerIsolationTests
         Assert.Same(heard, mixer.MasterInsert);
     }
 
+    /// <summary>The master's meter goes out when the music does.</summary>
     /// <remarks>
     /// The meter falls when there is nothing left to render, which is the one path that skips
     /// the render altogether. A track's own meter falls by itself, since it is worked out from
     /// the voices that are sounding; the master's is a peak measured off the last buffer, so
     /// without this it holds whatever the last thing to play was and the mixer goes on looking
     /// as though the song were still going.
+    ///
+    /// Two blocks: the first lets the cut fade out, the second finds nothing to render.
     /// </remarks>
     [Fact]
     public void The_master_meter_falls_when_there_is_nothing_left_to_play()
@@ -199,7 +227,6 @@ public class MixerIsolationTests
 
         mixer.StopAll();
 
-        // Two blocks: the first lets the cut fade out, the second finds nothing to render.
         mixer.Render(new float[Frames * 2], Frames);
         mixer.Render(new float[Frames * 2], Frames);
 
@@ -207,6 +234,7 @@ public class MixerIsolationTests
         Assert.Equal(0, mixer.MasterLevel.Right, 4);
     }
 
+    /// <summary>A preview that names a track is that track playing, and only that track.</summary>
     /// <remarks>
     /// A note played by hand on a track is that track playing: it moves the track's own meter
     /// and the master's, and it goes through the track's fader on the way. Without that the
@@ -225,6 +253,9 @@ public class MixerIsolationTests
         Assert.Equal(0, mixer.LevelFor(0).Left);
     }
 
+    /// <summary>
+    /// And it reaches the master too, since it goes through the mix rather than round it.
+    /// </summary>
     [Fact]
     public void And_the_masters()
     {
@@ -236,6 +267,9 @@ public class MixerIsolationTests
         Assert.True(mixer.MasterLevel.Left > 0);
     }
 
+    /// <summary>
+    /// A preview with no track is still heard at the output without touching a strip.
+    /// </summary>
     /// <remarks>
     /// And the rack's keyboard still belongs to nobody's track, because the instrument it is
     /// playing may not be in any song.
@@ -254,6 +288,9 @@ public class MixerIsolationTests
         Assert.True(mixer.MasterLevel.Left > 0);
     }
 
+    /// <summary>
+    /// A master reading is stamped when it is taken and stops being true on its own.
+    /// </summary>
     /// <remarks>
     /// The master's meter is a peak off the last buffer, so it is only true while buffers are
     /// being asked for. It went on showing the last thing that played after the stream stopped,
@@ -269,31 +306,35 @@ public class MixerIsolationTests
         Assert.False(TrackMixer.Fresh(TrackMixer.MeterHoldMs + 1));
     }
 
+    /// <summary>What decides whether the meters are worth reading at all.</summary>
     /// <remarks>
     /// And the meters are polled for as long as something is sounding rather than for as long
     /// as the transport is running. Both faults the user found came from the second rule: the
     /// master sat lit after a pass ended, because the last reading taken was true and no further
     /// one was ever taken, and a note played by hand with the transport stopped moved nothing at
     /// all, because nothing was reading.
+    ///
+    /// A pass between two notes is silent and is not over. A note played by hand needs no pass.
+    /// And the third case is the only one where there is nothing to read.
     /// </remarks>
     [Fact]
     public void Meters_are_read_for_as_long_as_something_is_sounding()
     {
-        // A pass between two notes is silent and is not over.
         Assert.True(TrackMixer.Sounding(playing: true, loudest: 0f));
 
-        // A note played by hand needs no pass.
         Assert.True(TrackMixer.Sounding(playing: false, loudest: 0.2f));
 
-        // And this is the only case where there is nothing to read.
         Assert.False(TrackMixer.Sounding(playing: false, loudest: 0f));
     }
 
+    /// <summary>A strip's meter answers before the transport has ever run.</summary>
     /// <remarks>
     /// A track's meter was bounded by the volume column's memory, which is only made when a pass
     /// starts, so before anybody pressed play there were nought tracks to report on and every
     /// strip read silent. The master does not go through that door, which is why a note played
     /// by hand moved the master's meter and no track's.
+    ///
+    /// The mixer answers for every track a song can have, played or not.
     /// </remarks>
     [Fact]
     public void A_tracks_meter_reads_before_anything_has_been_played()
@@ -303,7 +344,6 @@ public class MixerIsolationTests
         mixer.Preview(Loud(), new Note(60), 1f, 1.0, "by hand", 1);
         mixer.Render(new float[Frames * 2], Frames);
 
-        // The mixer answers for every track a song can have, played or not.
         Assert.True(mixer.LevelFor(1).Left > 0);
         Assert.Equal(0, mixer.LevelFor(JingleBox2.Tracker.Song.MaxTrackCount - 1).Left);
         Assert.Equal(0, mixer.LevelFor(JingleBox2.Tracker.Song.MaxTrackCount).Left);
@@ -312,8 +352,10 @@ public class MixerIsolationTests
     /// <summary>An effect that listens and passes the audio through untouched.</summary>
     private sealed class Listener : JingleBox2.Audio.Plugins.IAudioInsert
     {
+        /// <summary>The loudest sample it has ever been handed, over every block.</summary>
         public float Loudest { get; private set; }
 
+        /// <inheritdoc/>
         public void Process(float[] buffer, int frames)
         {
             for (int i = 0; i < frames * 2; i++)
@@ -324,9 +366,11 @@ public class MixerIsolationTests
     /// <summary>An effect that does nothing, so it can be recognised rather than heard.</summary>
     private sealed class Marker : JingleBox2.Audio.Plugins.IAudioInsert
     {
+        /// <inheritdoc/>
         public void Process(float[] buffer, int frames) { }
     }
 
+    /// <summary>Reordering the tracks carries each track's insert along with it.</summary>
     /// <remarks>
     /// Everything a track sounds through moves with it. The engine keeps seven things keyed by
     /// track number and a reorder has to carry all seven; one left behind and a track would play
@@ -346,6 +390,7 @@ public class MixerIsolationTests
         Assert.Null(mixer.InsertOn(0));
     }
 
+    /// <summary>And a track a move shifted past keeps its own.</summary>
     /// <remarks>
     /// And the tracks it passed over keep theirs, which is the half a shift gets wrong.
     /// </remarks>

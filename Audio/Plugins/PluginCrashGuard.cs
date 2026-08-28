@@ -18,10 +18,16 @@ public enum PluginStage
 /// <summary>One plugin that took the application down, and when.</summary>
 public sealed class PluginCrash
 {
+    /// <summary>Where the bundle was. Half of what identifies the plugin.</summary>
     public string Path { get; set; } = "";
 
+    /// <summary>
+    /// Which class inside the bundle. The other half: one bundle can hold a synth and an effect,
+    /// and one of them crashing says nothing about the other.
+    /// </summary>
     public string Id { get; set; } = "";
 
+    /// <summary>What it is called, so a note about it can be read by a person.</summary>
     public string Name { get; set; } = "";
 
     /// <summary>When it happened, so a note about it can say something better than "once".</summary>
@@ -63,16 +69,40 @@ public static class PluginCrashGuard
     /// </summary>
     public const int SettleSeconds = 6;
 
+    /// <summary>
+    /// The note written before something risky and rubbed out after. Found at the next start, it
+    /// is the whole evidence that the last run did not come back.
+    /// </summary>
     private const string MarkerFile = "plugin-opening.json";
+
+    /// <summary>The standing list of plugins that are not to be tried again.</summary>
     private const string BlockedFile = "plugin-blocked.json";
 
+    /// <summary>Held over every read and write of the lists and the files under them.</summary>
     private static readonly object Gate = new();
+
+    /// <summary>The blocked list in memory, newest first.</summary>
     private static readonly List<PluginCrash> Blocked_ = new();
 
+    /// <summary>
+    /// Where the two files live. Worked out once, and overridable so a test can point it
+    /// somewhere it can throw away.
+    /// </summary>
     private static string? _folder;
+
+    /// <summary>
+    /// True once the files have been read. The read happens once and turns the last run's
+    /// leftover note into a block, so doing it twice would be reading a note that has already
+    /// been acted on and rubbed out.
+    /// </summary>
     private static bool _read;
 
     /// <summary>Where the notes live. The same folder as the rest of the settings.</summary>
+    /// <remarks>
+    /// Nowhere to write means no guard, which is how this worked before there was one, and it
+    /// must not be a reason for the application not to start. So a folder that cannot be made is
+    /// still answered with, and the writes that follow fail quietly.
+    /// </remarks>
     public static string Folder
     {
         get
@@ -88,8 +118,6 @@ public static class PluginCrashGuard
             }
             catch (Exception)
             {
-                // Nowhere to write means no guard, which is how this worked before there was
-                // one. It must not be a reason for the application not to start.
             }
 
             return _folder;
@@ -126,6 +154,11 @@ public static class PluginCrashGuard
     /// Reads what is on disk, once. A note left behind by the last run is turned into a block
     /// here: nothing else could have written it, because it is rubbed out on the way out.
     /// </summary>
+    /// <remarks>
+    /// A note left over from before plugins were given their own processes is not evidence about
+    /// anything any more, and turning it into a block would say a plugin is being kept from its
+    /// window when it is not. Rubbed out instead.
+    /// </remarks>
     private static void Read()
     {
         lock (Gate)
@@ -138,9 +171,6 @@ public static class PluginCrashGuard
             var left = Load<List<PluginCrash>>(MarkerFile);
             if (left == null || left.Count == 0) return;
 
-            // A note left over from before plugins were given their own processes is not
-            // evidence about anything any more, and turning it into a block would say a plugin
-            // is being kept from its window when it is not. Rubbed out instead.
             if (PluginHost.Isolated)
             {
                 Marks.Clear();
@@ -148,8 +178,6 @@ public static class PluginCrashGuard
                 return;
             }
 
-            // The last run died with these in the middle of something. That is what the notes
-            // are for, and the only way they survive a run is if nobody got to rub them out.
             bool added = false;
 
             foreach (var note in left)
@@ -339,6 +367,10 @@ public static class PluginCrashGuard
         }
     }
 
+    /// <summary>
+    /// True when the blocked list already names this plugin. Called with the lock held, which is
+    /// why it does not take one.
+    /// </summary>
     private static bool Holds(string path, string id)
     {
         foreach (var blocked in Blocked_)
@@ -359,6 +391,10 @@ public static class PluginCrashGuard
                string.Equals(leftId, rightId, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Takes the note off. A note that will not come off means one plugin gets blocked that need
+    /// not have been, which is the safe way round and can be undone by hand.
+    /// </summary>
     private static void Rub()
     {
         try
@@ -368,11 +404,13 @@ public static class PluginCrashGuard
         }
         catch (Exception)
         {
-            // A note that will not come off means one plugin gets blocked that need not have
-            // been, which is the safe way round.
         }
     }
 
+    /// <summary>
+    /// Reads one of the two files, or null for one that is missing or unreadable. A note nobody
+    /// can read is no note: it must not stop the application starting.
+    /// </summary>
     private static T? Load<T>(string name) where T : class
     {
         try
@@ -384,11 +422,15 @@ public static class PluginCrashGuard
         }
         catch (Exception)
         {
-            // A note nobody can read is no note.
             return null;
         }
     }
 
+    /// <summary>
+    /// Writes one of the two files, through <c>SafeFile</c> so a run that stops mid-write leaves
+    /// the old one rather than half of a new one. Nowhere to write means no guard, which is not
+    /// a reason to refuse to open a plugin.
+    /// </summary>
     private static void Save(string name, object what)
     {
         try
@@ -398,9 +440,12 @@ public static class PluginCrashGuard
         }
         catch (Exception)
         {
-            // Nowhere to write means no guard. Not a reason to refuse to open a plugin.
         }
     }
 
+    /// <summary>
+    /// Written out readably, because the one thing anybody does with these files by hand is
+    /// look at them to find out why a plugin will not open.
+    /// </summary>
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 }

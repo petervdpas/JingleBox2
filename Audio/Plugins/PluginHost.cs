@@ -18,8 +18,8 @@ namespace JingleBox2.Audio.Plugins;
 public static class PluginHost
 {
     /// <summary>
-    /// True when plugins are given a process of their own. On Linux/Mac only; Windows requires
-    /// in-process loading for proper window embedding.
+    /// True when plugins are given a process of their own, which is Linux and macOS. Windows
+    /// loads them into this one.
     /// </summary>
     /// <remarks>
     /// A plugin in its own process cannot take the application down, so everything the crash
@@ -27,8 +27,12 @@ public static class PluginHost
     /// wrong in a plugin is fatal any more. See <see cref="PluginCrashGuard"/>, which stands
     /// down while this is true.
     ///
-    /// On Windows, the plugin window embedding architecture doesn't support out-of-process plugins.
-    /// VST3 plugins need to run in-process for UI interaction to work properly.
+    /// Windows is the exception because of how a plugin's window is handed over there: the
+    /// embedding used here only works within one process, so a VST3 plugin has to be loaded into
+    /// this one for its own interface to answer a mouse at all.
+    ///
+    /// <c>JB_PLUGINS_INPROCESS=1</c> turns it off everywhere, which is how a plugin is debugged
+    /// with the application's own debugger attached.
     /// </remarks>
     public static bool Isolated => !OperatingSystem.IsWindows() && !InProcessAsked;
 
@@ -36,7 +40,11 @@ public static class PluginHost
     private static bool InProcessAsked =>
         Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) == "1";
 
-    /// <summary>Opens a plugin, whichever standard it speaks.</summary>
+    /// <summary>Opens a plugin as an effect, whichever standard it speaks.</summary>
+    /// <remarks>
+    /// The block size is a promise: a plugin allocates against it and may not be handed a bigger
+    /// one afterwards.
+    /// </remarks>
     public static IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
     {
         return Open(plugin, sampleRate, maxFrames, false) as IPluginEffect;
@@ -50,6 +58,9 @@ public static class PluginHost
     /// of thing that goes wrong on somebody else's machine. Written down before and rubbed out
     /// after, so that a plugin which kills the application on the way in is not tried again on
     /// the way back up. See <see cref="PluginCrashGuard"/>.
+    ///
+    /// None of that applies on the normal path, where the plugin gets a process of its own:
+    /// nothing is written down beforehand because nothing in this process is at risk.
     /// </remarks>
     private static object? Open(PluginInfo? plugin, int sampleRate, int maxFrames, bool asInstrument)
     {
@@ -58,8 +69,6 @@ public static class PluginHost
         Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () =>
             $"Opening {plugin.Name} ({plugin.FormatName}), Isolated={Isolated}, InstrumentMode={asInstrument}");
 
-        // The normal way: the plugin gets a process of its own and nothing it does can reach
-        // this one. Nothing is written down beforehand because nothing here is at risk.
         if (Isolated)
         {
             Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using isolated (out-of-process) loading");
@@ -68,7 +77,6 @@ public static class PluginHost
 
         Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "Using in-process loading");
 
-        // A plugin that killed the last run while loading does not get to load this one.
         if (PluginCrashGuard.IsLoadBlocked(plugin))
         {
             Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => $"Plugin blocked by crash guard");
@@ -181,6 +189,13 @@ public static class PluginHost
     /// which makes a bad one here worse than a bad one anywhere else: it would go off every time
     /// the program started. Out of process it is somebody else's problem, and if the answer does
     /// not arrive the scan comes back empty and the plugins already known about stay known.
+    ///
+    /// The child is given no window and nothing to show in one: it writes a file and goes away.
+    /// Without that, a console flashes up on Windows every time somebody scans.
+    ///
+    /// The application may be running as <c>dotnet something.dll</c> rather than as its own
+    /// executable, in which case the assembly has to be named as the first argument or the child
+    /// would be a bare runtime with nothing to run.
     /// </remarks>
     private static List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders)
     {
@@ -194,8 +209,6 @@ public static class PluginHost
             FileName = self,
             UseShellExecute = false,
 
-            // Nothing to show and nowhere to show it: the child writes a file and goes away.
-            // Without this, a console flashes up on Windows every time somebody scans.
             CreateNoWindow = true,
             WorkingDirectory = AppContext.BaseDirectory
         };
@@ -245,6 +258,14 @@ public static class PluginHost
 
     /// <summary>The scan itself, run wherever it is called: in the child, or in this process
     /// when isolation has been turned off.</summary>
+    /// <remarks>
+    /// Each bundle's reference goes back as soon as it has been asked what it holds. The
+    /// libraries themselves stay loaded for the life of the process, which is deliberate and is
+    /// explained on <see cref="ClapBundle.Dispose"/>.
+    ///
+    /// Sorted by name and then by format, so a vendor who ships both a CLAP and a VST3 of the
+    /// same plugin has them next to each other rather than at opposite ends of the list.
+    /// </remarks>
     internal static List<PluginInfo> ScanHere(IReadOnlyList<string> folders)
     {
         var found = new List<PluginInfo>();
@@ -256,8 +277,6 @@ public static class PluginHost
 
             found.AddRange(bundle.Plugins());
 
-            // The reference goes back straight away. The rack itself stays loaded, which is
-            // deliberate and explained where that is decided.
             bundle.Dispose();
         }
 

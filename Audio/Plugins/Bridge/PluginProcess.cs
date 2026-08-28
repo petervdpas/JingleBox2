@@ -21,20 +21,84 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 internal sealed class PluginProcess : IDisposable
 {
+    /// <summary>How long a wait for one of the child's sockets sits in the kernel before looking up.</summary>
+    private const int AcceptPollMicroseconds = 200_000;
+
+    /// <summary>
+    /// How long disposal waits for the audio thread to come out of the shared block before the
+    /// memory underneath it goes. Longer than any block, and short enough that closing a track
+    /// still feels like closing a track.
+    /// </summary>
+    private const int DrainMilliseconds = 1000;
+
+    /// <summary>How long a child is given to go away politely before it is killed.</summary>
+    private const int QuitMilliseconds = 2000;
+
+    /// <summary>
+    /// One question at a time on the control socket. The answers come back in the order the
+    /// questions went out and nothing in a message says which question it belongs to.
+    /// </summary>
     private readonly object _callGate = new();
+
+    /// <summary>
+    /// Raised by the reader thread when an answer has arrived, and by <see cref="Bury"/> so
+    /// that a plugin dying releases whoever is waiting rather than leaving them on the timeout.
+    /// </summary>
     private readonly SemaphoreSlim _answered = new(0, 1);
+
+    /// <summary>The plugin's process, for its number, its exit code, and killing it.</summary>
     private readonly Process _child;
+
+    /// <summary>Everything that is said, except audio.</summary>
     private readonly BridgeLink _control;
+
+    /// <summary>
+    /// The audio socket, used by the audio thread alone. It exists so a slow question from the
+    /// interface, reading a Serum patch for instance, can never sit in front of a block.
+    /// </summary>
     private readonly BridgeLink _audio;
+
+    /// <summary>Reads the control socket for the life of the process.</summary>
     private readonly Thread _reader;
 
+    /// <summary>
+    /// The last answer read off the control socket. Written by the reader thread and read by
+    /// whoever is waiting on <see cref="_answered"/>, which is the only thing keeping the two
+    /// in order.
+    /// </summary>
     private (BridgeCall Call, byte[] Payload)? _answer;
+
+    /// <summary>
+    /// How many callers are inside the shared block right now. Disposal waits for this to come
+    /// down before the memory underneath them goes.
+    /// </summary>
     private int _rendering;
+
+    /// <summary>
+    /// True until the first block has come back. A plugin does its lazy loading on that block,
+    /// so it is given seconds rather than the audio thread's usual patience.
+    /// </summary>
     private bool _patient = true;
+
+    /// <summary>False once the plugin has gone, whichever thread noticed first.</summary>
     private volatile bool _alive = true;
+
+    /// <summary>
+    /// Set when the process is being closed on purpose, which is what makes the difference
+    /// between a death worth reporting and an ordinary shutdown.
+    /// </summary>
     private volatile bool _stopping;
+
+    /// <summary>What happened to it, in words fit to put on a page. Empty until it has gone.</summary>
     private string _epitaph = "";
 
+    /// <summary>
+    /// Takes a child that is already running with both sockets connected, and starts reading.
+    /// </summary>
+    /// <remarks>
+    /// The operating system telling us the child exited is subscribed to here as well as the
+    /// two sockets noticing, because a process can die without either socket being in use.
+    /// </remarks>
     private PluginProcess(Process child, BridgeLink control, BridgeLink audio, BridgeBlock block, string blockPath)
     {
         _child = child;
@@ -56,6 +120,7 @@ internal sealed class PluginProcess : IDisposable
         _child.Exited += (_, _) => Bury();
     }
 
+    /// <summary>The shared memory the audio crosses in. Only touched between Enter and Leave.</summary>
     public BridgeBlock Block { get; }
 
     /// <summary>Which process the plugin is, for a log or a list of what is running.</summary>
@@ -64,6 +129,7 @@ internal sealed class PluginProcess : IDisposable
         get { try { return _child.Id; } catch (Exception) { return 0; } }
     }
 
+    /// <summary>Where the shared block's file is, which is what the child was told to open.</summary>
     public string BlockPath { get; }
 
     /// <summary>True while the plugin's process is still running and still answering.</summary>
@@ -115,6 +181,13 @@ internal sealed class PluginProcess : IDisposable
     /// will not load, a child that dies on the way up. None of them is worth a crash in the
     /// caller, and all of them mean the same thing, which is that there is no plugin.
     /// </remarks>
+    /// <param name="plugin">Which plugin, and in which format.</param>
+    /// <param name="sampleRate">What the audio is running at on this side.</param>
+    /// <param name="maxFrames">
+    /// The most frames one crossing carries, and the size of the shared block. Held to at least
+    /// sixty four, since a block of a handful of frames costs a crossing for almost no audio.
+    /// </param>
+    /// <param name="asInstrument">True to play notes, false to work on audio handed to it.</param>
     public static PluginProcess? Start(PluginInfo plugin, int sampleRate, int maxFrames, bool asInstrument)
     {
         if (plugin == null) return null;
@@ -206,15 +279,21 @@ internal sealed class PluginProcess : IDisposable
     /// <summary>Everything the plugin exposes, read once when it loaded.</summary>
     public PluginParameter[] Parameters { get; private set; } = Array.Empty<PluginParameter>();
 
+    /// <summary>
+    /// Waits for one of the child's two sockets, or gives up.
+    /// </summary>
+    /// <remarks>
+    /// Accept has no timeout of its own, so the wait is done on the poll and the child is
+    /// looked at between polls: a plugin that dies while loading should cost a moment rather
+    /// than the whole thirty seconds a slow one is allowed.
+    /// </remarks>
     private static Socket? Accept(Socket listener, Process child)
     {
-        // Accept has no timeout of its own, so the wait is done on the poll and the child is
-        // checked while waiting: a plugin that dies on load should not cost thirty seconds.
         var end = DateTime.UtcNow.AddMilliseconds(PluginBridge.StartTimeoutMilliseconds);
 
         while (DateTime.UtcNow < end)
         {
-            if (listener.Poll(200_000, SelectMode.SelectRead)) return listener.Accept();
+            if (listener.Poll(AcceptPollMicroseconds, SelectMode.SelectRead)) return listener.Accept();
 
             if (child.HasExited) return null;
         }
@@ -222,6 +301,10 @@ internal sealed class PluginProcess : IDisposable
         return null;
     }
 
+    /// <summary>
+    /// A fresh name for the pair of sockets. The process number and a new identifier are both
+    /// in it, so two plugins, or two copies of the application, cannot land on the same one.
+    /// </summary>
     private static string SocketPath()
     {
         string folder = Directory.Exists("/tmp") ? "/tmp" : Path.GetTempPath();
@@ -237,7 +320,20 @@ internal sealed class PluginProcess : IDisposable
     /// plugin code in it, and there is nothing extra to install or to keep in step. When the
     /// program was started through the dotnet launcher there is no executable of our own to
     /// run, so the launcher is asked to run the same assembly again.
+    ///
+    /// The window that is asked for is the console and not the plugin's own: without it a black
+    /// box flashes up on Windows for every plugin opened, and it says nothing about what the
+    /// plugin is allowed to draw.
+    ///
+    /// A child logs when the application does, and is told where. It cannot read the setting
+    /// itself because it has no settings, on purpose: it is one plugin and nothing else.
     /// </remarks>
+    /// <param name="plugin">Which plugin, and in which format. Both go on the command line.</param>
+    /// <param name="socketPath">Where the child should connect, twice.</param>
+    /// <param name="blockPath">The shared block's file, which the child maps.</param>
+    /// <param name="sampleRate">What the audio is running at, so both sides agree.</param>
+    /// <param name="maxFrames">The most frames one crossing carries.</param>
+    /// <param name="asInstrument">Whether the child loads it to play notes or to work on audio.</param>
     private static Process? Launch(PluginInfo plugin, string socketPath, string blockPath, int sampleRate, int maxFrames, bool asInstrument)
     {
         string? self = Environment.ProcessPath;
@@ -247,9 +343,6 @@ internal sealed class PluginProcess : IDisposable
         {
             FileName = self,
             UseShellExecute = false,
-
-            // The console, not the plugin's own window: this stops a black box flashing up on
-            // Windows for every plugin opened, and has nothing to say about what the plugin draws.
             CreateNoWindow = true,
             WorkingDirectory = AppContext.BaseDirectory
         };
@@ -274,8 +367,6 @@ internal sealed class PluginProcess : IDisposable
         start.ArgumentList.Add(maxFrames.ToString(System.Globalization.CultureInfo.InvariantCulture));
         start.ArgumentList.Add(asInstrument ? "instrument" : "effect");
 
-        // A child logs when the application does. It cannot read the setting itself: it has no
-        // settings, on purpose.
         if (Diagnostics.Log.On(Diagnostics.LogArea.Plugins))
         {
             start.Environment[PluginBridge.TraceVariable] = "1";
@@ -295,6 +386,10 @@ internal sealed class PluginProcess : IDisposable
         }
     }
 
+    /// <summary>
+    /// Kills a child that never got as far as being a plugin, on the way out of a failed start.
+    /// Nothing is checked, because there is nothing to be done about a kill that fails.
+    /// </summary>
     private static void Stop(Process child)
     {
         try
@@ -348,6 +443,10 @@ internal sealed class PluginProcess : IDisposable
         }
     }
 
+    /// <summary>
+    /// Waits for the reader thread to put an answer down. Null when nothing arrived in time,
+    /// which the caller reads as the plugin having stopped answering.
+    /// </summary>
     private (BridgeCall Call, byte[] Payload)? Answer(int timeout)
     {
         if (!_answered.Wait(timeout)) return null;
@@ -362,6 +461,15 @@ internal sealed class PluginProcess : IDisposable
     /// This is on the audio thread, so everything it does is either already allocated or a
     /// syscall. The wait has a limit: a plugin that has stopped answering costs one late block
     /// and then never again, rather than a locked-up application.
+    ///
+    /// The first block is given seconds because that is where a plugin does its lazy loading.
+    /// Once it has come back the patience drops to something an audio thread can afford, and
+    /// that is set once rather than on every block: it is a call into the kernel, and this is
+    /// the audio thread.
+    ///
+    /// A message is eight bytes each way, the kind in the first and the frame count at the
+    /// fourth. Written by hand on the stack rather than through <see cref="BridgeLink"/>,
+    /// because this is the one path where a message has to cost nothing.
     /// </remarks>
     public bool Render(int frames)
     {
@@ -387,9 +495,6 @@ internal sealed class PluginProcess : IDisposable
                 read += got;
             }
 
-            // After the first block a plugin has done its loading, so the patience drops to
-            // something an audio thread can afford. Set once, not every block: it is a call
-            // into the kernel and this is the audio thread.
             if (_patient)
             {
                 _patient = false;
@@ -413,6 +518,18 @@ internal sealed class PluginProcess : IDisposable
         }
     }
 
+    /// <summary>
+    /// The reader thread: everything the child says, for the life of the process.
+    /// </summary>
+    /// <remarks>
+    /// The three things a plugin says without being asked are raised as events from here, on
+    /// this thread. Everything else is an answer to a question somebody is waiting on, so it is
+    /// put down and the waiter is released. A note is read and dropped: the child writes to the
+    /// same log this process does, so there is nothing left to do with one on this side.
+    ///
+    /// A message that cannot be read means the socket has gone, which means the child has, and
+    /// the thread ends there.
+    /// </remarks>
     private void Read()
     {
         while (true)
@@ -492,6 +609,10 @@ internal sealed class PluginProcess : IDisposable
         if (!_stopping) Died?.Invoke();
     }
 
+    /// <summary>
+    /// What the child exited with, or nought when it cannot be asked. Only read while working
+    /// out an epitaph, so an unknown code costs a few words rather than anything real.
+    /// </summary>
     private int ExitCode()
     {
         try { return _child.HasExited ? _child.ExitCode : 0; }
@@ -512,17 +633,30 @@ internal sealed class PluginProcess : IDisposable
         return " (exit code " + code + ")";
     }
 
+    /// <summary>
+    /// Closes the plugin down on purpose.
+    /// </summary>
+    /// <remarks>
+    /// Marked as stopping first, so <see cref="Bury"/> knows this is not a death worth
+    /// reporting and nobody is told the plugin crashed when it was taken off a track.
+    ///
+    /// Then the door is shut and whoever is already inside the shared block is waited for.
+    /// Nothing new can get in once the plugin is no longer alive, and the memory is only freed
+    /// once the audio thread has come back out of it: freeing it underneath a copy in progress
+    /// is a fault in this process, not in anybody's plugin.
+    ///
+    /// The child is asked to stop and then killed if it will not, which is the only honest way
+    /// to end a conversation with somebody else's code.
+    /// </remarks>
     public void Dispose()
     {
         _stopping = true;
 
         bool was = _alive;
 
-        // Nothing new gets into the shared block from here, and whatever is already in there
-        // is waited for before the memory underneath it goes.
         _alive = false;
 
-        var end = Environment.TickCount64 + 1000;
+        var end = Environment.TickCount64 + DrainMilliseconds;
 
         while (Volatile.Read(ref _rendering) > 0 && Environment.TickCount64 < end) Thread.Sleep(1);
 
@@ -532,7 +666,7 @@ internal sealed class PluginProcess : IDisposable
 
             try
             {
-                if (!_child.WaitForExit(2000)) _child.Kill(entireProcessTree: true);
+                if (!_child.WaitForExit(QuitMilliseconds)) _child.Kill(entireProcessTree: true);
             }
             catch (Exception)
             {

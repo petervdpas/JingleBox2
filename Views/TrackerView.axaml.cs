@@ -15,9 +15,20 @@ using JingleBox2.ViewModels;
 namespace JingleBox2.Views;
 
 /// <summary>
-/// Wiring only. Key handling maps a keystroke to one call on the view model; what the
-/// keystroke means lives in <see cref="KeyboardNoteMap"/> and <see cref="PatternEdit"/>.
+/// The TRACKER page: the pattern, its header, the order, the instruments beside it and the
+/// strips that fold away underneath.
 /// </summary>
+/// <remarks>
+/// Wiring only. Key handling maps a keystroke to one call on the view model; what the keystroke
+/// means lives in <see cref="KeyboardNoteMap"/> and <see cref="PatternEdit"/>, which is what
+/// makes both testable without a window.
+///
+/// Two things here exist because of the toolkit rather than because of the music. The grid is
+/// measured inside the scroll viewer with no height limit and never learns how tall the hole it
+/// is seen through is, so this page measures that and tells it. And the toolkit's own drag and
+/// drop draws nothing at all on X11, so the picture in the hand is this page's own; see
+/// <see cref="DragGhost"/>.
+/// </remarks>
 public partial class TrackerView : UserControl
 {
     /// <summary>
@@ -31,6 +42,7 @@ public partial class TrackerView : UserControl
     public static readonly Avalonia.StyledProperty<MachineRackViewModel?> InstrumentsProperty =
         Avalonia.AvaloniaProperty.Register<TrackerView, MachineRackViewModel?>(nameof(Instruments));
 
+    /// <inheritdoc cref="InstrumentsProperty"/>
     public MachineRackViewModel? Instruments
     {
         get => GetValue(InstrumentsProperty);
@@ -40,6 +52,22 @@ public partial class TrackerView : UserControl
     /// <summary>What is in the hand while something is being dragged. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;
 
+    /// <summary>
+    /// Builds the page and joins the pattern grid, the header, the scroll viewer and the ghost
+    /// layer to each other.
+    /// </summary>
+    /// <remarks>
+    /// The header sits outside the scroll area, so it has to be told how far the pattern has
+    /// scrolled sideways and what character width and row height the grid settled on. Without
+    /// that the names would stand still while the columns under them moved.
+    ///
+    /// The viewport is only real once the window has laid itself out, and it changes again
+    /// whenever the window is resized or a strip under the pattern grows, which is why the half
+    /// view is measured from an announcement rather than worked out once.
+    ///
+    /// The view follows the cursor always, and the playhead only while the transport is
+    /// running.
+    /// </remarks>
     public TrackerView()
     {
         InitializeComponent();
@@ -49,8 +77,6 @@ public partial class TrackerView : UserControl
         Grid.CursorMoved += (_, cursor) => ViewModel?.SetCursor(cursor);
         AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
 
-        // The header sits outside the scroll area, so it has to be told how far the pattern
-        // has scrolled sideways and what character width the grid settled on.
         Header.TrackClicked += (_, track) => SelectTrack(track);
 
         SetUpDragAndDrop();
@@ -64,12 +90,9 @@ public partial class TrackerView : UserControl
             Header.RowHeight = Grid.RowHeight;
         };
 
-        // The viewport is only real once the window has laid itself out, and it changes again
-        // whenever the window is resized or the strip under the pattern grows.
         GridScroll.GetObservable(ScrollViewer.ViewportProperty)
             .Subscribe(new AnonymousObserver<Size>(_ => MeasureHalfView()));
 
-        // Follow the cursor, and follow the player while it is running.
         Grid.GetObservable(PatternGrid.EditCursorProperty)
             .Subscribe(new AnonymousObserver<PatternCursor>(FollowCursor));
 
@@ -77,6 +100,20 @@ public partial class TrackerView : UserControl
             .Subscribe(new AnonymousObserver<int>(FollowPlayhead));
     }
 
+    /// <summary>How many beats a page key moves. A bar in four four, which is what a page means here.</summary>
+    private const int PageBeats = 4;
+
+    /// <summary>
+    /// How far a scroll offset has to differ before it is worth writing.
+    /// </summary>
+    /// <remarks>
+    /// Half a pixel, which is below anything anybody can see. Writing an unchanged offset would
+    /// restart the scroll animation on every keystroke, so a cursor moved down one line would
+    /// jump rather than step.
+    /// </remarks>
+    private const double ScrollSlop = 0.5;
+
+    /// <summary>The song and everything about it, or nothing before the page has been given one.</summary>
     private TrackerViewModel? ViewModel => DataContext as TrackerViewModel;
 
     /// <summary>
@@ -123,20 +160,27 @@ public partial class TrackerView : UserControl
     ///
     /// Both land on the same two surfaces, so which one a drop means comes from the format the
     /// drag carries rather than from where it was let go.
+    ///
+    /// Both presses are bubbled with handledEventsToo, because the list marks the press handled
+    /// once it has updated its selection and the header does the same once it has picked the
+    /// track, and that state is exactly what the drag needs to read.
+    ///
+    /// The whole track column takes a drop, not just its header, so an instrument can be let go
+    /// over the notes it is about to play.
+    ///
+    /// The page takes one too, so the picture in the hand keeps following it over the order
+    /// list, the instruments and the bar at the bottom. Nothing lands there: it only runs where
+    /// neither of the other two has already answered, which is exactly the places where letting
+    /// go would do nothing.
     /// </remarks>
     private void SetUpDragAndDrop()
     {
-        // Bubble with handledEventsToo: the ListBox marks the press handled once it has
-        // updated the selection, which is exactly the state the drag needs to read.
         InstrumentList.AddHandler(PointerPressedEvent, OnInstrumentPointerPressed,
             RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // The header marks the press handled once it has selected the track, so this reads it
-        // the same way and for the same reason.
         Header.AddHandler(PointerPressedEvent, OnHeaderPointerPressed,
             RoutingStrategies.Bubble, handledEventsToo: true);
 
-        // The whole track column takes a drop, not just its header.
         DragDrop.SetAllowDrop(Header, true);
         Header.AddHandler(DragDrop.DragOverEvent, OnHeaderDragOver);
         Header.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
@@ -147,10 +191,6 @@ public partial class TrackerView : UserControl
         Grid.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         Grid.AddHandler(DragDrop.DropEvent, OnGridDrop);
 
-        // And the whole page, so the picture in the hand keeps following it over the order
-        // list, the instruments and the bar at the bottom. Nothing lands here: this only runs
-        // where neither of the two above has already answered, which is exactly the places
-        // where letting go would do nothing.
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, OnPageDragOver);
     }
@@ -174,13 +214,19 @@ public partial class TrackerView : UserControl
         e.DragEffects = DragDropEffects.None;
     }
 
+    /// <summary>
+    /// Picks an instrument up off the list.
+    /// </summary>
+    /// <remarks>
+    /// Releasing without moving simply ends the drag with no effect, so this does not get in the
+    /// way of clicking a row to select it. The picture in the hand is put down in the
+    /// <c>finally</c>, which is the one moment that is always reached: see <see cref="LetGo"/>.
+    /// </remarks>
     private async void OnInstrumentPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (!e.GetCurrentPoint(InstrumentList).Properties.IsLeftButtonPressed) return;
         if (InstrumentList.SelectedItem is not InstrumentSlot slot) return;
 
-        // Releasing without moving simply ends the drag with no effect, so this does not get
-        // in the way of clicking a row to select it.
         try
         {
             await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
@@ -226,12 +272,16 @@ public partial class TrackerView : UserControl
         }
     }
 
+    /// <summary>The hand is over the header, so the track is read off the column it is on.</summary>
     private void OnHeaderDragOver(object? sender, DragEventArgs e)
     {
         Carry(e);
         HandleDragOver(e, Header.TrackAtPoint(e.GetPosition(Header)));
     }
 
+    /// <summary>
+    /// The hand is over the notes, which names the same track the column above it does.
+    /// </summary>
     private void OnGridDragOver(object? sender, DragEventArgs e)
     {
         Carry(e);
@@ -280,6 +330,15 @@ public partial class TrackerView : UserControl
         return slot == null ? null : Picture(slot.Name, slot.DetailText, slot.Colour);
     }
 
+    /// <summary>
+    /// Builds the card that is drawn in the hand: the name, the sentence under it, and the
+    /// machine's colour down the side.
+    /// </summary>
+    /// <remarks>
+    /// Built here rather than templated, because the ghost layer is a canvas over the page and
+    /// takes a control rather than a data context. A track being moved has no colour and no
+    /// sentence, so it comes out as the name alone.
+    /// </remarks>
     private static Control Picture(string name, string detail, string colour)
     {
         var lines = new StackPanel { Spacing = 1 };
@@ -310,12 +369,27 @@ public partial class TrackerView : UserControl
         return row;
     }
 
+    /// <summary>Let go over the header, onto the track that column names.</summary>
     private void OnHeaderDrop(object? sender, DragEventArgs e) =>
         HandleDrop(e, Header.TrackAtPoint(e.GetPosition(Header)));
 
+    /// <summary>Let go over the notes, onto the track that column names.</summary>
     private void OnGridDrop(object? sender, DragEventArgs e) =>
         HandleDrop(e, Grid.TrackAtPoint(e.GetPosition(Grid)));
 
+    /// <summary>
+    /// Says whether this track would take what is in the hand, and shows it on both surfaces.
+    /// </summary>
+    /// <remarks>
+    /// Which of the two drags this is comes from the format it carries rather than from where it
+    /// is: a track being moved and an instrument being pointed at a track land on the same two
+    /// surfaces. A track cannot be dropped on itself, which is the one refusal that is about
+    /// what is being carried rather than about where the hand is.
+    ///
+    /// Both surfaces light up together, so the header names the column being targeted even while
+    /// the hand is down among the notes. The event is marked handled either way, which is what
+    /// keeps <see cref="OnPageDragOver"/> to the places where letting go would really do nothing.
+    /// </remarks>
     private void HandleDragOver(DragEventArgs e, int track)
     {
         int moving = TrackDragData.IndexFrom(e.DataTransfer);
@@ -324,7 +398,6 @@ public partial class TrackerView : UserControl
         {
             bool somewhere = track >= 0 && track != moving;
 
-            // Both surfaces light up together, so the header names the column being targeted.
             ShowDropTarget(somewhere ? track : -1);
 
             _ghost.Refused = !somewhere;
@@ -345,12 +418,21 @@ public partial class TrackerView : UserControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Does what letting go there means: moves a track, or points a track at an instrument.
+    /// </summary>
+    /// <remarks>
+    /// A track being moved and an instrument being pointed at a track arrive the same way and
+    /// mean different things, so which it is comes from the format it carries.
+    ///
+    /// The instrument case is awaited rather than left running: pointing a track at an
+    /// instrument asks whether the notes already on it should follow, and that dialog cannot be
+    /// raised from inside the drop itself.
+    /// </remarks>
     private async void HandleDrop(DragEventArgs e, int track)
     {
         ShowDropTarget(-1);
 
-        // A track being moved and an instrument being pointed at a track arrive the same way
-        // and mean different things, so which it is comes from the format it carries.
         int moving = TrackDragData.IndexFrom(e.DataTransfer);
 
         if (moving >= 0)
@@ -365,31 +447,43 @@ public partial class TrackerView : UserControl
 
         e.Handled = true;
 
-        // Awaited rather than left running: binding an instrument to a track asks whether the
-        // notes already on it should follow, and the dialog cannot be raised from inside the
-        // drop itself.
         var model = ViewModel;
         if (model != null) await model.AssignInstrumentToTrack(track, instrument);
     }
 
+    /// <summary>
+    /// The hand has left a surface, so nothing on it is a target any more. The picture in the
+    /// hand is deliberately left alone: it is taken away when the drag itself ends.
+    /// </summary>
     private void OnDragLeave(object? sender, DragEventArgs e) => ShowDropTarget(-1);
 
+    /// <summary>
+    /// Lights one track's column on both surfaces, or none when given a number below nought.
+    /// </summary>
     private void ShowDropTarget(int track)
     {
         Header.DropTargetTrack = track;
         Grid.DropTargetTrack = track;
     }
 
+    /// <summary>
+    /// Keeps the cursor on the middle of the screen and its track in view.
+    /// </summary>
     private void FollowCursor(PatternCursor cursor)
     {
         ScrollToRow(cursor.Line);
         ScrollToTrack(cursor.Track);
     }
 
+    /// <summary>
+    /// Runs the pattern under the playhead while the transport is going.
+    /// </summary>
+    /// <remarks>
+    /// Only while it is actually moving. Chasing it when it is not would yank the view away from
+    /// wherever the cursor was left the moment the transport stopped.
+    /// </remarks>
     private void FollowPlayhead(int line)
     {
-        // Only chase the playhead while it is actually moving, or stopping would yank the
-        // view away from wherever the cursor was left.
         if (line >= 0 && ViewModel?.IsPlaying == true) ScrollToRow(line);
     }
 
@@ -407,13 +501,17 @@ public partial class TrackerView : UserControl
     {
         double half = Math.Max(0, (GridScroll.Viewport.Height - Grid.RowHeight) / 2);
 
-        if (Math.Abs(half - Grid.HalfView) < 0.5) return;
+        if (Math.Abs(half - Grid.HalfView) < ScrollSlop) return;
 
         Grid.HalfView = half;
 
         if (ViewModel is { } model) ScrollToRow(model.Cursor.Line);
     }
 
+    /// <summary>
+    /// Puts a line on the middle of the screen, which is where the line being worked on always
+    /// sits. Line 00 is on the middle exactly as any other row is, with blank above it.
+    /// </summary>
     private void ScrollToRow(int row)
     {
         var pattern = Grid.Pattern;
@@ -425,6 +523,10 @@ public partial class TrackerView : UserControl
         SetScrollOffset(offset, GridScroll.Offset.X);
     }
 
+    /// <summary>
+    /// Brings a track into view sideways, moving as little as will do it: the pattern is not
+    /// centred horizontally, since a track's neighbours are worth seeing.
+    /// </summary>
     private void ScrollToTrack(int track)
     {
         if (Grid.Pattern == null) return;
@@ -435,14 +537,21 @@ public partial class TrackerView : UserControl
         SetScrollOffset(GridScroll.Offset.Y, offset);
     }
 
+    /// <summary>
+    /// Moves the view, and does nothing at all when it is already there. See
+    /// <see cref="ScrollSlop"/> for why an unchanged offset must not be written.
+    /// </summary>
     private void SetScrollOffset(double y, double x)
     {
-        // Writing an unchanged offset would restart the scroll animation on every keystroke.
-        if (Math.Abs(x - GridScroll.Offset.X) < 0.5 && Math.Abs(y - GridScroll.Offset.Y) < 0.5) return;
+        if (Math.Abs(x - GridScroll.Offset.X) < ScrollSlop && Math.Abs(y - GridScroll.Offset.Y) < ScrollSlop) return;
 
         GridScroll.Offset = new Vector(x, y);
     }
 
+    /// <summary>
+    /// Puts the cursor on a track and gives the pattern the keyboard back, so clicking a header
+    /// leaves you able to type straight away.
+    /// </summary>
     private void SelectTrack(int track)
     {
         var vm = ViewModel;
@@ -452,12 +561,24 @@ public partial class TrackerView : UserControl
         Grid.Focus();
     }
 
+    /// <summary>
+    /// Everything typed into the pattern: moving about, the block, and what goes in a cell.
+    /// </summary>
+    /// <remarks>
+    /// Only while the grid has the keyboard, so the same keys on the bar or in a box are that
+    /// control's. Shift with a movement key grows the block instead of moving away from it.
+    ///
+    /// What a key means depends on the column the cursor is in. In the note column the piano
+    /// layout applies and a letter is a note; everywhere else the digit row and A to F type hex
+    /// values, and in the effect column a letter that is not a hex digit is the command itself.
+    /// The rules are in <see cref="KeyboardNoteMap"/>, so this only decides which of them to
+    /// ask.
+    /// </remarks>
     private void OnGridKeyDown(object? sender, KeyEventArgs e)
     {
         var vm = ViewModel;
         if (vm == null || !Grid.IsFocused) return;
 
-        // Shift with a movement key grows the block instead of moving away from it.
         bool extend = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         switch (e.Key)
@@ -466,8 +587,8 @@ public partial class TrackerView : UserControl
             case Key.Down: vm.MoveCursor(1, 0, 0, extend); e.Handled = true; return;
             case Key.Left: vm.MoveCursor(0, extend ? -1 : 0, extend ? 0 : -1, extend); e.Handled = true; return;
             case Key.Right: vm.MoveCursor(0, extend ? 1 : 0, extend ? 0 : 1, extend); e.Handled = true; return;
-            case Key.PageUp: vm.MoveCursor(-vm.LinesPerBeat * 4, 0, 0, extend); e.Handled = true; return;
-            case Key.PageDown: vm.MoveCursor(vm.LinesPerBeat * 4, 0, 0, extend); e.Handled = true; return;
+            case Key.PageUp: vm.MoveCursor(-vm.LinesPerBeat * PageBeats, 0, 0, extend); e.Handled = true; return;
+            case Key.PageDown: vm.MoveCursor(vm.LinesPerBeat * PageBeats, 0, 0, extend); e.Handled = true; return;
             case Key.Tab:
                 vm.MoveCursor(0, extend ? -1 : 1, 0);
                 e.Handled = true;
@@ -505,7 +626,6 @@ public partial class TrackerView : UserControl
 
         if (vm.Cursor.Column == CellColumn.Note)
         {
-            // Only here: on the other columns the digit row types values.
             if (KeyboardNoteMap.IsNoteOffInNotes(key))
             {
                 vm.EnterNoteOff();
@@ -521,7 +641,6 @@ public partial class TrackerView : UserControl
             return;
         }
 
-        // Hex entry for the instrument, volume, and effect parameter columns.
         char typed = KeyToChar(e.Key);
         if (typed != '\0')
         {
@@ -534,8 +653,17 @@ public partial class TrackerView : UserControl
         }
     }
 
+    /// <summary>Whether a letter is one of the six that are also digits in hex.</summary>
     private static bool IsHexLetter(char c) => c is >= 'A' and <= 'F';
 
+    /// <summary>
+    /// The character a key stands for, or nought when it stands for none.
+    /// </summary>
+    /// <remarks>
+    /// Read off the key rather than off the text the toolkit produces, because the pattern takes
+    /// the same characters whatever layout the keyboard is set to: a cell holds hex, and hex is
+    /// the same six letters everywhere.
+    /// </remarks>
     private static char KeyToChar(Key key) => key switch
     {
         >= Key.D0 and <= Key.D9 => (char)('0' + (key - Key.D0)),

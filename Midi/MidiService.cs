@@ -7,23 +7,70 @@ using JingleBox2.Diagnostics;
 
 namespace JingleBox2.Midi;
 
+/// <summary>
+/// The ports, over managed-midi.
+/// </summary>
+/// <remarks>
+/// Everything specific to that library stops here, which is the point of the interface over it.
+/// The library's whole surface is marked obsolete and warns about it, suppressed in the project
+/// file rather than argued with.
+///
+/// Two pieces of state have to be kept per device rather than per service, and both are here for
+/// the same reason: two controllers are two streams and one's habits say nothing about the
+/// other's. Running status, which is the status byte a device stops repeating while a knob is
+/// turned, and the system exclusive message being gathered, which is the only message in MIDI
+/// that can arrive in pieces.
+///
+/// Nothing throws out of here. A device pulled out of its socket mid-session throws on every
+/// call that touches it, and a controller going away is an ordinary event rather than a fault.
+/// </remarks>
 public sealed class MidiService : IMidiService
 {
     #pragma warning disable CS0618
+    /// <summary>The library's door to the system's ports, or null when there is none to be had.</summary>
+    /// <remarks>
+    /// Null on a machine with no MIDI at all, and everything here answers empty or false for
+    /// that rather than refusing to start: an audio pad launcher with no controller plugged in is
+    /// an ordinary way to run this.
+    /// </remarks>
     private readonly IMidiAccess? _access;
     #pragma warning restore CS0618
 
-    // Keyed by the same display name the device list shows, so bindings and open ports match up.
+    /// <summary>
+    /// The open inputs, keyed by the same display name the device list shows.
+    /// </summary>
+    /// <remarks>
+    /// The same name, so a binding stored in the settings and a port that is really open match
+    /// up without a second lookup. See <see cref="DisplayName"/> for why the name is trimmed.
+    /// </remarks>
     private readonly Dictionary<string, OpenPort> _ports = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Around everything a message arriving touches.
+    /// </summary>
+    /// <remarks>
+    /// Ports are opened and closed from the drawing thread and read from whichever thread the
+    /// driver delivers on, and the running status and gathering tables are written from the
+    /// second while SETTINGS may be closing the port from the first.
+    /// </remarks>
     private readonly object _lock = new();
 
+    /// <inheritdoc/>
     public event EventHandler<MidiMessage>? MessageReceived;
 
+    /// <summary>
+    /// Finds the system's MIDI, or settles for there being none.
+    /// </summary>
+    /// <remarks>
+    /// A machine with no MIDI at all, or a library that cannot reach it, leaves
+    /// <see cref="_access"/> null and every method here answering empty or false. Throwing would
+    /// mean the application refusing to start over a controller nobody has plugged in.
+    /// </remarks>
     public MidiService()
     {
         try
         {
-            _access = MidiAccessManager.Default; // IMidiAccess (obsolete warning suppressed via csproj)
+            _access = MidiAccessManager.Default;
         }
         catch
         {
@@ -31,6 +78,7 @@ public sealed class MidiService : IMidiService
         }
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> GetInputDevices()
     {
         if (_access is null) return Array.Empty<string>();
@@ -49,6 +97,7 @@ public sealed class MidiService : IMidiService
         }
     }
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> OpenDevices
     {
         get
@@ -57,6 +106,14 @@ public sealed class MidiService : IMidiService
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A port that is already open answers true without opening a second one, since roles are
+    /// applied by walking the settings and the same device can be reached twice on the way.
+    /// A name the system does not offer is written down along with everything it does offer,
+    /// because the usual reason for it is a name that was stored padded or trimmed differently
+    /// and the two lists side by side is what shows that at a glance.
+    /// </remarks>
     public bool Open(string deviceIdOrName)
     {
         if (_access is null) return false;
@@ -100,8 +157,6 @@ public sealed class MidiService : IMidiService
             return false;
         }
 
-        // The handler closes over the name: that is the only place the port identity is still
-        // known by the time a message arrives.
         EventHandler<MidiReceivedEventArgs> handler = (_, e) => OnMessageReceived(name, e);
 
         lock (_lock)
@@ -139,6 +194,7 @@ public sealed class MidiService : IMidiService
     /// an exception: writing to a screen is a courtesy, and a controller without one is the
     /// ordinary case rather than a fault.
     /// </remarks>
+    /// <inheritdoc/>
     public bool Send(string deviceIdOrName, byte[] bytes)
     {
         if (_access is null || bytes is null || bytes.Length == 0) return false;
@@ -167,14 +223,21 @@ public sealed class MidiService : IMidiService
         {
             Log.Write(LogArea.Midi, () => "port: could not write to '" + name + "': " + sending.Message);
 
-            // Dropped rather than kept, so the next write opens it again: a device unplugged
-            // mid-session leaves a handle that will never work.
             lock (_lock) _outputs.Remove(name);
 
             return false;
         }
     }
 
+    /// <summary>
+    /// Opens a device's output, or answers null when it has none.
+    /// </summary>
+    /// <remarks>
+    /// Null is the ordinary answer rather than the exception: most controllers are input only,
+    /// and writing to a screen is a courtesy. The handle is dropped again by <see cref="Send"/>
+    /// the first time a write fails, so a device unplugged mid-session does not leave a handle
+    /// behind that will never work again.
+    /// </remarks>
     private IMidiOutput? OpenOutput(string name)
     {
         IMidiPortDetails? port;
@@ -237,6 +300,7 @@ public sealed class MidiService : IMidiService
         }
     }
 
+    /// <inheritdoc/>
     public void Close(string deviceIdOrName)
     {
         if (string.IsNullOrWhiteSpace(deviceIdOrName)) return;
@@ -250,6 +314,7 @@ public sealed class MidiService : IMidiService
         Release(port);
     }
 
+    /// <inheritdoc/>
     public void CloseAll()
     {
         List<OpenPort> ports;
@@ -263,8 +328,17 @@ public sealed class MidiService : IMidiService
             Release(port);
     }
 
+    /// <inheritdoc/>
     public void Dispose() => CloseAll();
 
+    /// <summary>
+    /// Unhooks a port and lets it go.
+    /// </summary>
+    /// <remarks>
+    /// Both halves swallow. A device pulled out of its socket throws on the way down as readily
+    /// as on the way up, and it is going away either way; the alternative is an application that
+    /// cannot be closed because a controller was unplugged.
+    /// </remarks>
     private static void Release(OpenPort port)
     {
         try
@@ -273,12 +347,12 @@ public sealed class MidiService : IMidiService
         }
         catch
         {
-            // A device pulled out mid-session can throw on the way down; it is going away anyway.
         }
 
         TryDispose(port.Input);
     }
 
+    /// <summary>Lets a port go, swallowing what an absent device throws.</summary>
     private static void TryDispose(IDisposable port)
     {
         try
@@ -287,7 +361,6 @@ public sealed class MidiService : IMidiService
         }
         catch
         {
-            // Same as above.
         }
     }
 
@@ -351,21 +424,30 @@ public sealed class MidiService : IMidiService
         }
     }
 
-    /// <summary>One message read out of a delivery, said out loud or accounted for.</summary>
+    /// <summary>
+    /// One message read out of a delivery, said out loud or accounted for.
+    /// </summary>
+    /// <remarks>
+    /// The first hop of all, and it writes a line only for what is thrown away here. A message
+    /// that is understood goes on to say for itself what it did; one dropped at the wire is
+    /// silent everywhere else, and from outside, a controller sending nothing looks exactly like
+    /// a controller whose messages we do not know how to read. Telling those two apart is what
+    /// found running status, where every message after the first arrived two bytes long and
+    /// vanished without a word.
+    ///
+    /// What is dropped on purpose is dropped in silence. The clock and active sensing arrive
+    /// dozens of times a second from any device with a sequencer in it, and a piece of a system
+    /// exclusive message arrives whenever one is long; reporting either as unread would drown the
+    /// very lines this log is kept for. See <see cref="Chatter"/>.
+    ///
+    /// A system exclusive message is the one kind printed whole, because they are rare and
+    /// because this is how a device's identity gets into a controller file: plug it in, ask, and
+    /// read the answer out of the log.
+    /// </remarks>
     private void Delivered(string device, MidiMessage? msg, byte[] data, int start, int length)
     {
-
-        // The first hop of all, and only for what is thrown away here. A message that is
-        // understood goes on to say for itself what it did; one dropped at the wire is silent
-        // everywhere else, and a controller sending nothing looks exactly like a controller
-        // whose messages we do not know how to read. Telling those two apart is what found
-        // running status, where every message after the first arrived two bytes long and
-        // vanished without a word.
         if (msg is null)
         {
-            // The clock and active sensing arrive dozens of times a second on any device with a
-            // sequencer in it, and a piece of a system exclusive message arrives whenever one is
-            // long. Reporting either as unread would drown the very lines this log is kept for.
             if (!Chatter(data, start, length))
                 Log.Write(LogArea.Midi, () =>
                     "port: '" + device + "' sent " + Bytes(data, start, length)
@@ -374,8 +456,6 @@ public sealed class MidiService : IMidiService
             return;
         }
 
-        // Rare, and the only kind worth printing whole. It is also how a device's identity gets
-        // into a controller file: plug it in, ask, and read the answer out of the log.
         if (msg.Type == MidiMessageType.SystemExclusive)
             Log.Write(LogArea.Midi, () =>
                 "port: '" + device + "' sent " + Said(msg.Bytes) + ": "
@@ -390,6 +470,10 @@ public sealed class MidiService : IMidiService
     /// <remarks>
     /// Telling those two apart is the whole point of the line this guards. A message nobody
     /// reads is worth a line; the clock is not, at twenty four of them a beat.
+    ///
+    /// Four bytes are chatter by number: 0xF8 clock, 0xF9 which is undefined, 0xFE active sensing
+    /// and 0xFF reset, with 0xFD undefined beside them. Everything below 0x80 is a piece of a
+    /// system exclusive message that has not finished arriving, and 0xF0 is the start of one.
     /// </remarks>
     private bool Chatter(byte[]? data, int start, int length)
     {
@@ -397,10 +481,8 @@ public sealed class MidiService : IMidiService
 
         byte first = data[start];
 
-        // Clock, undefined, active sensing, reset.
         if (first is 0xF8 or 0xF9 or 0xFD or 0xFE or 0xFF) return true;
 
-        // A piece of a system exclusive message that has not finished arriving.
         return first < 0x80 || first == 0xF0;
     }
 
@@ -409,16 +491,20 @@ public sealed class MidiService : IMidiService
     /// Three of them are worth naming and the rest are worth their manufacturer. The identity
     /// reply is the useful one: it is the only name a device has that is the same on every
     /// operating system, and it is what a controller file's identity field is for.
+    ///
+    /// <code>
+    /// F0 7F &lt;device&gt; 06 &lt;command&gt; F7     MIDI Machine Control
+    /// F0 7E &lt;device&gt; 06 01 F7             asks who you are
+    /// F0 7E &lt;device&gt; 06 02 ...  F7        and the answer
+    /// </code>
     /// </remarks>
     private static string Said(byte[]? sysex)
     {
         if (sysex is null || sysex.Length < 4) return "a system exclusive message";
 
-        // F0 7F <device> 06 <command> F7
         if (sysex[1] == 0x7F && sysex.Length > 4 && sysex[3] == 0x06)
             return "MIDI Machine Control, command " + sysex[4].ToString("X2");
 
-        // F0 7E <device> 06 01 F7 asks; 06 02 answers.
         if (sysex[1] == 0x7E && sysex.Length > 4 && sysex[3] == 0x06)
         {
             if (sysex[4] == 0x01) return "an identity request";
@@ -456,7 +542,14 @@ public sealed class MidiService : IMidiService
     /// </remarks>
     private readonly Dictionary<string, byte> _running = new(StringComparer.Ordinal);
 
-    /// <summary>The three realtime bytes that mean something here.</summary>
+    /// <summary>
+    /// The three realtime bytes that mean something here.
+    /// </summary>
+    /// <remarks>
+    /// The transport as the specification has had it since 1983: one byte, no channel, no data.
+    /// Their siblings 0xF8 clock and 0xFE active sensing are dropped at the wire and never become
+    /// a message at all.
+    /// </remarks>
     private const byte Started = 0xFA;
     private const byte Continued = 0xFB;
     private const byte Stopped = 0xFC;
@@ -475,6 +568,7 @@ public sealed class MidiService : IMidiService
     /// <summary>Far more than any of these is, so a broken stream cannot grow without end.</summary>
     private const int TooLong = 4096;
 
+    /// <summary>Whether a system exclusive message from that device is part way through.</summary>
     private bool Building(string device)
     {
         lock (_lock) return _building.ContainsKey(device);
@@ -487,18 +581,23 @@ public sealed class MidiService : IMidiService
     /// Only 0xF7 ends one of these. A realtime byte is allowed to appear inside one and is not
     /// part of it, which is in the specification and is exactly what a device sending clock
     /// does while it answers an identity request. Any other byte with the top bit set means the
-    /// sender abandoned the message part way, which is what a cable being pulled looks like.
+    /// sender abandoned the message part way, which is what a cable being pulled looks like. The
+    /// byte that abandoned it is handed back rather than eaten, because it is the start of
+    /// whatever comes next; a fresh 0xF0 is the common way to see this and is not a fault, only
+    /// the piece before it never having been finished.
+    ///
+    /// It takes everything it was given unless it finds the end of a message inside it, in which
+    /// case what follows in the buffer is the next message's business. Whatever run of messages
+    /// was going is ended: running status does not survive one of these.
     /// </remarks>
     private MidiMessage? Gather(string device, byte[] data, int at, int end, out int used)
     {
         int from = at;
 
-        // Everything left, unless it finds the end of the message inside it.
         used = end - from;
 
         lock (_lock)
         {
-            // Whatever run of messages was going, this ended it.
             _running.Remove(device);
 
             if (!_building.TryGetValue(device, out var so)) _building[device] = so = new List<byte>(16);
@@ -507,16 +606,12 @@ public sealed class MidiService : IMidiService
             {
                 byte b = data[at];
 
-                // Realtime, threaded through the middle of it. Not part of the message.
                 if (b >= 0xF8) continue;
 
                 if (b >= 0x80 && b != 0xF7)
                 {
                     so.Clear();
 
-                    // A fresh one starting is the common way to see this, and it is not a
-                    // fault: the piece before it was simply never finished. The byte is handed
-                    // back rather than eaten, because it is the start of whatever comes next.
                     if (b != 0xF0) { _building.Remove(device); used = at - from; return null; }
                 }
 
@@ -527,8 +622,6 @@ public sealed class MidiService : IMidiService
                     var whole = so.ToArray();
                     _building.Remove(device);
 
-                    // The message ends here, and anything after it in the buffer is the next
-                    // one's business.
                     used = at + 1 - from;
 
                     return new MidiMessage
@@ -542,7 +635,6 @@ public sealed class MidiService : IMidiService
             }
         }
 
-        // More of it to come.
         return null;
     }
 
@@ -569,6 +661,28 @@ public sealed class MidiService : IMidiService
     ///
     /// So whoever is reading walks the buffer, and this is what tells them where the next
     /// message starts.
+    ///
+    /// Three things in here are subtle enough to be worth spelling out, and each of them was a
+    /// fault once or would have been.
+    ///
+    /// Running status: data with no status byte in front of it means the last status that device
+    /// sent still stands. It is in the specification and almost every controller does it while a
+    /// knob is being turned, so without it a knob is a stream of two-byte messages that read as
+    /// nothing at all and only the very first move of the very first knob is ever heard. A byte
+    /// with no status to read it against is stepped over rather than read again for ever.
+    ///
+    /// How many bytes a kind carries: a program change and a channel pressure carry one and
+    /// everything else here carries two. Nothing in this application wants either of them, but
+    /// under running status a wrong length is not one wrong message, it is every message after
+    /// it: reading a one-byte kind as two takes the next message's status byte for a value and
+    /// then loses that message as well.
+    ///
+    /// A pitch bend puts its least significant seven bits first, which is the other way round
+    /// from the rest of MIDI and the easiest thing in this file to write backwards.
+    ///
+    /// Half a message at the end of a buffer is taken and dropped rather than left to be read
+    /// again, since nothing here splits one across two deliveries and so nothing is ever going
+    /// to complete it.
     /// </remarks>
     public MidiMessage? Read(string device, byte[] data, int start, int length, out int used)
     {
@@ -581,7 +695,6 @@ public sealed class MidiService : IMidiService
 
         byte status;
 
-        // The one message with no length, and so the one that can arrive in pieces.
         if (data[at] == 0xF0 || Building(device)) return Gather(device, data, at, end, out used);
 
         if (data[at] >= 0x80)
@@ -589,10 +702,6 @@ public sealed class MidiService : IMidiService
             status = data[at];
             at++;
 
-            // A real time byte can turn up in the middle of anything and changes nothing about
-            // what was being sent. Three of them are the transport and are read; the rest are
-            // the clock and active sensing, which arrive dozens of times a second and say
-            // nothing this application acts on.
             if (status >= 0xF8)
             {
                 used = 1;
@@ -613,13 +722,8 @@ public sealed class MidiService : IMidiService
         }
         else
         {
-            // Data with no status in front of it: the last one this device sent still stands.
-            // Without this, a knob being turned is a stream of two-byte messages that read as
-            // nothing at all, and only the very first move of the very first knob is heard.
             lock (_lock)
             {
-                // Nothing to read it against, so the byte is stepped over rather than read
-                // again for ever.
                 if (!_running.TryGetValue(device, out status)) { used = 1; return null; }
             }
         }
@@ -627,14 +731,8 @@ public sealed class MidiService : IMidiService
         int type = status & 0xF0;
         int channel = (status & 0x0F) + 1;
 
-        // Not every kind carries two. A program change and a channel pressure carry one, and
-        // reading them as two takes the next message's status byte for a value and then loses
-        // that message. Nothing here wants either of them, but running status means a wrong
-        // length is not a wrong message, it is every message after it.
         int wants = type is 0xC0 or 0xD0 ? 1 : 2;
 
-        // Half a message. Nothing here splits one across two deliveries, so what is left is not
-        // going to be completed by anything: it is taken and dropped rather than read again.
         if (at + wants > end) { used = end - start; return null; }
 
         byte d1 = data[at];
@@ -648,13 +746,19 @@ public sealed class MidiService : IMidiService
             0x80 => new MidiMessage { Device = device, Type = MidiMessageType.Note, Channel = channel, Value = d1, Data = d2, IsOn = false },
             0xB0 => new MidiMessage { Device = device, Type = MidiMessageType.ControlChange, Channel = channel, Value = d1, Data = d2, IsOn = d2 > 0 },
 
-            // Least significant seven bits first, which is the other way round from how the
-            // rest of MIDI does it and the easiest thing in this file to write backwards.
             0xE0 => new MidiMessage { Device = device, Type = MidiMessageType.PitchBend, Channel = channel, Value = 0, Data = (d2 << 7) | d1, IsOn = false },
 
             _ => null
         };
     }
 
+    /// <summary>
+    /// One open input and the handler hooked to it.
+    /// </summary>
+    /// <remarks>
+    /// The handler is kept because it has to be taken off again, and it closes over the port's
+    /// name: that closure is the only place the port's identity is still known by the time a
+    /// message arrives, since the library's event says nothing about who sent it.
+    /// </remarks>
     private sealed record OpenPort(IMidiInput Input, EventHandler<MidiReceivedEventArgs> Handler);
 }

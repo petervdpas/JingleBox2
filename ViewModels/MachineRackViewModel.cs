@@ -29,8 +29,13 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
 
+    /// <summary>The shelf itself: one file per instrument, read and written here.</summary>
     private readonly MachineRack _rack;
+
+    /// <summary>How a note is heard, borrowed from the tracker so there is one audio engine.</summary>
     private readonly IInstrumentAudition _audition;
+
+    /// <summary>Your takes, the same list RECORD shows, offered as instrument sources.</summary>
     private readonly ObservableCollection<Recording> _recordings;
 
     /// <summary>Reads a sample down to peaks, so a sample instrument can show its shape.</summary>
@@ -38,10 +43,26 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
     /// <summary>The plugins this machine has, for building an instrument out of one.</summary>
     private readonly PluginLibraryViewModel? _plugins;
+    /// <summary>What holds a write back until the knobs have been still for a moment.</summary>
     private readonly DispatcherTimer _saveTimer;
 
+    /// <summary>The instrument waiting to be written, or null when nothing is.</summary>
+    /// <remarks>
+    /// One at a time, since moving to another instrument writes the last one out on the way past.
+    /// </remarks>
     private TrackerInstrument? _pendingSave;
 
+    /// <summary>
+    /// Reads the rack, brings it to what a rack is, and starts the clocks it needs.
+    /// </summary>
+    /// <remarks>
+    /// The plugin list is watched, because a scan in SETTINGS can happen while this page is open
+    /// and a plugin installed since startup should be offerable without restarting.
+    ///
+    /// The chop editor's cursor runs on the sounding clock, which is running exactly while
+    /// something is sounding. Subscribed once here: it used to be done on every change of
+    /// machine, so after ten switches the cursor was being moved ten times a tick.
+    /// </remarks>
     public MachineRackViewModel(
         MachineRack rack,
         IInstrumentAudition audition,
@@ -55,8 +76,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         _waveforms = waveforms;
         _plugins = plugins;
 
-        // A scan in SETTINGS can happen while this page is open, and a plugin installed since
-        // startup should be offerable without restarting.
         if (plugins != null)
         {
             plugins.Plugins.CollectionChanged += (_, _) =>
@@ -69,9 +88,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         _saveTimer = new DispatcherTimer { Interval = SaveDelay };
         _saveTimer.Tick += (_, _) => Flush();
 
-        // The chop editor's cursor runs on the same clock, which is running exactly while
-        // something is sounding. Subscribed once: this used to be done on every change of
-        // machine, so after ten switches the cursor was being moved ten times a tick.
         Sounding.Ticked += MovePlayhead;
 
         Refresh();
@@ -83,8 +99,10 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// <summary>Raised when the set of instruments changes, so pickers elsewhere follow.</summary>
     public event EventHandler? RackChanged;
 
+    /// <summary>What is on the rack: the machines in the order they are declared, then plugins.</summary>
     public ObservableCollection<RackMachine> Machines { get; } = new();
 
+    /// <summary>Which one is open, and so what the panel below is showing.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMachines))]
     private RackMachine? selected;
@@ -111,8 +129,15 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Made afresh whenever the selection moves, so it is never the last machine's.</remarks>
     [ObservableProperty] private InstrumentEditorViewModel? editor;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The rack's own, not the song's. Nothing plays this page but you, so it only ever moves for
+    /// a note typed above or below what the keyboard is showing.
+    /// </remarks>
     [ObservableProperty] private int octave = 4;
 
     /// <summary>
@@ -130,18 +155,31 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// </summary>
     [ObservableProperty] private double scopeCycles = 2;
 
+    /// <summary>The line along the bottom: what the last thing done here did, or why it did not.</summary>
     [ObservableProperty] private string status = "Ready";
 
     /// <summary>True while this page is on screen, so MIDI notes come here instead of the pattern.</summary>
     [ObservableProperty] private bool isEditing;
 
+    /// <summary>True when something is open, so the page can show the panel rather than a blank.</summary>
     public bool HasMachines => Selected != null;
 
     /// <summary>Recordings offered as instrument sources, shared with the RECORD tab.</summary>
     public ObservableCollection<Recording> AvailableRecordings => _recordings;
 
+    /// <summary>Makes a copy of the open instrument under a name nothing else has.</summary>
+    /// <remarks>Always enabled; with nothing open it says so in the status line instead.</remarks>
     public IRelayCommand DuplicateCommand => new RelayCommand(Duplicate);
+
+    /// <summary>Throws the open instrument away, after asking.</summary>
+    /// <remarks>
+    /// Always enabled, and refuses a machine's own slot with a reason rather than being greyed:
+    /// <see cref="CanDelete"/> is what the button's own look is bound to.
+    /// </remarks>
     public IAsyncRelayCommand DeleteCommand => new AsyncRelayCommand(Delete);
+
+    /// <summary>Plays one note, so what has just been changed can be heard.</summary>
+    /// <remarks>Always enabled; with nothing open it says so in the status line.</remarks>
     public IRelayCommand TestCommand => new RelayCommand(Test);
 
     /// <summary>
@@ -149,15 +187,23 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// </summary>
     public TrackLocationViewModel? Location { get; } = new(null);
 
+    /// <inheritdoc/>
+    /// <remarks>Never, here: the rack edits an instrument nothing is playing.</remarks>
     public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
     public Machines.IMachineLocation? MachineLocation =>
         _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
 
+    /// <inheritdoc cref="MachineLocation"/>
     private Machines.IMachineLocation? _place;
 
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
+    /// <remarks>
+    /// The machines first, in the order they are declared in, and the plugins after them by name.
+    /// A machine's place on the rack is a fact about the program and does not move; a plugin's is
+    /// alphabetical because there is nothing else to sort them by.
+    /// </remarks>
     public void Refresh()
     {
         string? keep = Selected?.Id;
@@ -168,7 +214,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Machines.Clear();
 
-        // The machines first, in the order they are declared in, and the plugins after them.
         foreach (var machine in Machine.Installed)
         {
             var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
@@ -183,22 +228,18 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     }
 
     /// <summary>
-    /// Makes sure every machine installed here has its slot on the shelf.
-    /// </summary>
-    /// <remarks>
-    /// Written once, the first time the rack is opened without them, and then they are
-    /// ordinary files that keep whatever you set on them. Not the same thing as stocking a
-    /// rack with sounds to start from: those are presets and live inside the machine. These
-    /// are the machines themselves.
-    ///
-    /// Installed here, and not simply ours. A machine thrown out in SETTINGS has no panel to
-    /// draw and no presets to offer, so there is nothing a box on the rack could do; its slot
-    /// stays on the shelf untouched and the box comes back when the machine does.
-    /// </remarks>
-    /// <summary>
     /// Brings the shelf to what a rack is: the machines, then the plugins, and nothing else.
     /// </summary>
     /// <remarks>
+    /// Every machine installed here gets its slot on the shelf. Written once, the first time the
+    /// rack is opened without them, and then they are ordinary files that keep whatever you set on
+    /// them. Not the same thing as stocking a rack with sounds to start from: those are presets
+    /// and live inside the machine. These are the machines themselves.
+    ///
+    /// Installed here, and not simply ours. A machine thrown out in SETTINGS has no panel to draw
+    /// and no presets to offer, so there is nothing a box on the rack could do; its slot stays on
+    /// the shelf untouched and the box comes back when the machine does.
+    ///
     /// Anything else comes off. There is no way left to make one, since a machine cannot be
     /// added and there is no duplicating, so what is there came from before the rack and is not
     /// something the program can explain any more.
@@ -273,6 +314,10 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// Both pictures read the same number: the one whole recording a sampler shows, and the
     /// pieces a chopped one shows. A machine has one or the other, never both, so this sets
     /// whichever is there.
+    ///
+    /// Nothing lit is nothing sounding, and this is the last beat of the clock before it stops.
+    /// Asking the engine there would catch a voice still letting go of its release and leave the
+    /// line standing in the middle of the picture with nothing playing.
     /// </remarks>
     private void MovePlayhead()
     {
@@ -280,9 +325,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         if (editor == null) return;
 
-        // Nothing lit is nothing sounding, and this is the last beat of the clock before it
-        // stops. Asking the engine here would catch a voice still letting go of its release and
-        // leave the line standing in the middle of the picture with nothing playing.
         double at = Sounding.Lit.Count == 0 ? -1 : _audition.SamplePosition(0);
 
         editor.Playhead = at;
@@ -302,43 +344,52 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
     public IMachineKeys MachineKeys => _machineKeys ??= new DesignerKeys(this);
 
+    /// <inheritdoc cref="MachineKeys"/>
     private IMachineKeys? _machineKeys;
 
     /// <summary>Which keys are down, which is the application's one monitor of the notes.</summary>
     public Midi.IMidiMonitor? MidiKeys { get; set; }
 
-
     /// <summary>One note from the panel's own keyboard.</summary>
     public void Play(Note note, int volume) => PlayNote(note, volume);
 
-    /// <summary>A note played on the computer keyboard or a MIDI keyboard while editing.</summary>
+    /// <summary>
+    /// A note played on the computer keyboard, on a drawn key, or on the hardware while editing.
+    /// </summary>
+    /// <remarks>
+    /// The key is lit for as long as the note sounds, which for a recording is the recording's own
+    /// length rather than a fixed moment.
+    ///
+    /// What was heard is said in the status line, and so is a key press that could not be played,
+    /// because silence with no explanation is the worst answer to a key press: a silent one is
+    /// otherwise impossible to tell from one that never arrived.
+    /// </remarks>
     public void PlayNote(Note note, int volume = TrackerCell.NoVolume)
     {
         var instrument = Selected?.Instrument;
         if (instrument == null)
         {
-            // Silence with no explanation is the worst answer to a key press.
             Status = "Nothing to play: add an instrument to the rack first.";
             return;
         }
 
         double held = _audition.Audition(instrument, note, volume);
 
-        // Lit for as long as it sounds, which for a recording is the recording's own length.
         Sounding.Struck(note, held > 0 ? held : HoldSeconds);
 
-        // Nothing plays this page but you, so the keyboard only ever moves for a note typed
-        // above or below what it is showing.
         Octave = PanelKeyboard.Reveal(note, Octave);
 
         NoteTrigger++;
 
-        // Say what was heard: a silent key press is otherwise impossible to tell from a key
-        // press that never arrived.
         Status = $"{note} on '{instrument.Name}'";
     }
 
     /// <summary>Writes anything still pending, for leaving the page or closing the app.</summary>
+    /// <remarks>
+    /// A plugin instrument's sound lives inside the plugin, so it is read back out of the running
+    /// one before anything is written. Done here rather than per knob move: it means serialising
+    /// the whole patch, which is a round trip to another process and a third of a megabyte.
+    /// </remarks>
     public void Flush()
     {
         _saveTimer.Stop();
@@ -347,9 +398,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         _pendingSave = null;
         if (instrument == null) return;
 
-        // A plugin instrument's sound lives inside the plugin, so it is read back out of the
-        // running one before anything is written. Done here rather than per knob move: it
-        // means serialising the whole patch, which is not free.
         Editor?.SyncPluginState();
 
         try
@@ -363,28 +411,38 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
+    /// <summary>
+    /// Another machine was picked, so everything the last one had going stops and a fresh panel
+    /// is built.
+    /// </summary>
+    /// <remarks>
+    /// Switching away is a good moment to write: never leave an edit only in memory.
+    ///
+    /// What the machine being left was sounding stops with it. A note played on one panel going on
+    /// under the next one's picture, with that picture's cursor running to it, is one machine
+    /// wearing another's face. Nothing is left lit or running either, so the new panel starts dark
+    /// and still rather than inheriting the last one's key and cursor.
+    ///
+    /// A plugin drawing its own window goes with the instrument that had it, rather than being
+    /// left behind on a page showing somebody else, and the old kit stops watching the keyboard,
+    /// which is now somebody else's.
+    ///
+    /// The keyboard then moves to the piece that is picked, so playing it plays that piece rather
+    /// than whatever happens to live under the octave you were left on.
+    /// </remarks>
     partial void OnSelectedChanged(RackMachine? value)
     {
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanRename));
 
-        // Switching away is a good moment to write: never leave an edit only in memory.
         Flush();
 
-        // What the machine being left was sounding stops with it. A note played on one panel
-        // going on under the next one's picture, with that picture's cursor running to it, is
-        // one machine wearing another's face.
         if (Editor != null) _audition.Silence(Editor.Instrument);
 
-        // And nothing is lit or running any more, so the new panel starts dark and still
-        // rather than inheriting the last one's key and cursor.
         Sounding.Silence();
 
-        // The instrument being left may have had a plugin drawing its own interface. That
-        // window goes with it rather than being left behind on a page showing somebody else.
         Editor?.ClosePlugin();
 
-        // And its pads stop watching the keyboard, which is now somebody else's.
         Editor?.Kit?.Unfollow();
 
         Editor = value == null
@@ -397,11 +455,8 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             ? null
             : new InstrumentPresets(value.Instrument, Reloaded, Editor?.Takes.Shown, Editor?.Takes);
 
-        // A kit lights its own pads, from the same set the keyboard reads.
         Editor?.Kit?.Follow(Sounding);
 
-        // The keyboard shows the keys of the piece in hand, so playing it is playing that
-        // piece rather than whatever happens to live under the octave you were left on.
         Reveal();
         Follow(Editor);
     }
@@ -450,6 +505,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         OnInstrumentEdited();
     }
 
+    /// <summary>Leaving the page writes whatever was still waiting on the clock.</summary>
     partial void OnIsEditingChanged(bool value)
     {
         if (!value) Flush();
@@ -472,16 +528,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     }
 
     /// <summary>
-    /// A new instrument on the picked machine, ready to shape.
-    /// </summary>
-    /// <remarks>
-    /// Starting from a sound you already have is what Duplicate is for. There is no third kind
-    /// of thing to start from: the rack is the shelf of starting points, and every sound on
-    /// it is an instrument like any other.
-    /// </remarks>
-
-
-    /// <summary>
     /// The plugins that can be an instrument here: the ones that take notes, in a format this
     /// host knows how to play. An effect is not offered, and neither is an instrument in a
     /// format that would load and then be silent.
@@ -491,11 +537,18 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             ? System.Array.Empty<Audio.Plugins.PluginInfo>()
             : _plugins.Plugins.Where(Audio.Plugins.PluginHost.CanPlay).ToList();
 
+    /// <summary>True when there is any plugin worth offering, so the menu can be hidden.</summary>
     public bool HasAvailablePlugins => AvailablePlugins.Count > 0;
 
+    /// <summary>Puts a plugin on the rack as an instrument of its own.</summary>
+    /// <remarks>
+    /// Always enabled. A plugin that cannot be played here is refused with a reason in the status
+    /// line, which is more use than a greyed row nobody can ask about.
+    /// </remarks>
     public IRelayCommand<Audio.Plugins.PluginInfo> NewFromPluginCommand =>
         new RelayCommand<Audio.Plugins.PluginInfo>(NewFromPlugin);
 
+    /// <summary>Makes an instrument on that plugin, or says why it cannot be one.</summary>
     private void NewFromPlugin(Audio.Plugins.PluginInfo? plugin)
     {
         if (plugin == null)
@@ -513,7 +566,16 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         Add(TrackerInstrument.CreatePlugin(UniqueName(plugin.Name), plugin));
     }
 
-
+    /// <summary>
+    /// Copies the open instrument, under a name nothing else on the rack has.
+    /// </summary>
+    /// <remarks>
+    /// The copy is given an id of its own rather than the original's, or the rack would hold two
+    /// files claiming to be the same instrument and a song would reach whichever was read last.
+    ///
+    /// This is how a sound is thrown away as well as kept: a machine cannot be deleted, so
+    /// duplicating one and deleting the copy is the whole of what deleting means here.
+    /// </remarks>
     private void Duplicate()
     {
         var source = Selected?.Instrument;
@@ -531,6 +593,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         Add(copy);
     }
 
+    /// <summary>Writes a new instrument to the shelf, puts it on the list and opens it.</summary>
     private void Add(TrackerInstrument instrument)
     {
         try
@@ -550,20 +613,27 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
+    /// <summary>
+    /// Throws an instrument off the rack, after asking.
+    /// </summary>
+    /// <remarks>
+    /// A machine is refused: it is not something you can be without, and duplicating one and
+    /// deleting the copy is how a sound is thrown away.
+    ///
+    /// The file goes for good, so it is asked about first. Songs already using it keep their own
+    /// copy, which is why removing it here cannot silence anything that is already written.
+    /// </remarks>
     private async Task Delete()
     {
         var row = Selected;
         if (row == null) return;
 
-        // A machine is not something you can be without. Duplicating one and deleting the copy
-        // is how you throw a sound away.
         if (row.IsSlot)
         {
             Status = row.Name + " is a machine, not an instrument you made. It cannot be deleted.";
             return;
         }
 
-        // The file goes for good, and other songs may be using it.
         bool confirmed = await ConfirmDialog.AskAsync(
             "Delete instrument",
             $"Delete '{row.Name}' from the rack? Songs that already use it keep their own copy, "
@@ -583,7 +653,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             Machines.Remove(row);
             Selected = Machines.ElementAtOrDefault(Math.Min(index, Machines.Count - 1));
 
-            // Songs already using it keep their copy: removing it here must not silence a song.
             RackChanged?.Invoke(this, EventArgs.Empty);
             Status = $"Deleted '{row.Name}'. Songs that already use it keep their copy.";
         }
@@ -593,6 +662,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         }
     }
 
+    /// <summary>Plays one note at the octave the page is on, so the sound can be judged.</summary>
     private void Test()
     {
         var instrument = Selected?.Instrument;

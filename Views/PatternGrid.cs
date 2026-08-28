@@ -15,20 +15,32 @@ namespace JingleBox2.Views;
 /// controls: a 64 line pattern across 8 tracks is 2048 cells, and one Render pass over the
 /// visible rows costs a fraction of what that many TextBlocks would.
 /// </summary>
+/// <remarks>
+/// The cursor stays on the middle of the screen and the pattern runs under it, which is what
+/// every tracker does and what makes the line you are working on somewhere your eye can rest
+/// rather than a highlight to follow down the page. Always, with no exceptions: line 00 of a
+/// song's first pattern is on the middle exactly as any other row is, and what is above it there
+/// is blank. See <see cref="Pad"/>.
+/// </remarks>
 public sealed class PatternGrid : ThemedControl
 {
+    /// <summary>The pattern being worked on. Edited in place, so its own event is watched too.</summary>
     public static readonly StyledProperty<Pattern?> PatternProperty =
         AvaloniaProperty.Register<PatternGrid, Pattern?>(nameof(Pattern));
 
+    /// <summary>Where typing goes: the line, the track and which column of it.</summary>
     public static readonly StyledProperty<PatternCursor> EditCursorProperty =
         AvaloniaProperty.Register<PatternGrid, PatternCursor>(nameof(EditCursor), PatternCursor.Start);
 
+    /// <inheritdoc cref="PlayingLine"/>
     public static readonly StyledProperty<int> PlayingLineProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(PlayingLine), -1);
 
+    /// <summary>Which rows are shaded: every beat, and more strongly every fourth of them.</summary>
     public static readonly StyledProperty<int> LinesPerBeatProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(LinesPerBeat), TrackerTiming.DefaultLinesPerBeat);
 
+    /// <summary>How tall a line is, which also decides the lettering it is drawn in.</summary>
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternGrid, double>(nameof(RowHeight), 18);
 
@@ -37,6 +49,7 @@ public sealed class PatternGrid : ThemedControl
         AvaloniaProperty.Register<PatternGrid, PatternSelection>(
             nameof(Selection), PatternSelection.None, defaultBindingMode: BindingMode.TwoWay);
 
+    /// <inheritdoc cref="DropTargetTrack"/>
     public static readonly StyledProperty<int> DropTargetTrackProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(DropTargetTrack), -1);
 
@@ -60,6 +73,10 @@ public sealed class PatternGrid : ThemedControl
     public static readonly StyledProperty<double> HalfViewProperty =
         AvaloniaProperty.Register<PatternGrid, double>(nameof(HalfView), 0);
 
+    /// <summary>
+    /// What changes the drawing and what changes the room asked for, and the grid takes the
+    /// keyboard, which is what makes it focusable.
+    /// </summary>
     static PatternGrid()
     {
         AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty, PlayingLineProperty,
@@ -70,30 +87,35 @@ public sealed class PatternGrid : ThemedControl
         FocusableProperty.OverrideDefaultValue<PatternGrid>(true);
     }
 
+    /// <inheritdoc cref="BeforeProperty"/>
     public Pattern? Before
     {
         get => GetValue(BeforeProperty);
         set => SetValue(BeforeProperty, value);
     }
 
+    /// <inheritdoc cref="AfterProperty"/>
     public Pattern? After
     {
         get => GetValue(AfterProperty);
         set => SetValue(AfterProperty, value);
     }
 
+    /// <inheritdoc cref="HalfViewProperty"/>
     public double HalfView
     {
         get => GetValue(HalfViewProperty);
         set => SetValue(HalfViewProperty, value);
     }
 
+    /// <inheritdoc cref="PatternProperty"/>
     public Pattern? Pattern
     {
         get => GetValue(PatternProperty);
         set => SetValue(PatternProperty, value);
     }
 
+    /// <inheritdoc cref="EditCursorProperty"/>
     public PatternCursor EditCursor
     {
         get => GetValue(EditCursorProperty);
@@ -107,25 +129,28 @@ public sealed class PatternGrid : ThemedControl
         set => SetValue(PlayingLineProperty, value);
     }
 
+    /// <inheritdoc cref="LinesPerBeatProperty"/>
     public int LinesPerBeat
     {
         get => GetValue(LinesPerBeatProperty);
         set => SetValue(LinesPerBeatProperty, value);
     }
 
+    /// <inheritdoc cref="RowHeightProperty"/>
     public double RowHeight
     {
         get => GetValue(RowHeightProperty);
         set => SetValue(RowHeightProperty, value);
     }
 
-    /// <summary>The track a drag is hovering, or -1. Drawn as a drop outline down the column.</summary>
+    /// <inheritdoc cref="SelectionProperty"/>
     public PatternSelection Selection
     {
         get => GetValue(SelectionProperty);
         set => SetValue(SelectionProperty, value);
     }
 
+    /// <summary>The track a drag is hovering, or -1. Drawn as a drop outline down the column.</summary>
     public int DropTargetTrack
     {
         get => GetValue(DropTargetTrackProperty);
@@ -147,8 +172,16 @@ public sealed class PatternGrid : ThemedControl
         return metrics.TrackAt(point.X);
     }
 
+    /// <summary>
+    /// One glyph's width in the monospaced face, which every column position is worked out from.
+    /// </summary>
+    /// <remarks>Measured in <see cref="EnsureMetrics"/> rather than assumed.</remarks>
     private double _charWidth = 8;
+
+    /// <summary>The lettering size, taken from the row height so the two cannot disagree.</summary>
     private double _fontSize = 13;
+
+    /// <summary>The monospaced face. A proportional one would not line the columns up at all.</summary>
     private Typeface _typeface = new(FontFamily.Default);
 
     /// <summary>Layout for the pattern currently bound, shared with the header control.</summary>
@@ -167,6 +200,13 @@ public sealed class PatternGrid : ThemedControl
     /// </remarks>
     private double Pad => Math.Max(0, HalfView);
 
+    /// <summary>
+    /// Takes up the pattern's own event, and asks to be measured again.
+    /// </summary>
+    /// <remarks>
+    /// The pattern binding lands after the first measure, so without that the control keeps the
+    /// nought size it was first measured at and the scroll viewer clips it away entirely.
+    /// </remarks>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
@@ -177,12 +217,11 @@ public sealed class PatternGrid : ThemedControl
             Pattern.Changed += OnPatternChanged;
         }
 
-        // The pattern binding lands after the first measure, so without this the control
-        // keeps the zero size it was first measured at and the ScrollViewer clips it away.
         InvalidateMeasure();
         InvalidateVisual();
     }
 
+    /// <summary>Lets go of the pattern's event, since the grid is no longer drawing it.</summary>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -190,14 +229,19 @@ public sealed class PatternGrid : ThemedControl
         if (Pattern != null) Pattern.Changed -= OnPatternChanged;
     }
 
+    /// <summary>
+    /// Moves the subscription from the pattern that was here to the one that is now.
+    /// </summary>
+    /// <remarks>
+    /// Patterns are edited in place, so watching the property alone is not enough: the same
+    /// object grows tracks and gains notes without the reference ever changing.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
         if (change.Property != PatternProperty) return;
 
-        // Patterns are edited in place, so watching the property alone is not enough: the
-        // same object grows tracks and gains notes without the reference ever changing.
         if (change.OldValue is Pattern previous) previous.Changed -= OnPatternChanged;
         if (change.NewValue is Pattern current) current.Changed += OnPatternChanged;
 
@@ -205,12 +249,20 @@ public sealed class PatternGrid : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>The pattern said something: it may have grown, so the room is asked for again.</summary>
     private void OnPatternChanged(object? sender, EventArgs e)
     {
         InvalidateMeasure();
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Every track across, and every line plus half a screen at each end down.
+    /// </summary>
+    /// <remarks>
+    /// Whatever room it is offered, since it is measured inside a scroll viewer with no height
+    /// limit and the whole point is that the pattern is taller than the hole it is seen through.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
         var pattern = Pattern;
@@ -222,6 +274,17 @@ public sealed class PatternGrid : ThemedControl
         return new Size(metrics.ContentWidth, metrics.ContentHeight(pattern.Lines));
     }
 
+    /// <summary>
+    /// The whole page: the track tint, the block, the neighbours, then every visible line with
+    /// its shading and its cells, and the rules, the drop column and the cursor over them.
+    /// </summary>
+    /// <remarks>
+    /// The neighbours are drawn first, so the shading and the cursor of the pattern being worked
+    /// on go over them rather than under.
+    ///
+    /// Before the first arrange the bounds are empty, and then the whole pattern is drawn: that
+    /// is cheaper than culling every row against a size that is not real yet, and it is one pass.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         var pattern = Pattern;
@@ -238,8 +301,6 @@ public sealed class PatternGrid : ThemedControl
 
         double contentHeight = metrics.ContentHeight(pattern.Lines);
 
-        // Before the first arrange the bounds are empty. Drawing the whole pattern is better
-        // than culling every row against a size that is not real yet.
         double visibleHeight = bounds.Height > 0 ? bounds.Height : contentHeight;
         double rowWidth = Math.Max(bounds.Width, metrics.ContentWidth);
 
@@ -252,14 +313,12 @@ public sealed class PatternGrid : ThemedControl
 
         int lpb = Math.Max(1, LinesPerBeat);
 
-        // The neighbours first, so the shading and the cursor of the pattern being worked on
-        // are drawn over them rather than under.
         DrawNeighbours(context, metrics, palette, rowWidth, pattern.Lines);
 
         for (int line = 0; line < pattern.Lines; line++)
         {
             double y = metrics.RowY(line);
-            if (y + RowHeight < 0 || y > visibleHeight) continue; // outside the viewport
+            if (y + RowHeight < 0 || y > visibleHeight) continue;
 
             if (line % (lpb * 4) == 0)
                 context.FillRectangle(barShade, new Rect(0, y, rowWidth, RowHeight));
@@ -316,6 +375,11 @@ public sealed class PatternGrid : ThemedControl
     /// Dimmed rather than drawn plainly, because these rows are context. Nothing here can be
     /// typed into or selected, and a click in it lands on the nearest row of the pattern that
     /// can be: a row that looked the same as the ones you can edit would be a trap.
+    ///
+    /// Faded as a whole rather than by choosing paler colours, so a note that is really there
+    /// still reads as one and an empty cell still reads as empty. Picking the muted colour for
+    /// everything made a neighbour look exactly like an empty pattern, which is the one thing it
+    /// must not look like.
     /// </remarks>
     private void DrawNeighbours(DrawingContext context, PatternMetrics metrics,
         ThemePalette palette, double rowWidth, int lines)
@@ -323,10 +387,6 @@ public sealed class PatternGrid : ThemedControl
         var ghost = palette.MutedBrush;
         var text = palette.TextBrush;
 
-        // Faded as a whole rather than by choosing paler colours, so a note that is really
-        // there still reads as one and an empty cell still reads as empty. Picking the muted
-        // colour for everything made a neighbour look exactly like an empty pattern, which is
-        // the one thing it must not look like.
         using var faded = context.PushOpacity(GhostOpacity);
 
         if (Before is { } before && metrics.TopPad > 0)
@@ -352,6 +412,10 @@ public sealed class PatternGrid : ThemedControl
     /// <summary>How much of a neighbouring pattern comes through.</summary>
     private const double GhostOpacity = 0.4;
 
+    /// <summary>
+    /// One row of a neighbouring pattern, shaded so it reads as a row rather than as loose text
+    /// in the space above or below the pattern.
+    /// </summary>
     private void DrawGhost(DrawingContext context, PatternMetrics metrics, ThemePalette palette,
         Pattern pattern, int line, double y, double rowWidth, IBrush text, IBrush muted)
     {
@@ -396,12 +460,15 @@ public sealed class PatternGrid : ThemedControl
     /// A vertical rule down each track boundary. Without them the columns of a wide pattern
     /// read as one block of text and it is hard to tell which track a note belongs to.
     /// </summary>
+    /// <remarks>
+    /// One after the line numbers, then one at the start of every track, which is why the loop
+    /// runs to the track count inclusive.
+    /// </remarks>
     private static void DrawTrackSeparators(DrawingContext context, PatternMetrics metrics,
         ThemePalette palette, int trackCount, double height)
     {
         var pen = new Pen(palette.BorderBrush, 1);
 
-        // One after the line numbers, then one at the start of every track after the first.
         for (int track = 0; track <= trackCount; track++)
         {
             double x = Math.Round(metrics.TrackDividerX(track)) - 0.5;
@@ -422,6 +489,10 @@ public sealed class PatternGrid : ThemedControl
         context.DrawRectangle(new Pen(palette.AccentBrush, 2), area);
     }
 
+    /// <summary>
+    /// The box round the one column typing goes into, a pixel wider each side than the column so
+    /// the lettering inside it is not touched by its own outline.
+    /// </summary>
     private void DrawCursor(DrawingContext context, PatternMetrics metrics,
         ThemePalette palette, PatternCursor cursor)
     {
@@ -434,6 +505,7 @@ public sealed class PatternGrid : ThemedControl
         context.DrawRectangle(new Pen(palette.AccentBrush, 1), area);
     }
 
+    /// <summary>One piece of lettering, sat on the middle of its row whatever height that is.</summary>
     private void DrawText(DrawingContext context, string text, double x, double y, IBrush brush)
     {
         var formatted = new FormattedText(text, CultureInfo.InvariantCulture,
@@ -442,6 +514,19 @@ public sealed class PatternGrid : ThemedControl
         context.DrawText(formatted, new Point(x, y + (RowHeight - formatted.Height) / 2));
     }
 
+    /// <summary>
+    /// Puts the cursor where the click landed, and decides what happens to the block.
+    /// </summary>
+    /// <remarks>
+    /// Shift keeps the anchor where it was, which is how a block is grown after the fact. A plain
+    /// click puts the cursor down and drops any block, and a drag from there turns into one as
+    /// soon as the pointer moves onto another cell. A right click outside the block works on what
+    /// was clicked rather than on a block that happens to be somewhere else.
+    ///
+    /// A right click moves the cursor too, so the menu that follows acts on the track under the
+    /// pointer, and it is deliberately left unhandled: handling it here swallows the request for
+    /// the menu itself.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -455,7 +540,6 @@ public sealed class PatternGrid : ThemedControl
         var cursor = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
         bool left = e.GetCurrentPoint(this).Properties.IsLeftButtonPressed;
 
-        // Shift keeps the anchor where it was, which is how a block is grown after the fact.
         if (left && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             Selection = Selection.IsEmpty
@@ -464,30 +548,30 @@ public sealed class PatternGrid : ThemedControl
         }
         else if (left)
         {
-            // A plain click puts the cursor down and drops any block. A drag from here turns
-            // into one as soon as the pointer moves onto another cell.
             _dragAnchor = cursor;
             Selection = PatternSelection.None;
         }
         else if (!Selection.Contains(cursor.Line, cursor.Track))
         {
-            // A right click outside the block works on what was clicked, not on the block
-            // that happens to be somewhere else.
             Selection = PatternSelection.None;
         }
 
         EditCursor = cursor;
         CursorMoved?.Invoke(this, cursor);
 
-        // A right click moves the cursor too, so the menu that follows acts on the track
-        // under the pointer. It is deliberately not handled: handling it here swallows the
-        // request for the menu itself.
         e.Handled = left;
     }
 
     /// <summary>Where a left press landed, so a drag from it can become a block.</summary>
     private PatternCursor? _dragAnchor;
 
+    /// <summary>
+    /// Grows the block as the hand moves, once it has really left the cell it started on.
+    /// </summary>
+    /// <remarks>
+    /// A press and a release on one cell is a click and selects nothing, which is why the cell it
+    /// started on is checked rather than the distance moved.
+    /// </remarks>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -499,7 +583,6 @@ public sealed class PatternGrid : ThemedControl
         var point = e.GetPosition(this);
         var at = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
 
-        // Still on the cell it started on: a click, not a drag, and a click selects nothing.
         if (Selection.IsEmpty && at.Line == _dragAnchor.Value.Line && at.Track == _dragAnchor.Value.Track) return;
 
         Selection = Selection.IsEmpty
@@ -511,6 +594,7 @@ public sealed class PatternGrid : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>Lets go of the anchor, so the next move is not read as a continuing drag.</summary>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -518,10 +602,17 @@ public sealed class PatternGrid : ThemedControl
         _dragAnchor = null;
     }
 
+    /// <summary>
+    /// Works out the lettering and measures one glyph of it.
+    /// </summary>
+    /// <remarks>
+    /// A monospaced face is what makes the columns line up, and measuring one glyph gives the
+    /// cell width every column position is worked out from. Measured rather than assumed: the
+    /// face is whatever the system found for the family, and a guessed width would put the
+    /// cursor box beside the cell it is about rather than round it.
+    /// </remarks>
     private void EnsureMetrics()
     {
-        // A monospace face is what makes the columns line up; measuring one glyph gives the
-        // cell width every column position is derived from.
         _fontSize = Math.Max(9, RowHeight - 5);
         _typeface = new Typeface(PatternFont.Family);
 

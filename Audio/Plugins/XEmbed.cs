@@ -18,53 +18,149 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 internal static unsafe class XEmbed
 {
+    /// <summary>
+    /// The X11 client library by its versioned name, since that is what is actually installed;
+    /// the unversioned link belongs to a development package plenty of machines do not have.
+    /// </summary>
     private const string Library = "libX11.so.6";
 
+    /// <summary>
+    /// Opens a connection of our own. Every method here opens one and closes it: the toolkit's
+    /// connection belongs to the toolkit, and using it from another thread is how a program ends
+    /// up with two things writing down one socket.
+    /// </summary>
     [DllImport(Library)] private static extern nint XOpenDisplay(nint name);
+
+    /// <summary>Closes one.</summary>
     [DllImport(Library)] private static extern int XCloseDisplay(nint display);
+
+    /// <summary>
+    /// Sends everything queued and waits for the server to have done it. Needed before asking
+    /// what is inside a window, or the plugin's own window may not have arrived yet.
+    /// </summary>
     [DllImport(Library)] private static extern int XSync(nint display, int discard);
+
+    /// <summary>Sends everything queued without waiting.</summary>
     [DllImport(Library)] private static extern int XFlush(nint display);
+
+    /// <summary>
+    /// A name as the server's own number for it. The last argument asks for one that already
+    /// exists rather than making it, which is how a property nobody has ever set is told apart
+    /// from one set to nothing.
+    /// </summary>
     [DllImport(Library)] private static extern nint XInternAtom(nint display, string name, int onlyIfExists);
+
+    /// <summary>Puts a window on screen. Mapping one that is already mapped does nothing.</summary>
     [DllImport(Library)] private static extern int XMapWindow(nint display, nint window);
+
+    /// <summary>
+    /// A window's parent and its children. The list of children is allocated by the library and
+    /// has to be freed, on every path including the ones that fail.
+    /// </summary>
     [DllImport(Library)] private static extern int XQueryTree(nint display, nint window, out nint root, out nint parent, out nint* children, out uint count);
+
+    /// <summary>Gives back memory the library allocated.</summary>
     [DllImport(Library)] private static extern int XFree(void* data);
+
+    /// <summary>Posts an event to a window as though the server had generated it.</summary>
     [DllImport(Library)] private static extern int XSendEvent(nint display, nint window, int propagate, nint mask, XEvent* send);
+
+    /// <summary>Where a window is, how big, and whether it is on screen.</summary>
     [DllImport(Library)] private static extern int XGetWindowAttributes(nint display, nint window, out XWindowAttributes attributes);
+
+    /// <summary>Which window has the keyboard, for the whole display.</summary>
     [DllImport(Library)] private static extern int XGetInputFocus(nint display, out nint window, out int revertTo);
 
+    /// <summary>
+    /// Reads a property off a window. The data comes back allocated by the library and has to be
+    /// freed.
+    /// </summary>
     [DllImport(Library)]
     private static extern int XGetWindowProperty(
         nint display, nint window, nint property, nint offset, nint length, int delete, nint type,
         out nint actualType, out int actualFormat, out nuint items, out nuint after, out byte* data);
 
+    /// <summary>
+    /// Everything X will say about a window. Written out in full because the layout has to match
+    /// the C header: only the size and the map state are read, but a field left out would move
+    /// every field after it.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     private struct XWindowAttributes
     {
+        /// <summary>Where the window is, in its parent.</summary>
         public int X;
+
+        /// <inheritdoc cref="X"/>
         public int Y;
+
+        /// <summary>
+        /// How big it is. The pair this class exists to ask about: a plugin handed a window that
+        /// is one pixel by one pixel lays itself out against that and never recovers.
+        /// </summary>
         public int Width;
+
+        /// <inheritdoc cref="Width"/>
         public int Height;
+
+        /// <summary>How wide its border is.</summary>
         public int BorderWidth;
+
+        /// <summary>
+        /// How many bits a pixel. Reported in the account of a window that will not draw, since
+        /// a plugin whose visual does not match its parent's is one of the ways that happens.
+        /// </summary>
         public int Depth;
+
+        /// <summary>How the window's colours are laid out. Reported for the same reason.</summary>
         public nint Visual;
+
+        /// <summary>The root window of the screen it is on.</summary>
         public nint Root;
+
+        /// <summary>Whether the window can be drawn into or is only a container.</summary>
         public int Class;
+
+        /// <summary>What happens to the contents when the window is resized.</summary>
         public int BitGravity;
+
+        /// <summary>What happens to the window when its parent is resized.</summary>
         public int WinGravity;
+
+        /// <summary>Whether the server keeps what is under the window.</summary>
         public int BackingStore;
+
+        /// <summary>Which planes of the backing store are kept.</summary>
         public nuint BackingPlanes;
+
+        /// <summary>What the backing store is filled with.</summary>
         public nuint BackingPixel;
+
+        /// <summary>Whether what is under this window is kept while it is up.</summary>
         public int SaveUnder;
+
+        /// <summary>The window's colour map.</summary>
         public nint Colormap;
+
+        /// <summary>Whether that map is the one currently in use.</summary>
         public int MapInstalled;
 
         /// <summary>0 unmapped, 1 unviewable, 2 viewable.</summary>
         public int MapState;
 
+        /// <summary>What every client on this window has asked to hear about.</summary>
         public nint AllEventMasks;
+
+        /// <summary>What this connection has asked to hear about.</summary>
         public nint YourEventMask;
+
+        /// <summary>What is not passed up to the parent.</summary>
         public nint DoNotPropagateMask;
+
+        /// <summary>Whether the window manager is to leave this window alone.</summary>
         public int OverrideRedirect;
+
+        /// <summary>Which screen it is on.</summary>
         public nint Screen;
     }
 
@@ -72,36 +168,83 @@ internal static unsafe class XEmbed
     [StructLayout(LayoutKind.Sequential)]
     private struct XEvent
     {
+        /// <summary>Which kind of event. Always <see cref="ClientMessage"/> here.</summary>
         public int Type;
+
+        /// <summary>The request number it came from. Filled in by the server on the way out.</summary>
         public nuint Serial;
+
+        /// <summary>Whether it was posted rather than generated. Filled in by the server.</summary>
         public int SendEvent;
+
+        /// <summary>Which connection. Filled in by the server.</summary>
         public nint Display;
+
+        /// <summary>Which window it is for.</summary>
         public nint Window;
+
+        /// <summary>Which message, as an atom. The _XEMBED atom here.</summary>
         public nint MessageType;
+
+        /// <summary>
+        /// How wide the data words are: 8, 16 or 32. Always 32 here, which is what XEMBED asks
+        /// for and what makes the five words below native integers rather than bytes.
+        /// </summary>
         public int Format;
+
+        /// <summary>When it happened. Nought, which X reads as "now".</summary>
         public nint Data0;
+
+        /// <summary>Which XEMBED message. See <see cref="EmbeddedNotify"/> and the ones beside it.</summary>
         public nint Data1;
+
+        /// <summary>The message's detail word, whose meaning depends on the message.</summary>
         public nint Data2;
+
+        /// <summary>The first of the two data words, likewise.</summary>
         public nint Data3;
+
+        /// <summary>The second.</summary>
         public nint Data4;
 
         /// <summary>An XEvent is a union as wide as its widest member. This is the rest of it.</summary>
         public fixed long Padding[8];
     }
 
+    /// <summary>X's own number for a client message, which is the only kind sent here.</summary>
     private const int ClientMessage = 33;
 
+    /// <summary>
+    /// XEMBED_EMBEDDED_NOTIFY: you are inside my window. Carries the embedder's window in the
+    /// first data word and the protocol version in the second.
+    /// </summary>
     private const long EmbeddedNotify = 0;
+
+    /// <summary>XEMBED_WINDOW_ACTIVATE: the window you are in is the one being used.</summary>
     private const long WindowActivate = 1;
+
+    /// <summary>XEMBED_WINDOW_DEACTIVATE: it is not, any more.</summary>
     private const long WindowDeactivate = 2;
+
+    /// <summary>XEMBED_FOCUS_IN: you have the keyboard. The detail word says where in you.</summary>
     private const long FocusIn = 4;
+
+    /// <summary>XEMBED_FOCUS_OUT: you have not.</summary>
     private const long FocusOut = 5;
 
+    /// <summary>
+    /// XEMBED_FOCUS_CURRENT: keep whatever had the focus inside you last time, rather than
+    /// moving it to the first or the last thing.
+    /// </summary>
     private const int FocusCurrent = 0;
 
     /// <summary>The version of the protocol being spoken. There has only ever been one.</summary>
     private const int Version = 1;
 
+    /// <summary>
+    /// The map state of a window that is not on screen at all. The other two are unviewable,
+    /// which is on screen but with an ancestor that is not, and viewable.
+    /// </summary>
     private const int Unmapped = 0;
 
     /// <summary>
@@ -112,6 +255,9 @@ internal static unsafe class XEmbed
     /// whatever it is handed, and what it is handed a moment too early is one pixel by one
     /// pixel and not on screen: some plugins cope with that and some crash on the first thing
     /// they try to draw, which is not a bug anybody can fix from this side.
+    ///
+    /// Answers true where there is no X to ask, which is every platform that is not this one and
+    /// every run with no display: a question that cannot be asked must not stop a window opening.
     /// </remarks>
     public static bool OnScreen(nint window, out int width, out int height)
     {
@@ -136,7 +282,6 @@ internal static unsafe class XEmbed
         }
         catch (Exception)
         {
-            // No X to ask means this is not a machine where the question makes sense.
             return true;
         }
         finally
@@ -150,6 +295,8 @@ internal static unsafe class XEmbed
 
     /// <summary>The two answers XGetInputFocus gives that are not a window.</summary>
     private const nint NoFocus = 0;
+
+    /// <inheritdoc cref="NoFocus"/>
     private const nint PointerRoot = 1;
 
     /// <summary>
@@ -172,20 +319,35 @@ internal static unsafe class XEmbed
         return watch;
     }
 
+    /// <summary>The thread and the connection behind <see cref="WatchFocus"/>.</summary>
     private sealed class FocusWatch : IDisposable
     {
+        /// <summary>The window being watched, which is the host's rather than the plugin's.</summary>
         private readonly nint _window;
+
+        /// <summary>Told each time the answer changes, on the watching thread.</summary>
         private readonly Action<bool> _changed;
+
+        /// <summary>
+        /// Set to stop. Also what the loop waits on between asks, so stopping is immediate
+        /// rather than up to a quarter of a second late.
+        /// </summary>
         private readonly System.Threading.ManualResetEventSlim _stop = new(false);
 
+        /// <summary>The thread, or null before it starts and after it is let go.</summary>
         private System.Threading.Thread? _thread;
 
+        /// <summary>Holds what is to be watched. Nothing runs until <see cref="Start"/>.</summary>
         public FocusWatch(nint window, Action<bool> changed)
         {
             _window = window;
             _changed = changed;
         }
 
+        /// <summary>
+        /// Starts the watching thread, or does nothing where there is no X to ask. A background
+        /// thread, so a watch nobody disposed cannot keep the process alive.
+        /// </summary>
         public void Start()
         {
             if (_window == 0 || !OperatingSystem.IsLinux()) return;
@@ -199,6 +361,11 @@ internal static unsafe class XEmbed
             _thread.Start();
         }
 
+        /// <summary>
+        /// The loop: open one connection, ask four times a second, and say so when the answer
+        /// changes. A connection that has gone ends the watch, and the plugin keeps whatever it
+        /// was last told, which is what it would have had without this at all.
+        /// </summary>
         private void Run()
         {
             nint display = 0;
@@ -223,8 +390,6 @@ internal static unsafe class XEmbed
             }
             catch (Exception)
             {
-                // No X to ask, or a connection that has gone: the plugin keeps whatever it
-                // was last told, which is what it would have had without this at all.
             }
             finally
             {
@@ -236,12 +401,15 @@ internal static unsafe class XEmbed
         }
 
         /// <summary>Whoever has the keyboard, walked up its parents to see whether it is us.</summary>
+        /// <remarks>
+        /// Bounded at a handful of steps, since a plugin's interface is a window or two inside
+        /// ours and a walk that went further would be following a tree that has changed under it.
+        /// </remarks>
         private static bool Inside(nint display, nint window)
         {
             if (XGetInputFocus(display, out nint focused, out _) == 0) return false;
             if (focused == NoFocus || focused == PointerRoot) return false;
 
-            // A handful of steps: a plugin's interface is a window or two inside ours.
             for (int step = 0; step < 32 && focused != 0; step++)
             {
                 if (focused == window) return true;
@@ -259,6 +427,11 @@ internal static unsafe class XEmbed
             return false;
         }
 
+        /// <summary>
+        /// Asks the thread to stop and lets go of it. Not joined: the thread's last act is to
+        /// close its own connection, and waiting for it would put a round trip to X on whoever
+        /// is closing the window.
+        /// </summary>
         public void Dispose()
         {
             _stop.Set();
@@ -273,7 +446,16 @@ internal static unsafe class XEmbed
     /// Harmless for a plugin that was not waiting for it: a window that does not understand
     /// XEMBED gets a client message it ignores, and one that is already mapped is mapped again,
     /// which X treats as nothing at all.
+    ///
+    /// The order and the slots both matter. XEMBED_EMBEDDED_NOTIFY carries the embedder's window
+    /// in the first data word and the protocol version in the second, and its detail word is
+    /// nought. A client told this in the wrong slot is a client that was never told.
     /// </remarks>
+    /// <returns>
+    /// An account of what was found, for the log. Written whether or not anything went wrong,
+    /// because a plugin that draws nothing looks the same from here as one that drew nothing on
+    /// purpose, and the depths and visuals in it are what tell the two apart.
+    /// </returns>
     public static string Complete(nint parent)
     {
         if (parent == 0 || !OperatingSystem.IsLinux()) return "";
@@ -318,10 +500,6 @@ internal static unsafe class XEmbed
                       .Append(wants ? ", wants embedding, flags " + flags : ", plain")
                       .Append("; ");
 
-                // The order and the slots both matter. XEMBED_EMBEDDED_NOTIFY carries the
-                // embedder's window in the first data word and the protocol version in the
-                // second; the detail word is nought. A client told this in the wrong slot is a
-                // client that was never told.
                 Tell(display, child, embed, EmbeddedNotify, 0, parent, Version);
                 Tell(display, child, embed, WindowActivate, 0, 0, 0);
                 Tell(display, child, embed, FocusIn, FocusCurrent, 0, 0);
@@ -363,6 +541,8 @@ internal static unsafe class XEmbed
     ///
     /// The order is the protocol's. Going in, the window is active before anything inside it
     /// has the focus; coming out, the focus goes before the window does.
+    ///
+    /// No X to talk to is not a reason to take a window down, so a failure here is silent.
     /// </remarks>
     public static void Activated(nint parent, bool active)
     {
@@ -401,7 +581,6 @@ internal static unsafe class XEmbed
         }
         catch (Exception)
         {
-            // No X to talk to is not a reason to take a window down.
         }
         finally
         {
@@ -413,6 +592,12 @@ internal static unsafe class XEmbed
     }
 
     /// <summary>True when the window says, in the way XEMBED says it, that it is a plug.</summary>
+    /// <remarks>
+    /// The _XEMBED_INFO property is two words: the protocol version the client speaks, and its
+    /// flags. The one flag that exists says whether it would like to be mapped. Only read for
+    /// the account written into the log: the messages are sent either way, since a window that
+    /// does not understand them ignores them.
+    /// </remarks>
     private static bool Wants(nint display, nint window, nint info, out int flags)
     {
         flags = 0;
@@ -429,8 +614,6 @@ internal static unsafe class XEmbed
 
             if (answer != 0 || items < 2 || data == null) return false;
 
-            // Two words: the protocol version the client speaks, and its flags. The one flag
-            // that exists says whether it would like to be mapped.
             flags = (int)*((nint*)data + 1);
 
             return true;

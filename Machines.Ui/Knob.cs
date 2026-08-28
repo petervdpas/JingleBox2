@@ -20,7 +20,6 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Knob : ThemedControl
 {
-    /// <summary>Gap between the dial and the label, and between the label and the value.</summary>
     /// <summary>
     /// The air between a knob's name and its dial, and between its dial and its value.
     /// </summary>
@@ -38,9 +37,20 @@ public class Knob : ThemedControl
     /// </remarks>
     private const double MajorTickReach = 8.5;
 
+    /// <summary>How far the marks between the thirds reach, shorter so the thirds read as thirds.</summary>
     private const double MinorTickReach = 6.5;
 
+    /// <summary>The name under the dial, small enough that a row of them does not shout.</summary>
     private const double LabelFontSize = 11;
+
+    /// <summary>
+    /// The reading, half a point larger than the name.
+    /// </summary>
+    /// <remarks>
+    /// It is drawn in the monospaced face, which sits visually smaller than the proportional one
+    /// at the same size, so matching the numbers makes the reading look like the quieter of the
+    /// two when it is the one you came to read.
+    /// </remarks>
     private const double ValueFontSize = 11.5;
 
     /// <summary>
@@ -76,9 +86,17 @@ public class Knob : ThemedControl
         return Math.Clamp(value, low, high);
     }
 
+    /// <summary>Backs <see cref="Minimum"/>, the value at seven o'clock.</summary>
     public static readonly StyledProperty<double> MinimumProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(Minimum));
 
+    /// <summary>
+    /// Backs <see cref="Maximum"/>, the value at five o'clock.
+    /// </summary>
+    /// <remarks>
+    /// One rather than nought, so a knob nobody has given a range to turns over the nought to
+    /// one every parameter here already uses, rather than being stuck against a dead range.
+    /// </remarks>
     public static readonly StyledProperty<double> MaximumProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(Maximum), 1.0);
 
@@ -93,21 +111,29 @@ public class Knob : ThemedControl
     private static void EndsMoved(Knob control, AvaloniaPropertyChangedEventArgs e) =>
         control.CoerceValue(ValueProperty);
 
-    /// <summary>The grid the value snaps to, and one press of an arrow key.</summary>
+    /// <summary>Backs <see cref="SmallStep"/>: the grid the value snaps to, and one arrow key.</summary>
     public static readonly StyledProperty<double> SmallStepProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(SmallStep), 0.01);
 
-    /// <summary>One press with shift held.</summary>
+    /// <summary>Backs <see cref="LargeStep"/>: one arrow key with shift held.</summary>
     public static readonly StyledProperty<double> LargeStepProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(LargeStep), 0.1);
 
+    /// <summary>Backs <see cref="Label"/>, the name printed with the dial.</summary>
     public static readonly StyledProperty<string> LabelProperty =
         AvaloniaProperty.Register<Knob, string>(nameof(Label), "");
 
-    /// <summary>Written straight after the number, as in "5.0Hz".</summary>
+    /// <summary>Backs <see cref="Unit"/>, written straight after the number, as in "5.0Hz".</summary>
     public static readonly StyledProperty<string> UnitProperty =
         AvaloniaProperty.Register<Knob, string>(nameof(Unit), "");
 
+    /// <summary>
+    /// Backs <see cref="Format"/>, the standard numeric format the reading is worded with.
+    /// </summary>
+    /// <remarks>
+    /// Two decimals unless a panel says otherwise, which is right for the nought to one a
+    /// parameter defaults to and wrong for a tempo. A machine that means whole numbers says so.
+    /// </remarks>
     public static readonly StyledProperty<string> FormatProperty =
         AvaloniaProperty.Register<Knob, string>(nameof(Format), "0.00");
 
@@ -118,32 +144,70 @@ public class Knob : ThemedControl
     public static readonly StyledProperty<string> DisplayProperty =
         AvaloniaProperty.Register<Knob, string>(nameof(Display), "");
 
+    /// <summary>
+    /// Backs <see cref="DialSize"/>, the diameter of the dial itself.
+    /// </summary>
+    /// <remarks>
+    /// The marks reach past this in every direction, so the control is always wider and taller
+    /// than the number here. See <see cref="TickReach"/>.
+    /// </remarks>
     public static readonly StyledProperty<double> DialSizeProperty =
         AvaloniaProperty.Register<Knob, double>(nameof(DialSize), 34.0);
 
-    /// <summary>Where a double click puts the knob back to. Nothing happens when it is not set.</summary>
+    /// <summary>
+    /// Backs <see cref="DefaultValue"/>: where a double click puts the knob back to, and nothing
+    /// happens when it is not set.
+    /// </summary>
     public static readonly StyledProperty<double?> DefaultValueProperty =
         AvaloniaProperty.Register<Knob, double?>(nameof(DefaultValue));
 
     /// <summary>One cursor for every knob: each instance would otherwise hold a platform handle.</summary>
     private static readonly Cursor DragCursor = new(StandardCursorType.SizeNorthSouth);
 
+    /// <summary>Whether a button is down on it, which is the whole of the drag state machine.</summary>
     private bool _dragging;
+
+    /// <summary>
+    /// Where the drag began, and what the value was there.
+    /// </summary>
+    /// <remarks>
+    /// The pair is kept rather than the last position, because the movement is measured from the
+    /// start of the drag: a hand that goes down and comes back up ends on the value it began
+    /// with, where accumulating each move would leave it somewhere else through rounding.
+    /// </remarks>
     private double _dragStartY;
+
+    /// <inheritdoc cref="_dragStartY"/>
     private double _dragStartValue;
+
+    /// <summary>Whether the pointer is over it, which lights the rim.</summary>
     private bool _hovered;
 
+    /// <summary>
+    /// Says which properties change the drawing and which change the size, and puts the ends
+    /// back into the question of what the value may be.
+    /// </summary>
+    /// <remarks>
+    /// The ends decide what the value may be, so a change to either has to put that question to
+    /// the value again; a panel builds a control's range and its value in whichever order the
+    /// layout happens to take them.
+    ///
+    /// <see cref="LinkGlow.LitProperty"/> is in here because the glow is painted by this control
+    /// itself rather than by a style, so the flag that turns it on has to bring it back round to
+    /// paint again.
+    ///
+    /// <see cref="ValueProperty"/> is deliberately absent from the measure list. A control
+    /// measured off its current reading is as wide as the number under it, and a knob would then
+    /// change width as it was turned; the width comes from <see cref="NumericInput.Widest"/>
+    /// instead, which is the longest thing it could ever say.
+    /// </remarks>
     static Knob()
     {
-        // The ends decide what the value may be, so a change to either has to put the question
-        // to it again.
         MinimumProperty.Changed.AddClassHandler<Knob>(EndsMoved);
         MaximumProperty.Changed.AddClassHandler<Knob>(EndsMoved);
 
         AffectsMeasure<Knob>(LabelAboveProperty, LabelLinesProperty, HeadRoomProperty, TicksProperty);
 
-        // The glow is painted by the control itself, so the flag that turns it on has to
-        // bring it back round to paint again. See LinkGlow.
         AffectsRender<Knob>(LinkGlow.LitProperty);
 
         AffectsRender<Knob>(
@@ -154,72 +218,84 @@ public class Knob : ThemedControl
         AffectsMeasure<Knob>(LabelProperty, UnitProperty, FormatProperty, DisplayProperty, DialSizeProperty);
     }
 
+    /// <summary>Takes the keyboard, and wears the up-and-down cursor so the drag is discoverable.</summary>
     public Knob()
     {
         Focusable = true;
         Cursor = DragCursor;
     }
 
+    /// <inheritdoc cref="ValueProperty"/>
     public double Value
     {
         get => GetValue(ValueProperty);
         set => SetValue(ValueProperty, value);
     }
 
+    /// <summary>The value at seven o'clock, where the sweep begins.</summary>
     public double Minimum
     {
         get => GetValue(MinimumProperty);
         set => SetValue(MinimumProperty, value);
     }
 
+    /// <summary>The value at five o'clock, where the sweep ends.</summary>
     public double Maximum
     {
         get => GetValue(MaximumProperty);
         set => SetValue(MaximumProperty, value);
     }
 
+    /// <summary>The grid every value lands on, and how far one arrow key moves it.</summary>
     public double SmallStep
     {
         get => GetValue(SmallStepProperty);
         set => SetValue(SmallStepProperty, value);
     }
 
+    /// <summary>How far one arrow key moves it with shift held.</summary>
     public double LargeStep
     {
         get => GetValue(LargeStepProperty);
         set => SetValue(LargeStepProperty, value);
     }
 
+    /// <summary>What the knob is called, printed with the dial.</summary>
     public string Label
     {
         get => GetValue(LabelProperty);
         set => SetValue(LabelProperty, value);
     }
 
+    /// <summary>What it is measured in, written straight after the number.</summary>
     public string Unit
     {
         get => GetValue(UnitProperty);
         set => SetValue(UnitProperty, value);
     }
 
+    /// <summary>The numeric format the reading is worded with.</summary>
     public string Format
     {
         get => GetValue(FormatProperty);
         set => SetValue(FormatProperty, value);
     }
 
+    /// <summary>Wording that replaces the number outright, for a dial whose position is not its meaning.</summary>
     public string Display
     {
         get => GetValue(DisplayProperty);
         set => SetValue(DisplayProperty, value);
     }
 
+    /// <summary>How wide across the dial itself is, not counting the ring of marks round it.</summary>
     public double DialSize
     {
         get => GetValue(DialSizeProperty);
         set => SetValue(DialSizeProperty, value);
     }
 
+    /// <summary>Where a double click puts it back to, or nothing when it has no detent.</summary>
     public double? DefaultValue
     {
         get => GetValue(DefaultValueProperty);
@@ -282,24 +358,28 @@ public class Knob : ThemedControl
     public static readonly StyledProperty<int> TicksProperty =
         AvaloniaProperty.Register<Knob, int>(nameof(Ticks), 11);
 
+    /// <inheritdoc cref="LabelAboveProperty"/>
     public bool LabelAbove
     {
         get => GetValue(LabelAboveProperty);
         set => SetValue(LabelAboveProperty, value);
     }
 
+    /// <inheritdoc cref="LabelLinesProperty"/>
     public int LabelLines
     {
         get => GetValue(LabelLinesProperty);
         set => SetValue(LabelLinesProperty, value);
     }
 
+    /// <inheritdoc cref="HeadRoomProperty"/>
     public double HeadRoom
     {
         get => GetValue(HeadRoomProperty);
         set => SetValue(HeadRoomProperty, value);
     }
 
+    /// <inheritdoc cref="TicksProperty"/>
     public int Ticks
     {
         get => GetValue(TicksProperty);
@@ -335,9 +415,27 @@ public class Knob : ThemedControl
     /// </remarks>
     private double HeadSpace => HeadRoom > 0 ? Math.Max(0, HeadRoom - TextGap) : 0;
 
+    /// <summary>What is printed under the dial: the wording if there is any, the number otherwise.</summary>
     public string ValueText =>
         string.IsNullOrEmpty(Display) ? NumericInput.Format(Value, Format) + Unit : Display;
 
+    /// <summary>
+    /// Room for the dial, the ring of marks all the way round it, the name and the reading.
+    /// </summary>
+    /// <remarks>
+    /// Measured the way it is drawn, and the two are not the same shape. With the name above,
+    /// the order down the control is name, dial, reading. With it below, which is every knob
+    /// written in XAML rather than described by a machine, it is dial, name, reading, and
+    /// nothing at all goes over the dial. Measuring both cases as the first reserved room for a
+    /// name at the top that was never used, and the control came out half a line taller than
+    /// what it drew, with the slack sitting under the reading: a hole under the mixer's pan knob
+    /// and a squeeze on its ducking knobs.
+    ///
+    /// The tick reach counts across as well as down. The marks are drawn outwards from the rim
+    /// in every direction, so a knob measured as its dial alone is measured too narrow, and two
+    /// of them side by side end up with their rings almost touching however much spacing the
+    /// panel between them asks for.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
         _room = double.IsInfinity(availableSize.Width) ? double.PositiveInfinity : availableSize.Width;
@@ -345,15 +443,8 @@ public class Knob : ThemedControl
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, Brushes.Black, _room);
         var value = BuildText(ValueText, ValueFontSize, PatternFont.Family, Brushes.Black);
 
-        // The reach counts across as well as down. The marks are drawn outwards from the rim
-        // in every direction, so a knob measured as its dial alone is measured too narrow, and
-        // two of them side by side end up with their tick rings almost touching however much
-        // spacing the panel between them asks for.
         double width = Math.Max(DialSize + TickReach * 2, Math.Max(label.Width, value.Width));
 
-        // Measured the way it is drawn, and the two are not the same shape. With the name above,
-        // the order down the control is name, dial, value. With it below, which is the ordinary
-        // knob, it is dial, name, value, and nothing at all goes over the dial.
         double height = LabelAbove
             ? LabelRoom(label) + TextGap + TickReach + DialSize + TickReach + TextGap + value.Height
             : HeadSpace + TickReach + DialSize + TickReach + TextGap + label.Height
@@ -362,6 +453,20 @@ public class Knob : ThemedControl
         return new Size(width, height);
     }
 
+    /// <summary>
+    /// Paints the name, the dial with its ring, and the reading, in whichever of the two orders
+    /// <see cref="LabelAbove"/> asks for.
+    /// </summary>
+    /// <remarks>
+    /// The marks reach past the dial at both ends, so the room for the top ones is left above it
+    /// rather than being drawn over whatever happens to be up there. That never showed while
+    /// every panel reserved fifty pixels over each dial; the moment that came off, every name on
+    /// the machine was sitting on its own tick marks.
+    ///
+    /// The link glow goes on last, over everything else, because while a controller is being
+    /// pointed at something the control being offered has to say so itself and nothing may
+    /// paint over that. See <see cref="LinkGlow"/>.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
@@ -387,23 +492,29 @@ public class Knob : ThemedControl
             return;
         }
 
-        // The marks reach past the dial at both ends, so the room for the top ones is left
-        // above it rather than being drawn over whatever is up there.
         double middle = HeadSpace + TickReach + radius + 1;
 
         DrawDial(context, palette, centerX, middle, radius);
         DrawText(context, palette, middle + radius + 1 + TickReach);
 
-        // Last, over everything else it drew: while a controller is being laid out, the one
-        // being offered says so itself. See LinkGlow.
         if (LinkGlow.GetLit(this)) LinkGlow.Paint(context, new Rect(Bounds.Size));
     }
 
+    /// <summary>
+    /// The dial itself: the ring of marks round it, the moulded face, and the pointer.
+    /// </summary>
+    /// <remarks>
+    /// The marks are what lets somebody read roughly where a knob is set from across the room,
+    /// which is why the two ends and the middle are drawn longer and heavier than the rest.
+    ///
+    /// The face is a gradient from light at the top to the page colour at the bottom, which is
+    /// what a real pot does under a light above it, and the rim takes the accent colour while
+    /// the knob is hovered or holds the keyboard.
+    /// </remarks>
     private void DrawDial(DrawingContext context, ThemePalette palette, double centerX, double centerY, double radius)
     {
         var center = new Point(centerX, centerY);
 
-        // The marks printed round the dial, so where it is set can be read at a glance.
         if (Ticks > 1)
         {
             var ink = new SolidColorBrush(Lighten(palette.Muted, 0.1), 0.75);
@@ -421,7 +532,6 @@ public class Knob : ThemedControl
             }
         }
 
-        // The face is lit from above, the way a real pot catches the light.
         var face = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
@@ -447,6 +557,7 @@ public class Knob : ThemedControl
     }
 
 
+    /// <summary>The name and the reading, stacked under the dial and centred on it.</summary>
     private void DrawText(DrawingContext context, ThemePalette palette, double top)
     {
         var label = BuildText(Label, LabelFontSize, FontFamily.Default, palette.MutedBrush, Bounds.Width);
@@ -457,6 +568,7 @@ public class Knob : ThemedControl
         context.DrawText(value, new Point((Bounds.Width - value.Width) / 2, labelY + label.Height + TextGap));
     }
 
+    /// <summary>A piece of text laid out with no width limit, for the reading, which never folds.</summary>
     private FormattedText BuildText(string? text, double size, FontFamily family, IBrush brush) =>
         BuildText(text, size, family, brush, double.PositiveInfinity);
 
@@ -487,6 +599,7 @@ public class Knob : ThemedControl
     /// <summary>How wide the name may be: what the layout offered, or the dial if it offered nothing.</summary>
     private double _room = double.PositiveInfinity;
 
+    /// <summary>Lights the rim, so a knob under the hand is visibly the one that will move.</summary>
     protected override void OnPointerEntered(PointerEventArgs e)
     {
         base.OnPointerEntered(e);
@@ -494,6 +607,7 @@ public class Knob : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>Puts the rim back.</summary>
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
@@ -501,6 +615,13 @@ public class Knob : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Starts a drag, remembering where it began and what the value was there.
+    /// </summary>
+    /// <remarks>
+    /// The pointer is captured, so a hand that runs off the edge of the knob goes on turning it
+    /// rather than losing it half way through a movement.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -517,14 +638,20 @@ public class Knob : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Turns the knob by how far the hand has moved since the press.
+    /// </summary>
+    /// <remarks>
+    /// From where the drag started rather than from the last move, so going down and back up
+    /// returns the value it began with instead of drifting. Shift makes the same movement cover
+    /// a quarter as much.
+    /// </remarks>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
 
         if (!_dragging) return;
 
-        // Measured from where the drag started, so going down and back up returns the value
-        // it began with instead of drifting.
         double draggedUp = _dragStartY - e.GetPosition(this).Y;
 
         Value = RangeValue.FromDrag(
@@ -534,6 +661,7 @@ public class Knob : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>Ends the drag and lets the pointer go.</summary>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -545,14 +673,31 @@ public class Knob : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// One notch of the wheel is one step.
+    /// </summary>
+    /// <remarks>
+    /// The base is deliberately not called and the event is marked handled: over a knob the
+    /// wheel turns the knob rather than scrolling the panel it sits in, and a panel that
+    /// scrolled underneath the hand would take the knob out from under it mid-turn.
+    /// </remarks>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
-        // Deliberately not calling the base: over a knob the wheel turns it rather than
-        // scrolling the panel it sits in.
         StepBy(Math.Sign(e.Delta.Y), e.KeyModifiers);
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Arrow keys step it, Home and End take it to its ends.
+    /// </summary>
+    /// <remarks>
+    /// Up and right both raise it and down and left both lower it, because a knob turns and has
+    /// no axis of its own: which pair somebody reaches for depends on whether they are thinking
+    /// of it as a dial or as a value in a row.
+    ///
+    /// A key this does not answer is left unhandled, so it carries on out to whatever the panel
+    /// wants to do with it.
+    /// </remarks>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -595,6 +740,7 @@ public class Knob : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>One step up or down, large if shift is held, landing on the small step's grid.</summary>
     private void StepBy(int direction, KeyModifiers modifiers)
     {
         if (direction == 0) return;
@@ -603,6 +749,7 @@ public class Knob : ThemedControl
         Value = RangeValue.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
     }
 
+    /// <summary>A colour taken towards white, keeping its transparency, for the lit top of the face.</summary>
     private static Color Lighten(Color color, double amount) => Color.FromArgb(
         color.A,
         (byte)Math.Clamp(color.R + 255 * amount, 0, 255),

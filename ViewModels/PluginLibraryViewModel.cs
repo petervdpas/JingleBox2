@@ -26,9 +26,25 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// <summary>Set while a scan is running, so a second one cannot start on top of it.</summary>
     private bool _scanning;
 
+    /// <summary>Where the settings are written, or null when nothing is to be kept.</summary>
+    /// <remarks>
+    /// Both this and the settings themselves are optional, because the plugin pickers are shown
+    /// in places that have no business writing a settings file, and a scan is worth having in
+    /// those too.
+    /// </remarks>
     private readonly ConfigStore? _store;
+
+    /// <summary>The settings, which is where the folders and the last scan's results live.</summary>
     private readonly AppConfig? _config;
 
+    /// <summary>
+    /// Takes the folders and the last scan's results out of the settings, without scanning.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately quiet at startup. A scan loads every plugin on the machine, and doing that
+    /// before anybody has asked to see a plugin would put the cost of the whole library on
+    /// opening the application.
+    /// </remarks>
     public PluginLibraryViewModel(ConfigStore? store = null, AppConfig? config = null)
     {
         _store = store;
@@ -47,6 +63,11 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// every plugin library to ask what is inside it, which is slow and is what makes hosts
     /// crash; there is no reason to do it again every time the app starts.
     /// </summary>
+    /// <remarks>
+    /// A plugin uninstalled since the last scan is dropped rather than offered and then failing
+    /// to load, and the count of those is said out loud: a list quietly one shorter than it was
+    /// is a list nobody can trust.
+    /// </remarks>
     private void Remember(List<PluginInfo>? known)
     {
         if (known == null || known.Count == 0) return;
@@ -55,8 +76,6 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         foreach (var plugin in known)
         {
-            // A plugin uninstalled since the last scan is dropped rather than offered and then
-            // failing to load.
             if (!PluginHost.Exists(plugin))
             {
                 gone++;
@@ -79,9 +98,15 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<string> Folders { get; } = new();
 
+    /// <summary>True when anything has been added by hand, for the page to show a list at all.</summary>
     public bool HasFolders => Folders.Count > 0;
 
     /// <summary>Adds a folder and scans again, so the effect of adding one is immediate.</summary>
+    /// <remarks>
+    /// The same folder twice is refused with a reason rather than accepted quietly, since the
+    /// list is the only evidence of what was asked for. The comparison ignores case, which is
+    /// right on Windows and merely cautious elsewhere.
+    /// </remarks>
     public void AddFolder(string? folder)
     {
         if (string.IsNullOrWhiteSpace(folder)) return;
@@ -100,8 +125,18 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         _ = ScanAsync();
     }
 
+    /// <summary>Takes a folder back off the list, which is the cross beside each row.</summary>
+    /// <remarks>Always enabled: a row that is there can always be removed.</remarks>
     public IRelayCommand<string> RemoveFolderCommand => new RelayCommand<string>(RemoveFolder);
 
+    /// <summary>
+    /// Forgets a folder and scans again, so what is on the list matches what is offered.
+    /// </summary>
+    /// <remarks>
+    /// The scan is what actually removes the plugins that were only found there. Leaving them
+    /// listed until the next start would mean offering plugins from a folder somebody has just
+    /// said they do not want looked in.
+    /// </remarks>
     public void RemoveFolder(string? folder)
     {
         if (folder == null || !Folders.Remove(folder)) return;
@@ -119,6 +154,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         _store.Save(_config);
     }
 
+    /// <summary>Writes the folder list out, and tells the page the paths it shows have moved.</summary>
     private void SaveFolders()
     {
         OnPropertyChanged(nameof(HasFolders));
@@ -137,15 +173,28 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     public System.Collections.Generic.IReadOnlyList<Audio.Plugins.PluginCrash> BlockedPlugins =>
         Audio.Plugins.PluginCrashGuard.Blocked;
 
+    /// <summary>True when anything is being held back, which is what shows that part of the page.</summary>
     public bool HasBlockedPlugins => BlockedPlugins.Count > 0;
 
+    /// <summary>Lifts every block at once, for somebody who has just updated their plugins.</summary>
+    /// <remarks>
+    /// Always enabled, including when nothing is blocked, because the part of the page it lives
+    /// on is only shown when something is.
+    /// </remarks>
     public IRelayCommand AllowBlockedCommand => new RelayCommand(AllowBlocked);
 
+    /// <summary>
+    /// Lets every blocked plugin try again, and puts back the ones that were kept out of the
+    /// pickers for being unloadable.
+    /// </summary>
+    /// <remarks>
+    /// Any of them that goes down again is back on the list straight away, so this costs at
+    /// worst the crash it already caused once.
+    /// </remarks>
     private void AllowBlocked()
     {
         Audio.Plugins.PluginCrashGuard.AllowEverything();
 
-        // Anything kept out of the pickers for being unloadable comes back into them.
         Sort();
 
         OnPropertyChanged(nameof(BlockedPlugins));
@@ -155,6 +204,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         Status = "Those plugins may open their own windows again.";
     }
 
+    /// <summary>Everything the last scan found, instruments included.</summary>
     public ObservableCollection<PluginInfo> Plugins { get; } = new();
 
     /// <summary>
@@ -164,17 +214,20 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// </summary>
     public ObservableCollection<PluginInfo> Effects { get; } = new();
 
+    /// <summary>True when the plus button has anything to offer.</summary>
     public bool HasEffects => Effects.Count > 0;
 
     /// <summary>Refills the effects list from the full one. Called after either is rebuilt.</summary>
+    /// <remarks>
+    /// A plugin whose loading is what killed the last run is not offered, but it stays on the
+    /// list above, where the reason for that is shown and can be undone.
+    /// </remarks>
     private void Sort()
     {
         Effects.Clear();
 
         foreach (var plugin in Plugins)
         {
-            // Not offered if loading it is what killed the last run. It stays on the list
-            // above, where the reason for that is shown and can be undone.
             if (plugin.CanInsert && !Audio.Plugins.PluginCrashGuard.IsLoadBlocked(plugin)) Effects.Add(plugin);
         }
 
@@ -182,13 +235,29 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         OnPropertyChanged(nameof(HasEffects));
     }
 
+    /// <summary>What the last thing that happened here has to say, for the line on the page.</summary>
+    /// <remarks>
+    /// Never empty. "Not scanned yet" is a real answer and is why a fresh install shows no
+    /// plugins, which is the question this line exists to answer.
+    /// </remarks>
     [ObservableProperty] private string status = "Not scanned yet";
 
     /// <summary>The directories a scan looks in, as one line for the page to show.</summary>
+    /// <remarks>
+    /// Printed because a plugin somebody expects and cannot see is nearly always a plugin
+    /// somewhere nobody looked.
+    /// </remarks>
     public string SearchPaths => string.Join("\n", PluginHost.SearchPaths(Folders));
 
+    /// <summary>True when anything at all is known, scanned now or remembered from last time.</summary>
     public bool HasPlugins => Plugins.Count > 0;
 
+    /// <summary>Scans, which is the button in SETTINGS.</summary>
+    /// <remarks>
+    /// Always enabled; a second scan while one is running is dropped in <see cref="ScanAsync"/>
+    /// rather than greyed out, because the button is also how somebody finds out that a scan is
+    /// happening at all.
+    /// </remarks>
     public IAsyncRelayCommand ScanCommand => new AsyncRelayCommand(ScanAsync);
 
     /// <summary>
@@ -196,6 +265,12 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// A bundle that will not open is skipped rather than stopping the scan: one bad plugin
     /// is not a machine with no plugins.
     /// </summary>
+    /// <remarks>
+    /// The loading itself happens off the drawing thread, since it is seconds rather than
+    /// milliseconds and every one of those seconds is another plugin's own startup. What comes
+    /// back is kept in the settings, so this is a thing somebody asks for rather than something
+    /// that happens on every start.
+    /// </remarks>
     public async Task ScanAsync()
     {
         if (_scanning) return;

@@ -24,10 +24,31 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class AutomationViewModel : ObservableObject
 {
+    /// <summary>What can be moved on a strip, and how to reach one of them.</summary>
+    /// <remarks>
+    /// The same door remote control writes through, which is what makes a lane and a knob one act
+    /// rather than two paths that would eventually disagree about what a parameter is.
+    /// </remarks>
     private readonly IControlTargets _targets;
+
+    /// <summary>The song, asked rather than held, for the pattern's number in the order.</summary>
     private readonly Func<Song?> _song;
+
+    /// <summary>
+    /// The pattern a lane is written against.
+    /// </summary>
+    /// <remarks>
+    /// Asked every time rather than held, because the pattern changes underneath this panel and a
+    /// held one would have the strip writing into a pattern nobody is looking at.
+    /// </remarks>
     private readonly Func<Pattern?> _pattern;
 
+    /// <summary>Points the panel at a track's targets, and at whichever pattern is current.</summary>
+    /// <param name="targets">What can be moved, and how to reach it.</param>
+    /// <param name="song">The song, for naming which pattern a lane is in.</param>
+    /// <param name="pattern">The pattern the lanes belong to.</param>
+    /// <param name="beat">How many lines make a beat, which is what the picture picks out.</param>
+    /// <param name="playing">The line being played, or -1 when nothing is.</param>
     public AutomationViewModel(IControlTargets targets, Func<Song?> song, Func<Pattern?> pattern,
                                Func<int> beat, Func<int> playing)
     {
@@ -38,8 +59,10 @@ public sealed partial class AutomationViewModel : ObservableObject
         _playing = playing;
     }
 
+    /// <summary>How many lines make a beat, asked of whoever knows rather than kept.</summary>
     private readonly Func<int> _beat;
 
+    /// <summary>Where the song has got to, asked on every frame the picture draws.</summary>
     private readonly Func<int> _playing;
 
     /// <summary>The playing line moved, so the picture can show where the song has got to.</summary>
@@ -64,6 +87,7 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private string search = "";
 
+    /// <summary>Reads the list again against the narrowed search.</summary>
     partial void OnSearchChanged(string value) => Restock();
 
     /// <summary>Every parameter on the track that could be moved, in panel order.</summary>
@@ -72,8 +96,10 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// <summary>The one being worked on, which is what the room after the head block is about.</summary>
     [ObservableProperty] private AutomationRow? chosen;
 
+    /// <summary>True when there is anything to automate, so the panel can say <see cref="Nothing"/>.</summary>
     public bool HasAny => Parameters.Count > 0;
 
+    /// <summary>True when a parameter is being worked on, which is what fills the room to the right.</summary>
     public bool HasChosen => Chosen is not null;
 
     /// <summary>
@@ -87,8 +113,10 @@ public sealed partial class AutomationViewModel : ObservableObject
     /// </remarks>
     public int Lines => _pattern()?.Lines ?? 0;
 
+    /// <inheritdoc cref="Lines"/>
     public int LinesPerBeat => _beat();
 
+    /// <inheritdoc cref="Lines"/>
     public int PlayingLine => _playing();
 
     /// <summary>Which track and which pattern, since a lane belongs to both.</summary>
@@ -117,15 +145,23 @@ public sealed partial class AutomationViewModel : ObservableObject
         }
     }
 
+    /// <summary>What to say when the list is empty, which is two different situations.</summary>
+    /// <remarks>
+    /// A search that found nothing and a track with nothing on it are told apart, because only one
+    /// of them is something to do about it.
+    /// </remarks>
     public string Nothing => Search.Length > 0
         ? "Nothing on this track is called that."
         : "This track has nothing on it that can be moved. Give it an instrument, or put a plugin on its chain.";
 
     /// <summary>Points the panel at a track and reads it.</summary>
+    /// <remarks>
+    /// Below nought is the master, which is a strip without being a track and is why a lane names
+    /// a strip rather than a track at all. Anything else out of range is a mistake and lands on
+    /// the first track, as it always did.
+    /// </remarks>
     public void Show(int track)
     {
-        // Below nought is the master, which is a strip without being a track. Anything else out
-        // of range is a mistake and lands on the first track, as it always did.
         Track = track < 0 && track != Tracker.TrackerPlayer.MasterStrip ? 0 : track;
 
         Restock();
@@ -177,6 +213,7 @@ public sealed partial class AutomationViewModel : ObservableObject
         OnPropertyChanged(nameof(LinesPerBeat));
     }
 
+    /// <summary>Says whether there is anything in the room to the right now.</summary>
     partial void OnChosenChanged(AutomationRow? value) => OnPropertyChanged(nameof(HasChosen));
 
     /// <summary>Puts a lane on the chosen parameter, with one point where it stands.</summary>
@@ -238,14 +275,6 @@ public sealed partial class AutomationViewModel : ObservableObject
     }
 
     /// <summary>
-    /// A point was dragged on the picture. Says so, without reading the whole list again.
-    /// </summary>
-    /// <remarks>
-    /// Not <see cref="Restock"/>, which is what every other edit here ends at, because this one
-    /// arrives per mouse move. Rebuilding forty rows and re-resolving every target forty times a
-    /// second to change one number would be paying a list's price for a point.
-    /// </remarks>
-    /// <summary>
     /// A gesture on the picture is starting. Told before it happens, like every other edit.
     /// </summary>
     /// <remarks>
@@ -266,6 +295,14 @@ public sealed partial class AutomationViewModel : ObservableObject
         Touched();
     }
 
+    /// <summary>
+    /// A point on the picture moved. Says so, without reading the whole list again.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="Restock"/>, which is what every other edit here ends at, because this one
+    /// arrives per mouse move. Rebuilding forty rows and re-resolving every target forty times a
+    /// second to change one number would be paying a list's price for a point.
+    /// </remarks>
     internal void Touched()
     {
         Chosen?.Reread();
@@ -296,6 +333,14 @@ public sealed partial class AutomationViewModel : ObservableObject
         return Math.Clamp((0 - target.Min) / span, 0, 1);
     }
 
+    /// <summary>
+    /// Where the parameter stands, in its own words, for the row to print.
+    /// </summary>
+    /// <remarks>
+    /// The unit is added only where the target has not already said it: a machine's parameter
+    /// carries its own unit in the reading and a plugin's usually does not, and appending it
+    /// blindly prints "50 % %".
+    /// </remarks>
     internal string Reading(ControlChoice choice)
     {
         if (_targets.Find(choice.Mapping) is not { } target) return "";
@@ -311,8 +356,14 @@ public sealed partial class AutomationViewModel : ObservableObject
 /// <summary>One parameter of one track, and the lane it has or has not got.</summary>
 public sealed class AutomationRow : ObservableObject
 {
+    /// <summary>The panel this row belongs to, which does the work the buttons ask for.</summary>
+    /// <remarks>
+    /// The row asks rather than doing it itself, because adding and clearing a lane is an edit to
+    /// the pattern and has to leave one undo step, which is the panel's business and not a row's.
+    /// </remarks>
     private readonly AutomationViewModel _owner;
 
+    /// <summary>One row over one parameter, with its lane read as the row is made.</summary>
     public AutomationRow(AutomationViewModel owner, ControlChoice choice, Pattern pattern, int track)
     {
         _owner = owner;
@@ -321,15 +372,19 @@ public sealed class AutomationRow : ObservableObject
         Lane = pattern.LaneFor(choice.Mapping, track);
     }
 
+    /// <summary>What this row is about: the mapping, and the words for it.</summary>
     public ControlChoice Choice { get; }
 
+    /// <summary>Which strip, counted from zero, with -1 for the master.</summary>
     public int Track { get; }
 
     /// <summary>The lane, or nothing. Read once when the row is made and not held live.</summary>
     public AutomationLane? Lane { get; }
 
+    /// <summary>The parameter's own name, without whatever holds it.</summary>
     public string Name => Choice.Name;
 
+    /// <summary>What holds it: the instrument, an insert, or the strip itself.</summary>
     public string Device => Choice.Device;
 
     /// <summary>What the picker shows: what holds it, then what it is.</summary>
@@ -341,6 +396,7 @@ public sealed class AutomationRow : ObservableObject
     /// <summary>Where its nought sits on the picture: the floor for a level, the middle for a pan.</summary>
     public double Zero => _owner.ZeroOf(Choice);
 
+    /// <summary>True when this parameter is automated, which is what the buttons swap on.</summary>
     public bool HasLane => Lane is not null;
 
     /// <summary>How much is written down, so a lane with nothing in it is not mistaken for one.</summary>
@@ -375,9 +431,18 @@ public sealed class AutomationRow : ObservableObject
         OnPropertyChanged(nameof(Reads));
     }
 
+    /// <summary>Puts a lane on this parameter, holding where it stands.</summary>
+    /// <remarks>
+    /// Always enabled; the panel refuses a row that already has a lane, and the button is hidden
+    /// rather than greyed in that case, since a lane and no lane are two different rows.
+    /// </remarks>
     public IRelayCommand AddCommand => new RelayCommand(() => _owner.Add(this));
 
+    /// <summary>Takes the lane off, leaving the parameter where it was last put.</summary>
+    /// <remarks>Always enabled; the panel refuses a row with no lane.</remarks>
     public IRelayCommand ForgetCommand => new RelayCommand(() => _owner.Forget(this));
 
+    /// <summary>Swaps the lane between stepping and sweeping.</summary>
+    /// <remarks>Always enabled; the panel refuses a row with no lane.</remarks>
     public IRelayCommand NextCommand => new RelayCommand(() => _owner.Next(this));
 }

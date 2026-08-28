@@ -26,6 +26,12 @@ public interface IPluginEditor : IDisposable
     /// Puts the plugin's interface inside a window the host owns. The handle is whatever this
     /// platform calls a window: an X11 window id, an HWND, an NSView.
     /// </summary>
+    /// <remarks>
+    /// The window has to really be on screen at its full size before it is handed over. Avalonia
+    /// makes a one-pixel window before the first layout, and giving that to a plugin is what
+    /// killed Serum: the plugin lays itself out against the size it is told and never recovers
+    /// from having been told one pixel.
+    /// </remarks>
     bool Attach(nint window);
 
     /// <summary>Takes it back out, before the window goes away.</summary>
@@ -39,14 +45,4 @@ public interface IPluginEditor : IDisposable
     /// it. The host is expected to make its window that size.
     /// </summary>
     event Action<int, int>? ResizeRequested;
-}
-
-/// <summary>A plugin that may have an interface of its own.</summary>
-public interface IPluginWindowSource
-{
-    /// <summary>
-    /// Opens the plugin's own interface, or null when it has none. Some plugins are all
-    /// parameters and no picture, and those still get the host's knobs.
-    /// </summary>
-    IPluginEditor? OpenEditor();
 }

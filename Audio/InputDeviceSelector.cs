@@ -9,6 +9,7 @@ namespace JingleBox2.Audio;
 /// </summary>
 public static class InputDeviceSelector
 {
+    /// <summary>What is picked when there is nothing to pick, which the system then resolves.</summary>
     public const string Fallback = "Default";
 
     /// <summary>

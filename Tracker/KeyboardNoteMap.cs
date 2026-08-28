@@ -9,16 +9,23 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public static class KeyboardNoteMap
 {
-    /// <summary>Semitone offset from the base octave, or null when the key is not a note key.</summary>
+    /// <summary>
+    /// Semitone offset from the base octave, or null when the key is not a note key.
+    /// </summary>
+    /// <remarks>
+    /// Two rows of the letter keyboard, each a keyboard of its own. On the lower row Z is C of
+    /// the current octave, with S and D standing in for the black keys above it; on the upper
+    /// row Q is C an octave higher, with the digit row doing the same job. The rows overlap by
+    /// five keys at the join, which is deliberate and is what every tracker does: the notes
+    /// under a hand resting on the middle of the keyboard can be reached from either row.
+    /// </remarks>
     private static readonly Dictionary<string, int> Offsets = new()
     {
-        // Lower row: Z is C of the current octave.
         ["Z"] = 0,  ["S"] = 1,  ["X"] = 2,  ["D"] = 3,  ["C"] = 4,
         ["V"] = 5,  ["G"] = 6,  ["B"] = 7,  ["H"] = 8,  ["N"] = 9,
         ["J"] = 10, ["M"] = 11,
         ["OemComma"] = 12, ["L"] = 13, ["OemPeriod"] = 14, ["OemSemicolon"] = 15, ["Oem2"] = 16,
 
-        // Upper row: Q is C one octave above.
         ["Q"] = 12, ["D2"] = 13, ["W"] = 14, ["D3"] = 15, ["E"] = 16,
         ["R"] = 17, ["D5"] = 18, ["T"] = 19, ["D6"] = 20, ["Y"] = 21,
         ["D7"] = 22, ["U"] = 23,
@@ -72,5 +79,14 @@ public static class KeyboardNoteMap
         return new Note(semitone);
     }
 
+    /// <summary>
+    /// True for a key that is part of the layout at all.
+    /// </summary>
+    /// <remarks>
+    /// Asked separately from <see cref="NoteFor"/> because they answer different questions: this
+    /// one says whether a key press belongs to the keyboard, and that one says what it plays.
+    /// A key that is on the layout but out of range at this octave is still the keyboard's, and
+    /// must not fall through to whatever the letter would otherwise have done.
+    /// </remarks>
     public static bool IsNoteKey(string key) => Offsets.ContainsKey(key);
 }

@@ -17,14 +17,23 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class MachinePresetNames : IMachinePresets
 {
+    /// <summary>The bench the presets are being written on, asked afresh rather than copied.</summary>
+    /// <remarks>
+    /// Held rather than the list itself, because a preset added or renamed while the panel is on
+    /// screen has to show up in the picker without anybody wiring the two together.
+    /// </remarks>
     private readonly MachinePresetDesk _desk;
 
+    /// <summary>Offers the desk's presets to a panel being laid out.</summary>
     public MachinePresetNames(MachinePresetDesk desk) => _desk = desk;
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> Names => _desk.Presets.Select(one => one.Name).ToList();
 
-    /// <summary>Which one is showing, which on a panel being laid out is none of them.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Which one is showing, which on a panel being laid out is none of them.</remarks>
     public int Picked { get; set; } = -1;
 
+    /// <inheritdoc/>
     public string Caption => "Preset";
 }

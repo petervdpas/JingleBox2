@@ -14,20 +14,36 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineWindow : Window
 {
+    /// <summary>
+    /// The one that is open, so a second request brings it forward rather than opening another.
+    /// </summary>
+    /// <remarks>
+    /// Static because the rack is one thing and there is nowhere else to keep it: the window is
+    /// opened from a command that holds no window of its own. Cleared when it closes, or the
+    /// next request would activate a window that is gone.
+    /// </remarks>
     private static MachineWindow? _open;
 
+    /// <summary>
+    /// Builds the window and lets the other mouse mode be reached from inside it.
+    /// </summary>
+    /// <remarks>
+    /// The pointer goes where the windows are, so the gesture has to be answered on every
+    /// window that has something pointable on it, not only on the main one. See
+    /// <see cref="LinkKey"/>.
+    /// </remarks>
     public MachineWindow()
     {
         InitializeComponent();
 
-        // The pointer goes where the windows are, so the mode has to be reachable from all of
-        // them. See LinkKey.
         LinkKey.Listen(this);
     }
 
     /// <summary>
     /// Opens the rack over the app's window, or brings the one that is open forward.
     /// </summary>
+    /// <param name="rack">The machines to show, and nothing is opened without one.</param>
+    /// <param name="owner">The app's window, which this one sits over, and nothing is opened without one.</param>
     /// <param name="inFront">
     /// Told whenever this window takes or loses the keyboard. A note played while the rack is
     /// in front is auditioning a machine; the same key on the pattern is writing a note, and

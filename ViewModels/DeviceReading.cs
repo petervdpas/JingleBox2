@@ -13,4 +13,6 @@ namespace JingleBox2.ViewModels;
 /// moved, and the list is replaced rather than each row being told: three rows is not worth a
 /// property changed apiece, and the plugin's own window is where a value is watched live.
 /// </remarks>
+/// <param name="Name">What the control is called, as the device names it.</param>
+/// <param name="Text">Where it stands, already worded the way its own window words it.</param>
 public sealed record DeviceReading(string Name, string Text);

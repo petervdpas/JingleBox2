@@ -19,13 +19,45 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PluginInstrumentViewModel : ObservableObject
 {
+    /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
+
+    /// <summary>
+    /// Asks for the plugin the tracker is actually playing, rather than loading a second one.
+    /// </summary>
+    /// <remarks>
+    /// A function and not the plugin itself, because at the moment this box is made there may be
+    /// no plugin at all: the tracker loads its copy on the first note, and asking early would
+    /// cost a load nobody wanted.
+    /// </remarks>
     private readonly Func<IPluginInstrument?> _live;
+
+    /// <summary>Told when a knob moves, so the song knows it has something to save.</summary>
     private readonly Action? _changed;
+
+    /// <summary>Builds the designer for a machine of ours, on the first ask.</summary>
     private readonly Func<TrackInstrumentDesigner>? _designer;
 
+    /// <summary>The plugin, once something has asked for it, so its patch can be read back.</summary>
     private IPluginInstrument? _plugin;
 
+    /// <summary>
+    /// Makes the head of a track's strip for one instrument, without loading anything.
+    /// </summary>
+    /// <param name="instrument">What the track plays, which is where the name and the settings are read from.</param>
+    /// <param name="live">
+    /// Asks for the plugin the tracker is actually playing. A function rather than the plugin
+    /// itself, since at the moment this block is made there may be none loaded yet.
+    /// </param>
+    /// <param name="changed">Told when a knob moves, so the song knows it has something to save.</param>
+    /// <param name="designer">
+    /// Builds the designer for a machine of ours, on the first ask, and is null for a plugin,
+    /// which has no described panel to design.
+    /// </param>
+    /// <param name="remove">
+    /// Takes it off the track, or null where there is no track to take it off, which is what
+    /// makes the cross on the block appear at all.
+    /// </param>
     public PluginInstrumentViewModel(
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
@@ -40,6 +72,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         _remove = remove;
     }
 
+    /// <summary>What the cross on the block does, or null when the box is not on a track.</summary>
     private readonly Action? _remove;
 
     /// <summary>
@@ -80,8 +113,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     public TrackInstrumentDesigner? Designer =>
         IsPlugin ? null : _built ??= _designer?.Invoke();
 
+    /// <summary>The designer once it exists, so coming back to a track shows the same one.</summary>
     private TrackInstrumentDesigner? _built;
 
+    /// <summary>What the instrument is called in this song, which is the name on the block.</summary>
     public string Name => _instrument.Name;
 
     /// <summary>What the plugin is called, for a window title that says which is which.</summary>
@@ -132,13 +167,23 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// </remarks>
     public System.Collections.Generic.IReadOnlyList<DeviceReading> Summary => _summary ??= Pick();
 
+    /// <summary>What was last read off the patch, or null when it has to be read again.</summary>
     private System.Collections.Generic.List<DeviceReading>? _summary;
 
+    /// <summary>True when there is anything to print under the name.</summary>
     public bool HasSummary => Summary.Count > 0;
 
     /// <summary>How many fit on a block without it becoming a panel of its own.</summary>
     private const int Shown = 3;
 
+    /// <summary>
+    /// Reads the machine's first few controls, in the order its own panel reads.
+    /// </summary>
+    /// <remarks>
+    /// Through a throwaway values adapter, since nothing here is edited: the editor is what the
+    /// panel needs and is deliberately not built. A plugin instrument answers with nothing,
+    /// because its settings live inside the plugin and its block says the plugin's name instead.
+    /// </remarks>
     private System.Collections.Generic.List<DeviceReading> Pick()
     {
         var found = new System.Collections.Generic.List<DeviceReading>(Shown);
@@ -225,6 +270,12 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// the song keeping a sound nobody is listening to. Reading a patch costs a plugin one
     /// call and a couple of hundred kilobytes at worst, and this happens when a song is saved
     /// or a window is closed, not while anything is being played.
+    ///
+    /// A plugin that will not give its patch back keeps whatever the instrument already had.
+    /// Writing nothing over something is how a saved sound gets lost.
+    ///
+    /// A patch is not a set of knob positions, which is why this exists at all: the wavetables,
+    /// the effect rack and the preset's own name are in the lump and in none of the parameters.
     /// </remarks>
     public void SyncPatch()
     {
@@ -232,8 +283,6 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
         var patch = _plugin.SaveState();
 
-        // A plugin that will not give its patch back keeps whatever the instrument already
-        // had. Writing nothing over something is how a saved sound gets lost.
         if (patch == null || patch.Length == 0) return;
 
         _instrument.PluginState = patch;

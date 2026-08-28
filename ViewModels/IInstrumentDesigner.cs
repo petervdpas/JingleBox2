@@ -82,6 +82,7 @@ public interface IInstrumentDesigner
     /// </remarks>
     IRelayCommand<int> KeyPressCommand => new RelayCommand<int>(MachineKeys.Play);
 
+    /// <inheritdoc cref="KeyPressCommand"/>
     IRelayCommand<int> KeyLetCommand => new RelayCommand<int>(MachineKeys.Let);
 
     /// <summary>

@@ -19,6 +19,10 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public sealed class PluginStateJson : JsonConverter<byte[]>
 {
+    /// <summary>
+    /// Reads the lump back. Anything that is not a base64 string reads as no state at all,
+    /// rather than being allowed to throw and take the document with it.
+    /// </summary>
     public override byte[] Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.String) return Array.Empty<byte>();
@@ -33,6 +37,11 @@ public sealed class PluginStateJson : JsonConverter<byte[]>
         }
     }
 
+    /// <summary>
+    /// Writes the lump as base64, and an empty string for nothing, so that a field which has
+    /// never held a patch still reads back as a string rather than as a null somebody has to
+    /// guard against.
+    /// </summary>
     public override void Write(Utf8JsonWriter writer, byte[] value, JsonSerializerOptions options)
     {
         if (value == null || value.Length == 0) writer.WriteStringValue("");

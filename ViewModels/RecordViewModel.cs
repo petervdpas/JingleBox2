@@ -19,15 +19,51 @@ using System.Threading.Tasks;
 
 namespace JingleBox2.ViewModels;
 
+/// <summary>
+/// RECORD: what the machine is listening to, what it has taken down, and the shelf of takes.
+/// </summary>
+/// <remarks>
+/// The shelf is the app's own, in the application folder, and it is where every other page gets
+/// its audio from: a pad plays a take off it, and so does a sampler, a kit and a map. That is
+/// the whole reason this page owns the files rather than pointing at wherever somebody happened
+/// to leave a wav.
+///
+/// Deleting a take does not delete it. It moves into <c>deleted/</c> beside the recordings, so
+/// undo on this page fetches the last one back and the confirmation stopped having to say "this
+/// cannot be undone". A move rather than a copy, because a take is the one thing here that can
+/// be a hundred megabytes and paying for the undo up front would be paying whether or not
+/// anybody wanted it. Only this session's deletions are offered back: putting back a take from
+/// last week is a filing cabinet, not undo.
+/// </remarks>
 public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.IShortcutContext
 {
+    /// <summary>What actually opens the input and writes the file.</summary>
     private readonly IRecordingService _recordingService;
+
+    /// <summary>Where the meter's numbers come from while nothing is being recorded.</summary>
     private readonly ILevelMeterService _levelMeter;
+
+    /// <summary>Reduces a finished take to peaks, for the picture under the list.</summary>
     private readonly IWaveformService _waveformService;
+
+    /// <summary>Where the input device and the gain are written down, which is the settings file.</summary>
     private readonly ConfigStore _configStore;
+
+    /// <summary>The settings themselves, held so a change can be written without reading first.</summary>
     private readonly AppConfig _cfg;
+
+    /// <summary>How long the take has been running, for the clock in the bar.</summary>
+    /// <remarks>
+    /// A stopwatch rather than a count of buffers, because what this shows is how long somebody
+    /// has been talking and not how much audio has been written; the two differ when the input
+    /// drops out, and the honest answer for a person watching a clock is wall time.
+    /// </remarks>
     private Stopwatch _recordingTimer = new();
+
+    /// <summary>Reads the meter while the page is up, and only while it is.</summary>
     private System.Timers.Timer? _levelUpdateTimer;
+
+    /// <summary>What the system has wired to the input, which is not what somebody chose.</summary>
     private readonly IAudioRouting _routing;
 
     /// <summary>Who to ask whether a recording is spoken for. Null before the rack exists.</summary>
@@ -39,6 +75,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </summary>
     private readonly Waveform.WaveformPlayer _preview = new();
 
+    /// <summary>The take the preview is on, so its row can be put back to idle when it stops.</summary>
     private Recording? _playing;
 
     /// <summary>Set while a route is being read back, so showing it does not re-apply it.</summary>
@@ -57,22 +94,60 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     private static readonly TimeSpan RouteWatchInterval = TimeSpan.FromSeconds(2);
 
     /// <summary>
+    /// How often the input's level is read, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Twenty a second: faster than an eye can follow a meter, and slow enough that reading the
+    /// last moment of audio costs nothing worth counting.
+    /// </remarks>
+    private const int LevelPollMs = 50;
+
+    /// <summary>
+    /// How long the gain sits still before it is written down.
+    /// </summary>
+    /// <remarks>
+    /// Half a second is longer than the pause inside a drag and shorter than the pause before
+    /// somebody closes the program, which is the only thing this has to get right.
+    /// </remarks>
+    private static readonly TimeSpan GainSaveDelay = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
     /// What was picked, as opposed to what happens to be wired up. The input is reopened every
     /// time this page comes back, and the system wires the new stream to its own default, so
     /// without this a choice would last until the next tab switch.
     /// </summary>
     private AudioRoute? _preferredRoute;
+
+    /// <summary>
+    /// Holds the gain back from the settings file while it is being dragged.
+    /// </summary>
+    /// <remarks>
+    /// The slider fires on every pixel, and each of those would otherwise be a write of the
+    /// whole settings file. The value reaches the recorder at once either way: only the writing
+    /// down waits.
+    /// </remarks>
     private readonly DispatcherTimer _gainSaveTimer;
+
+    /// <summary>
+    /// False until the stored gain has been put on the slider.
+    /// </summary>
+    /// <remarks>
+    /// Setting the slider raises a change like any other, and answering that one would write the
+    /// settings file back with the value it was just read from, on every start.
+    /// </remarks>
     private bool _gainLoaded;
+
+    /// <summary>The same guard for the input device, and for the same reason.</summary>
     private bool _deviceLoaded;
 
+    /// <summary>Every input the machine offers, in the order the system lists them.</summary>
     public ObservableCollection<string> InputDevices { get; } = new();
 
     /// <summary>Everything on the shelf, whatever the list is showing at the moment.</summary>
     public ObservableCollection<Recording> Recordings { get; } = new();
 
     /// <summary>What a take is filed under, written down beside the takes.</summary>
-    private readonly RecordingCategories _filing = new();
+    private readonly IRecordingCategories _filing = new RecordingCategories();
 
     /// <summary>
     /// The shelf as this page shows it, narrowed to a category or not.
@@ -93,6 +168,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     [ObservableProperty] private string takeCategory = "";
 
+    /// <summary>Which input is being listened to, by the name the system gives it.</summary>
+    /// <remarks>
+    /// A name rather than a number, because a device's number moves when something else is
+    /// plugged in and a name is what somebody recognises when they come back tomorrow.
+    /// </remarks>
     [ObservableProperty] private string? selectedDevice;
 
     /// <summary>Where you are, for the bar along the bottom: what it is listening to, and how many takes.</summary>
@@ -107,10 +187,15 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
                    (IsRecording ? "  ·  recording" : "");
         }
     }
+    /// <summary>Whether a take is being written right now.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     private bool isRecording;
+
+    /// <summary>How long it has been running, written out for the clock.</summary>
     [ObservableProperty] private string recordingTime = "00:00:00";
+
+    /// <summary>The loudest of the two sides, for a meter with one bar.</summary>
     [ObservableProperty] private float level;
 
     /// <summary>True when the input is captured in stereo, so the meter shows two bars.</summary>
@@ -118,8 +203,19 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
     /// <summary>The two sides on their own, for the meter. Mono input reports the same twice.</summary>
     [ObservableProperty] private float levelLeft;
+
+    /// <summary>The right side, which reads the same as the left on a mono input.</summary>
     [ObservableProperty] private float levelRight;
+
+    /// <summary>The picture of the take that is picked, or null while there is none to show.</summary>
     [ObservableProperty] private WaveformData? currentWaveform;
+
+    /// <summary>What the next take will be called.</summary>
+    /// <remarks>
+    /// Filled in with the next unused name so that pressing record twice does not stop to ask
+    /// anything, and checked as it is typed, since a name that cannot be a file name has to be
+    /// refused before the recording rather than after it.
+    /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     private string recordingName = RecordingNameValidator.DefaultBaseName;
@@ -129,6 +225,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     [NotifyPropertyChangedFor(nameof(CanRecord))]
     [NotifyPropertyChangedFor(nameof(HasNameError))]
     private string? nameError;
+
+    /// <summary>What the page has to say for itself, in the bar under the buttons.</summary>
     [ObservableProperty] private string status = "Ready";
 
     /// <summary>
@@ -142,16 +240,47 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     [ObservableProperty] private Recording? selectedRecording;
 
+    /// <summary>The take whose name is being typed over, or null when none is being renamed.</summary>
     [ObservableProperty] private Recording? selectedRecordingForEdit;
+
+    /// <summary>How much the input is turned up, in decibels, before anything is written.</summary>
+    /// <remarks>
+    /// Applied to the incoming audio rather than to the file afterwards, which is the point: a
+    /// take recorded too quietly cannot be repaired later without bringing the noise up with it.
+    /// </remarks>
     [ObservableProperty] private double recordGainDb;
+
+    /// <summary>True when the input has hit the ceiling, so the meter can say so in red.</summary>
     [ObservableProperty] private bool isClipping;
 
+    /// <summary>The two ends of the gain slider, taken from the recorder so they cannot drift.</summary>
     public double MinGainDb => Audio.RecordingService.MinGainDb;
+
+    /// <inheritdoc cref="MinGainDb"/>
     public double MaxGainDb => Audio.RecordingService.MaxGainDb;
 
+    /// <summary>Whether there is a reason to show, which is what puts the message on the page.</summary>
     public bool HasNameError => NameError != null;
+
+    /// <summary>Whether the record button does anything: not already running, and a usable name.</summary>
     public bool CanRecord => !IsRecording && NameError == null;
 
+    /// <summary>
+    /// Builds the page, reads the shelf, and puts the stored gain and input back where they were.
+    /// </summary>
+    /// <remarks>
+    /// The order matters in two places. The filter is built after the takes are read, so it
+    /// starts stocked rather than filling itself a moment later and flickering. And the gain is
+    /// pushed into the recorder as well as onto the slider, since a stored value that happens to
+    /// equal the slider's own starting value changes nothing and would never reach the recorder
+    /// at all.
+    ///
+    /// The name check follows the shelf rather than being run once, because deleting a recording
+    /// frees its name again and a name refused as taken would go on being refused.
+    ///
+    /// The preview's row goes back to idle when it stops, whether it ran out on its own or
+    /// somebody stopped it, since those are the same thing to whoever is looking at the list.
+    /// </remarks>
     public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing)
     {
         _routing = routing;
@@ -162,8 +291,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _waveformService = waveformService;
         _configStore = configStore;
 
-        // Dragging the slider fires on every pixel, so coalesce the writes to config.json.
-        _gainSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _gainSaveTimer = new DispatcherTimer { Interval = GainSaveDelay };
         _gainSaveTimer.Tick += (_, _) =>
         {
             _gainSaveTimer.Stop();
@@ -171,8 +299,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _configStore.Save(_cfg);
         };
 
-        RecordGainDb = cfg.RecordGainDb; // also pushes it into the service via the partial hook
-        _recordingService.GainDb = cfg.RecordGainDb; // covers the case where the value was already 0
+        RecordGainDb = cfg.RecordGainDb;
+        _recordingService.GainDb = cfg.RecordGainDb;
         _gainLoaded = true;
 
         RefreshDevices();
@@ -180,14 +308,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         LoadRecordings();
 
-        // Built after the takes are read, so it starts stocked rather than filling itself a
-        // moment later.
         Shelf = new TakeFilter(Recordings);
 
-        // Deleting a recording frees its name again, so the check has to follow the list.
         Recordings.CollectionChanged += (_, _) => ValidateName();
 
-        // Whether it ran out or was stopped, the row it was playing goes back to idle.
         _preview.Stopped += () =>
         {
             if (_playing != null) _playing.IsPlaying = false;
@@ -199,43 +323,95 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         ValidateName();
     }
 
+    /// <summary>
+    /// Opens the input and starts writing a take under the name in the box.
+    /// </summary>
+    /// <remarks>
+    /// Always enabled; what stops it is <see cref="CanRecord"/> on the button, since a page that
+    /// silently ignored the record key would be worse than one that says why it will not.
+    /// </remarks>
     public IAsyncRelayCommand StartRecordingCommand => new AsyncRelayCommand(StartRecording);
+
+    /// <summary>Closes the take, reads its shape, and puts it on the shelf.</summary>
     public IAsyncRelayCommand StopRecordingCommand => new AsyncRelayCommand(StopRecording);
+
+    /// <summary>Asks the system for its inputs again, for a microphone plugged in just now.</summary>
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
+
+    /// <summary>Opens the edit dialog on that take, which is where a rename is typed.</summary>
     public IRelayCommand<Recording> EditRecordingCommand => new RelayCommand<Recording>(EditRecording);
+
+    /// <summary>
+    /// Puts that take in the bin, having first asked what else is playing it.
+    /// </summary>
+    /// <remarks>
+    /// The bin is a folder beside the recordings rather than a delete, so undo can fetch it
+    /// back. What is asked is the rack and the songs both: a song owns its instruments, so a
+    /// recording nothing on the rack plays can still be the sound of three songs.
+    /// </remarks>
     public IAsyncRelayCommand<Recording> DeleteRecordingCommand => new AsyncRelayCommand<Recording>(DeleteRecording);
 
     /// <summary>True while a take is being auditioned from the list.</summary>
     [ObservableProperty] private bool isPreviewing;
 
-    /// <summary>
-    /// This page, as the transport at the top of the window sees it: record takes a take,
-    /// play plays the one whose picture is up, stop stops whichever is happening.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// Pause is greyed. A take is either being made or it is not, and half a recording paused
-    /// in the middle is not a thing a tape machine ever offered either.
+    /// Two things count as running here, taking a take and auditioning one, because either of
+    /// them is this page making a sound and the transport wants to know which page owns it.
     /// </remarks>
     bool ITransportDeck.IsRunning => IsRecording || IsPreviewing;
 
+    /// <inheritdoc/>
+    /// <remarks>Playing on RECORD means auditioning a take off the shelf, nothing else.</remarks>
     bool ITransportDeck.IsPlaying => IsPreviewing;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Never. A take is either being made or it is not, and half a recording paused in the
+    /// middle is not a thing a tape machine ever offered either.
+    /// </remarks>
     bool ITransportDeck.IsPaused => false;
 
+    /// <inheritdoc/>
+    /// <remarks>There has to be a take picked to play, and it must not already be playing.</remarks>
     bool ITransportDeck.CanPlay => SelectedRecording != null && !IsPreviewing;
+
+    /// <inheritdoc/>
+    /// <remarks>The pause cap is greyed on this page, so nothing ever calls Pause.</remarks>
     bool ITransportDeck.CanPause => false;
 
+    /// <inheritdoc/>
     void ITransportDeck.Record() => StartRecordingCommand.Execute(null);
+
+    /// <inheritdoc/>
+    /// <remarks>The take whose picture is up, which is the one the buttons underneath are about.</remarks>
     void ITransportDeck.Play() => PlayRecording(SelectedRecording);
+
+    /// <inheritdoc/>
+    /// <remarks>Nothing to do, and the cap that would call it is greyed.</remarks>
     void ITransportDeck.Pause() { }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Stops whichever of the two is happening. Recording wins, since it is the one where
+    /// pressing stop a second late costs something.
+    /// </remarks>
     void ITransportDeck.Stop()
     {
         if (IsRecording) StopRecordingCommand.Execute(null);
         else StopPreview();
     }
 
+    /// <summary>
+    /// Auditions that take, stopping whatever was being auditioned.
+    /// </summary>
+    /// <remarks>
+    /// One at a time on purpose: this is for hearing what a take is, and two at once tells you
+    /// nothing.
+    /// </remarks>
     public IRelayCommand<Recording> PlayRecordingCommand => new RelayCommand<Recording>(PlayRecording);
 
+    /// <summary>Stops the audition, whichever take it is on: the argument is ignored.</summary>
     public IRelayCommand<Recording> StopRecordingPlaybackCommand => new RelayCommand<Recording>(_ => StopPreview());
 
     /// <summary>
@@ -255,9 +431,15 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     [NotifyPropertyChangedFor(nameof(RenameError))]
     private string editName = "";
 
+    /// <summary>Typing in the box moves the dialog's button, which is what says the name is usable.</summary>
     partial void OnEditNameChanged(string value) => OnPropertyChanged(nameof(CanRename));
 
     /// <summary>Why that name cannot be used, or null when it can.</summary>
+    /// <remarks>
+    /// The take's own name is left out of what is checked against, or a take renamed to what it
+    /// is already called would be refused as taken. Its name unchanged is allowed outright,
+    /// since pressing Rename on a name nobody edited is not an error to report.
+    /// </remarks>
     public string? RenameError
     {
         get
@@ -276,6 +458,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>Whether the dialog's Rename button does anything: a take open and a usable name.</summary>
     public bool CanRename => RenameError == null && SelectedRecordingForEdit != null;
 
     /// <summary>
@@ -286,7 +469,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// put it: renaming is moving. Which is why the instruments that play it are repointed in
     /// the same breath, on the shelf and in whatever song is open, rather than being left to
     /// find out at the next note.
+    ///
+    /// The audition is stopped first, because a file being played is a file that is open, and on
+    /// Windows a file that is open is a file that will not move.
+    ///
+    /// The filing is kept by name rather than by path, so a take called something else has to be
+    /// written down again under the new one or it loses its category on the way past.
     /// </remarks>
+    /// <returns>
+    /// True when the take really moved. False leaves <see cref="Status"/> saying why, since a
+    /// rename that failed is something the dialog has to stay open about.
+    /// </returns>
     public async Task<bool> RenameAsync(string? newName)
     {
         var recording = SelectedRecordingForEdit;
@@ -321,8 +514,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         try
         {
-            // A file being played is a file that is open, which on Windows is a file that will
-            // not move.
             if (ReferenceEquals(_playing, recording)) StopPreview();
 
             await Task.Run(() => File.Move(from, to));
@@ -332,8 +523,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             recording.FilePath = to;
             recording.Name = wanted;
 
-            // The filing is kept by name, so a take that is called something else now has to
-            // be written down again under it.
             _filing.Renamed(was, wanted);
 
             int moved = _sampleUsage?.Repoint(from, to) ?? 0;
@@ -353,6 +542,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>
+    /// Asks the system what inputs there are and keeps the one that was chosen if it is still
+    /// there.
+    /// </summary>
+    /// <remarks>
+    /// The pick falls back to the settings file rather than to nothing, so a page built before
+    /// anybody has touched the picker still comes up on the input somebody chose last time. What
+    /// is not there any more falls back to the first input, since a page pointed at a microphone
+    /// that has been unplugged records silence and says nothing about why.
+    /// </remarks>
     private void RefreshDevices()
     {
         string? previous = SelectedDevice ?? _cfg.RecordInputDevice;
@@ -361,10 +560,21 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         foreach (var device in _recordingService.GetInputDevices())
             InputDevices.Add(device);
 
-        // Keep the current pick if it is still plugged in, otherwise fall back to the first one.
         SelectedDevice = InputDeviceSelector.Pick(InputDevices, previous);
     }
 
+    /// <summary>
+    /// Reads the shelf off the disc, which is the folder and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// There is no index: what is on the shelf is what wav files are in the folder, so a take
+    /// copied in by hand is on the shelf and one deleted by hand is off it, with nothing to
+    /// repair. The category is the one thing that cannot be read off the audio, so it is looked
+    /// up by name in the filing beside the takes.
+    ///
+    /// A folder that is not there yet is not a fault: it is a first run, and the folder appears
+    /// when the first take is written.
+    /// </remarks>
     private void LoadRecordings()
     {
         try
@@ -424,6 +634,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <remarks>
     /// Named rather than implied, because the box can be left by clicking on another take, and
     /// what was typed belongs to the take it was typed for.
+    ///
+    /// The box on the page is only written when the take being filed is the one the page is
+    /// showing, since the box says what the picked take is filed under and nothing else.
     /// </remarks>
     public void FileUnder(Recording? recording, string? category)
     {
@@ -431,7 +644,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         string wanted = (category ?? "").Trim();
 
-        // Only when it is the one on the page: the box shows the take that is picked.
         if (ReferenceEquals(recording, SelectedRecording) &&
             !string.Equals(TakeCategory, wanted, StringComparison.Ordinal))
         {
@@ -456,18 +668,23 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Whatever is sounding stops first: the picture and the play button now belong to the
     /// take that is picked, and leaving the last one running underneath a different waveform
     /// is a lie about what you are hearing.
+    ///
+    /// Three other things follow the pick. The transport's play cap is lit by there being
+    /// something to play. The trim, the normalise and the edit dialog all work on this take. And
+    /// the category box shows what it is filed under, since that box is about whichever take is
+    /// picked.
+    ///
+    /// A take that cannot be read leaves the picture empty and says so rather than throwing: a
+    /// damaged or half-copied wav is an ordinary thing to find on a shelf.
     /// </remarks>
     partial void OnSelectedRecordingChanged(Recording? value)
     {
         StopPreview();
 
-        // The transport's play cap is lit by there being something picked to play.
         OnPropertyChanged(nameof(ITransportDeck.CanPlay));
 
-        // The trim and the normalise work on this one, and so does the edit dialog.
         SelectedRecordingForEdit = value;
 
-        // The box belongs to whichever take is picked.
         TakeCategory = value?.Category ?? "";
 
         if (value == null)
@@ -488,8 +705,16 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>Every keystroke in the name box is checked, so the button moves as it is typed.</summary>
     partial void OnRecordingNameChanged(string value) => ValidateName();
 
+    /// <summary>
+    /// Works out whether the name in the box can be used, and why not when it cannot.
+    /// </summary>
+    /// <remarks>
+    /// Checked against the shelf rather than against the disc, because the shelf is what is
+    /// really there and a check that opened the folder would run on every letter typed.
+    /// </remarks>
     private void ValidateName() =>
         NameError = RecordingNameValidator.Validate(RecordingName, Recordings.Select(r => r.Name));
 
@@ -497,34 +722,59 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     private string NextRecordingName(string basedOn) =>
         RecordingNameValidator.NextName(basedOn, Recordings.Select(r => r.Name));
 
+    /// <summary>
+    /// The gain reaches the recorder at once and the settings file half a second later.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is written while the stored value is being put on the slider, or every start
+    /// would rewrite the settings file with the value it had just read out of it.
+    /// </remarks>
     partial void OnRecordGainDbChanged(double value)
     {
         _recordingService.GainDb = value;
 
-        if (!_gainLoaded) return; // do not rewrite the file just for loading it
+        if (!_gainLoaded) return;
 
         _gainSaveTimer.Stop();
         _gainSaveTimer.Start();
     }
 
+    /// <summary>
+    /// Points the recorder at that input and remembers it for the next session.
+    /// </summary>
+    /// <remarks>
+    /// Written down straight away rather than coalesced, unlike the gain: picking an input is
+    /// one act somebody performed, not a hundred values from a drag. The same guard applies
+    /// while the stored device is being put on the picker, and a device that is already the one
+    /// stored writes nothing.
+    /// </remarks>
     partial void OnSelectedDeviceChanged(string? value)
     {
         if (string.IsNullOrEmpty(value)) return;
 
         _recordingService.SelectedDevice = value;
 
-        if (!_deviceLoaded) return; // do not rewrite the file just for loading it
+        if (!_deviceLoaded) return;
         if (_cfg.RecordInputDevice == value) return;
 
         _cfg.RecordInputDevice = value;
         _configStore.Save(_cfg);
     }
 
+    /// <summary>
+    /// Opens the edit dialog on a take: its name, its picture, and the two things that rewrite it.
+    /// </summary>
+    /// <remarks>
+    /// The audition is stopped first, because the dialog has a player of its own and the page's
+    /// would go on sounding underneath it.
+    ///
+    /// The picture is read again rather than the page's being handed over, since the dialog is
+    /// the one that rewrites the file and has to start from what is on disc now.
+    /// </remarks>
     private void EditRecording(Recording? recording)
     {
         if (recording == null) return;
 
-        // The dialog has a player of its own, and the page's would go on underneath it.
         StopPreview();
 
         try
@@ -532,11 +782,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             SelectedRecordingForEdit = recording;
             EditName = recording.Name;
 
-            // Read again rather than trusting the page's, since the dialog is the one that
-            // rewrites the file and has to start from what is on disc now.
             CurrentWaveform = _waveformService.AnalyzeFile(recording.FilePath);
 
-            // Open edit dialog
             var dialog = new RecordingEditDialog
             {
                 DataContext = this
@@ -568,6 +815,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     ///
     /// One file at a time, so what came back can be matched to what went in and the line at
     /// the end can count honestly.
+    ///
+    /// A file picked out of the recordings folder itself is already on the shelf, and importing
+    /// it would hand it straight back and give the list a second row for one file. Those are
+    /// counted as held rather than refused, since dragging a folder in wholesale is the ordinary
+    /// way to meet this.
     /// </remarks>
     public void Import(IReadOnlyList<string> paths)
     {
@@ -578,8 +830,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         foreach (string path in paths)
         {
-            // A file picked out of the recordings folder itself is already on the shelf, and
-            // Take would hand it straight back and give the list a second row for one file.
             if (Recordings.Any(r => string.Equals(r.FilePath, path, StringComparison.OrdinalIgnoreCase)))
             {
                 held++;
@@ -633,7 +883,15 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Cuts the recording down to the selected region. Start and end are fractions of the
     /// whole file, matching the trim handles in the editor.
     /// </summary>
-    /// <summary>Returns true when the file was rewritten, so callers can reset their view.</summary>
+    /// <remarks>
+    /// The file itself is rewritten, so anything built on it is holding audio that no longer
+    /// exists: <see cref="RecordingChanged"/> says the path, and whoever is playing it from
+    /// memory reads it again.
+    ///
+    /// The work is done off the drawing thread, since a long take takes a moment and a page that
+    /// stopped while it did would read as a program that had hung.
+    /// </remarks>
+    /// <returns>True when the file was rewritten, so callers can reset their view.</returns>
     public async Task<bool> ApplyTrimAsync(double startFraction, double endFraction)
     {
         var recording = SelectedRecordingForEdit;
@@ -652,7 +910,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
             recording.DurationMs = ReadDurationMs(recording.FilePath);
 
-            // An instrument built on this file is holding the old audio in memory, so say so.
             RecordingChanged?.Invoke(this, recording.FilePath);
 
             Status = $"Trimmed '{recording.Name}' to {TimeSpan.FromMilliseconds(recording.DurationMs):mm\\:ss\\.fff}";
@@ -668,14 +925,25 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>Where a normalize puts the loudest moment, in dBFS.</summary>
     [ObservableProperty] private double normalizeTargetDb = Normalization.DefaultTargetDecibels;
 
+    /// <summary>The two ends of the target slider, taken from the rule so they cannot drift.</summary>
     public double MinNormalizeDb => Normalization.MinTargetDecibels;
+
+    /// <inheritdoc cref="MinNormalizeDb"/>
     public double MaxNormalizeDb => Normalization.MaxTargetDecibels;
 
     /// <summary>
     /// Lifts the whole recording so its loudest moment sits on the target. The trim region is
     /// not involved: this is about the level of the file, not about part of it.
     /// </summary>
-    /// <summary>Returns true when the file was rewritten, so callers can redraw.</summary>
+    /// <remarks>
+    /// A take already at the target is left alone and says so, rather than being rewritten to
+    /// the same audio: every rewrite is a file written and a picture redrawn, and doing that for
+    /// no change reads as work having happened when none did.
+    ///
+    /// The audio changes under anything built on this file, so <see cref="RecordingChanged"/>
+    /// carries the path.
+    /// </remarks>
+    /// <returns>True when the file was rewritten, so callers can redraw.</returns>
     public async Task<bool> NormalizeAsync()
     {
         var recording = SelectedRecordingForEdit;
@@ -696,7 +964,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
 
-            // The audio has changed under any instrument built on it.
             RecordingChanged?.Invoke(this, recording.FilePath);
 
             Status = $"Normalized '{recording.Name}' by {moved:+0.0;-0.0} dB";
@@ -748,7 +1015,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             recording.UsedBy = Tracker.SampleUsage.Describe(UsersOf(recording));
     }
 
-    /// <summary>The instruments playing a recording, right now rather than as last stamped.</summary>
+    /// <summary>
+    /// The instruments playing a recording, right now rather than as last stamped.
+    /// </summary>
+    /// <remarks>
+    /// A rack that cannot be read answers as "nothing known" rather than throwing: an unreadable
+    /// rack is no reason to start deleting things, and the delete still asks before it acts.
+    /// </remarks>
     private IReadOnlyList<string> UsersOf(Recording recording)
     {
         if (_sampleUsage == null) return Array.Empty<string>();
@@ -759,13 +1032,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
         catch (Exception)
         {
-            // An unreadable rack is no reason to start deleting things, so this reads as
-            // "nothing known" and the delete still asks before it acts.
             return Array.Empty<string>();
         }
     }
 
-    /// <summary>Plays a recording whole, from the list, so a take can be heard without opening it.</summary>
+    /// <summary>
+    /// Plays a recording whole, from the list, so a take can be heard without opening it.
+    /// </summary>
+    /// <remarks>
+    /// The stream can refuse to open even after the file has been read, and a row that said it
+    /// was playing when nothing was would leave its stop button as the only way out of a state
+    /// nobody is in. So the player is asked whether it really started before the row is lit.
+    /// </remarks>
     private void PlayRecording(Recording? recording)
     {
         if (recording == null) return;
@@ -790,8 +1068,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         _preview.Play(recording.FilePath, 0, 1, frames);
 
-        // The stream can refuse to open, and a row that says it is playing when nothing is
-        // would leave its stop button as the only way out.
         if (!_preview.IsPlaying)
         {
             Status = $"'{recording.Name}' could not be played.";
@@ -812,12 +1088,25 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         IsPreviewing = false;
     }
 
+    /// <summary>
+    /// Puts a take in the bin, having first found out what would go silent without it.
+    /// </summary>
+    /// <remarks>
+    /// What is playing it is asked again here rather than trusting the stamp on the row: the
+    /// rack may have gained an instrument since the list was last marked up, and this is the one
+    /// moment where being out of date costs somebody a song.
+    ///
+    /// A take that is in use is refused outright rather than warned about, because an instrument
+    /// plays the file itself: deleting the recording would silence it in every song that uses
+    /// it, and there is nothing the deletion could do about that afterwards.
+    ///
+    /// The audition is stopped first. A file that is being played is a file that is open, which
+    /// on Windows is a file that will not delete.
+    /// </remarks>
     private async Task DeleteRecording(Recording? recording)
     {
         if (recording == null) return;
 
-        // Asked again here rather than trusting the stamp: the rack may have gained an
-        // instrument since the list was last marked up.
         var used = UsersOf(recording);
         recording.UsedBy = Tracker.SampleUsage.Describe(used);
 
@@ -845,8 +1134,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         try
         {
-            // A file that is being played is a file that is open, which on Windows is a file
-            // that will not delete.
             if (ReferenceEquals(_playing, recording)) StopPreview();
 
             Binned(recording);
@@ -881,9 +1168,18 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Redo is deliberately not answered. Redoing a deletion is deleting, and asking somebody
     /// once is the point.
     /// </remarks>
+    /// <remarks>
+    /// This page is asked before the window is, because the shortcut dispatcher walks outwards
+    /// from whatever has the keyboard and, when nothing has it, that walk only reaches the
+    /// window: a page with no focused control inside it was never asked at all. Pressing undo on
+    /// RECORD straight after clicking a button in a dialog is exactly that, and it silently did
+    /// nothing.
+    /// </remarks>
     bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) =>
         action == Shortcuts.ShortcutAction.Undo && CanUnbin;
 
+    /// <inheritdoc/>
+    /// <remarks>Only undo is answered, and only while there is something in the bin.</remarks>
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
         if (action == Shortcuts.ShortcutAction.Undo) Unbin();
@@ -917,6 +1213,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// A move and not a copy, so it costs nothing whatever the take's length: a recording is
     /// the one thing here that can be a hundred megabytes, and copying one to make a deletion
     /// reversible would be paying for the undo whether or not anybody wanted it.
+    ///
+    /// A name already in the bin is given a number rather than being written over, since a
+    /// second take of the same name deleted later must not land on the first one.
     /// </remarks>
     private void Binned(Recording recording)
     {
@@ -930,7 +1229,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         string to = Path.Combine(folder, Path.GetFileName(from));
 
-        // A second take of the same name deleted later must not land on the first.
         for (int at = 2; File.Exists(to); at++)
             to = Path.Combine(folder,
                 Path.GetFileNameWithoutExtension(from) + " (" + at + ")" + Path.GetExtension(from));
@@ -991,17 +1289,36 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>What the input can be taken from, where the system lets that be chosen.</summary>
     public ObservableCollection<AudioRoute> Routes { get; } = new();
 
+    /// <summary>Which of those the input is being taken from, or null while none is chosen.</summary>
+    /// <remarks>
+    /// Written both by somebody picking one and by the graph being read back, which is why the
+    /// reading is guarded: a route shown would otherwise be applied again the moment it appeared
+    /// in the picker.
+    /// </remarks>
     [ObservableProperty] private AudioRoute? selectedRoute;
 
     /// <summary>False on a system with no graph to patch, and the picker stays hidden.</summary>
     public bool IsRoutingAvailable => _routing.IsAvailable;
 
+    /// <summary>Reads the graph again, for a program that has started playing since.</summary>
+    /// <remarks>
+    /// Always enabled, and the button is only on the page at all where there is a graph to
+    /// read. It is also called on a timer while the page is up, so pressing it is a way to be
+    /// sure rather than the only way to be told.
+    /// </remarks>
     public IRelayCommand RefreshRoutesCommand => new RelayCommand(RefreshRoutes);
 
     /// <summary>
     /// Reads the graph and shows what is feeding the recorder. The tools take a moment, so
     /// this happens off the UI thread.
     /// </summary>
+    /// <remarks>
+    /// The route on show is matched to the current one by node rather than by object, because
+    /// the list is read afresh every time and the object from before is not in it.
+    ///
+    /// One reading at a time: the timer fires every two seconds and the tools can take longer
+    /// than that, so without the guard the readings would pile up on each other.
+    /// </remarks>
     private async void RefreshRoutes()
     {
         if (!_routing.IsAvailable || _refreshingRoutes) return;
@@ -1017,7 +1334,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             Merge(routes);
 
-            // Match by node: the list is read afresh, so the object from before is not in it.
             var showing = current == null ? null : Routes.FirstOrDefault(r => r.Node == current.Node);
             if (!ReferenceEquals(showing, SelectedRoute)) SelectedRoute = showing;
 
@@ -1049,6 +1365,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _routeWatch.Start();
     }
 
+    /// <summary>Stops watching, for a page that has gone away or an input that has closed.</summary>
     private void StopRouteWatch()
     {
         _routeWatch?.Stop();
@@ -1076,6 +1393,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>Where a route with that node sits in the list, or -1 when none does.</summary>
+    /// <remarks>
+    /// By node and not by the whole route, since a route's name and its display can change under
+    /// it while it stays the same thing to connect to.
+    /// </remarks>
     private int IndexOfRoute(string node)
     {
         for (int i = 0; i < Routes.Count; i++)
@@ -1086,11 +1408,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         return -1;
     }
 
+    /// <summary>
+    /// Somebody picked a source, so it is wired up and remembered as what they want.
+    /// </summary>
+    /// <remarks>
+    /// Nothing happens while the graph is being read back, which is what tells a choice apart
+    /// from a reading: only a choice is worth putting back after the input has been reopened.
+    /// </remarks>
     partial void OnSelectedRouteChanged(AudioRoute? value)
     {
         if (_readingRoute || value == null) return;
 
-        // Picked, rather than merely being shown: this is the one to put back later.
         _preferredRoute = value;
         ApplyRoute(value, announce: true);
     }
@@ -1099,6 +1427,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Puts the chosen source back after the input has been reopened. Silent when the choice is
     /// already in place, and gives up when whatever was chosen has since stopped playing.
     /// </summary>
+    /// <remarks>
+    /// A retry rather than a request, so it says nothing unless it works: a source coming and
+    /// going is normal, and there is nothing anybody could do about it if it were announced.
+    /// </remarks>
     private void RestorePreferred(AudioRoute? current)
     {
         if (_applyingRoute || _preferredRoute == null) return;
@@ -1107,8 +1439,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         var still = Routes.FirstOrDefault(r => r.Node == _preferredRoute.Node);
         if (still == null) return;
 
-        // A retry, not a request: it says nothing unless it works, since the source coming and
-        // going is normal and there is nothing for anyone to do about it.
         ApplyRoute(still, announce: false);
     }
 
@@ -1116,6 +1446,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Rewires the input. Off the UI thread: connecting runs a handful of command line tools,
     /// and half a second of frozen window is not something a dropdown should cost.
     /// </summary>
+    /// <remarks>
+    /// Connecting replaces whatever the system wired up, which is the whole point of the
+    /// picker: the system's own choice is a default, not a decision.
+    ///
+    /// What was applied is then shown, with the reading guard up so that showing it does not
+    /// count as a fresh choice and start the whole thing again.
+    /// </remarks>
+    /// <param name="route">The input to wire up, taken from the picker or from what was preferred last.</param>
+    /// <param name="announce">
+    /// False for a retry, which must stay quiet: see <see cref="RestorePreferred"/>.
+    /// </param>
     private async void ApplyRoute(AudioRoute route, bool announce)
     {
         if (_applyingRoute) return;
@@ -1125,10 +1466,8 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _applyingRoute = true;
             if (announce) Status = $"Taking audio from {route.Name}...";
 
-            // Applying it replaces whatever the system wired up, which is the whole point.
             bool connected = await Task.Run(() => _routing.Connect(route));
 
-            // Show what was applied, without that showing counting as a new choice.
             _readingRoute = true;
             var showing = Routes.FirstOrDefault(r => r.Node == route.Node);
             if (connected && showing != null) SelectedRoute = showing;
@@ -1151,6 +1490,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Watches the input's level without keeping any of it, so the meter is live while a gain
     /// is being set. Called when the RECORD page comes up.
     /// </summary>
+    /// <remarks>
+    /// The routes are read after the input is open and not before, because the recorder only
+    /// appears in the graph once it is listening: reading first would show a graph with nothing
+    /// to connect to.
+    /// </remarks>
     public void StartInputMonitoring()
     {
         try
@@ -1158,8 +1502,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _recordingService.StartMonitoring();
             StartLevelPolling();
 
-            // The recorder only appears in the graph once it is listening, so the routes are
-            // read after the input is open, not before.
             RefreshRoutes();
             StartRouteWatch();
         }
@@ -1189,11 +1531,21 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// One poll for both jobs. It runs while the input is open, for a take or for the meter,
     /// and reads the last moment of audio rather than being pushed at from the audio thread.
     /// </summary>
+    /// <remarks>
+    /// Twenty readings a second, which is faster than an eye can follow a bar and slow enough
+    /// that the reading costs nothing. The audio is read on the timer's own thread and only the
+    /// writing is handed to the drawing one, since the meter is four values and the clock is a
+    /// string.
+    ///
+    /// The clock is only written while a take is running: the meter runs whenever the input is
+    /// open, and a clock that ticked while nothing was being recorded would be counting
+    /// something nobody could keep.
+    /// </remarks>
     private void StartLevelPolling()
     {
         if (_levelUpdateTimer != null) return;
 
-        _levelUpdateTimer = new System.Timers.Timer(50);
+        _levelUpdateTimer = new System.Timers.Timer(LevelPollMs);
         _levelUpdateTimer.Elapsed += (_, _) =>
         {
             var recentData = _recordingService.GetRecentRecordingData(4410);
@@ -1216,6 +1568,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _levelUpdateTimer.Start();
     }
 
+    /// <summary>Stops the poll and lets its timer go, for a page that is no longer listening.</summary>
     private void StopLevelPolling()
     {
         _levelUpdateTimer?.Stop();
@@ -1223,6 +1576,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         _levelUpdateTimer = null;
     }
 
+    /// <summary>
+    /// Opens the take: checks the name, silences the audition, and starts the clock.
+    /// </summary>
+    /// <remarks>
+    /// The audition is stopped first because auditioning an old take while capturing a new one
+    /// would put the first one into the second, on any source that carries what the machine is
+    /// playing.
+    ///
+    /// The name is checked again here rather than trusted from the box, since the record cap on
+    /// the transport reaches this without going past the button that is greyed out.
+    /// </remarks>
     private async Task StartRecording()
     {
         ValidateName();
@@ -1232,8 +1596,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             return;
         }
 
-        // Auditioning an old take while capturing a new one would put the first one into the
-        // second, on any source that carries what the machine is playing.
         StopPreview();
 
         try
@@ -1253,6 +1615,23 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         await Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Closes the take, writes it, and puts it on the shelf as the one being looked at.
+    /// </summary>
+    /// <remarks>
+    /// The meter goes on reading if the page is still watching the input; if it is not, the poll
+    /// goes with the take, since nothing would be reading it.
+    ///
+    /// The file is written under the trimmed name, because the name check trims and the two
+    /// would otherwise disagree about whether a name is taken.
+    ///
+    /// The take just made is picked, so its picture is up and the buttons under it are to hand;
+    /// reading it back is what puts the waveform on the page. And the box is filled with the
+    /// next name in the same series, so pressing record again stops to ask nothing.
+    ///
+    /// A take that clipped is still saved and says so. Refusing to keep it would throw away
+    /// audio somebody cannot record again.
+    /// </remarks>
     private async Task StopRecording()
     {
         try
@@ -1260,8 +1639,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             _recordingTimer.Stop();
             _recordingService.StopRecording();
 
-            // The meter keeps reading if the page is still watching the input; if it is not,
-            // the poll goes with the take.
             if (!_recordingService.IsMonitoring) StopLevelPolling();
 
             IsRecording = false;
@@ -1269,7 +1646,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             bool clipped = _recordingService.ClippedDuringTake;
 
-            // The name check trims, so save under the trimmed name too or the two disagree.
             string savedName = RecordingName.Trim();
             string filePath = await _recordingService.SaveRecordingAsync(savedName);
             Status = "Saved recording";
@@ -1285,8 +1661,6 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             Recordings.Add(recording);
 
-            // Picked, so the take just made is the one whose picture is up and whose buttons
-            // are to hand. Reading it back is what puts the waveform on the page.
             SelectedRecording = recording;
 
             if (clipped)

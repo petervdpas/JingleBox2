@@ -27,35 +27,71 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="instrument">Whose level it is, which is not the patch's.</param>
 public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
 {
-    // Written out one by one, never built from a name or a loop, so every key in the app can be
-    // found by searching for the string that is in the file.
-
-    // ---- the oscillator ---------------------------------------------------
-
+    /// <summary>The oscillator: which shape the wave is.</summary>
+    /// <remarks>
+    /// The keys are written out one by one, never built from a name or a loop, so every key in
+    /// the application can be found by searching for the string that is in the machine's own
+    /// file. A key assembled at the call site never appears in the source at all, and both the
+    /// tools that hunt for an orphaned key and anybody grepping would miss it.
+    /// </remarks>
     private const string WaveKey = "wave";
+
+    /// <summary>How wide the pulse is, which does nothing to the waves that have no pulse.</summary>
     private const string DutyKey = "duty";
+
+    /// <summary>Coarse tuning, in semitones.</summary>
     private const string TuneKey = "tune";
+
+    /// <summary>And fine tuning, in cents.</summary>
     private const string FineKey = "fine";
+
+    /// <summary>How far the pitch falls or rises at the start of a note, in semitones.</summary>
     private const string PitchEnvKey = "pitch_env";
+
+    /// <summary>And how long it takes to get there.</summary>
     private const string PitchTimeKey = "pitch_time";
 
-    // ---- the amplifier ----------------------------------------------------
-
+    /// <summary>The amplifier: how long the note takes to come up.</summary>
     private const string AttackKey = "attack";
+
+    /// <summary>How long it takes to fall to where it holds.</summary>
     private const string DecayKey = "decay";
+
+    /// <summary>Where it holds while the key is down.</summary>
     private const string SustainKey = "sustain";
+
+    /// <summary>And how long it takes to go quiet after the key comes up.</summary>
     private const string ReleaseKey = "release";
+
+    /// <summary>How hard the wave is pushed into the saturation at the end of it.</summary>
     private const string DriveKey = "drive";
+
+    /// <summary>How loud the instrument plays, in decibels.</summary>
+    /// <remarks>
+    /// The instrument's, not the patch's: it sits on top of whatever the wave comes out at, and
+    /// it is the same setting on every machine here, which is why they all read it the same way.
+    /// </remarks>
     private const string LevelKey = "level";
 
-    // ---- the filter and what moves it -------------------------------------
-
+    /// <summary>The filter: where it opens to.</summary>
     private const string CutoffKey = "cutoff";
+
+    /// <summary>The same, worded for a panel to print, since a frequency needs its unit.</summary>
     private const string CutoffTextKey = "cutoff_text";
+
+    /// <summary>How much it rings at the corner.</summary>
     private const string ResonanceKey = "resonance";
+
+    /// <summary>How fast the pitch wobbles.</summary>
     private const string VibratoRateKey = "vib_rate";
+
+    /// <summary>And how far, in cents.</summary>
     private const string VibratoDepthKey = "vib_depth";
+
+    /// <summary>How fast the level wobbles.</summary>
     private const string TremoloRateKey = "trem_rate";
+
+    /// <summary>And how far.</summary>
     private const string TremoloDepthKey = "trem_depth";
 
     /// <summary>
@@ -70,9 +106,23 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// <summary>Where the view setting is kept, since the instrument is no place for it.</summary>
     private double _cycles = 2;
 
+    /// <summary>The narrowest the picture goes, which is one whole cycle.</summary>
+    private const double FewestCycles = 1;
+
+    /// <summary>And the widest, past which the wave is thinner than the pixels drawing it.</summary>
+    private const double MostCycles = 8;
+
     /// <summary>What the picture is set to show, for whoever is drawing it.</summary>
     public double Cycles => _cycles;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The level comes back in decibels, because that is what a level fader is marked in and
+    /// what the ear reads. A fader on the raw amplitude does nothing for three quarters of its
+    /// travel.
+    ///
+    /// A key it does not know reads as nought rather than throwing.
+    /// </remarks>
     public override double Get(string key) => key switch
     {
         WaveKey => (double)patch.Wave,
@@ -88,8 +138,6 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
         ReleaseKey => patch.ReleaseMs,
         DriveKey => patch.Drive,
 
-        // Decibels, because that is what a level fader is marked in and what the ear reads. A
-        // fader on the raw amplitude does nothing for three quarters of its travel.
         LevelKey => GainScale.ToDecibels(instrument.Volume),
 
         CutoffKey => patch.FilterCutoff,
@@ -104,6 +152,16 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
         _ => 0,
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The level goes back through the decibel scale and is clamped to its ends, since a machine
+    /// file can name any number and an amplitude out of range is a voice nobody can turn down.
+    ///
+    /// <see cref="CyclesKey"/> is written and then reported as not having moved, deliberately.
+    /// Nobody saves it, so nobody should be told it moved either: the picture reads it back on
+    /// the next frame, which is sixteen milliseconds away, and announcing it would mark the song
+    /// as worth saving because somebody zoomed in.
+    /// </remarks>
     protected override bool Write(string key, double value)
     {
         return key switch
@@ -136,14 +194,17 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
             TremoloRateKey => Moved(patch.TremoloRateHz, value, () => patch.TremoloRateHz = value),
             TremoloDepthKey => Moved(patch.TremoloDepth, value, () => patch.TremoloDepth = value),
 
-            // Nobody saves it, so nobody is told it moved either. The picture reads it back on
-            // the next frame, which is sixteen milliseconds away.
             CyclesKey => Zoomed(value),
 
             _ => false,
         };
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The cutoff is the only one worded, since a frequency without its unit reads as a number
+    /// nobody can place.
+    /// </remarks>
     public override string GetText(string key) => key switch
     {
         CutoffTextKey => patch.FilterCutoffText,
@@ -172,7 +233,7 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// <summary>Moves the view, and says it did not change the machine.</summary>
     private bool Zoomed(double value)
     {
-        _cycles = Math.Clamp(value, 1, 8);
+        _cycles = Math.Clamp(value, FewestCycles, MostCycles);
 
         return false;
     }

@@ -21,9 +21,21 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public static class PresetWaves
 {
+    /// <summary>What a recording is called at the end, and the whole of how one is recognised.</summary>
+    /// <remarks>
+    /// Every recording this program writes is a wav, so the test is the extension and nothing
+    /// else. A machine that one day carries an mp3 would need this widened; nothing here reads
+    /// the file, so widening it is one string.
+    /// </remarks>
     private const string Kind = ".wav";
 
     /// <summary>Every recording a preset names, as written down, each one once.</summary>
+    /// <remarks>
+    /// A preset that will not read names nothing, which is the safe answer everywhere this is
+    /// asked: nothing gets renamed, nothing gets deleted, nothing gets rewritten. Reported as an
+    /// empty list rather than thrown, because a folder of presets with one bad file in it should
+    /// still be usable.
+    /// </remarks>
     public static IReadOnlyList<string> Named(string presetPath)
     {
         var found = new List<string>();
@@ -34,8 +46,6 @@ public static class PresetWaves
         }
         catch (Exception)
         {
-            // A preset that will not read names nothing, which is the safe answer: nothing gets
-            // renamed, nothing gets deleted, nothing gets rewritten.
             return Array.Empty<string>();
         }
 
@@ -98,6 +108,11 @@ public static class PresetWaves
         return found;
     }
 
+    /// <summary>Every string anywhere in the document that looks like a recording.</summary>
+    /// <remarks>
+    /// The whole tree rather than the keys a machine happens to use, which is the point: this
+    /// has to work for a machine written after it, whose keys nobody here has ever seen.
+    /// </remarks>
     private static void Walk(JsonNode? node, List<string> found)
     {
         switch (node)

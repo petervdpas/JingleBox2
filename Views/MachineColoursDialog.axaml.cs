@@ -19,6 +19,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineColoursDialog : Window
 {
+    /// <summary>Builds the window. Its eight swatches and its preview are filled in by <see cref="AskAsync"/>.</summary>
     public MachineColoursDialog()
     {
         InitializeComponent();
@@ -28,6 +29,12 @@ public partial class MachineColoursDialog : Window
     /// Asks what colours a machine should wear. Gives back the theme, or null when it is
     /// cancelled or there is no window to open it over.
     /// </summary>
+    /// <remarks>
+    /// The preview is tinted rather than bound, so it is repainted whenever one of the eight
+    /// moves, and once on the way in for what was already there. The subscription is dropped
+    /// when the window closes, or a cancelled dialog would go on repainting a window nobody can
+    /// see.
+    /// </remarks>
     public static Task<MachineTheme?> AskAsync(string name, MachineTheme theme)
     {
         var colours = new MachineColours(name, theme);
@@ -42,8 +49,6 @@ public partial class MachineColoursDialog : Window
 
         if (dialog.FindControl<TextBlock>("PanelName") is { } shown) shown.Text = colours.Name.ToUpperInvariant();
 
-        // The preview is tinted rather than bound, so it is repainted whenever one of the eight
-        // moves, and once on the way in for what was already there.
         void Show() => dialog.Retint(colours);
 
         colours.Changed += Show;
@@ -54,6 +59,10 @@ public partial class MachineColoursDialog : Window
         return Dialog.ShowAsync<MachineTheme?>(dialog, null);
     }
 
+    /// <summary>
+    /// Paints the preview in what is currently showing, through the panel's own tinting code,
+    /// so there is no second recipe to keep in step with the first.
+    /// </summary>
     private void Retint(MachineColours colours)
     {
         if (this.FindControl<Border>("Preview") is { } preview) MachineTint.Repaint(preview, colours.Theme);
@@ -81,8 +90,10 @@ public partial class MachineColoursDialog : Window
         colours.RowPicked = usual.RowPicked;
     }
 
+    /// <summary>Hands the eight back as a theme, which is the only moment anything is written.</summary>
     private void Confirm_Click(object? sender, RoutedEventArgs e) =>
         Close(DataContext is MachineColours colours ? colours.Theme : null);
 
+    /// <summary>Closes with nothing, leaving the machine painted as it was.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(null);
 }

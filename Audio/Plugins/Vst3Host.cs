@@ -23,13 +23,24 @@ internal static unsafe class Vst3Host
     /// <summary>What a plugin is told it is running inside.</summary>
     public const string HostName = "JingleBox2";
 
+    /// <summary>
+    /// The host context, made on first use and never freed. One for the process, since it holds
+    /// nothing about any particular plugin.
+    /// </summary>
     private static void* _application;
+
+    /// <summary>Held while it is built, so two plugins loading at once cannot both build it.</summary>
     private static readonly object Gate = new();
 
     /// <summary>
     /// The one host context, shared by every plugin. Built once and never freed, because a
     /// plugin may hold on to it for as long as it lives.
     /// </summary>
+    /// <remarks>
+    /// The table is the root's three, then IHostApplication's two, in the order the header
+    /// declares them. The order is the whole contract, since a plugin calls by position and
+    /// nothing checks.
+    /// </remarks>
     public static void* Application()
     {
         lock (Gate)
@@ -52,6 +63,11 @@ internal static unsafe class Vst3Host
         }
     }
 
+    /// <summary>
+    /// The host context is an IHostApplication and the root interface, and on X11 it is also
+    /// where the run loop is handed over: that is where a plugin looks for it, and on X11 it is
+    /// not optional. See <see cref="PluginRunLoop"/>.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int ApplicationQuery(void* self, byte* id, void** result)
     {
@@ -63,8 +79,6 @@ internal static unsafe class Vst3Host
             return Vst3Abi.ResultOk;
         }
 
-        // The run loop is a separate object, handed out from here because the host context is
-        // where a plugin looks for it. On X11 this is not optional: see PluginRunLoop.
         if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && Vst3Abi.SameId(id, Vst3Abi.RunLoopId))
         {
             *result = PluginRunLoop.Instance();
@@ -82,12 +96,15 @@ internal static unsafe class Vst3Host
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint KeepAlive(void* self) => 1;
 
+    /// <summary>
+    /// What the plugin is told it is running inside. The buffer is a String128, which is 128
+    /// UTF-16 characters with the terminator among them, so 127 is the most that can be written.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int ApplicationName(void* self, char* name)
     {
         if (name == null) return Vst3Abi.NoInterface;
 
-        // String128 is 128 UTF-16 characters, terminator included.
         for (int index = 0; index < HostName.Length && index < 127; index++) name[index] = HostName[index];
         name[Math.Min(HostName.Length, 127)] = '\0';
 
@@ -140,9 +157,20 @@ internal static unsafe class Vst3Host
         return handler;
     }
 
+    /// <summary>
+    /// Where each plugin's knob moves go, by slot number. A number rather than a pointer,
+    /// because a handler is native memory a plugin holds for as long as it likes and a managed
+    /// object cannot be left lying in it.
+    /// </summary>
     private static readonly Dictionary<int, Action<uint, double>> Moves = new();
+
+    /// <summary>Held over every read and write of the two dictionaries and the counter.</summary>
     private static readonly object MoveGate = new();
 
+    /// <summary>
+    /// The last slot given out. Never reused, so a callback arriving late from a plugin that has
+    /// already gone finds nothing rather than finding somebody else's.
+    /// </summary>
     private static int _slots;
 
     /// <summary>A number for a plugin about to be loaded, to find it again from a callback.</summary>
@@ -167,6 +195,11 @@ internal static unsafe class Vst3Host
         }
     }
 
+    /// <summary>
+    /// Whose knob moves a handler is about, read out of the second word of the handler block.
+    /// Null for a plugin that has already been forgotten, which is what a callback arriving
+    /// during teardown looks like.
+    /// </summary>
     private static Action<uint, double>? Whose(void* self)
     {
         if (self == null) return null;
@@ -176,6 +209,7 @@ internal static unsafe class Vst3Host
         lock (MoveGate) return Moves.TryGetValue(slot, out var moved) ? moved : null;
     }
 
+    /// <summary>A handler is an IComponentHandler and the root interface, and nothing else.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerQuery(void* self, byte* id, void** result)
     {
@@ -191,6 +225,11 @@ internal static unsafe class Vst3Host
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>
+    /// The plugin saying somebody has taken hold of a knob. Accepted and ignored: it marks the
+    /// start of a gesture, which matters to a host that writes automation from one and not to
+    /// this one, where a move is a move.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerBeginEdit(void* self, uint id) => Vst3Abi.ResultOk;
 
@@ -198,6 +237,11 @@ internal static unsafe class Vst3Host
     /// The plugin's own window reporting a knob. Passed on to the plugin, which queues it for
     /// the half that plays and tells the host it has something worth saving.
     /// </summary>
+    /// <remarks>
+    /// Arrives on whatever thread the plugin's window is on, and anything that throws is
+    /// swallowed: a knob move is not worth throwing back into somebody else's toolkit, which
+    /// would unwind through C++ frames that were not built for it.
+    /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerPerformEdit(void* self, uint id, double value)
     {
@@ -207,12 +251,12 @@ internal static unsafe class Vst3Host
         }
         catch (Exception)
         {
-            // A knob move is not worth throwing back into somebody else's toolkit.
         }
 
         return Vst3Abi.ResultOk;
     }
 
+    /// <inheritdoc cref="HandlerBeginEdit"/>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int HandlerEndEdit(void* self, uint id) => Vst3Abi.ResultOk;
 
@@ -235,6 +279,11 @@ internal static unsafe class Vst3Host
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Where each plugin's "everything changed" goes, by the same slot number as
+    /// <see cref="Moves"/>. Two dictionaries rather than one entry with two fields, so a plugin
+    /// that only ever does one of the two costs nothing for the other.
+    /// </summary>
     private static readonly Dictionary<int, Action> Reloaded = new();
 
     /// <summary>Says where a slot's "everything changed" should go.</summary>
@@ -243,6 +292,7 @@ internal static unsafe class Vst3Host
         lock (MoveGate) Reloaded[slot] = reloaded;
     }
 
+    /// <inheritdoc cref="Whose"/>
     private static Action? Reloads(void* self)
     {
         if (self == null) return null;
@@ -265,23 +315,45 @@ internal static unsafe class Vst3Host
 /// </remarks>
 internal sealed unsafe class Vst3Stream : IDisposable
 {
+    /// <summary>
+    /// Enough for the many plugins whose state is a few hundred bytes, and doubled from there
+    /// for the ones whose patch is a third of a megabyte.
+    /// </summary>
     private const int InitialCapacity = 4096;
 
+    /// <summary>What the plugin is handed: an IBStream, and the buffer behind it.</summary>
     [StructLayout(LayoutKind.Sequential)]
     private struct Body
     {
+        /// <summary>The table, which has to be the first word or the plugin calls rubbish.</summary>
         public nint Vtbl;
+
+        /// <summary>The buffer. Replaced when it grows, so nothing may hold a pointer into it.</summary>
         public byte* Data;
+
+        /// <summary>How much has been written, which is what a read runs out at.</summary>
         public long Length;
+
+        /// <summary>How much room there is. Doubled rather than grown by the amount wanted.</summary>
         public long Capacity;
+
+        /// <summary>Where the next read or write goes. The plugin moves it by seeking.</summary>
         public long Position;
     }
 
+    /// <summary>
+    /// The one table, shared by every stream in the process. A table is code rather than state,
+    /// so one is enough and it is never freed.
+    /// </summary>
     private static nint _table;
+
+    /// <summary>Held while the table is built, so two streams made at once cannot both build it.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>The unmanaged stream. Null once disposed, which every method here checks for.</summary>
     private Body* _body;
 
+    /// <summary>Makes an empty stream, ready to be written to or filled.</summary>
     public Vst3Stream()
     {
         _body = (Body*)NativeMemory.AllocZeroed(1, (nuint)sizeof(Body));
@@ -322,6 +394,7 @@ internal sealed unsafe class Vst3Stream : IDisposable
         if (_body != null) _body->Position = 0;
     }
 
+    /// <summary>How many bytes have been written, whatever the position is.</summary>
     public long Length => _body == null ? 0 : _body->Length;
 
     /// <summary>
@@ -340,6 +413,10 @@ internal sealed unsafe class Vst3Stream : IDisposable
         }
     }
 
+    /// <summary>
+    /// Builds the shared table once: the root's three, then IBStream's four, in the order the
+    /// header declares them.
+    /// </summary>
     private static nint Table()
     {
         lock (Gate)
@@ -361,6 +438,7 @@ internal sealed unsafe class Vst3Stream : IDisposable
         }
     }
 
+    /// <summary>A stream is an IBStream and the root interface, and nothing else.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Query(void* self, byte* id, void** result)
     {
@@ -376,9 +454,17 @@ internal sealed unsafe class Vst3Stream : IDisposable
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>
+    /// AddRef and Release both. A stream is freed by the host that made it rather than by a
+    /// count, so it always answers one: nought would tell a plugin the object had already gone.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint AddReference(void* self) => 1;
 
+    /// <summary>
+    /// Reads up to that many bytes and says how many it really gave. Fewer than asked for, and
+    /// nought at the end, are both success: that is how a plugin knows to stop asking.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Read(void* self, void* buffer, int count, int* read)
     {
@@ -398,6 +484,11 @@ internal sealed unsafe class Vst3Stream : IDisposable
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Takes that many bytes, growing the buffer as needed, and always says it took all of them.
+    /// A short write would have a plugin come round again, and there is nothing here that can
+    /// run out except memory.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Write(void* self, void* buffer, int count, int* written)
     {
@@ -418,6 +509,12 @@ internal sealed unsafe class Vst3Stream : IDisposable
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Makes room for at least that many bytes, doubling rather than growing by the amount
+    /// wanted: a plugin writing its patch in small pieces would otherwise copy the whole thing
+    /// once per piece. The old buffer is freed, so nothing may hold a pointer into it across a
+    /// write.
+    /// </summary>
     private static void Reserve(Body* body, long wanted)
     {
         if (wanted <= body->Capacity) return;
@@ -435,6 +532,11 @@ internal sealed unsafe class Vst3Stream : IDisposable
         body->Capacity = capacity;
     }
 
+    /// <summary>
+    /// Moves the position. The mode is the ABI's own: 1 is from where we are, 2 is from the end,
+    /// and anything else is from the start. Clamped rather than refused, since a plugin seeking
+    /// past the end and then reading is asking for nothing and should be given nothing.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Seek(void* self, long position, int mode, long* result)
     {
@@ -454,6 +556,7 @@ internal sealed unsafe class Vst3Stream : IDisposable
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>Where the position is.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Tell(void* self, long* position)
     {
@@ -464,6 +567,10 @@ internal sealed unsafe class Vst3Stream : IDisposable
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Frees the buffer and the stream. Called once both halves of the plugin are done with it:
+    /// a plugin holding this pointer afterwards would be reading freed memory.
+    /// </summary>
     public void Dispose()
     {
         if (_body == null) return;

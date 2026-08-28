@@ -25,6 +25,13 @@ namespace JingleBox2.Machines;
 /// </remarks>
 public sealed class MachineFace
 {
+    /// <summary>Puts the three halves of a machine together into the one thing a panel is handed.</summary>
+    /// <param name="panel">What it looks like.</param>
+    /// <param name="parameters">What its controls stand for.</param>
+    /// <param name="folder">
+    /// Where it is kept, empty for a machine that is not on disc and so can name no picture and
+    /// no sound of its own.
+    /// </param>
     public MachineFace(MachinePanel panel, IReadOnlyList<MachineParameter> parameters, string folder = "")
     {
         Panel = panel;

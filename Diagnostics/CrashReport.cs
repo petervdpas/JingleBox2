@@ -34,12 +34,19 @@ public static class CrashReport
     /// <summary>How many of the last things that happened a report carries.</summary>
     private const int Remembered = 200;
 
+    /// <summary>Guards the notes and the folder, which are written from whatever thread noticed.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>The last few things that happened, kept in memory and never written until they matter.</summary>
     private static readonly Queue<string> Lately = new();
 
+    /// <summary>Where reports and the marker go, which is the folder the settings live in.</summary>
     private static string _folder = "";
+
+    /// <summary>Whether <see cref="Watch"/> has already run, so a second call does nothing.</summary>
     private static bool _watching;
+
+    /// <summary>When this run began, so a report can say how long it had been going.</summary>
     private static DateTime _started;
 
     /// <summary>The report written for the run before this one, or empty when it ended properly.</summary>
@@ -51,6 +58,9 @@ public static class CrashReport
     /// <remarks>
     /// Called once, as early as there is a folder to write into. The looking back has to happen
     /// before the marker for this run is written, or every run would report the one before it.
+    ///
+    /// The marker is rubbed out on the ordinary way out, so what is left of it next time is the
+    /// whole of what says this run ever finished.
     /// </remarks>
     public static void Watch(string folder)
     {
@@ -75,7 +85,6 @@ public static class CrashReport
             e.SetObserved();
         };
 
-        // The ordinary way out. What is left of the marker says whether this ever happened.
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Rub();
     }
 
@@ -103,6 +112,17 @@ public static class CrashReport
     /// <summary>
     /// Writes a report. Safe to call from anywhere, including from a handler for the end.
     /// </summary>
+    /// <param name="reason">What happened, in words somebody can read.</param>
+    /// <param name="error">The exception, where there was one.</param>
+    /// <param name="began">
+    /// When the run being reported on started, for a report about a run that is already over.
+    /// Left out, this run's own start is used.
+    /// </param>
+    /// <returns>Where it was written, or empty when it could not be.</returns>
+    /// <remarks>
+    /// A report that cannot be written is passed over in silence: an exception of its own, on
+    /// the way out of an application that is already ending badly, helps nobody.
+    /// </remarks>
     public static string Write(string reason, Exception? error = null, DateTime? began = null)
     {
         string folder;
@@ -134,12 +154,19 @@ public static class CrashReport
         }
         catch (Exception)
         {
-            // A report that cannot be written is not worth an exception of its own on the way
-            // out of an application that is already ending badly.
             return "";
         }
     }
 
+    /// <summary>
+    /// The report itself: what was being done, what the machine is, and what had been happening.
+    /// </summary>
+    /// <remarks>
+    /// A report written as it happens can ask what is in the air. One written for a run that is
+    /// already over cannot: that run's memory went with it, and what is left is the note it
+    /// wrote to disc before it tried, which the crash guard has turned into a block by now. So
+    /// <paramref name="lastTime"/> decides which of the two the plugins are read from.
+    /// </remarks>
     private static string Compose(
         string reason, Exception? error, DateTime started, string[] lately, bool lastTime)
     {
@@ -159,9 +186,6 @@ public static class CrashReport
             ? "run in processes of their own"
             : "run inside this one, so a plugin that falls over takes the app with it").Append('\n');
 
-        // A report written as it happens can ask what is in the air. One written for a run that
-        // is already over cannot: that run's memory went with it, and what is left is the note
-        // it wrote to disc before it tried, which the guard has turned into a block by now.
         var marks = lastTime
             ? Held(Audio.Plugins.PluginCrashGuard.Blocked, started)
             : Audio.Plugins.PluginCrashGuard.InFlight;
@@ -202,6 +226,10 @@ public static class CrashReport
     /// <summary>
     /// The notes that belong to the run that stopped, rather than to any run before it.
     /// </summary>
+    /// <remarks>
+    /// The blocked list is kept across runs, so without the time it was written down a report
+    /// would name every plugin that has ever fallen over rather than the one that just did.
+    /// </remarks>
     private static IReadOnlyList<Audio.Plugins.PluginCrash> Held(
         IReadOnlyList<Audio.Plugins.PluginCrash> blocked, DateTime since)
     {
@@ -218,6 +246,11 @@ public static class CrashReport
     /// <summary>
     /// Looks for a marker from the run before this one and reports it if it is still there.
     /// </summary>
+    /// <remarks>
+    /// The marker says when the run that never came back started, and that is why it is read
+    /// rather than merely noticed: without it the report would date the run by the moment it
+    /// was found out, which is this one starting up.
+    /// </remarks>
     private static void LookBack()
     {
         string path = Marker();
@@ -234,8 +267,6 @@ public static class CrashReport
         {
             Note("last time: " + line);
 
-            // The marker says when the run that never came back started. Without it the report
-            // would date the run by the moment it was noticed, which is this one starting up.
             const string Began = "started ";
 
             if (line.StartsWith(Began, StringComparison.Ordinal) &&
@@ -283,6 +314,7 @@ public static class CrashReport
         try { if (File.Exists(path)) File.Delete(path); } catch (Exception) { }
     }
 
+    /// <summary>Where the note saying this run is under way lives.</summary>
     private static string Marker() =>
         _folder.Length == 0 ? "" : System.IO.Path.Combine(_folder, RunningFile);
 }

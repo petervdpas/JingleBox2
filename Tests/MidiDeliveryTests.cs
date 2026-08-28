@@ -36,6 +36,13 @@ public class MidiDeliveryTests
         Assert.Equal(new[] { "up 60", "up 64", "up 67" }, said);
     }
 
+    /// <summary>
+    /// A key struck and let go of inside one delivery, which is a short note or a pad.
+    /// </summary>
+    /// <remarks>
+    /// Reading only the first message here loses the release of a key that has already come up,
+    /// so the note sounds for ever with nothing left to stop it.
+    /// </remarks>
     [Fact]
     public void A_press_and_its_release_can_share_a_delivery()
     {

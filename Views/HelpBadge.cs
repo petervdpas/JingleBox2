@@ -37,42 +37,49 @@ public class HelpBadge : ThemedControl
     public static readonly StyledProperty<string> TipProperty =
         AvaloniaProperty.Register<HelpBadge, string>(nameof(Tip), "");
 
+    /// <summary>How big the circle is, which is also the whole size the badge asks for.</summary>
     public static readonly StyledProperty<double> DiameterProperty =
         AvaloniaProperty.Register<HelpBadge, double>(nameof(Diameter), 16);
 
+    /// <summary>The size changes what is asked for as well as what is drawn.</summary>
     static HelpBadge()
     {
         AffectsRender<HelpBadge>(TipProperty, TopicProperty, DiameterProperty);
         AffectsMeasure<HelpBadge>(DiameterProperty);
     }
 
+    /// <summary>Sits on the middle of the line it is on, and says it can be clicked.</summary>
     public HelpBadge()
     {
         VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center;
         Cursor = new Cursor(StandardCursorType.Hand);
     }
 
+    /// <inheritdoc cref="TopicProperty"/>
     public string Topic
     {
         get => GetValue(TopicProperty);
         set => SetValue(TopicProperty, value);
     }
 
-    /// <summary>What it says when it is hovered.</summary>
+    /// <inheritdoc cref="TipProperty"/>
     public string Tip
     {
         get => GetValue(TipProperty);
         set => SetValue(TipProperty, value);
     }
 
+    /// <inheritdoc cref="DiameterProperty"/>
     public double Diameter
     {
         get => GetValue(DiameterProperty);
         set => SetValue(DiameterProperty, value);
     }
 
+    /// <summary>Square and exactly <see cref="Diameter"/>, whatever room it is offered.</summary>
     protected override Size MeasureOverride(Size availableSize) => new(Diameter, Diameter);
 
+    /// <summary>Rewrites the hover line when either half of what it says has changed.</summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -98,6 +105,7 @@ public class HelpBadge : ThemedControl
         ToolTip.SetTip(this, line);
     }
 
+    /// <summary>Opens the help window on this badge's topic, over the window the badge is in.</summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -108,6 +116,13 @@ public class HelpBadge : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// A question mark in a circle, brighter while the pointer is on it.
+    /// </summary>
+    /// <remarks>
+    /// Filled as well as outlined: a ring on its own disappears against a busy panel, and this
+    /// has to read as a thing to point at rather than as punctuation after the title.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double size = System.Math.Min(Bounds.Width, Bounds.Height);
@@ -117,8 +132,6 @@ public class HelpBadge : ThemedControl
         var centre = new Point(Bounds.Width / 2, Bounds.Height / 2);
         double radius = size / 2 - 0.5;
 
-        // Filled as well as outlined: a ring on its own disappears against a busy panel, and
-        // this has to read as a thing to point at rather than as punctuation after the title.
         context.DrawEllipse(
             new SolidColorBrush(palette.Accent, IsPointerOver ? 0.35 : 0.18),
             new Pen(new SolidColorBrush(palette.Accent, IsPointerOver ? 1 : 0.75), 1),
@@ -137,12 +150,14 @@ public class HelpBadge : ThemedControl
         context.DrawText(mark, new Point(centre.X - mark.Width / 2, centre.Y - mark.Height / 2));
     }
 
+    /// <summary>Redraws brighter, since the lit state is worked out in <see cref="Render"/>.</summary>
     protected override void OnPointerEntered(Avalonia.Input.PointerEventArgs e)
     {
         base.OnPointerEntered(e);
         InvalidateVisual();
     }
 
+    /// <summary>And back down again when the pointer leaves.</summary>
     protected override void OnPointerExited(Avalonia.Input.PointerEventArgs e)
     {
         base.OnPointerExited(e);

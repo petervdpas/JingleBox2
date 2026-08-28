@@ -10,11 +10,23 @@ namespace JingleBox2.Machines.Ui;
 public static class WaveformGeometry
 {
     /// <summary>The slice of peak data a viewport puts on screen.</summary>
+    /// <param name="Start">First peak on screen.</param>
+    /// <param name="End">One past the last, so the pair reads as a half-open range.</param>
+    /// <param name="PixelWidth">How wide one peak is drawn, which is what spaces the columns.</param>
     public readonly record struct VisibleRange(int Start, int End, double PixelWidth)
     {
+        /// <summary>How many peaks are in it.</summary>
         public int Count => End - Start;
     }
 
+    /// <summary>
+    /// Which peaks a viewport is showing, and how wide each of them lands.
+    /// </summary>
+    /// <remarks>
+    /// The start is clamped so that scrolling to the far end still fills the width rather than
+    /// running off it into blank space, which is what a scroll position taken at face value
+    /// does once the zoom changes underneath it.
+    /// </remarks>
     public static VisibleRange GetVisibleRange(int peakCount, WaveformViewport viewport, double width)
     {
         int visibleCount = Math.Max(1, (int)Math.Ceiling(peakCount / viewport.Zoom));
@@ -60,6 +72,10 @@ public static class WaveformGeometry
         return geometry;
     }
 
+    /// <summary>
+    /// Where one peak is drawn, measured to the middle of its own column rather than to its
+    /// left edge, so the outline runs through the middle of each rather than leaning left.
+    /// </summary>
     private static double PixelFor(int index, VisibleRange range)
         => (index - range.Start) * range.PixelWidth + range.PixelWidth / 2;
 }

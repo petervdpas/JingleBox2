@@ -40,11 +40,18 @@ public abstract class ThemedControl : Control
             Opacity = IsEffectivelyEnabled ? 1 : DisabledOpacity;
     }
 
+    /// <summary>
+    /// Starts listening for the theme moving, and reads the enabled state once on the way in.
+    /// </summary>
+    /// <remarks>
+    /// The state is read here as well as watched, because whatever this is attached under may
+    /// already be disabled and nothing changed to say so: a control that only ever listened
+    /// would arrive drawn as if it were live.
+    /// </remarks>
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
 
-        // Whatever it is attached under may already be disabled, and nothing changed to say so.
         Opacity = IsEffectivelyEnabled ? 1 : DisabledOpacity;
 
         ActualThemeVariantChanged += OnThemeChanged;
@@ -53,6 +60,7 @@ public abstract class ThemedControl : Control
         InvalidateVisual();
     }
 
+    /// <summary>Stops listening, so a control off the tree is not kept alive by the theme.</summary>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
@@ -61,7 +69,12 @@ public abstract class ThemedControl : Control
         ResourcesChanged -= OnResourcesChanged;
     }
 
+    /// <summary>The theme variant moved, so whatever was painted is the wrong colours now.</summary>
     private void OnThemeChanged(object? sender, EventArgs e) => InvalidateVisual();
 
+    /// <summary>
+    /// A resource dictionary somewhere above changed, which is how a whole theme is swapped
+    /// rather than a variant flipped.
+    /// </summary>
     private void OnResourcesChanged(object? sender, ResourcesChangedEventArgs e) => InvalidateVisual();
 }

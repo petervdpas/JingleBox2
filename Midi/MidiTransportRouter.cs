@@ -3,14 +3,6 @@ using System;
 
 namespace JingleBox2.Midi;
 
-/// <summary>What a controller's transport buttons ask for.</summary>
-public interface ITransportKeys
-{
-    void Play();
-    void Stop();
-    void Record();
-}
-
 /// <summary>
 /// The transport buttons on a controller that speaks Mackie Control.
 /// </summary>
@@ -79,6 +71,7 @@ public sealed class MidiTransportRouter
 
     private readonly ITransportKeys _transport;
 
+    /// <param name="transport">Where a press comes out. Not a view model, so this can be tested.</param>
     public MidiTransportRouter(ITransportKeys transport) => _transport = transport;
 
     /// <summary>The three realtime bytes, which are the transport as MIDI has always had it.</summary>
@@ -113,17 +106,30 @@ public sealed class MidiTransportRouter
     private const int MmcRecordExit = 0x07;
     private const int MmcPause = 0x09;
 
+    /// <summary>
+    /// Reads a transport press, in whichever of the three dialects the device chose.
+    /// </summary>
+    /// <remarks>
+    /// A realtime byte and a machine control message are neither of them a button, so neither has
+    /// a press to wait for. Both are read above the guard rather than being given a pressed-ness
+    /// they do not have, which is also what keeps them out of the pads: every other router in the
+    /// application begins by asking for a press, and <see cref="MidiMessage.IsOn"/> is false on
+    /// both kinds.
+    ///
+    /// For the two dialects that are buttons it is the press and not the release. A button sends
+    /// both halves, and acting on both would stop what the press had just started.
+    ///
+    /// Everything named and left alone is named on purpose, so the log says what was pressed
+    /// rather than a number, and so that giving one of them a job later is a line here rather
+    /// than a rediscovery of the protocol.
+    /// </remarks>
     public void Handle(MidiMessage message)
     {
         if (message is null) return;
 
-        // Neither of these is a button, so neither has a press to wait for. Both are read
-        // before the guard below rather than being given a pressed-ness they do not have.
         if (message.Type == MidiMessageType.Realtime) { Realtime(message); return; }
         if (message.Type == MidiMessageType.SystemExclusive) { Exclusive(message); return; }
 
-        // The press, not the release. A button sends both, and doing it twice would stop what
-        // the press had just started.
         if (!message.IsOn) return;
 
         if (message.Type == MidiMessageType.ControlChange)
@@ -137,8 +143,6 @@ public sealed class MidiTransportRouter
                 case TapCc: Say(message, "tap tempo, which this does nothing with yet"); return;
             }
 
-            // Every other controller on that port is somebody's knob, and this is not the
-            // place that reads those.
             return;
         }
 
@@ -150,8 +154,6 @@ public sealed class MidiTransportRouter
             case Stop: Say(message, "stop"); _transport.Stop(); return;
             case Record: Say(message, "record"); _transport.Record(); return;
 
-            // Named so the log says what was pressed rather than a number, and so that adding
-            // one later is a line here instead of a rediscovery of the protocol.
             case Rewind: Say(message, "rewind, which this does nothing with yet"); return;
             case Forward: Say(message, "forward, which this does nothing with yet"); return;
             case Cycle: Say(message, "cycle, which this does nothing with yet"); return;
@@ -173,18 +175,21 @@ public sealed class MidiTransportRouter
         }
     }
 
-    /// <summary>MIDI Machine Control, which is a system exclusive message and nothing else.</summary>
+    /// <summary>
+    /// MIDI Machine Control, which is a system exclusive message and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Every other system exclusive message belongs to somebody, a device answering who it is or
+    /// a manufacturer's own settings protocol, and is left alone in silence: it is not this
+    /// router's business, and the wire has already written down what arrived.
+    ///
+    /// A pause is a stop, because this transport has nowhere to be paused at.
+    /// </remarks>
     private void Exclusive(MidiMessage message)
     {
         int command = Command(message.Bytes);
 
-        if (command < 0)
-        {
-            // Every other system exclusive message belongs to somebody: a device answering who
-            // it is, or a manufacturer's own settings protocol. Not this router's business, and
-            // the wire has already written down what arrived.
-            return;
-        }
+        if (command < 0) return;
 
         switch (command)
         {
@@ -192,7 +197,6 @@ public sealed class MidiTransportRouter
             case MmcDeferredPlay: Told(message, "deferred play, which is play here"); _transport.Play(); return;
             case MmcStop: Told(message, "stop"); _transport.Stop(); return;
 
-            // A pause is a stop to a transport with nowhere to be paused at.
             case MmcPause: Told(message, "pause, which is stop here"); _transport.Stop(); return;
 
             case MmcRecord: Told(message, "record"); _transport.Record(); return;
@@ -226,6 +230,7 @@ public sealed class MidiTransportRouter
         return sysex[4];
     }
 
+    /// <summary>The line a press earns, naming the device and what was pressed on it.</summary>
     private static void Say(MidiMessage message, string what) =>
         Log.Write(LogArea.Midi, () => "transport: '" + message.Device + "' pressed " + what);
 

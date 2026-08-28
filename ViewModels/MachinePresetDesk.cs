@@ -22,10 +22,14 @@ namespace JingleBox2.ViewModels;
 /// order they are offered in. Both are shown, because a folder of presets is a folder somebody
 /// is going to open.
 /// </remarks>
+/// <param name="Name">What it calls itself inside the file, which is what the picker shows.</param>
+/// <param name="Path">Where the file is, whose own name decides the order they are offered in.</param>
 public sealed record MachinePresetSlot(string Name, string Path)
 {
+    /// <summary>Just the file, since the folder is already known wherever this is shown.</summary>
     public string FileName => System.IO.Path.GetFileName(Path);
 
+    /// <summary>The name, which is what a picker with no template shows.</summary>
     public override string ToString() => Name;
 }
 
@@ -45,8 +49,16 @@ public sealed record MachinePresetSlot(string Name, string Path)
 /// </remarks>
 public sealed partial class MachinePresetDesk : ObservableObject
 {
+    /// <summary>
+    /// The machine being built, asked rather than held.
+    /// </summary>
+    /// <remarks>
+    /// Asked every time, because the machine open in the designer changes underneath this page and
+    /// a held one would have the presets written into the folder of a machine nobody is looking at.
+    /// </remarks>
     private readonly Func<MachineProject?> _project;
 
+    /// <summary>Takes the desk on to whichever machine the designer has open.</summary>
     public MachinePresetDesk(Func<MachineProject?> project) => _project = project;
 
     /// <summary>What the machine ships with, in the order its folder lists them.</summary>
@@ -57,6 +69,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasPreset))]
     private MachinePresetSlot? picked;
 
+    /// <summary>True when a preset is open, so the page can show it rather than a blank.</summary>
     public bool HasPreset => Picked != null;
 
     /// <summary>
@@ -71,6 +84,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasForm))]
     private MachinePresetForm? form;
 
+    /// <summary>True when there are lines to fill in, which the browse preset has not.</summary>
     public bool HasForm => Form != null;
 
     /// <summary>
@@ -90,6 +104,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasProblem))]
     private string problem = "";
 
+    /// <summary>True when there is a refusal to show.</summary>
     public bool HasProblem => Problem.Length > 0;
 
     /// <summary>Said after something was written, so the page can show it happened.</summary>
@@ -98,6 +113,18 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// <summary>True once the form has been changed and the file no longer says what it shows.</summary>
     [ObservableProperty] private bool moved;
 
+    /// <summary>
+    /// Reads the picked preset's file and builds the form from it.
+    /// </summary>
+    /// <remarks>
+    /// A preset written as a whole instrument, which is how the older ones on the disc are written,
+    /// is turned into one written the way the machine is drawn on the way in, so the page has one
+    /// shape to show and not two. Its recordings are made absolute at that point, since an
+    /// instrument names them from wherever it happened to be read.
+    ///
+    /// Everything the page was saying is cleared first: the problem, the note and the moved flag
+    /// all belong to the preset that was open and none of them is true of the next one.
+    /// </remarks>
     partial void OnPickedChanged(MachinePresetSlot? value)
     {
         Problem = "";
@@ -127,8 +154,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
                 return;
             }
 
-            // A preset written as a whole instrument is turned into one written the way the
-            // machine is drawn, so the page has one shape to show and not two.
             if (!read.ContainsKey(MachinePresetWords.Machine) && _project() is { } older)
             {
                 var sound = JsonSerializer.Deserialize<TrackerInstrument>(File.ReadAllText(value.Path));
@@ -185,6 +210,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// already on the disc are arranged. One folder per preset rather than one for the machine,
     /// because two kits that both have a file called kick.wav are two different kicks, and a
     /// shared folder would make somebody choose which one keeps the name.
+    ///
+    /// Wherever this preset already keeps its recordings wins, if it keeps any. A preset made
+    /// before the file was renamed, or one whose folder is named after the preset rather than the
+    /// file, has its drums somewhere with a name of its own, and bringing the next one in beside a
+    /// different name would split one kit across two folders.
     /// </remarks>
     public string Waves
     {
@@ -192,10 +222,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
         {
             if (Picked is not { } one || Folder.Length == 0) return "";
 
-            // Wherever this preset already keeps its recordings, if it keeps any. A preset made
-            // before the file was renamed, or one whose folder is named after the preset rather
-            // than the file, has its drums somewhere with a name of its own, and bringing the
-            // next one in beside a different name would split one kit across two folders.
             if (Beside() is { Length: > 0 } already) return already;
 
             return Path.Combine(Folder, Path.GetFileNameWithoutExtension(one.Path));
@@ -210,6 +236,9 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// Those are two different names whenever a preset's recordings sit in a folder named after
     /// the preset instead of the file, and writing the second one down names a file that is not
     /// there.
+    ///
+    /// A path that will not read at all falls through to the full path, which is at least somewhere
+    /// the file can be found today, rather than to nothing.
     /// </remarks>
     private string Relative(string full)
     {
@@ -219,7 +248,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
         }
         catch (Exception)
         {
-            // Fall through: the full path is at least somewhere it can be found today.
         }
 
         return full;
@@ -234,6 +262,9 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// stopped being set: the question was still asked and the answer was always nothing, so
     /// every recording brought in landed in the presets folder rather than beside the ones this
     /// preset was already using.
+    ///
+    /// A name that will not read is a name this cannot follow, and the next one may, so the walk
+    /// carries on rather than giving up on the preset.
     /// </remarks>
     private string? Beside()
     {
@@ -262,7 +293,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
             }
             catch (Exception)
             {
-                // A name that will not read is a name this cannot follow, and the next one may.
             }
         }
 
@@ -328,6 +358,9 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// one. What is written is the least a preset can be: a name, and a machine that plays your
     /// own recordings rather than any it ships with, which is what a preset is unless it says
     /// otherwise.
+    ///
+    /// Always enabled; with no folder to write into it does nothing, which is the state the page
+    /// is in before the machine has ever been saved.
     /// </remarks>
     public IRelayCommand NewCommand => new RelayCommand(() =>
     {
@@ -360,13 +393,19 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// A recording sitting inside the machine is written as its name in there, so the preset
     /// arrives whole on somebody else's disc; one from anywhere else is brought in first. A
     /// preset that could not be made to travel is a preset that ships broken.
+    ///
+    /// The browse preset is refused rather than written: it holds no settings, so saving it can
+    /// only take something away.
+    ///
+    /// The folder is read again afterwards, because the name on the picker lives inside the file
+    /// and may have just changed.
+    ///
+    /// Always enabled; with nothing open it does nothing.
     /// </remarks>
     public IRelayCommand SaveCommand => new RelayCommand(() =>
     {
         if (Picked is not { } one) return;
 
-        // Nothing to write. The browse preset holds no settings, so saving it can only take
-        // something away.
         if (Browses) return;
 
         if (_held is not { } held) return;
@@ -381,7 +420,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
             Problem = "";
             Moved = false;
 
-            // The name on the picker lives inside the file, so it may have just changed.
             Reread();
         }
         catch (Exception ex)
@@ -430,6 +468,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// afterwards. A folder another preset also plays out of is left where it is, and so is
     /// anything in there that no preset named: a note somebody dropped in beside the drums is
     /// theirs, and this is not the place to decide otherwise.
+    ///
+    /// What was removed is said after the list is rebuilt and not before: picking a different
+    /// preset is what happens when this one goes, and picking clears whatever the page was saying.
+    ///
+    /// Always enabled; with nothing open it does nothing.
     /// </remarks>
     public IRelayCommand DeleteCommand => new RelayCommand(() =>
     {
@@ -443,8 +486,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
             Reread();
 
-            // After the list is rebuilt, not before: picking a different preset is what happens
-            // when this one goes, and picking clears whatever the page was saying.
             Said = gone == 0
                 ? "Removed " + one.FileName
                 : "Removed " + one.FileName + " and " + (gone == 1 ? "its recording" : gone + " recordings");
@@ -458,6 +499,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// <summary>
     /// Removes the recordings a preset about to be deleted was the only one playing.
     /// </summary>
+    /// <remarks>
+    /// Anybody else playing out of the folder and it is not this preset's to take, so nothing goes
+    /// at all. The folder itself goes only when nothing of anybody else's is left in it: a note
+    /// somebody dropped in beside the drums is theirs.
+    /// </remarks>
     /// <returns>How many files went.</returns>
     private int Sweep(MachinePresetSlot one)
     {
@@ -467,7 +513,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         if (Tracker.Machines.PresetWaves.Folder(one.Path, home) is not { Length: > 0 } folder) return 0;
 
-        // Anybody else playing out of it and the folder is not this preset's to take.
         var others = Tracker.Machines.PresetWaves.Users(folder, home, Presets
             .Where(slot => !Tracker.FilePaths.Same(slot.Path, one.Path))
             .Select(slot => slot.Path));
@@ -487,7 +532,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
             gone++;
         }
 
-        // Only when nothing of anybody else's is left in it.
         if (Directory.Exists(folder) && Directory.GetFileSystemEntries(folder).Length == 0)
             Directory.Delete(folder);
 
@@ -504,7 +548,12 @@ public sealed partial class MachinePresetDesk : ObservableObject
     ///
     /// The name is kept, since "live-snare-shot-up" is about the sound and is the only thing
     /// anybody looking in the folder has to go on. A name already taken by a different file gets
-    /// a number; the same file brought in twice is brought in once.
+    /// a number; the same file brought in twice is brought in once, recognised by its length under
+    /// the name it already has here.
+    ///
+    /// The folder is made as the copy happens rather than on the way in, so an import that goes
+    /// wrong leaves nothing behind: an empty folder named after a preset is a folder somebody has
+    /// to work out the meaning of later.
     /// </remarks>
     public string Bring(string path)
     {
@@ -526,15 +575,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
                 if (File.Exists(full))
                 {
-                    // The same recording again, under the name it already has here.
                     if (new FileInfo(full).Length == new FileInfo(path).Length) return Relative(full);
 
                     continue;
                 }
 
-                // Made here rather than on the way in, so an import that goes wrong leaves
-                // nothing behind. An empty folder named after a preset is a folder somebody has
-                // to work out the meaning of later.
                 Directory.CreateDirectory(home);
 
                 File.Copy(path, full);
@@ -559,6 +604,10 @@ public sealed partial class MachinePresetDesk : ObservableObject
     ///
     /// Onto the pads the preset already speaks about first, then onto ones it does not, which it
     /// then starts speaking about. A preset is what somebody assigned, so filling it assigns.
+    ///
+    /// Each recording is written under whatever the machine calls the setting that holds one,
+    /// which is the same key its panel's take button names. There is no fixed word for it: a
+    /// machine says what its own settings are called and this reads that rather than assuming.
     /// </remarks>
     public void Fill(IReadOnlyList<string> paths)
     {
@@ -588,8 +637,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
                 held[key] = block;
             }
 
-            // The recording is written under whatever the machine calls the setting that holds
-            // one, which is the same key its panel's take button names.
             foreach (string word in Words(machine)) block[word] = block[word] ?? "";
 
             if (Words(machine).FirstOrDefault(IsTake) is { Length: > 0 } named) block[named] = brought[at];
@@ -604,15 +651,21 @@ public sealed partial class MachinePresetDesk : ObservableObject
             : "Brought in " + brought.Count + " recordings";
     }
 
+    /// <summary>What the machine calls the settings one of its things can hold.</summary>
     private IReadOnlyList<string> Words(Tracker.Machines.MachineProject? machine) =>
         machine == null
             ? Array.Empty<string>()
             : new MachineProjectShape(machine.Panel, machine.Parameters).ThingWords;
 
+    /// <summary>True when that setting is the one holding a recording.</summary>
     private bool IsTake(string key) =>
         _project() is { } machine && new MachineProjectShape(machine.Panel, machine.Parameters).IsTake(key);
 
     /// <summary>What the picker will call that file, which is what is written inside it.</summary>
+    /// <remarks>
+    /// A preset that will not read is still a file in the folder and is listed under its file
+    /// name: hiding it would leave somebody hunting for the one that broke the picker.
+    /// </remarks>
     private static string Named(string path)
     {
         try
@@ -625,8 +678,6 @@ public sealed partial class MachinePresetDesk : ObservableObject
         }
         catch (Exception)
         {
-            // A preset that will not read is still a file in the folder, and hiding it would
-            // leave somebody hunting for the one that broke the picker.
         }
 
         return Path.GetFileNameWithoutExtension(path);

@@ -18,7 +18,7 @@ namespace JingleBox2.Machines;
 /// <see cref="Write"/> and says whether anything moved. A machine cannot now move a value
 /// quietly, because there is nowhere left to do it.
 ///
-/// <see cref="Moved"/> is the other half of the same rule: it writes only when the value really
+/// <c>Moved</c> is the other half of the same rule: it writes only when the value really
 /// is different, so a knob reporting the position it already has does not mark a song as
 /// needing to be saved.
 /// </remarks>
@@ -39,6 +39,7 @@ public abstract class MachineValues : IMachineValues
     /// </remarks>
     public event Action<string>? Said;
 
+    /// <inheritdoc/>
     public abstract double Get(string key);
 
     /// <summary>
@@ -46,11 +47,13 @@ public abstract class MachineValues : IMachineValues
     /// </summary>
     /// <remarks>
     /// Not overridable. This is the whole point of the class.
+    ///
+    /// A NaN is dropped at the door rather than written. A knob cannot produce one; a file can,
+    /// and a NaN reaching a voice spreads through the filter and silences the instrument for
+    /// good, with nothing on the panel to say why.
     /// </remarks>
     public void Set(string key, double value)
     {
-        // A knob cannot produce one; a file can, and a NaN reaching a voice spreads through the
-        // filter and silences the instrument for good.
         if (double.IsNaN(value)) return;
 
         if (!Write(key, value)) return;
@@ -62,6 +65,11 @@ public abstract class MachineValues : IMachineValues
     /// <summary>Writes one setting, and says whether it actually moved.</summary>
     protected abstract bool Write(string key, double value);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Nothing, unless a machine says otherwise. Most of them are numbers from end to end and
+    /// have no text to answer with.
+    /// </remarks>
     public virtual string GetText(string key) => "";
 
     /// <summary>

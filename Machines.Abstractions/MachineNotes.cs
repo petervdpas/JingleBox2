@@ -15,6 +15,13 @@ namespace JingleBox2.Machines;
 /// </remarks>
 public static class MachineNotes
 {
+    /// <summary>
+    /// The twelve, each padded to two characters.
+    /// </summary>
+    /// <remarks>
+    /// The hyphen on a natural is what keeps every note the same width, so a column of them
+    /// lines up in the monospaced font the pattern is drawn in.
+    /// </remarks>
     private static readonly string[] Names =
         { "C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-" };
 

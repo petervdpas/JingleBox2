@@ -31,12 +31,21 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class ControlSurfaceViewModel : ObservableObject
 {
+    /// <summary>The rows underneath, which are what is actually stored and opened.</summary>
     private readonly IReadOnlyList<MidiDeviceViewModel> _ports;
+
+    /// <summary>Told to drop a port for good, or null where forgetting is not offered.</summary>
     private readonly Action<MidiDeviceViewModel>? _forget;
 
     /// <summary>True while the ticks are being read off the ports, so they do not write back.</summary>
     private bool _reading;
 
+    /// <summary>
+    /// Gathers a device's ports under one heading, with the ticks read off what they already do.
+    /// </summary>
+    /// <param name="name">What the hardware is called, from the profile or from the port itself.</param>
+    /// <param name="ports">Its ports, still the rows that hold the jobs.</param>
+    /// <param name="forget">Told to drop a port, where forgetting is offered.</param>
     public ControlSurfaceViewModel(string name, IReadOnlyList<MidiDeviceViewModel> ports,
                                    Action<MidiDeviceViewModel>? forget = null)
     {
@@ -66,26 +75,59 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     /// <summary>True when more than one, which is the only time they are worth listing.</summary>
     public bool HasPorts => Ports.Count > 1 || Ports.Any(one => one.Note.Length > 0);
 
+    /// <summary>True when any of its ports is plugged in, since a device arrives all at once.</summary>
     public bool IsConnected => _ports.Any(one => one.IsConnected);
 
+    /// <summary>Whether this device fires pads.</summary>
+    /// <remarks>
+    /// Ticked once for the whole device. Which of its ports really does it is the profile's
+    /// business, which is the whole reason this row exists.
+    /// </remarks>
     [ObservableProperty] private bool drivesPads;
+
+    /// <summary>Whether its notes are typed and played into the tracker.</summary>
+    /// <inheritdoc cref="DrivesPads" path="/remarks"/>
     [ObservableProperty] private bool drivesTracker;
+
+    /// <summary>Whether its knobs and faders move parameters.</summary>
+    /// <inheritdoc cref="DrivesPads" path="/remarks"/>
     [ObservableProperty] private bool drivesControls;
+
+    /// <summary>Whether its transport buttons work the caps at the top of the window.</summary>
+    /// <remarks>
+    /// This one goes on more than one port where a device has both a main port and a Mackie one,
+    /// since a controller sends one dialect or the other depending on its program and never both.
+    /// </remarks>
     [ObservableProperty] private bool drivesTransport;
 
+    /// <summary>Any of the four moving puts that job on the ports that can do it.</summary>
     partial void OnDrivesPadsChanged(bool value) => Put(MidiDeviceRole.Pads, value);
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesTrackerChanged(bool value) => Put(MidiDeviceRole.Tracker, value);
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesControlsChanged(bool value) => Put(MidiDeviceRole.Controls, value);
+
+    /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
     partial void OnDrivesTransportChanged(bool value) => Put(MidiDeviceRole.Transport, value);
 
     /// <summary>Only for hardware that is not plugged in. One on the desk comes straight back.</summary>
     public bool CanForget => !IsConnected && _forget is not null;
 
+    /// <summary>
+    /// Takes the whole device off the list, every port of it, with whatever was learned on it.
+    /// </summary>
+    /// <remarks>
+    /// Enabled only when nothing of it is plugged in; see <see cref="CanForget"/>. Walked over a
+    /// copy of the list, since forgetting a port takes it out of the list being walked.
+    /// </remarks>
     public IRelayCommand ForgetCommand => new RelayCommand(() =>
     {
         foreach (var port in _ports.ToList()) _forget?.Invoke(port);
     });
 
+    /// <summary>True when any port already has that job, which is how the ticks start out.</summary>
     private bool Any(MidiDeviceRole role) => _ports.Any(one => (one.Role & role) != 0);
 
     /// <summary>
@@ -118,6 +160,10 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
 /// <summary>One of a device's ports, and what the profile says it is for.</summary>
 public sealed class ControlSurfacePort
 {
+    /// <summary>One line under a device's heading.</summary>
+    /// <param name="name">The port's own name, as the operating system offers it.</param>
+    /// <param name="note">What the profile says it is for, still carrying the device's name.</param>
+    /// <param name="isConnected">False for a port that is remembered but not plugged in.</param>
     public ControlSurfacePort(string name, string note, bool isConnected)
     {
         Name = name;
@@ -125,13 +171,16 @@ public sealed class ControlSurfacePort
         IsConnected = isConnected;
     }
 
+    /// <summary>The port's own name.</summary>
     public string Name { get; }
 
     /// <summary>What it is for, without repeating the device's name on every line.</summary>
     public string Note { get; }
 
+    /// <summary>False for a port that is remembered but not plugged in.</summary>
     public bool IsConnected { get; }
 
+    /// <summary>True when there is anything to say about this port.</summary>
     public bool HasNote => Note.Length > 0;
 
     /// <summary>
@@ -146,8 +195,15 @@ public sealed class ControlSurfacePort
     {
         if (note.Length == 0) return "";
 
-        int at = note.IndexOf("  ·  ", StringComparison.Ordinal);
+        int at = note.IndexOf(Split, StringComparison.Ordinal);
 
-        return at >= 0 ? note[(at + 5)..] : "";
+        return at >= 0 ? note[(at + Split.Length)..] : "";
     }
+
+    /// <summary>What stands between the device's name and what the port is for.</summary>
+    /// <remarks>
+    /// A note with none of this in it is dropped rather than shown whole, since it is then all
+    /// device name and would be the heading said twice.
+    /// </remarks>
+    private const string Split = "  ·  ";
 }

@@ -147,13 +147,22 @@ public static class LinkKey
         window.AddHandler(InputElement.KeyDownEvent, Pressed, RoutingStrategies.Tunnel);
     }
 
+    /// <summary>
+    /// Answers Ctrl+Shift+M by turning the mode over, and does nothing at all otherwise.
+    /// </summary>
+    /// <remarks>
+    /// With nothing on screen to point at the keystroke is left alone rather than swallowed: a
+    /// gesture that does nothing here may mean something to whatever is in front of you.
+    ///
+    /// The moment is stamped whether or not the press was answered. A key leant on is one
+    /// gesture however many times the keyboard says it, and every repeat pushing the moment
+    /// forward is what makes none of them count.
+    /// </remarks>
     private static void Pressed(object? sender, KeyEventArgs e)
     {
         if (e.Handled || e.Key != Key.M) return;
         if (e.KeyModifiers != (KeyModifiers.Control | KeyModifiers.Shift)) return;
 
-        // Nothing on screen to point at. Not swallowed either: a keystroke that does nothing
-        // here may mean something to whatever is in front of you.
         if (!Pointable) return;
 
         var now = System.DateTime.UtcNow;
@@ -161,8 +170,6 @@ public static class LinkKey
         if (Answers(Pointable, now - _answered) && Midi.ControlLink.Current is { } link)
             link.IsLinking = !link.IsLinking;
 
-        // Whether it answered or not. A key leant on is one gesture however many times the
-        // keyboard says it, and every repeat pushes the moment forward so none of them counts.
         _answered = now;
         e.Handled = true;
     }

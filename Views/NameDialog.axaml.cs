@@ -15,6 +15,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class NameDialog : Window
 {
+    /// <summary>Builds the window. Its prompt, its box and its button are filled in by <see cref="AskAsync"/>.</summary>
     public NameDialog()
     {
         InitializeComponent();
@@ -24,11 +25,18 @@ public partial class NameDialog : Window
     /// Asks for a name. Gives back the trimmed name, or null when it is cancelled, left empty,
     /// or there is no window to open it over.
     /// </summary>
+    /// <param name="title">What the window's title bar says.</param>
+    /// <param name="prompt">The line above the box, saying what is being named.</param>
+    /// <param name="current">The name it opens with, selected, so typing replaces it.</param>
     /// <param name="confirm">
     /// What the button that accepts the name says. Renaming is what this box is usually for,
     /// so that is the default, but a box that asks what to call a song before saving it should
     /// not have Rename written on it.
     /// </param>
+    /// <remarks>
+    /// It opens with the old name selected, so typing replaces it and an arrow key keeps it.
+    /// That is what makes correcting a name and replacing one the same single gesture.
+    /// </remarks>
     public static Task<string?> AskAsync(string title, string prompt, string current, string confirm = "Rename")
     {
         var dialog = new NameDialog { Title = title };
@@ -45,7 +53,6 @@ public partial class NameDialog : Window
         {
             box.Text = current;
 
-            // Opened with the old name selected, so typing replaces it and the arrows keep it.
             dialog.Opened += (_, _) =>
             {
                 box.Focus();
@@ -56,6 +63,10 @@ public partial class NameDialog : Window
         return Dialog.ShowAsync<string?>(dialog, null);
     }
 
+    /// <summary>
+    /// Enter in the box accepts the name, since a one-box dialog has nothing else Enter could
+    /// mean and reaching for the mouse to press a button is a gesture nobody wants here.
+    /// </summary>
     private void Name_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
@@ -64,6 +75,13 @@ public partial class NameDialog : Window
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Hands the name back, trimmed, or null when it has been emptied.
+    /// </summary>
+    /// <remarks>
+    /// An empty name reads as cancel rather than as an error: there is nothing useful to say
+    /// about it and nothing this could do with it.
+    /// </remarks>
     private void Confirm_Click(object? sender, RoutedEventArgs e)
     {
         string wanted = (this.FindControl<TextBox>("NameBox")?.Text ?? "").Trim();
@@ -71,5 +89,6 @@ public partial class NameDialog : Window
         Close(wanted.Length == 0 ? null : wanted);
     }
 
+    /// <summary>Closes with nothing, leaving the thing called what it was called.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(null);
 }

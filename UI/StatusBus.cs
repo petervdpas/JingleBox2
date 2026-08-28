@@ -24,8 +24,13 @@ public enum StatusKind
 }
 
 /// <summary>One thing that happened, with who said it and when.</summary>
+/// <param name="Text">What was said.</param>
+/// <param name="Kind">How it wants to be read.</param>
+/// <param name="From">Who said it, or empty where nobody signed it.</param>
+/// <param name="At">When it was said, for working out whether it is still standing.</param>
 public sealed record StatusMessage(string Text, StatusKind Kind, string From, DateTime At)
 {
+    /// <summary>The message as one line, timed and signed, for the list of what has been said.</summary>
     public override string ToString() =>
         At.ToString("HH:mm:ss") + "  " + (From.Length > 0 ? From + ": " : "") + Text;
 }
@@ -56,9 +61,13 @@ public sealed class StatusBus
     /// <summary>How long an ordinary message stands in front of the context.</summary>
     public static readonly TimeSpan Holds = TimeSpan.FromSeconds(4);
 
+    /// <summary>Held while what has been said is read or written, since several threads speak.</summary>
     private readonly object _lock = new();
+
+    /// <summary>What has been said lately, oldest first.</summary>
     private readonly List<StatusMessage> _said = new();
 
+    /// <summary>Where you are, which is what the bar says when nothing has just happened.</summary>
     private string _context = "";
 
     /// <summary>Raised for every message, on whatever thread posted it.</summary>
@@ -100,16 +109,27 @@ public sealed class StatusBus
         get { lock (_lock) return _said.ToArray(); }
     }
 
+    /// <summary>Something happened, which is most of what is ever said.</summary>
+    /// <param name="text">What to say. A blank one says nothing.</param>
+    /// <param name="from">Who is saying it, shown before the message.</param>
     public void Say(string text, string from = "") => Post(text, StatusKind.Plain, from);
 
+    /// <summary>Something worked, and saying so is worth a moment of green.</summary>
+    /// <param name="text">What to say. A blank one says nothing.</param>
+    /// <param name="from">Who is saying it.</param>
     public void Done(string text, string from = "") => Post(text, StatusKind.Done, from);
 
+    /// <summary>Something is not as expected, but nothing has broken.</summary>
+    /// <param name="text">What to say. A blank one says nothing.</param>
+    /// <param name="from">Who is saying it.</param>
     public void Warn(string text, string from = "") => Post(text, StatusKind.Warning, from);
 
     /// <summary>
     /// Something failed. Said out loud and written down, because a fault the user saw for four
     /// seconds and a fault anybody can go back and read are different things.
     /// </summary>
+    /// <param name="text">What to say. A blank one says nothing.</param>
+    /// <param name="from">Who is saying it.</param>
     public void Fault(string text, string from = "")
     {
         Post(text, StatusKind.Fault, from);
@@ -118,9 +138,21 @@ public sealed class StatusBus
     }
 
     /// <summary>True while that message is still standing in front of the context.</summary>
+    /// <remarks>
+    /// A fault stands until the next thing is said, because a fault you had to catch inside four
+    /// seconds is a fault you missed. Told the time rather than reading the clock, so it can be
+    /// put a question to without waiting.
+    /// </remarks>
+    /// <param name="message">The message, or null when nothing has been said.</param>
+    /// <param name="now">The moment being asked about.</param>
     public static bool Holding(StatusMessage? message, DateTime now) =>
         message != null && (message.Kind == StatusKind.Fault || now - message.At < Holds);
 
+    /// <summary>Writes one message down and tells whoever is listening.</summary>
+    /// <remarks>
+    /// Saying the same thing twice running is one thing happening rather than two. The first is
+    /// replaced rather than the second dropped, so its four seconds start again.
+    /// </remarks>
     private void Post(string text, StatusKind kind, string from)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
@@ -129,8 +161,6 @@ public sealed class StatusBus
 
         lock (_lock)
         {
-            // Saying the same thing twice running is one thing happening, not two. Replaced
-            // rather than dropped, so its four seconds start again.
             if (_said.Count > 0 && _said[^1].Text == message.Text && _said[^1].Kind == message.Kind)
                 _said.RemoveAt(_said.Count - 1);
 
@@ -142,6 +172,7 @@ public sealed class StatusBus
         Posted?.Invoke(this, message);
     }
 
+    /// <summary>Forgets what has been said. Where you are is untouched.</summary>
     public void Clear()
     {
         lock (_lock) _said.Clear();

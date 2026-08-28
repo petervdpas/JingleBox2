@@ -10,6 +10,7 @@ namespace JingleBox2.UI;
 /// </summary>
 public static class TickList
 {
+    /// <summary>Reads the marks out of the written form, dropping anything that is not a number.</summary>
     public static double[] Parse(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return Array.Empty<double>();

@@ -3,16 +3,35 @@ using System.Collections.Generic;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// Reads a song step by step and says what should happen, without touching audio.
-/// Holds the per-track memory a tracker needs: a note with a blank instrument column
-/// reuses whatever that track played last, which is how patterns stay readable.
-/// </summary>
-public sealed class TrackerSequencer
+/// <inheritdoc/>
+/// <remarks>
+/// The memory is two arrays sized once at construction, so nothing here allocates per line. The
+/// two static walks below are on this class rather than on the contract because they hold
+/// nothing: where the next line is is a fact about the song and the position, and both are
+/// handed in.
+/// </remarks>
+public sealed class TrackerSequencer : ITrackerSequencer
 {
+    /// <summary>
+    /// What each track last played, so a note with a blank instrument column knows what to
+    /// sound. <see cref="TrackerCell.NoInstrument"/> until that track has played anything.
+    /// </summary>
     private readonly int[] _lastInstrument;
+
+    /// <summary>
+    /// Where each track's volume column was last set. It stays there until something moves it,
+    /// which is what lets a level be typed once and hold down the page.
+    /// </summary>
     private readonly float[] _trackGain;
 
+    /// <summary>
+    /// Memory for that many tracks, clamped to what a song can have.
+    /// </summary>
+    /// <remarks>
+    /// Clamped rather than trusted, since the count comes off a song file. The arrays are what
+    /// every lookup here is bounded by, so a count out of range would be an index fault on the
+    /// clock thread rather than a song that plays a track short.
+    /// </remarks>
     public TrackerSequencer(int trackCount)
     {
         int tracks = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
@@ -21,19 +40,23 @@ public sealed class TrackerSequencer
         Reset();
     }
 
+    /// <inheritdoc/>
     public int TrackCount => _lastInstrument.Length;
 
-    /// <summary>Forgets the per-track memory. Called whenever playback restarts.</summary>
+    /// <inheritdoc/>
     public void Reset()
     {
         Array.Fill(_lastInstrument, TrackerCell.NoInstrument);
         Array.Fill(_trackGain, 1f);
     }
 
-    /// <summary>
-    /// What to do on this step. Only tracks with something to say produce an event, so a
-    /// mostly empty pattern costs almost nothing to play.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A cell with no note in it but something in the volume or effect column becomes an Adjust
+    /// rather than a Trigger, which changes the voice already sounding instead of starting
+    /// another. That is how a fade written down the volume column works, and it is why an
+    /// event carries the track's remembered instrument even when nothing is being started.
+    /// </remarks>
     public IReadOnlyList<TrackerEvent> EventsFor(Song song, TrackerPosition position)
     {
         var events = new List<TrackerEvent>();
@@ -68,7 +91,6 @@ public sealed class TrackerSequencer
             }
             else
             {
-                // No note, but the volume or effect column said something. Adjust in place.
                 events.Add(new TrackerEvent(
                     track, TrackerEventKind.Adjust, Note.Empty,
                     _lastInstrument[track], _trackGain[track], cell.Effect));
@@ -82,6 +104,11 @@ public sealed class TrackerSequencer
     /// The step after this one, or null at the end of the song when not looping.
     /// Walks off the end of a pattern into the next order entry.
     /// </summary>
+    /// <remarks>
+    /// By the order entry rather than by the pattern, since the same pattern can be in a song
+    /// twice and what follows it is a different answer each time. An order entry pointing at no
+    /// pattern ends the pass rather than being skipped, which is what an empty song does.
+    /// </remarks>
     public static TrackerPosition? Advance(Song song, TrackerPosition position, bool loop)
     {
         var pattern = song.PatternAt(position.OrderIndex);

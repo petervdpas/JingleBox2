@@ -9,7 +9,10 @@ namespace JingleBox2.UI;
 /// </summary>
 public static class FrequencyScale
 {
+    /// <summary>The bottom of the dial, which is about as low as hearing goes.</summary>
     public const double MinHz = 20;
+
+    /// <summary>The top of it, which is about as high as hearing goes.</summary>
     public const double MaxHz = 20000;
 
     /// <summary>Where a frequency sits on the dial, 0 at the bottom and 1 at the top.</summary>

@@ -23,25 +23,59 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class ChopEditor : Decorator
 {
-    /// <summary>The recording being cut and where its boundaries are.</summary>
+    /// <summary>Backs <see cref="Slices"/>: the recording being cut and where its boundaries are.</summary>
     public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
         AvaloniaProperty.Register<ChopEditor, IMachineSlices?>(nameof(Slices));
 
-    /// <summary>How tall the picture is. The rest of the control is one row of fields.</summary>
+    /// <summary>
+    /// Backs <see cref="PictureHeight"/>. The rest of the control is one row of fields, so this
+    /// is very nearly the whole height of it.
+    /// </summary>
     public static readonly StyledProperty<double> PictureHeightProperty =
         AvaloniaProperty.Register<ChopEditor, double>(nameof(PictureHeight), 90);
 
+    /// <summary>Which recording is on the machine, trimmed when the name is longer than the room.</summary>
     private readonly TextBlock _take = new() { VerticalAlignment = VerticalAlignment.Center };
+
+    /// <summary>How many pieces there are now, hidden while there is no recording to count.</summary>
     private readonly TextBlock _count = new() { VerticalAlignment = VerticalAlignment.Center };
+
+    /// <summary>The take with every boundary on it, which is where the cutting is actually done.</summary>
     private readonly WaveformView _picture = new();
+
+    /// <summary>How many pieces the cutting should aim for, which is a wish rather than a promise.</summary>
     private readonly NumberField _pieces = new();
+
+    /// <summary>Which way the cutting looks for its boundaries.</summary>
     private readonly ComboBox _cutBy = new();
+
+    /// <summary>Whether the piece in hand repeats, and how.</summary>
     private readonly ComboBox _loop = new();
+
+    /// <summary>Cuts the recording again, throwing away wherever it is cut now.</summary>
     private readonly Button _chop = new();
 
+    /// <summary>
+    /// The machine's slices being listened to, and the handler doing it.
+    /// </summary>
+    /// <remarks>
+    /// Both are kept so the subscription can be taken off again. The handler is a closure rather
+    /// than a method, so it is not the same delegate twice and cannot be unsubscribed without
+    /// having been held on to; and this control is handed a different machine every time the
+    /// panel above it changes what it is showing.
+    /// </remarks>
     private IMachineSlices? _watching;
+
+    /// <inheritdoc cref="_watching"/>
     private PropertyChangedEventHandler? _listening;
 
+    /// <summary>
+    /// Builds the whole control once, and lets go of the machine when it leaves the tree.
+    /// </summary>
+    /// <remarks>
+    /// Built in code rather than from a template because it goes on a machine's own face, and a
+    /// machine that somebody else built has no access to this application's XAML.
+    /// </remarks>
     public ChopEditor()
     {
         Build();
@@ -49,18 +83,27 @@ public class ChopEditor : Decorator
         DetachedFromVisualTree += (_, _) => Unwatch();
     }
 
+    /// <inheritdoc cref="SlicesProperty"/>
     public IMachineSlices? Slices
     {
         get => GetValue(SlicesProperty);
         set => SetValue(SlicesProperty, value);
     }
 
+    /// <inheritdoc cref="PictureHeightProperty"/>
     public double PictureHeight
     {
         get => GetValue(PictureHeightProperty);
         set => SetValue(PictureHeightProperty, value);
     }
 
+    /// <summary>
+    /// Moves the listening to whichever machine has just arrived, and reads it once.
+    /// </summary>
+    /// <remarks>
+    /// The old one is let go of first. A control handed two machines in a row would otherwise go
+    /// on refreshing itself from the first for as long as anything else held it.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -77,6 +120,7 @@ public class ChopEditor : Decorator
         }
     }
 
+    /// <summary>Starts listening to the machine now in hand, and points the picture at its list.</summary>
     private void Watch()
     {
         if (Slices is not { } slices) return;
@@ -89,6 +133,7 @@ public class ChopEditor : Decorator
         _picture.SlicePoints = slices.Points;
     }
 
+    /// <summary>Stops listening, so nothing here keeps a machine alive after it has been put down.</summary>
     private void Unwatch()
     {
         if (_watching != null && _listening != null) _watching.PropertyChanged -= _listening;
@@ -97,6 +142,18 @@ public class ChopEditor : Decorator
         _listening = null;
     }
 
+    /// <summary>
+    /// Lays the whole thing out: the heading, the picture, and the row of fields under it.
+    /// </summary>
+    /// <remarks>
+    /// The picture carries the whole take with every boundary on it, and dragging a boundary is
+    /// truncating the two pieces it lies between, which is why there is no separate place to set
+    /// where a piece starts.
+    ///
+    /// The row underneath is plain controls rather than the panel-style ones, because it stands
+    /// next to the panel's other plain rows. A panel switch is a thing you reach for while
+    /// playing; these are things you set once and leave.
+    /// </remarks>
     private void Build()
     {
         _take.Classes.Add("cardHint");
@@ -115,8 +172,6 @@ public class ChopEditor : Decorator
         heading.Children.Add(_take);
         heading.Children.Add(_count);
 
-        // The whole take, with every boundary on it. Dragging one is truncating the two pieces
-        // it lies between, which is why there is no separate place to set a piece's start.
         _picture.Height = PictureHeight;
         _picture.ShowMarkers = false;
         _picture.Placeholder = "Put a recording on this machine to chop it.";
@@ -186,9 +241,6 @@ public class ChopEditor : Decorator
             if (_loop.SelectedItem is string chosen && Slices is { } slices) slices.LoopName = chosen;
         };
 
-        // Plain controls, because this row stands next to the panel's other plain rows. The
-        // panel-style switches belong on the machine itself, where a control is a thing you
-        // reach for while playing rather than a thing you set once.
         var fields = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
 
         fields.Children.Add(Field("Pieces"));
@@ -208,6 +260,7 @@ public class ChopEditor : Decorator
         Child = body;
     }
 
+    /// <summary>The wording in front of one of the fields, with room to its left where asked for.</summary>
     private static TextBlock Field(string said, double left = 0)
     {
         var text = new TextBlock

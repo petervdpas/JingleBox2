@@ -24,6 +24,15 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class ControlActions
 {
+    /// <summary>
+    /// The one this session is using.
+    /// </summary>
+    /// <remarks>
+    /// A static, and the same reason as <see cref="ControlLink.Current"/>: the panels that have
+    /// to hear this are drawn from a description and have never heard of a view model, so
+    /// threading a reference through every designer, window and panel would be a great deal of
+    /// wiring to express something that is true of the application rather than of any part of it.
+    /// </remarks>
     public static ControlActions Current { get; } = new();
 
     /// <summary>
@@ -35,6 +44,13 @@ public sealed class ControlActions
     /// </remarks>
     public event Action<string, string>? Fired;
 
+    /// <summary>
+    /// Says a mapped button was pressed, for whichever panel is showing that machine.
+    /// </summary>
+    /// <remarks>
+    /// An empty action is dropped rather than announced, since a panel matching on the name
+    /// would have to guard against it and every panel would have to remember to.
+    /// </remarks>
     public void Fire(string machine, string action)
     {
         if (string.IsNullOrEmpty(action)) return;

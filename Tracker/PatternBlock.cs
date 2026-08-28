@@ -9,8 +9,10 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public sealed class PatternBlock
 {
+    /// <summary>The cells themselves, line by track, copied out of the pattern.</summary>
     private readonly TrackerCell[,] _cells;
 
+    /// <summary>Private, so <see cref="Copy"/> is the only way one is made and it cannot be empty.</summary>
     private PatternBlock(TrackerCell[,] cells, int lines, int tracks)
     {
         _cells = cells;
@@ -18,12 +20,20 @@ public sealed class PatternBlock
         Tracks = tracks;
     }
 
+    /// <summary>How many lines deep it is.</summary>
     public int Lines { get; }
 
+    /// <summary>And how many tracks across.</summary>
     public int Tracks { get; }
 
+    /// <summary>True when there is nothing in it, which paste treats as nothing to do.</summary>
     public bool IsEmpty => Lines <= 0 || Tracks <= 0;
 
+    /// <summary>One cell of the block, or an empty one for anything outside it.</summary>
+    /// <remarks>
+    /// Held rather than thrown, because a block is read by a paste that is already clipping
+    /// itself against the pattern and an index past the edge is an ordinary state there.
+    /// </remarks>
     public TrackerCell At(int line, int track) =>
         line >= 0 && line < Lines && track >= 0 && track < Tracks ? _cells[line, track] : TrackerCell.Empty;
 
@@ -60,10 +70,14 @@ public sealed class PatternBlock
     /// what anyone dragging a phrase to the end of a pattern expects.
     ///
     /// Cells are replaced, not merged. A paste is a decision about that region.
+    ///
+    /// This is the one edit that does not go through <see cref="PatternEdit"/>, and it still has
+    /// to be recorded like the rest, so it rings that class's own bell on the way in. The bell is
+    /// rung before anything is checked, since a paste that turns out to land nowhere leaves no
+    /// step of its own but must not swallow the step the pattern was owed.
     /// </remarks>
     public PatternSelection Paste(Pattern? pattern, PatternCursor at)
     {
-        // The one edit that is not a PatternEdit, and it has to be recorded like the rest.
         if (pattern is not null) PatternEdit.Watching?.Invoke(pattern, "pasting");
 
         if (pattern == null || IsEmpty) return PatternSelection.None;

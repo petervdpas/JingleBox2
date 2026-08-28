@@ -17,6 +17,7 @@ public partial class SongDetailsDialog : Window
     /// <summary>What came back: the name, and what the song says about itself.</summary>
     public sealed record Details(string Name, string Description);
 
+    /// <summary>Builds the window. Both boxes are filled in by <see cref="AskAsync"/>.</summary>
     public SongDetailsDialog()
     {
         InitializeComponent();
@@ -26,6 +27,11 @@ public partial class SongDetailsDialog : Window
     /// Asks for both. Gives back null when it is cancelled, when the name is left empty, or
     /// when there is no window to open it over.
     /// </summary>
+    /// <remarks>
+    /// It opens on the name with the name selected, so typing replaces it and an arrow key
+    /// keeps it. That is what makes renaming an existing song one gesture rather than a
+    /// select-all first.
+    /// </remarks>
     public static Task<Details?> AskAsync(string name, string description)
     {
         var dialog = new SongDetailsDialog();
@@ -36,7 +42,6 @@ public partial class SongDetailsDialog : Window
         if (nameBox != null) nameBox.Text = name;
         if (aboutBox != null) aboutBox.Text = description;
 
-        // Opened on the name with it selected, so typing replaces it and the arrows keep it.
         dialog.Opened += (_, _) =>
         {
             nameBox?.Focus();
@@ -58,6 +63,13 @@ public partial class SongDetailsDialog : Window
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Hands back both, trimmed, or null when the name has been emptied.
+    /// </summary>
+    /// <remarks>
+    /// An empty name reads as cancel rather than as an error, because a song with no name is
+    /// not something this can save and there is nothing useful to say about it.
+    /// </remarks>
     private void Confirm_Click(object? sender, RoutedEventArgs e)
     {
         string name = (this.FindControl<TextBox>("NameBox")?.Text ?? "").Trim();
@@ -66,5 +78,6 @@ public partial class SongDetailsDialog : Window
         Close(name.Length == 0 ? null : new Details(name, about));
     }
 
+    /// <summary>Closes with nothing, leaving the song called what it was called.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(null);
 }

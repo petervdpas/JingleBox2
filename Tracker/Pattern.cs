@@ -18,10 +18,33 @@ public sealed class Pattern
     /// </summary>
     public event EventHandler? Changed;
 
+    /// <summary>A pattern of one step, which is as short as one can be.</summary>
     public const int MinLines = 1;
+
+    /// <summary>
+    /// Two hundred and fifty six, which is the longest a pattern can be.
+    /// </summary>
+    /// <remarks>
+    /// The same ceiling trackers have always had, and the reason it is worth having is the
+    /// history: a step is a copy of the cells, so the largest pattern there can be decides what
+    /// a hundred steps cost.
+    /// </remarks>
     public const int MaxLines = 256;
+
+    /// <summary>Sixty four, which is four bars at the usual four lines to a beat.</summary>
     public const int DefaultLines = 64;
 
+    /// <summary>
+    /// Every cell, line by line, one array rather than an array of rows.
+    /// </summary>
+    /// <remarks>
+    /// A cell is a value type, so this is one block with no allocation per cell and no reference
+    /// to follow per read. That is what makes a copy of a whole pattern a memory copy of a few
+    /// kilobytes, which is what the history is built on.
+    ///
+    /// Replaced rather than resized when the shape changes, since the index of a cell is worked
+    /// out from the track count and every one of them moves.
+    /// </remarks>
     private TrackerCell[] _cells;
 
     /// <summary>
@@ -39,12 +62,26 @@ public sealed class Pattern
     /// </remarks>
     private readonly List<AutomationLane> _lanes = new();
 
+    /// <summary>The lanes, to be read. <see cref="Lane"/> is the only way one is added.</summary>
     public IReadOnlyList<AutomationLane> Lanes => _lanes;
 
+    /// <summary>What the order list calls it, which is two digits unless somebody renames it.</summary>
     public string Name { get; set; } = "";
+
+    /// <summary>How many steps it has.</summary>
     public int Lines { get; private set; }
+
+    /// <summary>
+    /// How many tracks wide it is, which is the song's track count and not a choice of its own.
+    /// </summary>
+    /// <remarks>
+    /// Every pattern in a song is the same width. Kept here as well because the index of a cell
+    /// is worked out from it, and reaching to the song for it on every read would put a
+    /// reference in the one place that has to stay a plain array lookup.
+    /// </remarks>
     public int TrackCount { get; private set; }
 
+    /// <summary>A pattern of that shape, every cell blank. Both numbers are held to their range.</summary>
     public Pattern(int lines = DefaultLines, int trackCount = Song.DefaultTrackCount)
     {
         Lines = Math.Clamp(lines, MinLines, MaxLines);
@@ -52,6 +89,14 @@ public sealed class Pattern
         _cells = NewCells(Lines, TrackCount);
     }
 
+    /// <summary>
+    /// One cell. Reading or writing outside the pattern throws, because that is a mistake in the
+    /// caller rather than an ordinary state.
+    /// </summary>
+    /// <remarks>
+    /// A write that would change nothing raises nothing, which is what lets an edit that turned
+    /// out to be a no-op leave no undo step and no redraw.
+    /// </remarks>
     public TrackerCell this[int line, int track]
     {
         get
@@ -71,6 +116,7 @@ public sealed class Pattern
         }
     }
 
+    /// <summary>True when that cell is inside the pattern. The bounds check every edit uses.</summary>
     public bool Contains(int line, int track) =>
         line >= 0 && line < Lines && track >= 0 && track < TrackCount;
 
@@ -80,6 +126,7 @@ public sealed class Pattern
     /// <summary>Changes the track count, keeping whatever still fits.</summary>
     public void SetTrackCount(int trackCount) => Rebuild(Lines, trackCount);
 
+    /// <summary>Empties it: every cell, and every lane. One change, not one per cell.</summary>
     public void Clear()
     {
         Array.Fill(_cells, TrackerCell.Empty);
@@ -156,6 +203,9 @@ public sealed class Pattern
     /// A move, not a swap. Dragging track four in front of track one should leave the others
     /// in the order they were, one place along, which is what somebody dragging a column
     /// expects and what a swap does not do.
+    ///
+    /// The lanes slide with the cells. A lane belongs to a track by number, so a track moved
+    /// with its automation left behind would be somebody else's filter sweeping.
     /// </remarks>
     public void MoveTrack(int from, int to)
     {
@@ -175,8 +225,6 @@ public sealed class Pattern
 
         for (int line = 0; line < Lines; line++) _cells[line * TrackCount + to] = column[line];
 
-        // The lanes slide with the cells. A lane belongs to a track by number, so a track moved
-        // and its automation left behind would be somebody else's filter sweeping.
         foreach (var lane in _lanes)
         {
             if (lane.Track == from) lane.Track = to;
@@ -195,6 +243,11 @@ public sealed class Pattern
             yield return _cells[line * TrackCount + track];
     }
 
+    /// <summary>A pattern of its own holding the same music, with nothing shared.</summary>
+    /// <remarks>
+    /// The lanes are cloned rather than handed over, since a lane is a reference type edited in
+    /// place and two patterns sharing one would move together.
+    /// </remarks>
     public Pattern Clone()
     {
         var copy = new Pattern(Lines, TrackCount) { Name = Name };
@@ -229,6 +282,10 @@ public sealed class Pattern
         _lanes.Select(one => one.Clone()).ToList();
 
     /// <summary>True when what it holds now is exactly that.</summary>
+    /// <remarks>
+    /// What the history asks to find out whether the last edit changed anything, so a keystroke
+    /// that did nothing does not cost a step.
+    /// </remarks>
     public bool Holds(TrackerCell[]? cells, int lines, int trackCount, IReadOnlyList<AutomationLane>? lanes)
     {
         if (cells is null || lines != Lines || trackCount != TrackCount) return false;
@@ -253,6 +310,10 @@ public sealed class Pattern
     /// Once, rather than a change per cell, because putting a step back is one thing that
     /// happened however many cells it touched. Going through the indexer would raise the event a
     /// couple of hundred times and redraw the grid as many.
+    ///
+    /// The lanes are copied again on the way back in, for the same reason they were copied on
+    /// the way out: a step is kept and may be put back more than once, and handing over its own
+    /// lanes would let the next edit reach into the history and change what it holds.
     /// </remarks>
     public void Restore(TrackerCell[] cells, int lines, int trackCount,
                         IReadOnlyList<AutomationLane>? lanes)
@@ -267,9 +328,6 @@ public sealed class Pattern
         _cells = new TrackerCell[cells.Length];
         Array.Copy(cells, _cells, cells.Length);
 
-        // Copied again on the way back in, for the same reason they were copied on the way out:
-        // the step is kept and may be put back more than once, and handing over its own lanes
-        // would let the next edit reach into the history and change it.
         _lanes.Clear();
         if (lanes is not null)
             foreach (var lane in lanes) _lanes.Add(lane.Clone());
@@ -280,6 +338,14 @@ public sealed class Pattern
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Changes the shape, keeping whatever still fits, and says so once.
+    /// </summary>
+    /// <remarks>
+    /// The lanes follow the same rule the cells do. A pattern made shorter drops the points past
+    /// its end, and tracks taken off take their lanes with them. The master's lane stays: it is
+    /// not one of the tracks and there is no count of them that reaches it.
+    /// </remarks>
     private void Rebuild(int lines, int trackCount)
     {
         int newLines = Math.Clamp(lines, MinLines, MaxLines);
@@ -298,15 +364,13 @@ public sealed class Pattern
         Lines = newLines;
         TrackCount = newTracks;
 
-        // The same rule the cells follow: keep whatever still fits. A pattern made shorter
-        // drops the points past its end, and tracks taken off take their lanes with them. The
-        // master's stays: it is not one of the tracks and there is no count that removes it.
         _lanes.RemoveAll(one => !one.IsMaster && one.Track >= newTracks);
         foreach (var lane in _lanes) lane.FitTo(newLines);
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>A block of blank cells of that shape.</summary>
     private static TrackerCell[] NewCells(int lines, int trackCount)
     {
         var cells = new TrackerCell[lines * trackCount];
@@ -314,6 +378,7 @@ public sealed class Pattern
         return cells;
     }
 
+    /// <summary>Throws for a cell outside the pattern, naming the shape it was asked of.</summary>
     private void RequireInRange(int line, int track)
     {
         if (!Contains(line, track))

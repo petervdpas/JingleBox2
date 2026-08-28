@@ -11,14 +11,26 @@ namespace JingleBox2.Views;
 /// </summary>
 public partial class PluginStrip : UserControl
 {
+    /// <summary>
+    /// The chain currently shown, kept only so its announcement can be let go of when the strip
+    /// is pointed at another one. A strip is reused as the cursor moves between tracks, so
+    /// without this it would be subscribed to every chain it had ever shown.
+    /// </summary>
     private PluginChainViewModel? _chain;
 
+    /// <summary>
+    /// Builds the strip and keeps the plugin windows in step with what is on the chain.
+    /// </summary>
+    /// <remarks>
+    /// A device that leaves the chain takes its window with it, wherever the removal came from:
+    /// the strip's menu, a song being opened, or a pad profile changing. A window left open
+    /// over a disposed plugin draws into nothing, which is a crash inside the plugin's own
+    /// toolkit rather than an exception anything here could catch.
+    /// </remarks>
     public PluginStrip()
     {
         InitializeComponent();
 
-        // A device that leaves the chain takes its window with it, wherever the removal came
-        // from: the strip's menu, a song being opened, or a pad profile changing.
         DataContextChanged += (_, _) =>
         {
             if (_chain != null) _chain.DeviceClosing -= PluginWindow.CloseFor;
@@ -36,6 +48,9 @@ public partial class PluginStrip : UserControl
     /// The plugin is loaded here rather than when the track was picked: a track selection
     /// should not cost the time a big synth takes to come up. It is the one the notes go to,
     /// so a knob turned in it changes what is actually heard.
+    ///
+    /// An instrument of ours opens the designer's panel; a plugin opens its own interface. The
+    /// window is the same window either way, because to the track they are the same thing.
     /// </remarks>
     private void OnOpenInstrument(object? sender, RoutedEventArgs e)
     {
@@ -46,8 +61,6 @@ public partial class PluginStrip : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
-        // An instrument of ours opens the designer; a plugin opens its own interface. The box
-        // is the same box either way, because to the track they are the same thing.
         if (!instrument.IsPlugin)
         {
             var designer = instrument.Designer;
@@ -67,6 +80,13 @@ public partial class PluginStrip : UserControl
         PluginWindow.Show(instrument, panel, instrument.Title, owner, () => instrument.Close());
     }
 
+    /// <summary>
+    /// Opens the effect whose block was pressed.
+    /// </summary>
+    /// <remarks>
+    /// Read off the button's own row rather than off anything the strip has picked, since a
+    /// chain has no selection: a press on a block is about that block.
+    /// </remarks>
     private void OnOpenDevice(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control control) return;

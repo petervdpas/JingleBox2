@@ -31,10 +31,23 @@ public sealed class TakeLibrary : IMachineTakes
     /// <summary>And when it is there but nothing can be made of it.</summary>
     public const string UnreadableText = "The file could not be read.";
 
+    /// <summary>The application's recordings, or nothing when there is no shelf to look on.</summary>
     private readonly IReadOnlyList<Recording>? _shelf;
+
+    /// <summary>What turns a file into a picture, or nothing, in which case there are no pictures.</summary>
     private readonly IWaveformService? _waveforms;
 
+    /// <summary>What has been read, by file, so a panel drawn again does not read the disc again.</summary>
     private readonly Dictionary<string, Entry> _read = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// What guards <see cref="_read"/>.
+    /// </summary>
+    /// <remarks>
+    /// Two panels can be drawing at once and a preview can be being filled in behind them, so
+    /// the table itself is locked. What it holds is not: reading a long take takes a moment, and
+    /// doing it inside the lock would make the second panel wait on the first.
+    /// </remarks>
     private readonly object _gate = new();
 
     /// <param name="shelf">
@@ -51,13 +64,17 @@ public sealed class TakeLibrary : IMachineTakes
         _waveforms = waveforms;
     }
 
-    /// <summary>
-    /// The shape of that recording, one value per column, or null when there is none to draw.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Null covers everything that is not a picture: no take set, a take that cannot be found,
     /// a file that will not read, and no waveform service to read it with. The panel draws its
     /// empty picture for all four and the line from <see cref="Describe"/> says which it was.
+    ///
+    /// The reading happens outside the lock, since a long take takes a moment and two panels
+    /// asking at once should not queue. The worst that comes of that is the same file being read
+    /// twice, and the result is only kept if the entry it was read for is still the current one:
+    /// a file rewritten while it was being read has a newer entry by now, and the old peaks are
+    /// dropped rather than filed under it.
     /// </remarks>
     public float[]? Peaks(string take)
     {
@@ -69,8 +86,6 @@ public sealed class TakeLibrary : IMachineTakes
 
         if (entry.Peaks != null) return entry.Peaks;
 
-        // Outside the lock: reading a long take takes a moment, and two panels asking at once
-        // should not queue. The worst that happens is the same file being read twice.
         float[]? peaks;
 
         try
@@ -79,8 +94,6 @@ public sealed class TakeLibrary : IMachineTakes
         }
         catch (Exception)
         {
-            // A take somebody has half written, or one this build cannot decode. Nothing to
-            // draw, and the description says as much.
             return null;
         }
 
@@ -92,9 +105,7 @@ public sealed class TakeLibrary : IMachineTakes
         return peaks;
     }
 
-    /// <summary>
-    /// What the take is called, which is what the button on the panel says.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// The name and not the technical line, because this is what somebody reads to know which
     /// recording is on the machine. A file that is not on the shelf is called by its file name
@@ -174,6 +185,10 @@ public sealed class TakeLibrary : IMachineTakes
     /// The path first, because that is what an instrument holds. Then the name, because that is
     /// what a picker shows and what a person writes. Then the path on its own terms, so a take
     /// that is not on the shelf, a sample sitting in a machine's own sounds folder, still draws.
+    ///
+    /// The last of those is asked of the file system, which throws for a name that is not a path
+    /// at all: too long, or full of characters a file name cannot hold. That is nothing rather
+    /// than a fault, since a machine file can name anything somebody typed.
     /// </remarks>
     private string? PathOf(string take)
     {
@@ -198,7 +213,6 @@ public sealed class TakeLibrary : IMachineTakes
         }
         catch (Exception)
         {
-            // Not a path at all: too long, or full of characters a file name cannot hold.
             return null;
         }
     }
@@ -248,10 +262,14 @@ public sealed class TakeLibrary : IMachineTakes
     }
 
     /// <summary>One take as it was last read, and what the file looked like when it was.</summary>
+    /// <param name="written">When the file was last written, as it was when this was made.</param>
+    /// <param name="length">And how long it was, since a rewrite can leave the date alone.</param>
     private sealed class Entry(DateTime written, long length)
     {
+        /// <summary>When the file was last written, as it was when this entry was made.</summary>
         public DateTime Written { get; } = written;
 
+        /// <summary>And how long it was. Both have to match or the entry is thrown away.</summary>
         public long Length { get; } = length;
 
         /// <summary>The picture, once somebody has asked for it.</summary>

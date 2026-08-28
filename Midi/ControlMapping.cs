@@ -31,10 +31,19 @@ public enum ControlKind
 /// </remarks>
 public enum MixControl
 {
+    /// <summary>The fader.</summary>
     Volume,
+
+    /// <summary>Where it sits between the two sides.</summary>
     Pan,
+
+    /// <summary>Off. A knob writes it as anything at or above the middle of its range.</summary>
     Mute,
+
+    /// <summary>And on its own, which the same rule applies to.</summary>
     Solo,
+
+    /// <summary>How far another track's ducker pulls this one down.</summary>
     Duck,
 
     /// <summary>
@@ -192,8 +201,10 @@ public sealed class ControlMapping
     /// <summary>Which continuous controller, 0 to 127.</summary>
     public int Cc { get; set; }
 
+    /// <summary>What sort of thing it is pointed at, which decides which fields below are read.</summary>
     public ControlKind Kind { get; set; } = ControlKind.Instrument;
 
+    /// <summary>Whether it follows the track you are working on or stays on one.</summary>
     public ControlScope Scope { get; set; } = ControlScope.Focused;
 
     /// <summary>Which track, counted from zero. Only read when the scope is fixed.</summary>
@@ -238,6 +249,15 @@ public sealed class ControlMapping
     /// <summary>Which strip control, for <see cref="ControlKind.Mix"/>.</summary>
     public MixControl Mix { get; set; } = MixControl.Volume;
 
+    /// <summary>
+    /// How the hardware and the software are reconciled when they disagree.
+    /// </summary>
+    /// <remarks>
+    /// Starts as <see cref="ControlPickup.Sensed"/> and is written here once it has been worked
+    /// out, so a session after this one does not have to watch three messages again. A
+    /// controller's own file beats what was worked out by watching, and corrects this rather than
+    /// migrating it: the number stored was a guess made before anything knew the device.
+    /// </remarks>
     public ControlPickup Pickup { get; set; } = ControlPickup.Sensed;
 
     /// <summary>Which way an encoder counts, once that has been worked out.</summary>

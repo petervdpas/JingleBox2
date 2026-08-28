@@ -57,6 +57,11 @@ public static class FilePaths
     public static bool SameFile(string? left, string? right) => Same(Full(left), Full(right));
 
     /// <summary>The path as it really reads, or as it stands when it cannot be worked out.</summary>
+    /// <remarks>
+    /// A name with a character in it that no file can have is not a path at all, so there is
+    /// nothing to resolve. Handed back as it stands, which makes it equal to itself and to
+    /// nothing else, which is the only honest answer available.
+    /// </remarks>
     public static string Full(string? path)
     {
         if (string.IsNullOrEmpty(path)) return "";
@@ -67,8 +72,6 @@ public static class FilePaths
         }
         catch (Exception)
         {
-            // A name with something in it no file can have. It is not a path, so it is only
-            // ever equal to itself, which is what handing it back gives.
             return path;
         }
     }

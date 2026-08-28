@@ -26,6 +26,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public static class PanelPreview
 {
+    /// <summary>The switch that takes over startup, followed by the machine's name.</summary>
     public const string Argument = "--panel";
 
     /// <summary>Opens the panel as the rack page shows it: nothing playing, lamps greyed.</summary>
@@ -57,11 +58,19 @@ public static class PanelPreview
                ?? Machine.Plugin;
     }
 
+    /// <summary>
+    /// Opens the window and runs until it is closed. Nothing else in the application is started.
+    /// </summary>
+    /// <remarks>
+    /// The machines are read first, because one cannot be asked for by name until they are. The
+    /// application does this at startup and nothing here did, so every <c>--panel</c> showed the
+    /// plugin panel whatever was typed after it.
+    ///
+    /// With <see cref="Link"/> two of the machine's own parameters are made up as links, so the
+    /// quiet rings have somewhere to be. There is no controller here and nothing is written down.
+    /// </remarks>
     public static int Run(string[] args)
     {
-        // The machines have to be read before one can be asked for by name. The application
-        // does this at startup; nothing here did, so every --panel showed the plugin panel
-        // whatever was typed after it.
         Tracker.Machines.MachineProjects.Keep(Tracker.Machines.MachineRegistry.Load());
 
         PreviewApp.Wanted = Wanted(args);
@@ -71,8 +80,6 @@ public static class PanelPreview
         {
             var pretend = new System.Collections.Generic.List<Midi.ControlMapping>();
 
-            // Two of the machine's own parameters, whichever they turn out to be, so the quiet
-            // rings have somewhere to go.
             foreach (var parameter in Tracker.Machines.MachineProjects.For(PreviewApp.Wanted.SlotId)
                                           ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Machines.MachineParameter>())
             {
@@ -97,7 +104,14 @@ public static class PanelPreview
         return 0;
     }
 
-    /// <summary>The recordings on the shelf, so the take pickers on a panel have something in them.</summary>
+    /// <summary>
+    /// The recordings on the shelf, so the take pickers on a panel have something in them.
+    /// </summary>
+    /// <remarks>
+    /// Only ever read. No shelf, or one that will not be read, is an empty picker rather than a
+    /// crash: this window exists to be looked at, and a panel with no takes on it is still a
+    /// panel.
+    /// </remarks>
     private static System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording> Takes()
     {
         var takes = new System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>();
@@ -122,7 +136,6 @@ public static class PanelPreview
         }
         catch (Exception)
         {
-            // No shelf, or one that will not be read: an empty picker, not a crash.
         }
 
         return takes;
@@ -131,10 +144,14 @@ public static class PanelPreview
     /// <summary>An audition that plays nothing, since a panel being looked at makes no sound.</summary>
     private sealed class Silent : IInstrumentAudition
     {
+        /// <inheritdoc/>
+        /// <remarks>Nothing sounds, and nothing is held, so the length is nought.</remarks>
         public double Audition(TrackerInstrument instrument, Note note, int volume) => 0;
 
+        /// <inheritdoc/>
         public void Let(TrackerInstrument instrument, Note note) { }
 
+        /// <inheritdoc/>
         public void Silence(TrackerInstrument instrument) { }
 
         /// <summary>
@@ -151,8 +168,11 @@ public static class PanelPreview
         /// <summary>Two seconds at the panel's forty milliseconds.</summary>
         private const int Steps = 50;
 
+        /// <summary>How far round the walk has got, since there is no recording to be inside.</summary>
         private int _step;
 
+        /// <inheritdoc/>
+        /// <remarks>No plugin is ever loaded here, so a panel that asks gets nothing.</remarks>
         public IPluginInstrument? PluginFor(TrackerInstrument instrument) => null;
     }
 
@@ -162,8 +182,13 @@ public static class PanelPreview
     /// </summary>
     private sealed class Marching : ITrackerPanel
     {
+        /// <summary>Slow enough to be watched, which is the only thing this is for.</summary>
         private readonly System.Timers.Timer _clock = new(180) { AutoReset = true };
 
+        /// <summary>
+        /// Starts the walk and a tune of sorts, so the keyboard has something to light while it
+        /// is being looked at.
+        /// </summary>
         public Marching()
         {
             _clock.Elapsed += (_, _) =>
@@ -171,27 +196,33 @@ public static class PanelPreview
                 PlayingLine = (PlayingLine + 1) % PatternLines;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(PlayingLine)));
 
-                // A tune of sorts, so the keyboard has something to light while it is looked at.
                 NotePlayed?.Invoke(this, (0, new Note(Octave * 12 + Steps[PlayingLine % Steps.Length]), 0d));
             };
 
             _clock.Start();
         }
 
+        /// <inheritdoc/>
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        /// <inheritdoc/>
         public int PlayingLine { get; private set; }
 
+        /// <inheritdoc/>
+        /// <remarks>A pattern length like any other, since nothing here holds a song.</remarks>
         public int PatternLines => 32;
 
+        /// <inheritdoc/>
         public int Octave { get; set; } = 4;
 
+        /// <inheritdoc/>
         public void FollowOctave(int octave)
         {
             Octave = octave;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Octave)));
         }
 
+        /// <inheritdoc/>
         public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 
         /// <summary>
@@ -201,19 +232,27 @@ public static class PanelPreview
         private static readonly int[] Steps = { 0, 7, 3, 10, 5, 12, 3, 8, 40, 43, 38, -20, -13, -17, 24, 19 };
     }
 
+    /// <summary>The application this window runs inside: the theme, and one window in it.</summary>
     private sealed class PreviewApp : Application
     {
+        /// <summary>Which machine's panel is opened, set before the application is built.</summary>
         public static Machine Wanted { get; set; } = Machine.Plugin;
 
         /// <summary>False to see the panel with no track behind it, the way the rack shows it.</summary>
         public static bool Playing { get; set; } = true;
 
+        /// <summary>
+        /// Loads the application's own resources, so the panel is drawn in the colours it would
+        /// be inside it. Looking at it in different colours would prove nothing.
+        /// </summary>
+        /// <remarks>
+        /// A sheet that will not load leaves the panel in the wrong colours rather than stopping
+        /// the window, which is still worth looking at.
+        /// </remarks>
         public override void Initialize()
         {
             Styles.Add(new FluentTheme());
 
-            // The application's own resources, so the panel is drawn in the colours it would
-            // be inside it. Looking at it in different colours would prove nothing.
             foreach (var sheet in new[] { UI.ThemeManager.BaseSheet, UI.ThemeManager.SheetFor("Industrial Dark") })
             {
                 try
@@ -225,20 +264,33 @@ public static class PanelPreview
                 }
                 catch (Exception)
                 {
-                    // A theme that will not load is a panel in the wrong colours, not a crash.
                 }
             }
         }
 
+        /// <summary>
+        /// Builds the one window: the machine as an instrument, on a designer with nothing
+        /// behind it, inside a scroll viewer so a tall panel can still be reached.
+        /// </summary>
+        /// <remarks>
+        /// The machines that cut a recording into pieces have a picture of one on their panel,
+        /// and a panel with no picture on it cannot be judged, so the preview reads takes the way
+        /// the application does and puts the first one on the machine. Put on the machine rather
+        /// than handed to the chop editor: that is the only way in, here as anywhere else. A
+        /// machine that holds one recording has neither zones nor pads, and the take is a setting
+        /// on it like any other; without that line the Recording machine was the one machine the
+        /// preview showed empty.
+        ///
+        /// On top and in the corner, because the point of this window is to be photographed. A
+        /// window the desktop is free to put behind something else is one the camera gets the
+        /// something else of.
+        /// </remarks>
         public override void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var instrument = TrackerInstrument.CreateOn(Wanted, Wanted.Name);
 
-                // The machines that cut a recording into pieces have a picture of one on their
-                // panel, and a panel with no picture on it cannot be judged. So the preview
-                // reads takes the way the application does. It only ever reads them.
                 var shelf = Takes();
 
                 var designer = new TrackInstrumentDesigner(
@@ -248,19 +300,10 @@ public static class PanelPreview
                     null,
                     shelf);
 
-                // A machine that cuts recordings up, looked at with nothing on it, is a panel
-                // with a blank rectangle in the middle of it. So the first take on the shelf is
-                // put on it and chopped, the way Marching plays a tune so the lamps have
-                // something to show. Put on the machine, not handed to the chop editor: that is
-                // the only way in, here as anywhere else.
                 if (shelf.Count > 0)
                 {
                     string take = shelf[0].FilePath;
 
-                    // A machine that holds one recording has neither zones nor pads: the take
-                    // is a setting on it like any other, written the way its own panel writes
-                    // it. Without this the Recording machine was the one machine the preview
-                    // showed empty.
                     designer.Editor?.Values?.SetText("take", take);
 
                     designer.Editor?.Zones?.Selected?.Take(take);
@@ -273,9 +316,6 @@ public static class PanelPreview
                     Title = Wanted.Name + " panel",
                     SizeToContent = SizeToContent.WidthAndHeight,
 
-                    // On top and in the corner, because the point of this window is to be
-                    // photographed. A window the desktop is free to put behind something else
-                    // is one the camera gets the something else of.
                     Topmost = true,
                     WindowStartupLocation = WindowStartupLocation.Manual,
                     Position = new PixelPoint(0, 0),

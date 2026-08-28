@@ -28,31 +28,46 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
 {
+    /// <summary>Whoever really plays the notes. Every one is passed on untouched.</summary>
     private readonly INoteTrigger _next;
 
+    /// <summary>The keys held down now, whatever put them there.</summary>
     private readonly HashSet<int> _down = new();
 
+    /// <summary>Written from the port's thread and read from the drawing one.</summary>
     private readonly object _lock = new();
 
+    /// <param name="next">
+    /// Where the notes were going anyway. Left out for a monitor standing on its own, which is
+    /// what a test wants and what a keyboard with nothing behind it gets.
+    /// </param>
     public MidiMonitor(INoteTrigger? next = null) => _next = next ?? new Nobody();
 
     /// <summary>Nowhere for a note to go, for a monitor standing on its own.</summary>
     private sealed class Nobody : INoteTrigger
     {
+        /// <inheritdoc/>
         public void TriggerNote(Note note, int volume) { }
 
+        /// <inheritdoc/>
         public void ReleaseNote(Note note) { }
     }
 
-    /// <summary>The semitones held down now.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A copy, taken under the lock. It is a handful of notes, and a copy is cheaper than making
+    /// everybody who reads it hold a lock.
+    /// </remarks>
     public IReadOnlyCollection<int> Down
     {
         get { lock (_lock) return new List<int>(_down); }
     }
 
-    /// <summary>Told when a key goes down or comes up. On the thread the message arrived on.</summary>
+    /// <inheritdoc/>
     public event EventHandler? Changed;
 
+    /// <inheritdoc/>
+    /// <remarks>Noted and passed on. Nothing about what gets played goes through here.</remarks>
     public void TriggerNote(Note note, int volume)
     {
         Hold(note.Semitone, true);
@@ -60,6 +75,7 @@ public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
         _next.TriggerNote(note, volume);
     }
 
+    /// <inheritdoc/>
     public void ReleaseNote(Note note)
     {
         Hold(note.Semitone, false);
@@ -67,18 +83,25 @@ public sealed class MidiMonitor : INoteTrigger, IMidiMonitor
         _next.ReleaseNote(note);
     }
 
-    /// <summary>A key pressed by something that plays it itself, which is the drawn keyboard.</summary>
+    /// <inheritdoc/>
     public void Pressed(int semitone) => Hold(semitone, true);
 
-    /// <summary>And let go of.</summary>
+    /// <inheritdoc/>
     public void Released(int semitone) => Hold(semitone, false);
 
-    /// <summary>True while that key is down, whoever put it there.</summary>
+    /// <inheritdoc/>
     public bool Holds(int semitone)
     {
         lock (_lock) return _down.Contains(semitone);
     }
 
+    /// <summary>
+    /// Puts a key down or takes it up, and says so only when something really moved.
+    /// </summary>
+    /// <remarks>
+    /// Raised outside the lock, since what listens to it draws, and only on a real change: a
+    /// device sending the same note on twice is ordinary, and a redraw per repeat is not.
+    /// </remarks>
     private void Hold(int semitone, bool down)
     {
         bool moved;

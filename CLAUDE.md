@@ -273,6 +273,80 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 
+## How this code is written down
+
+Every seam is an interface, and the prose lives on the interface. What a thing is for, why it
+works the way it does and what was got wrong on the way there is a fact about the contract, not
+about one implementation of it, and a reader who has the interface in front of them should not
+have to go looking for the class to find out what they are holding.
+
+So: the interface carries the full XML documentation. The implementation carries `<inheritdoc/>`
+and, under it, only what is true of that implementation and untrue of the contract, which is
+usually how it does the thing rather than what the thing is. A remark that would still be true of
+a second implementation belongs upstairs.
+
+Not everything is a seam, and forcing an interface over one is indirection bought with nothing.
+Value types and records, pure rule holders that are already answerable without a window
+(`MeterScale`, `PanelKeyboard`, `NumericInput`, `MidiNoteInput`, `PatternEdit`, `FaderMath`),
+enums, and the controls that draw themselves get no interface. **Where there is no interface the
+documentation goes on the block itself**, in the same words it would have had upstairs: the rule
+is where the prose lives, not whether the prose exists.
+
+What does get one: anything that holds state, talks to hardware, touches a file, or is reached by
+something else. Those are the places a test needs to stand.
+
+An interface lives in a file of its own, named after it. It is the half a reader is meant to open
+first and the half everything else names, so it does not sit at the top of the class that happens
+to implement it: two implementations would then leave the contract living inside one of them, and
+a reader who wants to know what they are holding should not have to open somebody's plumbing to
+find out.
+
+### There are no line comments
+
+Documentation is XML documentation, and it lives above the block it is about. A `//` comment in
+the middle of a method is that same prose in the one place no tool can read it and no reader
+looking at the type will find it, and it is almost always there because the documentation above
+did not say enough. So a line comment is not a style preference, it is a defect report on the
+documentation over it: move what it says into the `<summary>` or the `<remarks>` and delete it.
+
+That covers the reasons, the traps and the history, which is most of what was written down here
+as `//`. Two things are not comments and stay: XAML, which has no XML documentation and carries
+its prose in `<!-- -->`, and a directive the compiler reads, such as a pragma or a region.
+
+### The documentation is generated, and CS1591 is the guard
+
+Every project generates its documentation file, and CS1591 is deliberately left on: the compiler
+saying "this public thing has no documentation" is what stops the rule quietly lapsing. The count
+is read with:
+
+```bash
+dotnet build -c Debug --no-incremental 2>&1 | grep "warning CS1591" | sed 's/: warning.*//' | sort -u | wc -l
+```
+
+**1981 members across 284 files when this began** (2026-08-28), and **nought** when it was finished,
+the same day. The whole tree went through in one pass, folder by folder: `Audio/` and its plugins
+and routing, `Midi/`, `Config/`, `Tracker/` with its synth and its machines, `ViewModels/`,
+`Views/`, `Machines.Ui/`, `Machines.Abstractions/`, `Diagnostics/`, `Shortcuts/`, `Scripting/`,
+`Controllers/`, `Models/`, `UI/`, `Converters/`, `Waveform/`, `Help/`, `Controls/` and `Tests/`.
+About 2600 line comments came out and went upstairs into the documentation over the block they
+sat in.
+
+The build is clean and has to stay clean: **nought warnings, of any kind**. The four that turn up
+while writing documentation are all real and all mean something. CS1573 is a method with some of
+its parameters described and not the others, which C# treats as all or nothing. CS1572 is a
+`<param>` naming something that is not a parameter, usually a tuple element on an event. CS1574
+and CS0419 are a `<see cref>` pointing at nothing, or at one of several overloads; a member the
+reader cannot reach is `<c>` rather than a cref. CS1587 is a `///` block on something that cannot
+carry one, a local function most often, and the answer is never a `//` comment: fold it into the
+containing method's `<remarks>`.
+
+What the pass turned up, besides the prose. A `<summary>` left behind when the member under it
+moved attaches itself silently to the next member, and there were about thirty of those, several
+describing a method fifteen lines away. Three places said the cursor rests on the middle of the
+screen except at the two ends of a pattern, which stopped being true when the metrics started
+leaving the room unconditionally, and one still said there is no undo anywhere in this
+application. Documentation goes stale exactly where nobody is made to read it.
+
 ## Tests
 
 ```bash

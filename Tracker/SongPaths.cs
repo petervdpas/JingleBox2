@@ -24,6 +24,14 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public static class SongPaths
 {
+    /// <summary>
+    /// What stands in for the application folder. Forward slash, on every platform.
+    /// </summary>
+    /// <remarks>
+    /// A separator has to be chosen and written down, because a song saved on Windows has to
+    /// open on Linux. Forward slash, since that is the one both understand and the one a zip
+    /// entry already uses.
+    /// </remarks>
     private const string Token = "{app}/";
 
     /// <summary>A path as a song should hold it.</summary>

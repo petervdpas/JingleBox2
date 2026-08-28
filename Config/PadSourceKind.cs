@@ -13,7 +13,12 @@ namespace JingleBox2.Config;
 /// </remarks>
 public enum PadSourceKind
 {
+    /// <summary>Nothing on it yet, which is what a fresh pad is.</summary>
     None = 0,
+
+    /// <summary>A take off the shelf, named by the file the app itself owns.</summary>
     Recording = 1,
+
+    /// <summary>An address to play from the network.</summary>
     Stream = 2
 }

@@ -11,13 +11,29 @@ namespace JingleBox2.Tracker.Synth;
 /// the loop and the direction belong to the instrument, and the note only decides how fast to
 /// read. Everything happens here rather than in the audio library, which is the point: BASS
 /// can pitch a channel and nothing else.
+///
+/// Two shapes in one class, decided by whether a <see cref="SamplerPatch"/> was handed in.
+/// Without one it is the plain path every recording-based instrument uses: drive, then a fixed
+/// tone filter. With one it is Zampler: two four pole filters and a second envelope for the
+/// brightness. They are one class because everything before that point, the window, the loop,
+/// the direction and the read speed, is identical and would otherwise be written twice.
+///
+/// Everything that does not move while the note lasts is worked out in the constructor, on
+/// whichever thread started the note. <see cref="Render"/> then runs on the audio thread and
+/// may not allocate, take a lock or wait on anything.
 /// </remarks>
 public sealed class SampleVoice : IVoice
 {
+    /// <summary>The take, shared with every other voice playing it and never written to.</summary>
     private readonly SampleData _sample;
+
     private readonly SynthPatch _patch;
     private readonly SynthEnvelope _envelope;
+
+    /// <summary>Where in the file to read and how to repeat, worked out once when the note started.</summary>
     private readonly SampleWindow _window;
+
+    /// <summary>The plain path's filter, one per side. Unused when Zampler's ladder is in play.</summary>
     private readonly ToneFilter _left;
     private readonly ToneFilter _right;
 
@@ -27,9 +43,14 @@ public sealed class SampleVoice : IVoice
     /// </summary>
     private readonly SamplerPatch? _zampler;
 
+    /// <summary>Zampler's four pole filters, one per side. Null on every other machine.</summary>
     private readonly LadderFilter? _ladderLeft;
     private readonly LadderFilter? _ladderRight;
+
+    /// <summary>The brightness's own envelope, which is the second of Zampler's two.</summary>
     private readonly SynthEnvelope? _filterEnvelope;
+
+    /// <summary>The note the zone or the pad calls its own, which the key follow is measured from.</summary>
     private readonly int _root;
 
     /// <summary>
@@ -42,12 +63,27 @@ public sealed class SampleVoice : IVoice
     /// </remarks>
     private const int SweepEvery = 16;
 
+    /// <summary>Samples left before the swept cutoff is worked out again.</summary>
     private int _sinceSweep;
 
     private readonly int _sampleRate;
+
+    /// <summary>
+    /// The file's own rate against the engine's.
+    /// </summary>
+    /// <remarks>
+    /// A file recorded at one rate played out at another is already a resample, before the note
+    /// is taken into account.
+    /// </remarks>
     private readonly double _rateRatio;
+
+    /// <summary>How much faster the note asks for than the recording's own, tuning folded in.</summary>
     private readonly double _noteRatio;
+
+    /// <summary>How hard the sample is pushed into the saturation curve. The plain path only.</summary>
     private readonly double _drive;
+
+    /// <summary>What the drive is levelled out by, worked out once since it only depends on the drive.</summary>
     private readonly double _driveMakeup;
 
     /// <summary>
@@ -59,12 +95,47 @@ public sealed class SampleVoice : IVoice
     /// </remarks>
     public int Choke { get; init; }
 
+    /// <summary>
+    /// Where the read head is, in fractional frames.
+    /// </summary>
+    /// <remarks>
+    /// Written on the audio thread and read from the drawing one through
+    /// <see cref="Progress"/>, deliberately without a lock. See that property for why.
+    /// </remarks>
     private double _position;
+
+    /// <summary>Which way the head is moving, turned round by a ping-pong loop.</summary>
     private int _direction;
+
+    /// <summary>How far into the note it is, in seconds, which is what the modulation runs on.</summary>
     private double _time;
+
+    /// <summary>When to let go of the note without being asked. Nought when nothing will.</summary>
     private double _holdSeconds;
+
+    /// <summary>The head has run off the window. The envelope still finishes the tail.</summary>
     private bool _ended;
 
+    /// <summary>
+    /// Starts a note on a recording, at whatever speed the note against the root asks for.
+    /// </summary>
+    /// <param name="sample">The take, already decoded. The mixer never reads a file.</param>
+    /// <param name="patch">The plain path's shaping, copied and held.</param>
+    /// <param name="shape">Which part of the file sounds and how it repeats. Nothing is the whole file.</param>
+    /// <param name="note">What was played.</param>
+    /// <param name="baseNote">
+    /// What the recording itself sounds at. Passing the played note here makes the ratio one and
+    /// nothing is resampled, which is what a kit does: a key chooses which recording sounds
+    /// rather than how fast to read one.
+    /// </param>
+    /// <param name="track">The strip it sounds on, or <see cref="SynthVoice.NoTrack"/> for an audition.</param>
+    /// <param name="gain">The volume column and the instrument's own level, together.</param>
+    /// <param name="pan">Where it sits, held to -1..1.</param>
+    /// <param name="sampleRate">The mixer's rate, which is half of how fast the file is read.</param>
+    /// <param name="zampler">
+    /// Zampler's own shaping, which swaps the plain filter for two four pole ones and adds a
+    /// second envelope for the brightness. Null on every other machine.
+    /// </param>
     public SampleVoice(
         SampleData sample,
         SynthPatch patch,
@@ -88,8 +159,6 @@ public sealed class SampleVoice : IVoice
         _position = _window.Entry;
         _direction = _window.Direction;
 
-        // A file recorded at one rate played out at another is already a resample, before the
-        // note is taken into account.
         _rateRatio = (double)sample.SampleRate / _sampleRate;
         _noteRatio = PitchRatio.For(note, baseNote) * PitchMotion.Ratio(PitchMotion.Tuning(_patch));
 
@@ -101,9 +170,6 @@ public sealed class SampleVoice : IVoice
 
         _root = baseNote.Semitone;
 
-        // How long one pass through the window takes at the speed this note reads it. The file's
-        // own rate and the note's ratio are the whole of it: a window of N frames read at ratio r
-        // out of a file recorded at R takes N / (R * r) seconds, whatever rate the engine runs at.
         WindowSeconds = _window.IsLooping || sample.SampleRate <= 0 || _noteRatio <= 0
             ? 0
             : Math.Max(0, _window.End - _window.Start) / (sample.SampleRate * _noteRatio);
@@ -113,8 +179,6 @@ public sealed class SampleVoice : IVoice
             _zampler = zampler.Clone();
             _zampler.Clamp();
 
-            // Two four pole filters and a second envelope, which is the machine this is named
-            // for: the loudness and the brightness are not the same shape.
             _ladderLeft = new LadderFilter(_sampleRate);
             _ladderRight = new LadderFilter(_sampleRate);
 
@@ -134,14 +198,23 @@ public sealed class SampleVoice : IVoice
         Pan = Math.Clamp(pan, -1f, 1f);
     }
 
+    /// <inheritdoc/>
     public int Track { get; }
 
+    /// <inheritdoc/>
     public Note Note { get; }
 
+    /// <inheritdoc/>
     public float Gain { get; set; }
 
+    /// <inheritdoc/>
     public float Pan { get; set; }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The loudest sample the file actually produced, not just where the envelope is: a quiet
+    /// recording should not light up a meter the way a full scale one does.
+    /// </remarks>
     public float Level { get; private set; }
 
     /// <summary>
@@ -161,7 +234,13 @@ public sealed class SampleVoice : IVoice
             ReleaseMs = release
         };
 
-    /// <summary>Puts the four pole filters where the envelope and the keyboard say they go.</summary>
+    /// <summary>
+    /// Puts the four pole filters where the envelope and the keyboard say they go.
+    /// </summary>
+    /// <remarks>
+    /// The filter's envelope runs whether or not the amount knob is doing anything, so turning
+    /// it up part way through a note does not start the envelope late.
+    /// </remarks>
     private void Sweep(double envelope)
     {
         if (_zampler == null) return;
@@ -172,7 +251,8 @@ public sealed class SampleVoice : IVoice
         _ladderRight!.Set(cutoff, _zampler.Resonance);
     }
 
-    /// <summary>Finished when the envelope closes, or when a one-shot runs off its end.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Finished when the envelope closes, or when a one-shot runs off its end.</remarks>
     public bool IsFinished => _ended || _envelope.IsFinished;
 
     /// <summary>
@@ -196,41 +276,57 @@ public sealed class SampleVoice : IVoice
     /// <remarks>
     /// What an audition of a one-shot should hold for. A recording cut off part way through is
     /// not the sound the instrument makes, and a fixed hold cuts every recording longer than it.
+    ///
+    /// The file's own rate and the note's ratio are the whole of it: a window of N frames read
+    /// at ratio r out of a file recorded at R takes N / (R * r) seconds, whatever rate the
+    /// engine happens to be running at.
     /// </remarks>
     public double WindowSeconds { get; }
 
-    /// <summary>
-    /// A recording with an end of its own, which is any that does not loop.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// The same fact <see cref="WindowSeconds"/> holds, asked as the question a hand letting go
     /// needs answered. A looping window has no end and answers no.
     /// </remarks>
     public bool OneShot => WindowSeconds > 0;
 
-    /// <summary>Which instrument auditioned this, for one that plays one note at a time.</summary>
+    /// <inheritdoc/>
     public string Audition { get; init; } = "";
 
+    /// <inheritdoc/>
     public void HoldFor(double seconds) => _holdSeconds = seconds;
 
+    /// <inheritdoc/>
+    /// <remarks>Both envelopes, or Zampler's filter would stay where the note left it.</remarks>
     public void NoteOff()
     {
         _envelope.NoteOff();
         _filterEnvelope?.NoteOff();
     }
 
+    /// <inheritdoc/>
+    /// <remarks>The same few milliseconds a generated voice uses, so a retrigger sounds alike.</remarks>
     public void Cut()
     {
         _envelope.NoteOff(SynthVoice.CutSeconds);
         _filterEnvelope?.NoteOff(SynthVoice.CutSeconds);
     }
 
+    /// <inheritdoc/>
     public void Kill()
     {
         _envelope.Kill();
         _ended = true;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A blank or note-off cell is not a pitch and must not be turned into one, so a voice
+    /// holding one kills itself the first time it is asked for audio.
+    ///
+    /// Running off the end of the window is not the end of the voice: the head stops and the
+    /// envelope is left to finish the tail rather than the sound being cut dead.
+    /// </remarks>
     public void Render(float[] buffer, int frames)
     {
         if (IsFinished || _sample.IsEmpty || !Note.IsPlayable)
@@ -240,15 +336,12 @@ public sealed class SampleVoice : IVoice
             return;
         }
 
-        // The same balance law the generated voices use, so the two sit together in a mix.
         double left = Pan <= 0 ? 1.0 : 1.0 - Pan;
         double right = Pan >= 0 ? 1.0 : 1.0 + Pan;
         double step = 1.0 / _sampleRate;
 
         bool stereo = _sample.Channels >= 2;
 
-        // The meter reads what the file is actually doing, not just where the envelope is: a
-        // quiet recording should not light up a meter the way a full scale one does.
         Level = 0;
 
         for (int frame = 0; frame < frames; frame++)
@@ -260,8 +353,6 @@ public sealed class SampleVoice : IVoice
                 _filterEnvelope?.NoteOff();
             }
 
-            // The filter's envelope runs whether or not it is doing anything, so that turning
-            // the amount up mid note does not start it late.
             if (_filterEnvelope != null)
             {
                 double brightness = _filterEnvelope.Next();
@@ -303,13 +394,10 @@ public sealed class SampleVoice : IVoice
             buffer[index] += (float)outLeft;
             buffer[index + 1] += (float)outRight;
 
-            // Vibrato and the pitch envelope move the read speed rather than a frequency, which
-            // is the same thing for a sample: faster is higher.
             double speed = _rateRatio * _noteRatio * PitchMotion.Ratio(PitchMotion.MotionAt(_patch, _time));
 
             if (!SamplePlayback.Advance(ref _position, ref _direction, speed, _window))
             {
-                // Out of audio: let the envelope finish the tail rather than cutting it dead.
                 _ended = true;
                 Level = 0;
                 return;

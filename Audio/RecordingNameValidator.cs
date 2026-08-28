@@ -14,10 +14,16 @@ namespace JingleBox2.Audio;
 /// </summary>
 public static class RecordingNameValidator
 {
+    /// <summary>Why a blank name cannot be used, in the words the page shows.</summary>
     public const string EmptyMessage = "Enter a name for the recording.";
+
+    /// <summary>Why a name holding a character no file name may hold cannot be used.</summary>
     public const string InvalidCharsMessage = "That name cannot be used as a file name.";
+
+    /// <summary>Why a name somebody else's take already has cannot be used.</summary>
     public const string InUseMessage = "A recording with this name already exists.";
 
+    /// <summary>The series a take falls into when its name says nothing about one.</summary>
     public const string DefaultBaseName = "recording";
 
     /// <summary>Width of the numeric suffix. Numbers past 999 simply grow past it.</summary>
@@ -26,6 +32,8 @@ public static class RecordingNameValidator
     private static readonly Regex NumberedName = new(@"^(?<base>.*?)-(?<number>\d+)$", RegexOptions.Compiled);
 
     /// <summary>Returns null when the name can be used, otherwise the reason it cannot.</summary>
+    /// <param name="name">What somebody typed, which is trimmed before it is judged.</param>
+    /// <param name="existingNames">The takes already on the shelf.</param>
     public static string? Validate(string? name, IEnumerable<string> existingNames)
     {
         string trimmed = (name ?? string.Empty).Trim();
@@ -43,6 +51,7 @@ public static class RecordingNameValidator
     /// The series a name belongs to: lowercased, with any "-001" style suffix removed.
     /// "Jingle-004" and "jingle" both belong to the series "jingle".
     /// </summary>
+    /// <param name="name">A take's name, or null.</param>
     public static string BaseNameOf(string? name)
     {
         string trimmed = (name ?? string.Empty).Trim();
@@ -61,6 +70,12 @@ public static class RecordingNameValidator
     /// highest number already taken. Numbers are not reused after a delete, so a name never
     /// points at two different takes over a session.
     /// </summary>
+    /// <remarks>
+    /// A name in the series carrying no number still occupies the place its number would map to,
+    /// so the search walks upwards until it finds one nothing answers to.
+    /// </remarks>
+    /// <param name="baseName">Any name in the series, numbered or not.</param>
+    /// <param name="existingNames">The takes already on the shelf.</param>
     public static string NextName(string? baseName, IEnumerable<string> existingNames)
     {
         string series = BaseNameOf(baseName);
@@ -77,7 +92,6 @@ public static class RecordingNameValidator
             if (number > highest) highest = number;
         }
 
-        // A pre-existing unnumbered name in the series still occupies the slot it would map to.
         string candidate = Compose(series, highest + 1);
         while (taken.Any(n => Matches(n, candidate)))
         {
@@ -88,11 +102,15 @@ public static class RecordingNameValidator
         return candidate;
     }
 
+    /// <summary>A series and a number as the name they make, with the number padded.</summary>
     private static string Compose(string series, int number) =>
         $"{series}-{number.ToString(CultureInfo.InvariantCulture).PadLeft(NumberWidth, '0')}";
 
-    // File names are case-insensitive on Windows and case-sensitive on Linux. Treat a
-    // case-only difference as a clash on both, so a config does not behave differently per OS.
+    /// <summary>Whether two names would be the same file.</summary>
+    /// <remarks>
+    /// File names are case insensitive on Windows and case sensitive on Linux, so a difference of
+    /// case is treated as a clash on both and a profile cannot behave differently per system.
+    /// </remarks>
     private static bool Matches(string a, string b) =>
         string.Equals(a.Trim(), b, StringComparison.OrdinalIgnoreCase);
 }

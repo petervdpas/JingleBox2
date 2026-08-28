@@ -1,6 +1,3 @@
-// ===============================
-// Config/ConfigStore.cs
-// ===============================
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,15 +7,43 @@ using JingleBox2.Midi;
 
 namespace JingleBox2.Config;
 
-public sealed class ConfigStore
+/// <inheritdoc/>
+/// <remarks>
+/// JSON, indented, so the file can be read and edited by a person: it is the only place a
+/// setting nobody has built a page for can be reached from, and it is the first thing anybody
+/// asks for when something is wrong.
+/// </remarks>
+public sealed class ConfigStore : IConfigStore
 {
+    /// <summary>
+    /// Indented on purpose. The file is meant to be readable by whoever has to look at it, and
+    /// it is small enough that the whitespace costs nothing worth counting.
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
 
+    /// <summary>The profile that always exists, and the one anything falls back to.</summary>
+    private const string DefaultProfile = "default";
+
+    /// <summary>What a pad listens for when nothing has said otherwise, one note per pad.</summary>
+    /// <remarks>
+    /// 36 is the note the bottom left pad sends on almost every pad controller made, so a
+    /// keyboard plugged in with nothing configured usually plays the pads straight away.
+    /// </remarks>
+    private const int FirstPadNote = 36;
+
+    /// <inheritdoc/>
     public string ConfigPath { get; }
 
+    /// <summary>
+    /// Settles where the file is and makes sure the folder around it exists.
+    /// </summary>
+    /// <param name="appName">
+    /// The folder under the user's application data. Taken as an argument only so a test can
+    /// point the whole thing at somewhere temporary; nothing in the application passes it.
+    /// </param>
     public ConfigStore(string appName = AppFolder.Name)
     {
         var dir = AppFolder.Path(appName);
@@ -27,6 +52,7 @@ public sealed class ConfigStore
         ConfigPath = Path.Combine(dir, "config.json");
     }
 
+    /// <inheritdoc/>
     public AppConfig LoadOrCreateDefault()
     {
         try
@@ -41,7 +67,6 @@ public sealed class ConfigStore
         }
         catch
         {
-            // ignore and fall back to default
         }
 
         var fresh = new AppConfig();
@@ -50,6 +75,7 @@ public sealed class ConfigStore
         return fresh;
     }
 
+    /// <inheritdoc/>
     public void Save(AppConfig cfg)
     {
         Normalize(cfg);
@@ -57,16 +83,34 @@ public sealed class ConfigStore
         SafeFile.Write(ConfigPath, json);
     }
 
+    /// <summary>
+    /// Puts the settings into the shape everything above them assumes, in place.
+    /// </summary>
+    /// <remarks>
+    /// Run on the way in and on the way out, so a file edited by hand, written by an older
+    /// version, or left half written by a crash is repaired once rather than being guarded
+    /// against everywhere it is read. In place rather than on a copy because the caller is
+    /// holding the settings the application is running on.
+    ///
+    /// The matrix is clamped to the application's ceiling and not to the setting's: a file that
+    /// says thirty-two pads keeps them even where the extended switch has since been turned off,
+    /// since dropping half somebody's pads on the way in is not something a settings file should
+    /// be able to do quietly. What the switch governs is what SETTINGS will let you ask for next.
+    ///
+    /// The MIDI mappings are per pad and global rather than per profile, so switching layouts
+    /// does not move which key fires what. They are grown, trimmed and renumbered to match the
+    /// matrix here, which is the only place that count is enforced.
+    ///
+    /// Two migrations live here and stay: pads written before profiles existed are moved into a
+    /// "default" profile, and <see cref="MidiDeviceBindings.Normalize"/> brings a file that
+    /// named one MIDI device across to the roles. Both are cheap and both have to keep working
+    /// for as long as anybody has an old file, which is for ever.
+    /// </remarks>
     private static void Normalize(AppConfig cfg)
     {
-        cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? "default" : cfg.SelectedProfile.Trim();
+        cfg.SelectedProfile = string.IsNullOrWhiteSpace(cfg.SelectedProfile) ? DefaultProfile : cfg.SelectedProfile.Trim();
         cfg.SelectedTheme = string.IsNullOrWhiteSpace(cfg.SelectedTheme) ? "Dark" : cfg.SelectedTheme.Trim();
 
-        // Rows by columns, with the total kept between four pads and the ceiling. The ceiling
-        // is the app's own, not the setting's: a config that says thirty-two pads keeps them
-        // even if the extended switch has since been turned off, since dropping half somebody's
-        // pads on the way in is not a thing a settings file should be able to do quietly. What
-        // the switch governs is what the SETTINGS page will let you ask for next.
         cfg.Rows = Math.Clamp(cfg.Rows, 1, PadMatrix.Most);
         cfg.Columns = Math.Clamp(cfg.Columns, 1, PadMatrix.Most);
 
@@ -87,14 +131,11 @@ public sealed class ConfigStore
         cfg.Profiles ??= new List<ConfigProfile>();
         cfg.Pads ??= new List<PadConfig>();
 
-        // MIDI defaults / normalization (global, not per profile)
         cfg.Midi ??= new MidiConfig();
         cfg.Midi.Pads ??= new List<MidiMapping>();
 
-        // Cleans the device roles and brings a single-device config file across.
         MidiDeviceBindings.Normalize(cfg.Midi);
 
-        // Ensure exactly padCount mappings
         while (cfg.Midi.Pads.Count < padCount)
         {
             var i = cfg.Midi.Pads.Count;
@@ -103,42 +144,37 @@ public sealed class ConfigStore
                 PadIndex = i,
                 Type = MidiMessageType.Note,
                 Channel = 1,
-                Value = 36 + i
+                Value = FirstPadNote + i
             });
         }
 
         while (cfg.Midi.Pads.Count > padCount)
             cfg.Midi.Pads.RemoveAt(cfg.Midi.Pads.Count - 1);
 
-        // Ensure indices consistent
         for (int i = 0; i < cfg.Midi.Pads.Count; i++)
             cfg.Midi.Pads[i].PadIndex = i;
 
-        // MIGRATION: if Profiles empty but legacy Pads exists, migrate to default profile
         if (cfg.Profiles.Count == 0 && cfg.Pads.Count > 0)
         {
             cfg.Profiles.Add(new ConfigProfile
             {
-                Name = "default",
+                Name = DefaultProfile,
                 Pads = cfg.Pads.Select(ClonePad).ToList()
             });
         }
 
-        // Ensure default profile exists
-        if (!cfg.Profiles.Any(p => string.Equals(p.Name, "default", StringComparison.OrdinalIgnoreCase)))
+        if (!cfg.Profiles.Any(p => string.Equals(p.Name, DefaultProfile, StringComparison.OrdinalIgnoreCase)))
         {
             cfg.Profiles.Add(new ConfigProfile
             {
-                Name = "default",
+                Name = DefaultProfile,
                 Pads = new List<PadConfig>()
             });
         }
 
-        // Ensure selected profile exists; otherwise default
         if (!cfg.Profiles.Any(p => string.Equals(p.Name, cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase)))
-            cfg.SelectedProfile = "default";
+            cfg.SelectedProfile = DefaultProfile;
 
-        // Normalize all profiles pad counts + fields
         foreach (var profile in cfg.Profiles)
         {
             profile.Name = string.IsNullOrWhiteSpace(profile.Name) ? "unnamed" : profile.Name.Trim();
@@ -159,7 +195,6 @@ public sealed class ConfigStore
             }
         }
 
-        // Keep legacy Pads in sync with selected profile (so old code can still work if anything uses it)
         var sel = GetSelectedProfile(cfg);
         if (sel != null)
             cfg.Pads = sel.Pads.Select(ClonePad).ToList();
@@ -167,9 +202,15 @@ public sealed class ConfigStore
             cfg.Pads = CreateDefaultPads(padCount);
     }
 
+    /// <summary>The profile the settings name, or null where it has gone missing.</summary>
+    /// <remarks>
+    /// Matched without regard to case, because the name is typed by a person and "Default" and
+    /// "default" are the same layout as far as anybody using it is concerned.
+    /// </remarks>
     private static ConfigProfile? GetSelectedProfile(AppConfig cfg)
         => cfg.Profiles.FirstOrDefault(p => string.Equals(p.Name, cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>A run of empty pads, named from one up so they read as they are counted.</summary>
     private static List<PadConfig> CreateDefaultPads(int padCount)
     {
         var pads = new List<PadConfig>(padCount);
@@ -178,6 +219,16 @@ public sealed class ConfigStore
         return pads;
     }
 
+    /// <summary>
+    /// A pad copied into the flat list, carrying only what that list has ever held.
+    /// </summary>
+    /// <remarks>
+    /// Not everything: the level, the fades, the colour and the effect chain stay in the profile
+    /// and are not copied out. The flat list is the old shape kept for migration and for
+    /// anything still reading it, so it holds what the old shape held and nothing added since.
+    /// A copy rather than the pad itself, or editing a pad would reach into the profile it came
+    /// from through the back door.
+    /// </remarks>
     private static PadConfig ClonePad(PadConfig p) => new()
     {
         Name = p.Name,

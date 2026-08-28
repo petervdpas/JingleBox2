@@ -33,10 +33,22 @@ public sealed partial class PresetLine : ObservableObject
     /// <summary>A recording, which has to be brought into the machine rather than typed.</summary>
     public const string WaveKind = "wave";
 
+    /// <summary>The block this line lives in, written straight through.</summary>
     private readonly JsonObject _held;
+
+    /// <summary>Which entry of it, which is what the machine calls this setting.</summary>
     private readonly string _key;
+
+    /// <summary>Told after every write, so the desk knows the preset no longer matches its file.</summary>
     private readonly Action _changed;
 
+    /// <summary>One line over one entry of a preset.</summary>
+    /// <param name="held">The block the entry is in.</param>
+    /// <param name="key">Which entry.</param>
+    /// <param name="name">What the machine writes beside it.</param>
+    /// <param name="kind">One of the three above.</param>
+    /// <param name="unit">What it is measured in, if anything.</param>
+    /// <param name="changed">Told after every write.</param>
     public PresetLine(JsonObject held, string key, string name, string kind, string unit, Action changed)
     {
         _held = held;
@@ -61,13 +73,22 @@ public sealed partial class PresetLine : ObservableObject
     /// <summary>What it is measured in, if anything.</summary>
     public string Unit { get; }
 
+    /// <summary>True for the one kind that is picked rather than typed.</summary>
     public bool IsWave => Kind == WaveKind;
 
     /// <summary>What it is set to. Writing it writes the preset.</summary>
     [ObservableProperty] private string text = "";
 
+    /// <summary>True while the line is reading itself off the file, so reading is not writing.</summary>
     private bool _reading;
 
+    /// <summary>
+    /// Writes what was typed into the preset, as a number where the machine says it is one.
+    /// </summary>
+    /// <remarks>
+    /// A number that will not parse is written as words rather than refused, so half a number typed
+    /// on the way to a whole one is not thrown away under the hand.
+    /// </remarks>
     partial void OnTextChanged(string value)
     {
         if (_reading) return;
@@ -99,6 +120,13 @@ public sealed partial class PresetLine : ObservableObject
         }
     }
 
+    /// <summary>
+    /// What the file holds for this entry, as text.
+    /// </summary>
+    /// <remarks>
+    /// Every kind JSON can hold, since a preset can have been written by hand or by an older
+    /// version: words, a number, a flag, and anything else as it is written down.
+    /// </remarks>
     private string Said()
     {
         if (!_held.TryGetPropertyValue(_key, out var node) || node is not JsonValue value) return "";
@@ -123,9 +151,19 @@ public sealed partial class PresetLine : ObservableObject
 /// </remarks>
 public sealed partial class PresetSection : ObservableObject
 {
+    /// <summary>The preset itself, since a block is renamed and removed from the whole file.</summary>
     private readonly JsonObject _held;
+
+    /// <summary>Told after every change, so the desk knows the preset has moved.</summary>
     private readonly Action _changed;
 
+    /// <summary>One block of a preset, with the lines the machine says it has.</summary>
+    /// <param name="held">The preset the block is in.</param>
+    /// <param name="key">What the block is called in the file.</param>
+    /// <param name="heading">What the page writes over it.</param>
+    /// <param name="lines">Its lines, already built.</param>
+    /// <param name="changed">Told after every change.</param>
+    /// <param name="canRename">True where the name is the builder's to choose.</param>
     public PresetSection(
         JsonObject held, string key, string heading, IReadOnlyList<PresetLine> lines, Action changed,
         bool canRename = false)
@@ -155,6 +193,11 @@ public sealed partial class PresetSection : ObservableObject
     public bool CanRename { get; }
 
     /// <summary>What the page writes over it, and what the file calls it.</summary>
+    /// <remarks>
+    /// A name already taken is refused rather than numbered: somebody typing a name that is already
+    /// there meant that name, and a silently different one is worse than none. The rename would
+    /// otherwise swallow the other block.
+    /// </remarks>
     public string Heading
     {
         get => _heading;
@@ -164,9 +207,6 @@ public sealed partial class PresetSection : ObservableObject
 
             if (!CanRename || wanted.Length == 0 || wanted == _heading) return;
 
-            // Already taken, so the rename would swallow the other one. Refused rather than
-            // numbered: somebody typing a name that is already there meant that name, and a
-            // silently different one is worse than none.
             if (_held.ContainsKey(wanted)) return;
 
             Rename(wanted);
@@ -180,6 +220,7 @@ public sealed partial class PresetSection : ObservableObject
         }
     }
 
+    /// <inheritdoc cref="Heading"/>
     private string _heading;
 
     /// <summary>
@@ -200,9 +241,11 @@ public sealed partial class PresetSection : ObservableObject
             _held[key == Key ? wanted : key] = node?.DeepClone();
     }
 
+    /// <summary>The values assigned to this thing, in the order the machine declares them.</summary>
     public ObservableCollection<PresetLine> Lines { get; }
 
     /// <summary>Takes it out of the preset, and everything assigned to it with it.</summary>
+    /// <remarks>Always enabled: a block is on the page only while it is in the file.</remarks>
     public IRelayCommand RemoveCommand => new RelayCommand(() =>
     {
         _held.Remove(Key);
@@ -223,8 +266,11 @@ public sealed partial class PresetSection : ObservableObject
 /// A machine that does not declare its things has one of these and no list, since how many there
 /// are is what the preset decides.
 /// </param>
+/// <param name="Key">What the machine calls it, which is the key a preset writes it under.</param>
+/// <param name="Said">What the page shows for it.</param>
 public sealed record PresetOffer(string Key, string Said, string Kind, bool Fresh = false)
 {
+    /// <summary>What the page shows, for a picker with no template.</summary>
     public override string ToString() => Said;
 }
 
@@ -247,11 +293,23 @@ public sealed record PresetOffer(string Key, string Said, string Kind, bool Fres
 /// </remarks>
 public sealed partial class MachinePresetForm : ObservableObject
 {
+    /// <summary>The preset itself, which every line on the page reads and writes.</summary>
     private readonly JsonObject _held;
+
+    /// <summary>What the machine's own description says its presets can hold.</summary>
     private readonly MachineProjectShape _machine;
+
+    /// <summary>Told after every change, so the desk knows the preset no longer matches its file.</summary>
     private readonly Action _changed;
+
+    /// <summary>The machine's presets folder, so a recording can be named from it.</summary>
     private readonly string _home;
 
+    /// <summary>Builds the form off a preset and the machine it belongs to.</summary>
+    /// <param name="held">The preset, written into directly.</param>
+    /// <param name="machine">What the machine's description says its presets can hold.</param>
+    /// <param name="changed">Told after every change.</param>
+    /// <param name="home">The presets folder, or nothing where the machine has not been saved.</param>
     public MachinePresetForm(JsonObject held, MachineProjectShape machine, Action changed, string home = "")
     {
         _held = held;
@@ -271,6 +329,7 @@ public sealed partial class MachinePresetForm : ObservableObject
     /// <summary>What can still be given a value: the machine's things of that sort, less the used.</summary>
     public ObservableCollection<PresetOffer> Offers { get; }
 
+    /// <summary>True when there is anything left to add, so the button can be greyed.</summary>
     public bool HasOffers => Offers.Count > 0;
 
     /// <summary>Which of them the button would add.</summary>
@@ -281,13 +340,20 @@ public sealed partial class MachinePresetForm : ObservableObject
     /// A pad arrives with the lines a pad has and nothing in them; a setting arrives at whatever
     /// the machine says it rests at. Both are the least that can be said about the thing, which
     /// is what somebody who has just added it wants to start from.
+    ///
+    /// A fresh offer is one more of something the machine does not name: the name is the builder's,
+    /// so it starts at whatever is free and is typed over.
+    ///
+    /// Something the preset already speaks about is refused. It cannot be reached from the list any
+    /// more, but a stale selection can still arrive here, and adding it again would replace what is
+    /// already there.
+    ///
+    /// Always enabled; with nothing offered it does nothing.
     /// </remarks>
     public IRelayCommand AddCommand => new RelayCommand(() =>
     {
         if (Offered is not { } offer) return;
 
-        // One more of something the machine does not name, which is the whole of what the offer
-        // is: the name is the builder's, so it starts at whatever is free and is typed over.
         if (offer.Fresh)
         {
             _held[Spare(_machine.ThingCalled)] = Started();
@@ -299,8 +365,6 @@ public sealed partial class MachinePresetForm : ObservableObject
             return;
         }
 
-        // Already spoken about, so there is nothing to start. It cannot be reached from the list
-        // any more, but a stale selection can still arrive here.
         if (_held.ContainsKey(offer.Key)) return;
 
         if (_machine.ThingKeys.Contains(offer.Key))
@@ -366,6 +430,15 @@ public sealed partial class MachinePresetForm : ObservableObject
     /// <remarks>
     /// The whole list rather than the one line that moved, because adding or removing a thing
     /// changes both halves at once and the two have to agree.
+    ///
+    /// What is offered is everything the machine has, whether the preset speaks about it yet or
+    /// not. That does not change as a preset is filled in: a list that shrank while you worked
+    /// would be a different list every time you looked at it, and the one thing you wanted would
+    /// have moved. Which of them can still be added is <see cref="Narrow"/>'s question.
+    ///
+    /// Either a list of the machine's things, or one offer that makes another. A grid says what
+    /// its buttons are called and a preset says what is on each; a map does not and cannot, since
+    /// how many zones an instrument is is what the preset decides.
     /// </remarks>
     public void Rebuild()
     {
@@ -387,15 +460,8 @@ public sealed partial class MachinePresetForm : ObservableObject
             Sections.Add(new PresetSection(_held, key, Called(key), new[] { Line(_held, key) }, Told));
         }
 
-        // Everything the machine has, whether the preset speaks about it yet or not. The list is
-        // what this machine can be given a value for, and that does not change as a preset is
-        // filled in: a list that shrank while you worked would be a different list every time you
-        // looked at it, and the one thing you wanted would have moved.
         var everything = new List<PresetOffer>();
 
-        // Either a list of the machine's things, or one offer that makes another. A grid says
-        // what its buttons are called and a preset says what is on each; a map does not and
-        // cannot, since how many zones an instrument is is what the preset decides.
         if (_machine.NamesThings)
         {
             foreach (string key in _machine.ThingKeys)
@@ -452,8 +518,10 @@ public sealed partial class MachinePresetForm : ObservableObject
     /// <summary>Which sort the list is narrowed to.</summary>
     [ObservableProperty] private string kind = AnyKind;
 
+    /// <summary>Shows the things of the newly picked sort.</summary>
     partial void OnKindChanged(string value) => Narrow();
 
+    /// <summary>Everything the machine can be given a value for, before any narrowing.</summary>
     private IReadOnlyList<PresetOffer> _everything = Array.Empty<PresetOffer>();
 
     /// <summary>
@@ -482,6 +550,11 @@ public sealed partial class MachinePresetForm : ObservableObject
         OnPropertyChanged(nameof(HasOffers));
     }
 
+    /// <summary>A line or a block moved: say so, and read the preset again.</summary>
+    /// <remarks>
+    /// Read again because a block removed or renamed changes what is offered as well as what is
+    /// held, and the two halves of the page have to agree.
+    /// </remarks>
     private void Told()
     {
         _changed();
@@ -490,6 +563,11 @@ public sealed partial class MachinePresetForm : ObservableObject
     }
 
     /// <summary>The lines one of the machine's things has, which is what it puts beside them.</summary>
+    /// <remarks>
+    /// Anything the machine no longer has a control for is still shown at the end, so a preset
+    /// written against a later version of the machine can be read here rather than quietly losing
+    /// half of itself.
+    /// </remarks>
     private IReadOnlyList<PresetLine> Thing(JsonObject block)
     {
         var lines = new List<PresetLine>();
@@ -498,8 +576,6 @@ public sealed partial class MachinePresetForm : ObservableObject
 
         foreach (var parameter in _machine.ThingParameters) lines.Add(Line(block, parameter.Key));
 
-        // Anything the machine no longer has a control for is still shown, so a preset written
-        // against a later version can be read here rather than quietly losing half of itself.
         foreach (var (key, _) in block.ToList())
         {
             if (lines.Any(one => one.Name == Called(key))) continue;
@@ -524,6 +600,7 @@ public sealed partial class MachinePresetForm : ObservableObject
         return new PresetLine(held, key, Called(key), PresetLine.WordsKind, "", _changed);
     }
 
+    /// <summary>What the machine writes beside that setting.</summary>
     private string Called(string key) => _machine.Called(key);
 
     /// <summary>That recording said from the machine's presets folder, where it is under it.</summary>
@@ -538,10 +615,20 @@ public sealed partial class MachinePresetForm : ObservableObject
 /// <summary>The words a preset file uses for itself rather than for the machine.</summary>
 public static class MachinePresetWords
 {
+    /// <summary>What the preset calls itself, which is the name on the picker.</summary>
     public const string Name = "Name";
 
+    /// <summary>Which machine it is for, and that it is written the way that machine is drawn.</summary>
     public const string Machine = "Machine";
 
+    /// <summary>
+    /// That this preset is the one saying the picker offers your own recordings.
+    /// </summary>
+    /// <remarks>
+    /// Not a preset in the ordinary sense: it sets nothing on the machine. It is how a machine
+    /// whose whole sound is a recording of yours says which browser it has, in the one place a
+    /// machine says what it ships with.
+    /// </remarks>
     public const string Browse = "Browse";
 }
 
@@ -555,6 +642,18 @@ public static class MachinePresetWords
 /// </remarks>
 public sealed class MachineProjectShape
 {
+    /// <summary>
+    /// Reads a machine's panel once and works out what shape its presets are.
+    /// </summary>
+    /// <remarks>
+    /// What one of the machine's things is set by is either the settings its own element names, or
+    /// all of them where it names none. A kit means all of them and says nothing, because every
+    /// knob on it is about the pad in hand and there is nothing else for one to be about; a sampler
+    /// has a filter as well as its zones, and no reader could tell which key is which by looking,
+    /// so it says.
+    /// </remarks>
+    /// <param name="panel">The machine's face, or null for one that has none.</param>
+    /// <param name="parameters">Everything it declares, in panel order.</param>
     public MachineProjectShape(MachinePanel? panel, IReadOnlyList<MachineParameter> parameters)
     {
         Parameters = parameters;
@@ -571,11 +670,6 @@ public sealed class MachineProjectShape
 
         HasThings = _holder != null;
 
-        // What one of the machine's things is set by: the settings its own element names, or all
-        // of them where it names none. A kit means all of them and says nothing, because every
-        // knob on it is about the pad in hand and there is nothing else for one to be about; a
-        // sampler has a filter as well as its zones, and no reader could tell which key is which
-        // by looking, so it says.
         var named = Declared();
 
         ThingParameters = parameters
@@ -615,6 +709,7 @@ public sealed class MachineProjectShape
     /// <summary>The element the machine's things stand on: its grid of pads, or its map of zones.</summary>
     private MachineElement? _holder;
 
+    /// <summary>Everything the machine declares, in panel order.</summary>
     public IReadOnlyList<MachineParameter> Parameters { get; }
 
     /// <summary>What one of the machine's things is set by.</summary>
@@ -671,6 +766,7 @@ public sealed class MachineProjectShape
     /// <summary>True when that setting is a recording, which is picked rather than typed.</summary>
     public bool IsTake(string key) => _takes.Contains(key);
 
+    /// <inheritdoc cref="IsTake"/>
     private readonly HashSet<string> _takes = new(StringComparer.Ordinal);
 
     /// <summary>What the panel draws that setting as: a knob, a fader, a recording, a pad.</summary>
@@ -681,6 +777,7 @@ public sealed class MachineProjectShape
     /// </remarks>
     public string Drawn(string key) => _drawn.TryGetValue(key, out string? kind) ? kind : "Setting";
 
+    /// <inheritdoc cref="Drawn"/>
     private readonly Dictionary<string, string> _drawn = new(StringComparer.Ordinal);
 
     /// <summary>What the panel writes beside that setting, or the key when it says nothing.</summary>
@@ -691,12 +788,23 @@ public sealed class MachineProjectShape
         return Parameters.FirstOrDefault(one => one.Key == key)?.Name ?? key;
     }
 
+    /// <inheritdoc cref="Called"/>
     private readonly Dictionary<string, string> _called = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Walks the panel once, gathering what its presets can hold.
+    /// </summary>
+    /// <remarks>
+    /// The grid or the map is taken as the holder, whichever the machine has. One or neither and
+    /// never both: a machine that did both would be two machines wearing one panel.
+    ///
+    /// A control can name settings other than the one it turns: a picture of a recording has four
+    /// handles on it, each a fraction of the file, and an envelope curve names the four the faders
+    /// beside it move. Those belong to the control that draws them, which is what somebody looking
+    /// for them would say they are, so its own properties are read for parameter keys as well.
+    /// </remarks>
     private void Walk(MachineElement element, List<string> keys, List<string> words)
     {
-        // The grid or the map, whichever the machine has. One or neither and never both: a
-        // machine that did both would be two machines wearing one panel.
         if (_holder == null
             && element.Element is MachineElementKinds.Pads or MachineElementKinds.Zones)
         {
@@ -714,10 +822,6 @@ public sealed class MachineProjectShape
         if (element.Parameter.Length > 0 && !_drawn.ContainsKey(element.Parameter))
             _drawn[element.Parameter] = element.Element;
 
-        // A control can name settings other than the one it turns: a picture of a recording has
-        // four handles on it, each a fraction of the file, and an envelope curve names the four
-        // the faders beside it move. Those belong to the control that draws them, which is what
-        // somebody looking for them would say they are.
         foreach (var (_, said) in element.Properties)
         {
             if (said.Length == 0 || _drawn.ContainsKey(said)) continue;

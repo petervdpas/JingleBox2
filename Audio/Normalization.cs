@@ -17,7 +17,10 @@ public static class Normalization
     /// <summary>Just under full scale. Room for a resampler to overshoot without clipping.</summary>
     public const double DefaultTargetDecibels = -1;
 
+    /// <summary>The quietest target worth offering. Below this the lift is barely audible.</summary>
     public const double MinTargetDecibels = -24;
+
+    /// <summary>Full scale, which is as loud as a target can be asked to be.</summary>
     public const double MaxTargetDecibels = 0;
 
     /// <summary>
@@ -30,6 +33,11 @@ public static class Normalization
     public const double SilenceAmplitude = 0.00001;
 
     /// <summary>The loudest sample in the file, 0 to 1.</summary>
+    /// <remarks>
+    /// Each sample is widened to an int before Abs, because Abs(short.MinValue) has no answer in
+    /// a short and throws rather than saturating.
+    /// </remarks>
+    /// <param name="samples">The whole recording, or null.</param>
     public static double PeakOf(short[]? samples)
     {
         if (samples == null || samples.Length == 0) return 0;
@@ -38,7 +46,6 @@ public static class Normalization
 
         foreach (short sample in samples)
         {
-            // Widen before Abs: Math.Abs(short.MinValue) throws.
             int magnitude = Math.Abs((int)sample);
             if (magnitude > loudest) loudest = magnitude;
         }
@@ -50,6 +57,8 @@ public static class Normalization
     /// What to multiply every sample by to put the peak on the target. One means leave it
     /// alone, which is the answer for silence and for a file that is already there.
     /// </summary>
+    /// <param name="peak">The loudest sample, 0 to 1, as <see cref="PeakOf"/> reports it.</param>
+    /// <param name="targetDecibels">Where that peak should end up. Out of range values are clamped.</param>
     public static double GainFor(double peak, double targetDecibels)
     {
         if (double.IsNaN(peak) || peak <= SilenceAmplitude) return 1;
@@ -63,6 +72,8 @@ public static class Normalization
     }
 
     /// <summary>Applies a gain in place, rounding to the nearest step and never wrapping round.</summary>
+    /// <param name="samples">The recording, changed where it lies.</param>
+    /// <param name="gain">What to multiply by. A gain of one leaves the recording untouched.</param>
     public static void Apply(short[]? samples, double gain)
     {
         if (samples == null || samples.Length == 0) return;
@@ -75,8 +86,10 @@ public static class Normalization
         }
     }
 
+    /// <summary>An amplitude as decibels, with silence reading as the quietest target.</summary>
     public static double ToDecibels(double amplitude) =>
         amplitude <= SilenceAmplitude ? MinTargetDecibels : 20 * Math.Log10(amplitude);
 
+    /// <summary>Decibels as an amplitude, the other half of <see cref="ToDecibels"/>.</summary>
     public static double ToAmplitude(double decibels) => Math.Pow(10, decibels / 20.0);
 }

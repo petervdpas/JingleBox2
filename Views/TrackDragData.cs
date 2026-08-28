@@ -23,8 +23,10 @@ public static class TrackDragData
         DataFormat.CreateInProcessFormat<Payload>(FormatName);
 
     /// <summary>A drag format has to carry a reference type, so the number travels wrapped.</summary>
+    /// <param name="Track">The number the track is at now, before anything is moved.</param>
     public sealed record Payload(int Track);
 
+    /// <summary>What to put in the hand when a drag of that track starts.</summary>
     public static IDataTransfer For(int track)
     {
         var transfer = new DataTransfer();

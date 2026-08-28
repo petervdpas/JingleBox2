@@ -17,15 +17,35 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public sealed unsafe class ClapBundle : IDisposable
 {
+    /// <summary>
+    /// Every bundle open in this process, by its full path. Ordinal because a path is bytes
+    /// rather than words, and two spellings that differ only in case are two files on Linux.
+    /// </summary>
     private static readonly Dictionary<string, ClapBundle> Open_ = new(StringComparer.Ordinal);
+
+    /// <summary>Held over the whole of an acquire, so two threads cannot both decide to load.</summary>
     private static readonly object Registry = new();
 
+    /// <summary>The loaded shared library. Never freed: see <see cref="Dispose"/>.</summary>
     private readonly nint _library;
+
+    /// <summary>The one exported symbol, which is where init and the factory come from.</summary>
     private readonly ClapPluginEntry* _entry;
+
+    /// <summary>What lists and creates the plugins inside the bundle. Owned by the library.</summary>
     private readonly ClapPluginFactory* _factory;
 
+    /// <summary>
+    /// How many things are holding this bundle. What stops the same file being initialised
+    /// twice, since a .clap that is deinitialised while still in use is a segmentation fault
+    /// inside somebody else's code.
+    /// </summary>
     private int _references;
 
+    /// <summary>
+    /// Private because a bundle is only ever reached through <see cref="Acquire"/>: one made any
+    /// other way would be outside the count and could be initialised a second time.
+    /// </summary>
     private ClapBundle(string path, nint library, ClapPluginEntry* entry, ClapPluginFactory* factory)
     {
         Path = path;
@@ -34,6 +54,7 @@ public sealed unsafe class ClapBundle : IDisposable
         _factory = factory;
     }
 
+    /// <summary>Where the .clap is, as a full path. Also the key it is shared under.</summary>
     public string Path { get; }
 
     /// <summary>
@@ -64,6 +85,18 @@ public sealed unsafe class ClapBundle : IDisposable
         }
     }
 
+    /// <summary>
+    /// Opens a .clap and gets as far as its factory, or answers null for anything that is not
+    /// one.
+    /// </summary>
+    /// <remarks>
+    /// The plugin is handed the path it was loaded from, because some of them load resources
+    /// next to themselves and have no other way of finding where they are.
+    ///
+    /// A library that is not a plugin, is built for another architecture, or simply refuses to
+    /// load is one plugin the user does not get rather than a dead application, so every failure
+    /// here unloads and answers null.
+    /// </remarks>
     private static ClapBundle? Load(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
@@ -78,7 +111,6 @@ public sealed unsafe class ClapBundle : IDisposable
             var entry = (ClapPluginEntry*)symbol;
             if (entry->Init == null || entry->GetFactory == null) return Fail(library);
 
-            // The plugin is told where it lives; some load resources next to themselves.
             using var pathText = new NativeText(path);
             if (entry->Init(pathText.Pointer) == 0) return Fail(library);
 
@@ -95,12 +127,14 @@ public sealed unsafe class ClapBundle : IDisposable
         }
         catch (Exception)
         {
-            // A library that is not a plugin, is built for another architecture, or refuses to
-            // load is one plugin the user does not get, not a dead application.
             return Fail(library);
         }
     }
 
+    /// <summary>
+    /// Unloads a library that turned out not to be usable and answers null, so every failing
+    /// path in <see cref="Load"/> is one line and cannot forget to free.
+    /// </summary>
     private static ClapBundle? Fail(nint library)
     {
         if (library != 0) NativeLibrary.Free(library);
@@ -161,6 +195,11 @@ public sealed unsafe class ClapBundle : IDisposable
     /// <summary>
     /// Makes an instance of one of the plugins in this bundle, ready to be activated.
     /// </summary>
+    /// <remarks>
+    /// By id rather than by index, since a bundle is entitled to list its plugins in a different
+    /// order next version and a saved chain names an id. The host struct handed over is kept by
+    /// the plugin for its whole life and must not move.
+    /// </remarks>
     internal ClapPlugin* Create(string id, ClapHost* host)
     {
         using var pluginId = new NativeText(id);
@@ -191,20 +230,32 @@ public sealed unsafe class ClapBundle : IDisposable
 }
 
 /// <summary>A C string in unmanaged memory, freed when it goes out of scope.</summary>
+/// <remarks>
+/// Every string handed into a plugin has to be UTF-8 and has to sit still, which rules out
+/// anything the collector owns. A struct with a using around it is the cheapest way to say
+/// "this lives exactly as long as the call".
+///
+/// It is only safe for a string the plugin reads and does not keep. Anything a plugin holds on
+/// to, such as the host's own name, is allocated once and never freed instead.
+/// </remarks>
 internal unsafe readonly struct NativeText : IDisposable
 {
+    /// <summary>The unmanaged copy. Nought for a string that could not be allocated.</summary>
     private readonly nint _memory;
 
+    /// <summary>Copies a string into unmanaged memory as UTF-8. Null is copied as empty.</summary>
     public NativeText(string text)
     {
         _memory = Marshal.StringToCoTaskMemUTF8(text ?? "");
     }
 
+    /// <summary>The string as a plugin wants it: a pointer to null terminated UTF-8.</summary>
     public byte* Pointer => (byte*)_memory;
 
     /// <summary>Reads a C string the plugin owns. Null and unterminated both read as empty.</summary>
     public static string Read(byte* text) => text == null ? "" : Marshal.PtrToStringUTF8((nint)text) ?? "";
 
+    /// <summary>Frees the copy. Safe to call on a default instance, which holds nothing.</summary>
     public void Dispose()
     {
         if (_memory != 0) Marshal.FreeCoTaskMem(_memory);

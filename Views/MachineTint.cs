@@ -24,28 +24,59 @@ namespace JingleBox2.Views;
 /// </remarks>
 public static class MachineTint
 {
-    // Declared, not built from a variable, so the keys stay greppable.
+    /// <summary>
+    /// The theme keys a panel's own resources stand in front of, every one declared rather than
+    /// built out of a variable, so a key can be found from either end by searching for it.
+    /// </summary>
     private const string BackgroundKey = "Color.Background";
+
+    /// <inheritdoc cref="BackgroundKey"/>
     private const string SurfaceKey = "Color.Surface";
+
+    /// <inheritdoc cref="BackgroundKey"/>
     private const string BorderKey = "Color.Border";
+
+    /// <inheritdoc cref="BackgroundKey"/>
     private const string AccentKey = "Color.Accent";
+
+    /// <inheritdoc cref="BackgroundKey"/>
     private const string TextKey = "Color.TextPrimary";
+
+    /// <inheritdoc cref="BackgroundKey"/>
     private const string MutedKey = "Color.TextMuted";
 
+    /// <summary>
+    /// And the brush beside each colour, because a control bound to the theme takes the brush
+    /// and one that paints itself reads the colour. Both have to be put back or half the panel
+    /// would follow the machine and half would follow the application.
+    /// </summary>
     private const string BackgroundBrushKey = "BgBrush";
+
+    /// <inheritdoc cref="BackgroundBrushKey"/>
     private const string SurfaceBrushKey = "SurfaceBrush";
+
+    /// <inheritdoc cref="BackgroundBrushKey"/>
     private const string BorderBrushKey = "BorderBrush";
+
+    /// <inheritdoc cref="BackgroundBrushKey"/>
     private const string AccentBrushKey = "AccentBrush";
+
+    /// <inheritdoc cref="BackgroundBrushKey"/>
     private const string TextBrushKey = "TextPrimaryBrush";
+
+    /// <inheritdoc cref="BackgroundBrushKey"/>
     private const string MutedBrushKey = "TextMutedBrush";
 
     /// <summary>
     /// Puts the machine's shades on the panel, or takes them off again when there is no
     /// machine to show.
     /// </summary>
+    /// <remarks>
+    /// Taken off first in every case, so what shows through when a machine says nothing is the
+    /// application's own colour and not the last machine's.
+    /// </remarks>
     public static void Apply(Control panel, Machines.MachineTheme? machine)
     {
-        // Off first, so what shows through is the application's own and not the last machine's.
         Clear(panel);
 
         if (machine == null) return;
@@ -84,6 +115,9 @@ public static class MachineTint
     /// Here rather than inside <see cref="Apply"/> because two things want the answer and only
     /// one of them is a panel: somebody setting the distances has to be shown what they do, and
     /// a preview drawn from a second copy of the arithmetic is a preview of something else.
+    ///
+    /// Whatever the face turned out to be, the lettering has to be readable on it: a pale machine
+    /// gets dark lettering the same way a dark one gets pale.
     /// </remarks>
     public static MachineShades? Shades(Machines.MachineTheme? machine)
     {
@@ -93,8 +127,6 @@ public static class MachineTint
 
         var face = Mix(hue, Colors.Black, machine.Face);
 
-        // Whatever the face turned out to be, the lettering has to be readable on it. A pale
-        // machine gets dark lettering the same way a dark one gets pale.
         var ink = Light(face) ? Color.FromRgb(0x14, 0x16, 0x1A) : Colors.White;
 
         return new MachineShades(
@@ -133,6 +165,7 @@ public static class MachineTint
     private static bool Light(Color colour) =>
         (0.2126 * colour.R + 0.7152 * colour.G + 0.0722 * colour.B) / 255.0 > 0.5;
 
+    /// <summary>Takes every key back off the panel, so nothing of a machine's is left behind.</summary>
     private static void Clear(Control panel)
     {
         foreach (string key in new[]
@@ -146,6 +179,7 @@ public static class MachineTint
         }
     }
 
+    /// <summary>One shade, as both the colour and the brush, since the panel is read both ways.</summary>
     private static void Set(Control panel, string colourKey, string brushKey, Color colour)
     {
         panel.Resources[colourKey] = colour;
@@ -164,6 +198,7 @@ public static class MachineTint
         Blend(from.G, to.G, amount),
         Blend(from.B, to.B, amount));
 
+    /// <summary>One channel of that mix, rounded and held inside a byte.</summary>
     private static byte Blend(byte from, byte to, double amount) =>
         (byte)Math.Clamp(Math.Round(from + (to - from) * amount), 0, 255);
 }

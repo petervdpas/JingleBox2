@@ -6,8 +6,18 @@ using System.Threading.Tasks;
 
 namespace JingleBox2.Views;
 
+/// <summary>
+/// The one window this application asks a yes or no question in, and tells things in.
+/// </summary>
+/// <remarks>
+/// One window for both because a note is a question with one answer, and two windows that look
+/// almost the same is how two windows come to drift apart. Deleting a recording no longer needs
+/// the "this cannot be undone" wording, since a deleted take moves to <c>deleted/</c> and can be
+/// fetched back.
+/// </remarks>
 public partial class ConfirmDialog : Window
 {
+    /// <summary>Builds the window. Its text and its buttons are filled in by the two callers.</summary>
     public ConfirmDialog()
     {
         InitializeComponent();
@@ -45,6 +55,14 @@ public partial class ConfirmDialog : Window
         return Dialog.ShowAsync(dialog, false);
     }
 
+    /// <summary>
+    /// Puts the question and the wording of the yes button into the window.
+    /// </summary>
+    /// <remarks>
+    /// Found by name rather than bound, because the window is built twice from two static
+    /// methods and giving it a view model for two strings would be more machinery than either
+    /// needs.
+    /// </remarks>
     private static void Fill(ConfirmDialog dialog, string message, string confirmText)
     {
         var text = dialog.FindControl<TextBlock>("MessageText");
@@ -54,7 +72,9 @@ public partial class ConfirmDialog : Window
         if (confirm != null) confirm.Content = confirmText;
     }
 
+    /// <summary>Yes. Also the only button a note has, where the answer is thrown away.</summary>
     private void Confirm_Click(object? sender, RoutedEventArgs e) => Close(true);
 
+    /// <summary>No, which is also what closing the window by any other means answers.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(false);
 }

@@ -25,22 +25,26 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class PadGrid : Decorator
 {
-    /// <summary>The kit behind it.</summary>
+    /// <summary>Backs <see cref="Pads"/>, the kit behind the grid.</summary>
     public static readonly StyledProperty<IMachinePads?> PadsProperty =
         AvaloniaProperty.Register<PadGrid, IMachinePads?>(nameof(Pads));
 
-    /// <summary>How many pads stand side by side. Four, on every drum machine ever made.</summary>
+    /// <summary>
+    /// Backs <see cref="Columns"/>: how many pads stand side by side. Four, on every drum
+    /// machine ever made.
+    /// </summary>
     public static readonly StyledProperty<int> ColumnsProperty =
         AvaloniaProperty.Register<PadGrid, int>(nameof(Columns), 4);
 
-    /// <summary>How wide and tall one pad's cap is.</summary>
+    /// <summary>Backs <see cref="CapWidth"/> and <see cref="CapHeight"/>: how big one pad is.</summary>
     public static readonly StyledProperty<double> CapWidthProperty =
         AvaloniaProperty.Register<PadGrid, double>(nameof(CapWidth), 86);
 
+    /// <inheritdoc cref="CapWidthProperty"/>
     public static readonly StyledProperty<double> CapHeightProperty =
         AvaloniaProperty.Register<PadGrid, double>(nameof(CapHeight), 42);
 
-    /// <summary>The air between them.</summary>
+    /// <summary>Backs <see cref="Gap"/>, the air between one pad and the next.</summary>
     public static readonly StyledProperty<double> GapProperty =
         AvaloniaProperty.Register<PadGrid, double>(nameof(Gap), 5);
 
@@ -55,11 +59,24 @@ public class PadGrid : Decorator
     public static readonly StyledProperty<IReadOnlyList<PadCell>?> CellsProperty =
         AvaloniaProperty.Register<PadGrid, IReadOnlyList<PadCell>?>(nameof(Cells));
 
-    /// <summary>What an unlit pad is painted, before the machine's own colour is put on it.</summary>
+    /// <summary>
+    /// Backs <see cref="Colour"/>: what an unlit pad is painted, before the machine's own colour
+    /// is put on it.
+    /// </summary>
     public static readonly StyledProperty<Color> ColourProperty =
         AvaloniaProperty.Register<PadGrid, Color>(nameof(Colour), Color.FromRgb(0x4A, 0x4E, 0x57));
 
+    /// <summary>
+    /// What the buttons are laid out in.
+    /// </summary>
+    /// <remarks>
+    /// A grid rather than a wrapping row, so a kit whose last row is short still has its pads
+    /// under the ones above them. A hand reaching for the bottom left pad is reaching for a
+    /// place, not for the twelfth item in a list.
+    /// </remarks>
     private readonly Grid _grid = new();
+
+    /// <summary>The buttons, in the order they were declared, so a note can find its own.</summary>
     private readonly List<PushButton> _caps = new();
 
     /// <summary>
@@ -73,9 +90,26 @@ public class PadGrid : Decorator
     /// </remarks>
     public IReadOnlyList<Control> Caps => _caps;
 
+    /// <summary>
+    /// The kit the grid is currently listening to, and the handler it gave it.
+    /// </summary>
+    /// <remarks>
+    /// Both are kept because the subscription has to come off the kit it went on, and by the
+    /// time the grid is handed a different kit the property already holds the new one.
+    /// </remarks>
     private IMachinePads? _watching;
+
+    /// <inheritdoc cref="_watching"/>
     private EventHandler? _listening;
 
+    /// <summary>
+    /// Builds an empty grid, and drops the kit's subscription when the grid leaves the tree.
+    /// </summary>
+    /// <remarks>
+    /// A kit outlives the panel showing it: it belongs to the instrument, and a panel is opened
+    /// and shut. Left subscribed, every panel ever opened would still be redrawing itself on
+    /// every note.
+    /// </remarks>
     public PadGrid()
     {
         Build();
@@ -83,42 +117,49 @@ public class PadGrid : Decorator
         DetachedFromVisualTree += (_, _) => Unwatch();
     }
 
+    /// <summary>The kit behind the grid: what is on each pad, which is lit, which is picked.</summary>
     public IMachinePads? Pads
     {
         get => GetValue(PadsProperty);
         set => SetValue(PadsProperty, value);
     }
 
+    /// <inheritdoc cref="ColumnsProperty"/>
     public int Columns
     {
         get => GetValue(ColumnsProperty);
         set => SetValue(ColumnsProperty, value);
     }
 
+    /// <summary>How wide one pad's cap is.</summary>
     public double CapWidth
     {
         get => GetValue(CapWidthProperty);
         set => SetValue(CapWidthProperty, value);
     }
 
+    /// <summary>And how tall.</summary>
     public double CapHeight
     {
         get => GetValue(CapHeightProperty);
         set => SetValue(CapHeightProperty, value);
     }
 
+    /// <summary>The air between one pad and the next.</summary>
     public double Gap
     {
         get => GetValue(GapProperty);
         set => SetValue(GapProperty, value);
     }
 
+    /// <summary>What an unlit pad is painted.</summary>
     public Color Colour
     {
         get => GetValue(ColourProperty);
         set => SetValue(ColourProperty, value);
     }
 
+    /// <inheritdoc cref="CellsProperty"/>
     public IReadOnlyList<PadCell>? Cells
     {
         get => GetValue(CellsProperty);
@@ -128,6 +169,14 @@ public class PadGrid : Decorator
     /// <summary>How many buttons there are: what the machine declares, or what the host has.</summary>
     private int Count => Cells is { Count: > 0 } cells ? cells.Count : Pads?.Count ?? 0;
 
+    /// <summary>
+    /// Rebuilds when the shape of the grid changes, and moves the subscription when the kit does.
+    /// </summary>
+    /// <remarks>
+    /// A new kit means both: the old subscription has to come off before the buttons are made
+    /// again, or a kit that has been put down goes on redrawing a grid that is no longer about
+    /// it.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -149,6 +198,7 @@ public class PadGrid : Decorator
         }
     }
 
+    /// <summary>Follows the kit, so a note that lands anywhere else still lights its pad here.</summary>
     private void Watch()
     {
         if (Pads is not { } kit) return;
@@ -159,6 +209,7 @@ public class PadGrid : Decorator
         kit.Changed += _listening;
     }
 
+    /// <summary>Stops following it, and forgets which one it was following.</summary>
     private void Unwatch()
     {
         if (_watching != null && _listening != null) _watching.Changed -= _listening;
@@ -174,6 +225,15 @@ public class PadGrid : Decorator
     /// The grid is made rather than a wrapping row used, so that a kit whose last row is short
     /// still has its pads under the ones above them. A hand reaching for the bottom left pad is
     /// reaching for a place, not for the twelfth item in a list.
+    ///
+    /// The gap goes on every pad, the last column and the last row included. It is what a kit
+    /// written by hand puts on each of its buttons, and trimming the two outer edges made the
+    /// grid narrower and shorter than the same grid drawn in XAML, so the box round it came out
+    /// the wrong size.
+    ///
+    /// Each cap is wired through its press rather than given a command, because a pad does two
+    /// things at once: it sounds, and it becomes the pad the controls beside the grid are about.
+    /// A command would be one of those and the panel would have to arrange the other.
     /// </remarks>
     private void Build()
     {
@@ -204,16 +264,9 @@ public class PadGrid : Decorator
                 Colour = Colour,
                 HasLamp = true,
                 LampBelow = false,
-                // The gap goes on every pad, the last column and the last row included. It is
-                // what a kit written by hand puts on each of its buttons, and trimming the two
-                // outer edges made the grid narrower and shorter than the same grid drawn in
-                // XAML, so the box round it came out the wrong size.
                 Margin = new Thickness(0, 0, Gap, Gap),
             };
 
-            // Pressed rather than commanded, because a pad does two things at once: it sounds,
-            // and it becomes the pad the controls beside the grid are about. A command would be
-            // one of those and the panel would have to arrange the other.
             cap.Pressed += (_, _) => Struck(held);
 
             Grid.SetColumn(cap, held % across);
@@ -228,6 +281,12 @@ public class PadGrid : Decorator
         Refresh();
     }
 
+    /// <summary>
+    /// A pad was hit: it sounds, and it becomes the one the controls beside the grid are about.
+    /// </summary>
+    /// <remarks>
+    /// Picked before hit, so anything the sounding reaches is already looking at the right pad.
+    /// </remarks>
     private void Struck(int at)
     {
         if (Pads is not { } kit) return;
@@ -238,7 +297,18 @@ public class PadGrid : Decorator
         Refresh();
     }
 
-    /// <summary>Tells every pad what it says and whether it is lit, without rebuilding one.</summary>
+    /// <summary>
+    /// Tells every pad what it says and whether it is lit, without rebuilding one.
+    /// </summary>
+    /// <remarks>
+    /// What is on a pad comes from the kit; what it is called and what note it answers to come
+    /// from the machine, where they were declared.
+    ///
+    /// A pad the machine declares that the kit behind the panel is not big enough to have is
+    /// drawn as an empty pad rather than left out, so the grid keeps the shape the machine says
+    /// it is. A pad the kit has but has nothing on is dimmed too, less far, since an empty pad
+    /// should read as empty rather than as a pad whose name happens to be blank.
+    /// </remarks>
     private void Refresh()
     {
         if (Pads is not { } kit) return;
@@ -248,15 +318,11 @@ public class PadGrid : Decorator
             var cap = _caps[at];
             var cell = Cells is { } cells && at < cells.Count ? cells[at] : null;
 
-            // What is on it comes from the kit; what it is called and what it answers to come
-            // from the machine, where they were declared.
             cap.CapText = at < kit.Count ? kit.Cap(at) : cell?.Name ?? "";
             cap.Label = cell?.Note ?? (at < kit.Count ? kit.Note(at) : "");
 
             if (at >= kit.Count)
             {
-                // Declared, but the kit behind the panel is not that big. Drawn as an empty pad
-                // rather than left out, so the grid is the shape the machine says it is.
                 cap.Lit = false;
                 cap.IsSelected = false;
                 cap.Opacity = 0.4;
@@ -267,7 +333,6 @@ public class PadGrid : Decorator
             cap.Lit = kit.Lit(at);
             cap.IsSelected = kit.Picked == at;
 
-            // An empty pad is drawn as an empty pad rather than as a pad whose name is blank.
             cap.Opacity = kit.Filled(at) ? 1 : 0.55;
         }
     }
@@ -282,4 +347,6 @@ public class PadGrid : Decorator
 /// pattern. Neither is a setting: they are what the button is, and they change only when
 /// somebody edits the machine.
 /// </remarks>
+/// <param name="Name">The text setting this pad's caption lives in.</param>
+/// <param name="Note">The key it answers to, written the way a note is written.</param>
 public sealed record PadCell(string Name, string Note);

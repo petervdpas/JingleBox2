@@ -24,21 +24,38 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="place">The lamps, already following whatever is playing.</param>
 public sealed class TrackLocation(TrackLocationViewModel place) : IMachineLocation
 {
+    /// <inheritdoc/>
     public bool Live => place.IsLive;
 
+    /// <inheritdoc/>
     public int Lamps => TrackLocationViewModel.PageLines;
 
+    /// <inheritdoc/>
     public int Lit => place.Lamp;
 
+    /// <inheritdoc/>
     public int FirstNumber => place.FirstNumber;
 
-    /// <summary>What is written on each page's cap, rebuilt only when the pattern changes length.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Kept once it has been worked out and thrown away when the list of pages is replaced,
+    /// which is the only thing that changes it. This is read while the panel draws, so building
+    /// a fresh array of strings per frame is a cost nobody asked for.
+    /// </remarks>
     public IReadOnlyList<string> Pages => _pages ??= place.Pages.Select(one => one.Text).ToArray();
 
+    /// <summary>The caps as last worked out, or nothing when they need working out again.</summary>
     private string[]? _pages;
 
+    /// <inheritdoc/>
     public int Page => place.Page;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A page number outside the list is ignored rather than clamped. A panel is drawn from a
+    /// description that can have more page buttons on it than the pattern has pages, and a press
+    /// on one of those should do nothing rather than jump somewhere.
+    /// </remarks>
     public void Show(int page)
     {
         if (page < 0 || page >= place.Pages.Count) return;
@@ -46,9 +63,7 @@ public sealed class TrackLocation(TrackLocationViewModel place) : IMachineLocati
         place.Pages[page].PickCommand.Execute(null);
     }
 
-    /// <summary>
-    /// Told when the playhead moved, or the pattern changed length.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Subscribed on the first listener rather than in the constructor, the way the other
     /// adapters do it: a panel that never draws this row should not be holding the tracker's
@@ -65,10 +80,19 @@ public sealed class TrackLocation(TrackLocationViewModel place) : IMachineLocati
         remove => _changed -= value;
     }
 
+    /// <summary>Everyone told when the playhead moved or the pattern changed length.</summary>
     private EventHandler? _changed;
 
+    /// <summary>Whether the lamps are being watched yet. A latch, never taken off again.</summary>
     private bool _listening;
 
+    /// <summary>
+    /// Puts the subscriptions on, once.
+    /// </summary>
+    /// <remarks>
+    /// A pattern of a different length is a different set of pages, so the caps are dropped when
+    /// the list is replaced and worked out again on the next draw.
+    /// </remarks>
     private void Listen()
     {
         if (_listening) return;
@@ -86,6 +110,7 @@ public sealed class TrackLocation(TrackLocationViewModel place) : IMachineLocati
             };
     }
 
+    /// <summary>Anything on the lamps moving is the whole panel worth drawing again.</summary>
     private void Moved(object? sender, PropertyChangedEventArgs e) =>
         _changed?.Invoke(this, EventArgs.Empty);
 }

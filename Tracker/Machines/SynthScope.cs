@@ -26,13 +26,39 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
     private const double ScrollCyclesPerSecond = 1.5;
 
     /// <summary>How long it keeps moving after a note, since a preview is about that long.</summary>
+    /// <remarks>
+    /// Trailing underscore because the property that hands it over has the name that belongs to
+    /// it, and the interface chose that name first.
+    /// </remarks>
     private const double MotionSeconds_ = 0.6;
 
     /// <summary>Enough of the noise wave to read as noise, and stable between redraws.</summary>
+    /// <remarks>
+    /// Any number would do. It is a date, so that nobody reading it later goes looking for the
+    /// meaning of it.
+    /// </remarks>
     private const int NoiseSeed = 20260821;
 
+    /// <summary>How often the noise is reseeded while a note runs, in steps per second.</summary>
+    /// <remarks>
+    /// The seed moves with the time, so noise drawn a millisecond apart is different noise,
+    /// which is what noise should look like. Still, it is drawn from one seed, so a repaint that
+    /// asks the same instant twice gets the same picture back rather than a flicker.
+    /// </remarks>
+    private const double NoiseStepsPerSecond = 1000;
+
+    /// <inheritdoc/>
     public double MotionSeconds => MotionSeconds_;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The wave travels while a note is sounding, the way a scope shows a running signal, and
+    /// stands still otherwise. The pitch it is drawn at is the instrument's tuning plus whatever
+    /// the vibrato and the pitch envelope have done to it by that point in the note, which is
+    /// why the window is a length of time rather than a count of cycles.
+    ///
+    /// A fixed seed while it is still, so the noise wave does not crawl on every repaint.
+    /// </remarks>
     public void Trace(double[] into, double cycles, double seconds, bool running)
     {
         if (into.Length == 0) return;
@@ -45,12 +71,10 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
 
         double shown = Math.Max(0.25, cycles) * PitchMotion.Ratio(semitones);
 
-        // The wave travels while a note is sounding, the way a scope shows a running signal.
         double travel = running ? seconds * ScrollCyclesPerSecond : 0;
 
-        // A fixed seed while it is still, so the noise wave does not crawl on every repaint;
-        // while it runs, a new one per frame is exactly what noise should look like.
-        var noise = new Random(running ? NoiseSeed + (int)(seconds * 1000) : NoiseSeed);
+        var noise = new Random(
+            running ? NoiseSeed + (int)(seconds * NoiseStepsPerSecond) : NoiseSeed);
 
         for (int step = 0; step < into.Length; step++)
         {
@@ -63,9 +87,7 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
         }
     }
 
-    /// <summary>
-    /// Told when the patch moved, so the picture is drawn again.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// The patch is plain data and says nothing when it is edited; its view model is what counts
     /// the changes, and that is what this listens to.
@@ -81,10 +103,13 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
         remove => _changed -= value;
     }
 
+    /// <summary>Everyone told when the patch moved.</summary>
     private EventHandler? _changed;
 
+    /// <summary>Whether the patch is being watched yet. A latch, never taken off again.</summary>
     private bool _listening;
 
+    /// <summary>Puts the subscription on, once, when somebody first asks to be told.</summary>
     private void Listen()
     {
         if (_listening) return;

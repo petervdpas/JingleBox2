@@ -14,19 +14,29 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MeterFallTests
 {
+    /// <summary>How long the mark sits still before it starts down, in seconds.</summary>
     private const double Hold = 1.2;
+
+    /// <summary>The rate of the fall in decibels a second, which is the meter's own.</summary>
     private const double PerSecond = 20;
 
+    /// <summary>
+    /// Nothing moves inside the hold, which is what makes the mark readable: a peak that began
+    /// falling the instant it was set would be gone before anybody had looked at it.
+    /// </summary>
     [Fact]
     public void A_mark_is_held_before_it_starts_to_drop()
     {
         Assert.Equal(1.0, MeterScale.DecayPeak(1.0, 0, Hold, Hold, PerSecond));
     }
 
+    /// <summary>The fall is in decibels, not in a fraction of the bar.</summary>
+    /// <remarks>
+    /// One second past the hold is twenty decibels down, which is a tenth of the amplitude.
+    /// </remarks>
     [Fact]
     public void And_then_falls_at_the_stated_rate()
     {
-        // One second past the hold is twenty decibels down, which is a tenth of the amplitude.
         double after = MeterScale.DecayPeak(1.0, 0, Hold + 1, Hold, PerSecond);
 
         Assert.Equal(0.1, after, 3);
@@ -44,7 +54,9 @@ public class MeterFallTests
         Assert.Equal(0, MeterScale.Position(after));
     }
 
-    /// <summary>A level louder than the mark takes it over at once, with no fall involved.</summary>
+    /// <summary>
+    /// A level louder than the mark takes it over at once, with no fall involved.
+    /// </summary>
     [Fact]
     public void A_louder_level_takes_the_mark_with_it()
     {

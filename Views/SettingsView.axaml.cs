@@ -8,6 +8,16 @@ using JingleBox2.ViewModels;
 
 namespace JingleBox2.Views;
 
+/// <summary>
+/// The SETTINGS page: the audio device, the pad matrix, the themes, the MIDI devices and their
+/// roles, the control surfaces, the desk's own controller links, the log, and the machine shelf.
+/// </summary>
+/// <remarks>
+/// Almost all of it is bindings onto <see cref="MainViewModel"/>. The two things answered here
+/// are the shape of the page, which no style can decide because a style cannot ask how wide
+/// anything is, and the two file pickers, which belong to the window rather than to a view
+/// model.
+/// </remarks>
 public partial class SettingsView : UserControl
 {
     /// <summary>
@@ -19,12 +29,18 @@ public partial class SettingsView : UserControl
     /// </remarks>
     private const double RailNeeds = 620;
 
+    /// <summary>
+    /// Builds the page and watches its width so the sections can move.
+    /// </summary>
+    /// <remarks>
+    /// Watched here rather than expressed as a style, because Avalonia has no way to ask a
+    /// style how wide anything is. The shape is chosen here and the look follows from the
+    /// class that is set.
+    /// </remarks>
     public SettingsView()
     {
         InitializeComponent();
 
-        // Not a style: Avalonia has no way to ask a style how wide anything is, so the shape
-        // is chosen here and the look follows from the class.
         this.GetObservable(BoundsProperty).Subscribe(new AnonymousObserver<Rect>(Shape));
     }
 

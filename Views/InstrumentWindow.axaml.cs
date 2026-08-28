@@ -18,16 +18,28 @@ public partial class InstrumentWindow : Window
     /// <summary>What is already open, so asking twice shows the window there is.</summary>
     private static readonly Dictionary<object, InstrumentWindow> Open = new();
 
+    /// <summary>
+    /// Builds the window and lets the other mouse mode be reached from inside it.
+    /// </summary>
+    /// <remarks>
+    /// The pointer goes where the windows are, so the gesture has to be answered on every
+    /// window that has something pointable on it, not only on the main one. See
+    /// <see cref="LinkKey"/>.
+    /// </remarks>
     public InstrumentWindow()
     {
         InitializeComponent();
 
-        // The pointer goes where the windows are, so the mode has to be reachable from all of
-        // them. See LinkKey.
         LinkKey.Listen(this);
     }
 
     /// <summary>Opens the designer for a track's instrument, or brings its window forward.</summary>
+    /// <remarks>
+    /// The window coming to the front is what a knob pointed at "the track you are on" means,
+    /// once there are panels open in windows of their own: the pattern cursor is on neither of
+    /// them. Nothing is applied by saying it; the mappings are walked per message, so the next
+    /// thing you touch resolves against this track instead.
+    /// </remarks>
     public static void Show(object key, TrackInstrumentDesigner designer, Window owner, Action? closed = null)
     {
         if (key == null || designer == null || owner == null) return;
@@ -42,10 +54,6 @@ public partial class InstrumentWindow : Window
 
         Open[key] = window;
 
-        // The window in front is what a knob pointed at "the track you are on" means, once
-        // there are panels open in windows of their own: the pattern cursor is on neither of
-        // them. Nothing is applied by saying it; the mappings are walked per message, so the
-        // next thing you touch resolves against this track instead.
         window.Activated += (_, _) => designer.InFront();
 
         window.Closed += (_, _) =>

@@ -4,41 +4,12 @@ using JingleBox2.Diagnostics;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// What was done in the tracker, so it can be undone.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// Whole copies rather than a description of each change, which is the right trade here and not
-/// everywhere. A pattern is one array of value types with no allocation per cell, so a step is
-/// a memory copy of a few kilobytes for an ordinary pattern; describing an edit instead would
-/// mean a type per operation, an inverse for each, and the certainty that the nineteenth one
-/// written would forget its inverse and undo would quietly corrupt a song. A copy cannot be
-/// wrong about what it holds.
-///
-/// The unit is one call to <see cref="PatternEdit"/>, which is the whole reason that class is
-/// the only door: one edit, one step, and a page of typing is a page of undos rather than one.
-/// An edit that changed nothing leaves no step, worked out by noticing that the pattern still
-/// holds what the last step kept, so a key that did nothing does not have to be undone.
-///
-/// Every step remembers which pattern it belongs to. Undo after switching patterns puts the
-/// right one back and says which, rather than silently editing the one you are looking at.
-///
-/// It holds the song's patterns, so it is emptied when the song changes. A history that
-/// outlived its song would hand somebody another song's notes.
-///
-/// Two kinds of step, one history, because Ctrl+Z means the last thing you did and not the last
-/// thing you did of a particular kind. Typing a note is a pattern, and a step is its cells.
-/// Taking an instrument out of a song is not: it renumbers every pattern that referred to it,
-/// which is an edit across the whole document, so a step there is the song as its own file would
-/// hold it. Keeping those apart in two histories would give one keystroke two meanings and a
-/// person no way of knowing which they were about to get.
-///
-/// The kinds cost very different amounts, which is why they are kept apart at all. A pattern's
-/// cells are a memory copy of a few kilobytes; a song is twelve to eighty. Serialising the whole
-/// song for every keystroke would work and would be wasteful in exactly the place that must not
-/// be.
+/// Two lists and a running total of what they cost, with the two kinds of step behind one
+/// abstract type so undo does not have to know which it is holding.
 /// </remarks>
-public sealed class TrackerHistory
+public sealed class TrackerHistory : ITrackerHistory
 {
     /// <summary>
     /// How many steps are kept.
@@ -54,17 +25,22 @@ public sealed class TrackerHistory
     /// <summary>And the ceiling, so a very large pattern keeps fewer steps rather than all of them.</summary>
     public const long MostBytes = 32L * 1024 * 1024;
 
+    /// <summary>What was done, oldest first, so the last is what undo takes back.</summary>
     private readonly List<Step> _done = new();
+
+    /// <summary>What was undone, which is emptied the moment something new is done.</summary>
     private readonly List<Step> _undone = new();
 
+    /// <summary>Roughly what both lists cost, kept as they are pushed and dropped.</summary>
     private long _bytes;
 
-    /// <summary>Raised when there is something different to say about what can be undone.</summary>
+    /// <inheritdoc/>
     public event Action? Changed;
 
     /// <summary>One thing that was done, of whichever kind.</summary>
     private abstract class Step
     {
+        /// <summary>How it is named in a menu or a log line.</summary>
         public string What = "";
 
         /// <summary>Roughly what it costs to keep, for the ceiling.</summary>
@@ -80,9 +56,21 @@ public sealed class TrackerHistory
     /// <summary>A pattern, as its cells. What typing produces, and it has to be cheap.</summary>
     private sealed class PatternStep : Step
     {
+        /// <summary>Which pattern this is about, held by reference so undo can go back to it.</summary>
+        /// <remarks>
+        /// Which is why <see cref="Song.TakeFrom"/> fills the patterns it already has rather than
+        /// replacing the list: a replaced list leaves every step here pointing at an orphan, and
+        /// undoing a note after undoing an instrument then silently does nothing.
+        /// </remarks>
         public Pattern Pattern = null!;
+
+        /// <summary>Its cells as they were, copied out of the pattern's own array.</summary>
         public TrackerCell[] Cells = Array.Empty<TrackerCell>();
+
+        /// <summary>How many lines it had, since a step can put a resize back too.</summary>
         public int Lines;
+
+        /// <summary>And how many tracks.</summary>
         public int TrackCount;
 
         /// <summary>
@@ -95,11 +83,22 @@ public sealed class TrackerHistory
         ///
         /// A pattern with no lanes carries an empty list here, which is what almost every step
         /// will be, and it costs the list and nothing else.
+        ///
+        /// Left out, undo would put the notes back and leave the movement where it was.
         /// </remarks>
         public List<AutomationLane> Lanes = new();
 
+        /// <summary>
+        /// The cells at twenty four bytes apiece and the points at sixteen.
+        /// </summary>
+        /// <remarks>
+        /// Both numbers are the shape of the value types rather than anything measured, and both
+        /// only have to be near enough: this feeds a ceiling on how much is kept, not an
+        /// allocator.
+        /// </remarks>
         public override long Bytes => Cells.LongLength * 24 + Points * 16;
 
+        /// <summary>How many points there are across every lane in the step.</summary>
         private long Points
         {
             get
@@ -111,6 +110,8 @@ public sealed class TrackerHistory
             }
         }
 
+        /// <inheritdoc/>
+        /// <remarks>Always true: a pattern cannot refuse its own cells back.</remarks>
         public override bool Put()
         {
             Pattern.Restore(Cells, Lines, TrackCount, Lanes);
@@ -118,8 +119,10 @@ public sealed class TrackerHistory
             return true;
         }
 
+        /// <inheritdoc/>
         public override Step Now() => Of(Pattern, What);
 
+        /// <summary>A step holding what that pattern is now.</summary>
         public static PatternStep Of(Pattern pattern, string what) => new()
         {
             Pattern = pattern,
@@ -145,12 +148,21 @@ public sealed class TrackerHistory
     /// </remarks>
     private sealed class SongStep : Step
     {
+        /// <summary>The live song, which is what the read-back one is poured into.</summary>
         public Song Song = null!;
+
+        /// <summary>The song as its own file would hold it, which is the step itself.</summary>
         public string Said = "";
+
+        /// <summary>How to pour a read-back song onto the live one.</summary>
         public Func<Song, Song, bool> Onto = null!;
 
+        /// <inheritdoc/>
+        /// <remarks>The text, which is what is actually being kept.</remarks>
         public override long Bytes => Said.Length;
 
+        /// <inheritdoc/>
+        /// <remarks>False when the text will not read back, which costs this step and no other.</remarks>
         public override bool Put()
         {
             var was = SongStore.Uncopy(Said);
@@ -158,8 +170,10 @@ public sealed class TrackerHistory
             return was is not null && Onto(Song, was);
         }
 
+        /// <inheritdoc/>
         public override Step Now() => Of(Song, What, Onto);
 
+        /// <summary>A step holding the song as it is now.</summary>
         public static SongStep Of(Song song, string what, Func<Song, Song, bool> onto) => new()
         {
             Song = song,
@@ -169,28 +183,23 @@ public sealed class TrackerHistory
         };
     }
 
+    /// <inheritdoc/>
     public bool CanUndo => _done.Count > 0;
+
+    /// <inheritdoc/>
     public bool CanRedo => _undone.Count > 0;
 
-    /// <summary>What undo would take back, for a menu or a tooltip.</summary>
+    /// <inheritdoc/>
     public string NextUndo => _done.Count > 0 ? _done[^1].What : "";
 
-    /// <summary>And what redo would put back.</summary>
+    /// <inheritdoc/>
     public string NextRedo => _undone.Count > 0 ? _undone[^1].What : "";
 
-    /// <summary>
-    /// Something is about to be done to a pattern. Called before it happens, not after.
-    /// </summary>
-    /// <remarks>
-    /// Before, because what has to be kept is the state being left rather than the one being
-    /// arrived at, and afterwards the first is gone.
-    /// </remarks>
+    /// <inheritdoc/>
     public void Taking(Pattern? pattern, string what)
     {
         if (pattern is null) return;
 
-        // The edit before this one changed nothing, so its step is worth no more than this
-        // one's and would cost somebody a keystroke to walk past. Reused rather than pushed.
         if (_done.Count > 0
             && _done[^1] is PatternStep last
             && ReferenceEquals(last.Pattern, pattern)
@@ -206,28 +215,11 @@ public sealed class TrackerHistory
         Push(PatternStep.Of(pattern, what));
     }
 
-    /// <summary>
-    /// The song itself is about to change: an instrument, the order, how many tracks.
-    /// </summary>
-    /// <remarks>
-    /// Called before, like the other one, and for the same reason. What separates these from a
-    /// pattern edit is not how big they are but what they reach: taking an instrument out of a
-    /// song renumbers every pattern that referred to it, and no snapshot of one pattern would
-    /// put that back.
-    /// </remarks>
-    /// <param name="onto">
-    /// How to put a read-back song onto the one that is open. Everything in the tracker holds
-    /// the live song, so a step cannot hand back a different object; the tracker knows how to
-    /// pour one into the other and this does not.
-    /// </param>
+    /// <inheritdoc/>
     public void Taking(Song? song, string what, Func<Song, Song, bool> onto)
     {
         if (song is null || onto is null) return;
 
-        // Gathered by what it is and when, the same rule the instrument panel's knobs use, and
-        // for the same reason: a fader dragged across its range says the mix changed a hundred
-        // times and is one thing a person did. The name is the control here rather than a
-        // parameter key, which is enough: two different edits do not share a description.
         var at = _since.Elapsed;
 
         bool same = _gathering == what && at - _last < SameGesture;
@@ -241,20 +233,33 @@ public sealed class TrackerHistory
     }
 
     /// <summary>How long an edit of the same kind stays the same gesture.</summary>
+    /// <remarks>
+    /// Deliberately a length of time rather than "while the mouse is down", which is true of a
+    /// mouse and false of a controller and of automation.
+    /// </remarks>
     public static readonly TimeSpan SameGesture = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>A clock of its own, so gathering does not depend on the wall clock being sane.</summary>
     private readonly System.Diagnostics.Stopwatch _since = System.Diagnostics.Stopwatch.StartNew();
 
+    /// <summary>What is being gathered now, by its description. Empty when nothing is.</summary>
     private string _gathering = "";
+
+    /// <summary>When the gathered edit was last added to.</summary>
     private TimeSpan _last;
 
+    /// <summary>
+    /// Puts a step on the done list and drops whatever was undone.
+    /// </summary>
+    /// <remarks>
+    /// Doing something new is what makes what was undone unreachable. Anything else would mean a
+    /// redo that puts back an edit somebody has since typed over.
+    /// </remarks>
     private void Push(Step step)
     {
         _done.Add(step);
         _bytes += step.Bytes;
 
-        // Doing something new is what makes what was undone unreachable. Anything else would
-        // mean a redo that puts back an edit somebody has since typed over.
         if (_undone.Count > 0) _undone.Clear();
 
         Trim();
@@ -262,26 +267,35 @@ public sealed class TrackerHistory
         Changed?.Invoke();
     }
 
-    /// <summary>Takes the last edit back. False when there is nothing to take back.</summary>
+    /// <inheritdoc/>
     public bool Undo() => Walk(_done, _undone, "undid");
 
-    /// <summary>Puts back the last thing undone.</summary>
+    /// <inheritdoc/>
     public bool Redo() => Walk(_undone, _done, "did again");
 
+    /// <summary>
+    /// Moves one step from one list to the other, putting its state back on the way.
+    /// </summary>
+    /// <remarks>
+    /// Where the pattern or the song is now is taken before anything is put back, so the other
+    /// direction has somewhere to go: undo and redo are the same walk in opposite directions.
+    ///
+    /// A step that will not go back is dropped rather than left at the top for somebody to press
+    /// again and again. Everything under it is still good.
+    ///
+    /// Whatever was being gathered is over either way, since what is under the hand is no longer
+    /// where it was.
+    /// </remarks>
     private bool Walk(List<Step> from, List<Step> onto, string said)
     {
         if (from.Count == 0) return false;
 
         var step = from[^1];
 
-        // Where it is now, taken before anything is put back, so the other direction has
-        // somewhere to go.
         var back = step.Now();
 
         if (!step.Put())
         {
-            // A step that will not go back is dropped rather than left at the top for somebody
-            // to press again and again. Everything under it is still good.
             from.RemoveAt(from.Count - 1);
             _bytes -= step.Bytes;
 
@@ -298,7 +312,6 @@ public sealed class TrackerHistory
         onto.Add(back);
         _bytes += back.Bytes;
 
-        // Whatever was being gathered is over: what is under the hand is not where it was.
         _gathering = "";
 
         Log.Write(LogArea.Tracker, () => "history: " + said + " " + step.What);
@@ -308,19 +321,13 @@ public sealed class TrackerHistory
         return true;
     }
 
-    /// <summary>
-    /// Which pattern the next undo is about, so the view can go there first.
-    /// </summary>
-    /// <remarks>
-    /// Nothing for a step about the song itself, which is not about one pattern and needs the
-    /// view to stay where it is.
-    /// </remarks>
+    /// <inheritdoc/>
     public Pattern? UndoIsAbout => _done.Count > 0 && _done[^1] is PatternStep one ? one.Pattern : null;
 
-    /// <summary>And the next redo.</summary>
+    /// <inheritdoc/>
     public Pattern? RedoIsAbout => _undone.Count > 0 && _undone[^1] is PatternStep one ? one.Pattern : null;
 
-    /// <summary>Empties it. For a song being closed, or opened.</summary>
+    /// <inheritdoc/>
     public void Forget()
     {
         if (_done.Count == 0 && _undone.Count == 0) return;
@@ -332,7 +339,14 @@ public sealed class TrackerHistory
         Changed?.Invoke();
     }
 
-    /// <summary>Drops the oldest steps until it is within both of its limits.</summary>
+    /// <summary>
+    /// Drops the oldest steps until it is within both of its limits.
+    /// </summary>
+    /// <remarks>
+    /// The last step is never dropped for weight, however heavy it is. One step is the least a
+    /// history can be and still be one, and a pattern at its largest is over the ceiling on its
+    /// own.
+    /// </remarks>
     private void Trim()
     {
         while (_done.Count > MostSteps || (_bytes > MostBytes && _done.Count > 1))

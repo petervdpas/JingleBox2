@@ -35,6 +35,7 @@ public static class RecordingImport
     public static string[] Kinds =>
         new[] { WavKind }.Concat(AudioDecode.Kinds).ToArray();
 
+    /// <summary>What the shelf holds, and what everything written here is written as.</summary>
     private const string WavKind = ".wav";
 
     /// <summary>Where JingleBox keeps its recordings.</summary>
@@ -49,10 +50,13 @@ public static class RecordingImport
     /// <remarks>
     /// For a panel that wants to say what it did with a file. The answer is the same one
     /// <see cref="Convert"/> acts on, asked without doing anything.
+    ///
+    /// Anything that is not a WAV is decoded and written out as one, whatever is inside it. A
+    /// file that cannot be read as a WAV either is copied as it is, so nothing is converted.
     /// </remarks>
+    /// <param name="path">The file, wherever it is.</param>
     public static bool Converts(string path)
     {
-        // Anything that is not a WAV is decoded and written out as one, whatever is inside it.
         if (AudioDecode.Handles(path)) return true;
 
         try
@@ -61,7 +65,6 @@ public static class RecordingImport
         }
         catch (Exception)
         {
-            // Not readable as a WAV: copied as it is, so nothing is converted.
             return false;
         }
     }
@@ -70,6 +73,15 @@ public static class RecordingImport
     /// Copies each file in and hands back what they became. Files already ours are left where
     /// they are and reported as themselves, so importing twice does not make two.
     /// </summary>
+    /// <remarks>
+    /// Only a WAV already sitting on the shelf is left alone. Anything else is brought in even
+    /// from that same folder, since an mp3 lying there is not on the shelf: nothing reads it.
+    ///
+    /// One file that will not copy is one file rather than a failed import, so the rest still
+    /// arrive.
+    /// </remarks>
+    /// <param name="paths">The files, or null.</param>
+    /// <returns>What each became, in the order they were given.</returns>
     public static IReadOnlyList<Recording> Take(IEnumerable<string> paths)
     {
         var taken = new List<Recording>();
@@ -84,9 +96,6 @@ public static class RecordingImport
 
             try
             {
-                // A WAV already sitting on the shelf is left where it is, so importing twice
-                // does not make two. Anything else is brought in even from that folder, since
-                // an mp3 lying there is not on the shelf: nothing reads it.
                 bool already = Path.GetDirectoryName(path) == home && !Converts(path);
 
                 string landed = already ? path : Copy(path, home);
@@ -102,7 +111,6 @@ public static class RecordingImport
             }
             catch (Exception)
             {
-                // One file that will not copy is one file, not a failed import.
             }
         }
 
@@ -115,13 +123,17 @@ public static class RecordingImport
     /// <remarks>
     /// Never overwrites. Two different kits can each have a "kick.wav" and neither should
     /// silently become the other.
+    ///
+    /// Always written as a WAV whatever came in. What lands here is what the machines read, and a
+    /// file called .mp3 holding a WAV would be a lie that something downstream eventually acts on.
     /// </remarks>
+    /// <param name="path">The file being brought in.</param>
+    /// <param name="home">The recordings folder.</param>
+    /// <returns>Where it landed.</returns>
     private static string Copy(string path, string home)
     {
         string stem = Path.GetFileNameWithoutExtension(path);
 
-        // Always a WAV, whatever came in. What lands here is what the machines read, and a file
-        // called .mp3 holding a WAV would be a lie that something downstream eventually acts on.
         const string suffix = WavKind;
 
         string wanted = Path.Combine(home, stem + suffix);
@@ -150,12 +162,17 @@ public static class RecordingImport
     ///
     /// Copied byte for byte when it is already ours, so importing a recording this app made
     /// gives back the same file and not a re-encoding of it.
+    ///
+    /// This is the only place in the program that meets an mp3, and the file it writes is the
+    /// only thing anything else will ever see of it. Something that cannot be read as a WAV at all
+    /// is copied as it is, and will report itself missing or unplayable later, which is a truer
+    /// thing to say than a conversion failure here.
     /// </remarks>
+    /// <param name="path">The file being brought in.</param>
+    /// <param name="wanted">Where it is to land.</param>
+    /// <exception cref="InvalidOperationException">It could not be decoded.</exception>
     private static void Convert(string path, string wanted)
     {
-        // Not a WAV at all: decoded, and written out as one. This is the only place in the
-        // program that meets an mp3, and the file it writes is the only thing anything else
-        // will ever see of it.
         if (AudioDecode.Handles(path))
         {
             if (AudioDecode.Read(path) is not { } decoded)
@@ -174,8 +191,6 @@ public static class RecordingImport
         }
         catch (Exception)
         {
-            // Not readable as a WAV at all: copied as it is, and it will report itself missing
-            // or unplayable later, which is a truer thing to say than a conversion failure here.
             File.Copy(path, wanted);
             return;
         }
@@ -192,9 +207,12 @@ public static class RecordingImport
     }
 
     /// <summary>How a file is written, for a panel that wants to say what it did with it.</summary>
+    /// <remarks>
+    /// A compressed file has no bit depth worth reporting, so what it is called is what it is.
+    /// </remarks>
+    /// <param name="path">The file.</param>
     public static string Describe(string path)
     {
-        // A compressed file has no bit depth worth reporting: what it is called is what it is.
         if (AudioDecode.Handles(path)) return Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
 
         try

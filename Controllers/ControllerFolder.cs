@@ -23,6 +23,11 @@ namespace JingleBox2.Controllers;
 /// </remarks>
 public static class ControllerFolder
 {
+    /// <summary>What the folder is called, in both places it exists.</summary>
+    /// <remarks>
+    /// The same word beside the program and under the application folder, so somebody told
+    /// where their controller files are has been told where both of them are.
+    /// </remarks>
     public const string Name = "controllers";
 
     /// <summary>Where the controller files that ship with the program live.</summary>
@@ -54,6 +59,10 @@ public static class ControllerFolder
     /// Right for everything anybody kept, and wrong once for anything they had already thrown
     /// out, which comes back a single time and stays gone after.
     ///
+    /// The offer is recorded whether or not the file went in. One that cannot be copied has
+    /// still been offered, and trying again on every start would write the same fault into the
+    /// log for ever.
+    ///
     /// Unlike machines, nothing is ever refreshed from what ships. A machine that ships is the
     /// machine and an update to it should reach the rack. A controller file is the opposite: the
     /// entire point of the folder is that you edit what is in it, and overwriting somebody's
@@ -81,9 +90,6 @@ public static class ControllerFolder
 
                 moved = true;
 
-                // Recorded whether or not it went in. A file that cannot be copied has still
-                // been offered, and trying again every start would write the same fault into
-                // the log for ever.
                 try
                 {
                     File.Copy(file, Path.Combine(Installed, name), overwrite: false);
@@ -140,6 +146,11 @@ public static class ControllerFolder
         return offered;
     }
 
+    /// <summary>Writes down what has been offered, so the next start does not offer it again.</summary>
+    /// <remarks>
+    /// Sorted, because this is a file a person may open when they want to know why a codec they
+    /// deleted has not come back.
+    /// </remarks>
     private static void Remember(HashSet<string> offered)
     {
         try

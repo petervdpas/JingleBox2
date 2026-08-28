@@ -1,6 +1,3 @@
-// ===============================
-// ViewModels/PadViewModel.cs
-// ===============================
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,12 +12,45 @@ using JingleBox2.Models;
 
 namespace JingleBox2.ViewModels;
 
+/// <summary>
+/// One pad: what it plays, how loud, what colour it is, and whether it is sounding now.
+/// </summary>
+/// <remarks>
+/// The pad is the same object on PADS, where it is laid out, and on FIRE and USE, where it is
+/// fired, so there is one answer to what a pad is doing rather than three views agreeing by
+/// accident. It talks to <see cref="IAudioEngine"/> by its own index and nothing else: pads are
+/// made and unmade while the application is running, and the engine holds against an index
+/// outside its range rather than throwing.
+///
+/// Every setting writes through to the engine as it is set rather than at some later apply, so
+/// a level dragged is heard while the hand is moving. The cost of that is the rate, which is
+/// why the chain's own saving waits for the hand to stop; see <see cref="Patches"/>.
+/// </remarks>
 public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
+    /// <summary>The sound, shared with every other pad and with the tracker.</summary>
     private readonly IAudioEngine _audio;
+
+    /// <summary>
+    /// Reads the progress, the meter and the fader back off the engine while a pad plays.
+    /// </summary>
+    /// <remarks>
+    /// Twenty times a second, which is fast enough that a progress bar looks continuous and
+    /// slow enough to cost nothing. It runs whether or not the pad is sounding, and writes
+    /// noughts when it is not, so a pad that stopped does not leave its meter lit.
+    /// </remarks>
     private readonly DispatcherTimer _progressTimer;
+
+    /// <summary>
+    /// The engine's playback event, kept so it can be taken off again in <see cref="Dispose"/>.
+    /// </summary>
+    /// <remarks>
+    /// A resized matrix disposes the pads it no longer has, and a lambda that could not be
+    /// unsubscribed would leave a dead pad listening to the engine for the rest of the session.
+    /// </remarks>
     private readonly EventHandler<PadPlaybackChanged> _playbackHandler;
 
+    /// <summary>Where this pad sits, counted from nought. It is also its index in the engine.</summary>
     public int Index { get; }
 
     /// <summary>
@@ -48,7 +78,20 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         _effectSave.Start();
     }
 
-    private readonly DispatcherTimer _effectSave = new() { Interval = TimeSpan.FromMilliseconds(600) };
+    /// <summary>
+    /// How long the chain has to be still before the pad is written down, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Long enough that a fader dragged across its travel is one save rather than a hundred,
+    /// short enough that letting go and closing the application keeps the change.
+    /// </remarks>
+    private const int ChainSettleMs = 600;
+
+    /// <summary>
+    /// Restarted by every change to the chain, so it only ever fires once the hand has stopped.
+    /// </summary>
+    private readonly DispatcherTimer _effectSave =
+        new() { Interval = TimeSpan.FromMilliseconds(ChainSettleMs) };
 
     /// <summary>
     /// What the plugins on this pad are holding inside themselves, by their place in the chain.
@@ -64,6 +107,14 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// </remarks>
     public IReadOnlyList<byte[]> Patches { get; private set; } = Array.Empty<byte[]>();
 
+    /// <summary>
+    /// Asks every plugin on the chain for its patch, which is a round trip apiece.
+    /// </summary>
+    /// <remarks>
+    /// Called from the settling tick and from nowhere else, for the rate reasons on
+    /// <see cref="Patches"/>. A pad with no chain answers an empty list rather than null, so
+    /// whatever writes the pad down has nothing to test for.
+    /// </remarks>
     private void ReadPatches()
     {
         Patches = Effect?.Target == null
@@ -75,6 +126,11 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// Puts back the effects this pad was saved with. A plugin that is no longer on the
     /// machine is named rather than passed over.
     /// </summary>
+    /// <remarks>
+    /// What was just put in is taken as what would be saved again, so a pad written down before
+    /// its plugins are next touched keeps the patches it was opened with. Without that, opening
+    /// the application and saving without touching a pad would strip the patches off it.
+    /// </remarks>
     public void RestoreEffects(JingleBox2.Audio.Plugins.PluginChainConfig? saved)
     {
         if (Effect?.Target == null || saved == null || saved.IsEmpty) return;
@@ -87,43 +143,98 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
 
         Effect.Reload();
 
-        // What was just put in is what would be saved again, so a pad written down before its
-        // plugins are next touched keeps the patches it was opened with rather than losing them.
         Patches = saved.Devices.Select(d => d.State).ToList();
 
         if (missing.Count > 0) Effect.Status = "Missing: " + string.Join(", ", missing);
     }
 
+    /// <summary>
+    /// The two things a pad can play, for the picker.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="PadSourceKind.None"/> is deliberately not on the list: it is what a pad
+    /// nobody has touched is stored as, and it is read as a recording by
+    /// <see cref="KindFor"/> rather than being a third choice somebody has to make.
+    /// </remarks>
     public static PadSourceKind[] SourceKinds { get; } =
         new[] { PadSourceKind.Recording, PadSourceKind.Stream };
 
+    /// <summary>
+    /// The eight colours a pad can be given, in the order they are offered.
+    /// </summary>
+    /// <remarks>
+    /// Red, orange, yellow, green, cyan, blue, purple and pink: one lap of the wheel, so any
+    /// two of them read as different colours across a desk seen at a glance and from an angle.
+    /// A pad may still hold any colour it was given; this is the palette, not the range.
+    /// </remarks>
     public static readonly string[] PaletteColors =
     {
-        "#E53935", // red
-        "#FB8C00", // orange
-        "#FDD835", // yellow
-        "#43A047", // green
-        "#00ACC1", // cyan
-        "#1E88E5", // blue
-        "#8E24AA", // purple
-        "#F06292", // pink
+        "#E53935",
+        "#FB8C00",
+        "#FDD835",
+        "#43A047",
+        "#00ACC1",
+        "#1E88E5",
+        "#8E24AA",
+        "#F06292",
     };
 
+    /// <summary>What the pad is called. Empty means it is called by its number.</summary>
     [ObservableProperty] private string name = "";
+
+    /// <summary>
+    /// What it plays: a path to a recording, or the address of a stream.
+    /// </summary>
+    /// <remarks>
+    /// A path either way, whichever kind it is, because that is what the engine is handed. What
+    /// changed when the pads took their sound off the shelf is where the path comes from, not
+    /// what is stored.
+    /// </remarks>
     [ObservableProperty] private string? filePath;
+
+    /// <summary>Its level as an amplitude, nought to one, which is what the engine multiplies by.</summary>
     [ObservableProperty] private float volume = 1.0f;
+
+    /// <summary>A recording off the shelf, or a stream from the network.</summary>
     [ObservableProperty] private PadSourceKind sourceKind = PadSourceKind.Recording;
+
+    /// <summary>Whether it starts again when it reaches the end.</summary>
     [ObservableProperty] private bool loop = false;
+
+    /// <summary>How long it takes to come up to level, in seconds.</summary>
     [ObservableProperty] private double fadeIn = 0;
+
+    /// <summary>And how long it takes to go quiet when it is stopped.</summary>
     [ObservableProperty] private double fadeOut = 0;
+
+    /// <summary>Its colour as text, empty for a pad wearing whatever the theme gives it.</summary>
     [ObservableProperty] private string padColor = "";
+
+    /// <summary>
+    /// What went wrong, in words a person can read, or empty.
+    /// </summary>
+    /// <remarks>
+    /// Cleared by every command before it tries anything, so a message on a pad is always about
+    /// the last thing that was asked of it rather than about something from ten minutes ago.
+    /// </remarks>
     [ObservableProperty] private string status = "";
+
+    /// <summary>Whether it is sounding, which the engine says rather than the command that started it.</summary>
     [ObservableProperty] private bool isPlaying;
+
+    /// <summary>How far through it is, nought to one, and nought when it is not playing.</summary>
     [ObservableProperty] private double playbackProgress;
+
+    /// <summary>What it is putting out right now, for its own meter.</summary>
     [ObservableProperty] private float currentVolume;
+
+    /// <summary>The level it is set to play at, which is the fader rather than the meter.</summary>
     [ObservableProperty] private float channelVolume;
 
+    /// <summary>True when this pad plays a recording, for the layout to show the right editor.</summary>
     public bool IsRecording => SourceKind == PadSourceKind.Recording;
+
+    /// <summary>And true when it plays a stream.</summary>
     public bool IsStream => SourceKind == PadSourceKind.Stream;
 
     /// <summary>
@@ -137,21 +248,38 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// </remarks>
     public string SourceText =>
         string.IsNullOrWhiteSpace(FilePath) ? "" : System.IO.Path.GetFileNameWithoutExtension(FilePath);
+
+    /// <summary>Whether there is a fade in worth showing a mark for.</summary>
     public bool HasFadeIn => FadeIn > 0;
+
+    /// <summary>And whether there is a fade out.</summary>
     public bool HasFadeOut => FadeOut > 0;
+
+    /// <summary>Whether anything is on this pad at all, which is what greys its transport.</summary>
     public bool HasSource => !string.IsNullOrWhiteSpace(FilePath);
 
+    /// <summary>
+    /// What is written on the pad: its name, or its number when it has none.
+    /// </summary>
+    /// <remarks>
+    /// Counted from one here and from nought everywhere else, because the number on the face of
+    /// a desk is what a person reads out loud.
+    /// </remarks>
     public string Title => string.IsNullOrWhiteSpace(Name) ? $"Pad {Index + 1}" : Name;
 
     /// <summary>
-    /// Returns a brush for the custom pad color, or null when no color is set / pad is playing
-    /// (null causes the NullToUnset converter to restore the theme style).
+    /// The pad's own colour, or null for the one the theme would give it.
     /// </summary>
+    /// <remarks>
+    /// Null rather than a fallback colour on purpose: the converter behind this reads null as
+    /// "unset", which puts the theme's own style back, and a pad that is playing wants exactly
+    /// that so the checked style can show it is on. A colour that will not parse is read as
+    /// none, since a pad painted from a broken setting is worse than one painted by the theme.
+    /// </remarks>
     public SolidColorBrush? PadBackground
     {
         get
         {
-            // While playing, let the :checked style handle the background
             if (IsPlaying || string.IsNullOrWhiteSpace(PadColor))
                 return null;
 
@@ -161,28 +289,65 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Always returns a brush: grey when no color is configured, custom color otherwise.
-    /// Used for the small preview dot in PadsView.
+    /// The same colour for the small dot on PADS, and always a brush.
     /// </summary>
+    /// <remarks>
+    /// The dot says which colour a pad has been given, so it cannot fall back to the theme the
+    /// way <see cref="PadBackground"/> does: a dot showing the card behind it would say the pad
+    /// has a colour when it has none. A pad with none, and one whose colour will not parse,
+    /// both get the same grey.
+    /// </remarks>
     public SolidColorBrush PadPreviewBrush
     {
         get
         {
             if (!string.IsNullOrWhiteSpace(PadColor))
                 try { return new SolidColorBrush(Color.Parse(PadColor)); }
-                catch { /* fall through */ }
+                catch { }
 
             return new SolidColorBrush(Color.FromRgb(80, 80, 80));
         }
     }
 
+    /// <summary>Starts the pad from the beginning. Says why in <see cref="Status"/> if it cannot.</summary>
     public IRelayCommand PlayCommand { get; }
+
+    /// <summary>Stops it, fading out if it has been given a fade.</summary>
     public IRelayCommand StopCommand { get; }
+
+    /// <summary>
+    /// Starts it, or stops it if it is already sounding.
+    /// </summary>
+    /// <remarks>
+    /// What a pad on the desk and a MIDI button both do, so the two cannot drift apart: a
+    /// button that started a pad already playing would restart it under the presenter's hand.
+    /// </remarks>
     public IRelayCommand TogglePlayCommand { get; }
+
+    /// <summary>
+    /// Empties the pad: stops it and puts every setting back to what a fresh pad has.
+    /// </summary>
+    /// <remarks>
+    /// Its effect chain is deliberately left alone. Clearing is about what the pad plays, and a
+    /// chain is set up once and kept, so taking it off with the sound would be a second edit
+    /// nobody asked for.
+    /// </remarks>
     public IRelayCommand ClearCommand { get; }
+
+    /// <summary>Takes the pad's colour off, so the theme paints it again.</summary>
     public IRelayCommand ClearColorCommand { get; }
+
+    /// <summary>Paints the pad, taking null as no colour rather than refusing it.</summary>
     public IRelayCommand<string?> SetColorCommand { get; }
 
+    /// <summary>
+    /// Builds a pad on a given place in the engine and starts reading it.
+    /// </summary>
+    /// <remarks>
+    /// It asks the engine whether that pad is already playing rather than assuming it is not:
+    /// the matrix is resized while the application runs, so a pad object can be built over a
+    /// pad that is on air.
+    /// </remarks>
     public PadViewModel(int index, IAudioEngine audio)
     {
         Index = index;
@@ -262,18 +427,24 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         };
         _progressTimer.Start();
 
-        // Fires once the hand has come off the knob, and is what makes the profile save.
         _effectSave.Tick += (_, _) =>
         {
             _effectSave.Stop();
 
-            // Read before the announcement, because the announcement is what saves.
             ReadPatches();
 
             OnPropertyChanged(nameof(Effect));
         };
     }
 
+    /// <summary>
+    /// Plays whatever is on the pad, or says why it cannot.
+    /// </summary>
+    /// <remarks>
+    /// A pad with nothing on it is an ordinary state rather than a fault, so it is answered in
+    /// <see cref="Status"/> and not by throwing. A stream is started the same way and arrives
+    /// when it arrives: nothing waits for it here.
+    /// </remarks>
     private void TryStart()
     {
         try
@@ -295,6 +466,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Stops it, and puts whatever went wrong on the pad rather than throwing it.</summary>
     private void TryStop()
     {
         try
@@ -307,8 +479,10 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>The name is half of <see cref="Title"/>, so the face has to be read again.</summary>
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(Title));
 
+    /// <summary>Points the engine at the new source, and re-reads what the pad says about it.</summary>
     partial void OnFilePathChanged(string? value)
     {
         _audio.SetPadSource(Index, SourceKind, value);
@@ -316,6 +490,14 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(SourceText));
     }
 
+    /// <summary>
+    /// Holds the level inside nought to one and sends it to the engine at once.
+    /// </summary>
+    /// <remarks>
+    /// Clamped rather than refused because this is written to from a fader, from a controller
+    /// and from a stored profile, and a level outside the range is silence or distortion rather
+    /// than an error anybody could act on.
+    /// </remarks>
     partial void OnVolumeChanged(float value)
     {
         Volume = Math.Clamp(value, 0f, 1f);
@@ -339,6 +521,10 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         set => Volume = (float)UI.GainScale.ToAmplitude(value);
     }
 
+    /// <summary>
+    /// Tells the engine what kind of thing the path is now, and re-reads the two flags the
+    /// layout picks its editor from.
+    /// </summary>
     partial void OnSourceKindChanged(PadSourceKind value)
     {
         OnPropertyChanged(nameof(IsRecording));
@@ -347,8 +533,17 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         _audio.SetPadSource(Index, SourceKind, FilePath);
     }
 
+    /// <summary>Takes effect on whatever the pad is playing now, not on the next thing.</summary>
     partial void OnLoopChanged(bool value) => _audio.SetPadLoop(Index, value);
 
+    /// <summary>
+    /// Holds the fade under five seconds and hands it to the engine.
+    /// </summary>
+    /// <remarks>
+    /// The ceiling is 4.9 rather than 5 so the number a spinner can reach still reads as under
+    /// five. A fade this long on a jingle is already past what anybody uses; the point of the
+    /// bound is that a fade cannot be set to a length that outlasts the thing being faded.
+    /// </remarks>
     partial void OnFadeInChanged(double value)
     {
         FadeIn = Math.Clamp(value, 0, 4.9);
@@ -356,6 +551,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasFadeIn));
     }
 
+    /// <summary>The other half of the fade, bounded the same way and for the same reason.</summary>
     partial void OnFadeOutChanged(double value)
     {
         FadeOut = Math.Clamp(value, 0, 4.9);
@@ -363,12 +559,17 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(HasFadeOut));
     }
 
+    /// <summary>Both brushes are worked out from the colour, so both have to be read again.</summary>
     partial void OnPadColorChanged(string value)
     {
         OnPropertyChanged(nameof(PadBackground));
         OnPropertyChanged(nameof(PadPreviewBrush));
     }
 
+    /// <summary>
+    /// A pad that starts playing gives its background back to the theme, so the checked style
+    /// can show that it is on. See <see cref="PadBackground"/>.
+    /// </summary>
     partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PadBackground));
 
     /// <summary>
@@ -383,12 +584,27 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     public static PadSourceKind KindFor(PadSourceKind stored) =>
         stored == PadSourceKind.None ? PadSourceKind.Recording : stored;
 
+    /// <summary>
+    /// Puts a stored source on the pad, reading a missing kind through <see cref="KindFor"/>.
+    /// </summary>
+    /// <remarks>
+    /// The kind goes on first: setting the path is what points the engine at it, and it points
+    /// it at the kind the pad currently says it is.
+    /// </remarks>
     public void SetSourceFromConfig(PadSourceKind kind, string source)
     {
         SourceKind = KindFor(kind);
         FilePath = string.IsNullOrWhiteSpace(source) ? null : source;
     }
 
+    /// <summary>
+    /// Stops reading the engine and lets go of it.
+    /// </summary>
+    /// <remarks>
+    /// Called when the matrix shrinks and the pad goes away. What the pad was playing is the
+    /// engine's business and is stopped there; a pad object going away is not a reason to take
+    /// something off air.
+    /// </remarks>
     public void Dispose()
     {
         _progressTimer.Stop();

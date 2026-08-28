@@ -28,21 +28,39 @@ public sealed class ControlTargets : IControlTargets
     private readonly TrackerViewModel _tracker;
     private readonly MachineRackViewModel? _rack;
 
+    /// <param name="tracker">
+    /// The song and everything in it: the tracks, their mixer strips, their instruments and the
+    /// plugins on their chains. Almost every mapping is answered out of this.
+    /// </param>
+    /// <param name="rack">
+    /// Where a controller actually gets laid out, and optional because the tracker alone is a
+    /// complete answer for a song that is playing. See <see cref="OnRack"/>.
+    /// </param>
     public ControlTargets(TrackerViewModel tracker, MachineRackViewModel? rack = null)
     {
         _tracker = tracker;
         _rack = rack;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The master is a strip without being a track, so it is the one thing here that answers from
+    /// outside the track numbers. Only the mixer kinds reach it: nothing is played on it, so it
+    /// has no machine and no instrument's plugin to be pointed at.
+    ///
+    /// A link that reaches nothing writes a line naming what it asked for and what the track and
+    /// the rack were actually holding, since that is the only way to tell "the mapping is wrong"
+    /// from "the mapping is right and you are on the wrong track". The log is asked before the
+    /// line is built, because a link whose machine is not on the track you are looking at answers
+    /// nothing on every message that arrives, which is perfectly ordinary and not worth an
+    /// allocation each time.
+    /// </remarks>
     public IControlTarget? Find(ControlMapping mapping)
     {
         if (mapping is null) return null;
 
         int track = mapping.Scope == ControlScope.Fixed ? mapping.Track : _tracker.FocusedTrack;
 
-        // The master is a strip without being a track, so it is the one thing that answers from
-        // outside the track numbers. Only the mixer kinds: nothing is played on it, so it has no
-        // machine and no instrument's plugin to be pointed at.
         if (track == Tracker.TrackerPlayer.MasterStrip)
             return mapping.Kind switch
             {
@@ -62,9 +80,6 @@ public sealed class ControlTargets : IControlTargets
             _ => null
         };
 
-        // Also asked first: a link whose machine is not on the track you are looking at answers
-        // nothing on every message that arrives, which is a perfectly ordinary thing for it to
-        // do and not worth an allocation each time.
         if (found == null && Log.On(LogArea.Midi))
             Log.Write(LogArea.Midi, () =>
                 "controls: CC " + mapping.Cc + " names " + mapping.Kind + " '" + mapping.Key + "'"
@@ -93,12 +108,13 @@ public sealed class ControlTargets : IControlTargets
     /// A plugin's read-only parameters are left out for a harder reason: a compressor's gain
     /// reduction meter is a parameter that reports rather than accepts, and a lane pointed at
     /// one would write into a value the plugin overwrites on the next block.
+    ///
+    /// The master has a strip and nothing else, since no machine plays through it and no
+    /// instrument's plugin sits on it: everything has been played by the time it is reached. Its
+    /// own inserts are offered, because those are the one thing it does have.
     /// </remarks>
     public IEnumerable<ControlChoice> On(int track)
     {
-        // The master has a strip and nothing else: no machine plays through it and no
-        // instrument's plugin sits on it, because everything has been played by the time it is
-        // reached. Its own inserts are offered, since those are the one thing it does have.
         if (track == Tracker.TrackerPlayer.MasterStrip)
         {
             foreach (var choice in OnInserts(track)) yield return choice;
@@ -259,6 +275,10 @@ public sealed class ControlTargets : IControlTargets
     /// The check on the machine is the point of the whole design. Knob one is not "the first
     /// knob on this track", it is "Zampler's cutoff", so a track playing a drum machine is not
     /// driven by it at all and nothing has to be reassigned when a track changes hands.
+    ///
+    /// A link that names no parameter at all is one nobody made: it means the third knob on
+    /// whatever face is in front of you, and which parameter that is depends on the face. See
+    /// <see cref="ControlMapping.Ordinal"/>.
     /// </remarks>
     private IControlTarget? OnMachine(ControlMapping mapping, int track)
     {
@@ -273,8 +293,6 @@ public sealed class ControlTargets : IControlTargets
 
         if (Tracker.Machines.MachineProjects.For(machine) is not { } project) return null;
 
-        // A link that names no parameter is one nobody made: it means the third knob on
-        // whatever face is in front of you, and which parameter that is depends on the face.
         string key = mapping.Key.Length > 0
             ? mapping.Key
             : Machines.PanelOrder.At(project.Panel, mapping.Ordinal);
@@ -375,11 +393,13 @@ public sealed class ControlTargets : IControlTargets
     /// Written through the strip rather than into the song's <c>TrackMix</c>, so the fader on
     /// the screen moves with the fader in your hand. Writing underneath it would change the
     /// sound and leave the mixer showing the old value.
+    ///
+    /// The master is asked for by name rather than found among the tracks, because it is kept
+    /// apart from them rather than on the end of them: nothing that walks the tracks by counting
+    /// reaches it, and it does not move when they are reordered.
     /// </remarks>
     private IControlTarget? OnStrip(ControlMapping mapping, int track)
     {
-        // The master is kept apart from the tracks rather than on the end of them, so it is
-        // asked for by name. See TrackerViewModel.MasterStrip for why.
         var strip = track == Tracker.TrackerPlayer.MasterStrip
             ? _tracker.MasterStrip
             : _tracker.Strips.FirstOrDefault(one => one.Track == track);
@@ -439,6 +459,7 @@ public sealed class ControlTargets : IControlTargets
             mapping);
     }
 
+    /// <summary>What a track is called in a target's name, which ends in the track it is on.</summary>
     private static string Named(int track) =>
         "TR-" + (track + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -450,6 +471,17 @@ public sealed class ControlTargets : IControlTargets
         private readonly ControlTargets _desk;
         private readonly ControlMapping _mapping;
 
+        /// <param name="name">What to call it, ending in the track it is on so a status line reads.</param>
+        /// <param name="min">The bottom of the parameter's own range, which a mapping is scaled into.</param>
+        /// <param name="max">And the top of it.</param>
+        /// <param name="read">Where it stands now, for a control that has to pick the value up.</param>
+        /// <param name="write">Where a new value goes, called on the drawing thread and not here.</param>
+        /// <param name="desk">The one that queues the write, so it lands on the drawing thread.</param>
+        /// <param name="mapping">What was pointed at this, kept so a write can say what moved.</param>
+        /// <param name="unit">
+        /// What the number is measured in, where the thing that owns it said. Empty otherwise,
+        /// and then a reading is the number on its own.
+        /// </param>
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
                       ControlTargets desk, ControlMapping mapping, string unit = "")
         {
@@ -463,9 +495,11 @@ public sealed class ControlTargets : IControlTargets
             _unit = unit;
         }
 
+        /// <summary>What it is measured in, when the thing that owns it said. Empty otherwise.</summary>
         private readonly string _unit;
 
-        /// <summary>The number, and what it is measured in when the machine said.</summary>
+        /// <inheritdoc/>
+        /// <remarks>The number, and what it is measured in when the machine said.</remarks>
         public string Reads(double value)
         {
             string said = value.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
@@ -473,14 +507,19 @@ public sealed class ControlTargets : IControlTargets
             return _unit.Length > 0 ? said + " " + _unit : said;
         }
 
+        /// <inheritdoc/>
         public string Name { get; }
+
+        /// <inheritdoc/>
         public double Min { get; }
+
+        /// <inheritdoc/>
         public double Max { get; }
 
-        /// <summary>
-        /// Where the parameter is, or where it is about to be when something is on its way.
-        /// </summary>
+        /// <inheritdoc/>
         /// <remarks>
+        /// Where the parameter is, or where it is about to be when something is on its way.
+        ///
         /// The waiting value first, and this is not a nicety. Writes are coalesced onto the
         /// drawing thread, so between a message arriving and the panel being drawn the machine
         /// still holds the old value. Anything that works out its next value from this one then
@@ -508,6 +547,8 @@ public sealed class ControlTargets : IControlTargets
             }
         }
 
+        /// <inheritdoc/>
+        /// <remarks>Queued rather than written, so it lands on the drawing thread and coalesces.</remarks>
         public void Set(double value) => _desk.Queue(_mapping, _write, value);
     }
 
@@ -521,6 +562,7 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     private readonly Dictionary<ControlMapping, (Action<double> Write, double Value)> _waiting = new();
 
+    /// <summary>Whether a trip to the drawing thread is already booked.</summary>
     private bool _posted;
 
     /// <summary>The value on its way to a parameter, or nothing when none is.</summary>
@@ -530,6 +572,13 @@ public sealed class ControlTargets : IControlTargets
             return _waiting.TryGetValue(mapping, out var held) ? held.Value : null;
     }
 
+    /// <summary>
+    /// Puts a value in the queue, and asks for one trip to the drawing thread if none is booked.
+    /// </summary>
+    /// <remarks>
+    /// At <c>DispatcherPriority.Input</c>, so a hand on three knobs cannot starve the drawing of
+    /// the panels it is moving.
+    /// </remarks>
     private void Queue(ControlMapping mapping, Action<double> write, double value)
     {
         lock (_waiting)
@@ -543,6 +592,13 @@ public sealed class ControlTargets : IControlTargets
         Dispatcher.UIThread.Post(Write, DispatcherPriority.Input);
     }
 
+    /// <summary>
+    /// Puts everything that is waiting where it goes, on the drawing thread.
+    /// </summary>
+    /// <remarks>
+    /// Each write is swallowed on its own: one parameter that will not take a value is one knob
+    /// gone quiet, and letting it throw here would take the rest of the desk with it.
+    /// </remarks>
     private void Write()
     {
         KeyValuePair<ControlMapping, (Action<double> Write, double Value)>[] due;
@@ -556,7 +612,6 @@ public sealed class ControlTargets : IControlTargets
 
         foreach (var (_, held) in due)
         {
-            // One parameter that will not take a value is one knob, not a dead controller.
             try { held.Write(held.Value); }
             catch (Exception) { }
         }

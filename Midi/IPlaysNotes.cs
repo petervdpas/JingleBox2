@@ -12,7 +12,17 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public interface IPlaysNotes
 {
+    /// <summary>Sounds that note, and writes it down if this half writes anything down.</summary>
     void PlayMidiNote(Note note, int volume);
 
+    /// <summary>
+    /// The key came up.
+    /// </summary>
+    /// <remarks>
+    /// Sent to both halves even where there is nothing to write: a key coming up is also the
+    /// moment a light goes out and a sound is let go of. Dropped for the rack once, on the
+    /// grounds that a note-off has nothing to be written into there, which was true and beside
+    /// the point, and left the two halves of one key press going to different places.
+    /// </remarks>
     void ReleaseMidiNote(Note note);
 }

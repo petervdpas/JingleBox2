@@ -22,40 +22,119 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>Stereo in, stereo out. Wider plugins are fed and read on their first two.</summary>
     public const int Channels = 2;
 
-    // From the CLAP parameter flags, declared rather than worked out from a shift each time.
+    /// <summary>
+    /// Whole positions rather than a sweep. One of CLAP's parameter flags, declared rather than
+    /// worked out from a shift each time.
+    /// </summary>
     private const uint SteppedFlag = 1 << 0;
+
+    /// <summary>The plugin asking that this one is not drawn.</summary>
     private const uint HiddenFlag = 1 << 2;
+
+    /// <summary>A reading rather than a control. Excluded from the knobs that are read back.</summary>
     private const uint ReadOnlyFlag = 1 << 3;
+
+    /// <summary>The parameter the standard reserves for switching the plugin out of circuit.</summary>
     private const uint BypassFlag = 1 << 4;
 
+    /// <summary>The library this plugin came out of. Held so the reference can be given back.</summary>
     private readonly ClapBundle _bundle;
+
+    /// <summary>The plugin instance itself.</summary>
     private readonly ClapPlugin* _plugin;
+
+    /// <summary>
+    /// This plugin's own host struct, which is how a plain C callback finds its way back here.
+    /// One per plugin, and it must not move for as long as the plugin is loaded.
+    /// </summary>
     private readonly ClapHost* _host;
+
+    /// <summary>The parameters extension, or null for a plugin that has no knobs.</summary>
     private readonly ClapPluginParams* _params;
+
+    /// <summary>The audio ports extension, or null for one that does not say what it wants.</summary>
     private readonly ClapPluginAudioPorts* _ports;
+
+    /// <summary>
+    /// The state extension, or null for a plugin that keeps nothing beyond its knobs. Null was
+    /// the answer here for every plugin until this was implemented at all, which is why CLAP
+    /// effects came back on their parameters alone.
+    /// </summary>
     private readonly ClapPluginState* _state;
 
+    /// <summary>Held over the pending queue, by the audio thread and the UI thread both.</summary>
     private readonly object _lock = new();
+
+    /// <summary>
+    /// Knob moves waiting to be handed over, latest per parameter. A dictionary rather than a
+    /// list because a knob dragged makes a hundred moves and only the last one matters.
+    /// </summary>
     private readonly Dictionary<uint, double> _pending = new();
 
+    /// <summary>One pointer per input channel, into <see cref="_inputData"/>. What CLAP reads.</summary>
     private float** _inputChannels;
+
+    /// <summary>The same on the way out.</summary>
     private float** _outputChannels;
+
+    /// <summary>
+    /// One block of memory holding every input channel end to end. Allocated once at activation,
+    /// because allocating inside an audio callback is how a mixer starts crackling.
+    /// </summary>
     private float* _inputData;
+
+    /// <inheritdoc cref="_inputData"/>
     private float* _outputData;
+
+    /// <summary>One buffer description per input port, pointing into the channels above.</summary>
     private ClapAudioBuffer* _inputBuffer;
+
+    /// <inheritdoc cref="_inputBuffer"/>
     private ClapAudioBuffer* _outputBuffer;
+
+    /// <summary>What is handed to the plugin per block. Filled in at activation and reused.</summary>
     private ClapProcess* _process;
+
+    /// <summary>The event list the plugin reads its parameter moves out of.</summary>
     private ClapInputEvents* _inEvents;
+
+    /// <summary>Where the plugin puts events of its own, which is how it reports a knob.</summary>
     private ClapOutputEvents* _outEvents;
+
+    /// <summary>The events themselves, refilled per block from <see cref="_pending"/>.</summary>
     private ClapEventParamValue* _events;
 
+    /// <summary>
+    /// The largest block the plugin was activated for. A longer one from the device is fed
+    /// through in pieces rather than refused.
+    /// </summary>
     private int _maxFrames;
+
+    /// <summary>Every input channel across every port, which is what has to be cleared or filled.</summary>
     private int _inputChannelCount;
+
+    /// <summary>How many events are in this block. Read by the static callbacks.</summary>
     private int _eventCount;
+
+    /// <summary>
+    /// Frames since the plugin started, for a plugin that wants to know time has passed. Reset
+    /// when a parked instance is picked up again.
+    /// </summary>
     private long _steadyTime;
+
+    /// <summary>True once the plugin has been switched on and can be given audio.</summary>
     private bool _active;
+
+    /// <summary>
+    /// True once this instance has been given up. A parked instance has it cleared again when
+    /// somebody picks it up: see <see cref="TakeParked"/>.
+    /// </summary>
     private bool _disposed;
 
+    /// <summary>
+    /// Private because an effect is only ever made by <see cref="Load"/>, which is the only
+    /// place that knows the plugin has been created and initialised.
+    /// </summary>
     private ClapEffect(ClapBundle bundle, ClapPlugin* plugin, ClapHost* host, PluginInfo info)
     {
         _bundle = bundle;
@@ -85,14 +164,22 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// </summary>
     public int InputChannels { get; }
 
+    /// <inheritdoc cref="InputChannels"/>
     public int OutputChannels { get; }
 
     /// <summary>How many ports the plugin has each way. A side chain is a port of its own.</summary>
     public int InputPorts => _inputPortChannels.Length;
 
+    /// <inheritdoc cref="InputPorts"/>
     public int OutputPorts => _outputPortChannels.Length;
 
+    /// <summary>
+    /// The channels each input port carries, in the plugin's own order. Read once at
+    /// construction, since it cannot change while the plugin is loaded.
+    /// </summary>
     private readonly int[] _inputPortChannels;
+
+    /// <inheritdoc cref="_inputPortChannels"/>
     private readonly int[] _outputPortChannels;
 
     /// <summary>
@@ -126,10 +213,16 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>More ports than any plugin this host is meant for, as a backstop.</summary>
     private const uint MaxPorts = 8;
 
+    /// <summary>
+    /// More channels on one port than any plugin this host is meant for. A plugin answering with
+    /// something absurd is clamped rather than believed, since the number decides an allocation.
+    /// </summary>
     private const int MaxChannelsPerPort = 8;
 
+    /// <inheritdoc/>
     public PluginInfo Info { get; }
 
+    /// <inheritdoc/>
     public bool IsActive => _active;
 
     /// <summary>The plugin itself, for the parts of the ABI that live in another file.</summary>
@@ -143,6 +236,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// its parameter names off an alphabetical list when the plugin has a picture of a meter it
     /// would rather show. See <see cref="ClapEditor"/>.
     /// </remarks>
+    /// <inheritdoc/>
     public IPluginEditor? OpenEditor() => _disposed ? null : ClapEditor.Open(this);
 
     /// <summary>One of the plugin's timers has come round. Called on the thread that draws.</summary>
@@ -222,13 +316,24 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// </summary>
     private static readonly Dictionary<string, Stack<ClapEffect>> Parked = new(StringComparer.Ordinal);
 
+    /// <summary>Held over the parked instances.</summary>
     private static readonly object ParkLock = new();
 
+    /// <summary>Which stack this instance goes back onto when it is given up.</summary>
     private string _key = "";
 
+    /// <summary>
+    /// What makes two instances interchangeable: the same plugin at the same rate and block
+    /// size. A parked instance at another rate would have to be reactivated, which is the one
+    /// call this class exists to avoid.
+    /// </summary>
     private static string Key(string path, string id, int sampleRate, int maxFrames) =>
         path + "|" + id + "|" + sampleRate + "|" + maxFrames;
 
+    /// <summary>
+    /// Picks up a parked instance, or null when there is none. A parked plugin still holds the
+    /// tail of whatever it was last doing, so it is reset before it is handed back.
+    /// </summary>
     private static ClapEffect? TakeParked(string key)
     {
         ClapEffect? effect = null;
@@ -240,7 +345,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         if (effect == null) return null;
 
-        // A parked plugin still holds the tail of whatever it was last doing.
         if (effect._plugin->Reset != null) effect._plugin->Reset(effect._plugin);
         if (effect._plugin->StartProcessing != null && effect._plugin->StartProcessing(effect._plugin) == 0) return null;
 
@@ -252,12 +356,15 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         return effect;
     }
 
+    /// <summary>
+    /// Which plugin in the bundle. No id given means the first one, which is what a bundle
+    /// holding a single plugin is and what a chain saved before ids were written down means.
+    /// </summary>
     private static PluginInfo? FindPlugin(ClapBundle bundle, string pluginId)
     {
         var plugins = bundle.Plugins();
         if (plugins.Count == 0) return null;
 
-        // No id given means the first one, which is what a bundle holding a single plugin is.
         if (string.IsNullOrWhiteSpace(pluginId)) return plugins[0];
 
         foreach (var plugin in plugins)
@@ -268,6 +375,11 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         return null;
     }
 
+    /// <summary>
+    /// Switches the plugin on for a rate and a block size, and takes the memory the audio thread
+    /// will need. Everything is allocated before the plugin is activated, since a plugin that
+    /// starts asking for blocks has to find its buffers already there.
+    /// </summary>
     private bool Activate(int sampleRate, int maxFrames)
     {
         if (_plugin->Activate == null) return false;
@@ -319,12 +431,15 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// Lays out one side of the plugin's audio: a buffer per port, a pointer per channel, and
     /// one block of memory holding all of it.
     /// </summary>
+    /// <remarks>
+    /// A port declaring no channels still needs somewhere to point, so the count is floored at
+    /// one: a null channel array handed to a plugin is a jump through nothing on its first read.
+    /// </remarks>
     private ClapAudioBuffer* AllocPorts(int[] ports, int frames, out float* data, out float** pointers)
     {
         int channels = 0;
         foreach (int port in ports) channels += Math.Max(0, port);
 
-        // A port declaring no channels still needs somewhere to point.
         channels = Math.Max(1, channels);
 
         data = Alloc<float>(frames * channels);
@@ -353,6 +468,11 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>More parameter moves in one block than any hand can produce.</summary>
     private const int MaxEventsPerBlock = 64;
 
+    /// <summary>
+    /// Unmanaged memory, zeroed. Zeroed rather than left as it was found, because several of
+    /// these structs are handed to a plugin with fields this host never sets and rubbish in one
+    /// of those is a call through a wild pointer.
+    /// </summary>
     private static T* Alloc<T>(int count) where T : unmanaged
     {
         var memory = (T*)NativeMemory.AllocZeroed((nuint)count, (nuint)sizeof(T));
@@ -364,15 +484,17 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// what the mixer works in; CLAP wants a pointer per channel, so it is split going in and
     /// woven back together coming out.
     /// </summary>
+    /// <remarks>
+    /// A plugin is activated for a maximum block and may not be handed more than that. The audio
+    /// engine's blocks are whatever the device felt like, so a long one is fed through in pieces
+    /// rather than refused.
+    /// </remarks>
     public void Process(float[] buffer, int frames)
     {
         if (_disposed || !_active || buffer == null) return;
         if (frames <= 0 || _plugin->Process == null) return;
         if (frames * 2 > buffer.Length) frames = buffer.Length / 2;
 
-        // A plugin is activated for a maximum block and may not be handed more than that.
-        // The audio engine's blocks are whatever the device felt like, so a long one is fed
-        // through in pieces rather than refused.
         int offset = 0;
 
         while (offset < frames)
@@ -383,19 +505,32 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
     }
 
+    /// <summary>
+    /// One block no longer than the plugin was activated for.
+    /// </summary>
+    /// <remarks>
+    /// The track goes into the main port. Everything else the plugin declared, a side chain
+    /// included, is given silence rather than whatever was left in it last block.
+    ///
+    /// Mono in takes the two sides summed rather than the left one alone, so a signal panned
+    /// right does not vanish into it; mono out goes to both sides, or half the mixer would go
+    /// quiet.
+    ///
+    /// The event list is read through static callbacks, which have no instance to work from, so
+    /// the effect being processed is put on the thread for the length of the call. The flush
+    /// lock is held across it so a parameter handed over from the UI cannot land in the middle
+    /// of a block; the other side of that lock uses TryEnter and gives up, so the audio thread
+    /// waits for nothing longer than one short flush.
+    /// </remarks>
     private void ProcessBlock(float[] buffer, int offset, int frames)
     {
         _lastProcess = Environment.TickCount64;
 
 
-        // The track goes into the main port. Everything else the plugin declared, a side
-        // chain included, is given silence rather than whatever was left in it last block.
         int fed = 0;
 
         if (InputChannels == 1)
         {
-            // Mono in takes the two sides summed rather than the left one alone, so a signal
-            // panned right does not vanish into it.
             for (int frame = 0; frame < frames; frame++)
                 _inputChannels[0][frame] = (buffer[(offset + frame) * 2] + buffer[(offset + frame) * 2 + 1]) * 0.5f;
 
@@ -420,11 +555,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         _process->FramesCount = (uint)frames;
         _process->SteadyTime = _steadyTime;
 
-        // The event list is read through static callbacks, which have no instance to work
-        // from: the block being processed is handed over here for the length of the call.
-        // Held so a parameter handed over from the UI cannot land in the middle of a block.
-        // The other side of this uses TryEnter and gives up, so the audio thread waits for
-        // nothing longer than one short flush.
         lock (_flush)
         {
             _current = this;
@@ -442,7 +572,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         if (OutputChannels == 1)
         {
-            // Mono out goes to both sides, or half the mixer would go quiet.
             for (int frame = 0; frame < frames; frame++)
             {
                 float value = _outputChannels[0][frame];
@@ -496,12 +625,22 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
     }
 
+    /// <summary>
+    /// Which effect the static event callbacks are about, for the length of one call into the
+    /// plugin. Per thread, because the audio thread and the thread that flushes can both be
+    /// inside a different plugin at the same moment.
+    /// </summary>
     [ThreadStatic]
     private static ClapEffect? _current;
 
+    /// <summary>How many events this block carries.</summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static uint EventCount(ClapInputEvents* list) => (uint)(_current?._eventCount ?? 0);
 
+    /// <summary>
+    /// One event, as a pointer into the host's own array. It stays valid for the length of the
+    /// call, which is all the standard asks for.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static ClapEventHeader* EventAt(ClapInputEvents* list, uint index)
     {
@@ -516,6 +655,9 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// own window arrives here, on the audio thread, at the end of the block it happened in.
     /// Anything else is accepted and dropped rather than refused, which some plugins treat as
     /// an error.
+    ///
+    /// Anything that throws is swallowed: a knob move is not worth throwing back into somebody
+    /// else's audio thread, which would unwind through C frames that were not built for it.
     /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static byte TakeEvent(ClapOutputEvents* list, ClapEventHeader* header)
@@ -535,7 +677,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
         catch (Exception)
         {
-            // A knob move is not worth throwing back into somebody else's audio thread.
         }
 
         return 1;
@@ -578,6 +719,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     }
 
     /// <summary>Puts a saved lump back. A plugin that refuses it keeps what it had.</summary>
+    /// <remarks>
+    /// A patch that will not go back in leaves a plugin on its own defaults, which is what it
+    /// would have been without one, so a failure here is silent.
+    /// </remarks>
     public void LoadState(byte[]? state)
     {
         if (_disposed || state is not { Length: > 0 }) return;
@@ -594,8 +739,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
         catch (Exception)
         {
-            // A patch that will not go back in is a plugin on its own defaults, which is what
-            // it would have been without one.
         }
         finally
         {
@@ -603,12 +746,22 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
     }
 
+    /// <summary>
+    /// Where a patch being read out of the plugin actually goes. Per thread rather than per
+    /// instance, since the stream handed to the plugin is a struct on the stack with a static
+    /// function in it and has nowhere to carry an instance.
+    /// </summary>
     [ThreadStatic]
     private static System.IO.MemoryStream? _writing;
 
+    /// <inheritdoc cref="_writing"/>
     [ThreadStatic]
     private static System.IO.MemoryStream? _reading;
 
+    /// <summary>
+    /// The plugin writing its patch. Answers how many bytes it took, and a negative number for a
+    /// failure, which is what the plugin reads as the save having gone wrong.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static long Written(ClapOutputStream* stream, void* buffer, ulong size)
     {
@@ -629,6 +782,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
     }
 
+    /// <summary>
+    /// The plugin reading its patch back. Nought is the end of it rather than a failure, which
+    /// is how the plugin knows to stop asking; a negative number is the failure.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(System.Runtime.CompilerServices.CallConvCdecl) })]
     private static long Fetched(ClapInputStream* stream, void* buffer, ulong size)
     {
@@ -640,8 +797,6 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         try
         {
-            // Nought is the end of it rather than a failure, which is how the plugin knows to
-            // stop asking.
             return reading.Read(new Span<byte>(buffer, wanted));
         }
         catch (Exception)
@@ -650,17 +805,23 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         }
     }
 
+    /// <inheritdoc/>
     public event Action<uint, double>? Edited;
 
+    /// <inheritdoc/>
     public event Action? Reloaded;
 
     /// <summary>The plugin says everything about it may have changed, which is a preset.</summary>
+    /// <remarks>
+    /// Whatever was known about its knobs is out of date, so the watch list is thrown away and
+    /// built again from scratch rather than compared against what the values used to be: a
+    /// preset moves every parameter at once, and reporting each of those as something somebody
+    /// did would be hundreds of edits for one act.
+    /// </remarks>
     internal void Reload()
     {
         if (_disposed) return;
 
-        // Whatever was known about its knobs is out of date, so they are read again from
-        // scratch rather than compared against what they used to be.
         _watched = null;
         _seen = null;
 
@@ -685,13 +846,15 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// only ever handed back during a block or a flush, so an idle plugin whose flush nobody
     /// calls can be turned all day without the host hearing a word of it. That is what
     /// <see cref="Poll"/> is for.
+    ///
+    /// Gives up rather than waiting when the audio thread is inside the plugin: it is about to
+    /// take the pending values itself, and a flush now would be a second call into the plugin
+    /// at the same time.
     /// </remarks>
     public void FlushParameters()
     {
         if (_disposed || _params == null || _params->Flush == null) return;
 
-        // If the audio thread is inside the plugin, it is about to take the pending values
-        // itself, and a flush now would be a second call into the plugin at the same time.
         if (!System.Threading.Monitor.TryEnter(_flush)) return;
 
         try
@@ -750,12 +913,14 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     ///
     /// So a plugin nobody is playing gets an empty block's worth of attention on the right
     /// thread instead, often enough that a knob never feels late.
+    ///
+    /// Does nothing for a plugin that is being played: its blocks are already carrying
+    /// everything both ways.
     /// </remarks>
     public void Idle()
     {
         if (_disposed) return;
 
-        // Being played: the blocks are already carrying everything both ways.
         if (!IsIdle)
         {
             _wantsFlush = false;
@@ -767,6 +932,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         FlushParameters();
     }
 
+    /// <summary>
+    /// Set by the plugin asking to be flushed, cleared when it has been. Volatile because it is
+    /// written from whatever thread the plugin's window is on and read from the one that idles.
+    /// </summary>
     private volatile bool _wantsFlush;
 
     /// <summary>The plugin asking to be given the chance to hand something over.</summary>
@@ -778,9 +947,20 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>How many parameters are worth reading every time round. Past this it is not a panel.</summary>
     private const int MaxWatched = 512;
 
+    /// <summary>
+    /// The parameters worth reading back, worked out once. Null means it has not been worked out
+    /// yet, or that a preset has made whatever was known about them out of date.
+    /// </summary>
     private uint[]? _watched;
+
+    /// <summary>What each of those read last time, so only a change is reported.</summary>
     private double[]? _seen;
 
+    /// <summary>
+    /// Builds the watch list on the first call and compares against it on every one after. The
+    /// first call reports nothing, deliberately: it is establishing where the knobs stand, and
+    /// reporting all of them as moved would mark a freshly loaded song as changed.
+    /// </summary>
     private void Ask()
     {
         if (_params == null || _params->GetValue == null) return;
@@ -859,6 +1039,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// <summary>Longer than any block, short enough that a knob never feels late.</summary>
     private const long IdleMilliseconds = 200;
 
+    /// <summary>True when no block has gone through recently, so nothing is playing this plugin.</summary>
     private bool IsIdle => Environment.TickCount64 - _lastProcess > IdleMilliseconds;
 
     /// <summary>
@@ -867,7 +1048,12 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// </summary>
     private readonly object _flush = new();
 
-    /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Not normalised: CLAP gives a range in the plugin's own units, so a threshold really does
+    /// run from -60 to 0. The step count is worked out from that range, since CLAP says a
+    /// parameter is stepped with a flag and leaves the count to be read off the ends.
+    /// </remarks>
     public IReadOnlyList<PluginParameter> Parameters()
     {
         var parameters = new List<PluginParameter>();
@@ -896,7 +1082,8 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         return parameters;
     }
 
-    /// <summary>What a parameter is set to right now, straight from the plugin.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Straight from the plugin, since a CLAP plugin is one object rather than two.</remarks>
     public double ValueOf(uint id)
     {
         if (_disposed || _params == null || _params->GetValue == null) return 0;
@@ -905,7 +1092,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         return _params->GetValue(_plugin, id, &value) == 0 ? 0 : value;
     }
 
-    /// <summary>How the plugin words a value: "-6.0 dB" rather than -6.</summary>
+    /// <inheritdoc/>
     public string TextFor(uint id, double value)
     {
         if (_disposed || _params == null || _params->ValueToText == null) return "";
@@ -916,26 +1103,31 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
         return _params->ValueToText(_plugin, id, value, text, size) == 0 ? "" : NativeText.Read(text);
     }
 
-    /// <summary>
-    /// Moves a parameter. The value is queued rather than written: the plugin expects to be
-    /// told at the start of a block, on the audio thread, not whenever a knob is dragged.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The value is written down as already known, so that reading the values back does not
+    /// report the host's own change as something the plugin did.
+    ///
+    /// A plugin that is not playing anything will never take the queue itself: a pad sitting
+    /// idle, or a track between takes. Without the flush at the end the value waits, the plugin
+    /// still reports the old one, and the knob springs back to it.
+    /// </remarks>
     public void SetValue(uint id, double value)
     {
         if (_disposed) return;
 
         lock (_lock) _pending[id] = value;
 
-        // Written down as already known, so that reading the values back does not report the
-        // host's own change as something the plugin did.
         Remember(id, value);
 
-        // A plugin that is not playing anything will never take the queue itself: a pad sitting
-        // idle, or a track between takes. Without this the value waits, the plugin still
-        // reports the old one, and the knob springs back to it.
         if (IsIdle) FlushParameters();
     }
 
+    /// <summary>
+    /// Reads one of the ABI's fixed width name fields. The terminator is looked for and the size
+    /// is the ceiling, because a field that is exactly full carries no terminator at all and
+    /// reading past it would run into the next field.
+    /// </summary>
     private static string ReadFixed(byte* text, int size)
     {
         int length = 0;
@@ -957,7 +1149,8 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// somebody was working on.
     ///
     /// The proper fix is hosting plugins in a process of their own, where a crash costs the
-    /// plugin and nothing else. That is a much larger piece of work.
+    /// plugin and nothing else. That is a much larger piece of work, and it is what
+    /// <see cref="PluginHost.Isolated"/> is now.
     /// </remarks>
     public void Dispose()
     {
@@ -984,6 +1177,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     /// The full teardown, for an instance that never started. Only safe here: a plugin that
     /// failed to activate has nothing to deactivate, so the path that faults is not taken.
     /// </summary>
+    /// <remarks>
+    /// The library goes last. Freeing it while the plugin is still in it is a crash with nothing
+    /// to read in the stack, since the code the plugin is running has been unmapped.
+    /// </remarks>
     private void Retire()
     {
         if (_disposed) return;
@@ -1013,11 +1210,10 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
 
         if (_host != null) NativeMemory.Free(_host);
 
-        // The rack goes last: freeing it while the plugin is still in it is a crash with
-        // nothing to read in the stack.
         _bundle.Dispose();
     }
 
+    /// <summary>Frees a block, allowing for one that was never taken.</summary>
     private static void Free(void* memory)
     {
         if (memory != null) NativeMemory.Free(memory);

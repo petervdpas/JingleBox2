@@ -22,6 +22,11 @@ public static class RangeValue
     }
 
     /// <summary>Clamps into range and onto the step grid, measured from the minimum.</summary>
+    /// <remarks>
+    /// From the minimum rather than from nought, which matters for any range that does not have
+    /// nought at an end: -24 to 24 in steps of 5 measured from nought cannot reach either of its
+    /// own ends, so a transpose knob would stop two semitones short at both extremes.
+    /// </remarks>
     public static double Quantize(double value, double minimum, double maximum, double step)
     {
         if (double.IsNaN(value)) return minimum;
@@ -30,8 +35,6 @@ public static class RangeValue
         double clamped = Math.Clamp(value, minimum, maximum);
         if (step <= 0) return clamped;
 
-        // Stepping from the minimum, not from zero: a range like -24..24 with a step of 5
-        // should still be able to reach its own ends.
         double stepped = minimum + Math.Round((clamped - minimum) / step, MidpointRounding.AwayFromZero) * step;
 
         return Math.Clamp(stepped, minimum, maximum);

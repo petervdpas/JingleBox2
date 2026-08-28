@@ -49,10 +49,20 @@ public sealed class ArturiaDisplay
     private static readonly byte[] Wake = { 0xF0, 0x00, 0x20, 0x6B, 0x7F, 0x42, 0x02, 0x02, 0x40, 0x6A, 0x21, 0xF7 };
 
     /// <summary>What the value bar is drawn as.</summary>
+    /// <remarks>
+    /// The device's own picture of the control, so a knob's reading appears as a ring and a
+    /// fader's as a bar. It is about the thing on the screen and not about the thing under your
+    /// hand: a mixer level pointed at by an encoder is still drawn as a fader.
+    /// </remarks>
     public enum Kind
     {
+        /// <summary>A ring, for a parameter on a machine.</summary>
         Knob = 0x03,
+
+        /// <summary>A bar, for anything on a mixer strip.</summary>
         Fader = 0x04,
+
+        /// <summary>A pad, for a button pointed at an action.</summary>
         Pad = 0x05
     }
 
@@ -60,9 +70,21 @@ public sealed class ArturiaDisplay
     private const int Room = 16;
 
     private readonly IMidiService _midi;
+
+    /// <summary>The controllers to greet, asked each time since what is plugged in changes.</summary>
     private readonly Func<IEnumerable<string>>? _devices;
+
+    /// <summary>Which devices have had <see cref="Wake"/> sent to them.</summary>
+    /// <remarks>
+    /// Forgotten again the moment a write fails, so a device unplugged and put back is woken
+    /// afresh rather than being written to for ever with nothing appearing.
+    /// </remarks>
     private readonly HashSet<string> _woken = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <param name="midi">
+    /// Where the messages go out. An output is opened on the device's own name when one is
+    /// wanted, so a controller with no output costs nothing here.
+    /// </param>
     /// <param name="devices">
     /// The controllers worth trying, for the text the screen shows at rest. Asked each time
     /// rather than held, because what is plugged in changes.
@@ -89,6 +111,8 @@ public sealed class ArturiaDisplay
     /// off and the screen comes back here.
     /// </remarks>
     private string _first = "";
+
+    /// <summary>The second line of the same.</summary>
     private string _second = "";
 
     /// <summary>
@@ -98,15 +122,16 @@ public sealed class ArturiaDisplay
     /// Sent to every device that has been woken, and remembered for any that is woken later, so
     /// a controller plugged in halfway through gets the same greeting as one that was there
     /// from the start.
+    ///
+    /// Everything plugged in is written to, not only what has been woken. At the moment this is
+    /// first called nothing has been woken at all, which is the whole of why the greeting never
+    /// appeared: it was being said to an empty room.
     /// </remarks>
     public void Standing(string first, string second)
     {
         _first = first ?? "";
         _second = second ?? "";
 
-        // Everything plugged in, not only what has been woken. At the moment this is first
-        // called nothing has been woken at all, which is the whole of why the name never
-        // appeared: it was being said to an empty room.
         var wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         lock (_woken) foreach (string one in _woken) wanted.Add(one);
@@ -139,7 +164,14 @@ public sealed class ArturiaDisplay
     /// <summary>
     /// A control being moved: what it is, what it reads, and where it is in its range.
     /// </summary>
+    /// <param name="device">The port to write to, named as the operating system names it.</param>
+    /// <param name="kind">
+    /// Which picture the reading is drawn in. About the thing on the screen rather than the
+    /// thing under your hand: a mixer level driven by an encoder is still drawn as a fader.
+    /// </param>
     /// <param name="fraction">Nought to one, which the screen draws as the bar.</param>
+    /// <param name="what">The parameter's name, on the first line and cut at sixteen characters.</param>
+    /// <param name="reads">What it now says, on the second line and cut the same way.</param>
     /// <param name="hide">
     /// True to have the screen go back to what it was showing after a moment, which is what a
     /// knob wants: the reading matters while your hand is on it and not afterwards.
@@ -195,7 +227,21 @@ public sealed class ArturiaDisplay
     /// </remarks>
     private readonly Dictionary<string, byte[]> _shown = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Sends it, waking the screen the first time this device is written to.</summary>
+    /// <summary>
+    /// Sends it, waking the screen the first time this device is written to.
+    /// </summary>
+    /// <remarks>
+    /// A device with no output, or one that will not open, is forgotten again straight away so
+    /// that plugging it in later still wakes it. The standing text goes up as soon as the screen
+    /// wakes, so it stops showing the name of whatever DAW the device was told about and a knob's
+    /// reading has somewhere of ours to fall back to.
+    ///
+    /// A device unplugged and put back has forgotten it was ever woken while this still thinks it
+    /// was. The failed write is the moment to forget: the next one wakes it again, one message is
+    /// lost to the replug, and nobody notices. What it was showing is forgotten with it, because
+    /// it is not showing it any more, and without that the guard at the top would refuse to send
+    /// the very message that would put it back on the grounds that the screen already says so.
+    /// </remarks>
     private void Write(string device, byte[] message)
     {
         if (string.IsNullOrWhiteSpace(device)) return;
@@ -215,8 +261,6 @@ public sealed class ArturiaDisplay
         {
             if (!_midi.Send(device, Wake))
             {
-                // No output, or it will not open. Forgotten again so that plugging the device
-                // in later still wakes it.
                 lock (_woken) _woken.Remove(device);
 
                 return;
@@ -224,23 +268,13 @@ public sealed class ArturiaDisplay
 
             Log.Write(LogArea.Midi, () => "screen: woke the display on '" + device + "'");
 
-            // Put the standing text up straight away, so the screen stops showing the name of
-            // whatever DAW the device was told about, and so that a knob's reading has
-            // somewhere of ours to go back to.
             if (_first.Length > 0 || _second.Length > 0) Say(device, _first, _second);
         }
 
-        // A device that has been unplugged and put back is a device that has forgotten it was
-        // ever woken, while this still thinks it was. The write fails, and that is the moment
-        // to forget: the next one wakes it again. One message is lost to the replug, which
-        // nobody notices, and everything after it works.
         if (!_midi.Send(device, message))
         {
             lock (_woken) _woken.Remove(device);
 
-            // And what it was showing, because it is not showing it any more. Without this the
-            // guard above would refuse to send the very message that would wake it again, on
-            // the grounds that the screen already says that, which it no longer does.
             lock (_shown) _shown.Remove(device);
         }
     }

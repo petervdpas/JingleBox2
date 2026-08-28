@@ -25,7 +25,23 @@ public static class MachineValuesFor
     /// <summary>
     /// The adapter for this instrument, or nothing for a machine that has none.
     /// </summary>
+    /// <remarks>
+    /// Nothing comes back for a plugin, whose settings are its own and are read through the
+    /// plugin rather than through any of this. That is also the one machine whose panel this
+    /// program draws itself, since a plugin is not edited in the designer and has no description
+    /// to be drawn from.
+    ///
+    /// The instrument's own missing parts are filled in on the way past, since a machine that
+    /// has never been opened has no kit, no zones and no patch, and every reader below would
+    /// otherwise have to hold against nothing.
+    /// </remarks>
+    /// <param name="instrument">The instrument being read, or nothing.</param>
     /// <param name="shelf">Where a recording's takes are found. Only a sample wants it.</param>
+    /// <param name="kit">The kit the editor is already on, or nothing for a throwaway.</param>
+    /// <param name="patch">The synth patch the editor is already on, or nothing.</param>
+    /// <param name="mono">The mono synth patch the editor is already on, or nothing.</param>
+    /// <param name="zones">The key map the editor is already on, or nothing.</param>
+    /// <param name="sampler">The sampler's own settings, as the editor holds them, or nothing.</param>
     public static MachineValues? Instrument(
         TrackerInstrument? instrument,
         TakeLibrary? shelf = null,
@@ -64,8 +80,6 @@ public static class MachineValuesFor
                 return new RecordingValues(instrument, shelf);
 
             default:
-                // A plugin, whose settings are its own and are read through the plugin rather
-                // than through any of this.
                 return null;
         }
     }

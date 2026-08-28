@@ -30,37 +30,56 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="map">The zones these settings are on.</param>
 /// <param name="patch">The filter and the two envelopes they all go through.</param>
 /// <param name="about">
-/// Which zone, or nothing for whichever is in hand.
+/// Which zone, or nothing for whichever is in hand. The panel wants the zone in hand, because
+/// that is what a front panel shows; a preset wants a named one, because a preset holds the
+/// whole map. Both are the same mapping from a key to a thing on a zone, so they are the same
+/// class asked about a different zone.
 /// </param>
-/// <remarks>
-/// The panel wants the zone in hand, because that is what a front panel shows; a preset wants a
-/// named one, because a preset holds the whole map. Both are the same mapping from a key to a
-/// thing on a zone, so they are the same class asked about a different zone.
-/// </remarks>
 public sealed class SamplerValues(
     ZoneMapViewModel map,
     SamplerPatchViewModel patch,
     Func<SampleZoneViewModel?>? about = null) : MachineValues
 {
-    // Written out one by one, never built from a name or a loop, so every key in the app can be
-    // found by searching for the string that is in the file.
-
-    // ---- the zone in hand -------------------------------------------------
-
+    /// <summary>How loud the zone in hand plays.</summary>
+    /// <remarks>
+    /// The keys are written out one by one, never built from a name or a loop, so every key in
+    /// the application can be found by searching for the string that is in the machine's own
+    /// file. A key assembled at the call site never appears in the source at all, and both the
+    /// tools that hunt for an orphaned key and anybody grepping would miss it.
+    ///
+    /// Everything named "zone_" is about the zone in hand and changes meaning when another zone
+    /// is picked. Everything after them is about the instrument and is true of every zone.
+    /// </remarks>
     private const string LevelKey = "zone_level";
+
+    /// <summary>Where it sits across the stereo picture.</summary>
     private const string PanKey = "zone_pan";
+
+    /// <summary>How far it is tuned off its root, in cents.</summary>
     private const string FineKey = "zone_fine";
 
-    /// <summary>Which keys it answers to, and the one its recording was made at.</summary>
+    /// <summary>The lowest key it answers to.</summary>
     private const string LowKey = "zone_low";
+
+    /// <summary>And the highest.</summary>
     private const string HighKey = "zone_high";
+
+    /// <summary>The key its recording was made at, which everything else is pitched against.</summary>
     private const string RootKey = "zone_root";
 
-    /// <summary>Which part of the recording plays, and how it repeats.</summary>
+    /// <summary>Where in the recording it starts.</summary>
     private const string StartKey = "zone_start";
+
+    /// <summary>And where it ends.</summary>
     private const string EndKey = "zone_end";
+
+    /// <summary>Whether it repeats, and which way round.</summary>
     private const string LoopKey = "zone_loop";
+
+    /// <summary>Where the repeat goes back to.</summary>
     private const string LoopStartKey = "zone_loop_start";
+
+    /// <summary>And where it turns round.</summary>
     private const string LoopEndKey = "zone_loop_end";
 
     /// <summary>The recording on the zone in hand, which the Take control puts there.</summary>
@@ -69,12 +88,14 @@ public sealed class SamplerValues(
     /// <summary>What that zone is called, which is yours to type.</summary>
     private const string NameKey = "zone_name";
 
-    /// <summary>And the three things the panel reads out rather than setting.</summary>
+    /// <summary>The file it plays, said in one line, which the panel reads out rather than sets.</summary>
     private const string FileKey = "zone_file";
-    private const string KeysKey = "zone_keys";
-    private const string PitchKey = "zone_pitch";
 
-    // ---- the instrument ---------------------------------------------------
+    /// <summary>The stretch of keyboard it covers, in words.</summary>
+    private const string KeysKey = "zone_keys";
+
+    /// <summary>And its root, in words.</summary>
+    private const string PitchKey = "zone_pitch";
 
     /// <summary>
     /// Whether the zones are pieces of one recording rather than separate recordings.
@@ -87,25 +108,63 @@ public sealed class SamplerValues(
     /// </remarks>
     private const string ChoppedKey = "chopped";
 
+    /// <summary>The one filter every zone goes through: where it opens to.</summary>
     private const string CutoffKey = "cutoff";
+
+    /// <summary>The same, worded for a panel to print, since a frequency needs its unit.</summary>
     private const string CutoffTextKey = "cutoff_text";
+
+    /// <summary>How much it rings at the corner.</summary>
     private const string ResonanceKey = "resonance";
+
+    /// <summary>How far the filter envelope moves it.</summary>
     private const string EnvelopeAmountKey = "env_amount";
+
+    /// <summary>And whether it moves it up or down.</summary>
     private const string EnvelopePolarityKey = "env_polarity";
+
+    /// <summary>How much the key played opens it, so a map stays even across the keyboard.</summary>
     private const string KeyFollowKey = "key_follow";
 
+    /// <summary>The filter envelope: how long it takes to come up.</summary>
     private const string FilterAttackKey = "filter_attack";
+
+    /// <summary>How long it takes to fall to where it holds.</summary>
     private const string FilterDecayKey = "filter_decay";
+
+    /// <summary>Where it holds while the key is down.</summary>
     private const string FilterSustainKey = "filter_sustain";
+
+    /// <summary>And how long it takes to fall away after the key comes up.</summary>
     private const string FilterReleaseKey = "filter_release";
 
+    /// <summary>The amplifier envelope: how long the note takes to come up.</summary>
     private const string AttackKey = "attack";
+
+    /// <summary>How long it takes to fall to where it holds.</summary>
     private const string DecayKey = "decay";
+
+    /// <summary>Where it holds while the key is down.</summary>
     private const string SustainKey = "sustain";
+
+    /// <summary>And how long it takes to go quiet after the key comes up.</summary>
     private const string ReleaseKey = "release";
+
+    /// <summary>How loud the whole instrument plays, after everything else.</summary>
+    /// <remarks>
+    /// Named for what it is rather than after its key, since <see cref="LevelKey"/> is the zone's
+    /// and the two would otherwise read as the same setting.
+    /// </remarks>
     private const string LevelOutKey = "level";
 
-    /// <summary>Told when something moved, for saving the song and redrawing what else shows it.</summary>
+    /// <summary>The highest key on a keyboard, which is where a zone with no map of its own ends.</summary>
+    private const int TopKey = 119;
+
+    /// <summary>And the root a zone falls back to, which is the middle of that.</summary>
+    private const int MiddleKey = 48;
+
+    /// <summary>The last of the ways a window can repeat, so a file cannot name one past it.</summary>
+    private const double LastLoopMode = 2;
 
     /// <summary>The zone every zone key is about, or nothing before one is picked.</summary>
     private SampleZoneViewModel? Zone => about != null ? about() : map.Selected;
@@ -121,6 +180,12 @@ public sealed class SamplerValues(
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// With no zone picked, the zone half reads as the settings' own resting values rather than
+    /// as nought: a map covers the whole keyboard by default, so an unpicked zone reads back as
+    /// one that does.
+    /// </remarks>
     public override double Get(string key) => key switch
     {
         LevelKey => Zone?.Volume ?? 1,
@@ -128,8 +193,8 @@ public sealed class SamplerValues(
         FineKey => Zone?.FineCents ?? 0,
 
         LowKey => Zone?.Zone.Low ?? 0,
-        HighKey => Zone?.Zone.High ?? 119,
-        RootKey => Zone?.Zone.Root ?? 48,
+        HighKey => Zone?.Zone.High ?? TopKey,
+        RootKey => Zone?.Zone.Root ?? MiddleKey,
 
         StartKey => Shape?.Start ?? 0,
         EndKey => Shape?.End ?? 1,
@@ -159,10 +224,17 @@ public sealed class SamplerValues(
         _ => 0,
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The instrument's own half is tried first, because it is there whether or not a zone is
+    /// picked: a map with nothing selected still has a filter, and a knob on it should still
+    /// turn.
+    ///
+    /// The two edges of a zone are written the way the map moves them, whichever is travelling
+    /// outwards going first, or the two cross on the way and are turned round behind our back.
+    /// </remarks>
     protected override bool Write(string key, double value)
     {
-        // The instrument's own half first, because it is there whether or not a zone is picked:
-        // a map with nothing selected still has a filter.
         if (Patch(key, value) is { } mine) return mine;
 
         if (Zone is not { } zone) return false;
@@ -173,15 +245,14 @@ public sealed class SamplerValues(
             PanKey => Moved(zone.Pan, value, () => zone.Pan = value),
             FineKey => Moved(zone.FineCents, value, () => zone.FineCents = value),
 
-            // The edges the way the map moves them: whichever is travelling outwards goes first,
-            // or the two cross on the way and are turned round behind our back.
             LowKey => Moved(zone.Low, value, () => zone.Low = value),
             HighKey => Moved(zone.High, value, () => zone.High = value),
             RootKey => Moved(zone.Root, value, () => zone.Root = value),
 
             StartKey => Window(shape => shape.Start = value),
             EndKey => Window(shape => shape.End = value),
-            LoopKey => Window(shape => shape.LoopMode = (SampleLoopMode)Math.Clamp(Math.Round(value), 0, 2)),
+            LoopKey => Window(
+                shape => shape.LoopMode = (SampleLoopMode)Math.Clamp(Math.Round(value), 0, LastLoopMode)),
             LoopStartKey => Window(shape => shape.LoopStart = value),
             LoopEndKey => Window(shape => shape.LoopEnd = value),
 
@@ -192,6 +263,8 @@ public sealed class SamplerValues(
     /// <summary>
     /// The half of the machine that belongs to the instrument rather than to a zone.
     /// </summary>
+    /// <param name="key">Which setting is being written.</param>
+    /// <param name="value">Where it is being put.</param>
     /// <returns>Whether it moved, or nothing at all when the key is not one of these.</returns>
     /// <remarks>
     /// Every one of these says so when it moves, and that is the whole of why this exists. They
@@ -234,6 +307,7 @@ public sealed class SamplerValues(
         return moved;
     }
 
+    /// <inheritdoc/>
     public override string GetText(string key) => key switch
     {
         TakeKey => Zone?.Zone.FilePath ?? "",
@@ -245,6 +319,15 @@ public sealed class SamplerValues(
         _ => "",
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Only the take and the name are yours to set. The other three are what the panel reads out
+    /// about the zone, and there is nothing to write them into.
+    ///
+    /// A take goes on through the zone's own way of taking one, which names the zone after the
+    /// file unless the zone has a name somebody chose. A zone still called after the recording it
+    /// used to hold says the old recording is still on it.
+    /// </remarks>
     protected override bool WriteText(string key, string value)
     {
         if (Zone is not { } zone) return false;
@@ -254,9 +337,6 @@ public sealed class SamplerValues(
             case TakeKey:
                 if (FilePaths.Same(zone.Zone.FilePath, value)) return false;
 
-                // Through the zone's own way of taking one, which names it after the file unless
-                // the zone has a name somebody chose. A zone still called after the recording it
-                // used to hold says the old recording is still on it.
                 zone.Take(value);
 
                 return true;
@@ -282,6 +362,7 @@ public sealed class SamplerValues(
     /// property for any of this: the window is dragged on the picture rather than typed, and the
     /// picture reads the shape.
     /// </remarks>
+    /// <param name="write">Which end to move, and where to.</param>
     private bool Window(Action<SampleShape> write)
     {
         if (Shape is not { } shape) return false;

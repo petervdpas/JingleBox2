@@ -27,28 +27,73 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Switch : ThemedControl
 {
+    /// <summary>The air between the recess and the words that say what its positions mean.</summary>
     private const double LabelGap = 7;
+
+    /// <summary>
+    /// The air under the name at the top.
+    /// </summary>
+    /// <remarks>
+    /// The same a knob leaves under its own name and a fader under its. These three stand beside
+    /// each other in rows all over the app, and one of them leaving less read as crammed.
+    /// </remarks>
     private const double TitleGap = 4;
 
+    /// <summary>Backs <see cref="Label"/>, the name printed over the top.</summary>
     public static readonly StyledProperty<string?> LabelProperty =
         AvaloniaProperty.Register<Switch, string?>(nameof(Label));
 
-    /// <summary>How wide the recess is. Everything else on the switch is sized from it.</summary>
+    /// <summary>
+    /// Backs <see cref="SlotWidth"/>: how wide the recess is, and everything else on the switch
+    /// is sized from it.
+    /// </summary>
+    /// <remarks>
+    /// The handle is worked out from this rather than set beside it, so a switch made wider
+    /// cannot end up with a cap that no longer fills its well.
+    /// </remarks>
     public static readonly StyledProperty<double> SlotWidthProperty =
         AvaloniaProperty.Register<Switch, double>(nameof(SlotWidth), 21.0);
 
-    /// <summary>How far the handle travels, when the positions stack around it.</summary>
+    /// <summary>
+    /// Backs <see cref="SlotHeight"/>: how far the handle travels when the positions stack
+    /// around it.
+    /// </summary>
+    /// <remarks>
+    /// Only read by the stacked shape. With the positions listed alongside, the recess runs the
+    /// whole height the switch was given, since it has to reach every position in the list.
+    /// </remarks>
     public static readonly StyledProperty<double> SlotHeightProperty =
         AvaloniaProperty.Register<Switch, double>(nameof(SlotHeight), 26.0);
 
+    /// <summary>
+    /// Backs <see cref="FontSize"/>, the size the positions are written at.
+    /// </summary>
+    /// <remarks>
+    /// Small, because there are two or three of these words on a control the width of a knob,
+    /// and they are read once to learn the switch rather than every time it is thrown.
+    /// </remarks>
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<Switch, double>(nameof(FontSize), 8.5);
 
-    /// <summary>The name over the top. Smaller than the positions by default.</summary>
+    /// <summary>
+    /// Backs <see cref="TitleSize"/>, the size of the name over the top.
+    /// </summary>
+    /// <remarks>
+    /// Larger than the positions under it: the name is what the eye runs along when it is
+    /// looking for a control, and the positions are what it reads once it has found one.
+    /// </remarks>
     public static readonly StyledProperty<double> TitleSizeProperty =
         AvaloniaProperty.Register<Switch, double>(nameof(TitleSize), 10.0);
 
-    /// <summary>How many lines of room the name gets, so a row of these lines up.</summary>
+    /// <summary>
+    /// Backs <see cref="TitleLines"/>: how many lines of room the name gets, used or not.
+    /// </summary>
+    /// <remarks>
+    /// A row of controls whose names are different lengths is a row whose handles sit at
+    /// different heights, because a name that folds onto two lines pushes what is under it down
+    /// and a short one does not. Reserving the same room for every name in a row puts them all
+    /// back on one line. The same rule a knob follows.
+    /// </remarks>
     public static readonly StyledProperty<int> TitleLinesProperty =
         AvaloniaProperty.Register<Switch, int>(nameof(TitleLines), 1);
 
@@ -64,22 +109,53 @@ public class Switch : ThemedControl
     public static readonly StyledProperty<double> HeadRoomProperty =
         AvaloniaProperty.Register<Switch, double>(nameof(HeadRoom));
 
+    /// <summary>
+    /// Backs <see cref="IsChecked"/>, which is the whole of the state for a plain on and off.
+    /// </summary>
+    /// <remarks>
+    /// Two way, because a switch is thrown by hand and whatever it is bound to has to hear about
+    /// it. Ignored entirely once <see cref="ItemsSource"/> is set: the position then lives in
+    /// <see cref="SelectedItem"/>, and two places holding it would eventually disagree.
+    /// </remarks>
     public static readonly StyledProperty<bool> IsCheckedProperty =
         AvaloniaProperty.Register<Switch, bool>(nameof(IsChecked), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
-    /// <summary>What the two positions are called when this is a plain on and off.</summary>
+    /// <summary>Backs <see cref="OnLabel"/>, the upper position of a plain on and off.</summary>
     public static readonly StyledProperty<string> OnLabelProperty =
         AvaloniaProperty.Register<Switch, string>(nameof(OnLabel), "On");
 
+    /// <summary>
+    /// Backs <see cref="OffLabel"/>, the lower one.
+    /// </summary>
+    /// <remarks>
+    /// On and off is what a switch nobody has worded says, which is true of every switch ever
+    /// made and useful on none of them. A machine that means something else says so.
+    /// </remarks>
     public static readonly StyledProperty<string> OffLabelProperty =
         AvaloniaProperty.Register<Switch, string>(nameof(OffLabel), "Off");
 
+    /// <summary>
+    /// Backs <see cref="ItemsSource"/>: the positions, when they are more than an on and an off.
+    /// </summary>
+    /// <remarks>
+    /// The same pair of properties a combo box takes, deliberately, so one can be swapped for
+    /// the other without touching the binding underneath.
+    /// </remarks>
     public static readonly StyledProperty<IEnumerable?> ItemsSourceProperty =
         AvaloniaProperty.Register<Switch, IEnumerable?>(nameof(ItemsSource));
 
+    /// <summary>Backs <see cref="SelectedItem"/>, which position of the list the handle is in.</summary>
     public static readonly StyledProperty<object?> SelectedItemProperty =
         AvaloniaProperty.Register<Switch, object?>(nameof(SelectedItem), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
+    /// <summary>
+    /// Says which properties change the picture and which change the size, and makes a switch
+    /// take the keyboard.
+    /// </summary>
+    /// <remarks>
+    /// Focusable is overridden rather than set in the constructor so that a style can still take
+    /// it back off a switch that is only there to be read.
+    /// </remarks>
     static Switch()
     {
         AffectsRender<Switch>(
@@ -95,42 +171,49 @@ public class Switch : ThemedControl
         FocusableProperty.OverrideDefaultValue<Switch>(true);
     }
 
+    /// <summary>What the switch is called, printed over the top of it.</summary>
     public string? Label
     {
         get => GetValue(LabelProperty);
         set => SetValue(LabelProperty, value);
     }
 
+    /// <inheritdoc cref="SlotWidthProperty"/>
     public double SlotWidth
     {
         get => GetValue(SlotWidthProperty);
         set => SetValue(SlotWidthProperty, value);
     }
 
+    /// <inheritdoc cref="SlotHeightProperty"/>
     public double SlotHeight
     {
         get => GetValue(SlotHeightProperty);
         set => SetValue(SlotHeightProperty, value);
     }
 
+    /// <inheritdoc cref="FontSizeProperty"/>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
     }
 
+    /// <inheritdoc cref="TitleSizeProperty"/>
     public double TitleSize
     {
         get => GetValue(TitleSizeProperty);
         set => SetValue(TitleSizeProperty, value);
     }
 
+    /// <inheritdoc cref="TitleLinesProperty"/>
     public int TitleLines
     {
         get => GetValue(TitleLinesProperty);
         set => SetValue(TitleLinesProperty, value);
     }
 
+    /// <inheritdoc cref="HeadRoomProperty"/>
     public double HeadRoom
     {
         get => GetValue(HeadRoomProperty);
@@ -144,32 +227,44 @@ public class Switch : ThemedControl
     /// <summary>The handle, sized from the recess it sits in so the two cannot drift apart.</summary>
     private double HandleWidth => Math.Max(6, SlotWidth - 6);
 
+    /// <summary>
+    /// How deep the handle is along its travel, also taken from the recess width.
+    /// </summary>
+    /// <remarks>
+    /// A little over half the width, so the cap reads as a handle lying across the well rather
+    /// than as a square plug filling it.
+    /// </remarks>
     private double HandleHeight => Math.Max(5, SlotWidth * 0.52);
 
+    /// <inheritdoc cref="IsCheckedProperty"/>
     public bool IsChecked
     {
         get => GetValue(IsCheckedProperty);
         set => SetValue(IsCheckedProperty, value);
     }
 
+    /// <summary>What the upper position is called, on a plain on and off.</summary>
     public string OnLabel
     {
         get => GetValue(OnLabelProperty);
         set => SetValue(OnLabelProperty, value);
     }
 
+    /// <summary>And the lower one.</summary>
     public string OffLabel
     {
         get => GetValue(OffLabelProperty);
         set => SetValue(OffLabelProperty, value);
     }
 
+    /// <inheritdoc cref="ItemsSourceProperty"/>
     public IEnumerable? ItemsSource
     {
         get => GetValue(ItemsSourceProperty);
         set => SetValue(ItemsSourceProperty, value);
     }
 
+    /// <summary>Which of <see cref="ItemsSource"/> the handle is in, and what a throw writes.</summary>
     public object? SelectedItem
     {
         get => GetValue(SelectedItemProperty);
@@ -191,7 +286,13 @@ public class Switch : ThemedControl
         }
     }
 
-    /// <summary>Which position the handle is in. Zero is the top.</summary>
+    /// <summary>
+    /// Which position the handle is in. Zero is the top.
+    /// </summary>
+    /// <remarks>
+    /// A selection that matches none of the positions reads as the top rather than as nothing,
+    /// so a switch bound to a value it has never heard of still draws a handle somewhere.
+    /// </remarks>
     private int Index
     {
         get
@@ -208,6 +309,13 @@ public class Switch : ThemedControl
         }
     }
 
+    /// <summary>
+    /// Puts the handle in a position, writing to whichever of the two bindings this switch uses.
+    /// </summary>
+    /// <remarks>
+    /// Held inside the list rather than refused, since the position is worked out from where a
+    /// click landed and a click near an end rounds past it.
+    /// </remarks>
     private void Move(int index)
     {
         var positions = Positions;
@@ -238,6 +346,15 @@ public class Switch : ThemedControl
     /// </remarks>
     private bool Stacked => Positions.Count == 2;
 
+    /// <summary>
+    /// Room for the name, the recess, and the positions in whichever of the two arrangements
+    /// this switch is drawn in.
+    /// </summary>
+    /// <remarks>
+    /// Stacked, the height is the taller of what the words and the travel need and what the
+    /// scribe line asks for, since a switch pushed down to stand level with the knobs beside it
+    /// is taller than one that follows its own name.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize)
     {
         _room = double.IsInfinity(availableSize.Width) ? double.PositiveInfinity : availableSize.Width;
@@ -279,6 +396,7 @@ public class Switch : ThemedControl
         return new Size(width, height);
     }
 
+    /// <summary>Paints the name, then the switch in whichever arrangement its positions call for.</summary>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
@@ -298,7 +416,17 @@ public class Switch : ThemedControl
         else RenderBeside(context, palette, positions, top);
     }
 
-    /// <summary>Name on top, one answer above the handle and the other below it.</summary>
+    /// <summary>
+    /// Name on top, one answer above the handle and the other below it.
+    /// </summary>
+    /// <remarks>
+    /// The recess goes on the scribe line when there is one, and the word above it is fitted
+    /// into whatever room that leaves rather than pushing the recess down: the whole point of
+    /// the scribe line is that everything in the row stands on it.
+    ///
+    /// The handle is drawn at whichever end of its travel is on, three pixels in from that end,
+    /// which is what keeps it inside the well's rounded cap.
+    /// </remarks>
     private void RenderStacked(DrawingContext context, ThemePalette palette, IReadOnlyList<object> positions, double top)
     {
         var upper = Text(Naming.Of(positions[0]), FontSize, Index == 0 ? palette.TextBrush : palette.MutedBrush);
@@ -306,8 +434,6 @@ public class Switch : ThemedControl
 
         double middle = Bounds.Width / 2;
 
-        // The slot goes on the scribe line when there is one, and the word above it is fitted
-        // into whatever room that leaves rather than pushing the slot down.
         context.DrawText(upper, new Point(middle - upper.Width / 2, top));
 
         double slotTop = top + upper.Height + LabelGap;
@@ -315,7 +441,6 @@ public class Switch : ThemedControl
 
         Well(context, palette, slot);
 
-        // The handle sits at whichever end is on.
         double handleY = Index == 0 ? slot.Top + 3 : slot.Bottom - HandleHeight - 3;
         Handle(context, palette, new Rect(middle - HandleWidth / 2, handleY, HandleWidth, HandleHeight));
 
@@ -392,6 +517,15 @@ public class Switch : ThemedControl
             new Point(handle.Left + 3, grip), new Point(handle.Right - 3, grip));
     }
 
+    /// <summary>
+    /// Throws the switch.
+    /// </summary>
+    /// <remarks>
+    /// A two position switch is thrown wherever it is clicked: there is nothing to aim at, and
+    /// asking somebody to hit a nine pixel label is not a switch, it is a test. With the
+    /// positions listed alongside there is something to aim at, so a click out on the names goes
+    /// to the nearest one and a click on the recess itself steps to the next.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -400,8 +534,6 @@ public class Switch : ThemedControl
 
         Focus();
 
-        // A two position switch is thrown wherever it is clicked: there is nothing to aim at,
-        // and asking somebody to hit a nine pixel label is not a switch, it is a test.
         if (Stacked)
         {
             Step(1);
@@ -427,6 +559,14 @@ public class Switch : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// One notch of the wheel is one position, up the list rather than down it.
+    /// </summary>
+    /// <remarks>
+    /// The event is marked handled: over a switch the wheel throws the switch rather than
+    /// scrolling the panel it sits in, and a panel that scrolled underneath the hand would take
+    /// the switch out from under it.
+    /// </remarks>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
@@ -435,6 +575,16 @@ public class Switch : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Arrows walk the positions; space and enter step to the next.
+    /// </summary>
+    /// <remarks>
+    /// Up and left both go one way and down and right the other, because a switch stacks its
+    /// positions in one arrangement and lists them in the other, and which pair somebody reaches
+    /// for follows whichever they are looking at.
+    ///
+    /// A key this does not answer is left unhandled, so it carries on out to the panel.
+    /// </remarks>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -447,6 +597,7 @@ public class Switch : ThemedControl
         }
     }
 
+    /// <summary>A piece of text laid out with no width limit, for a position name, which never folds.</summary>
     private FormattedText Text(string? text, double size, IBrush brush) =>
         Text(text, size, brush, double.PositiveInfinity);
 
@@ -465,10 +616,15 @@ public class Switch : ThemedControl
         return built;
     }
 
-    /// <summary>How wide the name may be: whatever the layout offered.</summary>
+    /// <summary>
+    /// How wide the name may be: whatever the layout offered, or nothing at all when it offered
+    /// no limit.
+    /// </summary>
+    /// <remarks>
+    /// Taken during the measure and used during it, since that is the only moment anything tells
+    /// a control how much room it is being given.
+    /// </remarks>
     private double _room = double.PositiveInfinity;
-
-    /// <summary>Lighter or darker than a colour, for the light falling on a moulded part.</summary>
 }
 
 /// <summary>How a value's name is written on a panel.</summary>
@@ -488,6 +644,10 @@ public static class Naming
     /// An enum's name with the words spaced out: LowPass reads as "Low pass", which is what a
     /// panel would have printed on it. Acronyms keep their capitals.
     /// </summary>
+    /// <remarks>
+    /// Only the first letter of the name is left as it was written, so the result is a phrase
+    /// rather than a run of capitalised words: a front panel prints "Low pass", not "Low Pass".
+    /// </remarks>
     public static string Of(object? value)
     {
         string raw = value?.ToString() ?? "";

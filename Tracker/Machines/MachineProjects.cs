@@ -20,6 +20,12 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public static class MachineProjects
 {
+    /// <summary>The machines this installation has, by id.</summary>
+    /// <remarks>
+    /// Case is ignored because an id is a folder name and Windows would call two spellings of
+    /// one machine the same folder while Linux would not. Agreeing with the file system is the
+    /// only answer that does not depend on which computer the machine was built on.
+    /// </remarks>
     private static readonly Dictionary<string, MachineProject> Found =
         new(StringComparer.OrdinalIgnoreCase);
 

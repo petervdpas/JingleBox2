@@ -13,9 +13,28 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class TrackStripViewModel : ObservableObject
 {
+    /// <summary>
+    /// The song's own settings for this track, written into rather than copied out of.
+    /// </summary>
+    /// <remarks>
+    /// A strip that held its own numbers would leave the mixer and the mix disagreeing until
+    /// something saved, and the mix is read on the audio thread while the fader is moving.
+    /// </remarks>
     private readonly TrackMix _strip;
+
+    /// <summary>
+    /// Told after anything on the strip moves, so the song knows it has something to save and
+    /// whatever is already sounding follows the fader.
+    /// </summary>
     private readonly Action _changed;
 
+    /// <summary>
+    /// Builds a strip over one track's settings, or over the master when the track is -1.
+    /// </summary>
+    /// <remarks>
+    /// Nothing keys the master and nothing is keyed off it, so it is given no ducking sources at
+    /// all: everything has already been summed by the time the master is reached.
+    /// </remarks>
     public TrackStripViewModel(int track, TrackMix strip, string instrumentName, int trackCount, Action changed)
     {
         Track = track;
@@ -23,8 +42,6 @@ public sealed class TrackStripViewModel : ObservableObject
         instrument = instrumentName;
         _changed = changed;
 
-        // Nothing keys the master and nothing is keyed off it: everything has already been
-        // summed by the time it is reached.
         DuckKeys = track < 0 ? Array.Empty<DuckKey>() : BuildKeys(track, trackCount);
     }
 
@@ -34,6 +51,10 @@ public sealed class TrackStripViewModel : ObservableObject
     /// </summary>
     public IReadOnlyList<DuckKey> DuckKeys { get; }
 
+    /// <summary>
+    /// Every other track, and None at the top. The strip's own track is left out, since a track
+    /// keying itself is a gate rather than a duck.
+    /// </summary>
     private static IReadOnlyList<DuckKey> BuildKeys(int track, int trackCount)
     {
         var keys = new List<DuckKey> { DuckKey.None };
@@ -48,8 +69,10 @@ public sealed class TrackStripViewModel : ObservableObject
         return keys;
     }
 
+    /// <summary>Which track this strip is, or -1 for the master, which is not a track.</summary>
     public int Track { get; }
 
+    /// <summary>Backing field for <see cref="IsSelected"/>.</summary>
     private bool selected;
 
     /// <summary>True for the strip the effect panel is about.</summary>
@@ -65,6 +88,7 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
+    /// <summary>Backing field for <see cref="EffectName"/>.</summary>
     private string effect = "";
 
     /// <summary>The effect running on this track, or empty. Shown on the strip as a tag.</summary>
@@ -81,16 +105,21 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
+    /// <summary>Whether there is a tag to draw at all.</summary>
     public bool HasEffect => EffectName.Length > 0;
 
-    /// <summary>The same two-digit form the pattern header and the instrument badges use.</summary>
     /// <summary>True for the strip the whole mix goes through, which is not a track.</summary>
     public bool IsMaster => Track < 0;
 
+    /// <summary>
+    /// What is written at the top of the strip: MASTER, or the track in the same two-digit form
+    /// the pattern header and the instrument badges use.
+    /// </summary>
     public string Label => IsMaster
         ? "MASTER"
         : "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
+    /// <summary>Backing field for <see cref="InstrumentName"/>.</summary>
     private string instrument;
 
     /// <summary>Settable, so renaming an instrument does not mean rebuilding the whole mixer.</summary>
@@ -116,6 +145,14 @@ public sealed class TrackStripViewModel : ObservableObject
         ? Label + ": no instrument"
         : Label + ": " + instrument;
 
+    /// <summary>
+    /// The track's level as an amplitude, held inside the range the mix allows.
+    /// </summary>
+    /// <remarks>
+    /// This is what is stored and what the engine multiplies by. The fader shows
+    /// <see cref="VolumeDecibels"/>, and both are announced whenever either moves, or a knob
+    /// pointed at one would leave the other reading the old value.
+    /// </remarks>
     public double Volume
     {
         get => _strip.Volume;
@@ -133,6 +170,7 @@ public sealed class TrackStripViewModel : ObservableObject
         set => Volume = GainScale.ToAmplitude(value);
     }
 
+    /// <summary>Where the track sits, -1 hard left to 1 hard right, nought in the middle.</summary>
     public double Pan
     {
         get => _strip.Pan;
@@ -140,6 +178,10 @@ public sealed class TrackStripViewModel : ObservableObject
     }
 
 
+    /// <summary>
+    /// Whether the track is silenced. Solo elsewhere silences it too, and does not touch this:
+    /// what a strip is muted to is a setting, and what it can be heard through is the mix.
+    /// </summary>
     public bool Mute
     {
         get => _strip.Mute;
@@ -153,22 +195,39 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
+    /// <summary>Backing field for <see cref="Left"/>.</summary>
     private double left;
+
+    /// <summary>Backing field for <see cref="Right"/>.</summary>
     private double right;
 
-    /// <summary>What the track is sounding right now, for the strip's meter.</summary>
+    /// <summary>
+    /// What the track is sounding right now on the left, for the strip's meter.
+    /// </summary>
+    /// <remarks>
+    /// Written from outside by whatever is polling the mixer, rather than read here: the meters
+    /// are polled while anything is sounding, which is a rule about the whole mix and not about
+    /// one strip. The master's reading is a peak off the last buffer and goes stale, so it says
+    /// nothing once it is older than the mixer's hold; a track's is worked out from the voices
+    /// that are sounding and falls on its own.
+    /// </remarks>
     public double Left
     {
         get => left;
         set => SetProperty(ref left, value);
     }
 
+    /// <summary>And the right, written the same way.</summary>
     public double Right
     {
         get => right;
         set => SetProperty(ref right, value);
     }
 
+    /// <summary>
+    /// Whether this track is soloed. The master has no solo, since soloing everything is what
+    /// it is already doing.
+    /// </summary>
     public bool Solo
     {
         get => _strip.Solo;
@@ -193,6 +252,13 @@ public sealed class TrackStripViewModel : ObservableObject
             nameof(Duck));
     }
 
+    /// <summary>
+    /// How long the duck takes to let go after the key track stops, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// The one value on the strip that had no name for a link to point at until the strip was
+    /// gone over control by control; see <c>Midi/MixLinks.cs</c>.
+    /// </remarks>
     public double DuckReleaseMs
     {
         get => _strip.DuckReleaseMs;
@@ -200,6 +266,15 @@ public sealed class TrackStripViewModel : ObservableObject
             TrackMix.MinDuckReleaseMs, TrackMix.MaxDuckReleaseMs, nameof(DuckReleaseMs));
     }
 
+    /// <summary>
+    /// Which track this strip ducks to, as the picker's own row rather than as a number.
+    /// </summary>
+    /// <remarks>
+    /// Read back off <see cref="DuckKeys"/> each time rather than kept, so a key naming a track
+    /// that no longer exists reads as None instead of as a row nothing matches. A knob cannot
+    /// be pointed at this: it names a track rather than a value, the same reason a take picker
+    /// cannot be pointed at.
+    /// </remarks>
     public DuckKey DuckKey
     {
         get
@@ -223,6 +298,25 @@ public sealed class TrackStripViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Writes one number into the mix, held inside its range, and only when it really moved.
+    /// </summary>
+    /// <remarks>
+    /// A value that is not a number is read as the floor rather than being written through: a
+    /// NaN reaching the mix is silence at best and a stuck strip at worst, and it can arrive
+    /// from an empty text box. The threshold below which nothing is announced is a tenth of a
+    /// thousandth, which is finer than any of these values is drawn or heard, and it is what
+    /// stops a fader dragged across its travel announcing the same number a hundred times.
+    /// </remarks>
+    /// <param name="assign">Puts the value into the mix, which is the only thing that knows where it goes.</param>
+    /// <param name="current">Where the mix stands now, so a value arriving as itself announces nothing.</param>
+    /// <param name="value">What is being asked for, before it has been bounded.</param>
+    /// <param name="min">The bottom of the value's own range, and where a NaN lands.</param>
+    /// <param name="max">The top of the value's own range.</param>
+    /// <param name="changed">
+    /// Every name that now reads differently, since one number can be two properties: a level
+    /// is an amplitude and a reading in decibels.
+    /// </param>
     private void Set(Action<double> assign, double current, double value, double min, double max, params string[] changed)
     {
         double clamped = double.IsNaN(value) ? min : Math.Clamp(value, min, max);
@@ -238,9 +332,18 @@ public sealed class TrackStripViewModel : ObservableObject
 }
 
 /// <summary>A track a side chain can listen to, as the mixer's picker shows it.</summary>
+/// <param name="Track">
+/// Which track, or <see cref="TrackMix.NoKey"/> for the row that means no side chain.
+/// </param>
+/// <param name="Label">
+/// What the row says: the same two-digit track name the pattern header uses, so the picker and
+/// the pattern cannot come to call one track two things.
+/// </param>
 public sealed record DuckKey(int Track, string Label)
 {
+    /// <summary>No side chain at all, which is the row at the top of every picker.</summary>
     public static readonly DuckKey None = new(TrackMix.NoKey, "None");
 
+    /// <summary>Its label, so a picker handed rows rather than text still reads.</summary>
     public override string ToString() => Label;
 }

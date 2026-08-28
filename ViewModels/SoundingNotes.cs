@@ -21,9 +21,27 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class SoundingNotes
 {
+    /// <summary>
+    /// How often the lit keys are counted down, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Twenty-five beats a second, which is finer than a key going out can be seen and coarse
+    /// enough that a room full of nothing costs nothing. A note's length is turned into a whole
+    /// number of these and is never fewer than one, so the shortest thing anybody can play still
+    /// lights its key for long enough to be seen.
+    /// </remarks>
     private const int TickMs = 40;
 
+    /// <summary>How many beats each lit semitone has left before it goes out.</summary>
     private readonly Dictionary<int, int> _left = new();
+
+    /// <summary>
+    /// Runs exactly while something is lit, started by the first note and stopped by the last.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not a timer left running: the panels this serves are open for a whole
+    /// session and are usually looking at silence.
+    /// </remarks>
     private readonly DispatcherTimer _clock;
 
     /// <summary>
@@ -35,6 +53,7 @@ public sealed class SoundingNotes
     /// </remarks>
     private int _alone = -1;
 
+    /// <summary>Sets the clock up and leaves it stopped, since nothing is lit yet.</summary>
     public SoundingNotes()
     {
         _clock = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickMs) };
@@ -64,21 +83,38 @@ public sealed class SoundingNotes
     public event Action<Note>? Hit;
 
     /// <summary>A note has just been played, and should light for as long as it sounds.</summary>
+    /// <param name="note">Which key to light, and an unplayable one for an OFF row, which puts a key out.</param>
+    /// <param name="seconds">
+    /// How long it will sound, so the key goes out on its own. Zero where nobody knows, which
+    /// leaves it lit until something else puts it out.
+    /// </param>
     /// <param name="alone">
     /// True for a note from a track, which has one voice: it puts out whatever that track was
     /// sounding. False for a note played by hand, which piles up with the others.
     /// </param>
+    /// <remarks>
+    /// Notes arrive from the clock thread, and <see cref="Lit"/> is what a keyboard draws from,
+    /// so anything off the drawing thread is posted to it rather than touching the collection
+    /// where it stands.
+    ///
+    /// A track's voice stops before the next one starts, so its key goes out first. An OFF row
+    /// arrives here as a note that cannot be played, which is exactly that and no more: the key
+    /// goes out and nothing is lit in its place.
+    ///
+    /// Struck again while still lit, a key stays lit from now rather than from when it was
+    /// first hit, so a note repeated quickly does not go dark under the second press.
+    ///
+    /// <see cref="Ticked"/> is raised at once as well as on the clock, so a cursor that follows
+    /// it appears with the note rather than a fortieth of a second after it.
+    /// </remarks>
     public void Struck(Note note, double seconds, bool alone = false)
     {
-        // Off the clock thread this would touch the collection a keyboard is drawing from.
         if (!Dispatcher.UIThread.CheckAccess())
         {
             Dispatcher.UIThread.Post(() => Struck(note, seconds, alone));
             return;
         }
 
-        // A track's voice stops before the next one starts, so its key goes out first. An OFF
-        // row arrives here as a note that cannot be played, which is exactly that and no more.
         if (alone && _alone >= 0)
         {
             _left.Remove(_alone);
@@ -94,12 +130,10 @@ public sealed class SoundingNotes
 
         if (!_left.ContainsKey(note.Semitone)) Lit.Add(note.Semitone);
 
-        // Struck again while still lit, it stays lit from now rather than from last time.
         _left[note.Semitone] = ticks;
 
         if (!_clock.IsEnabled) _clock.Start();
 
-        // At once, so a cursor appears with the note rather than a fortieth of a second later.
         Ticked?.Invoke();
 
         if (!alone) Hit?.Invoke(note);
@@ -122,6 +156,14 @@ public sealed class SoundingNotes
         Ticked?.Invoke();
     }
 
+    /// <summary>
+    /// Counts every lit key down one beat and puts out the ones that have run out.
+    /// </summary>
+    /// <remarks>
+    /// The keys are copied before they are walked, since a key going out is taken out of the
+    /// dictionary being read. Nothing sounding is nothing to count down, so the clock stops
+    /// rather than idling over an empty room.
+    /// </remarks>
     private void Tick()
     {
         foreach (int semitone in _left.Keys.ToList())
@@ -140,7 +182,6 @@ public sealed class SoundingNotes
             if (_alone == semitone) _alone = -1;
         }
 
-        // Nothing sounding is nothing to count down, so the timer stops rather than idling.
         if (_left.Count == 0) _clock.Stop();
 
         Ticked?.Invoke();

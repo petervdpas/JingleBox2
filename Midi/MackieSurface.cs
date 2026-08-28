@@ -44,6 +44,7 @@ public sealed class MackieSurface
     /// <summary>What every message to one of these begins with. 0x14 is a Mackie Control.</summary>
     private static readonly byte[] Head = { 0xF0, 0x00, 0x00, 0x66, 0x14 };
 
+    /// <summary>How many strips a surface shows at once. Eight, on everything that speaks this.</summary>
     private const int Strips = 8;
 
     /// <summary>Characters one strip gets on one line. Seven, on every surface that speaks this.</summary>
@@ -62,11 +63,26 @@ public sealed class MackieSurface
     /// <summary>Lit from the centre outward, which is what a pan wants.</summary>
     private const int FromCentre = 1;
 
+    /// <summary>What a fader's fourteen bits count up to. The same number the router reads.</summary>
+    private const double Travel = 16383.0;
+
     private readonly IMidiService _midi;
     private readonly IControlTargets _targets;
     private readonly Func<int> _tracks;
     private readonly Func<int, string> _names;
 
+    /// <param name="midi">
+    /// Where the messages go out, on the port the surface was last heard on rather than one
+    /// that was configured. See <see cref="Device"/>.
+    /// </param>
+    /// <param name="targets">
+    /// What the faders, the rings and the lights are reading: the mixer, through the same door
+    /// a link written by hand goes through.
+    /// </param>
+    /// <param name="tracks">
+    /// How many there are, so a strip past the end of the song is left dark rather than showing
+    /// whatever the last song put there.
+    /// </param>
     /// <param name="names">What to call each track, for the words under its fader.</param>
     public MackieSurface(IMidiService midi, IControlTargets targets, Func<int> tracks, Func<int, string> names)
     {
@@ -89,13 +105,33 @@ public sealed class MackieSurface
     /// <summary>Which track the leftmost strip is on. Set by the router when it banks.</summary>
     public int Bank { get; set; }
 
+    /// <summary>
+    /// What the surface was last told, per strip, so it is never told the same thing twice.
+    /// </summary>
+    /// <remarks>
+    /// Not tidiness: a display line is sixty two bytes, there are two of them, and the mix moves
+    /// for all sorts of reasons that change nothing on the desk. Started at
+    /// <see cref="int.MinValue"/>, which is a value no control can hold, so the first write of
+    /// each always goes.
+    /// </remarks>
     private readonly int[] _faders = Fresh(Strips);
+
+    /// <summary>The ring of lights round each knob, as last sent.</summary>
     private readonly int[] _rings = Fresh(Strips);
+
+    /// <summary>The mute lights, as last sent.</summary>
     private readonly int[] _mutes = Fresh(Strips);
+
+    /// <summary>And the solo lights.</summary>
     private readonly int[] _solos = Fresh(Strips);
+
+    /// <summary>Which faders have a hand on them, so their motors are left alone.</summary>
     private readonly bool[] _hands = new bool[Strips];
+
+    /// <summary>The two lines of the display, as last sent.</summary>
     private readonly string[] _lines = { "", "" };
 
+    /// <summary>A row of nothing-has-been-sent, which is a value no control can hold.</summary>
     private static int[] Fresh(int many)
     {
         var made = new int[many];
@@ -170,15 +206,21 @@ public sealed class MackieSurface
         _lines[0] = _lines[1] = "";
     }
 
+    /// <summary>
+    /// Drives one fader to where its level is, unless a hand is on it.
+    /// </summary>
+    /// <remarks>
+    /// A hand wins. Whatever the value says, a fader somebody is holding is where they are
+    /// holding it, and driving the motor against them feels like a fault rather than a policy.
+    /// </remarks>
     private void Fader(int strip)
     {
-        // A hand is on it. Whatever the value says, this fader is where somebody is holding it.
         if (_hands[strip]) return;
 
         if (Aim(strip, MixControl.Volume) is not { } target) return;
 
         double part = Part(target);
-        int position = (int)Math.Round(part * 16383.0);
+        int position = (int)Math.Round(part * Travel);
 
         if (position == _faders[strip]) return;
 
@@ -187,14 +229,20 @@ public sealed class MackieSurface
         Send(new byte[] { (byte)(0xE0 | strip), (byte)(position & 0x7F), (byte)((position >> 7) & 0x7F) });
     }
 
+    /// <summary>
+    /// Lights the ring round a knob to show where the pan is.
+    /// </summary>
+    /// <remarks>
+    /// One to eleven round the ring, lit outward from the centre, which is what a pan wants. The
+    /// centre light comes on when the value is near enough the middle for a hand to have meant
+    /// the middle.
+    /// </remarks>
     private void Ring(int strip)
     {
         if (Aim(strip, MixControl.Pan) is not { } target) return;
 
         double part = Part(target);
 
-        // One to eleven round the ring, and the centre light when it is near enough the middle
-        // for a hand to have meant the middle.
         int lit = (int)Math.Round(part * 10.0) + 1;
         int value = (FromCentre << 4) | (lit & 0x0F);
 
@@ -207,6 +255,7 @@ public sealed class MackieSurface
         Send(new byte[] { 0xB0, (byte)(RingFrom + strip), (byte)value });
     }
 
+    /// <summary>One button light, lit at 0x7F and dark at nothing.</summary>
     private void Light(int strip, int from, MixControl what, int[] was)
     {
         if (Aim(strip, what) is not { } target) return;
@@ -245,6 +294,7 @@ public sealed class MackieSurface
         Line(Second, bottom.ToString(), 1);
     }
 
+    /// <summary>One line of the display, as fifty six characters starting at that offset.</summary>
     private void Line(byte at, string said, int which)
     {
         if (said == _lines[which]) return;
@@ -278,6 +328,7 @@ public sealed class MackieSurface
         return span <= 0 ? 0 : Math.Clamp((target.Value - target.Min) / span, 0, 1);
     }
 
+    /// <summary>What a strip is pointed at, or nothing when the bank has run past the tracks.</summary>
     private IControlTarget? Aim(int strip, MixControl what) =>
         Bank + strip >= _tracks()
             ? null
@@ -289,15 +340,20 @@ public sealed class MackieSurface
                 Track = Bank + strip
             });
 
+    /// <summary>
+    /// Sends it, and forgets what the surface was showing when it will not go.
+    /// </summary>
+    /// <remarks>
+    /// The port having gone means the surface is not showing what this thinks it is showing, and
+    /// without forgetting, the compare-before-send in every method above would refuse to send the
+    /// very message that would put it back.
+    /// </remarks>
     private void Send(byte[] bytes)
     {
         if (Device.Length == 0) return;
 
         if (!_midi.Send(Device, bytes))
         {
-            // The port has gone. Forget what it was showing, because it is not showing it any
-            // more, and the guard above would otherwise refuse to send the very message that
-            // would put it back.
             Gone();
 
             Log.Write(LogArea.Midi, () => "mackie: '" + Device + "' will not take a message, so what it shows is forgotten");

@@ -36,6 +36,7 @@ public static class AudioDecode
     /// <summary>How much is read from BASS at a time. One page of samples, not one file.</summary>
     private const int Block = 32768;
 
+    /// <summary>How wide one sample is here, which is sixteen bits everywhere in this app.</summary>
     private const int BytesPerSample = 2;
 
     /// <summary>
@@ -45,7 +46,13 @@ public static class AudioDecode
     /// A decoding channel rather than a playing one: BASS hands the samples back instead of
     /// sending them to a device, so this neither makes a sound nor needs one. Sixteen bit is
     /// what a channel gives without being asked, which is what this app keeps anyway.
+    ///
+    /// Nought back from a read is the end of the file, and below nought is BASS saying it went
+    /// wrong, which for a file that is already open means a truncated one: what was read before
+    /// it is still good and is kept.
     /// </remarks>
+    /// <param name="path">The recording, in whichever of <see cref="Kinds"/> it is.</param>
+    /// <returns>The samples and how to read them, or null when nothing could be read.</returns>
     public static (short[] Samples, int SampleRate, int Channels)? Read(string path)
     {
         if (!Ready()) return null;
@@ -68,9 +75,6 @@ public static class AudioDecode
             {
                 int bytes = Bass.ChannelGetData(channel, block, Block * BytesPerSample);
 
-                // Nought is the end of the file. Below nought is BASS saying it went wrong,
-                // which for a file that is already open means a truncated one: what was read
-                // before it is still good, and is kept.
                 if (bytes <= 0) break;
 
                 int read = bytes / BytesPerSample;
@@ -121,8 +125,10 @@ public static class AudioDecode
             ? "'" + Path.GetFileName(path) + "' could not be decoded."
             : "'" + Path.GetExtension(path).TrimStart('.') + "' needs a BASS add-on this build has not got.";
 
+    /// <summary>Held while BASS is brought up, since two imports can start at once.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>Whether BASS has been brought up far enough to decode.</summary>
     private static bool _ready;
 
     /// <summary>
@@ -153,5 +159,6 @@ public static class AudioDecode
     /// <summary>BASS's own silent device, which decodes and plays nothing.</summary>
     private const int NoDevice = 0;
 
+    /// <summary>The rate the silent device is opened at. Decoding is unaffected by it.</summary>
     private const int SampleRate = 44100;
 }

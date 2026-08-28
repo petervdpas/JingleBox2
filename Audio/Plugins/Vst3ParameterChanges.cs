@@ -23,8 +23,13 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     private struct Queue
     {
+        /// <summary>The table, which has to be the first word or the plugin calls rubbish.</summary>
         public nint Vtbl;
+
+        /// <summary>Which parameter, by the plugin's own id.</summary>
         public uint Id;
+
+        /// <summary>Where it moved to, nought to one as every VST3 value is.</summary>
         public double Value;
     }
 
@@ -32,19 +37,45 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
     [StructLayout(LayoutKind.Sequential)]
     private struct List
     {
+        /// <summary>The table, which has to be the first word.</summary>
         public nint Vtbl;
+
+        /// <summary>How many parameters moved this block.</summary>
         public int Count;
+
+        /// <summary>How many there is room for. Fixed, since nothing here allocates per block.</summary>
         public int Capacity;
+
+        /// <summary>The queues themselves, allocated once and refilled.</summary>
         public Queue* Queues;
     }
 
+    /// <summary>
+    /// The two tables, shared by every instance in the process. A table is code rather than
+    /// state, so one of each is enough and neither is ever freed.
+    /// </summary>
     private static nint _listTable;
+
+    /// <inheritdoc cref="_listTable"/>
     private static nint _queueTable;
+
+    /// <summary>Held while a table is built, so two instances made at once cannot both build it.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>The unmanaged list. Null once disposed, which every method here checks for.</summary>
     private List* _list;
+
+    /// <summary>
+    /// The room, kept alongside the struct's own copy so it can be checked without following a
+    /// pointer that may have been freed.
+    /// </summary>
     private readonly int _capacity;
 
+    /// <summary>
+    /// Allocates the list and one queue per parameter that can move in a block, up front. Every
+    /// queue is given its table here rather than when it is used, since a queue handed to a
+    /// plugin with a null first word is a jump through a null pointer inside the plugin.
+    /// </summary>
     public Vst3ParameterChanges(int capacity)
     {
         _capacity = Math.Max(1, capacity);
@@ -61,8 +92,13 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
     /// <summary>The pointer that goes into the block.</summary>
     public void* Pointer => _list;
 
+    /// <summary>How many parameters moved this block.</summary>
     public int Count => _list == null ? 0 : _list->Count;
 
+    /// <summary>
+    /// Empties it for the next block. The queues are left where they are, tables and all, and
+    /// written over.
+    /// </summary>
     public void Clear()
     {
         if (_list != null) _list->Count = 0;
@@ -80,6 +116,11 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Builds the list's table once: the root's three, then the three IParameterChanges adds, in
+    /// the order the header declares them. The order is the whole contract, since a plugin calls
+    /// by position and nothing checks.
+    /// </summary>
     private static nint ListTable()
     {
         lock (Gate)
@@ -100,6 +141,10 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         }
     }
 
+    /// <summary>
+    /// The same for one parameter's queue: the root's three, then the four IParamValueQueue
+    /// adds.
+    /// </summary>
     private static nint QueueTable()
     {
         lock (Gate)
@@ -121,9 +166,18 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         }
     }
 
+    /// <summary>
+    /// AddRef and Release for both tables. These objects belong to the host and outlive any call
+    /// into a plugin, so neither is ever freed by a count and both always answer one.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint KeepAlive(void* self) => 1;
 
+    /// <summary>
+    /// The list is an IParameterChanges and the root interface, and nothing else. Refusing by
+    /// name is what stops a plugin calling through a table that does not have the method it
+    /// thinks it does.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int ListQuery(void* self, byte* id, void** result)
     {
@@ -139,6 +193,7 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>How many parameters the plugin will be offered this block.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int ListCount(void* self)
     {
@@ -146,6 +201,10 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return list == null ? 0 : list->Count;
     }
 
+    /// <summary>
+    /// One parameter's queue, as a pointer into the host's own memory. That is what the
+    /// interface asks for here, unlike the event list, which hands back a copy.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void* ListAt(void* self, int index)
     {
@@ -181,6 +240,9 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return queue;
     }
 
+    /// <summary>
+    /// A queue is an IParamValueQueue and the root interface, and nothing else.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int QueueQuery(void* self, byte* id, void** result)
     {
@@ -196,6 +258,7 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>Which parameter this queue is about.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint QueueId(void* self)
     {
@@ -207,6 +270,11 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int QueuePointCount(void* self) => 1;
 
+    /// <summary>
+    /// The one point: its offset into the block, which is always nought, and its value. Anything
+    /// but index nought is refused rather than clamped, since a plugin asking for a second point
+    /// after being told there is one is a plugin that has lost its place.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int QueuePoint(void* self, int index, int* offset, double* value)
     {
@@ -219,20 +287,28 @@ internal sealed unsafe class Vst3ParameterChanges : IDisposable
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// A plugin writing a point into a queue of its own, which is what the outgoing list is for.
+    /// The value is kept rather than dropped so that reading it back gives what was written,
+    /// which is what a plugin that checks its own work expects. The offset is ignored: there is
+    /// only ever the one point, at the start of the block.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int QueueAddPoint(void* self, int offset, double value, int* index)
     {
         var queue = (Queue*)self;
         if (queue == null) return Vst3Abi.NoInterface;
 
-        // Kept rather than dropped so that reading it back gives what was written, which is
-        // what a plugin that checks its own work expects.
         queue->Value = value;
 
         if (index != null) *index = 0;
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Frees the queues and the list. Called with no audio running: a plugin holding one of
+    /// these pointers through a block would be reading freed memory.
+    /// </summary>
     public void Dispose()
     {
         if (_list == null) return;

@@ -7,38 +7,40 @@ using System.Linq;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// Every recording an instrument plays, decoded once and kept. Handing the same data to any
-/// number of voices is what gives a sample instrument its polyphony: a voice owns a position
-/// in the file, never the file itself.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// Reading is bounded on purpose. An instrument is a jingle or a hit, not an album side, and
-/// a voice reads from memory on the audio thread, so a file long enough to matter is refused
-/// and reported rather than quietly turning the app into a disk cache.
+/// A dictionary by path, with one lock over both it and the list of what failed, so the clock
+/// thread and the drawing thread can ask at once. The decoding itself is done off the lock:
+/// reading a file is the slow part and holding the lock across it would queue every other
+/// track's first note behind whichever one asked first.
 /// </remarks>
-public sealed class SampleStore
+public sealed class SampleStore : ISampleStore
 {
     /// <summary>Roughly fifty megabytes of stereo audio. Past this it is not an instrument.</summary>
     public const int MaxSeconds = 300;
 
+    /// <summary>What has been decoded, by the path it was asked for under.</summary>
     private readonly Dictionary<string, SampleData> _samples = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// What could not be decoded, so the same missing file is not reopened on every note.
+    /// </summary>
     private readonly HashSet<string> _failed = new(StringComparer.Ordinal);
+
+    /// <summary>One lock over both, since a path moves between them.</summary>
     private readonly object _lock = new();
 
-    /// <summary>Paths that could not be used, so a broken instrument is reported once.</summary>
+    /// <inheritdoc/>
     public IReadOnlyCollection<string> FailedPaths
     {
         get { lock (_lock) return _failed.ToArray(); }
     }
 
-    /// <summary>Reads every instrument's file up front, so the first note is not late.</summary>
+    /// <inheritdoc/>
     public void Preload(IEnumerable<TrackerInstrument> instruments)
     {
         foreach (var instrument in instruments)
         {
-            // A kit is sixteen recordings rather than one, and the first hit of each would be
-            // the one that stutters if they were left to be read as they were played.
             if (instrument.Kit != null)
             {
                 foreach (string path in instrument.Kit.Files) Load(path);
@@ -55,7 +57,13 @@ public sealed class SampleStore
         }
     }
 
-    /// <summary>The decoded recording, or null when there is nothing usable at that path.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The lock is taken twice and not held across the read, so two threads asking for the same
+    /// file at once both decode it and the second's copy replaces the first's. That costs one
+    /// read and nothing else: the data is never written into, and a voice holds a position
+    /// rather than the array.
+    /// </remarks>
     public SampleData? Load(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath)) return null;
@@ -81,7 +89,7 @@ public sealed class SampleStore
         }
     }
 
-    /// <summary>Forgets a file so an edited or re-recorded one is picked up next time.</summary>
+    /// <inheritdoc/>
     public void Invalidate(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath)) return;
@@ -93,6 +101,7 @@ public sealed class SampleStore
         }
     }
 
+    /// <inheritdoc/>
     public void Clear()
     {
         lock (_lock)
@@ -102,6 +111,15 @@ public sealed class SampleStore
         }
     }
 
+    /// <summary>
+    /// Decodes one file, or answers null for every reason a file can be no good.
+    /// </summary>
+    /// <remarks>
+    /// Not a WAV, half written, longer than <see cref="MaxSeconds"/>, or gone since the
+    /// instrument was made: all the same answer, which the caller reports as an instrument that
+    /// will not sound. The length is checked off the header before the audio is read, so a file
+    /// too long to use is never held in memory even briefly.
+    /// </remarks>
     private static SampleData? Read(string filePath)
     {
         try
@@ -117,8 +135,6 @@ public sealed class SampleStore
         }
         catch (Exception)
         {
-            // Not a WAV, half written, or gone since the instrument was made: all the same
-            // answer, which the caller reports as an instrument that will not sound.
             return null;
         }
     }

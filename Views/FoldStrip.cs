@@ -21,14 +21,20 @@ namespace JingleBox2.Views;
 /// off the chain above it rather than off the pattern: move one and the other moved with it. A
 /// strip that owns its height answers only for itself, and the pattern, being the one thing
 /// measured in what is left, gives up or takes back the difference without being asked.
+///
+/// The grip is a short bar rather than a hairline running the width of the strip, because along
+/// the bottom of a card a hairline is exactly what that card's own edge looks like, so nobody
+/// would ever try to pull it.
 /// </remarks>
 public sealed class FoldStrip : ContentControl
 {
     /// <summary>Enough to be worth unfolding, and not so much that a drag can hide the music.</summary>
     private const double Least = 56;
 
+    /// <summary>Past this the strip is a page, and a page is somewhere you go instead of the music.</summary>
     private const double Most = 720;
 
+    /// <summary>The name on the line, which is what says whose business is folded away under it.</summary>
     public static readonly StyledProperty<string> TitleProperty =
         AvaloniaProperty.Register<FoldStrip, string>(nameof(Title), "");
 
@@ -48,26 +54,42 @@ public sealed class FoldStrip : ContentControl
         AvaloniaProperty.Register<FoldStrip, double>(
             nameof(StripHeight), 120, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
+    /// <inheritdoc cref="TitleProperty"/>
     public string Title
     {
         get => GetValue(TitleProperty);
         set => SetValue(TitleProperty, value);
     }
 
+    /// <inheritdoc cref="IsOpenProperty"/>
     public bool IsOpen
     {
         get => GetValue(IsOpenProperty);
         set => SetValue(IsOpenProperty, value);
     }
 
+    /// <inheritdoc cref="StripHeightProperty"/>
+    /// <remarks>
+    /// Held between <see cref="Least"/> and <see cref="Most"/> on the way in rather than in the
+    /// drag, since a height also arrives from whatever remembered it between one visit and the
+    /// next and a stored nonsense would be as bad as a dragged one.
+    /// </remarks>
     public double StripHeight
     {
         get => GetValue(StripHeightProperty);
         set => SetValue(StripHeightProperty, Math.Clamp(value, Least, Most));
     }
 
+    /// <summary>The bar along the top edge, once the template has been applied and there is one.</summary>
     private Thumb? _grip;
 
+    /// <summary>
+    /// Takes hold of the grip, and lets go of whichever one was there before.
+    /// </summary>
+    /// <remarks>
+    /// A template can be applied more than once to the same control, and a handler left on the
+    /// old thumb is a strip that resizes twice as fast as the hand moving it.
+    /// </remarks>
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);

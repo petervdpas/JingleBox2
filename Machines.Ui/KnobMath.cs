@@ -11,6 +11,7 @@ public static class KnobMath
     /// <summary>A pot turns three quarters of a circle, from seven o'clock to five o'clock.</summary>
     public const double SweepDegrees = 270;
 
+    /// <summary>Where the sweep begins, which is seven o'clock, measured from twelve.</summary>
     public const double StartDegrees = -135;
 
     /// <summary>Pixels of vertical drag that cover the whole range.</summary>

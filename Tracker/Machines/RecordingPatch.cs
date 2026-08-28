@@ -19,19 +19,40 @@ namespace JingleBox2.Tracker.Machines;
 /// second truth to keep in step. When the format moves over, this is the thing it moves to,
 /// and the fields go with it.
 /// </remarks>
+/// <param name="instrument">The instrument being read and written, held rather than copied.</param>
 public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
 {
-    // Written out, not built from the property names, so a rename in C# cannot silently
-    // change what is in everybody's files.
+    /// <summary>The recording itself, by the name the shelf knows it under.</summary>
+    /// <remarks>
+    /// The keys are written out one by one rather than built from the property names, so a
+    /// rename in C# cannot silently change what is in everybody's files, and so that every key
+    /// in the application can be found by searching for the string that is in the file.
+    /// </remarks>
     private const string TakeKey = "take";
+
+    /// <summary>The pitch the take was recorded at, so a key can be played in tune against it.</summary>
     private const string BaseNoteKey = "baseNote";
+
+    /// <summary>How loud it plays.</summary>
     private const string LevelKey = "level";
+
+    /// <summary>Whether a new key cuts the one still ringing.</summary>
     private const string OneVoiceKey = "oneVoice";
+
+    /// <summary>Which part of the take plays, and whether it loops.</summary>
     private const string WindowKey = "window";
+
+    /// <summary>The envelope and filter the result passes through.</summary>
     private const string VoiceKey = "voice";
 
+    /// <summary>How the nested objects are written, which is as small as they will go.</summary>
+    /// <remarks>
+    /// A settings file is read by a program and not by a person, and an instrument built on a
+    /// long take is already the biggest thing in a song.
+    /// </remarks>
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = false };
 
+    /// <inheritdoc/>
     public void Write(Utf8JsonWriter writer)
     {
         writer.WriteStartObject();
@@ -50,13 +71,14 @@ public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
         writer.WriteEndObject();
     }
 
-    /// <summary>
-    /// Takes what is there and leaves the rest alone.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// A key that is missing keeps the value the instrument already had, which is what makes a
     /// settings file written by an older machine still open: what it did not know about is
     /// simply not mentioned, and the default stands.
+    ///
+    /// The old loop flag that sat beside the window is kept in step with the window on the way
+    /// out, so a build that predates the window still loops what it should.
     /// </remarks>
     public void Read(JsonElement json)
     {
@@ -83,8 +105,6 @@ public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
         if (json.TryGetProperty(VoiceKey, out var voice) && voice.ValueKind == JsonValueKind.Object)
             instrument.Patch = voice.Deserialize<Synth.SynthPatch>(Layout) ?? instrument.Patch;
 
-        // The old flag beside the window, kept in step so a build that predates the window
-        // still loops.
         instrument.Loop = instrument.Shape?.IsLooping ?? instrument.Loop;
     }
 }

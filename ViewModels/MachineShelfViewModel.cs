@@ -18,6 +18,7 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class MachineShelfEntry
 {
+    /// <summary>One row over one machine, said to be installed or on offer.</summary>
     public MachineShelfEntry(MachineProject project, bool installed)
     {
         Project = project;
@@ -27,16 +28,22 @@ public sealed class MachineShelfEntry
     /// <summary>The machine itself, for the one operation that acts on it.</summary>
     public MachineProject Project { get; }
 
+    /// <summary>What it is called, falling back to its id for one that has not been named.</summary>
     public string Name => Project.Name.Length > 0 ? Project.Name : Project.Id;
 
+    /// <summary>Its own name in the folders and in a song, which never changes.</summary>
     public string Id => Project.Id;
 
+    /// <summary>Which version of it this is.</summary>
     public string Version => Project.Version;
 
+    /// <summary>Who made it.</summary>
     public string Author => Project.Author;
 
+    /// <summary>The one line it says about itself.</summary>
     public string Summary => Project.Summary;
 
+    /// <summary>Where it lives on the disc.</summary>
     public string Folder => Project.Folder;
 
     /// <summary>
@@ -72,6 +79,7 @@ public sealed class MachineShelfEntry
 /// </remarks>
 public sealed partial class MachineShelfViewModel : ObservableObject
 {
+    /// <summary>Reads what is installed and what is on offer.</summary>
     public MachineShelfViewModel() => Refresh();
 
     /// <summary>Every machine there is to show, installed and available together, by name.</summary>
@@ -99,12 +107,6 @@ public sealed partial class MachineShelfViewModel : ObservableObject
         + "The machines the program ships with can be added back after they are removed; "
         + "one that came in from a zip is gone until that zip is imported again.";
 
-    /// <summary>Rebuilds the list out of what is installed and what is on offer.</summary>
-    /// <remarks>
-    /// One list rather than two, in one order that does not move: a machine that changes side
-    /// stays where the eye left it, so adding one back reads as the row changing its mind rather
-    /// than as something jumping to the bottom of a second list.
-    /// </remarks>
     /// <summary>
     /// Said when what this installation has has changed, so whatever is showing a machine can
     /// show it again.
@@ -127,6 +129,12 @@ public sealed partial class MachineShelfViewModel : ObservableObject
         Changed?.Invoke();
     }
 
+    /// <summary>Rebuilds the list out of what is installed and what is on offer.</summary>
+    /// <remarks>
+    /// One list rather than two, in one order that does not move: a machine that changes side
+    /// stays where the eye left it, so adding one back reads as the row changing its mind rather
+    /// than as something jumping to the bottom of a second list.
+    /// </remarks>
     public void Refresh()
     {
         var rows = new List<MachineShelfEntry>();
@@ -193,8 +201,17 @@ public sealed partial class MachineShelfViewModel : ObservableObject
     }
 
     /// <summary>Takes a machine the program ships with and gives it to this installation.</summary>
+    /// <remarks>
+    /// Always enabled; a row that is already installed is refused rather than greyed, since a row
+    /// carries the one button that belongs to the side it is on.
+    /// </remarks>
     public IRelayCommand<MachineShelfEntry> AddCommand => new RelayCommand<MachineShelfEntry>(Add);
 
+    /// <summary>Copies a shipped machine into this installation, and says what happened.</summary>
+    /// <remarks>
+    /// The name is read before the copy, since afterwards the row is about to be replaced by the
+    /// rebuild and there would be nothing left to name in the status line.
+    /// </remarks>
     private void Add(MachineShelfEntry? entry)
     {
         if (entry == null || entry.IsInstalled) return;
@@ -217,9 +234,16 @@ public sealed partial class MachineShelfViewModel : ObservableObject
     /// Whether it can is asked before the folder goes, since afterwards the two lists no longer
     /// hold the answer. The shelf beside the program is not touched by any of this, so a machine
     /// that ships is on offer again by the time the list is rebuilt.
+    ///
+    /// Always enabled; a row that is not installed is refused rather than greyed.
     /// </remarks>
     public IRelayCommand<MachineShelfEntry> RemoveCommand => new RelayCommand<MachineShelfEntry>(Remove);
 
+    /// <summary>Deletes a machine's folder, and says whether it can be had again.</summary>
+    /// <remarks>
+    /// Whether it ships is asked before the folder goes, since afterwards the two lists no longer
+    /// hold the answer.
+    /// </remarks>
     private void Remove(MachineShelfEntry? entry)
     {
         if (entry == null || !entry.IsInstalled) return;

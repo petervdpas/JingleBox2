@@ -34,6 +34,10 @@ namespace JingleBox2.Tracker.Machines;
 /// with the values under them, written through the one adapter that knows what each name means.
 /// So <see cref="Block"/> and <see cref="Line"/> are the whole of the format and everything else
 /// is a question of which things there are.
+///
+/// A preset that will not read is written to <see cref="Diagnostics.LogArea.Machines"/> rather
+/// than to the application's own area, as everything under this folder is, and comes back as
+/// nothing rather than throwing: a machine with one bad preset in its folder should still open.
 /// </remarks>
 public static class MachinePresetFile
 {
@@ -57,6 +61,13 @@ public static class MachinePresetFile
     /// </remarks>
     public const string SettingsProperty = "settings";
 
+    /// <summary>What a pad button calls the key it answers to.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the one property a kit's keyboard depends on can be
+    /// found by looking for it, here and in every machine.json that names it.
+    /// </remarks>
+    public const string KeyProperty = "key";
+
     /// <summary>True when that file is written the new way.</summary>
     public static bool Keyed(JsonNode? read) =>
         read is JsonObject held && held.ContainsKey(MachineKey);
@@ -69,7 +80,22 @@ public static class MachinePresetFile
     /// heard. What this knows that nothing else does is which name goes where: a machine-wide
     /// key is a setting on the instrument, and a name that stands for one of the machine's things
     /// is that thing's block.
+    ///
+    /// Which adapter answers a key outside a block and which answers the keys inside one is
+    /// worked out first, and it is the only thing about a preset that depends on what machine it
+    /// is for. A machine with buttons is a kit, one with a map is a sampler, and one with
+    /// neither is whichever of the three plain machines its slot says it is.
+    ///
+    /// How many things a machine holds is not the same question on the two of them. A kit has as
+    /// many pads as the machine declares buttons, which is the only place that number is said,
+    /// and the key each pad answers to is on the button rather than in the preset, so a preset
+    /// saying it too would be a second place for it to be wrong. A sampler has one zone per
+    /// block in the order the file writes them: nothing declares how many zones a sampler has,
+    /// since a piano sampled every fourth key is thirteen of them and the same piano sampled
+    /// once is one, so the preset is where that number comes from.
     /// </remarks>
+    /// <param name="path">The preset file.</param>
+    /// <param name="machine">The machine it is for, which is what says how it is read.</param>
     public static TrackerInstrument? Read(string path, MachineProject machine)
     {
         try
@@ -87,18 +113,12 @@ public static class MachinePresetFile
 
             string home = Path.GetDirectoryName(path) ?? "";
 
-            // The names of the blocks, in the order the file writes them. A machine whose things
-            // are declared looks each one up by name; a machine whose things are not declared
-            // has as many as there are blocks, and this is the list of them.
             var blocks = Blocks(held);
 
             var buttons = Buttons(machine);
 
             var owned = Owned(machine);
 
-            // Which adapter answers a key outside a block, and which answers the keys inside
-            // one. Every machine has one of each, and which they are is the only thing about a
-            // preset that depends on what machine it is for.
             IMachineValues? wide = null;
             RecordingValues? loose = null;
             Func<int, IMachineValues>? inside = null;
@@ -106,13 +126,9 @@ public static class MachinePresetFile
 
             if (buttons.Count > 0)
             {
-                // As many pads as the machine declares buttons, which is the only place that
-                // number is said.
                 sound.Kit ??= DrumKit.Empty(buttons.Count);
                 sound.Kit.Clamp(buttons.Count);
 
-                // The key each pad answers to is on the button, not in the preset. A preset that
-                // said it too would be a second place for it to be wrong.
                 for (int at = 0; at < buttons.Count && at < sound.Kit.Pads.Count; at++)
                     if (buttons[at].Semitone >= 0) sound.Kit.Pads[at].Semitone = buttons[at].Semitone;
 
@@ -123,9 +139,6 @@ public static class MachinePresetFile
 
                 which = key =>
                 {
-                    // By the key the machine gave the button, as it wrote it. A name is taken
-                    // too, for a preset written before the keys were used and for a machine that
-                    // names its buttons and nothing else.
                     int at = buttons.FindIndex(one => one.Key == key);
 
                     if (at < 0) at = buttons.FindIndex(one => one.Name == key);
@@ -135,10 +148,6 @@ public static class MachinePresetFile
             }
             else if (Map(machine) != null)
             {
-                // One zone per block, in the order the file writes them, named by what names the
-                // block. Nothing declares how many zones a sampler has: a piano sampled every
-                // fourth key is thirteen of them and the same piano sampled once is one, so the
-                // preset is where that number comes from.
                 var made = new ZoneMap();
 
                 foreach (string named in blocks)
@@ -156,10 +165,6 @@ public static class MachinePresetFile
             }
             else
             {
-                // A machine with one set of settings and nothing in front of them. There are
-                // three of those and they are different machines: two generate their wave in
-                // different ways and one plays a recording back, so which adapter reads the file
-                // is which machine it is for.
                 if (kind == TrackerInstrumentKind.Synth)
                     wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
                 else if (kind == TrackerInstrumentKind.MonoSynth)
@@ -183,9 +188,6 @@ public static class MachinePresetFile
                     continue;
                 }
 
-                // The machine that plays one recording keeps its take at the top level, and
-                // whether a line is that take is a question about the line rather than about the
-                // machine, so it has a reader of its own.
                 if (loose != null) Put(loose, sound, key, node, home);
                 else if (wide != null) Line(wide, owned.Outside, owned.OutsideWords, key, node, home);
             }
@@ -212,7 +214,19 @@ public static class MachinePresetFile
     /// Only what the machine declares. A setting the machine has no control for is not written,
     /// because it is not a thing this machine can be set to, and carrying it would put a base
     /// note into a drum kit again.
+    ///
+    /// A pad's block is named after the key the pad answers to. That is the one fact about a pad
+    /// that is true outside the machine as well: it is the note that fires it in a pattern, so a
+    /// preset can be read against a keyboard rather than against a list of names somebody
+    /// invented. A zone's block is named after the zone, for the same reason a pad's is not
+    /// numbered: a preset that says what is on "Squeal" can be read, and one that says what is
+    /// on the fourth thing in a list cannot.
+    ///
+    /// A sampler writes the machine's own half first, so the file opens on the filter rather
+    /// than on the eleventh piece of a chop.
     /// </remarks>
+    /// <param name="sound">The instrument being written down.</param>
+    /// <param name="machine">The machine it came off, which is what says how it is written.</param>
     public static string Write(TrackerInstrument sound, MachineProject machine)
     {
         var held = new JsonObject
@@ -235,10 +249,6 @@ public static class MachinePresetFile
             {
                 var one = kit.Pads[at];
 
-                // The key the pad answers to is what names its block. It is the one fact about a
-                // pad that is true outside the machine as well: it is the note that fires it in a
-                // pattern, so a preset can be read against a keyboard rather than against a list
-                // of names somebody invented.
                 string named = buttons[at].Key.Length > 0 ? buttons[at].Key : buttons[at].Name;
 
                 held[named] = Block(new KitValues(kit, () => one), owned, home);
@@ -255,16 +265,11 @@ public static class MachinePresetFile
             var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
             var patch = new SamplerPatchViewModel(sound.Sampler, () => { });
 
-            // The machine's own half first, so the file opens on the filter rather than on the
-            // eleventh piece of a chop.
             var settings = new SamplerValues(zones, patch);
 
             foreach (string key in owned.OutsideWords) held[key] = settings.GetText(key);
             foreach (string key in owned.Outside) held[key] = JsonValue.Create(settings.Get(key));
 
-            // Then a block apiece. A zone is named rather than numbered for the reason a pad is:
-            // a preset that says what is on "Squeal" can be read, and one that says what is on
-            // the fourth thing in a list cannot.
             var used = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var one in zones.Zones)
@@ -288,8 +293,6 @@ public static class MachinePresetFile
             _ => new RecordingValues(sound),
         };
 
-        // The machine that holds one recording says where in its own words, so the panel's key is
-        // what the file uses too. A machine that generates its sound has none to name.
         if (Named(machine, MachineElementKinds.Take) is { Length: > 0 } take)
             held[take] = Inside(sound.FilePath, home);
 
@@ -298,6 +301,11 @@ public static class MachinePresetFile
         return held.ToJsonString(Layout);
     }
 
+    /// <summary>How a preset is written, which is laid out for reading.</summary>
+    /// <remarks>
+    /// A preset is a file somebody opens to see what a machine is doing, and one machine here
+    /// ships two presets that are a whole chop apiece. Indented, both are still readable.
+    /// </remarks>
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
 
     /// <summary>
@@ -393,24 +401,33 @@ public static class MachinePresetFile
         List<string> Numbers, List<string> Words,
         List<string> Outside, List<string> OutsideWords);
 
+    /// <summary>
+    /// Reads that split off the machine, once.
+    /// </summary>
+    /// <remarks>
+    /// Only what the machine says is part of the sound is taken at all. A knob that says how
+    /// much of the wave the picture shows is a knob on the face like any other and is no more
+    /// part of the instrument than which way you happen to be looking, so no preset carries it:
+    /// loading a sound would otherwise set somebody else's view. See
+    /// <see cref="MachineParameter.Saved"/>.
+    ///
+    /// Three cases, and the middle one is the one that is easy to get wrong. A machine that
+    /// holds no set of things has no blocks, so all of it is the machine's own. A machine that
+    /// holds things and names no settings means all of them are the thing's, which is what a kit
+    /// means: every knob on BongaBong is about the pad in hand and there is nothing else for one
+    /// to be about. Only a machine that holds things and names some settings has both halves,
+    /// which is the sampler, with one filter and as many zones as it turned out to need.
+    /// </remarks>
+    /// <param name="machine">The machine being read or written.</param>
     private static Settings Owned(MachineProject machine)
     {
         var words = Words(machine);
 
-        // Only what the machine says is part of the sound. A knob that says how much of the wave
-        // the picture shows is a knob on the face like any other and is no more part of the
-        // instrument than which way you happen to be looking, so no preset carries it: loading a
-        // sound would otherwise set somebody else's view.
         var keys = machine.Parameters.Where(one => one.Saved).Select(one => one.Key).ToList();
 
-        // A machine that holds no set of things has no blocks, so all of it is the machine's own.
-        // That is not the same as a machine that holds things and has said nothing about them.
         if (Held(machine) is not { } holder)
             return new Settings(new List<string>(), new List<string>(), keys, words);
 
-        // And one that holds things but names no settings means all of them are the thing's,
-        // which is what a kit means: every knob on BongaBong is about the pad in hand and there
-        // is nothing else for one to be about.
         if (!holder.Properties.TryGetValue(SettingsProperty, out string? said) || said.Trim().Length == 0)
             return new Settings(keys, words, new List<string>(), new List<string>());
 
@@ -458,7 +475,8 @@ public static class MachinePresetFile
     /// </summary>
     /// <remarks>
     /// A Take is a recording and a Text is something typed. Both are words, and which key each
-    /// is kept under is the machine's to say, so it is asked rather than assumed.
+    /// is kept under is the machine's to say, so it is asked rather than assumed. The face is
+    /// walked in reading order and each key is named once.
     /// </remarks>
     private static List<string> Words(MachineProject machine)
     {
@@ -479,6 +497,16 @@ public static class MachinePresetFile
         }
     }
 
+    /// <summary>
+    /// One line of a preset for the machine that plays a single recording.
+    /// </summary>
+    /// <remarks>
+    /// That machine keeps its take at the top level rather than in a block, and whether a line
+    /// is that take is a question about the line rather than about the machine: anything holding
+    /// a separator is a path and goes on the instrument's file, and everything else goes through
+    /// the adapter like any other setting. So it has a reader of its own rather than a case in
+    /// <see cref="Line"/>.
+    /// </remarks>
     private static void Put(RecordingValues values, TrackerInstrument sound, string key, JsonNode? node, string home)
     {
         if (node is JsonValue said && said.TryGetValue(out string? words))
@@ -494,6 +522,12 @@ public static class MachinePresetFile
         values.Set(key, Number(node));
     }
 
+    /// <summary>That line read as a number, whatever it was written as.</summary>
+    /// <remarks>
+    /// A flag and a number in quotes are both taken, because a preset is a file somebody can
+    /// write by hand and all three spellings are what people actually type. Anything that will
+    /// not read at all is nought, which every machine's adapter clamps into its own range.
+    /// </remarks>
     private static double Number(JsonNode? node)
     {
         if (node is not JsonValue value) return 0;
@@ -509,6 +543,7 @@ public static class MachinePresetFile
         return 0;
     }
 
+    /// <summary>That property read as words, or nothing when it is missing or is not words.</summary>
     private static string Said(JsonObject held, string key) =>
         held.TryGetPropertyValue(key, out var node) && node is JsonValue value
         && value.TryGetValue(out string? said)
@@ -524,7 +559,14 @@ public static class MachinePresetFile
     /// <summary>And back: where that name really is on this disc.</summary>
     private static string Outside(string named, string home) => MachinePaths.Outside(named, home);
 
-    /// <summary>The pad buttons the machine declares, with the key each answers to.</summary>
+    /// <summary>
+    /// The pad buttons the machine declares, with the key each answers to.
+    /// </summary>
+    /// <remarks>
+    /// The count is how many pads a kit built on this machine has, and it is the only place that
+    /// number is said. A machine that draws no grid has none, which is how a kit is told apart
+    /// from every other machine here.
+    /// </remarks>
     public static List<(string Name, string Key, int Semitone)> Buttons(MachineProject machine)
     {
         var found = new List<(string, string, int)>();
@@ -535,7 +577,7 @@ public static class MachinePresetFile
         {
             if (child.Element != MachineElementKinds.Pad) continue;
 
-            string said = child.Properties.TryGetValue("key", out string? held) ? held : "";
+            string said = child.Properties.TryGetValue(KeyProperty, out string? held) ? held : "";
 
             found.Add((child.Parameter, said, MachineNotes.Semitone(said)));
         }
@@ -561,6 +603,12 @@ public static class MachinePresetFile
     /// </remarks>
     private static MachineElement? Held(MachineProject machine) => Pads(machine) ?? Map(machine);
 
+    /// <summary>The first element of that kind anywhere on the machine's face, or nothing.</summary>
+    /// <remarks>
+    /// A machine with two grids or two maps on it is a machine nobody has finished, and there is
+    /// no sensible second answer to give. Found by walking down from the root, so the first in
+    /// reading order is the one that comes back.
+    /// </remarks>
     private static MachineElement? Find(MachineProject machine, string kind)
     {
         return machine.Panel.Root is { } root ? Look(root, kind) : null;

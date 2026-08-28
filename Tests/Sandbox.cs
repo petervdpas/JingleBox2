@@ -21,6 +21,17 @@ namespace JingleBox2.Tests;
 /// </remarks>
 internal static class Sandbox
 {
+    /// <summary>
+    /// Points both of the places the application folder can be worked out from at a fresh
+    /// temporary folder, named after the process so two runs on one machine cannot meet.
+    /// </summary>
+    /// <remarks>
+    /// A module initialiser rather than a fixture, because it has to have happened before the
+    /// first line of the first test: the folder is read by static state that is built on first
+    /// use, and a fixture runs too late to move it. Both variables are set, since the folder is
+    /// worked out from XDG_CONFIG_HOME on Linux and APPDATA on Windows and the suite runs on
+    /// both.
+    /// </remarks>
     [ModuleInitializer]
     internal static void Somewhere()
     {

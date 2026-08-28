@@ -10,5 +10,8 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public interface IAudioInsert
 {
+    /// <summary>Works on one block of audio, where it lies.</summary>
+    /// <param name="buffer">The block, interleaved stereo, read and written in place.</param>
+    /// <param name="frames">How many frames of it to work on, which may be fewer than it holds.</param>
     void Process(float[] buffer, int frames);
 }

@@ -26,56 +26,90 @@ namespace JingleBox2.Tracker.Machines;
 /// <param name="patch">The oscillator, the filter, the envelope and the two routes.</param>
 public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValues
 {
-    // Written out one by one, never built from a name or a loop, so every key in the app can be
-    // found by searching for the string that is in the file.
-
-    // ---- the oscillator ---------------------------------------------------
-
+    /// <summary>The oscillator: which shape the wave is.</summary>
+    /// <remarks>
+    /// The keys are written out one by one, never built from a name or a loop, so every key in
+    /// the application can be found by searching for the string that is in the machine's own
+    /// file. A key assembled at the call site never appears in the source at all, and both the
+    /// tools that hunt for an orphaned key and anybody grepping would miss it.
+    /// </remarks>
     private const string WaveKey = "wave";
+
+    /// <summary>How wide the pulse is, which does nothing to the waves that have no pulse.</summary>
     private const string PulseWidthKey = "pulse_width";
+
+    /// <summary>Coarse tuning, in semitones.</summary>
     private const string TuneKey = "tune";
+
+    /// <summary>And fine tuning, in cents.</summary>
     private const string FineKey = "fine";
+
+    /// <summary>How long the pitch takes to slide from the last note to this one.</summary>
     private const string GlideKey = "glide";
 
-    // ---- the mixer --------------------------------------------------------
-
+    /// <summary>The mixer: how much noise is stirred in with the oscillator.</summary>
     private const string NoiseMixKey = "noise_mix";
 
-    // ---- the filter -------------------------------------------------------
-
+    /// <summary>The filter: where it opens to.</summary>
     private const string CutoffKey = "cutoff";
+
+    /// <summary>The same, worded for a panel to print, since a frequency needs its unit.</summary>
     private const string CutoffTextKey = "cutoff_text";
+
+    /// <summary>How much it rings at the corner.</summary>
     private const string ResonanceKey = "resonance";
+
+    /// <summary>Which way round it works: low pass or high pass.</summary>
     private const string FilterModeKey = "filter_mode";
 
-    // ---- the amplifier ----------------------------------------------------
-
+    /// <summary>The amplifier: whether the envelope shapes the level, or the level is flat.</summary>
     private const string EnvelopeToAmpKey = "env_amp";
+
+    /// <summary>How loud it plays.</summary>
+    /// <remarks>
+    /// The patch's own, not the instrument's, which is the other way round from every other
+    /// machine here and is the panel this one follows being obeyed rather than tidied.
+    /// </remarks>
     private const string VolumeKey = "volume";
 
-    // ---- the envelope -----------------------------------------------------
-
+    /// <summary>The envelope: how long it takes to come up.</summary>
     private const string AttackKey = "attack";
+
+    /// <summary>Whether it holds while the key is down, or falls straight through.</summary>
     private const string SustainKey = "sustain";
+
+    /// <summary>And how long the fall takes.</summary>
     private const string DecayKey = "decay";
 
-    // ---- the low frequency oscillator -------------------------------------
-
+    /// <summary>The low frequency oscillator: how fast it runs.</summary>
     private const string LfoRateKey = "lfo_rate";
+
+    /// <summary>And what shape it is.</summary>
     private const string LfoWaveKey = "lfo_wave";
 
-    // ---- what moves the oscillator ----------------------------------------
-
+    /// <summary>The first route: where what moves the oscillator comes from.</summary>
     private const string VcoSourceKey = "vco_source";
+
+    /// <summary>How much of it there is.</summary>
     private const string VcoAmountKey = "vco_amount";
+
+    /// <summary>And what it lands on, which is the pitch or the pulse width.</summary>
     private const string VcoTargetKey = "vco_target";
 
-    // ---- what moves the filter --------------------------------------------
-
+    /// <summary>The second route: where what moves the filter comes from.</summary>
     private const string VcfSourceKey = "vcf_source";
+
+    /// <summary>How much of it there is.</summary>
     private const string VcfAmountKey = "vcf_amount";
+
+    /// <summary>And whether it opens the filter or closes it, since there is only one place to land.</summary>
     private const string VcfPolarityKey = "vcf_polarity";
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Switches and flags come back as numbers, because a number is all a described panel deals
+    /// in. A key it does not know reads as nought rather than throwing.
+    /// </remarks>
     public override double Get(string key) => key switch
     {
         WaveKey => (double)patch.Wave,
@@ -111,6 +145,12 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
         _ => 0,
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every switch goes through <see cref="Picked"/> and every flag through
+    /// <see cref="Flagged"/>, so a machine file naming a position this build has not got picks
+    /// one that exists rather than casting itself into an enum value nothing handles.
+    /// </remarks>
     protected override bool Write(string key, double value)
     {
         return key switch
@@ -155,6 +195,11 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
         };
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The cutoff is the only one worded, since a frequency without its unit reads as a number
+    /// nobody can place.
+    /// </remarks>
     public override string GetText(string key) => key switch
     {
         CutoffTextKey => patch.CutoffText,
@@ -169,6 +214,10 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
     /// says what the positions are called. Clamped rather than trusted: a machine.json listing
     /// three waves on a build that has two must pick one that exists.
     /// </remarks>
+    /// <param name="current">Where the switch is now.</param>
+    /// <param name="value">Where the panel says it should be.</param>
+    /// <param name="last">The highest position this build has.</param>
+    /// <param name="write">What to do once it is known to have moved.</param>
     private static bool Picked(int current, double value, int last, Action<int> write)
     {
         int wanted = (int)Math.Clamp(Math.Round(value), 0, last);
@@ -187,6 +236,9 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
     /// Half way up is on, so a control that sweeps rather than clicks still lands somewhere
     /// definite.
     /// </remarks>
+    /// <param name="current">Whether it is on now.</param>
+    /// <param name="value">What the panel says, which is a number either side of a half.</param>
+    /// <param name="write">What to do once it is known to have moved.</param>
     private static bool Flagged(bool current, double value, Action<bool> write)
     {
         bool on = value >= 0.5;

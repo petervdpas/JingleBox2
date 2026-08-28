@@ -12,6 +12,7 @@ using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker;
 
+/// <summary>What the clock does when it reaches the end of a pattern.</summary>
 public enum TrackerPlayMode
 {
     /// <summary>Walk the order list to the end.</summary>
@@ -21,16 +22,20 @@ public enum TrackerPlayMode
     Pattern
 }
 
-/// <summary>
-/// Plays a song. Sequencing decisions come from <see cref="TrackerSequencer"/>; this class
-/// owns the clock and the voices.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// The clock runs on its own thread against a stopwatch, with each step's time computed from
-/// the start rather than added to the last one. A timer that sleeps "one step" at a time
-/// accumulates its own lateness, and over a 64 line pattern that drift is audible.
+/// Three locks, and they are separate because they guard three unrelated things: the song and
+/// its sequencer, the plugins loaded on the tracks, and the store of decoded recordings. The
+/// plugin one is never held across a load, since starting a plugin is another process coming up
+/// and a patch of a quarter of a megabyte going into it, and holding the lock across that put
+/// the cost on whichever thread asked first, which is the clock.
+///
+/// A generation number is bumped whenever playback is torn down. A clock thread on its way out
+/// can still be mid-callback, and its events must not overwrite the state of a newer run; the
+/// plugins have a generation of their own for the same reason, since a plugin started for the
+/// last song can still be coming up when the next one opens.
 /// </remarks>
-public sealed class TrackerPlayer : IDisposable
+public sealed class TrackerPlayer : ITrackerPlayer
 {
     /// <summary>Below this the thread spins instead of sleeping, since sleep is not that precise.</summary>
     private const double SpinThresholdSeconds = 0.002;
@@ -38,12 +43,22 @@ public sealed class TrackerPlayer : IDisposable
     /// <summary>How long an audition holds before it releases, since no key is let go of.</summary>
     public const double PreviewHoldSeconds = 0.4;
 
+    /// <summary>The pads' engine, shared rather than a second one opened for the tracker.</summary>
     private readonly IAudioEngine _audio;
-    private readonly SampleStore _samples = new();
-    private readonly SynthOutput _synth = new();
+
+    /// <summary>Every recording the instruments play, decoded once.</summary>
+    private readonly ISampleStore _samples = new SampleStore();
+
+    /// <summary>The one stream everything sounds through, and the mixer behind it.</summary>
+    private readonly Audio.ISynthOutput _synth = new Audio.SynthOutput();
+
+    /// <summary>Guards the song and its sequencer, which are replaced whole when a pass starts.</summary>
     private readonly object _lock = new();
 
+    /// <summary>The clock thread, or null when nothing is running.</summary>
     private Thread? _clock;
+
+    /// <summary>How the clock thread is asked to stop, and what it waits on between steps.</summary>
     private CancellationTokenSource? _cancel;
 
     /// <summary>
@@ -52,78 +67,96 @@ public sealed class TrackerPlayer : IDisposable
     /// </summary>
     private int _generation;
 
+    /// <summary>What is being played, or null when nothing has been.</summary>
     private Song? _song;
-    private TrackerSequencer? _sequencer;
 
-    // What the note itself asked for, kept so the mixer can be re-applied to a voice that is
-    // already sounding: a fader move has to be heard now, not at the next note.
+    /// <summary>Its per-track memory, made fresh for each pass.</summary>
+    private ITrackerSequencer? _sequencer;
+
+    /// <summary>
+    /// What the note itself asked for, per track, kept so the mixer can be re-applied to a voice
+    /// that is already sounding: a fader move has to be heard now, not at the next note.
+    /// </summary>
+    /// <remarks>
+    /// Made when a pass starts and empty before then, which is why <see cref="LevelFor"/> is
+    /// deliberately not bounded by it: see the remarks there.
+    /// </remarks>
     private float[] _noteGain = Array.Empty<float>();
+
+    /// <summary>Where each track's last note asked to be placed, or null for wherever the strip puts it.</summary>
     private float?[] _notePan = Array.Empty<float?>();
 
+    /// <summary>
+    /// Takes the engine the pads are already using, rather than opening a second one.
+    /// </summary>
+    /// <remarks>
+    /// The watch is started here and runs for the life of the player. A second is often enough
+    /// to see a plugin come up, go busy or fall over, and slow enough that it costs nothing
+    /// worth measuring. Its own timer, never the audio thread and never the drawing thread:
+    /// writing a line of the log is a file opened and closed, and neither of those threads can
+    /// afford to wait on a disc.
+    /// </remarks>
     public TrackerPlayer(IAudioEngine audio)
     {
         _audio = audio;
 
-        // A second is often enough to see a plugin come up, go busy or fall over, and slow
-        // enough that the watch costs nothing worth measuring. Its own timer, never the audio
-        // thread and never the drawing thread: writing a line of the log is a file opened and
-        // closed, and neither of those threads can afford to wait on a disk.
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }
 
     /// <summary>How often the plugins are counted and their state written down.</summary>
     private const int WatchMilliseconds = 1000;
 
+    /// <summary>The watch itself, kept so it can be put down with the player.</summary>
     private readonly System.Threading.Timer _watch;
 
     /// <summary>What was said about each track last time, so a line is written when it changes.</summary>
     private readonly Dictionary<int, string> _mustered = new();
 
-    /// <summary>Raised from the clock thread. Marshal before touching UI.</summary>
+    /// <inheritdoc/>
     public event EventHandler<TrackerPosition>? PositionChanged;
 
-    /// <summary>Raised on every transport change, from whichever thread caused it.</summary>
+    /// <inheritdoc/>
     public event EventHandler<TrackerTransportState>? StateChanged;
 
+    /// <inheritdoc/>
     public event EventHandler? Stopped;
 
-    /// <summary>
-    /// Raised for every note that goes to a track, so a panel can show what its track plays.
-    /// </summary>
-    /// <remarks>
-    /// Raised from the clock thread, like the position. It carries the track and the note and
-    /// nothing else: what a listener does with it is its own business, and one that needs the
-    /// instrument can ask the song for it.
-    /// </remarks>
+    /// <inheritdoc/>
     public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 
+    /// <inheritdoc/>
     public TrackerTransportState State { get; private set; } = TrackerTransportState.Stopped;
 
+    /// <inheritdoc/>
     public bool IsPlaying => State == TrackerTransportState.Playing;
 
+    /// <inheritdoc/>
     public bool IsPaused => State == TrackerTransportState.Paused;
 
+    /// <inheritdoc/>
     public TrackerPosition Position { get; private set; } = TrackerPosition.Start;
 
+    /// <inheritdoc/>
     public TrackerPlayMode Mode { get; private set; } = TrackerPlayMode.Song;
 
-    /// <summary>Start again from the top instead of stopping at the end.</summary>
+    /// <inheritdoc/>
     public bool Loop { get; set; } = true;
 
-    /// <summary>Instrument files that could not be loaded, for reporting after a take.</summary>
+    /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyCollection<string> FailedInstruments => _samples.FailedPaths;
 
-    /// <summary>
-    /// What writes the lanes, when there is anything for them to write through.
-    /// </summary>
-    /// <remarks>
-    /// Handed in rather than made here, because resolving a lane means knowing the whole
-    /// program: which machine a track plays, which plugins are in its chain, where its fader is.
-    /// The player knows the clock and the voices and deliberately nothing else. Null is
-    /// ordinary and means a song plays exactly as it did before any of this existed.
-    /// </remarks>
+    /// <inheritdoc/>
     public AutomationPlayer? Automation { get; set; }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The automation is reset before the first line: the parameters have been moved by hand
+    /// since the last pass, so what was written last time is no longer what they hold, and a
+    /// lane comparing against it would decline to write the first line.
+    ///
+    /// The one stream is opened for any song that has an instrument at all, recordings included,
+    /// since everything sounds through it now.
+    /// </remarks>
     public void Play(Song song, TrackerPosition from, TrackerPlayMode mode = TrackerPlayMode.Song)
     {
         ArgumentNullException.ThrowIfNull(song);
@@ -141,25 +174,18 @@ public sealed class TrackerPlayer : IDisposable
             Position = from;
         }
 
-        // The parameters have been moved by hand since the last pass, so what was written last
-        // time is no longer what they hold, and a lane comparing against it would decline to
-        // write the first line.
         Automation?.Reset();
 
         _samples.Preload(song.Instruments);
 
-        // Everything sounds through the one stream now, recordings included, so it is opened
-        // for any song that has an instrument at all.
         if (song.Instruments.Count > 0) _synth.EnsureStarted(_audio);
 
-        // The strips are pushed once up front: a side chain set while stopped has nowhere to
-        // go until there is a song to take it.
         ApplyMix();
 
         StartClock();
     }
 
-    /// <summary>Continues from where a pause left off. Does nothing when not paused.</summary>
+    /// <inheritdoc/>
     public void Resume()
     {
         if (State != TrackerTransportState.Paused) return;
@@ -172,7 +198,7 @@ public sealed class TrackerPlayer : IDisposable
         StartClock();
     }
 
-    /// <summary>Freezes at the current step. The voices are cut, the position is kept.</summary>
+    /// <inheritdoc/>
     public void Pause()
     {
         if (State != TrackerTransportState.Playing) return;
@@ -181,6 +207,7 @@ public sealed class TrackerPlayer : IDisposable
         SetState(TrackerTransportState.Paused);
     }
 
+    /// <inheritdoc/>
     public void Stop()
     {
         Teardown();
@@ -192,6 +219,13 @@ public sealed class TrackerPlayer : IDisposable
         if (wasRunning) Stopped?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>
+    /// Takes a fresh generation and puts the clock thread on it.
+    /// </summary>
+    /// <remarks>
+    /// Above normal priority, since steps land every few milliseconds and the clock should not
+    /// queue behind drawing work. A background thread, so it cannot hold the application open.
+    /// </remarks>
     private void StartClock()
     {
         _cancel = new CancellationTokenSource();
@@ -204,13 +238,16 @@ public sealed class TrackerPlayer : IDisposable
         {
             IsBackground = true,
             Name = "JingleBox2 tracker clock",
-            // Steps land every few milliseconds, so the clock should not queue behind UI work.
             Priority = ThreadPriority.AboveNormal
         };
         _clock.Start();
     }
 
     /// <summary>Stops the clock and silences the voices without deciding what state follows.</summary>
+    /// <remarks>
+    /// A plugin holds its own notes and nothing else will let go of them, so stopping the clock
+    /// has to stop the sound too, or a chord hangs on until the application closes.
+    /// </remarks>
     private void Teardown()
     {
         Interlocked.Increment(ref _generation);
@@ -225,14 +262,13 @@ public sealed class TrackerPlayer : IDisposable
         if (clock != null && clock != Thread.CurrentThread)
             clock.Join(TimeSpan.FromSeconds(1));
 
-        // A plugin holds its own notes, and nothing else will let go of them: stopping the
-        // clock has to stop the sound too, or a chord hangs on until the app closes.
         if (_synth.HasMixer) _synth.Mixer.AllPluginNotesOff();
 
         cancel?.Dispose();
         StopAllVoices();
     }
 
+    /// <summary>Moves the transport, and says so only when it really moved.</summary>
     private void SetState(TrackerTransportState state)
     {
         if (State == state) return;
@@ -241,19 +277,7 @@ public sealed class TrackerPlayer : IDisposable
         StateChanged?.Invoke(this, state);
     }
 
-    /// <summary>Sounds a single note, for auditioning while editing. Independent of playback.</summary>
-    /// <returns>
-    /// How long the note will sound, so a keyboard can light its key and a picture can run its
-    /// cursor for exactly that long. Zero when nothing sounded.
-    /// </returns>
-    /// <summary>
-    /// Stops what an instrument is sounding by hand.
-    /// </summary>
-    /// <remarks>
-    /// For leaving a machine's panel: what you played on it is its own, and hearing it go on
-    /// under the next machine's picture, with that picture's cursor running to it, is one
-    /// instrument wearing another's face. A pattern's notes are untouched.
-    /// </remarks>
+    /// <inheritdoc/>
     public void CutPreview(TrackerInstrument? instrument)
     {
         if (instrument == null) return;
@@ -261,14 +285,7 @@ public sealed class TrackerPlayer : IDisposable
         _synth.Mixer.CutAuditions(instrument.Id);
     }
 
-    /// <summary>
-    /// Lets go of one note played by hand, which is what a key coming up means.
-    /// </summary>
-    /// <remarks>
-    /// The same thing a pattern's OFF does to a track, done to one auditioned note. A key is
-    /// down while a hand is on it and up when the hand comes off, and what it started releases
-    /// then rather than running to the end of the file.
-    /// </remarks>
+    /// <inheritdoc/>
     public void LetPreview(TrackerInstrument? instrument, Note note)
     {
         if (instrument == null || !note.IsPlayable) return;
@@ -276,13 +293,15 @@ public sealed class TrackerPlayer : IDisposable
         _synth.Mixer.LetAudition(instrument.Id, note.Semitone);
     }
 
-    /// <param name="track">
-    /// Which strip it sounds on, or below nought for a note that belongs to no track. The
-    /// tracker's keyboard names the track the cursor is in, so a note played by hand goes
-    /// through that track's inserts and its fader and moves its meter and the master's, which
-    /// is what makes it tell you what the part will sound like. The rack's keyboard names none,
-    /// because the instrument it is playing may not be in any song.
-    /// </param>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A plugin is auditioned through the copy already on a track wherever there is one. That is
+    /// the copy whose window is open and whose knobs have just been turned; a second copy would
+    /// play the sound the song was last saved with and leave you wondering what you changed.
+    /// Where the track named has no plugin loaded yet, it is loaded there rather than beside it:
+    /// the caller worked this instrument out from that very track, and there is no song to check
+    /// against anyway while the transport is stopped.
+    /// </remarks>
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return 0;
@@ -292,23 +311,12 @@ public sealed class TrackerPlayer : IDisposable
 
         float level = gain * (float)instrument.Volume;
 
-        // One voice: what this instrument was sounding by hand stops, so a long recording
-        // played again does not lie underneath the one just asked for. A pattern's notes are
-        // untouched, since a track is already one voice.
         if (instrument.OneVoice) _synth.Mixer.CutAuditions(instrument.Id);
 
         if (instrument.IsPlugin)
         {
-            // The copy already on a track wins. It is the one whose window is open and whose
-            // knobs have just been turned; auditioning through a second copy would play the
-            // sound the song was last saved with and leave you wondering what you changed.
             int playing = TrackPlaying(instrument.Id);
 
-            // Not loaded yet: load it on the track it was played on. A note played on a track
-            // should sound through that track's plugin whether or not anybody has opened its
-            // window, and through one copy of it rather than two. The caller worked this
-            // instrument out from that very track, so there is nothing further to check, and
-            // there is no song to check against anyway while the transport is stopped.
             if (playing < 0 && track >= 0)
             {
                 EnsurePlayerOn(track, instrument);
@@ -371,24 +379,23 @@ public sealed class TrackerPlayer : IDisposable
         return _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds, instrument.Id, track);
     }
 
-    /// <summary>
-    /// How loud a track is right now, both sides, for the mixer's meters. Zero for a track that
-    /// is not sounding, and zero for every track before there is a mixer at all.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// Bounded by how many tracks a song can have rather than by <c>_noteGain</c>, which is the
-    /// volume column's memory and is only made when a pass starts. Asking it how many tracks
-    /// there are answered nought until somebody pressed play, so a note played by hand moved
-    /// the master's meter, which does not go through here, and no track's.
+    /// Bounded by <see cref="Song.MaxTrackCount"/> and deliberately not by <c>_noteGain</c>,
+    /// which is the volume column's memory and is only made when a pass starts. Asking that
+    /// array how many tracks there are answered nought until somebody pressed play, so every
+    /// track's meter read nought while the transport was stopped and a note played by hand moved
+    /// the master's meter, which goes through the branch above this one, and no track's. It
+    /// looked like the tracks were not isolated when what was really happening is that nobody
+    /// was asking them.
+    ///
+    /// No mixer is made here. This is asked several times a second by the meters, and building
+    /// one would fix the rate before the device is even open.
     /// </remarks>
     public (float Left, float Right) LevelFor(int track)
     {
-        // Asked several times a second by the meters, and before anything has played there is
-        // no mixer yet. Building one here would fix the rate before the device is even open.
         if (!_synth.HasMixer) return (0, 0);
 
-        // The master reads what is leaving rather than what any track is doing, which is the
-        // only meter on the page measuring the thing you actually hear.
         if (track == MasterStrip) return _synth.Mixer.MasterLevel;
 
         if (track < 0 || track >= Song.MaxTrackCount) return (0, 0);
@@ -404,25 +411,15 @@ public sealed class TrackerPlayer : IDisposable
     /// </summary>
     public const int MaxPluginFrames = 2048;
 
-    /// <summary>What the engine is running at, which is what a plugin here has to be built for.</summary>
+    /// <inheritdoc/>
     public int SampleRate => _synth.SampleRate;
 
-    /// <summary>
-    /// Asks the engine to run at a rate, or at the device's own. Only heard before the first
-    /// note, so it comes from settings when the tracker is built.
-    /// </summary>
+    /// <inheritdoc/>
     public void UseSampleRate(int rate) => _synth.UseSampleRate(rate);
 
-    /// <summary>
-    /// How far ahead of the sound card to mix, in milliseconds. Heard when the stream is
-    /// opened, so it comes from settings when the tracker is built.
-    /// </summary>
+    /// <inheritdoc/>
     public void UseRenderAhead(int milliseconds) => _synth.UseRenderAhead(milliseconds);
 
-    /// <summary>
-    /// The chain of effects on a track, made and put into the mix the first time it is asked
-    /// for. A track with nothing on it costs an empty chain, which does nothing per block.
-    /// </summary>
     /// <summary>
     /// The strip that is not a track: the whole mix, after all of them.
     /// </summary>
@@ -433,14 +430,11 @@ public sealed class TrackerPlayer : IDisposable
     /// </remarks>
     public const int MasterStrip = -1;
 
+    /// <inheritdoc/>
     public PluginChain ChainFor(int track)
     {
         if (InsertOn(track) is PluginChain existing) return existing;
 
-        // The engine has to be running for an effect to be given anything at all. Until now it
-        // was opened by the first note, so a track with an effect on it and nothing playing was
-        // an effect that never saw a single block: it could not work on the audio, could not
-        // finish a delay's tail, and could not tell the host what its own window had done.
         EnsureEngine();
 
         var chain = new PluginChain();
@@ -469,14 +463,11 @@ public sealed class TrackerPlayer : IDisposable
         yield return MasterStrip;
     }
 
-    /// <summary>
-    /// Writes every track's chain into the song, ready to be saved with it.
-    /// </summary>
-    /// <param name="patches">
-    /// Whether to read each plugin's own state as well as its knobs. True where the song is
-    /// about to be written down, which is every caller: a plugin asked for its patch is a round
-    /// trip to another process, and that is a price worth paying at a save and nowhere else.
-    /// </param>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A strip with nothing on it is written as null rather than as an empty list, so a song
+    /// with no effects is not full of empty chains.
+    /// </remarks>
     public void CaptureChains(Song song, bool patches = true)
     {
         if (song == null) return;
@@ -488,16 +479,15 @@ public sealed class TrackerPlayer : IDisposable
             var chain = InsertOn(track) as PluginChain;
             var captured = PluginChainState.Capture(chain, patches);
 
-            // Null rather than an empty list: a song with no effects should not be full of
-            // empty chains.
             strip.Plugins = captured.IsEmpty ? null : captured;
         }
     }
 
-    /// <summary>
-    /// Builds every track's chain from what the song holds. Returns the plugins it could not
-    /// find, so the song can say so rather than quietly sounding different.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Nothing loaded and nothing wanted costs nothing, which matters most for the master:
+    /// almost no song has an effect on it and none should pay for a chain.
+    /// </remarks>
     public IReadOnlyList<string> RestoreChains(Song song)
     {
         var missing = new List<string>();
@@ -507,8 +497,6 @@ public sealed class TrackerPlayer : IDisposable
         {
             if (StripOf(song, track) is not { } strip) continue;
 
-            // Nothing loaded and nothing wanted costs nothing, which matters most for the
-            // master: almost no song has an effect on it and none should pay for a chain.
             if (strip.Plugins is null or { IsEmpty: true } && InsertOn(track) is null) continue;
 
             var chain = ChainFor(track);
@@ -519,25 +507,16 @@ public sealed class TrackerPlayer : IDisposable
         return missing;
     }
 
-    /// <summary>
-    /// Makes the loaded chains match what the song now says, for the tracks where they differ.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// For a history putting a step back. A track's inserts live in two places: the song holds a
-    /// description of them, which is what a step carries, and the mixer holds the plugins
-    /// themselves, each in a process of its own. Restoring the description alone leaves the
-    /// picture and the sound disagreeing, which is worse than not restoring it at all.
-    ///
-    /// Only where they differ, and that is the whole reason this exists beside
-    /// <see cref="RestoreChains"/>. Rebuilding a chain means stopping every plugin in it and
-    /// starting them again, which is seconds a plugin. Almost every undo changes no chain at
-    /// all, and pays one comparison; only undoing a plugin change pays the reload, which is the
-    /// one case where anybody expects a pause.
-    ///
     /// Compared as the two would be written down, so nothing can be forgotten: an ordering, a
-    /// parameter, a plugin swapped for another of the same name.
+    /// parameter, a plugin swapped for another of the same name. Without the patches, since
+    /// nothing here is being saved and a chain is what its description says rather than what its
+    /// plugins happen to be holding.
+    ///
+    /// Nothing loaded and nothing wanted is the ordinary case and costs nothing: no chain is
+    /// made for a strip that has never had one.
     /// </remarks>
-    /// <returns>Which tracks were rebuilt, so their panels can be told.</returns>
     public IReadOnlyList<int> MatchChains(Song song)
     {
         var changed = new List<int>();
@@ -549,12 +528,8 @@ public sealed class TrackerPlayer : IDisposable
 
             var chain = InsertOn(track) as PluginChain;
 
-            // Nothing loaded and nothing wanted is the ordinary case and costs nothing: no
-            // chain is made for a track that has never had one.
             if (chain is null && (wanted is null || wanted.IsEmpty)) continue;
 
-            // Without the patches. Nothing here is being saved, and a chain is what its
-            // description says rather than what its plugins are holding.
             var loaded = PluginChainState.Capture(chain);
 
             if (Same(loaded, wanted)) continue;
@@ -573,6 +548,8 @@ public sealed class TrackerPlayer : IDisposable
     /// other comes out of a history step, and a plugin asked for its lump twice is under no
     /// obligation to answer the same bytes, so comparing them would report every chain as
     /// changed and rebuild all of them on every undo.
+    ///
+    /// Unreadable either way is a reason to rebuild, not a reason to stop.
     /// </remarks>
     private static bool Same(PluginChainConfig? left, PluginChainConfig? right)
     {
@@ -588,7 +565,6 @@ public sealed class TrackerPlayer : IDisposable
         }
         catch (Exception)
         {
-            // Unreadable either way is a reason to rebuild, not a reason to stop.
             return false;
         }
     }
@@ -599,6 +575,7 @@ public sealed class TrackerPlayer : IDisposable
     /// </summary>
     private readonly Dictionary<int, (string Instrument, IPluginInstrument Plugin)> _players = new();
 
+    /// <summary>Guards the players, the ones coming up, and the auditioned one. Never held across a load.</summary>
     private readonly object _playerLock = new();
 
     /// <summary>
@@ -625,14 +602,10 @@ public sealed class TrackerPlayer : IDisposable
     /// </remarks>
     private int _playerGeneration;
 
-    /// <summary>
-    /// Moves a track to another position, live: the plugins loaded on it, the effects
-    /// inserted on it, and the levels its notes were last set to.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The song has already been reordered by the time this is called. This is the running
-    /// half of the same move, and the two have to agree or the notes arrive at one track while
-    /// the sound answers on another.
+    /// The table of players is rebuilt rather than edited in place: every key from the moved one
+    /// onwards changes, so editing while walking it would trip over its own renumbering.
     /// </remarks>
     public void MoveTrack(int from, int to)
     {
@@ -641,8 +614,6 @@ public sealed class TrackerPlayer : IDisposable
 
         lock (_playerLock)
         {
-            // Rebuilt rather than edited in place: every key from the moved one onwards
-            // changes, so editing while walking it would trip over its own renumbering.
             var moved = new Dictionary<int, (string Instrument, IPluginInstrument Plugin)>();
 
             foreach (var (track, loaded) in _players)
@@ -672,24 +643,14 @@ public sealed class TrackerPlayer : IDisposable
         values[to] = moved;
     }
 
-    /// <summary>
-    /// Opens the audio engine if it is not already open. A plugin has to be built for the rate
-    /// the engine settled on, and until the device is open there is no rate to build for.
-    /// </summary>
+    /// <inheritdoc/>
     public void EnsureEngine()
     {
         _audio.EnsureInitialized();
         _synth.EnsureStarted(_audio);
     }
 
-    /// <summary>
-    /// The plugin a track plays, loaded if it is not already. The same one the notes go to,
-    /// deliberately: a second copy would be a second sound, and turning a knob on it would
-    /// change something nobody can hear.
-    /// </summary>
-    /// <remarks>
-    /// Null when the plugin is missing or this host cannot play its kind.
-    /// </remarks>
+    /// <inheritdoc/>
     public IPluginInstrument? EnsurePlayerOn(int track, TrackerInstrument instrument)
     {
         EnsureEngine();
@@ -711,6 +672,13 @@ public sealed class TrackerPlayer : IDisposable
     /// Which means two callers can arrive at the same track at once, and <see cref="_loading"/>
     /// is what stops that from starting the plugin twice. It is also what lets a song start
     /// all of its plugins side by side, in <see cref="PreloadPlugins"/>.
+    ///
+    /// Started on a thread of its own rather than a pool one. Starting a plugin is mostly
+    /// waiting on another process, and a song's worth of them waiting at once on pool threads is
+    /// a pool with nothing left to run the note that is waiting for one of them.
+    ///
+    /// The caller wanted a plugin and is entitled to wait for one. What it is not entitled to is
+    /// holding the lock while it waits, which is the whole of the arrangement.
     /// </remarks>
     private IPluginInstrument? PlayerFor(int track, TrackerInstrument instrument)
     {
@@ -734,10 +702,6 @@ public sealed class TrackerPlayer : IDisposable
             {
                 int generation = _playerGeneration;
 
-                // A thread of its own rather than a pool one. Starting a plugin is mostly
-                // waiting on another process, and a song's worth of them waiting at once on
-                // pool threads is a pool with nothing left to run the note that is waiting
-                // for one of them.
                 loading = Task.Factory.StartNew(
                     () => Start(track, instrument, generation),
                     CancellationToken.None,
@@ -748,8 +712,6 @@ public sealed class TrackerPlayer : IDisposable
             }
         }
 
-        // The caller wanted a plugin and is entitled to wait for one. What it is not entitled
-        // to is holding the lock while it waits, which is the whole of the change.
         return loading.GetAwaiter().GetResult();
     }
 
@@ -757,6 +719,17 @@ public sealed class TrackerPlayer : IDisposable
     /// Brings one plugin up and puts it on its track. Runs off the lock, and off whatever
     /// thread asked.
     /// </summary>
+    /// <remarks>
+    /// The patch goes in before the first note, or the first note is the wrong sound. A plugin
+    /// that will not start is a silent track, not a silent application.
+    ///
+    /// Three things can be true by the time it is up, and all three are ordinary. The song it
+    /// was being started for may not be the song any more, in which case it goes straight back
+    /// down. Somebody may have put this very plugin on the track while it was coming up, and
+    /// theirs is the one the mixer is already playing, so this one goes down instead. Or a
+    /// different instrument may be on the track, and the old one comes off the mix before it is
+    /// put down, or it plays into a bus that is about to be somebody else's.
+    /// </remarks>
     private IPluginInstrument? Start(int track, TrackerInstrument instrument, int generation)
     {
         var description = instrument.Plugin;
@@ -769,12 +742,10 @@ public sealed class TrackerPlayer : IDisposable
             player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
             if (player == null) return null;
 
-            // The patch goes in before the first note, or the first note is the wrong sound.
             player.LoadState(instrument.PluginState);
         }
         catch (Exception)
         {
-            // A plugin that will not start is a silent track, not a silent application.
             try { player?.Dispose(); } catch (Exception) { }
             player = null;
         }
@@ -787,7 +758,6 @@ public sealed class TrackerPlayer : IDisposable
 
             if (player == null) return null;
 
-            // The song this was being started for is not the song any more.
             if (generation != _playerGeneration)
             {
                 var late = player;
@@ -797,8 +767,6 @@ public sealed class TrackerPlayer : IDisposable
 
             if (_players.TryGetValue(track, out var existing))
             {
-                // Somebody put this very plugin here while it was coming up. Theirs is the one
-                // the mixer is already playing, so this one goes back down.
                 if (string.Equals(existing.Instrument, instrument.Id, StringComparison.Ordinal))
                 {
                     var spare = player;
@@ -806,8 +774,6 @@ public sealed class TrackerPlayer : IDisposable
                     return existing.Plugin;
                 }
 
-                // A different instrument on this track. The old one comes off the mix before
-                // it is put down, or it plays into a bus that is about to be somebody else's.
                 _synth.Mixer.SetInstrument(track, null);
                 existing.Plugin.Dispose();
                 _players.Remove(track);
@@ -820,20 +786,12 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
-    /// <summary>
-    /// Starts every plugin this song's tracks are set to, at once, without waiting for any of
-    /// them.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// A song used to start its plugins one note at a time, on the clock, which is the worst
-    /// possible moment and the worst possible thread: the first bar of a song with three
-    /// plugins in it stuttered three times, once per track, each stall the length of a plugin
-    /// starting up. Opening the song is the moment nobody is listening, and each plugin is its
-    /// own process, so there is nothing to be gained by starting them in a queue.
-    ///
-    /// Nothing here is waited on. What this returns is a song whose plugins are on their way;
-    /// a note that arrives before its own plugin is up waits for that one, as it always did,
-    /// and not for the others.
+    /// The engine is opened first, and only where there is something to start. A plugin is
+    /// opened at a sample rate and keeps it, so the rate has to be the real one before any of
+    /// them start; a song of recordings and synths does not turn the device on early for the
+    /// sake of it.
     /// </remarks>
     public void PreloadPlugins(Song song)
     {
@@ -851,9 +809,6 @@ public sealed class TrackerPlayer : IDisposable
 
         if (wanted.Count == 0) return;
 
-        // A plugin is opened at a sample rate and keeps it, so the rate has to be the real one
-        // before any of them start. Nothing to start, nothing opened: a song of samples and
-        // synths does not turn the device on early for the sake of it.
         EnsureEngine();
 
         foreach (var (track, instrument) in wanted)
@@ -889,10 +844,7 @@ public sealed class TrackerPlayer : IDisposable
         return -1;
     }
 
-    /// <summary>
-    /// The plugin a track is playing, without loading one. What the editor asks when it wants
-    /// to save a patch back.
-    /// </summary>
+    /// <inheritdoc/>
     public IPluginInstrument? PlayerOn(int track)
     {
         lock (_playerLock) return _players.TryGetValue(track, out var found) ? found.Plugin : null;
@@ -904,17 +856,11 @@ public sealed class TrackerPlayer : IDisposable
     /// </summary>
     private (string Instrument, IPluginInstrument Plugin)? _auditioned;
 
-    /// <summary>
-    /// The plugin behind an audition, loaded if it is not already the one being auditioned.
-    /// Also what the editor calls to get a live plugin to work on.
-    /// </summary>
+    /// <inheritdoc/>
     public IPluginInstrument? PreviewPlayerFor(TrackerInstrument instrument)
     {
         if (instrument == null || !instrument.IsPlugin) return null;
 
-        // One copy of a plugin, not two. If a track is already playing this instrument, that is
-        // the copy to work on: a second one is a second process holding a second set of
-        // wavetables, and a knob turned on it would change something nobody can hear.
         int onTrack = TrackPlaying(instrument.Id);
 
         if (onTrack >= 0)
@@ -949,7 +895,7 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
-    /// <summary>Puts the auditioned plugin down, for a page that is being left.</summary>
+    /// <inheritdoc/>
     public void ClearPreviewPlayer()
     {
         IPluginInstrument? leaving;
@@ -966,7 +912,7 @@ public sealed class TrackerPlayer : IDisposable
         leaving.Dispose();
     }
 
-    /// <summary>Takes every plugin off the tracks and puts it down. For closing a song.</summary>
+    /// <inheritdoc/>
     public void ClearPlayers()
     {
         (string Instrument, IPluginInstrument Plugin)[] leaving;
@@ -985,21 +931,11 @@ public sealed class TrackerPlayer : IDisposable
         foreach (var (_, plugin) in leaving) plugin.Dispose();
     }
 
-    /// <summary>
-    /// Puts down every plugin this song is holding: the instruments and the inserts both.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// For leaving the tracker behind. Each plugin is a process with its patch loaded, and a
-    /// song of four is four of them sitting there while you work on the pads, keeping the
-    /// engine running besides, because a track with an insert has to be given blocks.
-    ///
-    /// What is loaded is read back onto the song first. A plugin's own window is where most of
-    /// its settings are turned, and letting go without capturing would throw away everything
-    /// since the last save, which is the sort of loss nobody would connect to changing tabs.
-    ///
-    /// The chain is emptied by hand rather than by <c>Clear</c>, which drops the devices
-    /// without putting them down: that would leave the processes running with nothing holding
-    /// them, which is the leak this is supposed to be the opposite of.
+    /// The chain is emptied by hand rather than by <c>Clear</c>, which drops the devices without
+    /// putting them down: that would leave the processes running with nothing holding them,
+    /// which is the leak this is supposed to be the opposite of.
     /// </remarks>
     public void LetGoOfPlugins(Song song)
     {
@@ -1028,11 +964,7 @@ public sealed class TrackerPlayer : IDisposable
         Log.Write(LogArea.Tracker, () => "let go of the plugins '" + song.Name + "' was holding");
     }
 
-    /// <summary>Picks them all up again, for coming back to the tracker.</summary>
-    /// <remarks>
-    /// The chains first, because a track's inserts are what the engine needs to run at all, and
-    /// then the instruments side by side, as opening a song does.
-    /// </remarks>
+    /// <inheritdoc/>
     public void TakeUpPlugins(Song song)
     {
         if (song == null) return;
@@ -1041,19 +973,38 @@ public sealed class TrackerPlayer : IDisposable
         PreloadPlugins(song);
     }
 
-    /// <summary>Forgets a cached sample so an edited or re-recorded file is picked up.</summary>
+    /// <inheritdoc/>
     public void ReloadInstrument(string filePath) => _samples.Invalidate(filePath);
 
-    /// <summary>How far through its recording a sounding sample voice is, or -1 for none.</summary>
+    /// <inheritdoc/>
     public double SamplePosition(int track) => _synth.Mixer.SamplePosition(track);
 
-    /// <summary>What this player's stream is putting out, 0 to 1.</summary>
+    /// <inheritdoc/>
     public double OutputLevel => _synth.Level;
 
+    /// <summary>
+    /// The clock: one step a line, until it is stopped or the song runs out.
+    /// </summary>
+    /// <remarks>
+    /// The automation is written before the notes, and that is the whole of the ordering
+    /// question: a note landing on a line where the filter also moves should be played through
+    /// the filter as the line leaves it, not as the line before it left it.
+    ///
+    /// The tempo is read per step rather than once. A tempo moved while playing has to be heard
+    /// on the next line, not at the next take; the times are still absolute from the start, so
+    /// the clock does not drift and a change simply lengthens or shortens the steps from there
+    /// on. The song's tempo is written by the drawing thread while this one reads it, which is
+    /// why every use goes through the clamped timing: even a value caught mid-write can only be
+    /// a tempo, never a stall or a division by nought.
+    ///
+    /// Running off the end is not the same as being stopped, and only the first is this
+    /// thread's business to report. A newer run may already have started, in which case this
+    /// thread has none.
+    /// </remarks>
     private void RunClock(CancellationToken token, int generation)
     {
         Song song;
-        TrackerSequencer sequencer;
+        ITrackerSequencer sequencer;
         lock (_lock)
         {
             if (_song == null || _sequencer == null) return;
@@ -1071,9 +1022,6 @@ public sealed class TrackerPlayer : IDisposable
         {
             if (generation != Volatile.Read(ref _generation)) return;
 
-            // Before the notes, and that is the whole of the ordering question: a note landing
-            // on a line where the filter also moves should be played through the filter as the
-            // line leaves it, not as the line before it left it.
             Automation?.Play(song, position);
 
             ApplyEvents(sequencer.EventsFor(song, position), song);
@@ -1087,18 +1035,10 @@ public sealed class TrackerPlayer : IDisposable
             if (next == null) break;
             position = next.Value;
 
-            // Read per step rather than once: a tempo moved while playing has to be heard on
-            // the next line, not at the next take. The times are still absolute from the
-            // start, so the clock does not drift; a change simply lengthens or shortens the
-            // steps from here on. The song's tempo is written by the UI thread while this one
-            // reads it, which is why every use goes through the clamped timing: even a value
-            // caught mid-write can only be a tempo, never a stall or a division by zero.
             nextLine += song.Timing.SecondsPerLine;
             if (!WaitUntil(clock, nextLine, token)) return;
         }
 
-        // Ran off the end on its own rather than being stopped. A newer run may already have
-        // started, in which case this thread has no business touching the transport.
         if (!token.IsCancellationRequested && generation == Volatile.Read(ref _generation))
         {
             StopAllVoices();
@@ -1109,6 +1049,12 @@ public sealed class TrackerPlayer : IDisposable
     }
 
     /// <summary>Sleeps until the step is due, then spins out the last couple of milliseconds.</summary>
+    /// <remarks>
+    /// Sleep is not precise enough to land a step on, and spinning the whole wait would burn a
+    /// core. The wait handle is the cancellation token's, so a stop is answered at once rather
+    /// than at the end of the sleep.
+    /// </remarks>
+    /// <returns>False when it was cancelled rather than reaching the time.</returns>
     private static bool WaitUntil(Stopwatch clock, double targetSeconds, CancellationToken token)
     {
         while (true)
@@ -1130,6 +1076,10 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Plays one step's events. Anything for a track this pass does not have is dropped rather
+    /// than reaching past the end of the per-track arrays.
+    /// </summary>
     private void ApplyEvents(System.Collections.Generic.IReadOnlyList<TrackerEvent> events, Song song)
     {
         foreach (var e in events)
@@ -1142,8 +1092,6 @@ public sealed class TrackerPlayer : IDisposable
                     _synth.Mixer.NoteOff(e.Track);
                     _synth.Mixer.PluginNoteOff(e.Track);
 
-                    // An OFF row is a note this track played too, and the one it says is that
-                    // there is not one. A panel showing its keys puts them out on hearing it.
                     NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
                     break;
 
@@ -1158,6 +1106,21 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Starts a note on a track, on whichever machine that track's instrument is.
+    /// </summary>
+    /// <remarks>
+    /// One voice per track, as a tracker has always worked: the mixer cuts whatever that track
+    /// was sounding, whichever kind of instrument it was. A plugin holds its own notes, so the
+    /// track's voices are let go rather than left ringing underneath it.
+    ///
+    /// The note is announced once, before the kinds part company: a note played on a plugin is
+    /// as much a note this track played as one played on Ouroboros. With no length, since a note
+    /// in a pattern lasts until whatever the track plays next and that has not happened yet.
+    ///
+    /// Every way of failing writes a line saying which, because from outside they are all the
+    /// same thing: a track that did not sound.
+    /// </remarks>
     private void Trigger(TrackerEvent e, Song song)
     {
         var instrument = song.InstrumentAt(e.Instrument);
@@ -1175,18 +1138,10 @@ public sealed class TrackerPlayer : IDisposable
 
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
 
-        // Said once, before the kinds part company: a note played on a plugin is as much a
-        // note this track played as one played on Ouroboros.
-        // No length: a note in a pattern lasts until whatever the track plays next, which
-        // has not happened yet.
         NotePlayed?.Invoke(this, (e.Track, e.Note, 0d));
 
-        // One voice per track, as a tracker has always worked: the mixer cuts whatever that
-        // track was sounding, whichever kind of instrument it was.
         if (instrument.IsPlugin)
         {
-            // The plugin holds its own notes, so the track's voices are let go rather than
-            // left ringing underneath it.
             _synth.Mixer.NoteOff(e.Track);
 
             if (PlayerFor(e.Track, instrument) != null)
@@ -1287,8 +1242,17 @@ public sealed class TrackerPlayer : IDisposable
 
     /// <summary>What the last note on each track was addressed to, so it is said once a second.</summary>
     private readonly int[] _lastAddressed = new int[Song.MaxTrackCount];
+
+    /// <summary>And where that note actually went, in the words the line will use.</summary>
     private readonly string[] _lastWent = new string[Song.MaxTrackCount];
+
+    /// <summary>How many notes each track has played since the last line was written.</summary>
     private readonly int[] _triggers = new int[Song.MaxTrackCount];
+
+    /// <summary>
+    /// When the last line was written. A note per line per track is a log nobody reads, so the
+    /// whole picture is written once a second instead.
+    /// </summary>
     private long _toldWhere;
 
     /// <summary>
@@ -1341,6 +1305,10 @@ public sealed class TrackerPlayer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Moves the level or the placement of what a track is already sounding, for a cell with a
+    /// volume or effect column and no note in it.
+    /// </summary>
     private void Adjust(TrackerEvent e, Song song)
     {
         var instrument = song.InstrumentAt(e.Instrument);
@@ -1377,10 +1345,15 @@ public sealed class TrackerPlayer : IDisposable
         return (mixed, pan ?? MixLevels.PanFor(song.Mix, track));
     }
 
-    /// <summary>
-    /// Re-applies the mix to whatever is sounding, for a fader or a mute moved mid-take. The
-    /// note's own level is kept, so the two are combined rather than one replacing the other.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The side chain is part of the strip, so it is pushed with the rest of it rather than
+    /// waiting for the next note.
+    ///
+    /// Then the strip everything has already been through. Muted is nothing rather than a level,
+    /// the same as a track: a fader pulled to the bottom and a mute are two different gestures
+    /// and only one of them is remembered when it is undone.
+    /// </remarks>
     public void ApplyMix()
     {
         Song? song;
@@ -1393,7 +1366,6 @@ public sealed class TrackerPlayer : IDisposable
 
             _synth.Mixer.SetLevels(track, mixed, placed);
 
-            // The side chain is part of the strip, so it is pushed with the rest of it.
             _synth.Mixer.SetDucking(
                 track,
                 MixLevels.DuckFor(song.Mix, track, song.TrackCount),
@@ -1401,9 +1373,6 @@ public sealed class TrackerPlayer : IDisposable
                 MixLevels.DuckReleaseFor(song.Mix, track));
         }
 
-        // And the strip everything has already been through. Muted is nothing rather than a
-        // level, the same as a track: a fader pulled to the bottom and a mute are two different
-        // gestures and only one of them is remembered when it is undone.
         var master = song.Master;
 
         _synth.Mixer.SetMaster(
@@ -1411,33 +1380,43 @@ public sealed class TrackerPlayer : IDisposable
             (float)master.Pan);
     }
 
-    /// <summary>
-    /// The level and placement a voice should have, from the cell and the instrument. Shared
-    /// by both kinds of instrument so the volume column means the same thing either way.
-    /// </summary>
     /// <summary>An instrument can be pushed past unity, so the ceiling is not one.</summary>
     private const float MaxGain = 2f;
 
+    /// <summary>
+    /// The level and placement a voice should have, from the cell and the instrument. Shared by
+    /// every machine, so the volume column means the same thing whichever one is playing.
+    /// </summary>
+    /// <remarks>
+    /// The effect column wins over the volume column when both set the same thing, since an
+    /// effect written into the pattern is a decision about that note.
+    ///
+    /// The pan effect reads the way a tracker's always has: 00 hard left, 40 centre, 80 hard
+    /// right, which is why the middle is 64 rather than half of the parameter's range.
+    /// </remarks>
     private static (float Gain, float? Pan) LevelsFor(TrackerEvent e, TrackerInstrument? instrument)
     {
         float gain = (e.Gain ?? 1f) * (float)(instrument?.Volume ?? 1.0);
 
-        // The effect column wins over the volume column when both set the same thing.
         if (e.Effect.Command == TrackerEffect.SetVolume)
             gain = Math.Clamp(e.Effect.Parameter / (float)TrackerCell.MaxVolume, 0f, 1f);
 
         float? pan = null;
         if (e.Effect.Command == TrackerEffect.SetPan)
         {
-            // 00 hard left, 40 centre, 80 hard right.
             pan = Math.Clamp((e.Effect.Parameter - 64) / 64f, -1f, 1f);
         }
 
         return (Math.Clamp(gain, 0f, MaxGain), pan);
     }
 
+    /// <summary>Cuts everything sounding, without deciding anything about the transport.</summary>
     private void StopAllVoices() => _synth.Silence();
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The watch goes first, so nothing is walking the plugins while they are being put down.
+    /// </remarks>
     public void Dispose()
     {
         _watch.Dispose();
@@ -1459,6 +1438,13 @@ public sealed class TrackerPlayer : IDisposable
     /// Written only when something changes. A line a second per track is a log nobody reads;
     /// a line when a plugin appears, stops or changes process is a log that says what happened
     /// and when.
+    ///
+    /// Every track a song can have is walked, not the length of the levels array: that one is
+    /// empty until a song is loaded, and a plugin can be put on a track before then. Two tracks
+    /// reporting one process would mean the isolation is not there at all, which is the line
+    /// worth shouting.
+    ///
+    /// A watch that throws is not worth taking anything down for.
     /// </remarks>
     private void Muster()
     {
@@ -1469,8 +1455,6 @@ public sealed class TrackerPlayer : IDisposable
             var processes = new Dictionary<int, string>();
             var seen = new List<int>();
 
-            // Every track a song can have, not the length of the levels array: that one is
-            // empty until a song is loaded, and a plugin can be put on a track before then.
             for (int track = 0; track < Song.MaxTrackCount; track++)
             {
                 string account = Account(track, processes);
@@ -1486,7 +1470,6 @@ public sealed class TrackerPlayer : IDisposable
                 Diagnostics.Log.Write(Diagnostics.LogArea.Plugins, () => "track " + number + " holds " + account);
             }
 
-            // Two tracks in one process would mean the isolation is not there at all.
             foreach (var pair in processes)
             {
                 if (!pair.Value.Contains(','.ToString())) continue;
@@ -1499,7 +1482,6 @@ public sealed class TrackerPlayer : IDisposable
         }
         catch (Exception)
         {
-            // A watch that throws is not worth taking anything down for.
         }
     }
 

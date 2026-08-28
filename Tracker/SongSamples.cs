@@ -36,8 +36,10 @@ public static class SongSamples
     /// <summary>What the container calls the list of what it carries.</summary>
     public const string ManifestEntry = "samples.json";
 
+    /// <summary>Where a carried recording sits inside the container.</summary>
     private const string Folder = "samples/";
 
+    /// <summary>Indented, since the manifest is small and somebody may well open the zip.</summary>
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>One recording a song carries: where it is in the file, and what it was.</summary>
@@ -53,7 +55,10 @@ public static class SongSamples
     /// <summary>The list itself.</summary>
     public sealed class Manifest
     {
+        /// <summary>What shape this list is, so a later one can be told from this.</summary>
         public int Version { get; set; } = 1;
+
+        /// <summary>Every recording the container carries.</summary>
         public List<Carried> Files { get; set; } = new();
     }
 
@@ -84,7 +89,18 @@ public static class SongSamples
         return files;
     }
 
-    /// <summary>Puts those recordings in the container, and the list of them beside.</summary>
+    /// <summary>
+    /// Puts those recordings in the container, and the list of them beside.
+    /// </summary>
+    /// <remarks>
+    /// The audio goes in stored rather than compressed. Sixteen bit audio gives up very little to
+    /// deflate and a long take is tens of megabytes: the wait is real and what it buys is not.
+    /// The manifest beside it is compressed, since it is text and it is small.
+    ///
+    /// One recording that will not go in is one silent instrument, not a failed save, so each is
+    /// tried on its own and a failure is passed over. Nothing is written at all when none of them
+    /// went in, so a container with a manifest is a container that really is carrying something.
+    /// </remarks>
     public static void Write(ZipArchive container, IReadOnlyList<string> files)
     {
         if (container == null || files == null || files.Count == 0) return;
@@ -98,9 +114,6 @@ public static class SongSamples
             {
                 string name = Free(System.IO.Path.GetFileName(path), taken);
 
-                // Stored rather than compressed. Sixteen bit audio gives up very little to
-                // deflate and a long take is tens of megabytes: the wait is real and what it
-                // buys is not.
                 var entry = container.CreateEntry(Folder + name, CompressionLevel.NoCompression);
 
                 using (var writing = entry.Open())
@@ -111,7 +124,6 @@ public static class SongSamples
             }
             catch (Exception)
             {
-                // One recording that will not go in is one silent instrument, not a failed save.
             }
         }
 
@@ -129,6 +141,13 @@ public static class SongSamples
     /// <summary>
     /// Puts a packed song's recordings on the shelf and points its instruments at them.
     /// </summary>
+    /// <remarks>
+    /// One recording at a time, and one that will not come out is passed over: its instrument is
+    /// left pointing where the song said, which is a path this machine may well have anyway.
+    ///
+    /// The instruments are repointed from where the recording was on the machine that packed it
+    /// to where it has just landed here, which is why the manifest keeps the old path at all.
+    /// </remarks>
     /// <returns>What landed, so the shelf can be told to look again.</returns>
     public static IReadOnlyList<string> Read(ZipArchive container, Song song)
     {
@@ -174,8 +193,6 @@ public static class SongSamples
             }
             catch (Exception)
             {
-                // A recording that will not come out leaves its instrument pointing where the
-                // song said, which is a path this machine may well have anyway.
             }
         }
 

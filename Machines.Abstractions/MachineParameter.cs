@@ -23,8 +23,17 @@ public sealed class MachineParameter
     /// <summary>What it is measured in, if anything: dB, ms, Hz, st.</summary>
     public string Unit { get; set; } = "";
 
+    /// <summary>The bottom of its range, which is what a control at rest against its low end reads.</summary>
     public double Min { get; set; }
 
+    /// <summary>
+    /// The top of its range.
+    /// </summary>
+    /// <remarks>
+    /// One rather than nought, so a parameter written down with neither end named is the nought
+    /// to one every plugin standard already uses, rather than a parameter with no range at all
+    /// whose control cannot be moved.
+    /// </remarks>
     public double Max { get; set; } = 1;
 
     /// <summary>Where it sits on a machine nobody has touched, and where a double click puts it back.</summary>

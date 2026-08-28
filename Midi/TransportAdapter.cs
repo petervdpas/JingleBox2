@@ -16,21 +16,28 @@ public sealed class TransportAdapter : ITransportKeys
 {
     private readonly TransportSwitch _transport;
 
+    /// <param name="transport">The caps at the top of the window, patched to the page in front.</param>
     public TransportAdapter(TransportSwitch transport) => _transport = transport;
 
+    /// <inheritdoc/>
     public void Play()
     {
         Said("play", _transport.CanPlay);
         _transport.PlayCommand.Execute(null);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The one of the three that always has something behind it, borrowed or not, so it is said
+    /// plainly rather than through <see cref="Said"/>: there is no refusal to report.
+    /// </remarks>
     public void Stop()
     {
-        // Stop is the one that always has something behind it, borrowed or not.
         Log.Write(LogArea.Midi, () => "transport: stop, on the page in front of you");
         _transport.StopCommand.Execute(null);
     }
 
+    /// <inheritdoc/>
     public void Record()
     {
         Said("record", _transport.CanRecord);

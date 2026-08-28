@@ -41,9 +41,10 @@ public interface IMachineSlices : INotifyPropertyChanged
     /// <summary>Whether the piece in hand repeats, which is what draws the dashed handles.</summary>
     bool Looping { get; }
 
-    /// <summary>Where that repeat starts and ends, inside the piece. Written by dragging them.</summary>
+    /// <summary>Where that repeat starts, inside the piece. Written by dragging its handle.</summary>
     double LoopStart { get; set; }
 
+    /// <summary>Where it ends, the other of the two handles.</summary>
     double LoopEnd { get; set; }
 
     /// <summary>Whether there is a recording to cut at all.</summary>
@@ -61,11 +62,13 @@ public interface IMachineSlices : INotifyPropertyChanged
     /// <summary>The ways of deciding where to cut, and which is chosen.</summary>
     IReadOnlyList<string> CutOptions { get; }
 
+    /// <summary>Which of those is chosen, by its own name.</summary>
     string CutBy { get; set; }
 
     /// <summary>Whether the piece in hand loops, offered as words rather than a switch.</summary>
     IReadOnlyList<string> LoopNames { get; }
 
+    /// <summary>Which of those is chosen, by its own name.</summary>
     string LoopName { get; set; }
 
     /// <summary>Cuts it, throwing away where it is cut now.</summary>

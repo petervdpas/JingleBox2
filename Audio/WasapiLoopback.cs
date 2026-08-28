@@ -5,24 +5,14 @@ using System.Runtime.InteropServices;
 
 namespace JingleBox2.Audio;
 
-/// <summary>One of the outputs whose playback can be captured.</summary>
-public readonly record struct LoopbackDevice(int Index, string Name);
-
-/// <summary>
-/// Recording what an output is playing, on Windows. WASAPI offers a loopback capture per
-/// output device, which is the same idea as a monitor source on Linux and needs no extra
-/// hardware, no Stereo Mix, and no virtual cable.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// This is a separate capture path from BASS's own recording: loopback does not come through
-/// Bass.RecordStart. Everything above it still sees 16 bit interleaved audio, so the gain,
-/// the clip detection, the meter and the WAV writer are unchanged; only where the audio comes
-/// from is different.
-///
-/// It needs basswasapi.dll beside the app. Without it, or off Windows, this reports itself
-/// unsupported and the recorder keeps to capture devices.
+/// Through WASAPI, which offers a loopback capture per output device. That is a Windows idea, so
+/// this needs basswasapi beside the program and reports itself unsupported without it or off
+/// Windows, and the recorder then keeps to capture devices. Linux answers the same question from
+/// the other side, with a monitor source that appears among the capture devices already.
 /// </remarks>
-public sealed class WasapiLoopback : IDisposable
+public sealed class WasapiLoopback : ILoopbackCapture
 {
     /// <summary>Ask for the device's own mix format rather than imposing one.</summary>
     private const int DeviceFormat = 0;
@@ -30,25 +20,47 @@ public sealed class WasapiLoopback : IDisposable
     /// <summary>Two channels is what everything downstream is written for.</summary>
     private const int StereoChannels = 2;
 
+    /// <summary>What to assume the device runs at when it will not say.</summary>
+    private const int FallbackSampleRate = 44100;
+
+    /// <summary>Held while the capture is started or stopped, which can be asked for from either thread.</summary>
     private readonly object _lock = new();
 
-    // The callback has to outlive the call that hands it over: WASAPI keeps calling it from
-    // its own thread, and a collected delegate is a crash rather than a silence.
+    /// <summary>
+    /// The callback WASAPI holds, kept here because it has to outlive the call that handed it
+    /// over: WASAPI goes on calling it from its own thread, and a collected delegate is a crash
+    /// rather than a silence.
+    /// </summary>
     private WasapiProcedure? _procedure;
 
+    /// <summary>Who each block is handed to.</summary>
     private Action<byte[]>? _onAudio;
+
+    /// <summary>The block as WASAPI wrote it, kept so a capture does not allocate per block.</summary>
     private float[] _floats = Array.Empty<float>();
+
+    /// <summary>The same block turned into sixteen bit samples, kept for the same reason.</summary>
     private byte[] _pcm = Array.Empty<byte>();
+
+    /// <summary>Which output is being listened to, or -1 for none.</summary>
     private int _device = -1;
+
+    /// <summary>Whether audio is arriving.</summary>
     private bool _running;
 
+    /// <summary>
+    /// Whether this can work at all here. Windows only, since loopback is a WASAPI idea and
+    /// Linux answers the same question with a monitor source on the capture side.
+    /// </summary>
     public static bool IsSupported => OperatingSystem.IsWindows();
 
-    /// <summary>What the capture is actually running at, once it has started.</summary>
+    /// <inheritdoc/>
     public int SampleRate { get; private set; }
 
+    /// <inheritdoc/>
     public int Channels { get; private set; }
 
+    /// <inheritdoc/>
     public bool IsRunning
     {
         get { lock (_lock) return _running; }
@@ -58,6 +70,10 @@ public sealed class WasapiLoopback : IDisposable
     /// The outputs that can be listened to. Empty everywhere the add-on is missing, which is
     /// how the rest of the app finds out this is not available without asking.
     /// </summary>
+    /// <remarks>
+    /// Empty rather than a fault when basswasapi is not beside the program, since a build without
+    /// the add-on is a build that does not offer this rather than a build that is broken.
+    /// </remarks>
     public static IReadOnlyList<LoopbackDevice> GetDevices()
     {
         if (!IsSupported) return Array.Empty<LoopbackDevice>();
@@ -76,7 +92,6 @@ public sealed class WasapiLoopback : IDisposable
         }
         catch (DllNotFoundException)
         {
-            // basswasapi.dll is not beside the app: nothing to offer, and nothing to report.
             return Array.Empty<LoopbackDevice>();
         }
         catch (Exception)
@@ -87,10 +102,11 @@ public sealed class WasapiLoopback : IDisposable
         return devices;
     }
 
-    /// <summary>
-    /// Starts listening to an output. The audio arrives as 16 bit interleaved stereo, whatever
-    /// the device mixes at, so the caller does not have to know it came from WASAPI.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Shared mode at the device's own format. Exclusive mode would take the output away from
+    /// whatever is playing, which is the one thing this is here to hear.
+    /// </remarks>
     public bool Start(int device, Action<byte[]> onAudio)
     {
         if (!IsSupported) return false;
@@ -104,8 +120,6 @@ public sealed class WasapiLoopback : IDisposable
 
             try
             {
-                // Shared mode at the device's own format: exclusive mode would take the output
-                // away from whatever is playing, which is the one thing we want to hear.
                 if (!BassWasapi.Init(device, DeviceFormat, DeviceFormat, WasapiInitFlags.Buffer,
                         0f, 0f, _procedure, IntPtr.Zero))
                 {
@@ -114,7 +128,7 @@ public sealed class WasapiLoopback : IDisposable
                 }
 
                 BassWasapi.GetInfo(out var info);
-                SampleRate = info.Frequency > 0 ? info.Frequency : 44100;
+                SampleRate = info.Frequency > 0 ? info.Frequency : FallbackSampleRate;
                 Channels = StereoChannels;
 
                 if (!BassWasapi.Start())
@@ -131,18 +145,23 @@ public sealed class WasapiLoopback : IDisposable
             }
             catch (Exception)
             {
-                // Missing add-on, or a device that will not open: either way, not available.
                 _procedure = null;
                 return false;
             }
         }
     }
 
+    /// <inheritdoc/>
     public void Stop()
     {
         lock (_lock) Release();
     }
 
+    /// <summary>Lets the device go and forgets everything about it. Called holding the lock.</summary>
+    /// <remarks>
+    /// A failure on the way out is swallowed, since this is reached when the capture is going
+    /// away regardless and there is nothing left to tell.
+    /// </remarks>
     private void Release()
     {
         if (!_running) return;
@@ -155,7 +174,6 @@ public sealed class WasapiLoopback : IDisposable
         }
         catch (Exception)
         {
-            // Going away regardless.
         }
 
         _running = false;
@@ -165,9 +183,17 @@ public sealed class WasapiLoopback : IDisposable
     }
 
     /// <summary>
-    /// WASAPI hands over floats; everything downstream reads 16 bit samples. The conversion is
-    /// here so that is the only place that has to know.
+    /// One block from WASAPI, turned into what everything downstream reads.
     /// </summary>
+    /// <remarks>
+    /// WASAPI hands over floats and everything downstream reads sixteen bit samples, so the
+    /// conversion is here and this is the only place that has to know. Called on WASAPI's own
+    /// thread.
+    /// </remarks>
+    /// <param name="buffer">The block, as floats.</param>
+    /// <param name="length">How many bytes of it there are.</param>
+    /// <param name="user">Unused, since what this needs is on the instance.</param>
+    /// <returns>The length, which is what WASAPI expects back.</returns>
     private int OnAudio(IntPtr buffer, int length, IntPtr user)
     {
         var onAudio = _onAudio;
@@ -204,5 +230,6 @@ public sealed class WasapiLoopback : IDisposable
         return (short)Math.Round(scaled);
     }
 
+    /// <inheritdoc/>
     public void Dispose() => Stop();
 }

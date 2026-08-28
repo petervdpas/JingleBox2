@@ -1,6 +1,3 @@
-// ===============================
-// ViewModels/MainViewModel.cs
-// ===============================
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
@@ -20,6 +17,20 @@ using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.ViewModels;
 
+/// <summary>
+/// The window itself: the pages, the settings behind them, and the wiring between the sound,
+/// the MIDI ports and what is on screen.
+/// </summary>
+/// <remarks>
+/// Almost nothing here is a page. The pages are their own view models and this holds them,
+/// which is what lets the parts that belong to the whole window rather than to any one page
+/// live in one place: the transport caps, the status bar, the pointing of a hardware knob at a
+/// software one, and the settings that are read while the app is starting.
+///
+/// The pads are the exception. Their profile, their matrix and their history are here rather
+/// than on a page view model of their own, because two pages show them: PADS is where they are
+/// laid out and FIRE is where they are played.
+/// </remarks>
 public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcutContext
 {
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
@@ -42,48 +53,111 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// A step is every pad at once, which costs almost nothing at this size and answers the one
     /// question a per-pad history could not: how many pads there are is an edit too, and it is
     /// not about any one of them.
+    ///
+    /// It is opened afresh on the pads of whichever profile is open, and again whenever another
+    /// one is opened. Nothing from before that can be undone, which is right: a history
+    /// outliving its profile would put one profile's pads back onto another.
     /// </remarks>
     public PadHistory PadHistory { get; } = new();
 
+    /// <summary>The pads' sound, shared with the tracker rather than opened twice.</summary>
     private readonly IAudioEngine _audio;
+
+    /// <summary>Where the settings are written, which is the same file for all of them.</summary>
     private readonly ConfigStore _store;
+
+    /// <summary>The settings as they stand, which is what everything here reads and writes.</summary>
     private readonly AppConfig _cfg;
 
+    /// <summary>
+    /// Set while this object is writing to its own properties, so the writes are not read back
+    /// as edits and stored again.
+    /// </summary>
+    /// <remarks>
+    /// Filling a combo box with the profile that is already selected, or pouring a profile into
+    /// the pads, moves a dozen properties that nobody touched. Without this each of them saves
+    /// the settings and the last one wins, which is how opening a profile used to overwrite it.
+    /// </remarks>
     private bool _suspendSave;
 
+    /// <summary>The MIDI ports, their roles, and what is being learned on them.</summary>
     public MidiViewModel Midi { get; }
 
     /// <summary>
-    /// The second mouse mode: what the pointer rests on is offered to the controller.
+    /// Which keys are down, for anything drawing a keyboard.
     /// </summary>
     /// <remarks>
-    /// On the window rather than on a page, because a hardware knob is pointed at machine
-    /// panels, plugin panels and mixer strips alike, and the mode has to mean the same thing
-    /// wherever the pointer happens to be. Ctrl+Shift+M turns it on and off.
+    /// One monitor for the whole application, standing in front of the half that plays the
+    /// notes and passing every one on untouched. A drawn keyboard reads this rather than the
+    /// presses its own panel happened to hear, because a key on the hardware never touches a
+    /// panel: it goes to whoever the notes are being played on. See
+    /// <see cref="Midi.MidiMonitor"/>.
     /// </remarks>
-    /// <summary>Which keys are down, for anything drawing a keyboard. See MidiMonitor.</summary>
     public Midi.MidiMonitor? Keys { get; private set; }
 
+    /// <summary>
+    /// What a hardware control is pointed at, in both layers: the desk's links and the open
+    /// song's.
+    /// </summary>
+    /// <remarks>
+    /// On the window rather than on a page, because a knob is pointed at machine panels, plugin
+    /// panels and mixer strips alike and the answer has to be the same wherever the pointer
+    /// happens to be. Pointing is done in the other mouse mode, Ctrl+Shift+M, by resting the
+    /// pointer on a control and touching the one on the desk; a message is offered to this
+    /// first and then driven anyway, so the turn that makes the link also moves the thing you
+    /// pointed at, which is the only confirmation worth having.
+    /// </remarks>
     public Midi.ControlLink ControlLink { get; private set; } = null!;
 
     /// <summary>What the controller is pointed at, for the list in SETTINGS.</summary>
     public ControlLinksViewModel Links { get; private set; } = null!;
+
+    /// <summary>RECORD: taking a recording, and the shelf everything else fetches takes off.</summary>
     public RecordViewModel Record { get; }
 
     /// <summary>The shelf of takes, for filling a pad from it.</summary>
+    /// <remarks>
+    /// The same shelf the machines fetch takes off, narrowed the same way: a pad plays a
+    /// recording you own, not a file that happened to be on the disc the day the profile was
+    /// built.
+    /// </remarks>
     public TakeFilter Takes { get; }
+
+    /// <summary>TRACKER: the song, its patterns, its mixer and the rack beside it.</summary>
     public TrackerViewModel Tracker { get; }
+
+    /// <summary>The machines you have, as a list to pick from and to open one of.</summary>
     public MachineRackViewModel Machines { get; }
 
     /// <summary>Where a machine is built, as opposed to the rack, which is what is installed.</summary>
+    /// <remarks>
+    /// Given the same shelf of takes everything else reads, because it draws real waveforms and
+    /// a panel laid out against a picture that is not there is laid out wrong. Its picker
+    /// offers that shelf too: a machine that plays a recording is started from a recording, so
+    /// what stands at the top of the panel is your takes and the categories they are filed
+    /// under.
+    /// </remarks>
     public MachineEditorViewModel MachineEditor { get; } = new();
 
     /// <summary>What machines are on the disc, for the settings page to list and add to.</summary>
+    /// <remarks>
+    /// The disc rather than the rack: what is installed, including anything that has arrived
+    /// since the app was started and is therefore not on the rack yet. A machine imported or
+    /// thrown out while the app is running changes which boxes the rack has rather than what
+    /// one of them looks like, so the rack builds its list again there and then rather than
+    /// waiting for the next start, and builds the list rather than redrawing an open panel.
+    /// </remarks>
     public MachineShelfViewModel MachineShelf { get; }
 
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.
     /// </summary>
+    /// <remarks>
+    /// One bar for the whole window rather than one line per page. Three pages had grown their
+    /// own back when they were three tabs, and putting two of them inside the third meant
+    /// looking at two at once, one of which was the other one's own property rendered a second
+    /// time.
+    /// </remarks>
     public StatusBus Bus { get; } = new();
 
     /// <summary>What the bar along the bottom of the window shows.</summary>
@@ -92,7 +166,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// <summary>The pads, as the transport sees them: one cap, and it silences the lot.</summary>
     private PadDeck? _padDeck;
 
-    /// <summary>What the four caps at the top of the window are working.</summary>
+    /// <summary>
+    /// What the four caps at the top of the window are working.
+    /// </summary>
+    /// <remarks>
+    /// They belong to the page you are on: the deck behind them is patched by
+    /// <see cref="DeckForPage"/> and repatched whenever the page changes. See
+    /// <see cref="TransportSwitch"/>.
+    /// </remarks>
     public TransportSwitch Transport { get; private set; } = null!;
 
     /// <summary>
@@ -114,30 +195,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     [ObservableProperty] private int selectedTab;
 
     /// <summary>
-    /// What a shortcut means on the page you are on, or nothing where it means nothing.
-    /// </summary>
-    /// <remarks>
-    /// Written out per page rather than defaulting, the same way the transport's deck is, so a
-    /// page added later has to say what saving on it means instead of quietly inheriting
-    /// somebody else's answer. Saying no is a perfectly good answer and the common one: the
-    /// keystroke then carries on as though none of this were here, which is what stops Ctrl+S on
-    /// the pads doing something nobody asked for.
-    ///
-    /// This is the outermost answer. Anything nearer the keyboard is asked first, so a dialog or
-    /// a view with its own idea takes it before this is reached.
-    ///
-    /// Undo and redo are not answered anywhere yet, because there is no history to walk in
-    /// either direction. See docs/shortcuts.md.
-    /// </remarks>
-    /// <summary>
     /// The page you are on, when it answers keystrokes for itself.
     /// </summary>
     /// <remarks>
     /// Written out per page, like the transport's deck, and needed for a reason the dispatcher
     /// cannot fix on its own: it walks outwards from whatever has the keyboard, and when nothing
     /// has it the only thing that walk reaches is the window. A page with no focused control
-    /// inside it would then never be asked, and pressing undo on RECORD after clicking a button
-    /// in a dialog is exactly that situation.
+    /// inside it would then never be asked, and pressing undo on RECORD straight after clicking
+    /// a button in a dialog is exactly that situation: it silently did nothing.
     ///
     /// So the window hands off to the page rather than the page waiting to be found. Anything
     /// that does have focus is still asked first and still wins.
@@ -149,26 +214,48 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         _ => null
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// This is the outermost answer, so it is the last one asked and the one nothing nearer the
+    /// keyboard claimed. What the open page says comes first, and only what it does not answer
+    /// is decided here.
+    ///
+    /// Saying no is a good answer and the common one: the keystroke then carries on as though
+    /// none of this were here, which is what stops Ctrl+S on the pads doing something nobody
+    /// asked for. Every page is written out rather than defaulting, the same way the transport's
+    /// deck is, so a page added later has to say what saving on it means instead of quietly
+    /// inheriting somebody else's answer.
+    /// </remarks>
     bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
     {
         _ when Page?.Can(action) == true => true,
 
         Shortcuts.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
 
-        // The pads are not a document you save, so they are undone from wherever they are laid
-        // out, which is PADS, and from where they are fired, which is FIRE and USE.
         Shortcuts.ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
         Shortcuts.ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
 
         _ => false
     };
 
-    /// <summary>True on the pages the pads are laid out or played on.</summary>
+    /// <summary>
+    /// True on the pages the pads are laid out or played on.
+    /// </summary>
+    /// <remarks>
+    /// Which is where undo means the pads. They are not a document you save, so they are undone
+    /// from wherever they are laid out, which is PADS, and from where they are fired, which is
+    /// FIRE and USE.
+    /// </remarks>
     private bool OnThePads => SelectedTab is PadsTab or UseTab;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The page first, and only what it does not answer falls through to the window's own. The
+    /// page is asked whether it can before being asked to, since an action it declines has to
+    /// reach the answer below rather than being swallowed by whoever was offered it first.
+    /// </remarks>
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
-        // The page first, and only what it does not answer falls through to the window's own.
         if (Page is { } page && page.Can(action))
         {
             page.Do(action);
@@ -216,12 +303,22 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Changing pages: the bar is retold where you are, the transport is repatched, and the
+    /// tracker's plugins are put down or picked up if that has been asked for.
+    /// </summary>
+    /// <remarks>
+    /// Each plugin the song holds is a process with its patch loaded, and they go on holding it
+    /// while you work on the pads, which is why leaving the tracker is the moment to let go of
+    /// them. Whether that happens at all is <see cref="FreeTrackerPlugins"/>, and it is only
+    /// ever done on the way out and undone on the way back in.
+    ///
+    /// The caps at the top are patched to the page you are on, so moving pages moves them.
+    /// </remarks>
     partial void OnSelectedTabChanged(int value)
     {
         Retell();
 
-        // Going away from the tracker, and asked to. Each plugin the song holds is a process
-        // with its patch loaded, and they go on holding it while you work on the pads.
         if (_cfg.FreeTrackerPlugins)
         {
             if (_wasOnTracker && value != TrackerTab) Tracker.LetGoOfPlugins();
@@ -230,7 +327,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         _wasOnTracker = value == TrackerTab;
 
-        // The caps are patched to the page you are on, so moving pages moves them.
         Transport?.Moved();
 
         OnPropertyChanged(nameof(ShowsTransport));
@@ -256,8 +352,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// <remarks>
     /// Without this the tabs on SETTINGS wrap onto a second line to keep clear of buttons that
     /// are not being drawn.
-    /// </remarks>
-    /// <remarks>
+    ///
     /// There is room under it as well. The transport is taller than the names beside it, so a
     /// strip only as tall as the words leaves it hanging over whatever the page starts with.
     /// </remarks>
@@ -270,10 +365,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// </summary>
     private const int RecordTab = 0;
 
+    /// <summary>Where the pads are laid out.</summary>
     private const int PadsTab = 1;
 
+    /// <summary>And where they are played, which is FIRE.</summary>
     private const int UseTab = 2;
 
+    /// <summary>The song, and the rack beside it.</summary>
     private const int TrackerTab = 3;
 
     /// <summary>Named for the sake of the list, though nothing asks about it by name.</summary>
@@ -296,6 +394,18 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         _ => ""
     };
 
+    /// <summary>Re-asks the open page where you are whenever anything about it changes.</summary>
+    /// <remarks>
+    /// Any property, not just a named one: where you are is made of the cursor, the selection,
+    /// the song's name and half a dozen other things, and listing them here would be a list to
+    /// keep up to date every time a page grew one more. Where you are changes as you move about
+    /// inside a page and not only as you change pages, which is the whole reason this exists.
+    ///
+    /// This object is one of the pages it follows, since the profile and the matrix live here
+    /// rather than on a pad page view model of their own.
+    /// </remarks>
+    private void Follow(ObservableObject page) => page.PropertyChanged += (_, _) => Retell();
+
     /// <summary>
     /// Repeats whatever a page puts in its own status onto the bus.
     /// </summary>
@@ -304,14 +414,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// code writes to it, and this saves rewriting all of that at once; anything new should say
     /// what it has to say on the bus directly.
     /// </remarks>
-    /// <summary>Re-asks the open page where you are whenever anything about it changes.</summary>
-    /// <remarks>
-    /// Any property, not just a named one: where you are is made of the cursor, the selection,
-    /// the song's name and half a dozen other things, and listing them here would be a list to
-    /// keep up to date every time a page grew one more.
-    /// </remarks>
-    private void Follow(ObservableObject page) => page.PropertyChanged += (_, _) => Retell();
-
+    /// <param name="page">The page whose Status property is being repeated onto the bus.</param>
+    /// <param name="from">Who is speaking, which is what the bar puts beside the line.</param>
     private void Watch(ObservableObject page, string from)
     {
         page.PropertyChanged += (sender, e) =>
@@ -342,6 +446,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         (96000, "96000 Hz")
     };
 
+    /// <summary>
+    /// The chosen rate, as the words the picker shows rather than as a number.
+    /// </summary>
+    /// <remarks>
+    /// A rate the settings hold that is not on the list reads back as the first entry, which is
+    /// following the device, since that is the only answer that is right whatever the card
+    /// turns out to be. Takes effect when the app is started again.
+    /// </remarks>
     public string SelectedEngineRate
     {
         get
@@ -385,8 +497,17 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         (40, "40 ms cushion")
     };
 
+    /// <summary>The four choices, for the picker to show.</summary>
     public string[] RenderAheadLabels { get; } = RenderAheads.Select(a => a.Label).ToArray();
 
+    /// <summary>
+    /// Which cushion is in force, as the words rather than the milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Read back off the settings by matching the number, so a cushion the settings hold that
+    /// nobody offers falls back to the tightest. Takes effect when the app is started again,
+    /// since the thread that does the mixing ahead is made once.
+    /// </remarks>
     public string SelectedRenderAhead
     {
         get
@@ -466,6 +587,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     private Diagnostics.LogArea Written =>
         _cfg.LogAreas == 0 ? Diagnostics.LogArea.Everything : (Diagnostics.LogArea)_cfg.LogAreas;
 
+    /// <summary>
+    /// Builds the tick boxes from the areas the log knows about, once, while starting.
+    /// </summary>
     private void BuildLogParts()
     {
         var on = Written;
@@ -474,6 +598,23 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             LogParts.Add(new LogAreaViewModel(area, name, (on & area) != 0, LogPartChanged));
     }
 
+    /// <summary>
+    /// One of the tick boxes moved, so the areas are gathered up and put in force.
+    /// </summary>
+    /// <remarks>
+    /// Nothing ticked is the log off, and not the log on with nothing to say. Nought is stored
+    /// as "whatever there is", which is what makes a settings file written before the areas
+    /// existed read as the whole log rather than as silence. The cost of that is this: taking
+    /// the last area off would store nought, which reads back as all of them, so the one action
+    /// anybody would take to quieten a log turned every area back on and there was nothing on
+    /// the page to suggest why. So taking the last one off turns the log off, which is what
+    /// somebody doing it means, and switching it on again with nothing remembered gives them
+    /// everything.
+    ///
+    /// Applied straight away rather than at the next start: the point of narrowing a log is
+    /// usually that something is happening right now and it is too loud to read.
+    /// </remarks>
+    /// <param name="part">Which box was ticked, which is not read: they are all gathered.</param>
     private void LogPartChanged(LogAreaViewModel part)
     {
         var wanted = Diagnostics.LogArea.None;
@@ -481,16 +622,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         foreach (var one in LogParts)
             if (one.Writes) wanted |= one.Area;
 
-        // Nothing ticked is the log off, and not the log on with nothing to say.
-        //
-        // Nought is stored as "whatever there is", which is what makes a settings file written
-        // before the areas existed read as the whole log rather than as silence. The cost of
-        // that is this: taking the last area off would store nought, which reads back as all of
-        // them, so the one action anybody would take to quieten a log turned every area back on
-        // and there was nothing on the page to suggest why.
-        //
-        // So taking the last one off turns the log off, which is what somebody doing it means,
-        // and switching it on again with nothing remembered gives them everything.
         if (wanted == Diagnostics.LogArea.None)
         {
             WriteLog = false;
@@ -501,8 +632,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         _cfg.LogAreas = (int)wanted;
         _store.Save(_cfg);
 
-        // Straight away rather than at the next start: the point of narrowing it is usually
-        // that something is happening right now and the log is too loud to read.
         if (WriteLog) Diagnostics.Log.Open(Config.AppFolder.Path(), true, Written);
 
         OnPropertyChanged(nameof(LogHint));
@@ -520,12 +649,28 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     public string EngineRateHint =>
         $"Running at {Tracker.EngineSampleRate} Hz. A change takes effect when the app is started again.";
 
+    /// <summary>The rates, for the picker to show.</summary>
     public string[] EngineRateLabels { get; } = EngineRates.Select(r => r.Label).ToArray();
 
     /// <summary>What plugins this machine has. Scanned from SETTINGS, on demand.</summary>
+    /// <remarks>
+    /// It keeps the folders it was told to look in, and those live with the rest of the
+    /// settings rather than beside the scan, so where somebody's plugins are is remembered
+    /// across a start like anything else on the settings page.
+    /// </remarks>
     public PluginLibraryViewModel Plugins { get; private set; } = new();
 
+    /// <summary>Every output the card offers, filled once while starting.</summary>
     public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
+
+    /// <summary>
+    /// The pads of the open profile, in the order they are laid out.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilt rather than edited whenever the profile or the matrix changes, so anything
+    /// holding one of these is holding a pad that has gone. The pages that show them bind to
+    /// the collection, which is why it is replaced in place rather than swapped.
+    /// </remarks>
     public ObservableCollection<PadViewModel> Pads { get; } = new();
 
     /// <summary>
@@ -538,24 +683,57 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// </remarks>
     [ObservableProperty] private PadViewModel? selectedPad;
 
-    // PADS header
+    /// <summary>
+    /// The profiles there are, sorted and with default always among them, for the picker at the
+    /// head of PADS.
+    /// </summary>
     public ObservableCollection<string> ProfileNames { get; } = new();
 
-    // THEME picker. The themes there are is ThemeManager's to say, since it is the one that
-    // knows which file each is; a second list here could only drift from it.
+    /// <summary>
+    /// The themes, taken from <see cref="ThemeManager"/> rather than written out again.
+    /// </summary>
+    /// <remarks>
+    /// Which themes there are is that class's to say, since it is the one that knows which file
+    /// each of them is. A second list here could only drift from it.
+    /// </remarks>
     public ObservableCollection<string> ThemeNames { get; } = new(ThemeManager.Names);
 
+    /// <summary>
+    /// The theme in force, which is applied and stored the moment it is picked.
+    /// </summary>
+    /// <remarks>
+    /// A name the settings hold that is not one of the themes is resolved to the default rather
+    /// than left standing, so a hand-edited settings file cannot leave the window unstyled.
+    /// </remarks>
     [ObservableProperty] private string selectedTheme = ThemeManager.Default;
 
+    /// <summary>
+    /// Where the sound goes. Changing it takes everything down and brings it up on the new
+    /// card, and the tracker's stream is reopened after it.
+    /// </summary>
     [ObservableProperty] private OutputDevice? selectedOutputDevice;
 
-    // Selected profile name (bind to ComboBox + also show in FIRE)
+    /// <summary>
+    /// Which profile is open. Shown at the head of PADS and again on FIRE, so what is under
+    /// your hands is named on the page you play from.
+    /// </summary>
+    /// <remarks>
+    /// Whatever is put here has to be one of <see cref="ProfileNames"/> exactly, or the picker
+    /// showing it has nothing to select and comes up blank. A name that is not among them is
+    /// resolved to one that is, falling back to default, which always exists.
+    /// </remarks>
     [ObservableProperty] private string selectedProfileName = "default";
 
+    /// <summary>What is being typed into the box beside Add, before it is a profile.</summary>
     [ObservableProperty] private string newProfileName = "";
 
-    // Matrix size (rows x columns)
+    /// <summary>
+    /// How many rows the settings page is being typed towards, which is not yet how many there
+    /// are: see <see cref="PadCount"/>.
+    /// </summary>
     [ObservableProperty] private int rows = 4;
+
+    /// <summary>And the columns, which follow the rows while the two are bracketed together.</summary>
     [ObservableProperty] private int columns = 2;
 
     /// <summary>
@@ -577,18 +755,151 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
     /// <summary>What the settings page would give you, for the settings page to say so.</summary>
     public int WantedPadCount => Rows * Columns;
 
-    // Validation message for matrix size
+    /// <summary>
+    /// Why the matrix being typed cannot be applied, in words, and empty when it can.
+    /// </summary>
+    /// <remarks>
+    /// The message names the count as well as the limit, since a matrix is two numbers and
+    /// "too many pads" leaves somebody working out which of the two to change.
+    /// </remarks>
     [ObservableProperty] private string matrixSizeError = "";
 
+    /// <summary>Whether what is being typed is a matrix this app will build.</summary>
     public bool IsMatrixSizeValid => string.IsNullOrEmpty(MatrixSizeError);
 
-    // Event to notify window to resize for square pads
+    /// <summary>
+    /// The matrix changed, so the window can take its own shape from it.
+    /// </summary>
+    /// <remarks>
+    /// The pads are square, and only the window knows what room it has: it is given the rows
+    /// and columns and works out its own size from them, which is not something a view model
+    /// can do for it.
+    /// </remarks>
     public event Action<int, int>? MatrixSizeChanged;
 
+    /// <summary>
+    /// Makes a profile from what is typed beside it, with clean pads rather than a copy of the
+    /// ones on screen, and opens it. Does nothing for an empty name or one that already exists.
+    /// </summary>
     public IRelayCommand AddProfileCommand { get; }
+
+    /// <summary>
+    /// Throws away the open profile and goes back to default, which itself cannot be deleted:
+    /// there has to be somewhere to land.
+    /// </summary>
     public IRelayCommand DeleteProfileCommand { get; }
+
+    /// <summary>
+    /// Puts the typed matrix in force: the pads are stored, rebuilt at the new size, the engine
+    /// is resized under them and the window is told to take its new shape.
+    /// </summary>
+    /// <remarks>
+    /// Dead unless what is typed is valid and is not already what is in force, so the button
+    /// says whether there is anything to apply.
+    /// </remarks>
     public IRelayCommand ApplyMatrixSizeCommand { get; }
 
+    /// <summary>
+    /// Builds the window: the pages, the settings they read, and the wiring between them.
+    /// </summary>
+    /// <remarks>
+    /// Almost all of this is wiring, and the order matters in one direction only: a page has to
+    /// exist before anything can be hung off it. The pieces worth knowing about are these.
+    ///
+    /// One rack is made here and handed to both the tracker and the machine list, since they
+    /// are two views of the same shelf and two racks would be two answers to what you own. A
+    /// song takes an instrument off a machine and keeps its own copy of it, which is why the
+    /// two words are not interchangeable.
+    ///
+    /// The recordings run through everything. An instrument pointed at a different take frees
+    /// the old one and claims the new one, so the shelf is asked to work out its usage again;
+    /// a take an instrument is built on cannot be thrown away, so RECORD is given somewhere to
+    /// ask before it deletes, and it asks the songs as well as the rack, because a song owns
+    /// its instruments and a take nothing on the rack plays can still be the sound of three
+    /// songs; a packed song puts what it carried on the shelf as it opens; and trimming or
+    /// renaming a take changes what its instruments sound like while the player is holding the
+    /// old audio.
+    ///
+    /// Two things are said out loud while starting, and both are said here because this is
+    /// where there is finally a bar to say them on. The rack is brought into shape while it is
+    /// being built, which is before any of this exists, and moving somebody's instruments
+    /// without saying so would be the one thing worth saying all session. And a run that
+    /// stopped without saying goodbye leaves a file behind saying what it was in the middle of,
+    /// which is said out loud because a report nobody knows about is a report nobody sends.
+    /// What there is to be got back is said after it rather than before: the report is a file
+    /// to send, the recovered work is work, and the second is the one worth leaving on the bar.
+    ///
+    /// The MIDI wiring is five routers over one dispatcher, and which of them hears a message
+    /// is decided by the roles ticked in SETTINGS rather than here. The mappings are the whole
+    /// application's rather than a profile's: which pad a note fires does not change when
+    /// another set of pads is opened. In front of all of them is
+    /// a controller's own codec, which gets first refusal on every message and can only say
+    /// that these bytes mean those bytes: a device nobody has written a file for is passed
+    /// straight through. Behind them, one <see cref="ControlTargets"/> shared by the lot, since
+    /// two would be two caches of the same answers and two chances of them disagreeing, and a
+    /// control surface asks exactly the question a knob does. Automation writes through those
+    /// same targets, which is what makes the clock arriving at line 32 and a knob writing from
+    /// CC 74 one act: a machine still only answers on a track that plays it, and an insert is
+    /// still found by what it is rather than by where it sits, without any of that being said
+    /// twice. Every value the router writes is then offered to the recorder, which does nothing
+    /// at all unless somebody armed it and the song is playing. That is subscribed alongside
+    /// the routers rather than beside the controller's screen, because a screen is for the one
+    /// device that has one and this has to happen for every controller there is.
+    ///
+    /// FIRE is the pads and nothing else: the note router is skipped while that page is open.
+    /// A controller with both jobs ticked sends one note to both lanes, and the same pad that
+    /// fires a sample would also play the armed track's instrument, which is two sounds from
+    /// one press and neither of them asked for. On the page whose whole purpose is the pads,
+    /// the pads have it.
+    ///
+    /// Links live in two layers and the link object is handed both. The desk's are in the
+    /// settings; a song keeps its own and takes it with it, so what is handed over is the list
+    /// and a way of saying it moved, and where that list lives stays the tracker's business.
+    /// The song's half is announced before it changes as well as after, so a layout can be
+    /// taken back like anything else in a song; the desk's half is not a song's business and is
+    /// not recorded. Both are then shown twice: <see cref="Links"/> in SETTINGS is everything,
+    /// and the tracker's is the same links narrowed to what the open song holds. Two lists of
+    /// one thing, wanted in two places for two reasons.
+    ///
+    /// A Mackie surface is wired in both directions, and the two halves are one piece of work
+    /// rather than two. Writing to it is what makes a desk feel attached to the music rather
+    /// than wired to it, and it is also what makes the reading half correct: a fader there
+    /// lands on the value rather than picking up, which is only right because the motor has
+    /// already driven it to where the value is. It needs no file and no learning, since the
+    /// protocol says what every control on it is, and it reaches the mixer through the same
+    /// targets a hand-made link does. Its transport buttons and its faders come out of one
+    /// device on one port, so the transport router and the surface router divide that stream
+    /// between them rather than competing for it: the five transport notes are the one place
+    /// they could overlap and are refused by name in the second. The mix is drawn on it
+    /// whenever the tracker says the mix moved, since the levels are under its own faders and
+    /// the names are on its own display and it has no other way of hearing that either moved.
+    ///
+    /// A controller with a screen is told what the knob under your hand is doing, including
+    /// when it has not caught up yet, which is drawn where the parameter is rather than where
+    /// the knob is: what you need to know is where to turn to. Nothing asks whether a device
+    /// has a screen, since one with no output is answered with a quiet false and a few bytes
+    /// down a port nobody reads cost nothing. It is written only to the ports carrying the
+    /// controls, not to everything with a role: a screen sits with the knobs, and the transport
+    /// often arrives on a port of its own speaking Mackie Control, where Arturia's own system
+    /// exclusive is a foreign language and stopped the transport answering until the device was
+    /// power cycled. What it says at rest is this app's name and the song's, put there over
+    /// whichever DAW the device was told about; a knob's reading lands on top of that and comes
+    /// back to it. A control that has not caught up yet says so in the same place, and when the
+    /// reading meets the bar it takes over: without that the knob is simply dead for half a
+    /// turn and nothing anywhere says why.
+    ///
+    /// Two other things happen while starting that could have waited and deliberately do not.
+    /// The controller profiles are read now rather than when something first asks, because a
+    /// startup that says what it found is the difference between "the names are missing" and
+    /// "the file is not there", and the log is the only place either of those is ever visible.
+    /// And the messages are watched here for playing things, which is a second subscription:
+    /// the MIDI page has its own for learning and for showing what arrived, and it deliberately
+    /// sees the raw bytes rather than what a codec made of them, which is what a monitor is
+    /// for. Each control change is also shown to the profiles, which work out from the numbers
+    /// which of a device's programs is running, since it will not say and cannot be asked. That
+    /// is a clue rather than an answer, only means anything for a device with a file, and
+    /// changes nothing except what its controls are called.
+    /// </remarks>
     public MainViewModel(
         IAudioEngine audio,
         ConfigStore store,
@@ -604,47 +915,25 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         Midi = new MidiViewModel(store, cfg, midiService);
 
-        // The plugin list keeps the folders it was told to look in, which live with the rest
-        // of the settings.
         Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
 
-        // What a pad is filled from. The same shelf the machines fetch takes off, narrowed the
-        // same way: a pad plays a recording you own, not a file that happened to be on the disc
-        // the day you built the profile.
         Takes = new TakeFilter(Record.Recordings);
 
-        // The machine editor draws real waveforms, so it is given the same shelf everything
-        // else reads. A panel laid out against a picture that is not there is laid out wrong.
         MachineEditor.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
 
-        // And the shelf its picker offers, which is the same one again: a machine that plays a
-        // recording is started from a recording, so the list at the top of the panel is your
-        // takes and the categories they are filed under.
         MachineEditor.Shelf = new Tracker.Machines.TakeShelf(
             Record.Recordings, take => MachineEditor.PutTake(take.FilePath));
 
-        // The rack: the machines you have, and the plugins you have added. A song takes an
-        // instrument off a machine and keeps its own copy of it.
         var rack = new MachineRack();
 
         Tracker = new TrackerViewModel(audio, rack, Record.Recordings, store, cfg, Plugins, waveformService);
         Machines = new MachineRackViewModel(rack, Tracker, Record.Recordings, waveformService, Plugins);
 
-        // The disc, not the rack: what is installed, including what has arrived since the app
-        // was started and is therefore not on the rack yet.
         MachineShelf = new MachineShelfViewModel();
 
-        // A machine imported or removed while the app is running changes what is on the rack and
-        // what the panel in front of you is drawn from, so the rack draws it again rather than
-        // waiting for the next start.
-        // A machine added or thrown out changes which boxes the rack has, not only what one of
-        // them looks like, so the list is built again rather than the open panel redrawn.
         MachineShelf.Changed += () => Machines.Refresh();
 
-
-        // The four caps at the top belong to the page you are on. See TransportSwitch for
-        // which deck they are patched to and when.
         _padDeck = new PadDeck(Pads);
         Transport = new TransportSwitch(() => DeckForPage, Record, _padDeck, Tracker);
 
@@ -652,8 +941,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         {
             Tracker.ApplyMachineEdit(instrument);
 
-            // An instrument can be pointed at a different recording, which frees the old one
-            // and claims the new one.
             Record.RefreshUsage();
         };
 
@@ -663,47 +950,25 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             Record.RefreshUsage();
         };
 
-        // A recording that an instrument is built on cannot be thrown away, so the RECORD page
-        // asks before it deletes anything. Both places: the rack is the instruments you own,
-        // and a song owns its own, so a take nothing on the rack plays can still be the sound
-        // of three songs.
         Record.SampleUsage = new JingleBox2.Tracker.SampleUsers(rack, Tracker.Songs);
 
-        // A packed song puts the recordings it carried on the shelf as it opens.
         Tracker.RecordingsArrived += (_, _) => Record.Rescan();
 
-        // Trimming a recording changes what its instruments sound like, and the player is
-        // holding the old audio.
         Record.RecordingChanged += (_, path) => Tracker.ReloadSample(path);
         Record.RecordingRenamed += (_, moved) => Tracker.RenameSample(moved.From, moved.To);
 
-        // One status bar for the whole window rather than one line per page. Three pages had
-        // grown their own back when they were three tabs, and putting two of them inside the
-        // third meant looking at two at once, one of which was the other one's own property
-        // rendered a second time.
         Watch(Tracker, "Tracker");
         Watch(Machines, "Machines");
         Watch(Record, "Record");
 
-        // The rack is brought into shape while the rack is being built, which is before any
-        // of this exists. Moving somebody's instruments and saying nothing about it would be
-        // the one thing worth saying out loud all session.
         if (Machines.Status.Length > 0) Bus.Warn(Machines.Status, "Machines");
 
-
-
-        // The last run stopped without saying goodbye, and there is now a file saying what it
-        // was in the middle of. Said out loud, because a report nobody knows about is a report
-        // nobody sends.
         if (Diagnostics.CrashReport.FromLastTime.Length > 0)
         {
             Bus.Warn("JingleBox stopped unexpectedly last time. What it was doing is written in " +
                      Diagnostics.CrashReport.FromLastTime, "Crash");
         }
 
-        // And what there is to be done about it. Said after the crash rather than before, because
-        // this is the one worth leaving on the bar: the other is a file to send, this is work to
-        // get back.
         if (Tracker.Recovered.Length > 0) Bus.Warn(Tracker.Recovered, "Tracker");
 
         StatusLine = new StatusViewModel(
@@ -711,13 +976,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             () => Record.Level,
             () => Math.Max(_audio.GetOutputLevel(), Tracker.OutputLevel));
 
-        // Where you are changes as you move about inside a page, not only as you change pages.
         Follow(Tracker);
         Follow(Machines);
         Follow(Record);
 
-        // And the pad page, which is this object: the profile and the matrix live here rather
-        // than on a page view model of their own.
         Follow(this);
         Pads.CollectionChanged += (_, _) => Retell();
 
@@ -727,7 +989,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         DeleteProfileCommand = new RelayCommand(DeleteProfile);
         ApplyMatrixSizeCommand = new RelayCommand(ApplyMatrixSize, CanApplyMatrixSize);
 
-        // Devices
         foreach (var d in _audio.GetOutputDevices())
             OutputDevices.Add(d);
 
@@ -741,15 +1002,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             Tracker.ReopenAudio();
         }
 
-        // Load matrix size from config
         Rows = _cfg.Rows;
         Columns = _cfg.Columns;
 
-        // Ensure profiles exist + list them
         EnsureProfilesInitialized(PadCount);
         RefreshProfilesList();
 
-        // Pick initial selected profile (must match an item in ProfileNames)
         var wanted = string.IsNullOrWhiteSpace(_cfg.SelectedProfile) ? "default" : _cfg.SelectedProfile.Trim();
         var resolved = ProfileNames.FirstOrDefault(n => string.Equals(n, wanted, StringComparison.OrdinalIgnoreCase))
                       ?? ProfileNames.FirstOrDefault()
@@ -761,7 +1019,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             SelectedProfileName = resolved;
             _cfg.SelectedProfile = resolved;
 
-            // Theme: load from config, validate against known themes
             SelectedTheme = ThemeManager.Resolve(_cfg.SelectedTheme);
             _cfg.SelectedTheme = SelectedTheme;
         }
@@ -770,21 +1027,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             _suspendSave = false;
         }
 
-        // Pads
         BuildPadsFromSelectedProfile(PadCount);
 
-        // Where the pads stood when this profile was opened. Nothing before it can be undone,
-        // and a history outliving its profile would put another one's pads back.
         PadHistory.Opened(PadsInProfile());
 
         BuildLogParts();
 
-        // MIDI routing: global, profile-independent mapping. Which controller reaches which
-        // half of the app is decided by the roles in SETTINGS, not here.
         var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
-        // One monitor of the notes going past, in front of the half that plays them, wired here
-        // and never taken off. What a drawn keyboard shows is read from this rather than from
-        // whatever that panel happened to hear: a key on the hardware never touches a panel.
+
         Keys = new MidiMonitor(new TrackerNoteAdapter(Tracker, Machines));
 
         Machines.MidiKeys = Keys;
@@ -792,14 +1042,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         var noteRouter = new MidiNoteRouter(Keys);
 
-        // Knobs and faders. The router knows the mappings and the adapter knows the program,
-        // as with the two above, and the link is what puts a mapping there in the first place.
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
-        // Through the link rather than at the list itself: the link is written from the MIDI
-        // thread and read here on the same one, and it is the only thing holding the lock.
-        // One of these, shared. Two would be two caches of the same answers and two chances of
-        // them disagreeing, and a control surface asks the same question a knob does.
         var targets = new ControlTargets(Tracker, Machines);
 
         var controlRouter = new MidiControlRouter(
@@ -809,48 +1053,21 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             Layout);
         ControlLink.UseThis();
 
-        // The clock's half of the same door: what a lane says is written through the targets a
-        // knob writes through, so a machine only answers on a track that plays it and an insert
-        // is found by what it is rather than where it sits, without any of that being said twice.
         Tracker.UseAutomation(targets);
 
-        // And the hand's half. Every value the router writes is offered to the recorder, which
-        // does nothing at all unless somebody armed it and the song is playing. Subscribed here
-        // rather than beside the controller screen below, because that one only exists for a
-        // device with a display and this has to happen for every controller there is.
         controlRouter.Moved += (mapping, target, value) => Tracker.Automation.Moved(mapping, target, value);
 
-        // A song keeps its own layout and takes it with it. What the link is handed is the
-        // list and a way of saying it moved; where the list lives is the tracker's business.
         ControlLink.Song = () => Tracker.Song?.Controls;
         ControlLink.SongChanged = Tracker.ControlsChanged;
 
-        // And before, so the song's own layout can be taken back like anything else in it. The
-        // desk's half is not a song's business and is not recorded.
         ControlLink.SongChanging = () => Tracker.ControlsChanging();
 
         Links = new ControlLinksViewModel(ControlLink);
 
-        // The same links again, narrowed to what the open song holds, for the page in the
-        // tracker. Two lists of one thing, wanted in two places for two reasons.
         Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true);
 
-        // A message is offered to the link first and then driven anyway. Pointing at a knob and
-        // turning one links them, and the same turn moves the thing you pointed at, which is
-        // the only confirmation worth having.
-        // FIRE is the pads and nothing else. A controller with both jobs ticked sends one note
-        // to both lanes, and the same pad that fires a sample also plays the armed track's
-        // instrument: two sounds from one press, neither of them asked for. On the page whose
-        // whole purpose is the pads, the pads have it.
         var transport = new MidiTransportRouter(new TransportAdapter(Transport));
 
-        // A control surface, which needs no file and no learning: the protocol says what every
-        // control on it is. Reaches the mixer through the same targets a link does.
-        //
-        // Both halves. The writing one is what makes a desk feel attached to the music rather
-        // than wired to it, and it is also what makes the reading half correct: a fader here
-        // lands on the value rather than picking up, which is only right because the fader has
-        // already been driven to where the value is.
         var surface = new MackieSurface(
             midiService, targets, () => Tracker.TrackCount,
             track => Tracker.Strips.FirstOrDefault(one => one.Track == track)?.InstrumentName
@@ -860,8 +1077,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount, surface);
 
-        // The levels are under its faders and the names are on its display, and it has no other
-        // way of hearing that either moved.
         Tracker.MixShown = surface.Draw;
 
         var dispatcher = new MidiDispatcher(
@@ -878,28 +1093,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             {
                 transport.Handle(msg);
 
-                // Both, on the same port and on purpose. A surface speaking Mackie Control is
-                // one device sending one stream: its transport buttons and its faders come out
-                // together and there is no way to have the first without the second. The two
-                // routers divide the stream between them rather than competing for it, and the
-                // one place they could have overlapped, the five transport notes, is refused
-                // by name in the second.
                 mackie.Handle(msg);
             });
 
-        // A controller with a screen is told what the knob under your hand is doing. Nothing
-        // asks whether it has one: a device with no output is answered with a quiet false, and
-        // a few bytes down a port nobody reads cost nothing. See ArturiaDisplay.
-        // The controls, and not everything with a role. A screen sits with the knobs, and the
-        // transport arrives on a port of its own that speaks Mackie Control: writing Arturia's
-        // own system exclusive down that one is talking to a protocol in another language, and
-        // it stopped the transport answering until the device was power cycled.
         var screen = new ArturiaDisplay(
             midiService,
             () => MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Controls));
 
-        // What the screen says at rest, replacing the name of whichever DAW the device was
-        // told about. A knob's reading lands on top of this and comes back to it.
         screen.Standing("JingleBox2", Tracker.SongName);
 
         Tracker.PropertyChanged += (_, e) =>
@@ -925,23 +1125,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
                 target.Reads(value));
         };
 
-        // A controller's own file, if it has one, gets first refusal on every message. It can
-        // only say that these bytes mean those bytes: it cannot add a feature or take one away,
-        // and a device nobody has written a file for is passed straight through. See
-        // Scripting/ControllerCodecs.
         _codecs = new ControllerCodecs(midiService);
 
-        // Read now rather than when something first asks. Nothing needs them until a message
-        // arrives or a list is drawn, but a startup that says what it found is the difference
-        // between "the names are missing" and "the file is not there", and the log is the only
-        // place either of those is ever visible.
         ControllerProfiles.Reload();
 
-        // A control that has not caught up yet says so on the device's own screen, which is the
-        // only surface a hand on a knob is looking at. The bar is drawn where the parameter is,
-        // not where the knob is: what you need to know is where to turn to, and when the reading
-        // meets the bar it takes over. Without this the knob is simply dead for half a turn and
-        // nothing anywhere says why.
         controlRouter.Reaching += (mapping, target, wanted) =>
         {
             double range = target.Max - target.Min;
@@ -954,38 +1141,38 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
                 "pick up " + target.Reads(target.Value));
         };
 
-        // NOTE: MidiViewModel already subscribes for learn/status, and sees what really
-        // arrived rather than what a codec made of it, which is what a monitor is for.
-        // This subscription is for playing things.
         midiService.MessageReceived += (_, msg) =>
         {
             if (_codecs.Read(msg) is not { } read) return;
 
-            // Which mode the device is in, worked out from the numbers it sends, since it will
-            // not say and cannot be asked. Only a clue, only for a device with a profile, and
-            // it changes nothing except what its controls are called. See ControllerProfiles.
             if (read.Type == MidiMessageType.ControlChange)
                 ControllerProfiles.Saw(read.Device, read.Channel, read.Value);
 
             dispatcher.Handle(read);
         };
 
-        // Apply initial theme once
         ThemeManager.Apply(SelectedTheme);
 
         PropertyChanged += OnMainChanged;
     }
 
+    /// <summary>
+    /// The rows were typed: the columns follow while the two are bracketed together, and the
+    /// button says again whether what is now typed can be applied.
+    /// </summary>
+    /// <remarks>
+    /// The two hooks set each other and cannot chase each other, because setting a property to
+    /// what it already holds raises nothing.
+    /// </remarks>
     partial void OnRowsChanged(int value)
     {
-        // The other one follows. Setting it to what it already is does nothing, so the two
-        // hooks cannot chase each other.
         if (LinkPadMatrix) Columns = value;
 
         ValidateMatrixSize();
         (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
+    /// <inheritdoc cref="OnRowsChanged(int)"/>
     partial void OnColumnsChanged(int value)
     {
         if (LinkPadMatrix) Rows = value;
@@ -1069,6 +1256,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Works out whether what is typed is a matrix this app will build, and says why not.
+    /// </summary>
+    /// <remarks>
+    /// Four pads at least, since fewer is not a matrix, and sixteen at most unless the extended
+    /// matrix has been turned on. The message names both the limit and what is currently typed:
+    /// a matrix is two numbers, and "too many pads" alone leaves somebody working out which of
+    /// the two to change.
+    /// </remarks>
     private void ValidateMatrixSize()
     {
         int total = Rows * Columns;
@@ -1087,42 +1283,63 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         OnPropertyChanged(nameof(IsMatrixSizeValid));
     }
 
+    /// <summary>
+    /// Whether there is anything to apply: a valid matrix that is not already the one in force.
+    /// </summary>
     private bool CanApplyMatrixSize() => IsMatrixSizeValid && (Rows != _cfg.Rows || Columns != _cfg.Columns);
 
+    /// <summary>
+    /// Puts the typed matrix in force, everywhere that counts pads.
+    /// </summary>
+    /// <remarks>
+    /// The order is the point. What is on the pads now is stored into the open profile first,
+    /// or it would be thrown away with the pads it is on; then the settings, since everything
+    /// below reads the count from them; then the engine, which stops anything on a pad that is
+    /// going away and leaves the rest playing; then the pads themselves and the MIDI router.
+    ///
+    /// The pages that show pads are told about the count and the columns by hand, because both
+    /// are worked out from the settings rather than held, so nothing else would ever say they
+    /// had changed. The window is told last, since the pads are square and only it can work out
+    /// what room that needs.
+    /// </remarks>
     private void ApplyMatrixSize()
     {
         if (!IsMatrixSizeValid) return;
 
-        // Save current pads into profile
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
-        // Update config
         _cfg.Rows = Rows;
         _cfg.Columns = Columns;
 
-        // Resize audio engine
         _audio.Resize(PadCount);
 
-        // Rebuild pads
         EnsureProfilesInitialized(PadCount);
         BuildPadsFromSelectedProfile(PadCount);
 
-        // Update MIDI router pad count
         Midi.UpdatePadCount(PadCount);
 
-        // Save
         _store.Save(_cfg);
 
-        // The pages that show the pads follow what is in force, not what is being typed.
         OnPropertyChanged(nameof(PadCount));
         OnPropertyChanged(nameof(PadColumns));
 
-        // Notify window to resize for square pads
         MatrixSizeChanged?.Invoke(Rows, Columns);
 
         (ApplyMatrixSizeCommand as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
+    /// <summary>
+    /// Another profile was picked: the pads on screen are stored into the one being left, and
+    /// the new one is poured into them.
+    /// </summary>
+    /// <remarks>
+    /// Stored before switching, or the edits made since the profile was opened would go with
+    /// it. The name is then resolved against the list and put back, because the picker showing
+    /// it can only show a name that is really in the list.
+    ///
+    /// The history is opened afresh at the end. A different profile is a different set of pads,
+    /// and what was done to the last one is not something to undo onto this one.
+    /// </remarks>
     partial void OnSelectedProfileNameChanged(string value)
     {
         if (_suspendSave) return;
@@ -1132,10 +1349,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         EnsureProfilesInitialized(PadCount);
 
-        // Persist edits of current pads into currently selected profile BEFORE switching
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
-        // Switch selection to the requested name (must exist)
         _cfg.SelectedProfile = EnsureProfileExistsAndReturnResolved(name, padCount: PadCount);
 
         _store.Save(_cfg);
@@ -1145,7 +1360,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         {
             RefreshProfilesList();
 
-            // Make sure SelectedProfileName matches an existing item (so ComboBox shows it)
             SelectedProfileName =
                 ProfileNames.FirstOrDefault(n => string.Equals(n, _cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase))
                 ?? "default";
@@ -1157,11 +1371,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             _suspendSave = false;
         }
 
-        // A different profile is a different set of pads. What was done to the last one is not
-        // something to undo onto this one.
         PadHistory.Opened(PadsInProfile());
     }
 
+    /// <summary>
+    /// A theme was picked: resolved against the ones there are, applied at once and stored.
+    /// </summary>
     partial void OnSelectedThemeChanged(string value)
     {
         if (_suspendSave) return;
@@ -1174,6 +1389,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         _store.Save(_cfg);
     }
 
+    /// <summary>
+    /// Watches this object's own properties for the one that has to reach the sound: the output
+    /// device.
+    /// </summary>
+    /// <remarks>
+    /// Changing the device closes the old one, which takes the tracker's stream with it, so the
+    /// tracker is asked to open its stream again straight afterwards. Nothing else would notice
+    /// until the next note, which is a long way from here.
+    /// </remarks>
     private void OnMainChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (_suspendSave) return;
@@ -1184,8 +1408,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             {
                 _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
-                // Changing the device closed the old one, which took the tracker's stream with
-                // it. Nothing else would notice until the next note.
                 Tracker.ReopenAudio();
             }
 
@@ -1193,15 +1415,23 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Anything on any pad moved: the settings are written, and the history is told.
+    /// </summary>
+    /// <remarks>
+    /// The one place every pad edit already ended, which is why the history is hooked here
+    /// rather than at each thing that edits a pad.
+    ///
+    /// Told after the settings have been written, so what the history reads back is what was
+    /// stored. What it is told is which pad and which setting, so a step gathers by both: a
+    /// level is a fader and a fader is a stream, and dragging one is one thing somebody did.
+    /// </remarks>
     private void OnPadChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (_suspendSave) return;
 
         SaveNow();
 
-        // After the settings have been written, so what the history reads is what was stored.
-        // Gathered by which pad and which setting: a level is a fader and a fader is a stream,
-        // and dragging one is one thing somebody did.
         PadsMoved(sender is PadViewModel pad
             ? Pads.IndexOf(pad) + "." + e.PropertyName
             : e.PropertyName ?? "");
@@ -1261,6 +1491,19 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Makes a profile out of the name typed beside the button and opens it.
+    /// </summary>
+    /// <remarks>
+    /// The new one starts on clean pads rather than on a copy of what is on screen: somebody
+    /// making a second profile is starting again, and a copy of the first is the one thing they
+    /// can already get by not making one. What is on the pads now is stored into the profile
+    /// being left first, as everywhere else here.
+    ///
+    /// The name is put through <see cref="NormalizeProfileName"/>, and a name that is already
+    /// taken is refused quietly: two profiles with one name would be two files nobody could
+    /// tell apart in the picker.
+    /// </remarks>
     private void AddProfile()
     {
         var raw = (NewProfileName ?? "").Trim();
@@ -1274,10 +1517,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         if (_cfg.Profiles.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
             return;
 
-        // Persist current edits into current selected profile first
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
-        // IMPORTANT: new profile must be a CLEAN SLATE
         var padCount = PadCount;
         var newProfile = new ConfigProfile
         {
@@ -1305,6 +1546,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Throws away the open profile and lands on default.
+    /// </summary>
+    /// <remarks>
+    /// Default cannot be deleted, since there has to be somewhere to land, and the pads are
+    /// stored into the profile on the way out even though it is about to go: a delete that is
+    /// interrupted part way through should not also have lost the last edit.
+    /// </remarks>
     private void DeleteProfile()
     {
         var cur = (_cfg.SelectedProfile ?? "default").Trim();
@@ -1313,7 +1562,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
 
         EnsureProfilesInitialized(padCount: PadCount);
 
-        // Persist current edits into current selected profile before deleting (optional but safe)
         SavePadsIntoProfile(cur);
 
         var idx = _cfg.Profiles.FindIndex(p => string.Equals(p.Name, cur, StringComparison.OrdinalIgnoreCase));
@@ -1340,24 +1588,41 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Writes the window's own settings out: the device, the pads of the open profile, which
+    /// profile that is, and the theme.
+    /// </summary>
+    /// <remarks>
+    /// The theme has already been stored by the hook that applied it. It is written again here
+    /// so that one save is the whole of what this object holds, rather than most of it plus
+    /// whatever another path happened to have got round to.
+    /// </remarks>
     private void SaveNow()
     {
         EnsureProfilesInitialized(padCount: PadCount);
 
         _cfg.SelectedOutputDeviceId = SelectedOutputDevice?.Id ?? -1;
 
-        // Persist pads into selected profile
         SavePadsIntoProfile(_cfg.SelectedProfile);
 
-        // Keep SelectedProfileName + cfg in sync
         _cfg.SelectedProfile = string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName.Trim();
 
-        // Theme is already stored via OnSelectedThemeChanged, but keep consistent:
         _cfg.SelectedTheme = string.IsNullOrWhiteSpace(SelectedTheme) ? "Dark" : SelectedTheme.Trim();
 
         _store.Save(_cfg);
     }
 
+    /// <summary>
+    /// Throws the pads away and builds them again from the open profile.
+    /// </summary>
+    /// <remarks>
+    /// The old ones are disposed rather than dropped, since each holds a channel and an effect
+    /// chain of its own. Every new pad is given the plugin library and whatever chain the
+    /// profile saved for it, so a pad comes back with its effects on it and pointed at itself.
+    ///
+    /// A pad is always selected afterwards, because whatever the PADS page was showing belonged
+    /// to the pads that have just gone.
+    /// </remarks>
     private void BuildPadsFromSelectedProfile(int padCount)
     {
         EnsureProfilesInitialized(padCount);
@@ -1383,8 +1648,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
                 PadColor = padCfg.Color
             };
 
-            // Every pad gets an effect chain of its own, pointed at itself, and whatever the
-            // profile saved is put back on it.
             pad.UsePlugins(Plugins);
             pad.RestoreEffects(padCfg.Plugins);
 
@@ -1392,11 +1655,21 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             Pads.Add(pad);
         }
 
-        // The page always has something to show. Whatever was picked before belonged to the
-        // pads that have just been thrown away.
         SelectedPad = Pads.Count > 0 ? Pads[0] : null;
     }
 
+    /// <summary>
+    /// Pours the open profile into the pads that already exist, without rebuilding them.
+    /// </summary>
+    /// <remarks>
+    /// For switching profiles, where the matrix has not changed and the view models can stay.
+    /// If the two counts have drifted apart it fills what it can and leaves the rest, since the
+    /// pads on screen are what the audio engine was sized for and quietly growing the list here
+    /// would leave the two disagreeing.
+    ///
+    /// Saving is suspended throughout: every one of these writes is this object pouring, not
+    /// somebody editing, and each would otherwise save the settings and post an undo step.
+    /// </remarks>
     private void ApplySelectedProfileToPads()
     {
         EnsureProfilesInitialized(padCount: PadCount);
@@ -1406,7 +1679,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         _suspendSave = true;
         try
         {
-            // If pad count changed elsewhere, keep VM count stable but fill what we have
             var n = Math.Min(Pads.Count, profile.Pads.Count);
             for (int i = 0; i < n; i++)
             {
@@ -1429,6 +1701,17 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Writes what is on the pads into a profile, including what their plugins are holding.
+    /// </summary>
+    /// <remarks>
+    /// The chain is read off the audio engine rather than off the pad, so what is stored is
+    /// what is loaded right now rather than what the pad was opened with. The patches are not
+    /// read here: this runs on every property a pad has, and a level dragged is a hundred of
+    /// those, while asking a plugin for its patch is a round trip to another process and a
+    /// third of a megabyte. The pad reads its own patches when its chain settles, on the same
+    /// 600ms tick that makes it save at all, and what it read is what is written in here.
+    /// </remarks>
     private void SavePadsIntoProfile(string? profileName)
     {
         EnsureProfilesInitialized(padCount: PadCount);
@@ -1450,12 +1733,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             pc.FadeOut = vm.FadeOut;
             pc.Color = vm.PadColor;
 
-            // What is loaded on the pad right now, rather than what it was opened with.
             var captured = JingleBox2.Audio.Plugins.PluginChainState.Capture(
                 _audio.GetPadInsert(i) as JingleBox2.Audio.Plugins.PluginChain);
 
-            // And what each of those plugins is holding inside itself, which the pad read when
-            // its chain last settled. Not read here: this runs on every property a pad has.
             for (int device = 0; device < captured.Devices.Count && device < vm.Patches.Count; device++)
                 captured.Devices[device].State = vm.Patches[device];
 
@@ -1463,6 +1743,17 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Rebuilds the list the picker shows: the profiles there are, sorted, without duplicates
+    /// and with default among them whatever happens.
+    /// </summary>
+    /// <remarks>
+    /// Names are compared without regard to case throughout, here and everywhere else that
+    /// looks a profile up, because they are typed and a profile found by one path and missed by
+    /// another is how a profile comes to be created twice. The stored selection is brought back
+    /// to default if it names something that is not there, so a hand-edited settings file
+    /// cannot leave the app pointed at a profile it does not have.
+    /// </remarks>
     private void RefreshProfilesList()
     {
         EnsureProfilesInitialized(padCount: PadCount);
@@ -1478,11 +1769,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             ProfileNames.Add(n);
         }
 
-        // Guarantee default exists in the list
         if (!ProfileNames.Any(n => string.Equals(n, "default", StringComparison.OrdinalIgnoreCase)))
             ProfileNames.Insert(0, "default");
 
-        // Keep cfg selection valid
         if (string.IsNullOrWhiteSpace(_cfg.SelectedProfile) ||
             !_cfg.Profiles.Any(p => string.Equals(p.Name, _cfg.SelectedProfile, StringComparison.OrdinalIgnoreCase)))
         {
@@ -1490,13 +1779,27 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         }
     }
 
+    /// <summary>
+    /// Brings the stored profiles into a shape the rest of this class can rely on, and is
+    /// called before anything reads them.
+    /// </summary>
+    /// <remarks>
+    /// There is always at least one profile, it is always called something, there is always one
+    /// called default, and every one of them holds exactly as many pads as the matrix says.
+    /// Profiles that are short are filled with empty pads and ones that are long are cut from
+    /// the end, which is what makes a matrix change something a profile written for another
+    /// size survives.
+    ///
+    /// A settings file from before profiles existed kept its pads in one flat list. Those are
+    /// carried into a profile called default rather than dropped, which is the only reason that
+    /// list is still read at all.
+    /// </remarks>
     private void EnsureProfilesInitialized(int padCount)
     {
         _cfg.Profiles ??= new System.Collections.Generic.List<ConfigProfile>();
 
         if (_cfg.Profiles.Count == 0)
         {
-            // migrate legacy Pads if present
             var pads = (_cfg.Pads != null && _cfg.Pads.Count > 0)
                 ? _cfg.Pads.Select(ClonePad).ToList()
                 : CreateDefaultPads(padCount);
@@ -1529,6 +1832,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             _cfg.SelectedProfile = "default";
     }
 
+    /// <summary>
+    /// Finds a profile by name, making it if there is none, and answers the name as it is
+    /// really stored.
+    /// </summary>
+    /// <remarks>
+    /// The stored spelling rather than the asked-for one, because the picker matches on the
+    /// exact string: handing back what somebody typed would leave the list showing nothing
+    /// selected while the right profile was open.
+    /// </remarks>
     private string EnsureProfileExistsAndReturnResolved(string requested, int padCount)
     {
         EnsureProfilesInitialized(padCount);
@@ -1546,10 +1858,17 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
             });
         }
 
-        // return exact stored casing
         return _cfg.Profiles.First(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)).Name;
     }
 
+    /// <summary>
+    /// The profile of that name, or default, which is guaranteed to exist by then.
+    /// </summary>
+    /// <remarks>
+    /// Answers a profile rather than null on purpose. Every caller here is about to read or
+    /// write pads and has nothing sensible to do with nothing, and default is the one profile
+    /// that cannot be missing.
+    /// </remarks>
     private ConfigProfile GetProfileByName(string? name)
     {
         EnsureProfilesInitialized(padCount: PadCount);
@@ -1559,10 +1878,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         var p = _cfg.Profiles.FirstOrDefault(x => string.Equals(x.Name, n, StringComparison.OrdinalIgnoreCase));
         if (p != null) return p;
 
-        // fallback
         return _cfg.Profiles.First(x => string.Equals(x.Name, "default", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>Empty pads, named Pad 1 upwards, at full level and playing nothing.</summary>
     private static System.Collections.Generic.List<PadConfig> CreateDefaultPads(int padCount)
     {
         var pads = new System.Collections.Generic.List<PadConfig>(padCount);
@@ -1579,6 +1898,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         return pads;
     }
 
+    /// <summary>
+    /// A copy of a stored pad, effect chain included.
+    /// </summary>
+    /// <remarks>
+    /// The chain is copied rather than shared, or two profiles would be holding one chain and
+    /// editing either would edit both.
+    /// </remarks>
     private static PadConfig ClonePad(PadConfig p) => new()
     {
         Name = p.Name,
@@ -1592,6 +1918,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.IShortcu
         Plugins = p.Plugins?.Clone()
     };
 
+    /// <summary>
+    /// Turns a typed name into one that can be a key: lower case, letters, digits, hyphen and
+    /// underscore, with runs of hyphens collapsed and the ends trimmed.
+    /// </summary>
+    /// <remarks>
+    /// Answers an empty string for a name with nothing usable left in it, which every caller
+    /// reads as "not a name" and refuses rather than storing a profile called "-".
+    /// </remarks>
     private static string NormalizeProfileName(string name)
     {
         name = (name ?? "").Trim();

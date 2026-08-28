@@ -36,15 +36,34 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// </summary>
     private const int MaxNotesPerBlock = 64;
 
+    /// <summary>The bundle this plugin came out of. Held so the reference can be given back.</summary>
     private readonly Vst3Module _module;
+
+    /// <summary>The audio half: busses, state, and being switched on.</summary>
     private readonly IComponent* _component;
+
+    /// <summary>The same half's rendering face, which is where a block goes.</summary>
     private readonly IAudioProcessor* _processor;
+
+    /// <summary>
+    /// The settings half: the knobs, their wording, and the window. Null for a plugin that
+    /// offers neither, which is rare and means no parameters and no picture.
+    /// </summary>
     private readonly IEditController* _controller;
+
+    /// <summary>
+    /// Where the settings half reports a knob it moved itself. Native memory the plugin holds,
+    /// carrying this instance's slot number rather than a managed pointer.
+    /// </summary>
     private readonly void* _handler;
 
     /// <summary>True when the knobs live in the audio half rather than a class of their own.</summary>
     private readonly bool _sharedController;
 
+    /// <summary>
+    /// Held over the pending values, the queued notes and what is sounding, by the audio thread
+    /// and the UI thread both.
+    /// </summary>
     private readonly object _lock = new();
 
     /// <summary>
@@ -64,11 +83,26 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// reads twelve kilobytes of preset.
     /// </remarks>
     private readonly object _swapping = new();
+
+    /// <summary>
+    /// Knob moves waiting for the audio half, latest per parameter. A dictionary rather than a
+    /// list because a knob dragged makes a hundred moves and only the last one matters.
+    /// </summary>
     private readonly Dictionary<uint, double> _pending = new();
 
+    /// <summary>The parameter moves handed to the plugin at the start of each block.</summary>
     private Vst3ParameterChanges? _changes;
+
+    /// <summary>
+    /// Somewhere for the plugin to put moves of its own. Nothing reads it back, but it has to be
+    /// there and it has to answer: some plugins assert on a host that offers none.
+    /// </summary>
     private Vst3ParameterChanges? _outgoing;
+
+    /// <summary>The notes handed to the plugin at the start of each block.</summary>
     private Vst3EventList? _notes;
+
+    /// <summary>Somewhere for the plugin to put notes of its own. Not read here.</summary>
     private Vst3EventList? _played;
 
     /// <summary>What is sounding, by pitch, so a note off can name the note that started.</summary>
@@ -77,26 +111,70 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// <summary>Notes waiting for the next block, in the order they were played.</summary>
     private readonly List<(bool On, int Pitch, float Velocity, int Id)> _queued = new();
 
+    /// <summary>
+    /// The next identity to give a sounding note. Never reused, so the same pitch played twice
+    /// at once is two notes the plugin can tell apart and end separately.
+    /// </summary>
     private int _nextNoteId = 1;
 
+    /// <summary>
+    /// The channels each input bus carries, after the plugin has had its say about the
+    /// arrangement. Read once at activation, since it cannot change while the plugin is on.
+    /// </summary>
     private int[] _inputBusChannels = Array.Empty<int>();
+
+    /// <inheritdoc cref="_inputBusChannels"/>
     private int[] _outputBusChannels = Array.Empty<int>();
 
+    /// <summary>One description per input bus, pointing into the channels below.</summary>
     private AudioBusBuffers* _inputBusses;
+
+    /// <inheritdoc cref="_inputBusses"/>
     private AudioBusBuffers* _outputBusses;
+
+    /// <summary>One pointer per input channel, into <see cref="_inputData"/>. What VST3 reads.</summary>
     private float** _inputChannels;
+
+    /// <inheritdoc cref="_inputChannels"/>
     private float** _outputChannels;
+
+    /// <summary>
+    /// One block of memory holding every input channel end to end. Allocated once at activation,
+    /// because allocating inside an audio callback is how a mixer starts crackling.
+    /// </summary>
     private float* _inputData;
+
+    /// <inheritdoc cref="_inputData"/>
     private float* _outputData;
+
+    /// <summary>What is handed to the plugin per block. Filled in at activation and reused.</summary>
     private ProcessData* _process;
 
+    /// <summary>
+    /// The largest block the plugin was set up for. A longer one from the device is fed through
+    /// in pieces rather than refused.
+    /// </summary>
     private int _maxFrames;
+
+    /// <summary>True once the audio half has been switched on.</summary>
     private bool _active;
+
+    /// <summary>True while the plugin has been told blocks are arriving.</summary>
     private bool _processing;
+
+    /// <summary>
+    /// True once this instance has been given up. A parked instance has it cleared again when
+    /// somebody picks it up: see <see cref="TakeParked"/>.
+    /// </summary>
     private bool _disposed;
 
+    /// <summary>Which stack this instance goes back onto when it is given up.</summary>
     private string _key = "";
 
+    /// <summary>
+    /// Private because a plugin is only ever made by <see cref="Load"/>, which is the only place
+    /// that knows both halves have been created, initialised and introduced.
+    /// </summary>
     private Vst3Plugin(
         Vst3Module module,
         IComponent* component,
@@ -116,8 +194,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         Info = info;
     }
 
+    /// <inheritdoc/>
     public PluginInfo Info { get; }
 
+    /// <inheritdoc/>
     public bool IsActive => _active;
 
     /// <summary>How many channels the plugin takes on its first input bus.</summary>
@@ -126,14 +206,23 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// <summary>How many channels the plugin gives on its first output bus.</summary>
     public int OutputChannels => _outputBusChannels.Length == 0 ? 0 : _outputBusChannels[0];
 
+    /// <summary>How many audio busses the plugin has each way. A side chain is a bus of its own.</summary>
     public int InputBusses => _inputBusChannels.Length;
 
+    /// <inheritdoc cref="InputBusses"/>
     public int OutputBusses => _outputBusChannels.Length;
 
     /// <summary>
     /// Opens one class out of a bundle and gets it ready to play. Null when the bundle will
     /// not load, does not hold that class, or refuses to start.
     /// </summary>
+    /// <remarks>
+    /// Every plugin is handed the host context at initialisation. It is the first thing Serum
+    /// asks for, and a plugin that cannot find one may simply refuse to run.
+    ///
+    /// From the moment the handler is in place, a knob turned in the plugin's own window comes
+    /// back to this instance, and so does a whole preset arriving.
+    /// </remarks>
     public static Vst3Plugin? Load(string bundlePath, string classId, int sampleRate, int maxFrames)
     {
         string key = Key(bundlePath, classId, sampleRate, maxFrames);
@@ -158,8 +247,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
             return null;
         }
 
-        // Every plugin is handed the host context here. It is the first thing Serum asks for,
-        // and a plugin that cannot find one may simply refuse to run.
         if (component->Vtbl->Initialize(component, Vst3Host.Application()) != Vst3Abi.ResultOk)
         {
             Release(component);
@@ -190,8 +277,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         var effect = new Vst3Plugin(module, component, processor, controller, handler, shared, info) { _key = key, _slot = slot };
 
-        // From here a knob turned in the plugin's own window comes back to this instance, and
-        // so does a whole preset arriving.
         Vst3Host.Listen(slot, effect.Moved);
         Vst3Host.ListenForReload(slot, effect.Reload);
 
@@ -269,26 +354,31 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Copies what the audio half is set to over to the settings half, so the knobs open where
     /// the sound already is rather than at the factory defaults.
     /// </summary>
+    /// <remarks>
+    /// A plugin with nothing to say leaves the stream empty, and handing that back is what makes
+    /// some of them assert on a read that returns nothing, so an empty one is not passed on.
+    /// </remarks>
     private static void CopyState(IComponent* component, IEditController* controller)
     {
         using var state = new Vst3Stream();
 
         if (component->Vtbl->GetState(component, state.Pointer) != Vst3Abi.ResultOk) return;
 
-        // A plugin with nothing to say leaves the stream empty, and handing that back is what
-        // makes some of them assert on a read that returns nothing.
         if (state.LooksEmpty) return;
 
         state.Rewind();
         controller->Vtbl->SetComponentState(controller, state.Pointer);
     }
 
+    /// <summary>
+    /// Which class in the bundle. No class given means the first one, which is what a bundle
+    /// holding one plugin is and what a chain saved before ids were written down means.
+    /// </summary>
     private static PluginInfo? FindPlugin(Vst3Module module, string classId)
     {
         var plugins = module.Plugins();
         if (plugins.Count == 0) return null;
 
-        // No class given means the first one, which is what a bundle holding one plugin is.
         if (string.IsNullOrWhiteSpace(classId)) return plugins[0];
 
         foreach (var plugin in plugins)
@@ -299,6 +389,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return null;
     }
 
+    /// <summary>
+    /// Asks a VST3 object for another of its faces. Null for one it does not have, which is an
+    /// ordinary answer rather than a fault. What comes back is already held and has to be
+    /// released.
+    /// </summary>
     private static void* Query(void* instance, byte[] id)
     {
         if (instance == null) return null;
@@ -316,6 +411,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return result;
     }
 
+    /// <summary>
+    /// Gives back one reference, guarding a null table, which a plugin that failed part way
+    /// through construction can leave behind.
+    /// </summary>
     private static void Release(void* instance)
     {
         if (instance == null) return;
@@ -324,6 +423,14 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         if (unknown->Vtbl != null && unknown->Vtbl->Release != null) unknown->Vtbl->Release(instance);
     }
 
+    /// <summary>
+    /// Agrees the busses, takes the memory the audio thread will need, and switches the plugin
+    /// on for a rate and a block size.
+    /// </summary>
+    /// <remarks>
+    /// Some plugins only accept being told that blocks are arriving once audio really is
+    /// flowing, so a refusal there is not treated as fatal: the first block will find out.
+    /// </remarks>
     private bool Activate(int sampleRate, int maxFrames)
     {
         _maxFrames = Math.Max(1, maxFrames);
@@ -348,8 +455,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         if (_processor->Vtbl->SetProcessing(_processor, 1) != Vst3Abi.ResultOk)
         {
-            // Some plugins only accept this once audio is actually flowing. Not fatal: the
-            // block that follows will find out.
         }
 
         _processing = true;
@@ -360,6 +465,14 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Agrees on what goes in and what comes out. Stereo is asked for everywhere and whatever
     /// the plugin settles on is read back, because a plugin is free to say no.
     /// </summary>
+    /// <remarks>
+    /// Only the main busses are switched on. An auxiliary bus is a side chain, and telling a
+    /// plugin one is live when nothing is feeding it invites it to duck against silence.
+    ///
+    /// Every event bus is switched on, both ways. Notes arrive on one, and a bus nobody switched
+    /// on is a bus the plugin ignores: that is the difference between an instrument that plays
+    /// and one that sits there taking every note without a sound.
+    /// </remarks>
     private void Arrange()
     {
         int inputs = Math.Max(0, _component->Vtbl->GetBusCount(_component, Vst3Abi.MediaAudio, Vst3Abi.DirectionInput));
@@ -380,18 +493,19 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         _inputBusChannels = Read(inputs, Vst3Abi.DirectionInput);
         _outputBusChannels = Read(outputs, Vst3Abi.DirectionOutput);
 
-        // Only the main busses are switched on. An auxiliary bus is a side chain, and telling
-        // a plugin one is live when nothing is feeding it invites it to duck against silence.
         SwitchOnMainBusses(inputs, Vst3Abi.DirectionInput);
         SwitchOnMainBusses(outputs, Vst3Abi.DirectionOutput);
 
-        // Notes arrive on an event bus, and a bus nobody switched on is a bus the plugin
-        // ignores. This is the difference between an instrument that plays and one that sits
-        // there taking every note without a sound.
         SwitchOnEventBusses(Vst3Abi.DirectionInput);
         SwitchOnEventBusses(Vst3Abi.DirectionOutput);
     }
 
+    /// <summary>
+    /// What each bus ended up carrying. The arrangement is asked for first, since that is what
+    /// the plugin actually agreed to, and the channel count is a mask of speakers so the answer
+    /// is how many bits are set in it. A plugin that will not say falls back to the bus's own
+    /// description.
+    /// </summary>
     private int[] Read(int count, int direction)
     {
         var channels = new int[count];
@@ -416,6 +530,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return channels;
     }
 
+    /// <summary>
+    /// Switches the main audio busses on and everything else off, in one direction. Called with
+    /// the bus count rather than asking again, since the count is settled by this point.
+    /// </summary>
     private void SwitchOnMainBusses(int count, int direction)
     {
         var info = new BusInfo();
@@ -429,6 +547,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
+    /// <summary>
+    /// Switches every event bus on in one direction, main or not: an instrument with its note
+    /// bus off takes every note and makes no sound.
+    /// </summary>
     private void SwitchOnEventBusses(int direction)
     {
         int count = _component->Vtbl->GetBusCount(_component, Vst3Abi.MediaEvent, direction);
@@ -471,14 +593,16 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// to be put in it or not, because a plugin handed fewer busses than it asked for is a
     /// plugin reading past the end of the list.
     /// </summary>
+    /// <remarks>
+    /// The pointer array is asked for in bytes rather than through the generic helper, because a
+    /// pointer is not something a generic type argument can be.
+    /// </remarks>
     private AudioBusBuffers* AllocBusses(int[] busses, int frames, out float* data, out float** pointers)
     {
         int total = 0;
         foreach (int channels in busses) total += Math.Max(0, channels);
 
         data = Alloc<float>(Math.Max(1, total * frames));
-        // A pointer is not something a generic can be told about, so this one is asked for
-        // in bytes.
         pointers = (float**)NativeMemory.AllocZeroed((nuint)Math.Max(1, total), (nuint)sizeof(float*));
 
         var buffers = Alloc<AudioBusBuffers>(Math.Max(1, busses.Length));
@@ -503,19 +627,29 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return buffers;
     }
 
+    /// <summary>
+    /// Unmanaged memory, zeroed, and never nought bytes of it: a null pointer handed to a plugin
+    /// is a read through nothing on its first block.
+    /// </summary>
     private static T* Alloc<T>(int count) where T : unmanaged
     {
         return (T*)NativeMemory.AllocZeroed((nuint)Math.Max(1, count), (nuint)sizeof(T));
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A block that arrives while a patch is going in is given up rather than waited for, and
+    /// what comes out is silence, which is what the plugin has to give at that moment in any
+    /// case. See <see cref="_swapping"/>.
+    ///
+    /// BASS asks for its whole playback buffer the first time it fills one, which is far more
+    /// than a plugin was set up for, so the block is cut to what the plugin agreed to.
+    /// </remarks>
     public void Process(float[] buffer, int frames)
     {
         if (_disposed || !_active || buffer == null || frames <= 0) return;
         if (_outputBusChannels.Length == 0) return;
 
-        // A patch is going in. See _swapping: this block is given up rather than waited for,
-        // and what comes out is silence, which is what the plugin has to give at that moment
-        // in any case.
         if (!System.Threading.Monitor.TryEnter(_swapping))
         {
             Array.Clear(buffer, 0, Math.Min(buffer.Length, frames * 2));
@@ -526,8 +660,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         {
             int offset = 0;
 
-            // BASS asks for its whole playback buffer the first time it fills one, which is far
-            // more than a plugin was activated for. The block is cut to what the plugin agreed to.
             while (offset < frames)
             {
                 int chunk = Math.Min(_maxFrames, frames - offset);
@@ -541,14 +673,23 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
+    /// <summary>
+    /// One block no longer than the plugin was set up for.
+    /// </summary>
+    /// <remarks>
+    /// The track goes into the main bus. Everything else the plugin declared, a side chain
+    /// included, is given silence rather than whatever happened to be left in it last block.
+    ///
+    /// Mono in takes the two sides summed rather than the left one alone, so a signal panned
+    /// right does not vanish into it; mono out goes to both sides, or half the mixer would go
+    /// quiet.
+    /// </remarks>
     private void ProcessBlock(float[] buffer, int offset, int frames)
     {
         int fed = 0;
 
         if (InputChannels == 1)
         {
-            // Mono in takes the two sides summed rather than the left one alone, so a signal
-            // panned right does not vanish into it.
             for (int frame = 0; frame < frames; frame++)
                 _inputChannels[0][frame] = (buffer[(offset + frame) * 2] + buffer[(offset + frame) * 2 + 1]) * 0.5f;
 
@@ -565,8 +706,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
             fed = 2;
         }
 
-        // Everything else the plugin declared, a side chain included, is given silence rather
-        // than whatever happened to be left in it last block.
         int channels = 0;
         foreach (int count in _inputBusChannels) channels += count;
 
@@ -651,7 +790,14 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
-    /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Normalised: every VST3 value is nought to one whatever it means, which is why the range
+    /// is written as nought to one here and the wording has to be asked of the plugin.
+    ///
+    /// Program changes are left out. They are a list of patches rather than a knob, and this
+    /// host has no way to show one yet; drawn as a dial, one would load a preset per pixel.
+    /// </remarks>
     public IReadOnlyList<PluginParameter> Parameters()
     {
         var parameters = new List<PluginParameter>();
@@ -664,8 +810,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         {
             if (_controller->Vtbl->GetParameterInfo(_controller, index, &info) != Vst3Abi.ResultOk) continue;
 
-            // Program changes are a list of patches rather than a knob, and this host has no
-            // way to show one yet.
             if ((info.Flags & Vst3Abi.ProgramChangeFlag) != 0) continue;
 
             parameters.Add(new PluginParameter(
@@ -685,7 +829,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return parameters;
     }
 
-    /// <summary>What a parameter is set to right now, straight from the settings half.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// From the settings half, which is the half that holds the value a person set. The audio
+    /// half has no way to be asked.
+    /// </remarks>
     public double ValueOf(uint id)
     {
         if (_disposed || _controller == null) return 0;
@@ -693,7 +841,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return _controller->Vtbl->GetParamNormalized(_controller, id);
     }
 
-    /// <summary>How the plugin words a value: "-6.0 dB" rather than 0.42.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The only way to print a VST3 parameter at all, since the number is nought to one whatever
+    /// it means. The buffer is a String128, which is the size the interface fixes.
+    /// </remarks>
     public string TextFor(uint id, double value)
     {
         if (_disposed || _controller == null) return "";
@@ -705,10 +857,12 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         return ReadWide((byte*)text);
     }
 
-    /// <summary>
-    /// Moves a parameter. The settings half hears it now, so what is shown is what the plugin
-    /// believes; the audio half hears it on its next block, which is the only time VST3 allows.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The settings half hears it now, so what is shown is what the plugin believes; the audio
+    /// half hears it on its next block, which is the only time VST3 allows. A host that writes
+    /// to one and not the other leaves a plugin whose window and whose sound disagree.
+    /// </remarks>
     public void SetValue(uint id, double value)
     {
         if (_disposed) return;
@@ -723,8 +877,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// <summary>Which slot this plugin answers on, for knob moves coming back from its window.</summary>
     private int _slot;
 
+    /// <inheritdoc/>
     public event Action<uint, double>? Edited;
 
+    /// <inheritdoc/>
     public event Action? Reloaded;
 
     /// <summary>The plugin says everything about it may have changed, which is a preset.</summary>
@@ -759,6 +915,7 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// queue simply waits, and the settings half already knows. This is what stops a knob on
     /// an idle pad from springing back.
     /// </summary>
+    /// <inheritdoc/>
     public void FlushParameters()
     {
     }
@@ -767,6 +924,14 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Starts a note. Queued rather than played: a plugin hears about notes at the start of a
     /// block, on the audio thread, not when a key goes down.
     /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Queued rather than played: a plugin hears about notes at the start of a block, on the
+    /// audio thread, not when a key goes down.
+    ///
+    /// The same pitch twice over is the tracker retriggering a note. The one that was sounding
+    /// is ended first, or the plugin is left holding a note nothing will ever release.
+    /// </remarks>
     public void NoteOn(int semitone, float velocity)
     {
         if (_disposed) return;
@@ -775,9 +940,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         lock (_lock)
         {
-            // The same pitch twice over is the tracker retriggering a note. The one that was
-            // sounding is ended first, or the plugin is left holding a note nothing will
-            // ever release.
             if (_sounding.TryGetValue(pitch, out int held))
             {
                 _queued.Add((false, pitch, 0, held));
@@ -791,6 +953,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A note off for something that never started is a note off from somewhere that lost track,
+    /// and passing it on would end a note the plugin is holding for somebody else.
+    /// </remarks>
     public void NoteOff(int semitone)
     {
         if (_disposed) return;
@@ -799,9 +966,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         lock (_lock)
         {
-            // A note off for something that never started is a note off from somewhere that
-            // lost track, and passing it on would end a note the plugin is holding for
-            // somebody else.
             if (!_sounding.TryGetValue(pitch, out int held)) return;
 
             _sounding.Remove(pitch);
@@ -809,6 +973,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every sounding note is turned into a note off in the queue rather than being cut, so the
+    /// plugin's own releases run and a reverb tail is not chopped in half.
+    /// </remarks>
     public void AllNotesOff()
     {
         if (_disposed) return;
@@ -821,10 +990,11 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         }
     }
 
-    /// <summary>
-    /// Fills a block with what the plugin is playing. An instrument has no audio input, so
-    /// what was in the buffer is replaced rather than added to.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same path as an effect's. An instrument has no audio input, so what was in the buffer
+    /// goes in and is written over by what comes out, which amounts to replacing it.
+    /// </remarks>
     public void Render(float[] buffer, int frames)
     {
         if (buffer == null || frames <= 0) return;
@@ -858,19 +1028,31 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Everything inside the plugin, as a lump to keep. This is where a patch really lives:
     /// the parameters are knob positions, and a wavetable is not a knob position.
     /// </summary>
+    /// <remarks>
+    /// Reading what a plugin holds is the same kind of reach into it as writing it, and it
+    /// happens while a song is being saved, which is a thing people do while something is
+    /// playing. So it takes the same lock a patch going in does.
+    /// </remarks>
     public byte[] SaveState()
     {
         if (_disposed || _component == null) return Array.Empty<byte>();
 
-        // Reading what a plugin holds is the same kind of reach into it as writing it, and it
-        // happens while a song is being saved, which is a thing people do while something is
-        // playing.
         lock (_swapping)
         {
             return SaveStateHere();
         }
     }
 
+    /// <summary>
+    /// Reads both halves, with the lock already held.
+    /// </summary>
+    /// <remarks>
+    /// The settings half keeps its own state, and it is not the same lump as the audio half's.
+    /// What is in it is everything the plugin shows rather than everything it plays: which
+    /// preset is on, what the browser is looking at, where the panels are. Saving only the audio
+    /// half is a song that comes back sounding right and looking like nothing was ever loaded,
+    /// which is what Serum saying "- Init -" over the patch you chose actually is.
+    /// </remarks>
     private byte[] SaveStateHere()
     {
         using var state = new Vst3Stream();
@@ -880,12 +1062,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         var sound = state.ToArray();
 
-        // The settings half keeps its own state, and it is not the same lump as the audio
-        // half's. What is in it is everything the plugin shows rather than everything it
-        // plays: which preset is on, what the browser is looking at, where the panels are.
-        // Saving only the audio half is a song that comes back sounding right and looking
-        // like nothing was ever loaded, which is what Serum saying "- Init -" over the patch
-        // you chose actually is.
         if (_controller == null) return sound;
 
         using var settings = new Vst3Stream();
@@ -955,18 +1131,30 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Puts a saved lump back, into both halves: the audio half so it sounds right, and the
     /// settings half so the knobs agree with it.
     /// </summary>
+    /// <remarks>
+    /// The block that is in the plugin now is allowed to finish; the next one goes silent until
+    /// this is done. See <see cref="_swapping"/>.
+    /// </remarks>
     public void LoadState(byte[]? state)
     {
         if (_disposed || _component == null || state == null || state.Length == 0) return;
 
-        // The block that is in the plugin now is allowed to finish; the next one goes silent
-        // until this is done. See _swapping.
         lock (_swapping)
         {
             LoadStateHere(state);
         }
     }
 
+    /// <summary>
+    /// Puts both halves back, with the lock already held.
+    /// </summary>
+    /// <remarks>
+    /// Three writes in a fixed order. The audio half first, so it sounds right. Then the same
+    /// bytes to the settings half through SetComponentState, which is how the knobs come to
+    /// agree with the sound. Then the settings half's own state, which is the part that says
+    /// which preset this is: last, because a plugin works out its display from the sound first
+    /// and then puts back whatever it kept for itself on top.
+    /// </remarks>
     private void LoadStateHere(byte[] state)
     {
         var (sound, settings) = Apart(state);
@@ -978,28 +1166,21 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         if (_controller == null) return;
 
-        // The audio half's state goes to the settings half as well, which is how the knobs
-        // come to agree with the sound.
         stream.Rewind();
         _controller->Vtbl->SetComponentState(_controller, stream.Pointer);
 
         if (settings.Length == 0) return;
 
-        // And then the settings half's own, which is the part that says which preset this is.
-        // Last, because a plugin works out its display from the sound first and then puts back
-        // whatever it kept for itself on top.
         using var mine = new Vst3Stream();
         mine.Fill(settings);
 
         _controller->Vtbl->SetState(_controller, mine.Pointer);
     }
 
-    /// <summary>
-    /// Opens the plugin's own interface, or null when it has none or will not draw here.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The view belongs to the settings half, which is the half that knows what the plugin
-    /// looks like. A plugin with no settings half has no window either.
+    /// The view belongs to the settings half, which is the half that knows what the plugin looks
+    /// like. A plugin with no settings half has no window either.
     /// </remarks>
     public IPluginEditor? OpenEditor()
     {
@@ -1032,11 +1213,26 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// </remarks>
     private static readonly Dictionary<string, Stack<Vst3Plugin>> Parked = new(StringComparer.Ordinal);
 
+    /// <summary>Held over the parked instances.</summary>
     private static readonly object ParkLock = new();
 
+    /// <summary>
+    /// What makes two instances interchangeable: the same class at the same rate and block size.
+    /// A parked instance at another rate would have to be set up again, which is the one call
+    /// this parking exists to avoid.
+    /// </summary>
     private static string Key(string path, string id, int sampleRate, int maxFrames) =>
         path + "|" + id + "|" + sampleRate + "|" + maxFrames;
 
+    /// <summary>
+    /// Picks up a parked instance, or null when there is none.
+    /// </summary>
+    /// <remarks>
+    /// Whatever it was holding when it was put down was turned into note offs then, and those
+    /// are still in the queue. They go out on the first block, so the plugin does not come back
+    /// sounding a chord from its last life; what is cleared here is only the record of which
+    /// notes were sounding, since that record is now wrong.
+    /// </remarks>
     private static Vst3Plugin? TakeParked(string key)
     {
         Vst3Plugin? effect = null;
@@ -1054,9 +1250,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
         {
             effect._pending.Clear();
 
-            // Whatever it was holding when it was put down was turned into note offs then,
-            // and those are still waiting. They go out on the first block so the plugin does
-            // not come back sounding a chord from its last life.
             effect._sounding.Clear();
         }
 
@@ -1073,6 +1266,12 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// Puts the plugin down. It keeps its place in memory, switched off but not taken apart,
     /// ready for the next slot that wants it.
     /// </summary>
+    /// <remarks>
+    /// Anything still sounding is ended before this is put down. The note offs stay in the queue
+    /// rather than being played here: this runs on the UI thread, the audio thread may be in the
+    /// middle of a block, and the queue is delivered on the first block after this plugin is
+    /// picked up again.
+    /// </remarks>
     public void Dispose()
     {
         if (_disposed) return;
@@ -1084,10 +1283,6 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
             _processing = false;
         }
 
-        // Anything still sounding is ended before this is put down. The note offs stay in the
-        // queue rather than being played here: this runs on the UI thread, the audio thread
-        // may be in the middle of a block, and the queue is delivered on the first block after
-        // this plugin is picked up again.
         AllNotesOff();
 
         lock (_lock) _pending.Clear();
@@ -1108,14 +1303,20 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// The full teardown, for an instance that never started. Only safe here: a plugin that
     /// failed to activate has nothing to switch off, so the path that faults is not taken.
     /// </summary>
+    /// <remarks>
+    /// The order matters throughout. Nothing more from its window first: the handler is native
+    /// memory the plugin may still be holding, and what it points at has to stop being this
+    /// instance before this instance goes anywhere. The two halves are parted before either is
+    /// terminated, or each is left holding a pointer to something on its way out. A shared
+    /// controller is not released separately, since it is the audio half. And the bundle goes
+    /// last: freeing it while the plugin is still in it is a crash with nothing to read in the
+    /// stack, because the code the plugin is running has been unmapped.
+    /// </remarks>
     private void Retire()
     {
         if (_disposed) return;
         _disposed = true;
 
-        // Nothing more from its window: the handler is native memory the plugin may still be
-        // holding, and what it points at has to stop being this instance before this instance
-        // goes anywhere.
         Vst3Host.Forget(_slot);
 
         if (_processing)
@@ -1167,11 +1368,10 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
 
         if (_handler != null) NativeMemory.Free(_handler);
 
-        // The rack goes last: freeing it while the plugin is still in it is a crash with
-        // nothing to read in the stack.
         _module.Dispose();
     }
 
+    /// <summary>Frees a block, allowing for one that was never taken.</summary>
     private static void Free(void* memory)
     {
         if (memory != null) NativeMemory.Free(memory);

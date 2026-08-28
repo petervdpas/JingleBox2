@@ -85,8 +85,10 @@ public sealed class ControllerIdentity
     /// <summary>One or three bytes, as hex: "00 20 6B".</summary>
     public string Manufacturer { get; set; } = "";
 
+    /// <summary>The family, as hex: two bytes, least significant first, as the device sends them.</summary>
     public string Family { get; set; } = "";
 
+    /// <summary>And the model within that family, the same way.</summary>
     public string Member { get; set; } = "";
 }
 
@@ -106,6 +108,7 @@ public sealed class ControllerPort
 /// <summary>One of a device's modes.</summary>
 public sealed class ControllerProgram
 {
+    /// <summary>What the device calls this mode, which is what a log line and a link list say.</summary>
     public string Name { get; set; } = "";
 
     /// <summary>
@@ -119,6 +122,12 @@ public sealed class ControllerProgram
     /// </remarks>
     public string Sends { get; set; } = "";
 
+    /// <summary>What each control sends while this program is the one running.</summary>
+    /// <remarks>
+    /// Which program is running is worked out from these: they do not overlap, so one number is
+    /// usually enough to say which mode the device is in. A number that appears in two programs
+    /// says nothing and is passed over.
+    /// </remarks>
     public List<ControllerControl> Controls { get; set; } = new();
 }
 

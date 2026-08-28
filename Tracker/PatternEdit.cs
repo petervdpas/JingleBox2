@@ -23,6 +23,14 @@ public static class PatternEdit
     /// </remarks>
     public static Action<Pattern, string>? Watching;
 
+    /// <summary>
+    /// Rings <see cref="Watching"/> for one edit, and does nothing when there is no pattern.
+    /// </summary>
+    /// <remarks>
+    /// Every method here calls this first, before it has decided whether it will change
+    /// anything. A step for an edit that turned out to do nothing costs nothing: the history
+    /// notices that the pattern still holds what the last step kept and reuses it.
+    /// </remarks>
     private static void Taking(Pattern? pattern, string what)
     {
         if (pattern is not null) Watching?.Invoke(pattern, what);
@@ -150,6 +158,11 @@ public static class PatternEdit
     /// level to decide. What a velocity sensitive keyboard needs after a take: a kick that
     /// came out a little different every time becomes one kick again. Returns how many changed.
     /// </summary>
+    /// <remarks>
+    /// Only cells that sound a note are touched. A note-off with a level would be a
+    /// contradiction, and a level on an empty cell is invisible: nothing would ever play it and
+    /// nothing on the screen would say it was there.
+    /// </remarks>
     public static int SetTrackVolume(Pattern pattern, int track, int volume)
     {
         Taking(pattern, "a track's volume");
@@ -166,8 +179,6 @@ public static class PatternEdit
         {
             var cell = pattern[line, track];
 
-            // Only cells that sound a note carry a volume; a note off with a level would be
-            // a contradiction, and an empty cell with one is invisible.
             if (!cell.Note.IsPlayable || cell.Volume == wanted) continue;
 
             pattern[line, track] = cell with { Volume = wanted };
@@ -318,14 +329,17 @@ public static class PatternEdit
     }
 
     /// <summary>The nearest line that is a multiple of the grid, kept inside the pattern.</summary>
+    /// <remarks>
+    /// The last grid line can fall off the end of a pattern whose length is not a multiple of
+    /// the grid, so the answer walks back a grid at a time until it is inside. A note pushed
+    /// past the end is a note thrown away, and quantising is not allowed to cost anybody a note.
+    /// </remarks>
     public static int SnapLine(int line, int grid, int lines)
     {
         if (grid <= 1 || lines <= 0) return Math.Clamp(line, 0, Math.Max(0, lines - 1));
 
         int snapped = (int)Math.Round(line / (double)grid, MidpointRounding.AwayFromZero) * grid;
 
-        // The last grid line can fall off the end of a pattern whose length is not a multiple
-        // of the grid, and a note pushed past the end is a note thrown away.
         while (snapped > lines - 1) snapped -= grid;
 
         return Math.Max(0, snapped);
@@ -375,8 +389,13 @@ public static class PatternEdit
         pattern[pattern.Lines - 1, cursor.Track] = TrackerCell.Empty;
     }
 
+    /// <summary>
+    /// Shifts a hex digit into the low nibble of a two-digit field, dropping what falls off the
+    /// top, which is how a tracker's two-digit columns are typed.
+    /// </summary>
     private static int ShiftIn(int current, int digit) => (current * 16 + digit) & 0xFF;
 
+    /// <summary>What a hex digit is worth, or false for a key that is not one.</summary>
     private static bool TryHexValue(char digit, out int value) =>
         int.TryParse(digit.ToString(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
 }

@@ -4,60 +4,55 @@ using System.Collections.Generic;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// Writes what the lanes say, one line at a time.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// The other half of remote control, and deliberately the same half. A knob turned from CC 74
-/// and the clock arriving at line 32 are one act against one interface, so this reaches a
-/// parameter through <see cref="IControlTargets"/> exactly as <see cref="MidiControlRouter"/>
-/// does, and everything that made a link resolve correctly makes a lane resolve correctly for
-/// free: a machine only answering on a track that plays it, an insert found by what it is
-/// rather than where it sits, a strip written through the fader on the screen.
-///
-/// It knows nothing about the clock beyond being called with a position, which is what makes it
-/// testable with no audio and no window.
+/// Keeps what it has worked out about each lane between one line and the next, which is what
+/// stops the per-line work being a mapping built from scratch and a write nobody needed.
 /// </remarks>
-public sealed class AutomationPlayer
+public sealed class AutomationPlayer : IAutomationPlayer
 {
+    /// <summary>Where a parameter is reached, which is the same door remote control goes through.</summary>
     private readonly IControlTargets _targets;
 
     /// <summary>
     /// What is known about a lane between one line and the next.
     /// </summary>
     /// <remarks>
-    /// Two things, and both are about not doing work per line. The mapping is built once
-    /// rather than per line, because it is the same half dozen fields every time. And the last
-    /// value written is remembered so an unchanged one is not written again: a lane holding
-    /// still between two points would otherwise post the same number thirty times a second, and
-    /// for a plugin in another process every one of those is a round trip.
+    /// Three things, and all of them are about not doing work per line. The mapping is built once
+    /// rather than per line, because it is the same half dozen fields every time. The last value
+    /// written is remembered so an unchanged one is not written again. And whether the log has
+    /// already been told this lane resolves to nothing is remembered too, so it is said once per
+    /// pass rather than thirty times a second.
     /// </remarks>
     private sealed class Known
     {
+        /// <summary>The lane as a mapping, built the first time this lane is played.</summary>
         public ControlMapping Mapping = null!;
+
+        /// <summary>The last value written, in the parameter's own units. NaN before the first.</summary>
         public double Written = double.NaN;
+
+        /// <summary>Whether the log has already been told this lane reaches nothing.</summary>
         public bool Complained;
     }
 
+    /// <summary>What is known about each lane, emptied by <see cref="Reset"/>.</summary>
+    /// <remarks>
+    /// Keyed by the lane itself, so a lane taken out of a pattern takes its entry with it the
+    /// next time the song changes and nothing here holds a closed song alive.
+    /// </remarks>
     private readonly Dictionary<AutomationLane, Known> _known = new();
 
+    /// <summary>Reads and writes parameters through the door a link already goes through.</summary>
     public AutomationPlayer(IControlTargets targets)
     {
         _targets = targets;
     }
 
-    /// <summary>
-    /// Forgets what was written and what was resolved.
-    /// </summary>
-    /// <remarks>
-    /// Called when playback starts and when the song changes. Both matter: the parameters have
-    /// been moved by hand since the last pass, so the remembered value is a lie and would stop
-    /// the first line writing anything at all, and holding lanes from a song that has been
-    /// closed would keep it alive for as long as this lives.
-    /// </remarks>
+    /// <inheritdoc/>
     public void Reset() => _known.Clear();
 
-    /// <summary>Puts every lane on this line where it should be. Silent when there are none.</summary>
+    /// <inheritdoc/>
     public void Play(Song? song, TrackerPosition position)
     {
         var pattern = song?.PatternAt(position.OrderIndex);
@@ -77,9 +72,6 @@ public sealed class AutomationPlayer
             var target = _targets.Find(known.Mapping);
             if (target is null)
             {
-                // Said once per lane per pass rather than per line. A lane that names a machine
-                // this track is not playing answers nothing thirty times a second, and that is
-                // an ordinary thing for it to do, not thirty faults.
                 if (!known.Complained && Log.On(LogArea.Tracker))
                 {
                     known.Complained = true;
@@ -94,9 +86,6 @@ public sealed class AutomationPlayer
 
             double value = target.Min + wanted * (target.Max - target.Min);
 
-            // Compared before writing rather than trusting the target to notice. A machine
-            // setting is a field and would take the write happily; a plugin parameter is a
-            // message to another process.
             if (value == known.Written) continue;
 
             known.Written = value;

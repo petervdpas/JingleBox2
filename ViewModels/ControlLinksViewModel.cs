@@ -21,6 +21,7 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class ControlLinksViewModel : ObservableObject
 {
+    /// <summary>Where the links live, read for the list and told when one is taken off.</summary>
     private readonly ControlLink _link;
 
     /// <summary>
@@ -38,6 +39,9 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </remarks>
     private readonly bool _songOnly;
 
+    /// <summary>Reads one layer's links and follows them for as long as this list is on screen.</summary>
+    /// <param name="link">Where the links live.</param>
+    /// <param name="songOnly">True for the song's own layer, false for the desk.</param>
     public ControlLinksViewModel(ControlLink link, bool songOnly = false)
     {
         _link = link;
@@ -53,6 +57,7 @@ public sealed class ControlLinksViewModel : ObservableObject
         ? "This song has no controls of its own. Point a knob at an instrument on a track and it will be kept here, and travel in the song's file."
         : "Nothing is pointed at anything yet. Point a knob at a machine on the rack and it will be kept here, and work in every song.";
 
+    /// <summary>Every link in this layer, flat, in the order the headings put them.</summary>
     public ObservableCollection<ControlLinkRow> Links { get; } = new();
 
     /// <summary>
@@ -66,9 +71,14 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </remarks>
     public ObservableCollection<ControlDeviceLinks> Controllers { get; } = new();
 
+    /// <summary>True when there is anything to show, so the page can say <see cref="Nothing"/>.</summary>
     public bool HasLinks => Links.Count > 0;
 
     /// <summary>Takes every one off at once, for a controller being started again from nothing.</summary>
+    /// <remarks>
+    /// Always enabled, including with an empty list, where it does nothing visible. Walked over a
+    /// copy, since unlinking a row rebuilds the list this is walking.
+    /// </remarks>
     public IRelayCommand ForgetAllCommand => new RelayCommand(() =>
     {
         foreach (var row in Links.ToList()) _link.Unlink(row.Mapping);
@@ -85,13 +95,20 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </remarks>
     public void Reread() => Restock();
 
+    /// <summary>
+    /// Builds both lists again off whichever layer this is about.
+    /// </summary>
+    /// <remarks>
+    /// Ordered by controller, then by number within it, then by machine where one number holds a
+    /// job on several. That last one matters: a knob can be pointed at the filter of four
+    /// machines, and without it those four rows scatter through the list instead of sitting
+    /// together and reading as the one knob they are.
+    /// </remarks>
     private void Restock()
     {
         Links.Clear();
         Controllers.Clear();
 
-        // By controller, then by number within it, then by machine where one number holds a
-        // job on several: a knob's rows sit together and read as the one knob they are.
         var order = (_songOnly ? _link.Kept : _link.Desk)
             .OrderBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
             .ThenBy(one => one.Channel)
@@ -115,6 +132,7 @@ public sealed class ControlLinksViewModel : ObservableObject
 /// </summary>
 public sealed class ControlDeviceLinks
 {
+    /// <summary>Gathers one controller's rows under its own heading.</summary>
     public ControlDeviceLinks(string device, IEnumerable<ControlLinkRow> links)
     {
         Device = device;
@@ -125,6 +143,7 @@ public sealed class ControlDeviceLinks
     /// <summary>What the controller is called, or nothing for links that name none.</summary>
     public string Device { get; }
 
+    /// <summary>Everything learned on it, in the order the list put them.</summary>
     public ObservableCollection<ControlLinkRow> Links { get; } = new();
 
     /// <summary>The heading: the controller, and how much of it is spoken for.</summary>
@@ -140,14 +159,17 @@ public sealed class ControlDeviceLinks
 /// <summary>One line of it: which control, what it moves, and how it picks it up.</summary>
 public sealed class ControlLinkRow
 {
+    /// <summary>Where the links live, so a row can change or remove its own.</summary>
     private readonly ControlLink _link;
 
+    /// <summary>One row over one mapping, which it edits in place rather than copying.</summary>
     public ControlLinkRow(ControlMapping mapping, ControlLink link)
     {
         Mapping = mapping;
         _link = link;
     }
 
+    /// <summary>The link itself, which is what the buttons on the row work on.</summary>
     public ControlMapping Mapping { get; }
 
     /// <summary>
@@ -213,6 +235,9 @@ public sealed class ControlLinkRow
     /// counting notches, because that is what both of them send. So the answer is a control you
     /// can press, and pressing past the end of the list puts it back to listening, which is how
     /// you ask it to work it out again from your next turn of the knob.
+    ///
+    /// Always enabled. The list comes round, so there is no end to be stuck against and no state
+    /// in which pressing it would do nothing.
     /// </remarks>
     public IRelayCommand NextCommand => new RelayCommand(() =>
     {
@@ -237,5 +262,7 @@ public sealed class ControlLinkRow
         return ControlPickup.Relative;
     }
 
+    /// <summary>Takes this one link off, leaving everything else on the controller alone.</summary>
+    /// <remarks>Always enabled: a row exists only while there is a link behind it.</remarks>
     public IRelayCommand ForgetCommand => new RelayCommand(() => _link.Unlink(Mapping));
 }

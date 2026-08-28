@@ -7,33 +7,33 @@ using System.Text.Json;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// The instruments you own, kept outside any song: where a sound starts. One file per
-/// instrument, named by its id, so renaming one costs nothing and breaks no song.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// Taking an instrument into a song copies it, and from then on the copy is the song's. Editing
-/// it there changes that song and nothing else, and editing the one here changes what the next
-/// song will start from. Two songs can therefore use the same kick sounding differently, which
-/// is what anyone who has built a kick for one track and not for another expects.
-///
-/// The shelf starts empty and stays that way until you put something on it. What a new
-/// instrument starts from is its machine's presets, which belong to the machine and are never
-/// written here: see <see cref="MachinePreset"/>. Everything on this shelf is yours.
-///
-/// A synth or a plugin travels inside the song that way, patch and all. A recording does not:
-/// the instrument keeps the path it was made from and the audio stays where it is, so a song
-/// moved to another machine finds a sample instrument pointing at nothing. Making an instrument
-/// hold its own recordings is what would finish this, and it has not been done.
+/// A folder under the application data directory, walked on every question. There is no index
+/// and nothing is held between calls, which is what lets the folder be somewhere a person can
+/// open: a file dropped in shows up, and one taken out stops showing up.
 /// </remarks>
-public sealed class MachineRack : ISampleUsage
+public sealed class MachineRack : IMachineRack
 {
+    /// <summary>What an instrument file is called. JSON, so it can be read and edited by hand.</summary>
     public const string Extension = ".json";
 
+    /// <summary>
+    /// Indented on purpose. These files are somewhere a person can go and look, and a patch
+    /// written on one line is a file nobody can read or diff.
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
+    /// <inheritdoc/>
     public string Folder { get; }
 
+    /// <summary>
+    /// Opens the rack under the application data folder, making it if it is not there.
+    /// </summary>
+    /// <param name="appName">
+    /// Which application folder to sit in. Given rather than fixed so the tests can point the
+    /// whole rack at a temporary one.
+    /// </param>
     public MachineRack(string appName = "JingleBox2")
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -42,9 +42,10 @@ public sealed class MachineRack : ISampleUsage
 
     }
 
+    /// <inheritdoc/>
     public string PathFor(string id) => Path.Combine(Folder, id + Extension);
 
-    /// <summary>Everything in the rack, by name. Unreadable files are skipped, not fatal.</summary>
+    /// <inheritdoc/>
     public IReadOnlyList<TrackerInstrument> List()
     {
         if (!Directory.Exists(Folder)) return Array.Empty<TrackerInstrument>();
@@ -62,6 +63,7 @@ public sealed class MachineRack : ISampleUsage
             .ToList();
     }
 
+    /// <inheritdoc/>
     public TrackerInstrument? Load(string id)
     {
         if (string.IsNullOrWhiteSpace(id)) return null;
@@ -69,6 +71,7 @@ public sealed class MachineRack : ISampleUsage
         return Read(PathFor(id));
     }
 
+    /// <inheritdoc/>
     public void Save(TrackerInstrument instrument)
     {
         if (instrument is null) return;
@@ -77,15 +80,10 @@ public sealed class MachineRack : ISampleUsage
         Config.SafeFile.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
     }
 
-    /// <summary>
-    /// The instruments that play a given recording. A sample instrument owns no copy of its
-    /// file, so this is what a recording has to be asked about before it is thrown away.
-    /// </summary>
+    /// <inheritdoc/>
     public IReadOnlyList<string> InstrumentsUsing(string filePath) => SampleUsage.By(List(), filePath);
 
-    /// <summary>
-    /// Follows a recording to its new place, for every instrument on the shelf that plays it.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// The shelf only. A song holds its own copies of the instruments it uses, so a song that
     /// is open is repointed by whoever is holding it and a song on disc keeps the old path
@@ -106,16 +104,14 @@ public sealed class MachineRack : ISampleUsage
         return moved;
     }
 
-    /// <summary>Where instruments that are no longer on the rack are kept.</summary>
+    /// <inheritdoc/>
     public string RetiredDirectory => Path.Combine(Folder, "retired");
 
-    /// <summary>
-    /// Moves an instrument off the rack without destroying it.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// The rack holds the machines and the plugins and nothing else, so everything else has to
-    /// come off it. Moved rather than deleted, because what comes off is the only copy of work
-    /// somebody did, and a folder they can go and look in costs nothing.
+    /// Never overwrites: two instruments with the same name can have been through here before,
+    /// and the whole point of moving rather than deleting is lost the moment one lands on
+    /// another. A number is added until the name is free.
     /// </remarks>
     public bool Retire(string id)
     {
@@ -127,7 +123,6 @@ public sealed class MachineRack : ISampleUsage
 
         string landed = Path.Combine(RetiredDirectory, Path.GetFileName(path));
 
-        // Never overwrites: two retired instruments can have been through here before.
         int at = 2;
 
         while (File.Exists(landed))
@@ -141,7 +136,7 @@ public sealed class MachineRack : ISampleUsage
         return true;
     }
 
-    /// <summary>False when there was nothing to remove.</summary>
+    /// <inheritdoc/>
     public bool Delete(string id)
     {
         string path = PathFor(id);
@@ -151,6 +146,15 @@ public sealed class MachineRack : ISampleUsage
         return true;
     }
 
+    /// <summary>
+    /// One instrument file, brought back into shape on the way in.
+    /// </summary>
+    /// <remarks>
+    /// A file may have been written by an older version, edited by hand, or half written by a
+    /// crash. It is given an id if it has none, its patch is straightened, and its shape is
+    /// worked out from the loop flag an older build wrote. Anything that will not read at all
+    /// is one instrument missing rather than a rack that refuses to open.
+    /// </remarks>
     private static TrackerInstrument? Read(string path)
     {
         try

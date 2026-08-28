@@ -34,10 +34,20 @@ public sealed class TakeShelf : IMachinePresets
     /// <summary>And for the takes nobody has filed yet.</summary>
     public const string Uncategorized = "Uncategorized";
 
+    /// <summary>The application's own list of recordings, held live rather than copied.</summary>
     private readonly ObservableCollection<Recording> _shelf;
+
+    /// <summary>What picking one means, which is the caller's business and not this one's.</summary>
     private readonly Action<Recording> _picked;
 
+    /// <summary>The takes that pass the filter, in the order <see cref="Names"/> lists them.</summary>
+    /// <remarks>
+    /// Kept beside the names because <see cref="Picked"/> arrives as a number into the narrowed
+    /// list, and a number into a list that is not the whole shelf cannot be resolved without it.
+    /// </remarks>
     private List<Recording> _shown = new();
+
+    /// <summary>Which category is in force.</summary>
     private string _filter = AllTakes;
 
     /// <param name="shelf">
@@ -55,15 +65,16 @@ public sealed class TakeShelf : IMachinePresets
         Restock();
     }
 
-    /// <summary>The takes on offer now, by name, narrowed to whatever the filter says.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Narrowed to whatever <see cref="Filter"/> says, and rebuilt when the shelf moves.</remarks>
     public IReadOnlyList<string> Names { get; private set; } = Array.Empty<string>();
 
-    /// <summary>What the machine calls this picker.</summary>
+    /// <inheritdoc/>
+    /// <remarks>"Take", because these are recordings and not presets, and saying so is the
+    /// whole of how somebody knows this machine has no presets to offer.</remarks>
     public string Caption => "Take";
 
-    /// <summary>
-    /// Which one is showing, or -1 for none, which is where it starts.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Nothing rather than the first: a machine that has just been opened is playing whatever it
     /// was playing, and pointing the picker at the top of the shelf would say it was playing that
@@ -81,10 +92,12 @@ public sealed class TakeShelf : IMachinePresets
         }
     }
 
-    /// <summary>Everything, the unfiled, and then whatever categories are in use.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Everything, the unfiled, and then whatever categories are in use, in order.</remarks>
     public IReadOnlyList<string> Filters { get; private set; } = Array.Empty<string>();
 
-    /// <summary>Which of those is in force. Setting it narrows the list.</summary>
+    /// <inheritdoc/>
+    /// <remarks>An empty string is read as everything, so a panel can clear it and get the shelf back.</remarks>
     public string Filter
     {
         get => _filter;
@@ -98,7 +111,14 @@ public sealed class TakeShelf : IMachinePresets
         }
     }
 
-    /// <summary>Reads the shelf again, since a take may have arrived, gone, or been filed.</summary>
+    /// <summary>
+    /// Reads the shelf again, since a take may have arrived, gone, or been filed.
+    /// </summary>
+    /// <remarks>
+    /// The last take out of a category takes the category with it, and the narrowing with it:
+    /// left standing, the picker would be filtered to a category that no longer exists and would
+    /// show nothing at all, with no way back except knowing to reset it.
+    /// </remarks>
     private void Restock()
     {
         var found = _shelf
@@ -109,7 +129,6 @@ public sealed class TakeShelf : IMachinePresets
 
         Filters = new[] { AllTakes, Uncategorized }.Concat(found).ToList();
 
-        // The last take out of a category takes the category with it, and the narrowing with it.
         if (!Filters.Contains(_filter)) _filter = AllTakes;
 
         _shown = _shelf.Where(Passes).ToList();
@@ -117,8 +136,14 @@ public sealed class TakeShelf : IMachinePresets
         Names = _shown.Select(take => take.Name).ToList();
     }
 
+    /// <summary>Whether that take belongs on the picker at all.</summary>
+    /// <remarks>
+    /// A recording with no file is a row RECORD is still filling in, and offering it would put a
+    /// take on a machine that plays nothing.
+    /// </remarks>
     private bool Passes(Recording take) => take.FilePath.Length > 0 && InCategory(take);
 
+    /// <summary>Whether that take is in the category in force.</summary>
     private bool InCategory(Recording take) => _filter switch
     {
         AllTakes => true,

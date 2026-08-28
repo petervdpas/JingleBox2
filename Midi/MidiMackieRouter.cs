@@ -80,6 +80,11 @@ public sealed class MidiMackieRouter
     private readonly Func<int> _tracks;
     private readonly MackieSurface? _surface;
 
+    /// <param name="targets">
+    /// Where a fader, a knob or a button lands: the mixer, through the same door a link written
+    /// by hand goes through. A surface says what every control on it is, so nothing here has to
+    /// be learned or pointed.
+    /// </param>
     /// <param name="tracks">
     /// How many there are, so banking stops at the end instead of walking off it and leaving
     /// eight faders pointed at nothing with no clue as to why.
@@ -98,13 +103,18 @@ public sealed class MidiMackieRouter
     /// <summary>Which track the leftmost strip is on.</summary>
     public int Bank { get; private set; }
 
+    /// <summary>
+    /// Reads one message off a surface: a fader, a knob, or a button.
+    /// </summary>
+    /// <remarks>
+    /// The port to write back on is learned here rather than configured. A surface speaks and
+    /// listens on the same port, so the first thing it says is also the address to answer on:
+    /// nothing has to be ticked twice, and a device moved to another socket still works.
+    /// </remarks>
     public void Handle(MidiMessage? message)
     {
         if (message is null) return;
 
-        // A surface speaks and listens on the same port, so the first thing it says is also
-        // where to answer. Nothing has to be ticked twice and a device moved to another socket
-        // still works.
         if (_surface is not null && !string.Equals(_surface.Device, message.Device, StringComparison.Ordinal))
         {
             _surface.Device = message.Device;
@@ -134,6 +144,12 @@ public sealed class MidiMackieRouter
     /// Which is only true because <see cref="MackieSurface"/> drives it there. Without the
     /// writing half this would be right in principle and wrong in the room: the first touch
     /// after opening a song would throw the level to wherever the fader was left standing.
+    ///
+    /// The ninth channel is the surface's master fader, which this has nothing to move. Named
+    /// rather than ignored, so a fader that does nothing says why.
+    ///
+    /// What arrives is written down as though it had been sent, which is what stops the level,
+    /// having changed, asking for this fader to be moved to where it already is.
     /// </remarks>
     private void Fader(MidiMessage message)
     {
@@ -141,8 +157,6 @@ public sealed class MidiMackieRouter
 
         if (strip == Strips)
         {
-            // There is no master level in this application to move. Named rather than ignored,
-            // so a fader that does nothing says why.
             Say(message, "the master fader, which this has nothing to move");
             return;
         }
@@ -153,8 +167,6 @@ public sealed class MidiMackieRouter
 
         double part = Math.Clamp(message.Data / Travel, 0, 1);
 
-        // Written down as though it had been sent, which is what stops the level, having
-        // changed, asking for this fader to be moved to where it already is.
         _surface?.Heard(strip, message.Data);
 
         target.Set(target.Min + part * (target.Max - target.Min));
@@ -162,7 +174,14 @@ public sealed class MidiMackieRouter
         Moved(message, target, strip);
     }
 
-    /// <summary>A knob, which counts how far it moved and never says where it is.</summary>
+    /// <summary>
+    /// A knob, which counts how far it moved and never says where it is.
+    /// </summary>
+    /// <remarks>
+    /// Bit six is the direction and the six below it are how far, counted since the last message
+    /// rather than since anything fixed. A device sending nought ticks means one: the encoders on
+    /// some surfaces do that, and read literally the knob would be dead.
+    /// </remarks>
     private void Turned(MidiMessage message)
     {
         if (message.Value == Jog)
@@ -175,9 +194,6 @@ public sealed class MidiMackieRouter
 
         int strip = message.Value - PotFrom;
 
-        // Bit six is the direction and the six below it are how far, counted since the last
-        // message rather than since anything. A device sending nought means one: the encoders
-        // on some surfaces do that, and read literally the knob would be dead.
         double way = (message.Data & 0x40) == 0 ? 1 : -1;
         double ticks = message.Data & 0x3F;
 
@@ -192,20 +208,32 @@ public sealed class MidiMackieRouter
         Moved(message, target, strip);
     }
 
-    /// <summary>A button, on the press and not the release.</summary>
+    /// <summary>
+    /// A button, on the press and not the release.
+    /// </summary>
+    /// <remarks>
+    /// With one exception: letting go of a fader is a message worth having and it is a note off,
+    /// so the touch row is read before the guard. Everything else here is a press, since held is
+    /// a note on at full velocity and let go is the same note at nothing, and acting on both
+    /// would toggle twice and leave it as it was.
+    ///
+    /// The five transport notes are refused by name, because <see cref="MidiTransportRouter"/>
+    /// already answers them and they arrive on this same port. That is the only place the two can
+    /// overlap, and answering twice would stop what the press had started.
+    ///
+    /// Three rows are named and do nothing, because there is nothing here for them to do: a
+    /// track is not armed one at a time in this application, selecting a strip is the pattern
+    /// cursor's business rather than a surface's, and a knob press is a surface's own idea of
+    /// reset.
+    /// </remarks>
     private void Pressed(MidiMessage message)
     {
         int note = message.Value;
 
-        // Letting go of a fader is a message worth having, and it is a note off. Everything
-        // else here is a press: held is a note on at full velocity and let go is the same note
-        // at nothing, and acting on both would toggle twice and leave it as it was.
         if (Within(note, TouchFrom)) { _surface?.Touched(note - TouchFrom, message.IsOn); return; }
 
         if (!message.IsOn) return;
 
-        // Answered by the transport router, which is on this same port. Reading it here as well
-        // would start and then stop on one press.
         if (note >= TransportFrom && note <= TransportTo) return;
 
         switch (note)
@@ -219,9 +247,6 @@ public sealed class MidiMackieRouter
         if (Switched(message, note, SoloFrom, MixControl.Solo, "solo")) return;
         if (Switched(message, note, MuteFrom, MixControl.Mute, "mute")) return;
 
-        // Named, and doing nothing, because there is nothing here for them to do. A track is
-        // not armed one at a time in this application, selecting a strip is the pattern cursor's
-        // business rather than a surface's, and a knob press is a surface's own idea of reset.
         if (Within(note, RecFrom)) { Say(message, "record arm on strip " + (note - RecFrom + 1) + ", which this does nothing with"); return; }
         if (Within(note, SelectFrom)) { Say(message, "select on strip " + (note - SelectFrom + 1) + ", which this does nothing with yet"); return; }
         if (Within(note, PressFrom)) { Say(message, "a knob pressed on strip " + (note - PressFrom + 1) + ", which this does nothing with yet"); return; }
@@ -231,7 +256,13 @@ public sealed class MidiMackieRouter
             + ", which is a button this does not read");
     }
 
-    /// <summary>One of the rows of eight, switched by pressing it.</summary>
+    /// <summary>
+    /// One of the rows of eight, switched by pressing it.
+    /// </summary>
+    /// <remarks>
+    /// Read and turned over rather than set from the button, because the button says it was
+    /// pressed and nothing else: there is no on and off in a press.
+    /// </remarks>
     private bool Switched(MidiMessage message, int note, int from, MixControl what, string called)
     {
         if (!Within(note, from)) return false;
@@ -240,8 +271,6 @@ public sealed class MidiMackieRouter
 
         if (Aim(strip, what) is not { } target) return true;
 
-        // Read and turned over rather than set from the button, because the button says it was
-        // pressed and nothing else: there is no on and off in a press.
         double now = target.Value >= 0.5 ? 0 : 1;
 
         target.Set(now);
@@ -255,6 +284,7 @@ public sealed class MidiMackieRouter
         return true;
     }
 
+    /// <summary>Whether that note is in the row of eight starting there.</summary>
     private static bool Within(int note, int from) => note >= from && note < from + Strips;
 
     /// <summary>Where a strip is pointed, which is its place plus wherever the bank has got to.</summary>
@@ -297,11 +327,13 @@ public sealed class MidiMackieRouter
             + (Bank + 1) + " to " + Math.Min(tracks, Bank + Strips));
     }
 
+    /// <summary>The line a fader or a knob earns: what moved, from which strip, and to what.</summary>
     private void Moved(MidiMessage message, IControlTarget target, int strip) =>
         Log.Write(LogArea.Midi, () =>
             "mackie: '" + message.Device + "' moved " + target.Name
             + " from strip " + (strip + 1) + " to " + target.Reads(target.Value));
 
+    /// <summary>The line something named but unused earns, so it says why nothing happened.</summary>
     private static void Say(MidiMessage message, string what) =>
         Log.Write(LogArea.Midi, () => "mackie: '" + message.Device + "' sent " + what);
 }

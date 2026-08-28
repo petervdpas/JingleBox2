@@ -18,6 +18,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachinesView : UserControl
 {
+    /// <summary>Builds the page. The rack and its machines come through the data context.</summary>
     public MachinesView()
     {
         InitializeComponent();
@@ -34,9 +35,20 @@ public partial class MachinesView : UserControl
     private void OpenMachine(object? sender, RoutedEventArgs e) =>
         MachineWindow.Show(ViewModel, TopLevel.GetTopLevel(this) as Window);
 
+    /// <summary>
+    /// Whether the page is up. Half of what decides where a played note goes, the other half
+    /// being whether there is a rack to send it to at all.
+    /// </summary>
     private bool _onScreen;
+
+    /// <summary>
+    /// The rack this page last armed, kept so it can be disarmed when the page is pointed at
+    /// another one. Without it a rack the page has let go of would stay armed and would go on
+    /// taking notes meant for the pattern.
+    /// </summary>
     private MachineRackViewModel? _bound;
 
+    /// <summary>The rack this page is showing, or nothing when it has not been given one.</summary>
     private MachineRackViewModel? ViewModel => DataContext as MachineRackViewModel;
 
     /// <summary>
@@ -49,19 +61,23 @@ public partial class MachinesView : UserControl
 
         _onScreen = true;
         UpdateEditingFlag();
-
-        // The keys are the panel's own: it listens for them wherever it is opened, so this
-        // page does not have to hear them on its behalf. What is still this page's is the MIDI
-        // routing above, which is about which page is up rather than about which panel is on it.
     }
 
+    /// <summary>
+    /// Leaving the page hands the MIDI keyboard back, so notes land in the pattern again.
+    /// </summary>
+    /// <remarks>
+    /// The keys typed on the computer keyboard are the panel's own: it listens for them
+    /// wherever it is opened, so this page does not have to hear them on its behalf. What is
+    /// still this page's is the MIDI routing, which is about which page is up rather than about
+    /// which panel is on it.
+    /// </remarks>
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
 
         _onScreen = false;
         UpdateEditingFlag();
-
     }
 
     /// <summary>
@@ -74,11 +90,17 @@ public partial class MachinesView : UserControl
         UpdateEditingFlag();
     }
 
+    /// <summary>
+    /// Arms the rack the page is showing, and disarms whichever one it was showing before.
+    /// </summary>
+    /// <remarks>
+    /// A rack this page has let go of must not stay armed, or two racks would both believe they
+    /// are being edited and a played note would sound twice.
+    /// </remarks>
     private void UpdateEditingFlag()
     {
         var current = ViewModel;
 
-        // A view model this page has let go of must not stay armed.
         if (!ReferenceEquals(_bound, current) && _bound != null) _bound.IsEditing = false;
 
         _bound = current;

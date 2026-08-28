@@ -19,10 +19,25 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class ZoneMapViewModel : ObservableObject
 {
+    /// <summary>The map the song holds, written into in place rather than copied.</summary>
     private readonly ZoneMap _map;
+
+    /// <summary>Told after every edit, which is what marks the song unsaved.</summary>
     private readonly Action _changed;
+
+    /// <summary>
+    /// Plays one note, so a zone can be heard from the row it is on. The panel owns how a note
+    /// is sounded; a map knows only that it can ask for one.
+    /// </summary>
     private readonly Action<Note> _tap;
 
+    /// <summary>
+    /// The highest key a zone can answer to, which is ten octaves and as far as the pattern
+    /// can name a note.
+    /// </summary>
+    internal const int TopKey = 119;
+
+    /// <summary>Shows one map. Nothing is copied: the map handed in is the map edited.</summary>
     public ZoneMapViewModel(ZoneMap map, Action changed, Action<Note> tap)
     {
         _map = map;
@@ -35,6 +50,14 @@ public sealed partial class ZoneMapViewModel : ObservableObject
     /// <summary>The map itself, for the strip that draws it.</summary>
     public ZoneMap Map => _map;
 
+    /// <summary>
+    /// One row per zone, in the map's own order.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilt rather than patched when the number of zones changes, which throws away
+    /// whichever row was in hand; see <see cref="Resliced"/> for why that matters while a
+    /// boundary is being dragged.
+    /// </remarks>
     public ObservableCollection<SampleZoneViewModel> Zones { get; } = new();
 
     /// <summary>Which zone the settings underneath are about.</summary>
@@ -42,11 +65,16 @@ public sealed partial class ZoneMapViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasZone))]
     private SampleZoneViewModel? selected;
 
+    /// <summary>Whether there is a zone to show settings for, which greys the panel below.</summary>
     public bool HasZone => Selected != null;
 
     /// <summary>Bumped whenever the map's shape changes, so the strip knows to redraw.</summary>
     [ObservableProperty] private int revision;
 
+    /// <summary>
+    /// Marks the picked row and unmarks the rest, since the strip draws the selection itself
+    /// rather than reading which one this holds.
+    /// </summary>
     partial void OnSelectedChanged(SampleZoneViewModel? value)
     {
         foreach (var zone in Zones) zone.IsSelected = ReferenceEquals(zone, value);
@@ -54,6 +82,10 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         Revision++;
     }
 
+    /// <summary>
+    /// Whether the remove cap does anything: a map always keeps at least one zone, since a map
+    /// with none is an instrument that cannot make a sound and no way back from it.
+    /// </summary>
     public bool CanRemove => Zones.Count > 1;
 
     /// <summary>Another zone, put where there is room and left for you to fill.</summary>
@@ -71,6 +103,14 @@ public sealed partial class ZoneMapViewModel : ObservableObject
     /// </remarks>
     public IRelayCommand SpreadCommand => new RelayCommand(Spread);
 
+    /// <summary>
+    /// Adds a zone over the middle octave and picks it, or does nothing at the map's ceiling.
+    /// </summary>
+    /// <remarks>
+    /// One octave from C3 with its root at the bottom, which is somewhere it can be heard
+    /// straight away: a zone laid over the whole keyboard would silence every zone under it,
+    /// and a zone of one key is a zone you have to hunt for.
+    /// </remarks>
     private void Add()
     {
         if (_map.Zones.Count >= ZoneMap.MaxZones) return;
@@ -86,6 +126,13 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         Say();
     }
 
+    /// <summary>
+    /// Takes the zone in hand off the map and leaves the one before it picked.
+    /// </summary>
+    /// <remarks>
+    /// The neighbour rather than nothing, because removing several in a row is one gesture and
+    /// a selection that emptied itself each time would mean picking the next one by hand.
+    /// </remarks>
     private void Remove()
     {
         var zone = Selected?.Zone;
@@ -102,6 +149,13 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         Say();
     }
 
+    /// <summary>
+    /// Lays the zones out evenly and says every value again, since every zone moved.
+    /// </summary>
+    /// <remarks>
+    /// The rows are not rebuilt: the same zones are still there in the same order, and a
+    /// rebuild would take the selection with it.
+    /// </remarks>
     private void Spread()
     {
         _map.Spread();
@@ -136,7 +190,7 @@ public sealed partial class ZoneMapViewModel : ObservableObject
                 Name = Path.GetFileNameWithoutExtension(path),
                 FilePath = path,
                 Low = 0,
-                High = 119,
+                High = ZoneMapViewModel.TopKey,
                 Root = 48,
                 Shape = new SampleShape()
             });
@@ -177,6 +231,13 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         Revision++;
     }
 
+    /// <summary>
+    /// Builds a row per zone and picks the first.
+    /// </summary>
+    /// <remarks>
+    /// Every row is thrown away, so this is only for a map whose shape has changed. Whatever
+    /// was picked is lost, which is why <see cref="Resliced"/> avoids it wherever it can.
+    /// </remarks>
     private void Rebuild()
     {
         Zones.Clear();
@@ -188,6 +249,9 @@ public sealed partial class ZoneMapViewModel : ObservableObject
         OnPropertyChanged(nameof(CanRemove));
     }
 
+    /// <summary>
+    /// Moves the revision on, re-reads what the caps allow, and tells the owner the song moved.
+    /// </summary>
     private void Say()
     {
         Revision++;
@@ -200,9 +264,13 @@ public sealed partial class ZoneMapViewModel : ObservableObject
 /// <summary>One zone: what is on it, which keys it answers to, and what it takes to change either.</summary>
 public sealed partial class SampleZoneViewModel : ObservableObject
 {
+    /// <summary>Told after every edit to this zone, which the map passes on to the song.</summary>
     private readonly Action _changed;
+
+    /// <summary>Plays a note, so the zone can be heard from its own row.</summary>
     private readonly Action<Note> _tap;
 
+    /// <summary>Shows one zone off the map, written into in place.</summary>
     public SampleZoneViewModel(SampleZone zone, Action changed, Action<Note> tap)
     {
         Zone = zone;
@@ -210,8 +278,13 @@ public sealed partial class SampleZoneViewModel : ObservableObject
         _tap = tap;
     }
 
+    /// <summary>The zone itself, for the strip that draws it and the picture that windows it.</summary>
     public SampleZone Zone { get; }
 
+    /// <summary>
+    /// True for the zone the settings below are about. Set by the map rather than by the row,
+    /// since only one can be picked at a time.
+    /// </summary>
     [ObservableProperty] private bool isSelected;
 
     /// <summary>What this zone is called: its name, or the file's, or the keys it covers.</summary>
@@ -227,12 +300,21 @@ public sealed partial class SampleZoneViewModel : ObservableObject
         }
     }
 
+    /// <summary>Which keys it answers to, as two note names.</summary>
     public string RangeText => Zone.RangeText;
 
+    /// <summary>
+    /// The recording on it, by name, or the word for having none: a zone with nothing on it is
+    /// an ordinary state on a map being built, and a blank row would read as a fault.
+    /// </summary>
     public string FileText => Zone.HasSound ? Path.GetFileName(Zone.FilePath) : "empty";
 
+    /// <summary>Whether there is anything on it to play.</summary>
     public bool HasSound => Zone.HasSound;
 
+    /// <summary>
+    /// What you have called it, which beats the recording's own name; see <see cref="Take"/>.
+    /// </summary>
     public string Name
     {
         get => Zone.Name;
@@ -245,30 +327,40 @@ public sealed partial class SampleZoneViewModel : ObservableObject
         }
     }
 
+    /// <summary>The bottom key of the zone, as a number so a slider can drive it.</summary>
     public double Low
     {
         get => Zone.Low;
         set => Move(v => Zone.Low = v, Zone.Low, value, nameof(Low));
     }
 
+    /// <summary>And the top key.</summary>
     public double High
     {
         get => Zone.High;
         set => Move(v => Zone.High = v, Zone.High, value, nameof(High));
     }
 
+    /// <summary>
+    /// The key at which the recording plays untransposed, which is what the rest are pitched
+    /// against.
+    /// </summary>
     public double Root
     {
         get => Zone.Root;
         set => Move(v => Zone.Root = v, Zone.Root, value, nameof(Root));
     }
 
+    /// <summary>The bottom key as a note name, which is how a keyboard is read.</summary>
     public string LowText => new Note(Zone.Low).ToString();
 
+    /// <summary>The top key, the same way.</summary>
     public string HighText => new Note(Zone.High).ToString();
 
+    /// <summary>And the root.</summary>
     public string RootText => new Note(Zone.Root).ToString();
 
+    /// <summary>The zone's own level, nought to one, before anything the mixer does.</summary>
     public double Volume
     {
         get => Zone.Volume;
@@ -281,6 +373,7 @@ public sealed partial class SampleZoneViewModel : ObservableObject
         }
     }
 
+    /// <summary>Where it sits, -1 hard left to 1 hard right.</summary>
     public double Pan
     {
         get => Zone.Pan;
@@ -293,6 +386,10 @@ public sealed partial class SampleZoneViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Its detune, a semitone either way in cents, for a recording that was not quite in tune
+    /// when it was made.
+    /// </summary>
     public double FineCents
     {
         get => Zone.FineCents;
@@ -306,16 +403,19 @@ public sealed partial class SampleZoneViewModel : ObservableObject
     }
 
     /// <summary>Puts a recording on this zone, or takes one off when given nothing.</summary>
+    /// <remarks>
+    /// The name follows the take unless the zone has a name of its own. What it was called
+    /// after is worked out first, so a name nobody chose can be told from one somebody did: a
+    /// zone still called after the recording it used to hold is a zone nobody has named, and
+    /// leaving that name on it after another take lands makes the map say the old recording is
+    /// still there.
+    /// </remarks>
     public void Take(string? path)
     {
-        // What it was called after, so a name nobody chose can be told from one somebody did.
         string was = Path.GetFileNameWithoutExtension(Zone.FilePath);
 
         Zone.FilePath = path ?? "";
 
-        // The name follows the take unless the zone has a name of its own. A zone still called
-        // after the recording it used to hold is a zone nobody has named, and leaving that name
-        // on it after another take lands makes the map say the old recording is still there.
         if (Zone.HasSound && Slices.Auto(Zone.Name, was))
             Zone.Name = Path.GetFileNameWithoutExtension(Zone.FilePath);
 
@@ -328,11 +428,20 @@ public sealed partial class SampleZoneViewModel : ObservableObject
     /// <summary>Says every value again, for a map that has been laid out from underneath.</summary>
     public void Reread() => OnPropertyChanged(string.Empty);
 
+    /// <summary>Its title, so a list handed rows rather than text still reads.</summary>
     public override string ToString() => Title;
 
+    /// <summary>
+    /// Moves one of the three keys, rounded to a whole one and held on the keyboard.
+    /// </summary>
+    /// <remarks>
+    /// The zone clamps itself afterwards, which can move the other two: a low pushed above a
+    /// high is not a zone. So all three are announced whatever moved, along with everything
+    /// written from them, rather than only the one that was set.
+    /// </remarks>
     private void Move(Action<int> write, int current, double value, string name)
     {
-        int wanted = (int)Math.Clamp(Math.Round(value), 0, 119);
+        int wanted = (int)Math.Clamp(Math.Round(value), 0, ZoneMapViewModel.TopKey);
         if (current == wanted) return;
 
         write(wanted);
@@ -343,6 +452,9 @@ public sealed partial class SampleZoneViewModel : ObservableObject
             nameof(RangeText), nameof(Title));
     }
 
+    /// <summary>
+    /// Says every name that now reads differently and tells the map, which tells the song.
+    /// </summary>
     private void Say(params string[] names)
     {
         foreach (string name in names) OnPropertyChanged(name);

@@ -8,12 +8,22 @@ namespace JingleBox2.ViewModels;
 /// <summary>One row in the instrument rack. No number: a rack has no cell to answer to.</summary>
 public sealed partial class RackMachine : ObservableObject
 {
+    /// <summary>Shows one instrument off the rack. The instrument itself is held, not copied.</summary>
     public RackMachine(TrackerInstrument instrument) => Instrument = instrument;
 
+    /// <summary>
+    /// The instrument this row is about, which is the rack's own object rather than a copy.
+    /// </summary>
+    /// <remarks>
+    /// The editor edits that instrument in place, which is why <see cref="Refresh"/> exists:
+    /// the row has nothing of its own to update, it only has to be told to read again.
+    /// </remarks>
     public TrackerInstrument Instrument { get; }
 
+    /// <summary>Its id, which is the name of its file under the instruments folder.</summary>
     public string Id => Instrument.Id;
 
+    /// <summary>What it is called. A machine's own slot is called what the machine is called.</summary>
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
@@ -22,11 +32,19 @@ public sealed partial class RackMachine : ObservableObject
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;
 
-    /// <summary>The row's own wash, and the two it takes under the pointer and in hand.</summary>
+    /// <summary>The row's own wash: the machine's colour at the weight its theme asks for.</summary>
     public IBrush Row => Wash(Theme.Row);
+
+    /// <summary>The same colour, heavier, for the row under the pointer.</summary>
     public IBrush RowOver => Wash(Theme.RowOver);
+
+    /// <summary>And heavier again for the row that is picked.</summary>
     public IBrush RowPicked => Wash(Theme.RowPicked);
 
+    /// <summary>
+    /// The machine's accent at a given weight, or nothing at all when the theme's colour cannot
+    /// be read: a row painted a colour nobody chose is worse than a row painted none.
+    /// </summary>
     private IBrush Wash(double amount) =>
         Views.MachineTint.Hue(Theme.Accent, out var hue)
             ? new SolidColorBrush(hue, amount)
@@ -81,5 +99,6 @@ public sealed partial class RackMachine : ObservableObject
         OnPropertyChanged(nameof(DetailText));
     }
 
+    /// <summary>Its name, so a list that was handed rows rather than text still reads.</summary>
     public override string ToString() => Name;
 }

@@ -19,12 +19,15 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class StatusBar : ThemedControl
 {
+    /// <summary>What the line says. Empty draws the lamp alone.</summary>
     public static readonly StyledProperty<string> TextProperty =
         AvaloniaProperty.Register<StatusBar, string>(nameof(Text), "");
 
+    /// <summary>What kind of thing it is, which is the lamp's colour and the ink's weight.</summary>
     public static readonly StyledProperty<StatusKind> KindProperty =
         AvaloniaProperty.Register<StatusBar, StatusKind>(nameof(Kind), StatusKind.Context);
 
+    /// <summary>Its own rather than inherited, since the bar is drawn and not a text block.</summary>
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<StatusBar, double>(nameof(FontSize), 12);
 
@@ -32,9 +35,11 @@ public class StatusBar : ThemedControl
     public static readonly StyledProperty<double> BarHeightProperty =
         AvaloniaProperty.Register<StatusBar, double>(nameof(BarHeight), 26);
 
+    /// <inheritdoc cref="InputLevel"/>
     public static readonly StyledProperty<double> InputLevelProperty =
         AvaloniaProperty.Register<StatusBar, double>(nameof(InputLevel));
 
+    /// <inheritdoc cref="OutputLevel"/>
     public static readonly StyledProperty<double> OutputLevelProperty =
         AvaloniaProperty.Register<StatusBar, double>(nameof(OutputLevel));
 
@@ -42,29 +47,37 @@ public class StatusBar : ThemedControl
     public static readonly StyledProperty<bool> ShowLevelsProperty =
         AvaloniaProperty.Register<StatusBar, bool>(nameof(ShowLevels));
 
+    /// <summary>The lamp at the near end, big enough to read a colour off and no bigger.</summary>
     private const double LampSize = 8;
 
     /// <summary>The meters: two thin columns, tall enough to read and no taller.</summary>
     private const double MeterWidth = 4;
 
+    /// <summary>Between the two columns, so they read as two meters rather than one wide one.</summary>
     private const double MeterGap = 3;
 
     /// <summary>Where the scale stops being green. Above this it is amber, then red.</summary>
     private const double Warm = 0.72;
 
+    /// <summary>And where it stops being amber. Above this the level is being clipped.</summary>
     private const double Hot = 0.92;
 
+    /// <summary>How far in from either end anything is drawn.</summary>
     private const double Inset = 10;
 
+    /// <summary>Between the lamp and the words.</summary>
     private const double Gap = 8;
 
     /// <summary>A warning is amber and a fault is the red a record button is.</summary>
     private static readonly Color Amber = Color.FromRgb(0xF5, 0xA6, 0x23);
 
+    /// <inheritdoc cref="Amber"/>
     private static readonly Color Red = Color.FromRgb(0xE5, 0x39, 0x35);
 
+    /// <summary>And something that worked is green, which is also a meter with room left in it.</summary>
     private static readonly Color Green = Color.FromRgb(0x4C, 0xAF, 0x50);
 
+    /// <summary>Everything drawn is a render; only the height is a measurement.</summary>
     static StatusBar()
     {
         AffectsRender<StatusBar>(TextProperty, KindProperty, FontSizeProperty, BarHeightProperty,
@@ -72,24 +85,28 @@ public class StatusBar : ThemedControl
         AffectsMeasure<StatusBar>(BarHeightProperty);
     }
 
+    /// <inheritdoc cref="TextProperty"/>
     public string Text
     {
         get => GetValue(TextProperty);
         set => SetValue(TextProperty, value);
     }
 
+    /// <inheritdoc cref="KindProperty"/>
     public StatusKind Kind
     {
         get => GetValue(KindProperty);
         set => SetValue(KindProperty, value);
     }
 
+    /// <inheritdoc cref="FontSizeProperty"/>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
     }
 
+    /// <inheritdoc cref="BarHeightProperty"/>
     public double BarHeight
     {
         get => GetValue(BarHeightProperty);
@@ -110,15 +127,35 @@ public class StatusBar : ThemedControl
         set => SetValue(OutputLevelProperty, value);
     }
 
+    /// <inheritdoc cref="ShowLevelsProperty"/>
     public bool ShowLevels
     {
         get => GetValue(ShowLevelsProperty);
         set => SetValue(ShowLevelsProperty, value);
     }
 
+    /// <summary>
+    /// As wide as it is offered and exactly <see cref="BarHeight"/> tall, so the line along the
+    /// bottom of a window does not move as its wording changes.
+    /// </summary>
+    /// <remarks>
+    /// Offered an unbounded width, which is what a stack panel does, it asks for a plain 200
+    /// rather than infinity, since a bar that asks for everything there is cannot be arranged.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize) =>
         new(double.IsInfinity(availableSize.Width) ? 200 : availableSize.Width, BarHeight);
 
+    /// <summary>
+    /// The bar, the lamp, the words trimmed to what is left, and the meters at the far end.
+    /// </summary>
+    /// <remarks>
+    /// The context kind is the resting state and is drawn in the muted ink, so something that has
+    /// just happened reads as louder than where you happen to be standing.
+    ///
+    /// The room the meters take is subtracted from the words rather than the words being drawn
+    /// under them: a line trimmed with an ellipsis says it was too long, and a line running
+    /// behind a meter looks like a fault in the drawing.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -141,7 +178,6 @@ public class StatusBar : ThemedControl
 
         if (Text.Length == 0) return;
 
-        // The context is the resting state and reads quieter than something that just happened.
         var ink = Kind == StatusKind.Context
             ? new SolidColorBrush(palette.Muted)
             : new SolidColorBrush(palette.Text);
@@ -222,6 +258,7 @@ public class StatusBar : ThemedControl
         }
     }
 
+    /// <summary>The lamp's colour for the kind, and the theme's muted for the resting state.</summary>
     private Color Lamp(ThemePalette palette) => Kind switch
     {
         StatusKind.Done => Green,

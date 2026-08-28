@@ -4,6 +4,17 @@ using System.Text.Json.Serialization;
 
 namespace JingleBox2.Tracker;
 
+/// <summary>
+/// Which machine an instrument is on, as the number every song and instrument file already
+/// holds.
+/// </summary>
+/// <remarks>
+/// These numbers are in people's files, so they do not move and none is ever reused. The
+/// readable side of the same fact, what the machine is called and what it is for, is
+/// <see cref="Machine"/>: an instrument of a kind whose machine is not installed here still
+/// sounds and still has to be named, and what it is named is the engine rather than a machine
+/// that is not there.
+/// </remarks>
 public enum TrackerInstrumentKind
 {
     /// <summary>One of your recordings, pitched by resampling.</summary>
@@ -38,8 +49,10 @@ public sealed class TrackerInstrument
     /// </summary>
     public string Id { get; set; } = "";
 
+    /// <summary>What you called it, which is yours and is not the machine's name.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>Which machine it is on, and therefore which of the settings below it plays from.</summary>
     public TrackerInstrumentKind Kind { get; set; } = TrackerInstrumentKind.Sample;
 
     /// <summary>The synth settings. Carried by every instrument, used when Kind is Synth.</summary>
@@ -83,8 +96,13 @@ public sealed class TrackerInstrument
     /// <summary>The plugin this instrument is, when it is one. Found again by id first.</summary>
     public string PluginPath { get; set; } = "";
 
+    /// <summary>
+    /// The plugin's own identifier, which is what it is found by first: a plugin moved to
+    /// another folder is the same plugin, and the path is only the fallback.
+    /// </summary>
     public string PluginId { get; set; } = "";
 
+    /// <summary>VST3 or CLAP, since the host loads the two differently.</summary>
     public Audio.Plugins.PluginFormat PluginFormat { get; set; } = Audio.Plugins.PluginFormat.Clap;
 
     /// <summary>Kept so a plugin that is no longer installed can be named rather than blank.</summary>
@@ -160,12 +178,15 @@ public sealed class TrackerInstrument
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Synth.SamplerPatch? Sampler { get; set; }
 
+    /// <summary>On Zampler: recordings across the keyboard, each transposed from its own root.</summary>
     [JsonIgnore]
     public bool IsSampler => Kind == TrackerInstrumentKind.Sampler;
 
+    /// <summary>On BongaBong: one recording to a key, none of them transposed.</summary>
     [JsonIgnore]
     public bool IsKit => Kind == TrackerInstrumentKind.Kit;
 
+    /// <summary>On Ouroboros: one oscillator, a filter that sweeps, and glide between notes.</summary>
     [JsonIgnore]
     public bool IsMonoSynth => Kind == TrackerInstrumentKind.MonoSynth;
 
@@ -203,9 +224,11 @@ public sealed class TrackerInstrument
         }
     }
 
+    /// <summary>On OddSkilla: generated from a patch, so it needs no recording at all.</summary>
     [JsonIgnore]
     public bool IsSynth => Kind == TrackerInstrumentKind.Synth;
 
+    /// <summary>Somebody else's instrument, playing in a process of its own.</summary>
     [JsonIgnore]
     public bool IsPlugin => Kind == TrackerInstrumentKind.Plugin;
 
@@ -230,6 +253,10 @@ public sealed class TrackerInstrument
         };
     }
 
+    /// <summary>
+    /// The same pitch as <see cref="BaseNoteSemitone"/>, as a note rather than a number, for
+    /// anything printing it or comparing it with a cell.
+    /// </summary>
     [JsonIgnore]
     public Note BaseNote
     {
@@ -301,15 +328,17 @@ public sealed class TrackerInstrument
     }
 
     /// <summary>A new instrument on whichever machine was asked for.</summary>
+    /// <remarks>
+    /// The Recording machine has to be named here even though what it makes is an instrument
+    /// with no recording on it yet, which is exactly what that machine is until you put a take
+    /// on it. Left out, it fell through to the last arm and came back an OddSkilla wearing the
+    /// name you had just typed.
+    /// </remarks>
     public static TrackerInstrument CreateOn(Machine machine, string name) => machine?.Kind switch
     {
         TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
         TrackerInstrumentKind.Kit => CreateKit(name),
         TrackerInstrumentKind.Sampler => CreateSampler(name),
-
-        // A recording with no recording on it yet, which is what the Recording machine is until
-        // you put a take on it. Without this it fell through and came back an OddSkilla wearing
-        // the wrong name.
         TrackerInstrumentKind.Sample => CreateSample(name, "", new Note(48)),
 
         _ => CreateSynth(name)
@@ -340,15 +369,19 @@ public sealed class TrackerInstrument
     /// there was a shape carries its loop as a flag, so that is what the shape starts from;
     /// after that the two are kept saying the same thing.
     /// </summary>
+    /// <remarks>
+    /// A missing shape is the one reliable sign that an instrument predates the change, and it
+    /// is why the envelope is flattened here. A sample used to be handed to the audio library
+    /// whole, so whatever its patch said was never heard; playing it through the voice now
+    /// would put a decay on every recording that has one, and a sound that quietly changed
+    /// under somebody is worse than one that never had the setting.
+    /// </remarks>
     public void EnsureShape()
     {
         if (Shape == null)
         {
             Shape = new SampleShape();
 
-            // A sample used to be handed to the audio library whole, so whatever its patch
-            // says was never heard. Playing it through the voice now would put a decay on
-            // every recording that has one, so the envelope opens flat instead.
             if (!IsSynth) FlattenEnvelope();
         }
 
@@ -377,6 +410,11 @@ public sealed class TrackerInstrument
     /// Takes on another instrument's sound and name, keeping this object. A song's copy is
     /// refreshed this way, so everything already pointing at it stays pointing at it.
     /// </summary>
+    /// <remarks>
+    /// Everything a plugin instrument is comes across too, and that is not incidental: left
+    /// out, an instrument copied into a song is one that says it is a plugin and cannot say
+    /// which, so it plays nothing and opens nothing.
+    /// </remarks>
     public void CopyFrom(TrackerInstrument other)
     {
         if (other is null || ReferenceEquals(other, this)) return;
@@ -396,9 +434,6 @@ public sealed class TrackerInstrument
         OneVoice = other.OneVoice;
         Shape = other.Shape?.Clone();
 
-        // What makes a plugin instrument a plugin instrument. Left out of here, an instrument
-        // copied into a song is one that says it is a plugin and cannot say which, so it plays
-        // nothing and opens nothing.
         PluginPath = other.PluginPath;
         PluginId = other.PluginId;
         PluginFormat = other.PluginFormat;
@@ -416,6 +451,9 @@ public sealed class TrackerInstrument
     ///
     /// Only what the machine in question actually plays from is copied, so a preset picked for
     /// one machine cannot quietly write over another's settings.
+    ///
+    /// A plugin's patch moves only between two instruments on the same plugin. Another
+    /// plugin's state is not a preset for this one, it is a file it cannot read.
     /// </remarks>
     public void TakeSoundFrom(TrackerInstrument other)
     {
@@ -456,8 +494,6 @@ public sealed class TrackerInstrument
                 break;
 
             case TrackerInstrumentKind.Plugin:
-                // Only between two instruments on the same plugin: another plugin's state is
-                // not a preset for this one, it is a file it cannot read.
                 if (other.PluginId == PluginId && other.PluginPath == PluginPath)
                     PluginState = other.PluginState;
 
@@ -465,6 +501,14 @@ public sealed class TrackerInstrument
         }
     }
 
+    /// <summary>
+    /// An instrument nothing else is holding, for a history step or for taking one into a song.
+    /// </summary>
+    /// <remarks>
+    /// The plugin's patch is passed by reference rather than copied, which is safe because
+    /// nothing ever writes into one: anything changing a patch replaces the array. A third of a
+    /// megabyte of wavetables copied per clone would be paid on every undo step.
+    /// </remarks>
     public TrackerInstrument Clone() => new()
     {
         Id = Id,

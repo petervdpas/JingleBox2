@@ -44,24 +44,51 @@ public sealed class InstrumentHistory
     /// </remarks>
     public static readonly TimeSpan SameGesture = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>How many steps are kept.</summary>
+    /// <remarks>
+    /// A count and no weight, unlike the machine designer's, because an instrument without its
+    /// plugin patch is a few kilobytes whatever it is: there is no picture in it to make one step
+    /// far heavier than another.
+    /// </remarks>
     public const int MostSteps = 100;
 
+    /// <summary>How a step is written down, which is the reader and writer's own defaults.</summary>
     private static readonly JsonSerializerOptions Layout = new();
 
+    /// <summary>The states left behind, oldest first, each the instrument as its file holds it.</summary>
     private readonly List<string> _done = new();
+
+    /// <summary>The states walked back out of, so redo has somewhere to go.</summary>
     private readonly List<string> _undone = new();
 
+    /// <summary>
+    /// The clock the gathering is measured against.
+    /// </summary>
+    /// <remarks>
+    /// A stopwatch rather than the wall clock, since the only question asked of it is how long ago
+    /// something was and the wall clock can be put back underneath the answer.
+    /// </remarks>
     private readonly Stopwatch _since = Stopwatch.StartNew();
 
+    /// <summary>The instrument as it stands, so a change has something to compare against.</summary>
     private string _now = "";
+
+    /// <summary>Which control the step being gathered belongs to, or empty when none is.</summary>
     private string _gathering = "";
+
+    /// <summary>When that control last moved, which is what ends the gesture.</summary>
     private TimeSpan _last;
 
+    /// <summary>True while a step is being put back, so putting one back is not itself a step.</summary>
     private bool _walking;
 
+    /// <summary>Raised whenever the answers below could have moved, so the buttons follow.</summary>
     public event Action? Changed;
 
+    /// <summary>True when there is something to take back.</summary>
     public bool CanUndo => _done.Count > 0;
+
+    /// <summary>True when something has been taken back and not yet put again.</summary>
     public bool CanRedo => _undone.Count > 0;
 
     /// <summary>An instrument was opened. This is where it started.</summary>
@@ -78,6 +105,23 @@ public sealed class InstrumentHistory
     /// <summary>
     /// A setting moved. Called after, with the key of whatever moved.
     /// </summary>
+    /// <remarks>
+    /// A move that leaves the instrument reading exactly as it did leaves no step, which is what
+    /// makes it safe to say this more often than there are edits.
+    ///
+    /// While the same control keeps moving inside <see cref="SameGesture"/>, the step already
+    /// holds where the knob started and nothing is added: that is the whole of the gathering.
+    /// A different key, or a longer gap, begins a new step and what is kept is where the
+    /// instrument stood before this message.
+    /// </remarks>
+    /// <param name="instrument">
+    /// The instrument as it stands after the move, read for the step that keeps where it stood
+    /// before it.
+    /// </param>
+    /// <param name="key">
+    /// What moved, as a panel names it. An empty key never gathers, so a change nobody can name
+    /// is its own step rather than being folded into whatever was last touched.
+    /// </param>
     public void Did(TrackerInstrument? instrument, string key)
     {
         if (_walking) return;
@@ -87,18 +131,14 @@ public sealed class InstrumentHistory
 
         var at = _since.Elapsed;
 
-        // Still the same control, and not long enough ago to be a second thought.
         bool same = key.Length > 0 && key == _gathering && at - _last < SameGesture;
 
-        // Where it was before this message, which is what a step has to keep.
         string before = _now;
 
         _gathering = key;
         _last = at;
         _now = said;
 
-        // The gesture that began this step is still going, so the step already holds where the
-        // knob started and there is nothing to add. This is the whole of the gathering.
         if (same)
         {
             Changed?.Invoke();
@@ -121,6 +161,23 @@ public sealed class InstrumentHistory
     /// <summary>Puts back the last thing undone.</summary>
     public bool Redo(TrackerInstrument? instrument) => Walk(_undone, _done, instrument, "did again");
 
+    /// <summary>
+    /// Moves one step from one list to the other and puts the instrument where that step says.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is moved until the step is known to go back. A step that will not read is dropped
+    /// and everything under it is still good, which is why the list is only shortened after
+    /// <see cref="Take"/> has been tried rather than before.
+    ///
+    /// Whatever was being gathered is over once this has run: the thing under the hand is not
+    /// where it was, so the next move begins a step of its own rather than joining a gesture that
+    /// has just been undone.
+    /// </remarks>
+    /// <param name="from">The list the step is taken off, done for undo and undone for redo.</param>
+    /// <param name="onto">The list where the instrument as it reads now is put, so the walk can be reversed.</param>
+    /// <param name="instrument">The instrument to pour the step into, in place, since the panel holds it by reference.</param>
+    /// <param name="word">The word for the log, which is the only difference between the two.</param>
+    /// <returns>True when a step was put back, false when there was nothing to take or the step would not read.</returns>
     private bool Walk(List<string> from, List<string> onto, TrackerInstrument? instrument, string word)
     {
         if (instrument is null || from.Count == 0) return false;
@@ -132,8 +189,6 @@ public sealed class InstrumentHistory
 
         try
         {
-            // Nothing is moved until the step is known to go back. A step that will not read is
-            // dropped and everything under it is still good.
             if (!Take(instrument, wanted))
             {
                 from.RemoveAt(from.Count - 1);
@@ -148,7 +203,6 @@ public sealed class InstrumentHistory
 
             _now = wanted;
 
-            // Whatever was being gathered is over: the thing under the hand is not where it was.
             _gathering = "";
 
             Log.Write(LogArea.Tracker, () => "instrument: " + word + " a change to " + instrument.Name);
@@ -186,14 +240,23 @@ public sealed class InstrumentHistory
         }
     }
 
+    /// <summary>
+    /// The instrument written down, which is what a step is.
+    /// </summary>
+    /// <remarks>
+    /// The plugin's own patch is left out and put straight back. A described panel cannot move it,
+    /// so keeping it would be carrying the one part of an instrument that never changes here, and
+    /// it is a third of a megabyte apiece.
+    ///
+    /// An empty string for an instrument that will not serialise, and for no instrument at all;
+    /// <see cref="Take"/> refuses both rather than putting back an empty instrument.
+    /// </remarks>
     private static string Said(TrackerInstrument? instrument)
     {
         if (instrument is null) return "";
 
         try
         {
-            // The plugin's own patch is left out. A described panel cannot move it, so keeping
-            // it would be carrying the one part of an instrument that never changes here.
             var was = instrument.PluginState;
             instrument.PluginState = Array.Empty<byte>();
 
@@ -221,6 +284,12 @@ public sealed class InstrumentHistory
     /// In place, because the voice playing it, the panel drawing it and the song holding it all
     /// have this object. Every field but the plugin's patch, which was never in the step and
     /// must not be cleared by its absence.
+    ///
+    /// The patch, the kit and the shape are poured into rather than swapped. Those are things the
+    /// panel's own view models wrap and hold by reference: handing over a new one leaves every
+    /// knob on the panel writing to an object the instrument no longer owns, so the sound stops
+    /// following the picture and the next edit records nothing at all. Same rule the song's
+    /// patterns need, for the same reason.
     /// </remarks>
     private static bool Take(TrackerInstrument instrument, string said)
     {
@@ -239,11 +308,6 @@ public sealed class InstrumentHistory
                 object? wanted = property.GetValue(was);
                 object? here = property.GetValue(instrument);
 
-                // The patch, the kit, the shape: things the panel's own view models wrap and
-                // hold by reference. Handing over a new one leaves every knob on the panel
-                // writing to an object the instrument no longer owns, so the sound stops
-                // following the picture and the next edit records nothing at all. Poured into
-                // rather than swapped, which is the same rule the song's patterns need.
                 if (Nested(property.PropertyType) && wanted is not null && here is not null)
                 {
                     Fill(here, wanted);

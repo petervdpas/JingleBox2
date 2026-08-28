@@ -1,8 +1,25 @@
 namespace JingleBox2.Midi;
 
+/// <summary>The kinds of message this application reads. Everything else is dropped at the wire.</summary>
 public enum MidiMessageType
 {
+    /// <summary>
+    /// A key going down or coming up.
+    /// </summary>
+    /// <remarks>
+    /// Both spellings of a release are this: a note off, and a note on at nothing, which is what
+    /// most keyboards actually send. <see cref="MidiMessage.IsOn"/> is the difference, and
+    /// reading the second as a press is the classic way to hang every note on a keyboard.
+    /// </remarks>
     Note = 0,
+
+    /// <summary>
+    /// A knob, a fader, a button, or an encoder counting notches.
+    /// </summary>
+    /// <remarks>
+    /// All four are the same three bytes and nothing in the message says which sent it, which is
+    /// the whole reason <see cref="ControlSense"/> exists.
+    /// </remarks>
     ControlChange = 1,
 
     /// <summary>
@@ -30,12 +47,12 @@ public enum MidiMessageType
     /// 0xFA start, 0xFB continue, 0xFC stop. Its siblings 0xF8 clock and 0xFE active sensing
     /// arrive dozens of times a second and are dropped at the wire.
     ///
-    /// <see cref="Value"/> carries the status byte itself, since there is nothing else to carry.
+    /// <c>Value</c> carries the status byte itself, since there is nothing else to carry.
     /// </remarks>
     Realtime = 3,
 
     /// <summary>
-    /// A system exclusive message, whole, in <see cref="Bytes"/>.
+    /// A system exclusive message, whole, in <c>Bytes</c>.
     /// </summary>
     /// <remarks>
     /// The only variable length message MIDI has, and so the only one that can arrive in pieces.
@@ -48,11 +65,25 @@ public enum MidiMessageType
     SystemExclusive = 4
 }
 
+/// <summary>
+/// One message off the wire, in the terms the rest of the program uses.
+/// </summary>
+/// <remarks>
+/// Deliberately one shape for five kinds rather than five types, because almost everything that
+/// reads these begins by asking two questions, what kind and is it a press, and a hierarchy
+/// would turn that into a cast. The fields mean slightly different things per kind and each says
+/// so on itself.
+///
+/// Immutable, and made in exactly one place, <c>MidiService.Read</c>. That is what lets
+/// the whole routing half of the application be tested by handing it messages nobody's hardware
+/// sent.
+/// </remarks>
 public sealed class MidiMessage
 {
     /// <summary>Which controller sent it, so routing can tell a pad box from a keyboard.</summary>
     public string Device { get; init; } = "";
 
+    /// <summary>Which of the five kinds this is. Everything that reads one asks this first.</summary>
     public MidiMessageType Type { get; init; }
 
     /// <summary>1 to 16. For a bend this is the whole of its address.</summary>

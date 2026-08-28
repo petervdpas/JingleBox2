@@ -35,37 +35,73 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public sealed class MachinePartSample : Decorator
 {
-    // Declared rather than built from a variable, so every kind this can draw is greppable and
-    // the set stays visible to anything that goes looking for it.
+    /// <summary>
+    /// The kinds of part this can draw, one literal each.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than assembled from anything, so every kind stays greppable: a name
+    /// built from a variable never appears in the source as a string, and nothing that goes
+    /// looking for which kinds the library covers, or which of them a machine's file names,
+    /// would find it. These have to match what a panel description calls its elements.
+    /// </remarks>
     private const string GridKind = "Grid";
+    /// <inheritdoc cref="GridKind"/>
     private const string GroupKind = "Group";
+    /// <inheritdoc cref="GridKind"/>
     private const string RowKind = "Row";
+    /// <inheritdoc cref="GridKind"/>
     private const string ColumnKind = "Column";
+    /// <inheritdoc cref="GridKind"/>
     private const string StripKind = "Strip";
+    /// <inheritdoc cref="GridKind"/>
     private const string KnobKind = "Knob";
+    /// <inheritdoc cref="GridKind"/>
     private const string FaderKind = "Fader";
+    /// <inheritdoc cref="GridKind"/>
     private const string SwitchKind = "Switch";
+    /// <inheritdoc cref="GridKind"/>
     private const string NumberKind = "Number";
+    /// <inheritdoc cref="GridKind"/>
     private const string ButtonKind = "Button";
+    /// <inheritdoc cref="GridKind"/>
     private const string LabelKind = "Label";
+    /// <inheritdoc cref="GridKind"/>
     private const string SpacerKind = "Spacer";
+    /// <inheritdoc cref="GridKind"/>
     private const string LedKind = "Led";
+    /// <inheritdoc cref="GridKind"/>
     private const string MeterKind = "Meter";
+    /// <inheritdoc cref="GridKind"/>
     private const string KeysKind = "Keys";
+    /// <inheritdoc cref="GridKind"/>
     private const string LocationKind = "Location";
+    /// <inheritdoc cref="GridKind"/>
     private const string WaveKind = "Wave";
+    /// <inheritdoc cref="GridKind"/>
     private const string EnvelopeKind = "Envelope";
+    /// <inheritdoc cref="GridKind"/>
     private const string ScopeKind = "Scope";
+    /// <inheritdoc cref="GridKind"/>
     private const string ImageKind = "Image";
+    /// <inheritdoc cref="GridKind"/>
     private const string ChoiceKind = "Choice";
+    /// <inheritdoc cref="GridKind"/>
     private const string TakeKind = "Take";
+    /// <inheritdoc cref="GridKind"/>
     private const string PresetKind = "Preset";
+    /// <inheritdoc cref="GridKind"/>
     private const string PadsKind = "Pads";
+    /// <inheritdoc cref="GridKind"/>
     private const string PadKind = "Pad";
+    /// <inheritdoc cref="GridKind"/>
     private const string SlicesKind = "Slices";
+    /// <inheritdoc cref="GridKind"/>
     private const string PadPickerKind = "PadPicker";
+    /// <inheritdoc cref="GridKind"/>
     private const string ZonesKind = "Zones";
+    /// <inheritdoc cref="GridKind"/>
     private const string ZonePickerKind = "ZonePicker";
+    /// <inheritdoc cref="GridKind"/>
     private const string TextKind = "Text";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
@@ -77,24 +113,33 @@ public sealed class MachinePartSample : Decorator
     public static readonly StyledProperty<string?> KindProperty =
         AvaloniaProperty.Register<MachinePartSample, string?>(nameof(Kind));
 
+    /// <inheritdoc cref="KindProperty"/>
     public string? Kind
     {
         get => GetValue(KindProperty);
         set => SetValue(KindProperty, value);
     }
 
+    /// <summary>
+    /// Makes the whole example deaf to the pointer and invisible to tabbing.
+    /// </summary>
+    /// <remarks>
+    /// One flag at the top rather than one per control: hit testing stops at the first thing
+    /// that says it is not there, so this takes the whole example with it and the press lands on
+    /// the chip underneath, which is what starts the drag. A live knob catching that press would
+    /// turn instead of picking anything up.
+    ///
+    /// Tab navigation is the same again for the keyboard, which does not care about hit testing.
+    /// Without it a library of twenty chips is twenty extra stops on the way to the panel.
+    /// </remarks>
     public MachinePartSample()
     {
-        // One flag at the top rather than one per control: hit testing stops at the first thing
-        // that says it is not there, so this takes the whole example with it and the press lands
-        // on the chip underneath, which is what starts the drag.
         IsHitTestVisible = false;
 
-        // The same again for the keyboard, which does not care about hit testing. Without it a
-        // library of twenty chips is twenty extra stops on the way to the panel.
         KeyboardNavigation.SetTabNavigation(this, KeyboardNavigationMode.None);
     }
 
+    /// <summary>Builds a different example whenever the kind moves.</summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -102,7 +147,17 @@ public sealed class MachinePartSample : Decorator
         if (change.Property == KindProperty) Rebuild();
     }
 
-    /// <summary>Throws the old example away and builds the one the kind now names.</summary>
+    /// <summary>
+    /// Throws the old example away and builds the one the kind now names.
+    /// </summary>
+    /// <remarks>
+    /// The built control is unfocusable as well as the sample being untabbable: a control that
+    /// thinks it can be focused still can be, reached from a child of it.
+    ///
+    /// It goes inside a viewbox that shrinks and never grows. A part drawn at half scale still
+    /// reads as itself; one with its corner cut off does not, and one blown up past its own size
+    /// stops looking like the control it is standing for.
+    /// </remarks>
     private void Rebuild()
     {
         var built = Build(Kind ?? "");
@@ -113,11 +168,8 @@ public sealed class MachinePartSample : Decorator
             return;
         }
 
-        // A control that thinks it can be focused still can be, reached from a child of it.
         built.Focusable = false;
 
-        // Shrunk to whatever room the chip has, never stretched past its own size. A part drawn
-        // at half scale still reads as itself; one with its corner cut off does not.
         Child = new Viewbox
         {
             Child = built,
@@ -197,6 +249,13 @@ public sealed class MachinePartSample : Decorator
         Child = new PartSketch(SketchShape.Blank) { Width = 44, Height = 18 },
     };
 
+    /// <summary>
+    /// A dial turned two thirds of the way round, named the way a machine names one.
+    /// </summary>
+    /// <remarks>
+    /// The name goes above the dial, which is what a machine's own panel does with a knob and so
+    /// what the chip has to show. Everywhere else in the application it sits underneath.
+    /// </remarks>
     private static Control BuildKnob() => new Knob
     {
         Label = "TONE",
@@ -204,10 +263,16 @@ public sealed class MachinePartSample : Decorator
         Minimum = 0,
         Maximum = 1,
         Value = 0.66,
-        // The way a machine prints it, which is what the panel does with a knob of its own.
         LabelAbove = true,
     };
 
+    /// <summary>
+    /// A fader a little under two thirds up, on a throw short enough for a chip.
+    /// </summary>
+    /// <remarks>
+    /// Not at unity and not at an end: a cap resting against either end of its travel is what a
+    /// fader that has not been wired up looks like.
+    /// </remarks>
     private static Control BuildFader() => new Fader
     {
         Label = "LEVEL",
@@ -235,6 +300,7 @@ public sealed class MachinePartSample : Decorator
         IsChecked = true,
     };
 
+    /// <summary>A field with a number in it, since an empty one would look like a text box.</summary>
     private static Control BuildNumber() => new NumberField
     {
         Width = 64,
@@ -244,7 +310,6 @@ public sealed class MachinePartSample : Decorator
         Value = 8,
     };
 
-    /// <summary>A latching button, held down, with its lamp lit to say so.</summary>
     /// <summary>
     /// Where a machine is started from: the arrows, the name, and how far through the list you are.
     /// </summary>
@@ -260,14 +325,6 @@ public sealed class MachinePartSample : Decorator
         FontSize = 9,
     };
 
-    /// <summary>
-    /// The button that fetches a recording off the shelf.
-    /// </summary>
-    /// <remarks>
-    /// An ordinary button rather than the app's own take picker, which lives in the
-    /// application and cannot be reached from here. What the library has to show is the shape
-    /// of the thing on the panel, and on the panel it is a button with the take's name on it.
-    /// </remarks>
     /// <summary>
     /// Four pads, not sixteen: the chip is an inch across and what it has to say is "a grid of
     /// pads", which four of them say as plainly as sixteen would and legibly at this size.
@@ -303,6 +360,7 @@ public sealed class MachinePartSample : Decorator
         return grid;
     }
 
+    /// <summary>A box with a word in it, since an empty one is a rectangle and says nothing.</summary>
     private static Control BuildTextBox() => new TextBox
     {
         Text = "Name",
@@ -310,6 +368,14 @@ public sealed class MachinePartSample : Decorator
         FontSize = 11,
     };
 
+    /// <summary>
+    /// The button that fetches a recording off the shelf.
+    /// </summary>
+    /// <remarks>
+    /// An ordinary button rather than the app's own take picker, which lives in the application
+    /// and cannot be reached from here. What the library has to show is the shape of the thing
+    /// on the panel, and on the panel it is a button with the take's name on it.
+    /// </remarks>
     private static Control BuildTake() => new Button
     {
         Content = "kick.wav",
@@ -318,6 +384,7 @@ public sealed class MachinePartSample : Decorator
         IsHitTestVisible = false,
     };
 
+    /// <summary>A latching button, held down, with its lamp lit to say so.</summary>
     private static Control BuildButton() => new PushButton
     {
         CapText = "RUN",
@@ -418,7 +485,6 @@ public sealed class MachinePartSample : Decorator
         Gap = 6,
     };
 
-    /// <summary>The ordinary drop down, with something picked, since an empty one says nothing.</summary>
     /// <summary>
     /// The map, drawn as a map: three stretches of keyboard, one of them in hand.
     /// </summary>
@@ -454,30 +520,40 @@ public sealed class MachinePartSample : Decorator
         SelectedIndex = 0,
     };
 
-    /// <summary>
-    /// A map for the chip to draw: three zones across the keyboard, playing nothing.
-    /// </summary>
-    /// <remarks>
-    /// The same reason the pads on a chip are real buttons. Nothing here can be edited: the chip
-    /// is not hit testable, so the drag that moves an edge never reaches it.
-    /// </remarks>
     /// <summary>A track a third of the way through the first of two pages.</summary>
     private sealed class SampleRun : IMachineLocation
     {
+        /// <summary>
+        /// Two pages rather than the eight a full pattern has.
+        /// </summary>
+        /// <remarks>
+        /// Written out and shared, since nothing about a chip changes and building the list per
+        /// instance would be building the same two strings for every chip in the library.
+        /// </remarks>
         private static readonly string[] Runs = { "0-7", "8-15" };
 
+        /// <inheritdoc/>
+        /// <remarks>Always, so the chip shows the part working rather than greyed out.</remarks>
         public bool Live => true;
 
+        /// <inheritdoc/>
         public int Lamps => 8;
 
+        /// <inheritdoc/>
+        /// <remarks>A third of the way along, so the playhead is plainly somewhere rather than parked.</remarks>
         public int Lit => 2;
 
+        /// <inheritdoc/>
         public int FirstNumber => 0;
 
+        /// <inheritdoc/>
         public System.Collections.Generic.IReadOnlyList<string> Pages => Runs;
 
+        /// <inheritdoc/>
         public int Page => 0;
 
+        /// <inheritdoc/>
+        /// <remarks>Nothing to do: a chip is not hit testable, so no press ever reaches this.</remarks>
         public void Show(int page) { }
 
         /// <summary>Nowhere to subscribe, because a chip does not play.</summary>
@@ -488,28 +564,53 @@ public sealed class MachinePartSample : Decorator
         }
     }
 
+    /// <summary>
+    /// A map for the chip to draw: three zones across the keyboard, playing nothing.
+    /// </summary>
+    /// <remarks>
+    /// The same reason the pads on a chip are real buttons. Nothing here can be edited: the chip
+    /// is not hit testable, so the drag that moves an edge never reaches it.
+    /// </remarks>
     private sealed class SampleMap : IMachineZones
     {
+        /// <summary>
+        /// Three stretches of keyboard, laid end to end with no gap between them.
+        /// </summary>
+        /// <remarks>
+        /// Three rather than one, because what is worth seeing on the chip is that there is more
+        /// than one of them and that they lie side by side.
+        /// </remarks>
         private static readonly (int Low, int High)[] Laid =
         {
             (0, 39), (40, 79), (80, 119),
         };
 
+        /// <inheritdoc/>
         public int Count => Laid.Length;
 
+        /// <inheritdoc/>
+        /// <remarks>Unnamed: at chip size a caption would be the widest thing on the drawing.</remarks>
         public string Cap(int at) => "";
 
+        /// <inheritdoc/>
         public int Low(int at) => Laid[at].Low;
 
+        /// <inheritdoc/>
         public int High(int at) => Laid[at].High;
 
+        /// <inheritdoc/>
+        /// <remarks>The middle of the zone, which is where a root note sits when nobody has moved it.</remarks>
         public int Root(int at) => (Laid[at].Low + Laid[at].High) / 2;
 
+        /// <inheritdoc/>
+        /// <remarks>All of them, or the chip would show a map that is half empty.</remarks>
         public bool Filled(int at) => true;
 
         /// <summary>The middle one, so the chip shows both a picked zone and an unpicked one.</summary>
         public int Picked { get; set; } = 1;
 
+        /// <inheritdoc/>
+        /// <remarks>Nothing to do: the chip is not hit testable, so there is no drag to answer.</remarks>
         public void Move(int at, int low, int high, int root) { }
 
         /// <summary>
@@ -542,6 +643,12 @@ public sealed class MachinePartSample : Decorator
     /// <summary>A wave for the chip to draw, which no machine is making.</summary>
     private sealed class SampleWave : IMachineScope
     {
+        /// <inheritdoc/>
+        /// <remarks>
+        /// A sawtooth, because it is the one wave that cannot be mistaken for anything else at
+        /// this size: a sine and a triangle are hard to tell apart across an inch. The time and
+        /// the running flag are ignored, since a chip does not animate.
+        /// </remarks>
         public void Trace(double[] into, double cycles, double seconds, bool running)
         {
             for (int at = 0; at < into.Length; at++)
@@ -560,6 +667,7 @@ public sealed class MachinePartSample : Decorator
         }
     }
 
+    /// <summary>The ordinary drop down, with something picked, since an empty one says nothing.</summary>
     private static Control BuildChoice() => new ComboBox
     {
         Width = 78,
@@ -613,6 +721,7 @@ public sealed class MachinePartSample : Decorator
         /// <summary>Between one box and the next.</summary>
         private const double Gap = 4;
 
+        /// <summary>How much each box's corners are rounded, matching the controls beside it.</summary>
         private const double Corner = 3;
 
         /// <summary>How tall each cell of a strip stands, as a share of the room above the line.</summary>
@@ -631,10 +740,24 @@ public sealed class MachinePartSample : Decorator
             0.56, 0.31, 0.45, 0.25, 0.35, 0.19, 0.27, 0.12,
         };
 
+        /// <summary>Fixes what this one is a drawing of, for the life of the control.</summary>
         public PartSketch(SketchShape shape) => Shape = shape;
 
+        /// <summary>Which drawing this is, settled when it was made and never moved.</summary>
         public SketchShape Shape { get; }
 
+        /// <summary>
+        /// Paints whichever diagram this sketch was made for.
+        /// </summary>
+        /// <remarks>
+        /// Outlined in the muted text colour and filled with the surface, not drawn in the
+        /// border colour. A border is meant to be barely there, which is right for a border and
+        /// wrong for the only thing on the chip: a container drawn in it read as an empty chip,
+        /// and the library then had five entries nobody could tell apart.
+        ///
+        /// Everything is laid out on half pixels so the one pixel outlines land on a pixel
+        /// rather than straddling two and coming out grey and two wide.
+        /// </remarks>
         public override void Render(DrawingContext context)
         {
             double width = Bounds.Width;
@@ -644,10 +767,6 @@ public sealed class MachinePartSample : Decorator
 
             var palette = ThemePalette.From(this);
 
-            // Outlined in the muted text colour and filled with the surface, not drawn in the
-            // border colour. A border is meant to be barely there, which is right for a border
-            // and wrong for the only thing on the chip: a container drawn in it reads as an
-            // empty chip, and the library then has five entries nobody can tell apart.
             var pen = new Pen(palette.MutedBrush, 1);
             var fill = palette.SurfaceBrush;
 
@@ -664,6 +783,7 @@ public sealed class MachinePartSample : Decorator
             }
         }
 
+        /// <summary>Four boxes in two rows, which is what placing things by row and column looks like.</summary>
         private static void DrawGrid(DrawingContext context, IPen pen, IBrush fill, double width, double height)
         {
             double cellWidth = (width - Gap) / 2;
@@ -682,6 +802,7 @@ public sealed class MachinePartSample : Decorator
             }
         }
 
+        /// <summary>Three boxes side by side, all the same height.</summary>
         private static void DrawRow(DrawingContext context, IPen pen, IBrush fill, double width, double height)
         {
             double cellWidth = (width - Gap * 2) / 3;
@@ -690,6 +811,7 @@ public sealed class MachinePartSample : Decorator
                 Box(context, pen, fill, new Rect(i * (cellWidth + Gap) + 0.5, 0.5, cellWidth - 1, height - 1));
         }
 
+        /// <summary>The same three, stacked instead.</summary>
         private static void DrawColumn(DrawingContext context, IPen pen, IBrush fill, double width, double height)
         {
             double cellHeight = (height - Gap * 2) / 3;
@@ -819,6 +941,14 @@ public sealed class MachinePartSample : Decorator
             return geometry;
         }
 
+        /// <summary>
+        /// One rounded box, or nothing at all when it has been squeezed to no size.
+        /// </summary>
+        /// <remarks>
+        /// The empty case is not defensive tidiness: a chip is measured before it is given any
+        /// room, so a diagram of three boxes across an inch really does get asked to draw at
+        /// negative widths on the first pass.
+        /// </remarks>
         private static void Box(DrawingContext context, IPen pen, IBrush? fill, Rect area)
         {
             if (area.Width <= 0 || area.Height <= 0) return;

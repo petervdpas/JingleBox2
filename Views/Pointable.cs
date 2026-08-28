@@ -45,21 +45,34 @@ public static class Pointable
     public static readonly AttachedProperty<bool> InSongProperty =
         AvaloniaProperty.RegisterAttached<Control, Control, bool>("InSong");
 
+    /// <summary>Hanging a mapping is what wires the control up, so the change is what is watched.</summary>
     static Pointable()
     {
         OffersProperty.Changed.AddClassHandler<Control>(Hung);
     }
 
+    /// <inheritdoc cref="OffersProperty"/>
     public static ControlMapping? GetOffers(Control control) => control.GetValue(OffersProperty);
 
+    /// <inheritdoc cref="OffersProperty"/>
     public static void SetOffers(Control control, ControlMapping? value) =>
         control.SetValue(OffersProperty, value);
 
+    /// <inheritdoc cref="InSongProperty"/>
     public static bool GetInSong(Control control) => control.GetValue(InSongProperty);
 
+    /// <inheritdoc cref="InSongProperty"/>
     public static void SetInSong(Control control, bool value) =>
         control.SetValue(InSongProperty, value);
 
+    /// <summary>
+    /// Takes the pointer handlers on or off as a mapping is hung on the control or taken away.
+    /// </summary>
+    /// <remarks>
+    /// Tunnel and bubble both. A knob takes the move to be dragged and a button takes it to light
+    /// up, so coming down is the only way to be sure of hearing it; entering is a direct event
+    /// and reaches the control it is about however it is asked for.
+    /// </remarks>
     private static void Hung(Control control, AvaloniaPropertyChangedEventArgs e)
     {
         control.RemoveHandler(InputElement.PointerMovedEvent, Rested);
@@ -67,9 +80,6 @@ public static class Pointable
 
         if (e.NewValue is not ControlMapping) return;
 
-        // Tunnel and bubble both. A knob takes the move to be dragged and a button takes it to
-        // light up, so coming down is the only way to be sure of hearing it; entering is a
-        // direct event and reaches the control it is about however it is asked for.
         control.AddHandler(InputElement.PointerMovedEvent, Rested,
             RoutingStrategies.Tunnel | RoutingStrategies.Bubble);
         control.AddHandler(InputElement.PointerEnteredEvent, Rested,
@@ -124,6 +134,7 @@ public static class Pointable
         link.Changed += Looked;
     }
 
+    /// <summary>The link said something; anything but a standing offer puts the glow out.</summary>
     private static void Looked()
     {
         if (_watching is { IsLinking: true, Offered: not null }) return;
@@ -133,11 +144,17 @@ public static class Pointable
         Light(null);
     }
 
+    /// <summary>The class a templated control wears while it is being offered.</summary>
     private const string Glow = "offered";
 
+    /// <summary>The link being listened to, so the same one is not subscribed to twice.</summary>
     private static ControlLink? _watching;
 
+    /// <summary>Whatever is glowing now, since only one thing is ever offered at a time.</summary>
     private static Control? _lit;
+
+    /// <summary>The control last offered, so resting still offers once rather than per move.</summary>
+    private static Control? _last;
 
     /// <summary>
     /// The pointer is on it. Offered, and nothing is handled: the control still works.
@@ -145,21 +162,19 @@ public static class Pointable
     /// <remarks>
     /// Working while it is being pointed at is the whole confirmation. Turn the knob on the desk
     /// and the one on the screen moves, which says the link took better than any light could.
+    ///
+    /// Offered once per control rather than once per move. What is offered has to be a fresh
+    /// copy, since a link keeps the object it is given, so the link cannot tell two offers of the
+    /// same thing apart the way the panel can. It is remembered here instead. An offer that has
+    /// been taken clears itself, and resting on the same control again offers it again, which is
+    /// what a hand that has just made a link and wants another expects.
     /// </remarks>
-    /// <summary>The control last offered, so resting still offers once rather than per move.</summary>
-    private static Control? _last;
-
     private static void Rested(object? sender, PointerEventArgs e)
     {
         if (sender is not Control control) return;
         if (ControlLink.Current is not { IsLinking: true } link) return;
         if (control.GetValue(OffersProperty) is not { } template) return;
 
-        // Offered once per control rather than once per move. What is offered has to be a fresh
-        // copy, since a link keeps the object it is given, so the link cannot tell two offers of
-        // the same thing apart the way the panel can. It is remembered here instead. An offer
-        // that has been taken clears itself, and resting on the same control again offers it
-        // again, which is what a hand that has just made a link and wants another expects.
         if (ReferenceEquals(_last, control) && link.Offered is not null) return;
 
         _last = control;

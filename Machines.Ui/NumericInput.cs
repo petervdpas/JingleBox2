@@ -13,6 +13,17 @@ public static class NumericInput
     public static double Step(double value, double delta, double step, double minimum, double maximum) =>
         Clamp(value + delta * step, minimum, maximum);
 
+    /// <summary>
+    /// Holds a value inside a range, and inside the bottom of it when the range is the wrong
+    /// way round.
+    /// </summary>
+    /// <remarks>
+    /// The reversed case is not defensive tidiness. A machine's description comes out of a file
+    /// somebody wrote by hand, so a parameter with its maximum below its minimum is an ordinary
+    /// arrival, and <see cref="Math.Clamp(double,double,double)"/> throws on one. A control that
+    /// sits at the low end is a control somebody can see is wrong; an exception on the drawing
+    /// thread takes the whole panel down.
+    /// </remarks>
     public static double Clamp(double value, double minimum, double maximum) =>
         maximum < minimum ? minimum : Math.Clamp(value, minimum, maximum);
 
@@ -29,6 +40,14 @@ public static class NumericInput
             : fallback;
     }
 
+    /// <summary>
+    /// Words a value the way its control asks for.
+    /// </summary>
+    /// <remarks>
+    /// Invariant culture, deliberately: these readings are measured for width, compared with
+    /// each other, and read back through <see cref="Parse"/>, and a decimal comma would break
+    /// all three on somebody else's machine. No format at all means whole numbers.
+    /// </remarks>
     public static string Format(double value, string? format) =>
         value.ToString(string.IsNullOrEmpty(format) ? "0" : format, CultureInfo.InvariantCulture);
 

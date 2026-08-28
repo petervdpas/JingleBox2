@@ -8,14 +8,27 @@ namespace JingleBox2.Shortcuts;
 /// <remarks>
 /// An enum and not a string, so the set of them is visible in one place and a page cannot ask
 /// for something nothing offers. Adding one is adding a member here and a line in
-/// <see cref="ShortcutMap.Everything"/>, and every page that does not answer it simply says it
+/// <see cref="ShortcutActions.Everything"/>, and every page that does not answer it simply says it
 /// cannot.
 /// </remarks>
 public enum ShortcutAction
 {
+    /// <summary>Write down whatever the page in front of you owns: a song, a machine, the pads.</summary>
     Save,
+
+    /// <summary>Take away whatever is picked out, on a page that has something to pick out.</summary>
     Delete,
+
+    /// <summary>
+    /// The last thing that was done on this page, put back.
+    /// </summary>
+    /// <remarks>
+    /// There is no undo for the application: each page keeps its own, because what the last
+    /// thing you did was is a question only the page you did it on can answer.
+    /// </remarks>
     Undo,
+
+    /// <summary>And the last thing undone, done again.</summary>
     Redo
 }
 
@@ -28,6 +41,11 @@ public enum ShortcutAction
 /// </remarks>
 public static class ShortcutActions
 {
+    /// <summary>Every action, what it is called, and the keystroke it ships on.</summary>
+    /// <remarks>
+    /// The order is the order a settings page lists them in, so it is the order somebody reads
+    /// rather than the order the enum happens to be written in.
+    /// </remarks>
     public static readonly IReadOnlyList<(ShortcutAction Action, string Name, string Default)> Everything =
         new[]
         {
@@ -38,6 +56,10 @@ public static class ShortcutActions
         };
 
     /// <summary>What to call one, for a page listing them.</summary>
+    /// <remarks>
+    /// Falls back to the member's own name for an action nobody has given a wording to, which
+    /// is ugly rather than broken and is what a page shows the day one is added and forgotten.
+    /// </remarks>
     public static string Named(ShortcutAction action)
     {
         foreach (var (one, name, _) in Everything)

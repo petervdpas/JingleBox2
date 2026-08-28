@@ -9,12 +9,31 @@ namespace JingleBox2.Tests;
 /// <summary>
 /// What a controller does before anybody has pointed it at anything.
 /// </summary>
+/// <remarks>
+/// Faders are the first tracks' levels, pinned one per track, and encoders are the controls on
+/// the face in front of you, in the order the panel reads. It works on hardware nobody has
+/// written a file for, nothing is stored, and any link somebody made beats it, so the worst it
+/// can be is uninteresting.
+/// <para>
+/// The tests run in three groups. First a device nobody has described, where the kind of a
+/// control is worked out by watching the stream. Then the devices with a file, where the file
+/// says what a control is without waiting and decides whether it lands on the mixer or on the
+/// machine in front of you. Last the edges: the layout switched off, and notes, which are not
+/// its business.
+/// </para>
+/// </remarks>
 public class DefaultLayoutTests
 {
+    /// <summary>A controller nobody has ever written a file for.</summary>
     private const string Nobodys = "Some Other Box Port 1";
+
+    /// <summary>An MPD218: six knobs and no faders at all.</summary>
     private const string Mpd = "MPD218 Port A";
+
+    /// <summary>A nanoKONTROL2: eight sliders and eight knobs, all of them described.</summary>
     private const string Korg = "nanoKONTROL2 MIDI 1";
 
+    /// <summary>One control change off a device, which is all the layout is ever handed.</summary>
     private static MidiMessage Cc(int number, int value, string device = Nobodys) => new()
     {
         Device = device, Type = MidiMessageType.ControlChange,
@@ -43,6 +62,10 @@ public class DefaultLayoutTests
     private static ControlMapping? Knobbed(DefaultLayout layout, int cc) =>
         layout.For(Cc(cc, 40, Mpd));
 
+    /// <summary>
+    /// A fader on a device nobody has described drives a track's level, and it stays on the
+    /// track it was given rather than following what is selected.
+    /// </summary>
     [Fact]
     public void A_fader_is_a_tracks_level_and_is_pinned_to_that_track()
     {
@@ -57,12 +80,20 @@ public class DefaultLayoutTests
         Assert.Equal(0, link.Track);
     }
 
+    /// <summary>
+    /// The leftmost fader is track one, by controller number ascending rather than by which was
+    /// touched first.
+    /// </summary>
+    /// <remarks>
+    /// Worked out of order on purpose. Ascending number is right for any program written for a
+    /// DAW nobody has heard of, and wrong for one written for a particular instrument, and the
+    /// second kind never points at this application.
+    /// </remarks>
     [Fact]
     public void Faders_take_the_tracks_in_the_order_their_numbers_run()
     {
         var layout = new DefaultLayout();
 
-        // Touched out of order on purpose: the order is the numbers, not the touching.
         Fader(layout, 22);
         Fader(layout, 20);
         Fader(layout, 21);
@@ -72,6 +103,15 @@ public class DefaultLayoutTests
         Assert.Equal(2, Fader(layout, 22)!.Track);
     }
 
+    /// <summary>
+    /// An encoder points at a place on whatever panel is open, never at a machine or a
+    /// parameter, because the machine in front of you tomorrow is not the one in front of you
+    /// now.
+    /// </summary>
+    /// <remarks>
+    /// A profile can know a MiniLab has eight encoders and can never know that encoder three
+    /// should be a filter, so a layout is expressed against the machine rather than the device.
+    /// </remarks>
     [Fact]
     public void An_encoder_is_a_control_on_the_face_in_front_of_you()
     {
@@ -84,12 +124,14 @@ public class DefaultLayoutTests
         Assert.Equal(ControlScope.Focused, link.Scope);
         Assert.Equal(0, link.Ordinal);
 
-        // It names a place, never a machine or a parameter, because the machine in front of you
-        // tomorrow is not the one in front of you now.
         Assert.Equal("", link.Machine);
         Assert.Equal("", link.Key);
     }
 
+    /// <summary>
+    /// The two kinds are counted apart, or a desk with both would have two first controls
+    /// pointed at the same parameter.
+    /// </summary>
     [Fact]
     public void Encoders_and_faders_are_counted_apart()
     {
@@ -107,6 +149,10 @@ public class DefaultLayoutTests
         Assert.Equal(1, Encoder(layout, 21)!.Ordinal);
     }
 
+    /// <summary>
+    /// A control does nothing until it is known what kind it is: three messages settles it, and
+    /// a guess before that is a parameter thrown across its range in front of you.
+    /// </summary>
     [Fact]
     public void Nothing_is_claimed_until_it_is_known_what_the_control_is()
     {
@@ -115,25 +161,30 @@ public class DefaultLayoutTests
         Assert.Null(layout.For(Cc(20, 40)));
         Assert.Null(layout.For(Cc(20, 41)));
 
-        // Three messages settles it, and a guess before that is a parameter thrown across its
-        // range in front of you.
         Assert.NotNull(layout.For(Cc(20, 43)));
     }
 
+    /// <summary>
+    /// Pressing something nobody assigned does nothing rather than something surprising.
+    /// </summary>
     [Fact]
     public void A_button_is_not_something_a_layout_has_an_opinion_about()
     {
         var layout = new DefaultLayout();
 
-        // Pressing something nobody assigned should do nothing rather than something surprising.
         Assert.Null(Turn(layout, 20, 0, 127, 0, 127));
     }
 
+    /// <summary>
+    /// One control gets one mapping object, handed back every time rather than made again.
+    /// </summary>
+    /// <remarks>
+    /// The router keeps each mapping's hand state in a table keyed on the mapping itself, so
+    /// a fresh one per message would reset pickup on every message and the knob would jump.
+    /// </remarks>
     [Fact]
     public void The_same_control_is_handed_back_the_same_mapping()
     {
-        // The router keeps each mapping's hand state in a table keyed on the mapping itself, so
-        // a fresh one per message would reset pickup on every message and the knob would jump.
         var layout = new DefaultLayout();
 
         var first = Fader(layout, 20);
@@ -142,6 +193,10 @@ public class DefaultLayoutTests
         Assert.Same(first, again);
     }
 
+    /// <summary>
+    /// Two desks plugged in at once each start their own count, so the first fader on either is
+    /// track one and each mapping remembers which device it came off.
+    /// </summary>
     [Fact]
     public void Two_controllers_are_counted_apart()
     {
@@ -155,12 +210,14 @@ public class DefaultLayoutTests
         Assert.Equal("Another Box", layout.For(Cc(20, 44, "Another Box"))!.Device);
     }
 
+    /// <summary>
+    /// A MiniLab's slider is a fader because its file says so, not after three messages.
+    /// </summary>
     [Fact]
     public void A_controllers_own_file_says_what_a_control_is_without_waiting()
     {
         var layout = new DefaultLayout();
 
-        // A MiniLab's slider is a fader because its file says so, not after three messages.
         Controllers.ControllerProfiles.Saw("Minilab3 MIDI", 1, 86);
 
         var link = layout.For(new MidiMessage
@@ -173,13 +230,21 @@ public class DefaultLayoutTests
         Assert.Equal(ControlKind.Mix, link!.Kind);
     }
 
+    /// <summary>
+    /// An MPD218's knobs land on the machine in front of you, and they are picked up because a
+    /// knob says where it is.
+    /// </summary>
+    /// <remarks>
+    /// Six knobs and no faders. Left on the mixer they would be a six channel desk on a box
+    /// built for hitting things, which is the wrong half of the application to land on. This is
+    /// the whole of what a profile adds to a layout: watching cannot tell a knob from a fader,
+    /// since both report a position and are picked up identically.
+    /// </remarks>
     [Fact]
     public void An_mpd218s_knobs_drive_the_machine_rather_than_the_mixer()
     {
         var layout = new DefaultLayout();
 
-        // Six knobs and no faders. Left on the mixer they would be a six channel desk on a box
-        // built for hitting things, which is the wrong half of the application to land on.
         Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
 
         var link = Knobbed(layout, 22);
@@ -189,10 +254,17 @@ public class DefaultLayoutTests
         Assert.Equal(ControlScope.Focused, link.Scope);
         Assert.Equal(0, link.Ordinal);
 
-        // And picked up, because a knob says where it is.
         Assert.Equal(ControlPickup.Takeover, link.Pickup);
     }
 
+    /// <summary>
+    /// Knobs take the panel's controls by controller number ascending, whatever order they were
+    /// touched in.
+    /// </summary>
+    /// <remarks>
+    /// A knob nobody has touched yet turning up in between moves the one above it, which is
+    /// accepted rather than engineered around: any link somebody makes beats all of this.
+    /// </remarks>
     [Fact]
     public void And_they_take_the_machines_controls_in_the_order_their_numbers_run()
     {
@@ -200,35 +272,49 @@ public class DefaultLayoutTests
 
         Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
 
-        // Touched out of order on purpose: the order is the numbers, not the touching.
         Knobbed(layout, 25);
         Knobbed(layout, 22);
 
         Assert.Equal(0, Knobbed(layout, 22)!.Ordinal);
         Assert.Equal(1, Knobbed(layout, 25)!.Ordinal);
 
-        // And a knob nobody has touched yet turning up in between moves the one above it, which
-        // is accepted rather than engineered around: any link somebody makes beats all of this.
         Knobbed(layout, 23);
 
         Assert.Equal(1, Knobbed(layout, 23)!.Ordinal);
         Assert.Equal(2, Knobbed(layout, 25)!.Ordinal);
     }
 
+    /// <summary>
+    /// Teaching the layout about knobs took nothing away from a device with no file: its round
+    /// controls stay on the mixer exactly as before.
+    /// </summary>
+    /// <remarks>
+    /// A knob and a fader both report a position and are picked up identically, so watching
+    /// cannot tell them apart and does not try. Saying which is which is the whole of what a
+    /// profile adds here, and without one nothing changes.
+    /// </remarks>
     [Fact]
     public void A_device_nobody_has_written_a_file_for_keeps_its_knobs_on_the_mixer()
     {
         var layout = new DefaultLayout();
 
-        // A knob and a fader both report a position and are picked up identically, so watching
-        // cannot tell them apart and does not try. Saying which is which is the whole of what a
-        // profile adds here, and without one nothing changes.
         var link = Fader(layout, 20);
 
         Assert.NotNull(link);
         Assert.Equal(ControlKind.Mix, link!.Kind);
     }
 
+    /// <summary>
+    /// A nanoKONTROL2 is a working mixer and a working panel the moment it is unwrapped.
+    /// </summary>
+    /// <remarks>
+    /// Eight faders on the first eight tracks, which is what a mixer is, and eight knobs on
+    /// whatever panel is open. Nobody linked any of it. This is the whole reason the two
+    /// words are kept apart in a controller's file. The two kinds are counted apart, so with the
+    /// whole surface worked slider 8 is track 8 and knob 8 is the machine's eighth control,
+    /// rather than the two sharing one run of sixteen; and a strip button is not something a
+    /// layout has an opinion about.
+    /// </remarks>
     [Fact]
     public void A_nanokontrols_sliders_go_to_the_mixer_and_its_knobs_to_the_machine()
     {
@@ -236,9 +322,6 @@ public class DefaultLayoutTests
 
         Controllers.ControllerProfiles.Saw(Korg, 1, 0);
 
-        // Eight faders on the first eight tracks, which is what a mixer is, and eight knobs on
-        // whatever panel is open. Nobody linked any of it. This is the whole reason the two
-        // words are kept apart in a controller's file.
         var slider = layout.For(Cc(0, 40, Korg));
         var knob = layout.For(Cc(16, 40, Korg));
 
@@ -250,8 +333,6 @@ public class DefaultLayoutTests
         Assert.Equal(ControlScope.Focused, knob.Scope);
         Assert.Equal(0, knob.Ordinal);
 
-        // Counted apart, so with the whole surface worked slider 8 is track 8 and knob 8 is the
-        // machine's eighth control, rather than the two kinds sharing one run of sixteen.
         for (int at = 0; at < 8; at++)
         {
             layout.For(Cc(at, 40, Korg));
@@ -261,18 +342,22 @@ public class DefaultLayoutTests
         Assert.Equal(7, layout.For(Cc(7, 40, Korg))!.Track);
         Assert.Equal(7, layout.For(Cc(23, 40, Korg))!.Ordinal);
 
-        // And a strip button is not something a layout has an opinion about.
         Assert.Null(layout.For(Cc(41, 127, Korg)));
     }
 
+    /// <summary>
+    /// A modulation strip is the control that looks like it belongs on the mixer and does not.
+    /// </summary>
+    /// <remarks>
+    /// It is picked up exactly as a fader is, so it would be easy to file it with them. It
+    /// springs back, which is the whole difference: a track whose level it drove would drop
+    /// to nothing the moment a thumb came off.
+    /// </remarks>
     [Fact]
     public void A_modulation_strip_is_left_alone()
     {
         var layout = new DefaultLayout();
 
-        // It is picked up exactly as a fader is, so it would be easy to file it with them. It
-        // springs back, which is the whole difference: a track whose level it drove would drop
-        // to nothing the moment a thumb came off.
         Controllers.ControllerProfiles.Saw("Minilab3 MIDI", 1, 86);
 
         Assert.Null(layout.For(new MidiMessage
@@ -282,18 +367,25 @@ public class DefaultLayoutTests
         }));
     }
 
+    /// <summary>
+    /// The mapping carries what the layout worked out, so the router does not have to work it
+    /// out again.
+    /// </summary>
+    /// <remarks>
+    /// Both this and the router listen for three messages to decide the same thing about the
+    /// same control. Listening twice in a row means a control does nothing for six messages
+    /// the first time it is touched, which is long enough to read as broken.
+    /// </remarks>
     [Fact]
     public void What_it_worked_out_is_carried_on_the_mapping()
     {
-        // Both this and the router listen for three messages to decide the same thing about the
-        // same control. Listening twice in a row means a control does nothing for six messages
-        // the first time it is touched, which is long enough to read as broken.
         var layout = new DefaultLayout();
 
         Assert.Equal(ControlPickup.Takeover, Fader(layout, 20)!.Pickup);
         Assert.Equal(ControlPickup.Relative, Encoder(layout, 30)!.Pickup);
     }
 
+    /// <summary>Switched off it answers nothing, and every control goes back to unlinked.</summary>
     [Fact]
     public void It_can_be_switched_off_and_then_says_nothing()
     {
@@ -302,6 +394,10 @@ public class DefaultLayoutTests
         Assert.Null(Fader(layout, 20));
     }
 
+    /// <summary>
+    /// Notes and nothing at all are both refused: a layout is about continuous controllers, and
+    /// a pad hit is somebody playing.
+    /// </summary>
     [Fact]
     public void Notes_are_not_its_business()
     {
@@ -317,11 +413,17 @@ public class DefaultLayoutTests
 }
 
 /// <summary>The order a panel reads in, which is what "the third knob" means.</summary>
+/// <remarks>
+/// A default layout points an encoder at a place rather than at a parameter, so the place has to
+/// mean the same thing to a person and to the code: the third control your eye lands on.
+/// </remarks>
 public class PanelOrderTests
 {
+    /// <summary>A knob on a panel, which is the one element kind that always turns something.</summary>
     private static MachineElement Knob(string parameter) =>
         new() { Element = MachineElementKinds.Knob, Parameter = parameter };
 
+    /// <summary>A panel holding the given elements straight under its root grid.</summary>
     private static MachinePanel Panel(params MachineElement[] children)
     {
         var root = new MachineElement { Element = MachineElementKinds.Grid };
@@ -330,6 +432,7 @@ public class PanelOrderTests
         return new MachinePanel { Root = root };
     }
 
+    /// <summary>Controls come back in the order they are drawn, which is how they are read.</summary>
     [Fact]
     public void Controls_come_in_the_order_the_eye_goes_over_them()
     {
@@ -338,6 +441,10 @@ public class PanelOrderTests
         Assert.Equal(new[] { "cutoff", "resonance", "drive" }, PanelOrder.Of(panel));
     }
 
+    /// <summary>
+    /// A group is walked where it stands, so its contents come before whatever follows the group
+    /// rather than after everything else.
+    /// </summary>
     [Fact]
     public void Everything_in_a_group_comes_before_what_stands_after_it()
     {
@@ -350,15 +457,22 @@ public class PanelOrderTests
         Assert.Equal(new[] { "cutoff", "attack", "decay", "level" }, PanelOrder.Of(panel));
     }
 
+    /// <summary>
+    /// One parameter is one place however many elements show it, which happens wherever a value
+    /// is printed beside the knob that turns it.
+    /// </summary>
     [Fact]
     public void A_parameter_shown_twice_keeps_the_place_of_the_first()
     {
-        // Which happens wherever a value is printed beside the knob that turns it.
         var panel = Panel(Knob("cutoff"), Knob("resonance"), Knob("cutoff"));
 
         Assert.Equal(new[] { "cutoff", "resonance" }, PanelOrder.Of(panel));
     }
 
+    /// <summary>
+    /// A label names a thing rather than a value, so it takes no place: an encoder pointed at
+    /// one would reach nothing.
+    /// </summary>
     [Fact]
     public void Things_that_turn_nothing_are_not_counted()
     {
@@ -369,6 +483,10 @@ public class PanelOrderTests
         Assert.Equal(new[] { "cutoff" }, PanelOrder.Of(panel));
     }
 
+    /// <summary>
+    /// A place answers the parameter standing at it, and a place the panel does not reach that
+    /// far answers nothing rather than the nearest one.
+    /// </summary>
     [Theory]
     [InlineData(0, "cutoff")]
     [InlineData(1, "resonance")]
@@ -377,6 +495,9 @@ public class PanelOrderTests
     public void And_a_place_answers_the_parameter_at_it(int ordinal, string wanted) =>
         Assert.Equal(wanted, PanelOrder.At(Panel(Knob("cutoff"), Knob("resonance")), ordinal));
 
+    /// <summary>
+    /// No panel is not a failure: a knob turned with nothing open reaches nothing quietly.
+    /// </summary>
     [Fact]
     public void A_panel_that_is_not_there_reads_as_nothing()
     {

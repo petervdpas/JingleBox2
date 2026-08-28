@@ -30,12 +30,28 @@ public class Clavier : ThemedControl
     /// <summary>Which semitones of an octave are the raised keys.</summary>
     private static readonly bool[] Raised = { false, true, false, true, false, false, true, false, true, false, true, false };
 
+    /// <summary>
+    /// How wide and how tall a raised key is, as a fraction of a white one.
+    /// </summary>
+    /// <remarks>
+    /// The two happen to be the same number and mean different things: the width is measured
+    /// against a white key's width, the height against the keyboard's height.
+    /// </remarks>
     private const double RaisedWidth = 0.62;
+
+    /// <inheritdoc cref="RaisedWidth"/>
     private const double RaisedHeight = 0.62;
 
+    /// <summary>The air between the head, which is the arrows and lamps, and the keys under it.</summary>
     private const double HeadGap = 8;
+
+    /// <summary>Between the caption and the lamps it names.</summary>
     private const double CaptionGap = 4;
+
+    /// <summary>Between a lamp and its number, and between a C and the octave written under it.</summary>
     private const double NumberGap = 3;
+
+    /// <summary>Between the row of lamps and the arrow at either end of it.</summary>
     private const double ArrowGap = 9;
 
     /// <summary>
@@ -45,24 +61,55 @@ public class Clavier : ThemedControl
     /// Thirty-seven keys is thirty-seven gradients if each one builds its own, and a keyboard
     /// repaints every time a note starts or stops. Only the sounding keys need a brush of their
     /// own, and there are never many of those, so the rest share these four.
+    ///
+    /// A pressed key is the same gradient turned over, which is lighting it from below and is
+    /// the whole of what makes a key look struck.
     /// </remarks>
     private static readonly IBrush WhiteUp = Face(Color.FromRgb(0xE8, 0xE8, 0xE4), Color.FromRgb(0xB4, 0xB4, 0xAE));
+
+    /// <inheritdoc cref="WhiteUp"/>
     private static readonly IBrush WhiteDown = Face(Color.FromRgb(0xB4, 0xB4, 0xAE), Color.FromRgb(0xE8, 0xE8, 0xE4));
+
+    /// <inheritdoc cref="WhiteUp"/>
     private static readonly IBrush RaisedUp = Face(Color.FromRgb(0x2A, 0x2C, 0x30), Color.FromRgb(0x14, 0x15, 0x18));
+
+    /// <inheritdoc cref="WhiteUp"/>
     private static readonly IBrush RaisedDown = Face(Color.FromRgb(0x14, 0x15, 0x18), Color.FromRgb(0x2A, 0x2C, 0x30));
 
+    /// <summary>
+    /// The line round every key, near black and the same on both kinds.
+    /// </summary>
+    /// <remarks>
+    /// Not the theme's border colour. A keyboard is white and black plastic whatever colour the
+    /// rest of the application is wearing, and a pale line between the keys in a light theme
+    /// would lose the gaps that make it read as a keyboard at all.
+    /// </remarks>
     private static readonly IPen Edge = new Pen(new SolidColorBrush(Color.FromRgb(0x0C, 0x0D, 0x0F)), 1);
 
-    /// <summary>Which octave the leftmost key is the C of, and which lamp is lit.</summary>
+    /// <summary>
+    /// Backs <see cref="Octave"/>: which octave the leftmost key is the C of, and which lamp is
+    /// lit.
+    /// </summary>
+    /// <remarks>
+    /// Two way, because the keyboard moves it itself: the arrows and the lamps are both ways of
+    /// setting it, so a panel that bound it one way would watch its own keyboard walk away from
+    /// whatever it thought it was showing.
+    /// </remarks>
     public static readonly StyledProperty<int> OctaveProperty =
         AvaloniaProperty.Register<Clavier, int>(
             nameof(Octave), 4, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
-    /// <summary>How many octaves the lamps count, which is how far the keyboard can travel.</summary>
+    /// <summary>
+    /// Backs <see cref="OctaveCount"/>: how many octaves the lamps count, which is how far the
+    /// keyboard can travel.
+    /// </summary>
     public static readonly StyledProperty<int> OctaveCountProperty =
         AvaloniaProperty.Register<Clavier, int>(nameof(OctaveCount), 10);
 
-    /// <summary>How many keys there are, counted in semitones. Thirty-seven is three octaves.</summary>
+    /// <summary>
+    /// Backs <see cref="KeyCount"/>: how many keys there are, counted in semitones.
+    /// Thirty-seven is three octaves, which is what a panel has room for.
+    /// </summary>
     public static readonly StyledProperty<int> KeyCountProperty =
         AvaloniaProperty.Register<Clavier, int>(nameof(KeyCount), 37);
 
@@ -100,12 +147,12 @@ public class Clavier : ThemedControl
     public static readonly StyledProperty<int> MarkedProperty =
         AvaloniaProperty.Register<Clavier, int>(nameof(Marked), -1);
 
-    /// <summary>Run with the pressed key's absolute semitone as its argument.</summary>
+    /// <summary>Backs <see cref="Command"/>, run with the pressed key's absolute semitone.</summary>
     public static readonly StyledProperty<ICommand?> CommandProperty =
         AvaloniaProperty.Register<Clavier, ICommand?>(nameof(Command));
 
     /// <summary>
-    /// Run with that same semitone when the key is let go.
+    /// Backs <see cref="ReleaseCommand"/>, run with that same semitone when the key is let go.
     /// </summary>
     /// <remarks>
     /// A key is down while a hand is on it and up when the hand comes off, which is not the same
@@ -115,34 +162,48 @@ public class Clavier : ThemedControl
     public static readonly StyledProperty<ICommand?> ReleaseCommandProperty =
         AvaloniaProperty.Register<Clavier, ICommand?>(nameof(ReleaseCommand));
 
+    /// <summary>Backs <see cref="KeyHeight"/>: how far a white key runs down the panel.</summary>
     public static readonly StyledProperty<double> KeyHeightProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(KeyHeight), 52.0);
 
+    /// <summary>Backs <see cref="KeyWidth"/>: how wide one white key is, which sets the whole width.</summary>
     public static readonly StyledProperty<double> KeyWidthProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(KeyWidth), 18.0);
 
-    /// <summary>What colour a key burns when it is sounding.</summary>
+    /// <summary>Backs <see cref="LitColour"/>: what a key burns when it is sounding.</summary>
     public static readonly StyledProperty<Color> LitColourProperty =
         AvaloniaProperty.Register<Clavier, Color>(nameof(LitColour), Color.FromRgb(0xE5, 0xB3, 0x39));
 
-    /// <summary>What colour the octave lamps burn.</summary>
+    /// <summary>Backs <see cref="LampColour"/>: what the octave lamps burn, and what a filled key is banded with.</summary>
     public static readonly StyledProperty<Color> LampColourProperty =
         AvaloniaProperty.Register<Clavier, Color>(nameof(LampColour), Color.FromRgb(0xE5, 0xB3, 0x39));
 
+    /// <summary>Backs <see cref="LampSize"/>: how big one octave lamp is across.</summary>
     public static readonly StyledProperty<double> LampSizeProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(LampSize), 9.0);
 
+    /// <summary>Backs <see cref="LampGap"/>: the space between one lamp and the next.</summary>
     public static readonly StyledProperty<double> LampGapProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(LampGap), 9.0);
 
-    /// <summary>Written over the lamps, the way a panel names a section.</summary>
+    /// <summary>
+    /// Backs <see cref="Caption"/>, written over the lamps the way a panel names a section.
+    /// </summary>
+    /// <remarks>
+    /// OCTAVE unless a machine says otherwise, which is what the row is on every keyboard that
+    /// has one.
+    /// </remarks>
     public static readonly StyledProperty<string?> CaptionProperty =
         AvaloniaProperty.Register<Clavier, string?>(nameof(Caption), "OCTAVE");
 
-    /// <summary>True to write the octave's number on each C, the way a keyboard is marked.</summary>
+    /// <summary>
+    /// Backs <see cref="MarksOctaves"/>: whether the octave's number is written on each C, the
+    /// way a keyboard is marked.
+    /// </summary>
     public static readonly StyledProperty<bool> MarksOctavesProperty =
         AvaloniaProperty.Register<Clavier, bool>(nameof(MarksOctaves), true);
 
+    /// <summary>Backs <see cref="FontSize"/>, the size of the caption and every number here.</summary>
     public static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<Clavier, double>(nameof(FontSize), 8.5);
 
@@ -161,16 +222,39 @@ public class Clavier : ThemedControl
     /// </remarks>
     private (double Left, double Width, bool Raised, int Note)[]? _laid;
 
+    /// <summary>What <see cref="_laid"/> was worked out for, so it is known when it has gone stale.</summary>
     private (int First, int Count, double Width) _laidFor;
 
     /// <summary>The lit faces and the halo, remade only when the colour itself changes.</summary>
     private IBrush? _litWhite;
+
+    /// <inheritdoc cref="_litWhite"/>
     private IBrush? _litRaised;
+
+    /// <inheritdoc cref="_litWhite"/>
     private IBrush? _halo;
+
+    /// <summary>Which colour those three were made from.</summary>
     private Color _litFor;
 
+    /// <summary>
+    /// The sounding collection this is currently following, where it announces itself.
+    /// </summary>
+    /// <remarks>
+    /// Kept because the subscription has to come off the collection it went on, and by the time
+    /// a different one is handed over the property already holds the new one.
+    /// </remarks>
     private INotifyCollectionChanged? _watching;
 
+    /// <summary>
+    /// Says which properties change the picture and which change the size, and makes the
+    /// keyboard focusable.
+    /// </summary>
+    /// <remarks>
+    /// Focusable so the arrow keys can walk the octave, which is the one thing here a hand wants
+    /// without reaching for the mouse. <see cref="LitProperty"/> and <see cref="MarkedProperty"/>
+    /// change nothing about the room the keyboard takes and so are in the render list alone.
+    /// </remarks>
     static Clavier()
     {
         AffectsRender<Clavier>(
@@ -188,112 +272,135 @@ public class Clavier : ThemedControl
         FocusableProperty.OverrideDefaultValue<Clavier>(true);
     }
 
+    /// <inheritdoc cref="OctaveProperty"/>
     public int Octave
     {
         get => GetValue(OctaveProperty);
         set => SetValue(OctaveProperty, value);
     }
 
+    /// <summary>How many octaves the lamps count, which is how far the keys can travel.</summary>
     public int OctaveCount
     {
         get => GetValue(OctaveCountProperty);
         set => SetValue(OctaveCountProperty, value);
     }
 
+    /// <summary>How many keys there are, counted in semitones rather than in white keys.</summary>
     public int KeyCount
     {
         get => GetValue(KeyCountProperty);
         set => SetValue(KeyCountProperty, value);
     }
 
+    /// <inheritdoc cref="LitProperty"/>
     public IEnumerable? Lit
     {
         get => GetValue(LitProperty);
         set => SetValue(LitProperty, value);
     }
 
+    /// <inheritdoc cref="FilledProperty"/>
     public IEnumerable? Filled
     {
         get => GetValue(FilledProperty);
         set => SetValue(FilledProperty, value);
     }
 
+    /// <inheritdoc cref="MarkedProperty"/>
     public int Marked
     {
         get => GetValue(MarkedProperty);
         set => SetValue(MarkedProperty, value);
     }
 
+    /// <inheritdoc cref="ReleaseCommandProperty"/>
     public ICommand? ReleaseCommand
     {
         get => GetValue(ReleaseCommandProperty);
         set => SetValue(ReleaseCommandProperty, value);
     }
 
+    /// <summary>Run with the pressed key's absolute semitone, which is what sounds it.</summary>
     public ICommand? Command
     {
         get => GetValue(CommandProperty);
         set => SetValue(CommandProperty, value);
     }
 
+    /// <summary>How far a white key runs down the panel.</summary>
     public double KeyHeight
     {
         get => GetValue(KeyHeightProperty);
         set => SetValue(KeyHeightProperty, value);
     }
 
+    /// <summary>How wide one white key is, which is what sets the keyboard's whole width.</summary>
     public double KeyWidth
     {
         get => GetValue(KeyWidthProperty);
         set => SetValue(KeyWidthProperty, value);
     }
 
+    /// <summary>What a key burns when it is sounding, and what the key in hand is ringed with.</summary>
     public Color LitColour
     {
         get => GetValue(LitColourProperty);
         set => SetValue(LitColourProperty, value);
     }
 
+    /// <summary>What the octave lamps burn, and what a key with something on it is banded with.</summary>
     public Color LampColour
     {
         get => GetValue(LampColourProperty);
         set => SetValue(LampColourProperty, value);
     }
 
+    /// <summary>How big one octave lamp is across.</summary>
     public double LampSize
     {
         get => GetValue(LampSizeProperty);
         set => SetValue(LampSizeProperty, value);
     }
 
+    /// <summary>The space between one lamp and the next.</summary>
     public double LampGap
     {
         get => GetValue(LampGapProperty);
         set => SetValue(LampGapProperty, value);
     }
 
+    /// <inheritdoc cref="CaptionProperty"/>
     public string? Caption
     {
         get => GetValue(CaptionProperty);
         set => SetValue(CaptionProperty, value);
     }
 
+    /// <summary>Whether the octave's number is written on each C.</summary>
     public bool MarksOctaves
     {
         get => GetValue(MarksOctavesProperty);
         set => SetValue(MarksOctavesProperty, value);
     }
 
+    /// <summary>How big the caption and every number here are.</summary>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
     }
 
-    /// <summary>The note the leftmost key sounds.</summary>
+    /// <summary>The note the leftmost key sounds, which is the C of whichever octave is showing.</summary>
     private int FirstNote => Octave * 12;
 
-    /// <summary>How many white keys the keyboard has, which is how wide it is.</summary>
+    /// <summary>
+    /// How many white keys the keyboard has, which is how wide it is.
+    /// </summary>
+    /// <remarks>
+    /// Counted rather than divided, because the answer depends on which note the keyboard starts
+    /// on: thirty-seven keys from C is twenty-two whites and from F sharp is twenty-one.
+    /// </remarks>
     private int Whites
     {
         get
@@ -307,10 +414,19 @@ public class Clavier : ThemedControl
         }
     }
 
+    /// <summary>How wide the keys are altogether, which is the whole control's width.</summary>
     private double KeysWidth => Whites * KeyWidth;
 
+    /// <summary>
+    /// How big the two octave arrows are, sized off a lamp rather than fixed.
+    /// </summary>
+    /// <remarks>
+    /// A machine that draws its lamps larger draws its arrows larger with them, or the head goes
+    /// out of proportion the moment anybody changes one number.
+    /// </remarks>
     private double ArrowWidth => LampSize * 2.4;
 
+    /// <inheritdoc cref="ArrowWidth"/>
     private double ArrowHeight => LampSize * 2.0;
 
     /// <summary>How tall the arrows, lamps and their numbers are together.</summary>
@@ -326,14 +442,27 @@ public class Clavier : ThemedControl
         }
     }
 
+    /// <summary>
+    /// How tall one line of writing is, measured off a digit.
+    /// </summary>
+    /// <remarks>
+    /// Off a digit rather than off the text actually being drawn, so every row in the head sits
+    /// at the same height whether or not it happens to have anything in it.
+    /// </remarks>
     private double LineHeight => Text("0", Brushes.Black).Height;
 
+    /// <summary>
+    /// Follows the sounding collection itself, not only the property holding it.
+    /// </summary>
+    /// <remarks>
+    /// Notes are added to the same collection rather than a new one being handed over each time,
+    /// so a keyboard watching the property alone would light on the first note it was given and
+    /// then never move again.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
-        // Follow the collection itself, not only the property holding it: notes are added to
-        // the same collection rather than a new one being handed over each time.
         if (change.Property != LitProperty) return;
 
         if (_watching != null) _watching.CollectionChanged -= OnLitChanged;
@@ -343,11 +472,20 @@ public class Clavier : ThemedControl
         if (_watching != null) _watching.CollectionChanged += OnLitChanged;
     }
 
+    /// <summary>A note started or stopped, so the keys have to be painted again.</summary>
     private void OnLitChanged(object? sender, NotifyCollectionChangedEventArgs e) => InvalidateVisual();
 
+    /// <summary>
+    /// The keys' width, and the head, the keys and the octave numbers stacked down the panel.
+    /// </summary>
+    /// <remarks>
+    /// The halo a sounding key spills is not measured. It reaches three pixels past the key on
+    /// every side and is painted over whatever is beside it, the same way a lamp's is.
+    /// </remarks>
     protected override Size MeasureOverride(Size availableSize) =>
         new(KeysWidth, HeadHeight + HeadGap + KeyHeight + (MarksOctaves ? NumberGap + LineHeight : 0));
 
+    /// <summary>The head, then the keys under it.</summary>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
@@ -387,6 +525,16 @@ public class Clavier : ThemedControl
         DrawArrow(context, RightArrow(), pointsRight: true, held: _arrow > 0);
     }
 
+    /// <summary>
+    /// One octave arrow, moulded so that a held one reads as pressed in.
+    /// </summary>
+    /// <remarks>
+    /// Held, the gradient is turned over and darkened at the top, which is the same trick the
+    /// keys use: a thing lit from below looks like a thing that has gone down.
+    ///
+    /// Its own grey rather than the theme's, since these are buttons on a machine's front panel
+    /// and are the same colour on every machine and in every theme.
+    /// </remarks>
     private void DrawArrow(DrawingContext context, Rect at, bool pointsRight, bool held)
     {
         var seat = Color.FromRgb(0xB0, 0xB3, 0xB8);
@@ -431,6 +579,13 @@ public class Clavier : ThemedControl
         context.DrawGeometry(moulding, new Pen(new SolidColorBrush(Lighten(seat, -0.45)), 1), shape);
     }
 
+    /// <summary>
+    /// The keys, and the octave number under each C.
+    /// </summary>
+    /// <remarks>
+    /// The white keys go down first, whole, and the raised ones over them. Drawn the other way
+    /// round a raised key would be sitting under its neighbours instead of on top of them.
+    /// </remarks>
     private void DrawKeys(DrawingContext context, ThemePalette palette)
     {
         double top = HeadHeight + HeadGap;
@@ -440,8 +595,6 @@ public class Clavier : ThemedControl
         var sounding = Sounding();
         var loaded = Occupied();
 
-        // The white keys first, whole, then the raised ones over them. Drawn the other way
-        // round a raised key would be sitting under its neighbours instead of on top.
         for (int i = 0; i < laid.Length; i++)
         {
             var (left, width, raised, note) = laid[i];
@@ -472,15 +625,27 @@ public class Clavier : ThemedControl
         }
     }
 
+    /// <summary>
+    /// One key, in whichever of its states it is in.
+    /// </summary>
+    /// <remarks>
+    /// A sounding key is the panel's own colour rather than a coloured rectangle: it is the same
+    /// key with a light behind it, and it spills onto the ones beside it the way a lamp does.
+    /// Pressed, it is lit from below instead, which is the whole of what makes a key look
+    /// struck.
+    ///
+    /// A key with something on it says so along its bottom edge, where nothing else is drawn and
+    /// where the eye reads a whole row of them at once, rather than by painting the key: a key
+    /// with a drum on it is still an ordinary key, neither sounding nor in hand.
+    ///
+    /// The one in hand is outlined, the same way the pad it belongs to is.
+    /// </remarks>
     private void Draw(
         DrawingContext context, Rect key, bool raised, bool lit, bool pressed,
         bool filled = false, bool marked = false)
     {
         double round = raised ? 2 : 3;
 
-        // A lit key is the panel's colour rather than a coloured rectangle: it is the same key,
-        // with a light behind it. Pressed, it is lit from below, which is the whole of what
-        // makes a key look struck.
         var face = lit
             ? Burning(raised)
             : raised
@@ -489,11 +654,8 @@ public class Clavier : ThemedControl
 
         context.DrawRectangle(face, Edge, key, round, round);
 
-        // A lit key spills onto the ones beside it, the same way a lamp does.
         if (lit) context.DrawRectangle(Halo(), null, key.Inflate(3), round, round);
 
-        // A key with something on it says so along its bottom edge, where nothing else is drawn
-        // and where the eye reads a whole row of them at once.
         if (filled)
         {
             double inset = raised ? 2 : 3;
@@ -506,7 +668,6 @@ public class Clavier : ThemedControl
                 1, 1);
         }
 
-        // And the one in hand is outlined, the same way the pad it belongs to is.
         if (marked) context.DrawRectangle(null, Outline(), key.Deflate(0.5), round, round);
     }
 
@@ -517,6 +678,7 @@ public class Clavier : ThemedControl
     /// </remarks>
     private IBrush Marking() => new SolidColorBrush(LampColour, 0.75);
 
+    /// <summary>What the key in hand is ringed with: the colour a sounding key burns.</summary>
     private IPen Outline() => new Pen(new SolidColorBrush(LitColour), 2);
 
     /// <summary>The sounding face, kept until the colour it is made from changes.</summary>
@@ -527,6 +689,7 @@ public class Clavier : ThemedControl
         return raised ? _litRaised! : _litWhite!;
     }
 
+    /// <summary>The wash a sounding key spills onto its neighbours.</summary>
     private IBrush Halo()
     {
         Refresh();
@@ -534,6 +697,13 @@ public class Clavier : ThemedControl
         return _halo!;
     }
 
+    /// <summary>
+    /// Makes the three lit brushes, and only when the colour they are made from has moved.
+    /// </summary>
+    /// <remarks>
+    /// A keyboard repaints every time a note starts or stops, and the colour almost never
+    /// changes, so building these per paint would be three gradients per frame for nothing.
+    /// </remarks>
     private void Refresh()
     {
         if (_litWhite != null && _litFor == LitColour) return;
@@ -582,18 +752,36 @@ public class Clavier : ThemedControl
         return laid;
     }
 
-    /// <summary>Which of the twelve a note is, never negative however far below zero it is.</summary>
+    /// <summary>
+    /// Which of the twelve a note is, never negative however far below zero it is.
+    /// </summary>
+    /// <remarks>
+    /// C# gives a negative remainder for a negative dividend, which would index the raised-key
+    /// table from the wrong end. Nothing here should reach a negative note, but the keyboard is
+    /// drawn from whatever octave it is handed.
+    /// </remarks>
     private static int Mod12(int note) => ((note % 12) + 12) % 12;
 
+    /// <summary>How far apart the lamps are, and how wide the row of them is altogether.</summary>
     private double LampPitch() => LampSize + LampGap;
 
+    /// <inheritdoc cref="LampPitch"/>
     private double LampsWidth() => LampPitch() * OctaveCount - LampGap;
 
+    /// <summary>Where the arrows and lamps begin, which is under the caption where there is one.</summary>
     private double HeadTop => string.IsNullOrEmpty(Caption) ? 0 : LineHeight + CaptionGap;
 
+    /// <summary>
+    /// Where the two octave arrows sit, one either side of the lamps.
+    /// </summary>
+    /// <remarks>
+    /// Worked out in one place rather than at the drawing and again at the press, or the arrow
+    /// somebody sees and the arrow they can hit would drift apart.
+    /// </remarks>
     private Rect LeftArrow() =>
         new(KeysWidth / 2 - LampsWidth() / 2 - ArrowGap - ArrowWidth, HeadTop, ArrowWidth, ArrowHeight);
 
+    /// <inheritdoc cref="LeftArrow"/>
     private Rect RightArrow() =>
         new(KeysWidth / 2 + LampsWidth() / 2 + ArrowGap, HeadTop, ArrowWidth, ArrowHeight);
 
@@ -623,6 +811,13 @@ public class Clavier : ThemedControl
         return sounding;
     }
 
+    /// <summary>
+    /// An arrow, a lamp, or a key, in that order.
+    /// </summary>
+    /// <remarks>
+    /// A lamp is a place to go rather than a report: pressing one takes the keys there, which is
+    /// quicker than pressing an arrow five times.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -650,8 +845,6 @@ public class Clavier : ThemedControl
             return;
         }
 
-        // A lamp is a place to go rather than a report: pressing one takes the keys there,
-        // which is quicker than pressing an arrow five times.
         int lamp = LampAt(point);
         if (lamp >= 0)
         {
@@ -669,7 +862,13 @@ public class Clavier : ThemedControl
         e.Handled = true;
     }
 
-    /// <summary>Dragging across the keys plays them, the way a finger down a keyboard does.</summary>
+    /// <summary>
+    /// Dragging across the keys plays them, the way a finger down a keyboard does.
+    /// </summary>
+    /// <remarks>
+    /// Sliding off one key onto the next lets the first go before the second is played, so the
+    /// two halves of a key press stay in order and nothing is left holding a note nobody is on.
+    /// </remarks>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -679,7 +878,6 @@ public class Clavier : ThemedControl
         int now = KeyAt(e.GetPosition(this));
         if (now < 0 || now == _pressed) return;
 
-        // Slid off one key onto the next: the first is up before the second is down.
         Let(_pressed);
 
         _pressed = now;
@@ -687,6 +885,7 @@ public class Clavier : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>Lets go of whatever was held: a key is released, an arrow simply comes back up.</summary>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -714,8 +913,16 @@ public class Clavier : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Moves the keyboard by an octave, stopping at the ends.
+    /// </summary>
+    /// <remarks>
+    /// Stopping rather than coming round, since an arrow held down that wrapped would carry the
+    /// hand past the octave it was looking for.
+    /// </remarks>
     private void Step(int by) => Octave = Math.Clamp(Octave + by, 0, Math.Max(0, OctaveCount - 1));
 
+    /// <summary>Sounds a key, if anybody is listening for it.</summary>
     private void Play(int key)
     {
         int note = FirstNote + key;
@@ -733,13 +940,18 @@ public class Clavier : ThemedControl
         if (ReleaseCommand?.CanExecute(note) == true) ReleaseCommand.Execute(note);
     }
 
+    /// <summary>
+    /// Which lamp is under a point, or -1 for none.
+    /// </summary>
+    /// <remarks>
+    /// The whole column under a lamp counts, its number included: nine pixels across is not a
+    /// target anybody can hit.
+    /// </remarks>
     private int LampAt(Point point)
     {
         double left = KeysWidth / 2 - LampsWidth() / 2;
         double top = HeadTop + Math.Max(0, (ArrowHeight - LampSize) / 2);
 
-        // The whole column under a lamp counts, its number included: a nine pixel target is
-        // not one anybody can hit.
         var row = new Rect(left, top, LampsWidth(), LampSize + NumberGap + LineHeight);
         if (!row.Contains(point)) return -1;
 
@@ -776,10 +988,18 @@ public class Clavier : ThemedControl
         return -1;
     }
 
+    /// <summary>The caption or a number, laid out for measuring or for drawing.</summary>
     private FormattedText Text(string? text, IBrush brush) =>
         new(text ?? "", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default), FontSize, brush);
 
+    /// <summary>
+    /// A key face: a gradient down from the top colour to the bottom one.
+    /// </summary>
+    /// <remarks>
+    /// Frozen, since the four unlit faces are shared by every keyboard in the application and a
+    /// brush that can still be written to cannot be.
+    /// </remarks>
     private static IBrush Face(Color top, Color bottom) =>
         new LinearGradientBrush
         {
@@ -792,6 +1012,13 @@ public class Clavier : ThemedControl
             }
         }.ToImmutable();
 
+    /// <summary>
+    /// A colour taken towards white or towards black, for the lit faces and the arrows' moulding.
+    /// </summary>
+    /// <remarks>
+    /// Its own copy rather than <see cref="ThemePalette.Shade"/>, because none of the colours it
+    /// is used on here comes from the theme.
+    /// </remarks>
     private static Color Lighten(Color colour, double amount)
     {
         double Mix(byte channel) => amount >= 0

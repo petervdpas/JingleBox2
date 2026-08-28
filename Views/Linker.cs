@@ -23,6 +23,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class Linker : ThemedControl
 {
+    /// <summary>Whether the two fields move together. Two way: the bracket is what sets it.</summary>
     public static readonly StyledProperty<bool> IsLinkedProperty =
         AvaloniaProperty.Register<Linker, bool>(nameof(IsLinked), defaultBindingMode: BindingMode.TwoWay);
 
@@ -32,30 +33,49 @@ public class Linker : ThemedControl
     /// <summary>The break in the middle the link sits in.</summary>
     private const double LinkHeight = 16;
 
+    /// <summary>How wide the link is, which with the arm decides the whole width asked for.</summary>
     private const double LinkWidth = 9;
 
+    /// <summary>Lit the same as focused, so a pointer and a Tab key say the same thing.</summary>
     private bool _hovered;
 
+    /// <summary>Focusable, since the bracket answers Enter as well as a click.</summary>
     static Linker()
     {
         AffectsRender<Linker>(IsLinkedProperty);
         FocusableProperty.OverrideDefaultValue<Linker>(true);
     }
 
+    /// <inheritdoc cref="IsLinkedProperty"/>
     public bool IsLinked
     {
         get => GetValue(IsLinkedProperty);
         set => SetValue(IsLinkedProperty, value);
     }
 
+    /// <summary>
+    /// As wide as the bracket needs and as tall as it is given, since the two fields it spans
+    /// are what decide the height.
+    /// </summary>
+    /// <remarks>
+    /// Offered an unbounded height, which is what a stack panel does, it asks for enough to draw
+    /// two arms and a link rather than nothing at all.
+    /// </remarks>
     protected override Size MeasureOverride(Size available)
     {
-        // As tall as it is given, since it is the two fields it spans that decide that.
         double height = double.IsInfinity(available.Height) ? 48 : available.Height;
 
         return new Size(ArmLength + LinkWidth + 2, height);
     }
 
+    /// <summary>
+    /// The bracket: an arm at the top reaching back over the first field, an arm at the foot
+    /// reaching over the second, and the spine between them broken for the link.
+    /// </summary>
+    /// <remarks>
+    /// The spine is put on a half pixel so a one and a half pixel line lands on the grid rather
+    /// than being smeared across two columns of it.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -77,8 +97,6 @@ public class Linker : ThemedControl
         double middle = height / 2;
         double gap = LinkHeight / 2;
 
-        // The bracket: an arm at the top reaching back over the first field, an arm at the
-        // foot reaching over the second, and the spine between them broken for the link.
         context.DrawLine(pen, new Point(spine - ArmLength, 0.5), new Point(spine, 0.5));
         context.DrawLine(pen, new Point(spine, 0.5), new Point(spine, middle - gap));
 
@@ -104,6 +122,7 @@ public class Linker : ThemedControl
         context.DrawRectangle(null, pen, new RoundedRect(foot, 0, 0, half, half));
     }
 
+    /// <summary>Lights the bracket, since the lit colour is worked out in <see cref="Render"/>.</summary>
     protected override void OnPointerEntered(PointerEventArgs e)
     {
         base.OnPointerEntered(e);
@@ -112,6 +131,7 @@ public class Linker : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>And puts it back down again.</summary>
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
@@ -120,6 +140,7 @@ public class Linker : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>A click opens or closes the link, and takes the focus so Enter works next.</summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);

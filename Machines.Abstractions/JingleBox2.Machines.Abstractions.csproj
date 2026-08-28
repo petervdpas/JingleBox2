@@ -12,6 +12,12 @@
     put a module under the GPL, which is what makes an instrument somebody can sell possible.
   -->
   <PropertyGroup>
+    <!-- The documentation is an artefact of the build, not a comment nobody reads. Every seam
+         in this application is an interface and the prose lives on it; this is what turns that
+         into a file, and what makes the compiler say which public thing is still undocumented.
+         CS1591 is left switched on deliberately: it is the list of what is left to write. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

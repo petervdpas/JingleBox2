@@ -49,6 +49,7 @@ public static class Dialog
     /// <summary>
     /// Shows a window modally over the app's own and gives back what it closed with.
     /// </summary>
+    /// <param name="dialog">The window to show, already built with whatever it is asking about.</param>
     /// <param name="whenNone">
     /// What to answer when there is no window to sit over. The one that changes nothing: false
     /// for a confirm, null for a name.

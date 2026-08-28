@@ -24,10 +24,24 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 public static class PluginHostProcess
 {
+    /// <summary>
+    /// Messages read off the socket and waiting for the one thread the plugin may be touched
+    /// from. The reader thread never calls into the plugin itself, only puts things here.
+    /// </summary>
     private static readonly ConcurrentQueue<(BridgeCall Call, byte[] Payload)> Incoming = new();
+
+    /// <summary>
+    /// What the plugin's own run loop has asked to have done: its timers, and whatever it is
+    /// waiting on a file descriptor for. Run on the same thread as everything else it can see.
+    /// </summary>
     private static readonly ConcurrentQueue<Action> Errands = new();
 
     /// <summary>Knobs the plugin turned in its own window, waiting to be sent home.</summary>
+    /// <remarks>
+    /// Queued rather than sent where it happens. For CLAP a knob is reported at the end of a
+    /// block, which is the audio thread, and an audio thread has no business waiting on a
+    /// socket. The pump sends them.
+    /// </remarks>
     private static readonly ConcurrentQueue<(uint Id, double Value)> Moves = new();
 
     /// <summary>Set when the plugin has loaded a whole new sound and the parent has not heard.</summary>
@@ -36,26 +50,74 @@ public static class PluginHostProcess
     /// <summary>The moment the plugin's window opened, so what it asked for can go with it.</summary>
     private static long _windowMark;
 
-    /// <summary>How long the plugin has been inside its own run loop, and how many rounds.</summary>
+    /// <summary>
+    /// How long the plugin has been inside its own run loop since the last census, in stopwatch
+    /// ticks. Read out as milliseconds and set back to nought when the census is written.
+    /// </summary>
     private static long _inLoop;
+
+    /// <summary>How many rounds of it there were, over the same stretch.</summary>
     private static long _rounds;
+
+    /// <summary>
+    /// How the pump is woken: a message arrived, the plugin asked for something, or it is time
+    /// to stop. The wait has a timeout as well, so a plugin whose toolkit expects to be called
+    /// regularly still is.
+    /// </summary>
     private static readonly AutoResetEvent Knock = new(false);
 
     /// <summary>How often the audio thread looks up when nothing is being played through it.</summary>
     private const int IdleMilliseconds = 40;
 
+    /// <summary>
+    /// How often a CLAP plugin with a window open is asked what its knobs are set to. The same
+    /// interval as the audio thread's idle, and for the same reason: it is often enough to
+    /// follow a hand on a knob and rare enough to cost nothing.
+    /// </summary>
+    private const int PollMilliseconds = 40;
+
+    /// <summary>How long a window on its way out is given to hand over its last knob positions.</summary>
+    /// <remarks>
+    /// A fifth of a second: longer than the audio thread's own round, which is what has to
+    /// happen for the handover to take place at all, and short enough that closing a window
+    /// still feels like closing a window.
+    /// </remarks>
+    private const int SettleMilliseconds = 200;
+
+    /// <summary>How often the run loop writes down what it has been doing, while logging is on.</summary>
+    private const int CensusMilliseconds = 2000;
+
+    /// <summary>The socket home. Null until the parent has been reached.</summary>
     private static BridgeLink? _control;
+
+    /// <summary>The shared memory the audio and the queued events cross in.</summary>
     private static BridgeBlock? _block;
+
+    /// <summary>
+    /// The plugin, which is the whole of what this process is for. Held as the narrow interface
+    /// and asked at each use whether it is also an effect, an instrument, or a window.
+    /// </summary>
     private static IPluginParameters? _plugin;
+
+    /// <summary>
+    /// The plugin's own interface, once anybody has asked for it. Built once per process and
+    /// never rebuilt: see <see cref="OpenEditor"/>.
+    /// </summary>
     private static IPluginEditor? _editor;
+
+    /// <summary>False once the parent has said stop, or has gone away without saying it.</summary>
     private static volatile bool _running = true;
+
+    /// <summary>Whether the parent asked for a log. A child cannot read the setting itself.</summary>
     private static bool _trace;
 
     /// <summary>How many blocks have gone through, so the log can say whether audio is running.</summary>
     private static long _blocks;
 
-    /// <summary>Blocks that came out with something in them, and the loudest sample among them.</summary>
+    /// <summary>Blocks that came out with something in them since the last census.</summary>
     private static long _sounded;
+
+    /// <summary>The loudest sample among them, which is what says whether it is really playing.</summary>
     private static float _loudest;
 
     /// <summary>True when these arguments mean this process is meant to be a plugin's process.</summary>
@@ -67,13 +129,16 @@ public static class PluginHostProcess
     /// Does whatever the arguments asked for and returns the exit code. Nothing here ever
     /// returns to the application: a process that is a plugin is only ever a plugin.
     /// </summary>
+    /// <remarks>
+    /// The log is the same one the application writes, in the same folder, with this process's
+    /// number on every line. A plugin falling over then leaves its account of it beside what
+    /// the application was doing at the time, which is the whole reason the folder is passed in
+    /// rather than worked out again.
+    /// </remarks>
     public static int Run(string[] args)
     {
         _trace = Environment.GetEnvironmentVariable(PluginBridge.TraceVariable) == "1";
 
-        // The same log the application writes, in the same folder, with this process's number
-        // on every line. A plugin falling over then leaves its account of it next to what the
-        // application was doing at the time.
         string folder = Environment.GetEnvironmentVariable(PluginBridge.LogFolderVariable) ?? "";
 
         Log.Open(folder.Length > 0 ? folder : Config.AppFolder.Path(), _trace, LogArea.Plugins);
@@ -123,6 +188,23 @@ public static class PluginHostProcess
     }
 
     /// <summary>Loads one plugin and serves it until the parent has had enough.</summary>
+    /// <remarks>
+    /// The arguments are positional and are written by <c>PluginProcess.Launch</c>: the socket,
+    /// the block, the format, the plugin's path and id, the sample rate, the block size, and
+    /// whether it is being used as an instrument. Too few of them means somebody has started
+    /// this by hand, and it exits rather than guessing.
+    ///
+    /// The order matters twice over. X errors are caught before anything can open a window,
+    /// because Xlib answers a bad request by printing to whatever terminal this process
+    /// happened to inherit, which is nowhere the log can see and nowhere at all for an
+    /// application started from a menu. And the run loop is taken over before the plugin is
+    /// loaded, not after: until somebody takes it, it pumps on a thread of its own, and a
+    /// plugin registering a timer during load would be called from that thread while this one
+    /// is still building it.
+    ///
+    /// Every exit code is a different way of not being a plugin, and they are distinct so the
+    /// parent's epitaph can say something true.
+    /// </remarks>
     private static int Serve(string[] args)
     {
         if (args.Length < 9) return 2;
@@ -137,9 +219,6 @@ public static class PluginHostProcess
         int maxFrames = int.TryParse(args[7], out int frames) ? frames : 512;
         bool asInstrument = args[8] == "instrument";
 
-        // Before anything opens a window. Xlib answers a bad request by printing to the
-        // terminal this process happened to inherit, which is nowhere the log can see and
-        // nowhere at all for an application started from a menu. See XErrors.
         XErrors.Catch(System.IO.Path.GetFileName(path));
 
         Socket control;
@@ -165,9 +244,6 @@ public static class PluginHostProcess
             return 4;
         }
 
-        // Before the plugin is loaded, not after. Until somebody takes the loop over it pumps
-        // on a thread of its own, and a plugin registering something during load would then be
-        // called from one thread while this one is still building it.
         Vst3RunLoopDriveHere();
 
         Say("loading " + path);
@@ -183,8 +259,6 @@ public static class PluginHostProcess
             return 5;
         }
 
-        // A knob the plugin turns itself. Queued rather than sent where it happens: for CLAP
-        // that is the audio thread, and an audio thread has no business waiting on a socket.
         _plugin.Edited += (id, value) =>
         {
             Moves.Enqueue((id, value));
@@ -221,11 +295,21 @@ public static class PluginHostProcess
     /// <summary>
     /// Says that timers and windows belong to this thread, whoever asks for them.
     /// </summary>
+    /// <remarks>
+    /// Both standards ask a host for the same thing in different words, and the answer here is
+    /// the same either way: whatever the plugin wants doing is queued as an errand and run on
+    /// the pump. Called before the plugin is loaded, since a plugin may register a timer while
+    /// it is still loading.
+    /// </remarks>
     private static void Vst3RunLoopDriveHere()
     {
         PluginRunLoop.DriveWith(round => { Errands.Enqueue(round); Knock.Set(); });
     }
 
+    /// <summary>
+    /// One connection home. Called twice, and the parent accepts them in order: the first is
+    /// the control socket and the second is the audio one.
+    /// </summary>
     private static Socket Connect(string path)
     {
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -238,6 +322,21 @@ public static class PluginHostProcess
     /// <summary>
     /// The one thread the plugin is allowed to see: its timers, its window, its parameters.
     /// </summary>
+    /// <remarks>
+    /// A plugin's toolkit expects all of that on one thread, and giving it anything else is a
+    /// crash in somebody else's code rather than a bug report. So everything arrives here as a
+    /// queue and is done in turn: the run loop's errands, the knobs to send home, and the
+    /// messages the reader thread took off the socket.
+    ///
+    /// A CLAP plugin with a window open is also asked now and then what its knobs are set to.
+    /// It hands one back at the end of a block and at no other time, so a plugin on a track
+    /// nobody is playing would otherwise keep whatever its own window did to itself. Only while
+    /// there is a window, since that is the only time a knob can be turned over there.
+    ///
+    /// The census is written while logging is on, and is where what the audio thread counted is
+    /// reported: the audio thread counts and says nothing, because a line of the log is a file
+    /// opened, written and closed under a lock.
+    /// </remarks>
     private static void Pump()
     {
         Say("pump running");
@@ -250,7 +349,7 @@ public static class PluginHostProcess
         {
             Knock.WaitOne(5);
 
-            if (Log.On(LogArea.Plugins) && Environment.TickCount64 - census > 2000)
+            if (Log.On(LogArea.Plugins) && Environment.TickCount64 - census > CensusMilliseconds)
             {
                 census = Environment.TickCount64;
                 long blocks = _blocks;
@@ -287,11 +386,7 @@ public static class PluginHostProcess
                 _rounds++;
             }
 
-            // A CLAP plugin with a window open is asked now and then what its knobs are set to.
-            // It hands a knob back at the end of a block and at no other time, so a plugin on a
-            // track nobody is playing would otherwise keep its own window a secret. Only while
-            // there is a window, because that is the only time a knob can be turned.
-            if (_editor != null && Environment.TickCount64 - asked > 40)
+            if (_editor != null && Environment.TickCount64 - asked > PollMilliseconds)
             {
                 asked = Environment.TickCount64;
 
@@ -324,6 +419,14 @@ public static class PluginHostProcess
         }
     }
 
+    /// <summary>
+    /// Reads the control socket and puts what arrives where the pump will find it.
+    /// </summary>
+    /// <remarks>
+    /// This thread never calls into the plugin. A message that cannot be read means the parent
+    /// is gone, and there is nobody left to be a plugin for, so the whole process is told to
+    /// stop rather than waiting to be asked.
+    /// </remarks>
     private static void Listen(BridgeLink control)
     {
         while (_running)
@@ -332,7 +435,6 @@ public static class PluginHostProcess
 
             if (message == null)
             {
-                // The parent is gone. There is nobody left to be a plugin for.
                 _running = false;
                 Knock.Set();
                 return;
@@ -343,6 +445,18 @@ public static class PluginHostProcess
         }
     }
 
+    /// <summary>
+    /// Does one message and answers it.
+    /// </summary>
+    /// <remarks>
+    /// Everything the parent asks gets an answer, because the parent is waiting on one and has
+    /// no way of telling a question it will never hear about from a plugin that has stopped
+    /// answering. Anything the plugin cannot do, being asked to flush when it is an instrument
+    /// for instance, is quietly nothing and is still answered.
+    ///
+    /// Called from the pump and nowhere else, so every one of these reaches the plugin on the
+    /// thread it expects.
+    /// </remarks>
     private static void Handle(BridgeCall call, byte[] payload)
     {
         var control = _control;
@@ -438,6 +552,10 @@ public static class PluginHostProcess
     ///
     /// So a window closing takes the interface out of it and leaves it standing. See
     /// <see cref="CloseEditor"/>.
+    ///
+    /// The run loop is marked when the interface is first built, because everything the plugin
+    /// asks the host for from that moment on belongs to the interface and goes when the
+    /// interface finally does. See <see cref="DropEditor"/> and PluginRunLoop.DropSince.
     /// </remarks>
     private static void OpenEditor(BridgeLink control, IPluginParameters plugin)
     {
@@ -455,8 +573,6 @@ public static class PluginHostProcess
 
             _editor = editor;
 
-            // Everything the plugin asks for from here belongs to the interface, and goes when
-            // the interface finally does. See PluginRunLoop.DropSince.
             _windowMark = PluginRunLoop.Mark();
 
             editor.ResizeRequested += (width, height) =>
@@ -466,6 +582,17 @@ public static class PluginHostProcess
         control.Send(BridgeCall.Ok, BridgeBody.Three(editor.Size.Width, editor.Size.Height, editor.CanResize ? 1 : 0));
     }
 
+    /// <summary>
+    /// Puts the plugin's interface inside a window the parent owns.
+    /// </summary>
+    /// <remarks>
+    /// The window belongs to another program, which X11 allows, and the plugin draws straight
+    /// into it. Once it has, whatever the plugin put in there is told it is embedded: some
+    /// toolkits wait for that handshake before they will draw anything at all. See XEmbed.
+    ///
+    /// The size goes back with the answer, since a plugin often has its own opinion once it has
+    /// really drawn.
+    /// </remarks>
     private static void Attach(BridgeLink control, nint window)
     {
         var editor = _editor;
@@ -484,8 +611,6 @@ public static class PluginHostProcess
             return;
         }
 
-        // Whatever the plugin put inside the window is told it is embedded, which some toolkits
-        // wait for before they will draw anything. See XEmbed.
         Say("embedding: " + XEmbed.Complete(window));
 
         control.Send(BridgeCall.Ok, BridgeBody.Pair(editor.Size.Width, editor.Size.Height));
@@ -506,8 +631,6 @@ public static class PluginHostProcess
 
         if (editor == null) return;
 
-        // The last moment anybody can ask. Whatever was turned in that window is still worth
-        // knowing about, and after this nobody is looking at it.
         Settle();
 
         try { editor.Detach(); } catch (Exception error) { Say("taking the window back: " + error.Message); }
@@ -538,9 +661,12 @@ public static class PluginHostProcess
     /// Takes a last reading of the plugin's own knobs, for a window on its way out.
     /// </summary>
     /// <remarks>
+    /// The last moment anybody can ask. Whatever was turned in that window is still worth
+    /// knowing about, and after this nobody is looking at it.
+    ///
     /// The handing over belongs to the audio thread, so this asks for it and waits a moment
-    /// rather than doing it here. A fifth of a second is longer than the audio thread's own
-    /// round and short enough that closing a window still feels like closing a window.
+    /// rather than doing it here. See <see cref="SettleMilliseconds"/> for how long. Only a
+    /// CLAP plugin needs any of this: VST3 reports a knob the moment it moves.
     /// </remarks>
     private static void Settle()
     {
@@ -548,7 +674,7 @@ public static class PluginHostProcess
 
         clap.WantsFlush();
 
-        long end = Environment.TickCount64 + 200;
+        long end = Environment.TickCount64 + SettleMilliseconds;
 
         while (clap.IsWaitingToSpeak && Environment.TickCount64 < end) Thread.Sleep(5);
 
@@ -564,7 +690,27 @@ public static class PluginHostProcess
     /// Nothing here allocates once it is going. The buffer is made at the size the parent asked
     /// for and reused for every block after that, because a garbage collection in the middle of
     /// an audio block is a click.
+    ///
+    /// A plugin nobody is playing still needs a moment of this thread now and then. CLAP says a
+    /// switched-on plugin's flush belongs to the audio thread, and the flush is the only way
+    /// what the plugin's own window did reaches the rest of it. So the wait gives up every
+    /// <see cref="IdleMilliseconds"/>, does that, and goes back to waiting. Only between
+    /// messages: half a message is still a message, and giving up in the middle of one would
+    /// lose the other half.
+    ///
+    /// What came out is counted here and said by the pump's census rather than written down as
+    /// it happens. A line of the log is a file opened, written and closed under a lock, and
+    /// saying one per block meant taking eighty times a second the same lock the thread driving
+    /// the plugin's own window needs. The whole block is measured rather than the first hundred
+    /// samples: a block that starts quiet and ends loud is a note beginning, which is exactly
+    /// the one worth seeing.
     /// </remarks>
+    /// <param name="audio">The socket the parent asks for blocks on.</param>
+    /// <param name="asInstrument">
+    /// Whether to ask the plugin to play something or to hand it the audio in the block. A
+    /// plugin that can do both is used as whichever the parent said.
+    /// </param>
+    /// <param name="maxFrames">The most frames one crossing carries, which sizes the buffer.</param>
     private static unsafe void Mix(Socket audio, bool asInstrument, int maxFrames)
     {
         var block = _block;
@@ -583,10 +729,6 @@ public static class PluginHostProcess
         var instrument = plugin as IPluginInstrument;
         var clap = plugin as ClapEffect;
 
-        // A plugin nobody is playing still needs a moment of this thread now and then. CLAP
-        // says a switched-on plugin's flush belongs to the audio thread, and the flush is the
-        // only way what its own window did reaches the rest of it. So the wait gives up every
-        // so often, does that, and goes back to waiting.
         audio.ReceiveTimeout = IdleMilliseconds;
 
         while (_running)
@@ -603,7 +745,6 @@ public static class PluginHostProcess
                 }
                 catch (SocketException error) when (error.SocketErrorCode == SocketError.TimedOut)
                 {
-                    // Nothing to play. Only between messages: half a message is still a message.
                     if (read == 0)
                     {
                         try { clap?.Idle(); } catch (Exception) { }
@@ -646,13 +787,6 @@ public static class PluginHostProcess
                 effect?.Process(buffer, frames);
             }
 
-            // Counted rather than said. A line of the log is a file opened, written and closed
-            // under a lock, and this is the audio thread; saying it once a block was the same
-            // lock the thread driving the plugin's own window needs, taken eighty times a
-            // second. What came out is reported with the run loop's census below instead.
-            //
-            // The whole block rather than the first hundred samples: a block that starts
-            // quiet and ends loud is a note beginning, which is exactly the one worth seeing.
             if (Log.On(LogArea.Plugins))
             {
                 float peak = 0;
@@ -686,6 +820,11 @@ public static class PluginHostProcess
     }
 
     /// <summary>Hands the plugin everything the parent queued since the last block.</summary>
+    /// <remarks>
+    /// Done immediately before the block, so a parameter moved and a note pressed both land
+    /// where they were meant to rather than a block late. A note for a plugin that is not an
+    /// instrument is dropped, since there is nothing to play it.
+    /// </remarks>
     private static void Deliver(BridgeBlock block, IPluginInstrument? instrument, IPluginParameters plugin)
     {
         var events = block.Take();

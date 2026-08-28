@@ -33,14 +33,21 @@ public class Transport : ThemedControl
         Stop
     }
 
+    /// <summary>
+    /// Left to right, and the same order everywhere: it is where the caps are drawn, how wide
+    /// the control asks to be, and which one a click landed on.
+    /// </summary>
     private static readonly Key[] Order = { Key.Record, Key.Play, Key.Pause, Key.Stop };
 
+    /// <summary>Whether the record cap is armed, which fills its circle rather than outlining it.</summary>
     public static readonly StyledProperty<bool> IsRecordingProperty =
         AvaloniaProperty.Register<Transport, bool>(nameof(IsRecording));
 
+    /// <summary>Whether the transport is running, which puts the play symbol in the accent.</summary>
     public static readonly StyledProperty<bool> IsPlayingProperty =
         AvaloniaProperty.Register<Transport, bool>(nameof(IsPlaying));
 
+    /// <summary>And whether it is held, which does the same to the pause symbol.</summary>
     public static readonly StyledProperty<bool> IsPausedProperty =
         AvaloniaProperty.Register<Transport, bool>(nameof(IsPaused));
 
@@ -64,24 +71,31 @@ public class Transport : ThemedControl
     public static readonly StyledProperty<bool> CanPlayProperty =
         AvaloniaProperty.Register<Transport, bool>(nameof(CanPlay), true);
 
+    /// <summary>What the record cap does, and nothing at all when it is not given one.</summary>
     public static readonly StyledProperty<ICommand?> RecordCommandProperty =
         AvaloniaProperty.Register<Transport, ICommand?>(nameof(RecordCommand));
 
+    /// <inheritdoc cref="RecordCommandProperty"/>
     public static readonly StyledProperty<ICommand?> PlayCommandProperty =
         AvaloniaProperty.Register<Transport, ICommand?>(nameof(PlayCommand));
 
+    /// <inheritdoc cref="RecordCommandProperty"/>
     public static readonly StyledProperty<ICommand?> PauseCommandProperty =
         AvaloniaProperty.Register<Transport, ICommand?>(nameof(PauseCommand));
 
+    /// <inheritdoc cref="RecordCommandProperty"/>
     public static readonly StyledProperty<ICommand?> StopCommandProperty =
         AvaloniaProperty.Register<Transport, ICommand?>(nameof(StopCommand));
 
+    /// <summary>How wide one cap is. The bar is four of these and three gaps, always.</summary>
     public static readonly StyledProperty<double> CapWidthProperty =
         AvaloniaProperty.Register<Transport, double>(nameof(CapWidth), 46);
 
+    /// <summary>And how tall, which is the whole height the control asks for.</summary>
     public static readonly StyledProperty<double> CapHeightProperty =
         AvaloniaProperty.Register<Transport, double>(nameof(CapHeight), 34);
 
+    /// <summary>Between the caps, so four of them read as four and not as one long strip.</summary>
     public static readonly StyledProperty<double> GapProperty =
         AvaloniaProperty.Register<Transport, double>(nameof(Gap), 6);
 
@@ -103,14 +117,19 @@ public class Transport : ThemedControl
     /// <summary>The red a record button is, everywhere.</summary>
     private static readonly Color Armed = Color.FromRgb(0xE5, 0x39, 0x35);
 
+    /// <summary>The rounding on a cap, the same as the machine panels' caps have.</summary>
     private const double Corner = 3;
 
     /// <summary>How much of the cap the symbol on it takes up.</summary>
     private const double SymbolShare = 0.30;
 
+    /// <summary>Which cap is being held down, so it can be drawn sitting in its own shadow.</summary>
     private Key _down = Key.None;
+
+    /// <summary>And which the pointer is resting on, which lifts its seat a little.</summary>
     private Key _over = Key.None;
 
+    /// <summary>The three sizes change the room asked for; everything else only changes the paint.</summary>
     static Transport()
     {
         AffectsRender<Transport>(
@@ -121,36 +140,42 @@ public class Transport : ThemedControl
         AffectsMeasure<Transport>(CapWidthProperty, CapHeightProperty, GapProperty);
     }
 
+    /// <inheritdoc cref="IsRecordingProperty"/>
     public bool IsRecording
     {
         get => GetValue(IsRecordingProperty);
         set => SetValue(IsRecordingProperty, value);
     }
 
+    /// <inheritdoc cref="IsPlayingProperty"/>
     public bool IsPlaying
     {
         get => GetValue(IsPlayingProperty);
         set => SetValue(IsPlayingProperty, value);
     }
 
+    /// <inheritdoc cref="IsPausedProperty"/>
     public bool IsPaused
     {
         get => GetValue(IsPausedProperty);
         set => SetValue(IsPausedProperty, value);
     }
 
+    /// <inheritdoc cref="CanPauseProperty"/>
     public bool CanPause
     {
         get => GetValue(CanPauseProperty);
         set => SetValue(CanPauseProperty, value);
     }
 
+    /// <inheritdoc cref="CanRecordProperty"/>
     public bool CanRecord
     {
         get => GetValue(CanRecordProperty);
         set => SetValue(CanRecordProperty, value);
     }
 
+    /// <inheritdoc cref="CanPlayProperty"/>
     public bool CanPlay
     {
         get => GetValue(CanPlayProperty);
@@ -167,57 +192,70 @@ public class Transport : ThemedControl
         _ => false
     };
 
+    /// <inheritdoc cref="QuietProperty"/>
     public bool Quiet
     {
         get => GetValue(QuietProperty);
         set => SetValue(QuietProperty, value);
     }
 
+    /// <inheritdoc cref="RecordCommandProperty"/>
     public ICommand? RecordCommand
     {
         get => GetValue(RecordCommandProperty);
         set => SetValue(RecordCommandProperty, value);
     }
 
+    /// <inheritdoc cref="PlayCommandProperty"/>
     public ICommand? PlayCommand
     {
         get => GetValue(PlayCommandProperty);
         set => SetValue(PlayCommandProperty, value);
     }
 
+    /// <inheritdoc cref="PauseCommandProperty"/>
     public ICommand? PauseCommand
     {
         get => GetValue(PauseCommandProperty);
         set => SetValue(PauseCommandProperty, value);
     }
 
+    /// <inheritdoc cref="StopCommandProperty"/>
     public ICommand? StopCommand
     {
         get => GetValue(StopCommandProperty);
         set => SetValue(StopCommandProperty, value);
     }
 
+    /// <inheritdoc cref="CapWidthProperty"/>
     public double CapWidth
     {
         get => GetValue(CapWidthProperty);
         set => SetValue(CapWidthProperty, value);
     }
 
+    /// <inheritdoc cref="CapHeightProperty"/>
     public double CapHeight
     {
         get => GetValue(CapHeightProperty);
         set => SetValue(CapHeightProperty, value);
     }
 
+    /// <inheritdoc cref="GapProperty"/>
     public double Gap
     {
         get => GetValue(GapProperty);
         set => SetValue(GapProperty, value);
     }
 
+    /// <summary>
+    /// Four caps and three gaps wide, and one cap tall, whatever room it is offered: the bar is
+    /// a fixed thing standing on a line, not something that stretches to fill one.
+    /// </summary>
     protected override Size MeasureOverride(Size availableSize) =>
         new(Order.Length * CapWidth + (Order.Length - 1) * Gap, CapHeight);
 
+    /// <summary>The four caps, in the order they are always in.</summary>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
@@ -225,6 +263,18 @@ public class Transport : ThemedControl
         foreach (var key in Order) DrawCap(context, palette, key);
     }
 
+    /// <summary>
+    /// One cap: the seat, the moulding over it, and the symbol cut into the middle.
+    /// </summary>
+    /// <remarks>
+    /// The seat is the panel's own surface on a panel, and on the bare page a shade above the
+    /// page, which is enough to be a cap and not enough to be a block of light. Hovering lifts it
+    /// a little, so a cap says it can be pressed before it is.
+    ///
+    /// Lit from above when it is up and from below when it is down: a pressed cap sits in its own
+    /// shadow, which is the whole of what makes a button look pressed, and it is the same
+    /// moulding the machine panels' caps are drawn with.
+    /// </remarks>
     private void DrawCap(DrawingContext context, ThemePalette palette, Key key)
     {
         var cap = Seat(key);
@@ -234,16 +284,10 @@ public class Transport : ThemedControl
         bool down = _down == key;
         bool dead = Dead(key);
 
-        // On a panel, the panel's own surface. On the bare page, a shade above the page, which
-        // is enough to be a cap and not enough to be a block of light.
         var seat = Quiet ? ThemePalette.Shade(palette.Background, 0.05) : palette.Surface;
 
-        // Hovering lifts the seat a little, so a cap says it can be pressed before it is.
         if (_over == key && !down && !dead) seat = ThemePalette.Shade(seat, 0.10);
 
-        // Lit from above when it is up, from below when it is down: a pressed cap sits in its
-        // own shadow, which is the whole of what makes a button look pressed. The same moulding
-        // the machine panels' caps are drawn with.
         var moulding = new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
@@ -274,11 +318,13 @@ public class Transport : ThemedControl
     /// What colour the symbol goes: red for record whatever it is doing, the accent for a
     /// transport that is running, and the ordinary text colour otherwise.
     /// </summary>
+    /// <remarks>
+    /// The resting colour is the muted one on the bare page. There the symbols keep company with
+    /// the tab names beside them, which are muted until you are on one, and white marks read as
+    /// four things shouting on a line that is otherwise quiet.
+    /// </remarks>
     private Color Ink(ThemePalette palette, Key key)
     {
-        // On the bare page the symbols keep company with the tab names beside them, which are
-        // muted until you are on one. White marks there read as four things shouting on a line
-        // that is otherwise quiet.
         var idle = Quiet ? palette.Muted : palette.Text;
 
         return key switch
@@ -290,6 +336,13 @@ public class Transport : ThemedControl
         };
     }
 
+    /// <summary>
+    /// The mark on the cap, moved half a pixel down while it is pressed so it goes with the seat.
+    /// </summary>
+    /// <remarks>
+    /// Record is filled while armed and an outline while not: a record button that looks the same
+    /// armed and idle is one you have to read the colour of to know.
+    /// </remarks>
     private void DrawSymbol(DrawingContext context, Key key, Rect cap, IBrush ink, bool down)
     {
         double size = Math.Min(cap.Width, cap.Height) * SymbolShare;
@@ -298,8 +351,6 @@ public class Transport : ThemedControl
         switch (key)
         {
             case Key.Record:
-                // Filled while armed, an outline while not: a record button that looks the same
-                // armed and idle is one you have to read the colour of to know.
                 if (IsRecording) context.DrawEllipse(ink, null, middle, size, size);
                 else context.DrawEllipse(null, new Pen(ink, 2), middle, size - 1, size - 1);
                 break;
@@ -357,6 +408,10 @@ public class Transport : ThemedControl
         return Key.None;
     }
 
+    /// <summary>
+    /// Takes a cap down, and takes the pointer with it so the hand can wander off the control
+    /// and come back without losing the press.
+    /// </summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -373,6 +428,13 @@ public class Transport : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Lets the cap up, and does the thing only if the hand let go on the cap it pressed.
+    /// </summary>
+    /// <remarks>
+    /// Released somewhere else means the press was thought better of, which is what every button
+    /// everywhere does.
+    /// </remarks>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -386,13 +448,12 @@ public class Transport : ThemedControl
         e.Pointer.Capture(null);
         InvalidateVisual();
 
-        // Released somewhere else means the press was thought better of, which is what every
-        // button everywhere does.
         if (At(e.GetPosition(this)) == key) Fire(key);
 
         e.Handled = true;
     }
 
+    /// <summary>Moves the lift from one cap to the next, and redraws only when it really moved.</summary>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -406,6 +467,7 @@ public class Transport : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>Puts every cap back down when the pointer leaves the bar.</summary>
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
@@ -417,6 +479,9 @@ public class Transport : ThemedControl
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Runs whichever command that cap holds, and nothing when it holds none or refuses.
+    /// </summary>
     private void Fire(Key key)
     {
         var command = key switch

@@ -42,6 +42,13 @@ public class LocationView : StackPanel
     public static readonly StyledProperty<bool> HasPagesProperty =
         AvaloniaProperty.Register<LocationView, bool>(nameof(HasPages), true);
 
+    /// <summary>
+    /// Backs <see cref="Colour"/>, what the lamps are lit in.
+    /// </summary>
+    /// <remarks>
+    /// Amber unless a machine says otherwise, which is what a counting lamp on hardware is, and
+    /// fixed rather than taken from the theme for the same reason a meter's red is fixed.
+    /// </remarks>
     public static readonly StyledProperty<Color> ColourProperty =
         AvaloniaProperty.Register<LocationView, Color>(nameof(Colour), Color.FromRgb(0xE5, 0xB3, 0x39));
 
@@ -60,12 +67,25 @@ public class LocationView : StackPanel
     /// <summary>How much of it is left when there is no track behind it.</summary>
     private const double DimmedTo = 0.45;
 
+    /// <summary>How tall one page button is, and how big the writing on it is.</summary>
     private const double CapHeight = 18;
+
+    /// <inheritdoc cref="CapHeight"/>
     private const double CapFontSize = 9;
+
+    /// <summary>The air to the right of each page button, which is what spaces the row.</summary>
     private const double CapGap = 4;
 
+    /// <summary>
+    /// The page buttons' own grey.
+    /// </summary>
+    /// <remarks>
+    /// Not the lamps' colour: the buttons choose what is shown and the lamps report where the
+    /// playhead is, and two things in one colour read as one thing.
+    /// </remarks>
     private static readonly Color CapColour = Color.FromRgb(0xB0, 0xB3, 0xB8);
 
+    /// <summary>Stacks the buttons over the lamps, and lets go of the track when it leaves the tree.</summary>
     public LocationView()
     {
         Spacing = 6;
@@ -75,48 +95,63 @@ public class LocationView : StackPanel
         DetachedFromVisualTree += (_, _) => Unwatch();
     }
 
+    /// <inheritdoc cref="LocationProperty"/>
     public IMachineLocation? Location
     {
         get => GetValue(LocationProperty);
         set => SetValue(LocationProperty, value);
     }
 
+    /// <inheritdoc cref="CaptionProperty"/>
     public string? Caption
     {
         get => GetValue(CaptionProperty);
         set => SetValue(CaptionProperty, value);
     }
 
+    /// <inheritdoc cref="HasPagesProperty"/>
     public bool HasPages
     {
         get => GetValue(HasPagesProperty);
         set => SetValue(HasPagesProperty, value);
     }
 
+    /// <inheritdoc cref="ColourProperty"/>
     public Color Colour
     {
         get => GetValue(ColourProperty);
         set => SetValue(ColourProperty, value);
     }
 
+    /// <inheritdoc cref="LampSizeProperty"/>
     public double LampSize
     {
         get => GetValue(LampSizeProperty);
         set => SetValue(LampSizeProperty, value);
     }
 
+    /// <inheritdoc cref="GapProperty"/>
     public double Gap
     {
         get => GetValue(GapProperty);
         set => SetValue(GapProperty, value);
     }
 
+    /// <inheritdoc cref="PageWidthProperty"/>
     public double PageWidth
     {
         get => GetValue(PageWidthProperty);
         set => SetValue(PageWidthProperty, value);
     }
 
+    /// <summary>
+    /// Anything about the shape of the row means building it again; the track arriving also
+    /// moves the listening.
+    /// </summary>
+    /// <remarks>
+    /// Every one of these decides how many controls there are or how big they are, so none of
+    /// them can be applied to a row that is already built.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -139,9 +174,20 @@ public class LocationView : StackPanel
         }
     }
 
+    /// <summary>
+    /// The track being listened to, and the handler doing it.
+    /// </summary>
+    /// <remarks>
+    /// Both are kept so the subscription can be taken off again: the handler is a closure rather
+    /// than a method, so it is not the same delegate twice and could not be unsubscribed without
+    /// having been held on to.
+    /// </remarks>
     private IMachineLocation? _watching;
+
+    /// <inheritdoc cref="_watching"/>
     private EventHandler? _listening;
 
+    /// <summary>Starts following whichever track has just arrived.</summary>
     private void Watch()
     {
         if (Location is not { } place) return;
@@ -152,6 +198,7 @@ public class LocationView : StackPanel
         place.Changed += _listening;
     }
 
+    /// <summary>Stops following, so nothing here keeps a track alive after the panel has gone.</summary>
     private void Unwatch()
     {
         if (_watching != null && _listening != null) _watching.Changed -= _listening;
@@ -160,7 +207,16 @@ public class LocationView : StackPanel
         _listening = null;
     }
 
+    /// <summary>
+    /// The two halves of the row, held so the playhead can be followed without rebuilding.
+    /// </summary>
+    /// <remarks>
+    /// The page buttons are null on a machine that asked for none, and both are null between a
+    /// rebuild starting and the new controls being added.
+    /// </remarks>
     private WrapPanel? _pages;
+
+    /// <inheritdoc cref="_pages"/>
     private LedRow? _lamps;
 
     /// <summary>
@@ -238,6 +294,11 @@ public class LocationView : StackPanel
     }
 
     /// <summary>What moves while it is up: which page is shown and which lamp is lit.</summary>
+    /// <remarks>
+    /// The buttons are counted rather than rebuilt each time, since the pattern changing length
+    /// is the one thing that adds a button or takes one away, and that is rare next to the
+    /// playhead moving.
+    /// </remarks>
     private void Follow()
     {
         if (Location is not { } place) return;
@@ -252,7 +313,6 @@ public class LocationView : StackPanel
 
         if (_pages is null) return;
 
-        // The pattern changing length is the one thing that adds or takes a button away.
         if (_pages.Children.Count != place.Pages.Count)
         {
             Pages();

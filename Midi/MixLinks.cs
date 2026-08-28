@@ -15,16 +15,30 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public static class MixLinks
 {
+    /// <summary>The fader on the track you are working on.</summary>
     public static readonly ControlMapping Level = Strip(MixControl.Volume, "Level");
 
+    /// <summary>Its pan.</summary>
     public static readonly ControlMapping Pan = Strip(MixControl.Pan, "Pan");
 
+    /// <summary>Its mute, which a knob writes as anything over a half.</summary>
     public static readonly ControlMapping Mute = Strip(MixControl.Mute, "Mute");
 
+    /// <summary>And its solo.</summary>
     public static readonly ControlMapping Solo = Strip(MixControl.Solo, "Solo");
 
+    /// <summary>How far it is ducked by whatever is ducking it.</summary>
     public static readonly ControlMapping Duck = Strip(MixControl.Duck, "Duck");
 
+    /// <summary>
+    /// How long the ducking takes to come back up.
+    /// </summary>
+    /// <remarks>
+    /// The one that was missing, and it was found by going over the strip control by control
+    /// rather than by anybody reporting it: every other value on a strip had a name a link could
+    /// use, and the knob beside Duck had none, so it was the one thing on the mixer no controller
+    /// could reach.
+    /// </remarks>
     public static readonly ControlMapping Release = Strip(MixControl.Release, "Duck release");
 
     /// <summary>
@@ -39,10 +53,13 @@ public static class MixLinks
     /// </remarks>
     public static readonly ControlMapping MasterLevel = Master(MixControl.Volume, "Master level");
 
+    /// <summary>The master's pan, fixed on strip -1 for the same reason its level is.</summary>
     public static readonly ControlMapping MasterPan = Master(MixControl.Pan, "Master pan");
 
+    /// <summary>And its mute, which is the whole song.</summary>
     public static readonly ControlMapping MasterMute = Master(MixControl.Mute, "Master mute");
 
+    /// <summary>One of the tracks' templates: this control, on whichever strip is picked.</summary>
     private static ControlMapping Strip(MixControl what, string said) => new()
     {
         Kind = ControlKind.Mix,
@@ -51,6 +68,7 @@ public static class MixLinks
         Name = said
     };
 
+    /// <summary>And one of the master's: this control, on strip -1, wherever you are.</summary>
     private static ControlMapping Master(MixControl what, string said) => new()
     {
         Kind = ControlKind.Mix,

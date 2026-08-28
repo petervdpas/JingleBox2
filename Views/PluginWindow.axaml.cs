@@ -20,19 +20,26 @@ public partial class PluginWindow : Window
     /// <summary>What is already open, so a thing shows the window it has rather than another.</summary>
     private static readonly Dictionary<object, PluginWindow> Open = new();
 
+    /// <summary>
+    /// Builds the window, and takes on the two duties an embedded plugin window puts on
+    /// whoever is holding it.
+    /// </summary>
+    /// <remarks>
+    /// XEMBED makes the embedder responsible for telling the plugin when its window is the one
+    /// being used, every time, not once when it was handed over. Without these the plugin
+    /// believes whatever it was told at attach, which after the first click on anything else is
+    /// that it is not active: it carries on drawing from its own timers and ignores everything
+    /// clicked on it.
+    ///
+    /// <see cref="LinkKey"/>.Listen is the other one: the pointer goes where the windows are,
+    /// so the other mouse mode has to be reachable from all of them.
+    /// </remarks>
     public PluginWindow()
     {
         InitializeComponent();
 
-        // The pointer goes where the windows are, so the mode has to be reachable from all of
-        // them. See LinkKey.
         LinkKey.Listen(this);
 
-        // XEMBED makes the embedder responsible for telling the plugin when its window is the
-        // one being used, every time, not once when it was handed over. Without these the
-        // plugin believes whatever it was told at attach, which after the first click on
-        // anything else is that it is not active: it carries on drawing from its own timers
-        // and ignores everything clicked on it.
         Activated += (_, _) => TellPlugin(true);
         Deactivated += (_, _) => TellPlugin(false);
     }
@@ -65,6 +72,20 @@ public partial class PluginWindow : Window
         Show(key, panel, title, owner, null, closed);
     }
 
+    /// <summary>
+    /// The one that actually opens a window, which both public overloads reach.
+    /// </summary>
+    /// <remarks>
+    /// The plugin's interface is opened before the window is built, so the window can size
+    /// itself to whatever the plugin turns out to be. A plugin drawing its own interface is a
+    /// picture at a size it chose, so it is let out of the caps that keep a wall of host-drawn
+    /// knobs from filling the screen.
+    ///
+    /// The plugin is taken out of its window on the way out rather than after: letting the
+    /// window go first leaves the plugin drawing into something that is not there, which is a
+    /// crash on closing rather than on opening. Only the picture is put away; the plugin itself
+    /// carries on playing.
+    /// </remarks>
     private static void Show(
         object key,
         PluginControlsViewModel panel,
@@ -81,8 +102,6 @@ public partial class PluginWindow : Window
             return;
         }
 
-        // The plugin's interface is opened before the window is built, so the window can size
-        // itself to whatever the plugin turns out to be.
         panel.Prepare();
 
         var window = new PluginWindow
@@ -91,8 +110,6 @@ public partial class PluginWindow : Window
             Title = title
         };
 
-        // A plugin drawing its own interface is a picture at a size it chose, so it is let out
-        // of the caps that keep a wall of knobs from filling the screen.
         if (panel.HasOwnWindow)
         {
             window.MaxWidth = double.PositiveInfinity;
@@ -105,14 +122,8 @@ public partial class PluginWindow : Window
 
         Open[key] = window;
 
-        // On the way out rather than after. The plugin has to be taken out of its window
-        // while that window still exists: letting the window go first leaves the plugin
-        // drawing into something that is not there, which is a crash on closing rather than
-        // on opening.
         window.Closing += (_, _) =>
         {
-            // The plugin's interface goes with the window. The plugin itself carries on
-            // playing; only its picture is put away.
             panel.Close();
         };
 

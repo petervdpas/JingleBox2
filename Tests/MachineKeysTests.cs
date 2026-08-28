@@ -24,6 +24,10 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MachineKeysTests
 {
+    /// <summary>A key on the drawn keyboard lights and sounds, and sounds exactly once.</summary>
+    /// <remarks>
+    /// A panel sounds its own keys, since the press never went anywhere else to be played.
+    /// </remarks>
     [Fact]
     public void A_key_pressed_here_lights_and_sounds_once()
     {
@@ -35,6 +39,7 @@ public class MachineKeysTests
         Assert.Equal(1, designer.Played);
     }
 
+    /// <summary>And letting go puts the light out and lets the note go, once each.</summary>
     [Fact]
     public void And_goes_dark_when_it_is_let_go_of()
     {
@@ -193,6 +198,11 @@ public class MachineKeysTests
         Assert.Empty(Lit(keys));
     }
 
+    /// <summary>A release with no press in front of it is not a fault.</summary>
+    /// <remarks>
+    /// The mouse can leave a key it never landed on, and a device already holding a note when
+    /// the program starts sends a release nobody remembers.
+    /// </remarks>
     [Fact]
     public void A_key_that_was_never_down_can_be_let_go_of_safely()
     {
@@ -321,6 +331,9 @@ public class MachineKeysTests
     /// <remarks>
     /// Nothing sends one on purpose. A codec written in Lua can, a controller file can name a
     /// nonsense note, and this is the last place between either of those and a drawn key.
+    ///
+    /// It is still shown, because a monitor shows what went past, and taken quietly: what
+    /// cannot be drawn on a keyboard is simply not drawn.
     /// </remarks>
     [Fact]
     public void A_note_that_is_on_no_keyboard_is_taken_quietly()
@@ -330,8 +343,6 @@ public class MachineKeysTests
         designer.Monitor.Pressed(-1);
         designer.Monitor.Pressed(500);
 
-        // Shown, because a monitor shows what went past, and taken quietly: what cannot be
-        // drawn on a keyboard is simply not drawn.
         Assert.Equal(new[] { -1, 500 }, Lit(keys).OrderBy(one => one));
 
         designer.Monitor.Released(-1);
@@ -340,6 +351,7 @@ public class MachineKeysTests
         Assert.Empty(Lit(keys));
     }
 
+    /// <summary>A keyboard and the designer under it, which is the pair every test needs.</summary>
     private static (IMachineKeys Keys, Designer Designer) Keyboard()
     {
         var designer = new Designer();
@@ -347,13 +359,21 @@ public class MachineKeysTests
         return (designer.MachineKeys, designer);
     }
 
+    /// <summary>What the keyboard is showing lit, as note numbers.</summary>
     private static IEnumerable<int> Lit(IMachineKeys keys) => keys.Lit.Cast<int>();
 
-    /// <summary>Enough of a designer to hang a keyboard on: what it played, and what it heard.</summary>
+    /// <summary>Enough of a designer to hang a keyboard on: what it played and heard.</summary>
+    /// <remarks>
+    /// Everything below the monitor, the sounding notes and the two counters is what
+    /// <see cref="IInstrumentDesigner"/> asks for and no test looks at. A real designer owns a
+    /// window; this one owns two numbers.
+    /// </remarks>
     private sealed class Designer : IInstrumentDesigner
     {
+        /// <summary>Made on first use, so two designers sharing a monitor still differ.</summary>
         private IMachineKeys? _keys;
 
+        /// <summary>Takes a monitor to share, or keeps one of its own.</summary>
         public Designer(MidiMonitor? monitor = null) => Monitor = monitor ?? new MidiMonitor();
 
         /// <summary>The notes going past, which is where a keyboard's lights come from.</summary>
@@ -373,8 +393,10 @@ public class MachineKeysTests
 
         public IRelayCommand TestCommand { get; } = new RelayCommand(() => { });
 
+        /// <summary>What is ringing, which is a different question from what is held down.</summary>
         public SoundingNotes Sounding { get; } = new();
 
+        /// <summary>The keyboard under test, built once and kept.</summary>
         public IMachineKeys MachineKeys => _keys ??= new DesignerKeys(this);
 
         public InstrumentPresets? Presets => null;
@@ -385,12 +407,16 @@ public class MachineKeysTests
 
         public IMachineLocation? MachineLocation => null;
 
+        /// <summary>How many notes the panel asked to be sounded.</summary>
         public int Played { get; private set; }
 
+        /// <summary>How many it asked to be let go of.</summary>
         public int Let { get; private set; }
 
+        /// <inheritdoc/>
         void IInstrumentDesigner.Play(Note note, int volume) => Played++;
 
+        /// <inheritdoc/>
         void IInstrumentDesigner.Let(Note note) => Let++;
     }
 }

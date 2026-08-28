@@ -13,17 +13,38 @@ namespace JingleBox2.Audio.Routing;
 /// system can capture, and picking one points the recorder at it: a device through BASS as
 /// before, or an output through WASAPI loopback. One program on its own is not in reach this
 /// way; that needs per-process loopback, which is a different piece of work.
+///
+/// Setting the recorder's loopback device reopens the capture, so a route picked here is heard
+/// straight away rather than the next time the input happens to be opened.
 /// </remarks>
 public sealed class WindowsLoopbackRouting : IAudioRouting
 {
-    // Declared, not composed from a variable, so the two kinds of id stay greppable.
+    /// <summary>
+    /// In front of an output's number, for a route that records what that output is playing.
+    /// </summary>
+    /// <remarks>
+    /// Declared rather than composed from a variable, so both kinds of id stay greppable: a
+    /// node string is written in one place and read in another, and an id built out of pieces
+    /// is one nobody can search for.
+    /// </remarks>
     private const string LoopbackPrefix = "loopback:";
+
+    /// <summary>In front of a capture device's name, for a route that records that device.</summary>
     private const string DevicePrefix = "device:";
 
+    /// <summary>The recorder, which is what is actually pointed somewhere: nothing is rewired here.</summary>
     private readonly IRecordingService _recording;
 
+    /// <summary>Takes the recorder this will be pointing at devices and outputs.</summary>
     public WindowsLoopbackRouting(IRecordingService recording) => _recording = recording;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Windows, and the system really offering loopback. No loopback devices means the add-on
+    /// is missing or the system will not do it, and then this offers nothing the recorder's own
+    /// device picker does not already, so it stands down rather than showing the same devices
+    /// twice.
+    /// </remarks>
     public bool IsAvailable
     {
         get
@@ -32,8 +53,6 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
 
             try
             {
-                // No loopback devices means the add-on is missing or the system will not do it,
-                // and then this offers nothing the device picker does not already.
                 return _recording.GetLoopbackDevices().Count > 0;
             }
             catch (Exception)
@@ -43,6 +62,15 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The capture devices first and then the outputs, which is the same reading order the
+    /// PipeWire side produces. One running program on its own is not among them: that needs
+    /// per-process loopback, which is a different piece of work.
+    ///
+    /// Anything that goes wrong reading the two lists comes back as no routes at all rather
+    /// than half of them, since half a list is a page that looks complete and is not.
+    /// </remarks>
     public IReadOnlyList<AudioRoute> GetRoutes()
     {
         if (!IsAvailable) return Array.Empty<AudioRoute>();
@@ -70,6 +98,13 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
         return routes;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Asked of the recorder rather than remembered: a loopback output wins where one is set,
+    /// and the selected capture device answers otherwise. The answer is matched back against
+    /// the offered list, so the page marks the row it is already showing rather than a second
+    /// route that merely says the same thing.
+    /// </remarks>
     public AudioRoute? GetCurrentRoute()
     {
         if (!IsAvailable) return null;
@@ -88,6 +123,12 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
         return routes.FirstOrDefault(r => r.Node == DevicePrefix + device);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Nothing is rewired: the two prefixes say which of the recorder's two ways of listening
+    /// is meant, and the recorder is set accordingly. Pointing at a device clears the loopback
+    /// first, or the recorder would go on taking the output it was given before.
+    /// </remarks>
     public bool Connect(AudioRoute route)
     {
         if (!IsAvailable || route == null) return false;
@@ -100,7 +141,6 @@ public sealed class WindowsLoopbackRouting : IAudioRouting
                 if (!int.TryParse(index, NumberStyles.Integer, CultureInfo.InvariantCulture, out int device))
                     return false;
 
-                // The setter reopens the capture, so the change is heard straight away.
                 _recording.LoopbackDevice = device;
                 return true;
             }

@@ -25,9 +25,16 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 internal static unsafe class Vst3Messages
 {
+    /// <summary>Held while either table is built, so two plugins asking at once cannot both build it.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>
+    /// The two tables, shared by every message in the process. A table is code rather than
+    /// state, so one of each is enough and neither is ever freed.
+    /// </summary>
     private static nint* _messageTable;
+
+    /// <inheritdoc cref="_messageTable"/>
     private static nint* _attributesTable;
 
     /// <summary>What is written on one message, kept on this side of the wall.</summary>
@@ -36,6 +43,11 @@ internal static unsafe class Vst3Messages
         /// <summary>The message's name, as a C string the plugin may hold on to.</summary>
         public nint Name;
 
+        /// <summary>
+        /// What has been written on the message, by attribute name. Boxed rather than typed
+        /// because the ABI allows four kinds and a getter of the wrong kind has to be refused:
+        /// that is what the pattern match in each getter is for.
+        /// </summary>
         public readonly Dictionary<string, object> Values = new(StringComparer.Ordinal);
 
         /// <summary>Lumps of bytes handed out by pointer, kept until they are replaced.</summary>
@@ -52,9 +64,25 @@ internal static unsafe class Vst3Messages
     [StructLayout(LayoutKind.Sequential)]
     private struct Block
     {
+        /// <summary>The table, which has to be the first word or the plugin calls rubbish.</summary>
         public nint Vtbl;
+
+        /// <summary>
+        /// How many holders there are. Raised and lowered with interlocked operations, since the
+        /// two halves of a plugin need not be on the same thread.
+        /// </summary>
         public int Held;
+
+        /// <summary>
+        /// Nothing, and it has to stay: it is what puts <see cref="Handle"/> on an eight byte
+        /// boundary, which is where the compiler would have put it in C.
+        /// </summary>
         public int Padding;
+
+        /// <summary>
+        /// A pinned handle on the managed <see cref="Note"/> behind this block. The only way
+        /// from a plain C callback back to an object the collector owns.
+        /// </summary>
         public nint Handle;
     }
 
@@ -91,6 +119,11 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.NotImplemented;
     }
 
+    /// <summary>
+    /// Builds one message and the attribute list that belongs to it. The list is made here
+    /// rather than when it is first asked for, because a plugin is entitled to ask for it and
+    /// write on it before anybody looks.
+    /// </summary>
     private static void* Message()
     {
         var note = new Note();
@@ -106,6 +139,10 @@ internal static unsafe class Vst3Messages
         return block;
     }
 
+    /// <summary>
+    /// Builds an attribute list over a note. Its own block and its own count, but it is freed by
+    /// the message rather than by that count: see <see cref="LetGo"/>.
+    /// </summary>
     private static void* Attributes(Note note)
     {
         var block = (Block*)NativeMemory.AllocZeroed(1, (nuint)sizeof(Block));
@@ -117,6 +154,10 @@ internal static unsafe class Vst3Messages
         return block;
     }
 
+    /// <summary>
+    /// What a block is really about. Null for a block that has already been freed, which is what
+    /// a plugin calling on a message it has let go of looks like.
+    /// </summary>
     private static Note? Behind(void* self)
     {
         var block = (Block*)self;
@@ -132,6 +173,11 @@ internal static unsafe class Vst3Messages
         }
     }
 
+    /// <summary>
+    /// Builds the message table once: the root's three, then IMessage's three, in the order the
+    /// header declares them. The order is the whole contract, since a plugin calls by position
+    /// and nothing checks.
+    /// </summary>
     private static nint* MessageTable()
     {
         lock (Gate)
@@ -152,6 +198,10 @@ internal static unsafe class Vst3Messages
         }
     }
 
+    /// <summary>
+    /// The same for an attribute list: the root's three, then the eight setters and getters
+    /// IAttributeList declares, in pairs by kind.
+    /// </summary>
     private static nint* AttributesTable()
     {
         lock (Gate)
@@ -177,6 +227,11 @@ internal static unsafe class Vst3Messages
         }
     }
 
+    /// <summary>
+    /// A message is an IMessage and the root interface, and nothing else. The count goes up on
+    /// the way out, because whatever comes back from a query is already held: a plugin that
+    /// releases it once has released what it asked for and not the message itself.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int MessageQuery(void* self, byte* id, void** result)
     {
@@ -193,6 +248,10 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>
+    /// An attribute list is an IAttributeList and the root interface, and nothing else. The
+    /// count goes up on the way out, as it does for a message.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int AttributesQuery(void* self, byte* id, void** result)
     {
@@ -209,6 +268,7 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>The plugin taking one more hold on a message or a list.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint Hold(void* self) => Keep(self);
 
@@ -225,6 +285,12 @@ internal static unsafe class Vst3Messages
     /// One holder fewer. The last one out frees the object, and a message frees what was
     /// written on it.
     /// </summary>
+    /// <remarks>
+    /// The attribute list belongs to the message and goes when it does. Freeing it here rather
+    /// than on its own count is deliberate: a plugin is given the list without being made a
+    /// holder of it, which is how the specification has it, so its own count would never reach
+    /// nought and the list would leak once per message.
+    /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint LetGo(void* self)
     {
@@ -236,9 +302,6 @@ internal static unsafe class Vst3Messages
 
         var note = Behind(self);
 
-        // The attribute list belongs to the message and goes when it does. Freeing it here
-        // rather than on its own count is deliberate: a plugin is given it without being made
-        // a holder of it, which is how the specification has it.
         if (note != null && note.Attributes != 0 && note.Attributes != (nint)self)
         {
             var attributes = (Block*)note.Attributes;
@@ -256,6 +319,11 @@ internal static unsafe class Vst3Messages
         return 0;
     }
 
+    /// <summary>
+    /// Frees the handle that ties a block to its note, so the collector can have the note back.
+    /// Guarded, because a block whose handle has already gone is what a double release looks
+    /// like and freeing a handle twice throws.
+    /// </summary>
     private static void Forget(Block* block)
     {
         if (block == null || block->Handle == 0) return;
@@ -286,6 +354,10 @@ internal static unsafe class Vst3Messages
         }
     }
 
+    /// <summary>
+    /// What the message is called. The pointer belongs to the host and stays valid until the
+    /// message is renamed or freed, which is what the plugin expects.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte* NameOf(void* self)
     {
@@ -295,6 +367,11 @@ internal static unsafe class Vst3Messages
         lock (note) return (byte*)note.Name;
     }
 
+    /// <summary>
+    /// Naming the message, which is the first thing a sender does. The old name is freed here
+    /// rather than left for the message to free, since a plugin that renames a message in a loop
+    /// would otherwise leak one string per turn.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Rename(void* self, byte* id)
     {
@@ -311,6 +388,10 @@ internal static unsafe class Vst3Messages
         }
     }
 
+    /// <summary>
+    /// The message's attribute list, which is where everything except the name is written. The
+    /// plugin is not made a holder of it: the message owns it.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void* AttributesOf(void* self)
     {
@@ -319,8 +400,14 @@ internal static unsafe class Vst3Messages
         return note == null ? null : (void*)note.Attributes;
     }
 
+    /// <summary>
+    /// An attribute's name as a string to look it up by. Null reads as empty rather than being
+    /// refused, since a plugin naming nothing is asking about one particular attribute and will
+    /// find it again by the same nothing.
+    /// </summary>
     private static string Key(byte* id) => id == null ? "" : Marshal.PtrToStringUTF8((nint)id) ?? "";
 
+    /// <summary>Writing a whole number onto the message.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int SetWhole(void* self, byte* id, long value)
     {
@@ -332,6 +419,10 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Reading one back. Refused for a name that is not there and for one holding another kind,
+    /// which is what the specification asks for and what stops a fraction being read as bits.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int GetWhole(void* self, byte* id, long* value)
     {
@@ -348,6 +439,7 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>Writing a fractional number onto the message.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int SetFraction(void* self, byte* id, double value)
     {
@@ -359,6 +451,7 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <inheritdoc cref="GetWhole"/>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int GetFraction(void* self, byte* id, double* value)
     {
@@ -391,6 +484,12 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Reading words back into the plugin's own buffer. The room is given in bytes and the
+    /// characters are two bytes each, so the count has to be halved and one taken off for the
+    /// terminator; a buffer with room for fewer than one character is refused rather than
+    /// written into.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int GetWords(void* self, byte* id, char* value, uint bytes)
     {
@@ -416,6 +515,11 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Writing a lump of bytes onto the message. Copied rather than kept by pointer, because the
+    /// plugin's buffer is its own and may be gone by the time the other half reads it. The copy
+    /// under the same name is freed first, so writing twice does not leak.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int SetLump(void* self, byte* id, void* data, uint bytes)
     {
@@ -439,6 +543,11 @@ internal static unsafe class Vst3Messages
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// Reading a lump back, as a pointer into the host's own copy. It stays valid until the same
+    /// name is written again or the message is freed, which is why the copies are kept on the
+    /// note rather than freed as they are read.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int GetLump(void* self, byte* id, void** data, uint* bytes)
     {

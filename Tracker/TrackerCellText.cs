@@ -9,13 +9,21 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public static class TrackerCellText
 {
+    /// <summary>How a blank instrument or volume column is written.</summary>
     public const string BlankByte = "..";
+
+    /// <summary>And a blank effect column, which is three characters wide rather than two.</summary>
     public const string BlankEffect = "...";
 
+    /// <summary>One cell as the file and the grid both write it.</summary>
     public static string Write(TrackerCell cell) =>
         $"{cell.Note} {cell.InstrumentText} {cell.VolumeText} {cell.Effect}";
 
     /// <summary>Parses what <see cref="Write"/> produced. Returns false on anything malformed.</summary>
+    /// <remarks>
+    /// Blank text is not malformed and gives an empty cell, since a song file only stores the
+    /// cells that hold something and everything else is read as nothing.
+    /// </remarks>
     public static bool TryRead(string? text, out TrackerCell cell)
     {
         cell = TrackerCell.Empty;
@@ -33,6 +41,13 @@ public static class TrackerCellText
         return true;
     }
 
+    /// <summary>
+    /// One two-character column, decimal or hex depending on which it is.
+    /// </summary>
+    /// <remarks>
+    /// A blank column reads as -1, which is what both <see cref="TrackerCell.NoInstrument"/> and
+    /// <see cref="TrackerCell.NoVolume"/> are, so one function serves the two of them.
+    /// </remarks>
     private static bool TryReadByte(string text, NumberStyles style, out int value)
     {
         value = -1;
@@ -44,6 +59,14 @@ public static class TrackerCellText
         return true;
     }
 
+    /// <summary>
+    /// The effect column: a letter and two hex digits.
+    /// </summary>
+    /// <remarks>
+    /// The letter is not checked against the four the player knows. A command from a later
+    /// version has to read back and be written out again untouched, or opening a song here
+    /// would quietly throw away what somebody else's copy put in it.
+    /// </remarks>
     private static bool TryReadEffect(string text, out TrackerEffect effect)
     {
         effect = TrackerEffect.None;

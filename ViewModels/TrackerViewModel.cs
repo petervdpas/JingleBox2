@@ -25,11 +25,40 @@ namespace JingleBox2.ViewModels;
 /// Holds the song being edited and drives the player. All sequencing, editing, and cursor
 /// maths live in the Tracker namespace; this class is the bridge to the view.
 /// </summary>
+/// <remarks>
+/// It is the one object the tracker page, the mixer, the instrument panels and the surfaces all
+/// reach through, which is why it answers to five interfaces rather than one: what a panel wants
+/// (<see cref="ITrackerPanel"/>) is not what the transport bar wants
+/// (<see cref="ITransportDeck"/>), and neither is what a MIDI keyboard wants
+/// (<see cref="Midi.IPlaysNotes"/>). Each of those says what it is for on itself; what is here
+/// is how this one implementation does it.
+/// </remarks>
 public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.IPlaysNotes, Shortcuts.IShortcutContext
 {
+    /// <summary>The clock, the mixer and everything that makes a sound. One per tracker.</summary>
     private readonly TrackerPlayer _player;
+
+    /// <summary>The songs folder, and the reading and writing of a song file.</summary>
     private readonly SongStore _store;
+
+    /// <summary>
+    /// What you own, which is where an instrument comes from and never where one lives.
+    /// </summary>
+    /// <remarks>
+    /// Only read here, and only when a machine is brought into the song: a song's instruments
+    /// are its own, so nothing on the rack reaches back into a song already written.
+    /// </remarks>
     private readonly MachineRack _rack;
+
+    /// <summary>
+    /// Asks the mixer what every strip is reading, so the meters on the screen move.
+    /// </summary>
+    /// <remarks>
+    /// Polled rather than pushed: the audio side should not be calling into the UI dozens of
+    /// times a second, and a meter that misses a frame costs nothing. What it runs on is
+    /// whether anything is sounding rather than whether the transport is playing; see
+    /// <see cref="ReadMeters"/> for why that distinction cost two separate faults.
+    /// </remarks>
     private readonly DispatcherTimer _meters;
 
     /// <summary>Writes the song down while it is unsaved, so a crash costs a minute, not a session.</summary>
@@ -64,25 +93,58 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Something found on the way in that the last session never got to save.</summary>
     public string Recovered { get; } = "";
+
+    /// <summary>
+    /// The shelf of takes, shared with RECORD rather than copied.
+    /// </summary>
+    /// <remarks>
+    /// The same list the recording page owns, so a take made while the tracker is open is on
+    /// the shelf an instrument picks from without anybody being told to look again. A packed
+    /// song is the one case where it has to be told; see <see cref="OpenSong"/>.
+    /// </remarks>
     private readonly ObservableCollection<Recording> _recordings;
 
     /// <summary>Where the velocity preference is kept. Null in a test or a headless run.</summary>
     private readonly ConfigStore? _configStore;
 
+    /// <summary>The settings as they stand, for the handful of preferences the tracker reads.</summary>
     private readonly AppConfig? _config;
 
+    /// <summary>The song being worked on. There is always one, even if it is empty.</summary>
     [ObservableProperty] private Song song;
 
+    /// <summary>
+    /// The pattern under the cursor, which is the one the grid draws and edits.
+    /// </summary>
+    /// <remarks>
+    /// Always set through the property and never through this field. The generated setter
+    /// subscribes to the pattern's own change event, and that is the part a field assignment
+    /// skips; see the constructor.
+    /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PatternLines))]
     private Pattern? currentPattern;
+
+    /// <summary>Where the caret is: the line, the track and the column within it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedTrack))]
     [NotifyPropertyChangedFor(nameof(CursorTrackLabel))]
     private PatternCursor cursor = PatternCursor.Start;
 
+    /// <summary>
+    /// Moving the cursor moves what the panels under the pattern are about.
+    /// </summary>
+    /// <remarks>
+    /// The track is the only part of the cursor that matters to them, and
+    /// <see cref="FollowCursorTrack"/> does nothing when it has not changed, so a keystroke
+    /// that walks down one column costs a comparison.
+    /// </remarks>
     partial void OnCursorChanged(PatternCursor value) => FollowCursorTrack();
+
+    /// <summary>Which slot of the order is being worked on, which decides the pattern.</summary>
     [ObservableProperty] private int orderIndex;
+
+    /// <summary>The row the clock has reached, or -1 when nothing is playing.</summary>
     [ObservableProperty] private int playingLine = -1;
 
     /// <summary>How many rows the pattern has, for a panel showing where its track is.</summary>
@@ -106,15 +168,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public Pattern? PatternBefore =>
         PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex - 1);
 
+    /// <summary>What is coming next, on the same terms as <see cref="PatternBefore"/>.</summary>
     public Pattern? PatternAfter =>
         PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex + 1);
 
+    /// <summary>
+    /// Says both neighbours may have changed, for the things that change them without either
+    /// property being touched.
+    /// </summary>
+    /// <remarks>
+    /// Neither is stored, so nothing raises them on its own: the play mode, the slot and the
+    /// order all decide what is either side of this pattern, and an order edited in place moves
+    /// them without the slot number moving at all.
+    /// </remarks>
     private void NeighboursMoved()
     {
         OnPropertyChanged(nameof(PatternBefore));
         OnPropertyChanged(nameof(PatternAfter));
     }
 
+    /// <summary>In pattern mode nothing is coming but this pattern again, so both go blank.</summary>
     partial void OnPlayModeChanged(TrackerPlayMode value) => NeighboursMoved();
 
     /// <summary>
@@ -141,6 +214,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// the thing that knows it is built after this is. Called once, on the way up. A tracker
     /// nobody calls it on plays songs exactly as it did before automation existed, which is
     /// what every test that makes one relies on.
+    ///
+    /// Two panels come out of it, not one. <see cref="MasterLanes"/> is the same panel again
+    /// pointed at the strip that is not a track, and it is its own rather than the one under
+    /// the pattern for the same reason its chain is: that one follows the cursor, and the
+    /// master is not somewhere the cursor can be.
     /// </remarks>
     public void UseAutomation(Midi.IControlTargets targets)
     {
@@ -153,9 +231,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Dirtied = MarkDirty
         };
 
-        // The same panel again, pointed at the strip that is not a track. Its own rather than
-        // the one under the pattern, for the same reason its chain is: that one follows the
-        // cursor, and the master is not somewhere the cursor can be.
         MasterLanes = new AutomationViewModel(
             targets, () => Song, () => CurrentPattern, () => LinesPerBeat, () => PlayingLine)
         {
@@ -181,6 +256,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _ => false
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A step knows which pattern it is about, so both go through <see cref="TakeBack"/>, which
+    /// goes there first rather than changing a pattern behind your back.
+    /// </remarks>
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
         switch (action)
@@ -214,34 +294,35 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// than no undo at all. The patterns keep their identity, which is what stops the cheap
     /// steps in the history pointing at objects the song no longer holds. See
     /// <see cref="Song.TakeFrom"/>.
+    ///
+    /// The order of the four things it does is the whole of it. Any plugin window open over a
+    /// chain that is about to be taken apart is dropped first: a plugin drawing into a window
+    /// whose plugin has been disposed is a crash inside its own toolkit, and this is the one
+    /// moment that can happen, since a song opens with no plugin windows up and an undo can be
+    /// pressed with one on screen. Then the contents. Then the chains, because the song now
+    /// says which plugins each track has while the mixer still holds the ones that were loaded
+    /// a moment ago; they are made to agree only for the tracks where they differ, since
+    /// rebuilding a chain is seconds a plugin and almost every undo changes none of them.
+    /// Then everything the tracker hangs off the song is hung off it again: the instrument
+    /// list, the mixer strips, whichever pattern the order now points at, and the effect slot,
+    /// which builds its rows off whatever the chain now holds.
     /// </remarks>
     private bool Pour(Song live, Song was)
     {
-        // Any plugin window open over a chain that is about to be taken apart goes first. A
-        // plugin drawing into a window whose plugin has been disposed is a crash inside its own
-        // toolkit, and this is the one moment that can happen: a song opens with no plugin
-        // windows up, and an undo can be pressed with one on screen.
         TrackEffect.Target = null;
 
         live.TakeFrom(was);
 
-        // The song now says which plugins each track has; the mixer still holds the ones that
-        // were loaded a moment ago. Made to agree, and only for the tracks where they do not:
-        // rebuilding a chain is seconds a plugin, and almost every undo changes none of them.
         var rebuilt = _player.MatchChains(live);
 
         if (rebuilt.Count > 0)
             Log.Write(LogArea.Plugins, () =>
                 "history: " + rebuilt.Count + " track(s) had their inserts built again to match the step");
 
-        // Everything the tracker hangs off the song has to be hung off it again: the instrument
-        // list, the mixer strips, and whichever pattern the order now points at.
         SyncInstruments();
 
         CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
 
-        // And the slot is pointed at its track again, which builds its rows off whatever the
-        // chain now holds.
         PointEffectSlot();
 
         OnPropertyChanged(nameof(Song));
@@ -297,6 +378,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     private EventHandler<(int Track, Note Note, double Seconds)>? _played;
 
+    /// <summary>
+    /// Says a note played by hand, so a panel's keyboard lights for it the same as for one the
+    /// pattern played.
+    /// </summary>
     private void Played(int track, Note note, double seconds) =>
         _played?.Invoke(this, (track, note, seconds));
 
@@ -333,6 +418,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Points the effect slot at the track the cursor is on. Moving between tracks changes
     /// what the panel under the pattern is about; moving up and down a track does not.
     /// </summary>
+    /// <remarks>
+    /// The mixer is told as well, since it is the one page where the cursor is not on the
+    /// screen to say which track is being worked on for itself. So is the automation under the
+    /// chain, which is about the same track and for the same reason: both are what the column
+    /// the cursor is in has on it. That last only while the strip is open, since reading it
+    /// costs a walk over the track's machine and every plugin on it.
+    /// </remarks>
     private void FollowCursorTrack()
     {
         int track = Cursor.Track;
@@ -343,13 +435,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect.Target = new TrackPluginTarget(_player, track);
         TrackEffect.Instrument = InstrumentBoxFor(track);
 
-        // And the mixer says which one it is about, since it is the one page where the cursor
-        // is not on the screen to say it for itself.
         foreach (var strip in Strips) strip.IsSelected = strip.Track == track;
 
-        // The automation under the chain is about the same track the chain is, and for the same
-        // reason: both are what the column the cursor is in has on it. Only while it is open,
-        // since reading it costs a walk over the track's machine and every plugin on it.
         if (ShowsLanes) Lanes?.Show(track);
     }
 
@@ -376,34 +463,38 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>
     /// Made from what the song says is on the track, not from what is loaded: the plugin
     /// itself is not asked for until somebody opens the box.
+    ///
+    /// Every kind of instrument, not only plugins. What a track plays sits at the head of its
+    /// strip whether the sound is Serum's or ours; they are the same thing to the track, and
+    /// only what opens when you click differs.
+    ///
+    /// The same box is handed back every time, or coming back to a track would make a second
+    /// one and open a second window onto one plugin's interface, which some plugins do not
+    /// survive. A box for an instrument this track no longer plays is discarded: it is
+    /// watching the tracker on behalf of a panel nobody can open any more.
+    ///
+    /// The box is told to report an edit through <c>InstrumentEdited</c> rather than
+    /// <see cref="MarkDirty"/>, because what the panel changes is the song's own copy, so the
+    /// row beside the pattern has to show it as well as the file having to be written.
     /// </remarks>
     private PluginInstrumentViewModel? InstrumentBoxFor(int track)
     {
         var instrument = Song.InstrumentAt(Song.GetTrackInstrument(track));
 
-        // Every kind, not only plugins. What a track plays sits at the head of its strip
-        // whether the sound is Serum's or ours; they are the same thing to the track, and
-        // only what opens when you click differs.
         if (instrument == null)
         {
             if (_instrumentBoxes.Remove(track, out var gone)) gone.Discard();
             return null;
         }
 
-        // The same box every time, or coming back to a track would make a second one and open
-        // a second window onto one plugin's interface, which some plugins do not survive.
         if (_instrumentBoxes.TryGetValue(track, out var existing) &&
             ReferenceEquals(existing.Instrument, instrument))
         {
             return existing;
         }
 
-        // A box for an instrument this track no longer plays is finished with: it is watching
-        // the tracker on behalf of a panel nobody can open any more.
         if (existing != null) existing.Discard();
 
-        // InstrumentEdited rather than MarkDirty: what the panel changes is the song's own copy,
-        // so the row beside the pattern has to show it as well as the file having to be written.
         var box = new PluginInstrumentViewModel(
             instrument,
             () => _player.EnsurePlayerOn(track, instrument),
@@ -453,6 +544,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     [ObservableProperty] private bool ignoreVelocity;
 
+    /// <summary>
+    /// Stopped, playing or paused, which is what the transport bar's three buttons read off.
+    /// </summary>
+    /// <remarks>
+    /// One state rather than a flag per button, since the three are exclusive and two flags
+    /// would eventually disagree about which.
+    /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsPlaying))]
     [NotifyPropertyChangedFor(nameof(IsPaused))]
@@ -480,17 +578,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private bool isDirty;
 
     /// <summary>The switch and the recorder are one thing said twice, so they are kept in step.</summary>
+    /// <remarks>
+    /// Disarming ends the pass as well as stopping it. Otherwise a knob touched after it was
+    /// switched off and on again would go on adding to the step the earlier pass took, and one
+    /// undo would take back two sessions of mixing.
+    /// </remarks>
     partial void OnIsAutomatingChanged(bool value)
     {
         Automation.Armed = value;
 
-        // Disarming ends the pass. Otherwise a knob touched after it was switched off and on
-        // again would go on adding to the step the earlier pass took.
         if (!value) Automation.Stopped();
     }
 
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
     [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
+
+    /// <summary>
+    /// The octave notes are typed and auditioned at, which is the song's and not the view's.
+    /// </summary>
     [ObservableProperty] private int octave = 4;
 
     /// <summary>
@@ -509,10 +614,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>True while the octave is chasing a note rather than being set by hand.</summary>
     private bool _followingOctave;
 
-    /// <summary>
-    /// The octave moved because a panel's keyboard had to show a note. The song keeps the new
-    /// value, but it is not an edit, so it does not ask to be saved.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Done by setting the same property a hand would, with <see cref="_followingOctave"/> up,
+    /// rather than by a second path into the song: two ways of moving one number is how they
+    /// come to disagree. The flag is what <c>OnOctaveChanged</c> reads to decide whether
+    /// the song has been edited or has merely been kept up.
+    /// </remarks>
     public void FollowOctave(int octave)
     {
         if (Octave == octave) return;
@@ -528,11 +636,27 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             _followingOctave = false;
         }
     }
+    /// <summary>
+    /// Which instrument is picked out in the list beside the pattern.
+    /// </summary>
+    /// <remarks>
+    /// About the list and not about the sound: what a new track would be given, and what the
+    /// rack is showing. What a track plays is the track's own instrument. The tracker answered
+    /// the first question with this one whenever a track had none of its own, so the keyboard
+    /// sounded an instrument the track had not got and the status bar named it.
+    /// </remarks>
     [ObservableProperty] private int selectedInstrument;
+
+    /// <summary>How far the caret drops after a note is typed, in lines.</summary>
     [ObservableProperty] private int editStep = 1;
+
+    /// <summary>The line under the tracker page, saying what just happened.</summary>
     [ObservableProperty] private string status = "Ready";
+
+    /// <summary>What the song is called, which is <see cref="Unnamed"/> until it is saved.</summary>
     [ObservableProperty] private string songName = Unnamed;
 
+    /// <summary>The song's instruments, as rows: the list beside the pattern.</summary>
     public ObservableCollection<InstrumentSlot> Instruments { get; } = new();
 
     /// <summary>One channel strip per track, for the MIXER page.</summary>
@@ -549,10 +673,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     [ObservableProperty] private TrackStripViewModel? masterStrip;
 
-    /// <summary>The rack, for bringing an instrument into this song.</summary>
-
+    /// <summary>
+    /// The machine picked out on the rack, which is where an instrument added to this song
+    /// comes from.
+    /// </summary>
+    /// <remarks>
+    /// A machine and not an instrument: what goes into the song is a copy with an id of its
+    /// own. See <see cref="AddInstrumentCommand"/>.
+    /// </remarks>
     [ObservableProperty] private RackMachine? pickedMachine;
+
+    /// <summary>The order, as rows: which pattern is played at each slot, in words.</summary>
     public ObservableCollection<string> OrderEntries { get; } = new();
+
+    /// <summary>Every song on the shelf, which is what the open dialog is narrowed from.</summary>
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
 
     /// <summary>
@@ -572,6 +706,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     [ObservableProperty] private string songSearch = "";
 
+    /// <summary>Typing narrows the list as it is typed, so nothing has to be pressed.</summary>
     partial void OnSongSearchChanged(string value) => RestockSongs();
 
     /// <summary>True when there are songs but none of them match what was typed.</summary>
@@ -581,8 +716,60 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public bool NoSongsFound => SavedSongs.Count > 0 && ShownSongs.Count == 0;
 
+    /// <summary>The row picked out in the open dialog, which is what Open and Delete act on.</summary>
     [ObservableProperty] private SongFile? selectedSongFile;
 
+    /// <summary>
+    /// Builds a tracker on an audio engine and a rack, with nothing open but an empty song.
+    /// </summary>
+    /// <remarks>
+    /// Everything after the rack is optional so the whole class can be made in a test with no
+    /// settings file, no plugin library and no waveform service: those are the four things that
+    /// would otherwise need a running application behind them.
+    ///
+    /// The order the pieces are built in matters, and in one place it has already cost a bug.
+    ///
+    /// <see cref="PatternEdit.Watching"/> is pointed at the history here rather than by
+    /// <see cref="PatternEdit"/> itself, because a history belongs to the thing being edited
+    /// and a pattern has never heard of one. Every edit to any pattern goes through that class
+    /// and tells the history before it happens, which is what makes an edit added later
+    /// undoable without anybody remembering to hook it up.
+    ///
+    /// The master's chain is its own <see cref="PluginChainViewModel"/> rather than the one
+    /// under the pattern, because that one follows the cursor and the master is not a track the
+    /// cursor can be in: pointing it there would mean losing it the moment you touched an arrow
+    /// key. Its target is set once and never again, unlike a track's, since it is always about
+    /// the same strip.
+    ///
+    /// The two preferences are assigned to their backing fields rather than to the properties,
+    /// deliberately: this is what was saved, not a change to save again.
+    ///
+    /// The automation recorder and the two chain history hooks are wired after the player
+    /// because they read it. A lane written into is a pattern edit like any other and goes
+    /// through the same history, one step per lane per pass. A chain about to change captures
+    /// what is really loaded onto the song first, because a step has to hold that rather than
+    /// whatever the song was last told, and the song's record of the chains is otherwise only
+    /// refreshed at particular moments.
+    ///
+    /// The sample rate is settled before anything can sound, since it cannot move once the
+    /// engine is built.
+    ///
+    /// <see cref="CurrentPattern"/> is set through the property and not through the field.
+    /// Setting the field is what the generated setter does plus nothing, and the plus nothing
+    /// is the part that subscribes to the pattern's own change event. Assigned directly, the
+    /// song the application starts on never heard about its own edits: typing a note into it
+    /// left the song looking saved, the Save button unmarked, and nothing in the log to say so.
+    /// Every song opened afterwards went through the property and was fine, which is exactly
+    /// why it survived. Worth remembering as a shape: a backing field assignment skips exactly
+    /// the part that was worth having.
+    /// </remarks>
+    /// <param name="audio">The one engine, shared with the pads rather than opened again.</param>
+    /// <param name="rack">Where a sound starts, which is not where a song's instruments live.</param>
+    /// <param name="recordings">The shelf of takes, shared with RECORD rather than copied.</param>
+    /// <param name="configStore">Where a preference is written down. Null in a test.</param>
+    /// <param name="config">The settings as they stand. Null in a test.</param>
+    /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
+    /// <param name="waveforms">What draws a recording's shape. Null draws a flat line.</param>
     public TrackerViewModel(
         IAudioEngine audio,
         MachineRack rack,
@@ -594,9 +781,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         _waveforms = waveforms;
 
-        // Every edit to any pattern goes through PatternEdit, which tells this before it
-        // happens. Set here rather than by PatternEdit itself, because a history belongs to the
-        // thing being edited and a pattern has never heard of one.
         PatternEdit.Watching = History.Taking;
 
         _configStore = configStore;
@@ -605,10 +789,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect = new PluginChainViewModel(Plugins);
         TrackEffect.Changed += MarkDirty;
 
-        // The chain across the whole mix. Its own view model rather than the one under the
-        // pattern, because that one follows the cursor and the master is not a track the cursor
-        // can be in: pointing it at the master would mean losing it the moment you touched an
-        // arrow key.
         MasterEffect = new PluginChainViewModel(Plugins)
         {
             Nothing = "No effect across the mix yet."
@@ -616,19 +796,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         MasterEffect.Changed += MarkDirty;
 
-
-
-        // Assigned to the field rather than the property: this is what was saved, not a
-        // change to save again.
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio);
 
-        // The same door as PatternEdit, for a recorded sweep: a lane written into is a pattern
-        // edit like any other and goes through the history the same way, one step per lane per
-        // pass. Made here rather than beside that line because it reads the player, and the
-        // player has only just been made.
         Automation = new AutomationRecorder(
             () => Song,
             () => Transport == TrackerTransportState.Playing,
@@ -640,11 +812,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Dirtied = MarkDirty
         };
 
-        // And before a chain changes, so a plugin put on a track or taken off one can be taken
-        // back. Wired here rather than with the other half, because it reads the player and the
-        // player has only just been made. The song's own record of the chains is brought up to
-        // date first: a step has to hold what is really loaded, and that record is otherwise
-        // only refreshed at particular moments.
         TrackEffect.Changing += () =>
         {
             _player.CaptureChains(Song);
@@ -659,11 +826,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             Changing("a plugin on the master");
         };
 
-        // Pointed once and never again: unlike a track's, this is about the one strip that is
-        // always the same one.
         MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
 
-        // Before anything sounds: the rate cannot move once the engine is built.
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
         _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
         _store = new SongStore();
@@ -672,20 +836,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         song = Song.CreateDefault();
 
-        // Through the property, not the field. Setting the field is what the generated setter
-        // does plus nothing, and the plus nothing is the part that subscribes to the pattern's
-        // own change. Assigned directly, the song the application starts on never heard about
-        // its own edits: typing a note into it left the song looking saved, the Save button
-        // unmarked, and nothing in the log to say so. Every song opened afterwards was fine,
-        // which is exactly why it survived.
         CurrentPattern = song.Patterns[0];
 
-        // The meters are polled rather than pushed: the audio side should not be calling into
-        // the UI dozens of times a second, and a meter that misses a frame costs nothing.
         _meters = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => ReadMeters();
 
-        // Unsaved work, kept where it can be found again. See Keep.
         _keeping = new DispatcherTimer { Interval = TimeSpan.FromSeconds(KeepSeconds) };
         _keeping.Tick += (_, _) => Keep();
         _keeping.Start();
@@ -704,6 +859,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         FollowCursorTrack();
     }
 
+    /// <summary>
+    /// The tempo, in beats a minute, which belongs to the song rather than to the transport.
+    /// </summary>
+    /// <remarks>
+    /// Announced to the history before it moves, so a tempo dragged across its range is one
+    /// step rather than a hundred: steps are gathered by what they say they are about and when
+    /// they happened.
+    /// </remarks>
     public double Bpm
     {
         get => Song.Bpm;
@@ -718,6 +881,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// How many rows make a beat, which is what the pattern's stripes are drawn from.
+    /// </summary>
+    /// <remarks>
+    /// Clamped to what the timing allows rather than refused, so a number typed into the box
+    /// lands somewhere sensible instead of doing nothing.
+    /// </remarks>
     public int LinesPerBeat
     {
         get => Song.LinesPerBeat;
@@ -732,13 +902,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// How many tracks the song has, which is an edit like any other: adding one and taking it
+    /// back is undoable.
+    /// </summary>
+    /// <remarks>
+    /// The work is in <see cref="SetTrackCount"/>, because changing it moves the mixer, the
+    /// cursor and every pattern at once.
+    /// </remarks>
     public int TrackCount
     {
         get => Song.TrackCount;
         set => SetTrackCount(value);
     }
 
+    /// <summary>The fewest tracks a song can have, for the box that sets the number.</summary>
     public int MinTrackCount => Song.MinTrackCount;
+
+    /// <summary>And the most, which is also what bounds anything indexed by track.</summary>
     public int MaxTrackCount => Song.MaxTrackCount;
 
     /// <summary>The track the cursor is in, for the header to pick out.</summary>
@@ -753,16 +934,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public Midi.IMidiMonitor? MidiKeys { get; set; }
 
+    /// <summary>The clock is running and the pattern is moving under the cursor.</summary>
     public bool IsPlaying => Transport == TrackerTransportState.Playing;
+
+    /// <summary>Held at a line: still somewhere, rather than back at the beginning.</summary>
     public bool IsPaused => Transport == TrackerTransportState.Paused;
+
+    /// <summary>Nothing is running, which is not the same as nothing sounding: a tail outlives a stop.</summary>
     public bool IsStopped => Transport == TrackerTransportState.Stopped;
 
     /// <summary>Pause only means anything while something is running.</summary>
     public bool CanPause => Transport == TrackerTransportState.Playing;
 
-    /// <summary>The save button carries the unsaved marker, so it is visible where it matters.</summary>
     /// <summary>
-    /// True while there is work that is not on disc.
+    /// True while there is work that is not on disc, which is what the Save button reads.
     /// </summary>
     /// <remarks>
     /// Shown by the Save button warming rather than by a star after its label. A star is a
@@ -780,20 +965,56 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     bool ITransportDeck.IsRunning => Transport != TrackerTransportState.Stopped;
 
+    /// <inheritdoc/>
+    /// <remarks>A song can always be typed into, so the button is never dead here.</remarks>
     bool ITransportDeck.CanRecord => true;
+
+    /// <inheritdoc/>
+    /// <remarks>And can always be played, even when every pattern in it is empty.</remarks>
     bool ITransportDeck.CanPlay => true;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Arming for typing rather than starting a recording: what the tracker records is
+    /// keystrokes into a pattern, not audio.
+    /// </remarks>
     void ITransportDeck.Record() => IsRecording = !IsRecording;
+
+    /// <inheritdoc/>
     void ITransportDeck.Play() => Play();
+
+    /// <inheritdoc/>
     void ITransportDeck.Pause() => Pause();
+
+    /// <inheritdoc/>
     void ITransportDeck.Stop() => Stop();
 
+    /// <summary>Starts the pattern or the song, whichever mode is set. Always enabled.</summary>
     public IRelayCommand PlayCommand => new RelayCommand(Play);
+
+    /// <summary>Holds where it is, so play carries on from there. Always enabled; a pause with
+    /// nothing running does nothing rather than being refused.</summary>
     public IRelayCommand PauseCommand => new RelayCommand(Pause);
+
+    /// <summary>Stops and goes back to the top of the pattern. Always enabled.</summary>
     public IRelayCommand StopCommand => new RelayCommand(Stop);
+
+    /// <summary>Arms and disarms typing into the pattern. Always enabled.</summary>
     public IRelayCommand ToggleRecordCommand => new RelayCommand(() => IsRecording = !IsRecording);
+
+    /// <summary>Adds a pattern to the song and a slot at the end of the order. Always enabled.</summary>
     public IRelayCommand AddPatternCommand => new RelayCommand(AddPattern);
+
+    /// <summary>Takes the picked slot out of the order, leaving the pattern itself alone.</summary>
     public IRelayCommand RemoveOrderEntryCommand => new RelayCommand(RemoveOrderEntry);
+
+    /// <summary>
+    /// Saves the song, asking for a name only if it has never had one.
+    /// </summary>
+    /// <remarks>
+    /// Always enabled: saving a song with nothing to save is cheap and refusing it would mean
+    /// explaining why the button is dead.
+    /// </remarks>
     public IAsyncRelayCommand SaveCommand => new AsyncRelayCommand(SaveOrAsk);
 
     /// <summary>Saves under a name you give it, whether or not it already has one.</summary>
@@ -802,8 +1023,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Shows the songs there are and opens the one picked.</summary>
     public IAsyncRelayCommand OpenSongCommand => new AsyncRelayCommand(OpenSong);
 
+    /// <summary>Opens the song picked out in the list, without a dialog. Always enabled.</summary>
     public IRelayCommand LoadCommand => new RelayCommand(Load);
+
+    /// <summary>Puts this song down and starts an empty one. Always enabled.</summary>
     public IRelayCommand NewSongCommand => new RelayCommand(NewSong);
+
+    /// <summary>Reads the songs folder again, for a file that arrived from outside.</summary>
     public IRelayCommand RefreshSongsCommand => new RelayCommand(RefreshSavedSongs);
 
     /// <summary>
@@ -876,7 +1102,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>The track whose panel is in front, or nothing when none is.</summary>
     private int? _panelTrack;
 
-    /// <summary>An instrument's window came to the front, so that is the track being worked on.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Remembered in <see cref="_panelTrack"/>, which is what <see cref="FocusedTrack"/>
+    /// prefers over the cursor while it holds anything.</remarks>
     public void PanelInFront(int track) => _panelTrack = track;
 
     /// <summary>
@@ -898,9 +1126,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = Cursor with { Track = track };
     }
 
-    /// <summary>
-    /// And has gone. The cursor says where you are again.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Only when the one that left is the one that was in front. Closing the window behind the
     /// one you are using is not you leaving the one you are using.
@@ -930,9 +1156,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IMachineValues? MachineValuesOn(int track) =>
         InstrumentBoxFor(track)?.Designer?.Editor?.Values;
 
-    /// <summary>The plugins inserted on a track, for something that wants to move one's knob.</summary>
     /// <summary>
-    /// What is inserted on a strip, the master included.
+    /// What is inserted on a strip, the master included, for something that wants to move one
+    /// of their knobs.
     /// </summary>
     /// <remarks>
     /// The master answers here because its chain is a chain like any other; it is only the
@@ -981,6 +1207,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public IAsyncRelayCommand RevertSongCommand => new AsyncRelayCommand(RevertSong);
 
+    /// <summary>
+    /// Asks, then reads the song back off disc and adopts it as though it had just been opened.
+    /// </summary>
+    /// <remarks>
+    /// A song that will not read is reported and nothing is changed, rather than the open song
+    /// being emptied to make room for what did not arrive.
+    /// </remarks>
     private async Task RevertSong()
     {
         if (!CanRevertSong) return;
@@ -1022,12 +1255,37 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             return !Needs(name) && _store.Exists(name);
         }
     }
+    /// <summary>
+    /// Takes the picked instrument out of the song, asking first.
+    /// </summary>
+    /// <remarks>
+    /// The edit that reaches furthest: every pattern that named it is renumbered around the
+    /// gap, so the step it leaves is the whole song rather than one pattern.
+    /// </remarks>
     public IAsyncRelayCommand RemoveInstrumentCommand => new AsyncRelayCommand(RemoveSelectedInstrument);
+
+    /// <summary>
+    /// Brings the machine picked out on the rack into the song as an instrument of its own.
+    /// </summary>
+    /// <remarks>
+    /// Enabled by there being a machine picked; with none it does nothing rather than being
+    /// refused.
+    /// </remarks>
     public IRelayCommand AddInstrumentCommand => new RelayCommand(AddInstrument);
+
+    /// <summary>Reads the rack again, for a machine or plugin added while the song was open.</summary>
     public IRelayCommand RefreshLibraryCommand => new RelayCommand(RefreshRack);
 
+    /// <summary>Whether the song has any instruments, for the list to say so when it has none.</summary>
     public bool HasInstruments => Instruments.Count > 0;
 
+    /// <summary>
+    /// Starts the clock, from where it was paused or from the top of the pattern.
+    /// </summary>
+    /// <remarks>
+    /// No audio device is a quiet application rather than a broken one, which is why what this
+    /// does is caught and said in the status line rather than thrown.
+    /// </remarks>
     private void Play()
     {
         try
@@ -1049,12 +1307,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>Holds the clock where it is, so play carries on from the same line.</summary>
     private void Pause()
     {
         _player.Pause();
         Status = "Paused";
     }
 
+    /// <summary>
+    /// Stops the clock and takes the playhead off the pattern.
+    /// </summary>
+    /// <remarks>
+    /// The meters are not stopped here, deliberately: a release tail outlives the stop, and
+    /// what the meters are about is whether anything is sounding. See <see cref="ReadMeters"/>.
+    /// </remarks>
     private void Stop()
     {
         _player.Stop();
@@ -1069,6 +1335,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MasterLanes?.Running();
     }
 
+    /// <summary>
+    /// The clock reached a new line, so the playhead, the order and the pattern follow it.
+    /// </summary>
+    /// <remarks>
+    /// Posted to the drawing thread, since this arrives on the clock's. A song crossing into
+    /// the next slot changes which pattern is on the screen, which is the one thing here that
+    /// is not simply a number moving.
+    /// </remarks>
     private void OnPositionChanged(object? sender, TrackerPosition position) =>
         Dispatcher.UIThread.Post(() =>
         {
@@ -1087,6 +1361,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The player owns the transport state; the view model only mirrors it. Deriving it here
     /// instead is what let a teardown from one run switch the buttons off during the next.
     /// </summary>
+    /// <remarks>
+    /// A pass ending ends the automation pass with it, so the next one takes its own steps
+    /// rather than adding to the last one's: stopping and starting again is two things a person
+    /// did.
+    ///
+    /// The meters are started here and never stopped here. What they are about is whether
+    /// anything is sounding, and a pass ending is not that: a release tail outlives the stop,
+    /// and a note played by hand does not need a pass at all. See <see cref="ReadMeters"/>.
+    /// </remarks>
     private void OnPlayerStateChanged(object? sender, TrackerTransportState state) =>
         Dispatcher.UIThread.Post(() =>
         {
@@ -1095,14 +1378,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             {
                 PlayingLine = -1;
 
-                // The pass is over, so the next one takes its own steps rather than adding to
-                // the last one's. Stopping and starting again is two things a person did.
                 Automation.Stopped();
             }
 
-            // Started here and never stopped here. What the meters are about is whether
-            // anything is sounding, and a pass ending is not that: a release tail outlives the
-            // stop and a note played by hand does not need a pass at all. See ReadMeters.
             if (state == TrackerTransportState.Playing) Meters();
         });
 
@@ -1130,6 +1408,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// did not do was read it again, so the reading stayed on screen for ever. It also meant a
     /// note played by hand with the transport stopped moved no meter at all, since nothing was
     /// reading them.
+    ///
+    /// <see cref="Tracker.Synth.TrackMixer.Sounding"/> is the rule: polling runs while anything
+    /// is sounding, and only then while a pass runs, since a pass between two notes is silent
+    /// and is not over. Auditioning starts the timer through <see cref="Meters"/> and the timer
+    /// stops itself when everything reads nought. The mixer was never wrong about any of this;
+    /// both faults were in what was asking.
     /// </remarks>
     private void ReadMeters()
     {
@@ -1189,6 +1473,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// The player came to rest, which is the moment to say what would not load.
+    /// </summary>
+    /// <remarks>
+    /// Said here rather than as each one fails: a song whose recordings are not on this machine
+    /// would otherwise report every missing file on every pass, and the one line that matters is
+    /// how many there were.
+    /// </remarks>
     private void OnPlayerStopped(object? sender, EventArgs e) =>
         Dispatcher.UIThread.Post(() =>
         {
@@ -1197,6 +1489,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 Status = $"Stopped. {failed.Count} instrument file(s) could not be loaded.";
         });
 
+    /// <summary>
+    /// Moving to another slot moves the pattern under the cursor, and both neighbours with it.
+    /// </summary>
     partial void OnOrderIndexChanged(int value)
     {
         CurrentPattern = Song.PatternAt(value);
@@ -1207,9 +1502,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Patterns are edited in place, so the one on screen is watched rather than every edit
     /// method remembering to report itself.
     /// </summary>
+    /// <remarks>
+    /// The selection is dropped, because a block belongs to the pattern it was drawn on: kept,
+    /// it would name lines and tracks in a pattern that never had them.
+    /// </remarks>
     partial void OnCurrentPatternChanged(Pattern? oldValue, Pattern? newValue)
     {
-        // A block belongs to the pattern it was drawn on.
         Selection = PatternSelection.None;
 
         if (oldValue != null) oldValue.Changed -= OnPatternEdited;
@@ -1218,6 +1516,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         NeighboursMoved();
     }
 
+    /// <summary>Any edit to the pattern on screen is work that is not on disc.</summary>
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
 
     /// <summary>A different song is a different description, and different neighbours.</summary>
@@ -1227,6 +1526,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         NeighboursMoved();
     }
 
+    /// <summary>
+    /// Renaming a song is an edit, and it changes what Delete and Cancel changes can do, since
+    /// both ask whether a file of that name exists.
+    /// </summary>
     partial void OnSongNameChanged(string value)
     {
         MarkDirty();
@@ -1234,6 +1537,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         OnPropertyChanged(nameof(CanRevertSong));
     }
 
+    /// <summary>Whether a block is drawn, which decides what the edit commands act on.</summary>
     public bool HasSelection => !Selection.IsEmpty;
 
     /// <summary>What the menu is about to act on: a block, or the track the cursor is on.</summary>
@@ -1245,14 +1549,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Drags the loose corner of the block to here.</summary>
     public void ExtendSelection(PatternCursor to) => Selection = Selection.ExtendTo(to);
 
+    /// <summary>Lets the block go, leaving the cursor where it is.</summary>
     public void ClearSelection() => Selection = PatternSelection.None;
 
+    /// <summary>Draws a block over the whole pattern. Always enabled.</summary>
     public IRelayCommand SelectAllCommand => new RelayCommand(SelectAll);
 
+    /// <summary>Copies the block, or the cell under the cursor when there is none.</summary>
     public IRelayCommand CopySelectionCommand => new RelayCommand(CopySelection);
 
+    /// <summary>Copies and then empties what was copied.</summary>
     public IRelayCommand CutSelectionCommand => new RelayCommand(CutSelection);
 
+    /// <summary>Puts the copy down with its corner at the cursor.</summary>
     public IRelayCommand PasteCommand => new RelayCommand(Paste);
 
     /// <summary>
@@ -1261,6 +1570,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     private PatternBlock? _clipboard;
 
+    /// <summary>Whether there is anything to paste, for the menu to grey itself out.</summary>
     public bool HasClipboard => _clipboard != null;
 
     /// <summary>What the paste would put down, for the menu.</summary>
@@ -1283,6 +1593,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = "Copied " + block.Describe();
     }
 
+    /// <summary>
+    /// Copies the block and then empties it, which is two edits and one gesture.
+    /// </summary>
+    /// <remarks>
+    /// What is emptied is worked out before the copy, since copying with no block selects the
+    /// cell under the cursor and the two answers have to be the same one.
+    /// </remarks>
     public void CutSelection()
     {
         var taken = HasSelection ? Selection : PatternSelection.At(Cursor);
@@ -1314,8 +1631,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = "Pasted " + landed.Describe();
     }
 
+    /// <summary>Empties the block without copying it.</summary>
     public IRelayCommand ClearSelectionCommand => new RelayCommand(DeleteSelection);
 
+    /// <summary>Draws a block over every line and every track of the pattern.</summary>
     public void SelectAll()
     {
         if (CurrentPattern == null) return;
@@ -1348,6 +1667,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>
     /// True for as long as you are there rather than something that just happened, which is the
     /// whole difference between the two halves of that bar.
+    ///
+    /// The instrument it names is what the track under the cursor plays, not what is picked out
+    /// in the list beside the pattern. Those are two questions: the bar says where you are, and
+    /// where you are is the track. Reading the list instead named an instrument on a track that
+    /// had none.
     /// </remarks>
     public string Context
     {
@@ -1364,9 +1688,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             string line = "line " + Cursor.Line.ToString("00", CultureInfo.InvariantCulture);
             string track = CursorTrackLabel;
 
-            // What the track under the cursor plays, not what is picked out in the list. The bar
-            // says where you are, and where you are is the track: it read the list instead and
-            // so named an instrument on a track that had none.
             var playing = Song.InstrumentAt(Song.GetTrackInstrument(Cursor.Track));
             string sound = playing == null ? "no instrument" : playing.Name;
 
@@ -1374,16 +1695,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>Pulls the notes onto every nth line, the grid coming from the menu as text.</summary>
     public IRelayCommand<string> QuantizeTrackCommand => new RelayCommand<string>(QuantizeTrack);
 
+    /// <summary>Empties the track the cursor is on, across the whole pattern.</summary>
     public IRelayCommand ClearTrackCommand => new RelayCommand(ClearTrack);
 
+    /// <summary>Empties every track of the pattern.</summary>
     public IRelayCommand ClearPatternCommand => new RelayCommand(ClearPattern);
 
+    /// <summary>Moves the notes up or down, by however many semitones the menu carries.</summary>
     public IRelayCommand<string> TransposeTrackCommand => new RelayCommand<string>(TransposeTrack);
 
+    /// <summary>Sets the volume column on every note, or takes it off. See <see cref="SetTrackVolume"/>.</summary>
     public IRelayCommand<string> SetTrackVolumeCommand => new RelayCommand<string>(SetTrackVolume);
 
+    /// <summary>Takes the instrument off the track the cursor is on, leaving its notes alone.</summary>
     public IRelayCommand ClearTrackInstrumentCommand =>
         new RelayCommand(() => ClearTrackInstrument(Cursor.Track));
 
@@ -1391,6 +1718,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Pulls the track's notes onto every nth line. The grid comes from the menu as text,
     /// since that is what a menu item can carry.
     /// </summary>
+    /// <remarks>
+    /// A block quantises whole tracks even when it covers only part of their height: a note is
+    /// early or late against the beat, which is a property of the track's timeline rather than
+    /// of the lines somebody happened to draw round.
+    /// </remarks>
     private void QuantizeTrack(string? grid)
     {
         if (CurrentPattern == null) return;
@@ -1400,8 +1732,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (HasSelection)
         {
-            // Whole tracks, even from a part-height block: a note is early or late against
-            // the beat, which is a property of the track's timeline, not of the lines picked.
             for (int track = Selection.FirstTrack; track <= Selection.LastTrack; track++)
                 moved += PatternEdit.Quantize(CurrentPattern, track, lines);
         }
@@ -1415,6 +1745,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : $"Quantized {SelectionLabel} to {lines}: {moved} note(s) moved";
     }
 
+    /// <summary>Empties the cursor's track across every line of the pattern.</summary>
     private void ClearTrack()
     {
         if (CurrentPattern == null) return;
@@ -1423,6 +1754,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Cleared {CursorTrackLabel}";
     }
 
+    /// <summary>Empties every track of the pattern, which is one edit and one step.</summary>
     private void ClearPattern()
     {
         if (CurrentPattern == null) return;
@@ -1453,6 +1785,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : $"{SelectionLabel} set to {what}: {changed} note(s) changed";
     }
 
+    /// <summary>
+    /// Moves the notes by that many semitones, over the block when there is one and over the
+    /// whole track otherwise.
+    /// </summary>
     private void TransposeTrack(string? semitones)
     {
         if (CurrentPattern == null) return;
@@ -1470,6 +1806,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     [ObservableProperty] private bool recordNoteOffs;
 
+    /// <summary>
+    /// Says which way it went and writes it down: it is a preference, so it outlives the run.
+    /// </summary>
     partial void OnRecordNoteOffsChanged(bool value)
     {
         Status = value
@@ -1482,6 +1821,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _configStore.Save(_config);
     }
 
+    /// <summary>
+    /// The same for how hard a key was hit. Nothing is stored in a test or a headless run,
+    /// where there is no settings file to write to.
+    /// </summary>
     partial void OnIgnoreVelocityChanged(bool value)
     {
         Status = value
@@ -1497,10 +1840,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>What the engine ended up running at, for SETTINGS to report.</summary>
     public int EngineSampleRate => _player.SampleRate;
 
-    /// <summary>Forgets a cached recording, for a file that has been edited under us.</summary>
     /// <summary>What the tracker's own stream is putting out, 0 to 1.</summary>
+    /// <remarks>
+    /// Half of what the status bar's meter shows; the pads are the other half, on a channel of
+    /// their own, and whoever wants the main output takes the louder of the two.
+    /// </remarks>
     public double OutputLevel => _player.OutputLevel;
 
+    /// <summary>How far through its recording a track is, for a panel drawing a playhead.</summary>
     public double SamplePosition(int track) => _player.SamplePosition(track);
 
     /// <summary>
@@ -1518,13 +1865,16 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private const string PatternPage = "Pattern";
 
+    /// <summary>The rack: what this song has to play, and where an instrument comes from.</summary>
     private const string MachinesPage = "Machines";
 
+    /// <summary>The mixer: the song's tracks and the strip that is not one.</summary>
     private const string MixerPage = "Mixer";
 
     /// <summary>What this song's controller is pointed at, which travels in its file.</summary>
     private const string ControlsPage = "Controls";
 
+    /// <summary>Which of the four pages is up. The pattern, since that is what a song is.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPattern))]
     [NotifyPropertyChangedFor(nameof(ShowsMachines))]
@@ -1532,10 +1882,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [NotifyPropertyChangedFor(nameof(ShowsControls))]
     private string page = PatternPage;
 
+    /// <summary>True while the pattern is showing, which is where the music is written.</summary>
     public bool ShowsPattern => Page == PatternPage;
 
+    /// <summary>True while the rack is showing.</summary>
     public bool ShowsMachines => Page == MachinesPage;
 
+    /// <summary>True while the mixer is showing, which is the one page with no cursor on it.</summary>
     public bool ShowsMixer => Page == MixerPage;
 
     /// <summary>
@@ -1563,6 +1916,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>Behind <see cref="Lanes"/>, which is set once and then only read.</summary>
     private AutomationViewModel? _lanes;
 
     /// <summary>What the master makes move over this pattern, and what else on it could.</summary>
@@ -1576,6 +1930,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>Behind <see cref="MasterLanes"/>. Pointed at strip -1 and never moved.</summary>
     private AutomationViewModel? _masterLanes;
 
     /// <summary>True while the master's automation is unfolded under the mixer.</summary>
@@ -1584,6 +1939,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>How tall it stands while it is open. See the strips under the pattern.</summary>
     [ObservableProperty] private double masterLanesHeight = 120;
 
+    /// <summary>
+    /// Read when it is opened, the same rule the pattern's automation follows, since reading a
+    /// strip's parameters costs a walk over everything on it.
+    /// </summary>
     partial void OnShowsMasterLanesChanged(bool value)
     {
         if (value) MasterLanes?.Show(TrackerPlayer.MasterStrip);
@@ -1633,6 +1992,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     [ObservableProperty] private double chainHeight = 104;
 
+    /// <summary>And how tall the automation stands, which is its own answer and not a share.</summary>
     [ObservableProperty] private double lanesHeight = 120;
 
     /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
@@ -1651,6 +2011,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>Behind <see cref="SongControls"/>, which is set from outside once.</summary>
     private ControlLinksViewModel? _songControls;
 
     /// <summary>
@@ -1665,6 +2026,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             ? PatternPage
             : which);
 
+    /// <summary>
+    /// Forgets a decoded recording, for a file that has been edited under us.
+    /// </summary>
+    /// <remarks>
+    /// A take is decoded once and shared by every instrument pointing at it, so trimming one on
+    /// RECORD leaves the tracker playing what the file used to be until it is told.
+    /// </remarks>
     public void ReloadSample(string filePath) => _player.ReloadInstrument(filePath);
 
     /// <summary>
@@ -1694,6 +2062,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The tracker's stream belongs to whichever device was open when it was made, and
     /// changing devices closes that one. Without this the stream is gone and nothing notices
     /// until the next note, which means a track's effects stop being given anything at all.
+    ///
+    /// A failure is swallowed on purpose: no audio device is a quiet application, not a broken
+    /// one, and there is nothing a person could do about it here.
     /// </remarks>
     public void ReopenAudio()
     {
@@ -1703,7 +2074,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
         catch (Exception)
         {
-            // No audio device is a quiet app, not a broken one.
         }
     }
 
@@ -1715,6 +2085,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// it is for is the twenty minutes of work between two saves, which is what a plugin taking
     /// the application down costs today. Doing nothing while there is nothing to do, so a
     /// tracker sitting idle writes no files.
+    ///
+    /// Never written under the placeholder name: a rescue file is the one song on the shelf
+    /// nobody named, and calling it "untitled" makes it look like one somebody saved. What goes
+    /// into it is what the tracks are actually playing, chains and patches read back exactly as
+    /// a real save reads them, or the rescue would be worth less than the thing it is rescuing.
+    ///
+    /// A song that will not be written down is logged and let go rather than allowed to stop
+    /// the song being written: it will be tried again in <see cref="KeepSeconds"/> seconds.
     /// </remarks>
     private void Keep()
     {
@@ -1722,15 +2100,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         try
         {
-            // Never the placeholder: a rescue file is the one song on the shelf nobody
-            // named, and calling it "untitled" makes it look like one somebody saved.
             string name = SongName.Trim();
             if (name.Length == 0 || Needs(name)) name = "unsaved song";
 
             if (name.EndsWith(RecoveredSuffix, StringComparison.Ordinal)) return;
             if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return;
 
-            // What the tracks are actually playing, the same as a real save reads back.
             _player.CaptureChains(Song);
             foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
 
@@ -1748,8 +2123,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
         catch (Exception error)
         {
-            // A song that will not be written down is not a reason to stop the one being
-            // written. It will be tried again in twenty seconds.
             Log.Fault(LogArea.Tracker, "keeping the unsaved song", error);
         }
     }
@@ -1784,71 +2157,95 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>Something about the song changed and the file on disk no longer matches.</summary>
+    /// <remarks>
+    /// The log line is written once, where it changes, and not on every call: one turn of a
+    /// plugin's knob is eighty of these.
+    /// </remarks>
     private void MarkDirty()
     {
-        // Once, when it changes: one turn of a plugin's knob is eighty of these.
         if (!IsDirty) Log.Write(LogArea.Tracker, "the song has something unsaved in it now");
 
         IsDirty = true;
     }
 
+    /// <summary>Says which way it went, since the difference is invisible until you type.</summary>
     partial void OnIsRecordingChanged(bool value) =>
         Status = value ? "Record armed: typing writes into the pattern" : "Record off: typing only auditions";
 
     /// <summary>Auditions the note under the cursor's instrument, for note entry feedback.</summary>
     public void PreviewNote(Note note) => PreviewNote(note, TrackerCell.NoVolume);
 
-    /// <summary>Auditions at a given volume, which is what makes a keyboard's velocity audible.</summary>
+    /// <summary>
+    /// Auditions at a given volume, which is what makes a keyboard's velocity audible.
+    /// </summary>
+    /// <remarks>
+    /// Played on the track the cursor is in, which is the whole point: it goes through that
+    /// track's inserts and its fader, so a plugin instrument sounds through the copy the track
+    /// plays rather than through an audition copy of its own, and the strip's meter and the
+    /// master's move for it exactly as they do for a pass. Everything but the plugin path used
+    /// to go to the loose audition bus instead and moved no track meter at all.
+    ///
+    /// The meters are started here rather than by the transport, since a note played by hand
+    /// with the transport stopped is exactly the case nothing was reading them for.
+    ///
+    /// And the note is said out loud through <see cref="Played"/>, so a panel's keyboard lights
+    /// for a note played by hand the same as for one the pattern played. Only the pattern used
+    /// to say anything, which is why a MIDI key sounded and nothing on the screen moved.
+    /// </remarks>
     public void PreviewNote(Note note, int volume)
     {
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument == null) return;
 
-        // Played on the track the cursor is on, so a plugin instrument sounds through the copy
-        // that track plays rather than through an audition copy of its own.
         double held = _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
 
-        // A note played by hand is that track playing, so its strip and the master move for it
-        // exactly as they do for a pass.
         Meters();
 
-        // And said out loud, so a panel's keyboard lights for a note played by hand the same as
-        // for one the pattern played. Only the pattern used to say anything, which is why a MIDI
-        // key sounded and nothing on screen moved.
         Played(Cursor.Track, note, held);
     }
 
+    /// <summary>Types a note at the instrument's own level, which is what a letter key sends.</summary>
     public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
 
+    /// <summary>
+    /// Sounds a note and, while record is armed, writes it into the pattern.
+    /// </summary>
+    /// <remarks>
+    /// A velocity sensitive keyboard makes every hit a little different. With
+    /// <see cref="IgnoreVelocity"/> on, how hard a key was pressed is dropped here, on the way
+    /// in, so a part comes out even and the instrument's own level is the only thing deciding
+    /// how loud it is.
+    ///
+    /// While the song is playing a note lands on the line you can hear rather than the line you
+    /// left the cursor on, and the cursor is not stepped down: the music is already moving.
+    /// </remarks>
     public void EnterNote(Note note, int volume)
     {
-        // A velocity sensitive keyboard makes every hit a little different. With this on, how
-        // hard a key is pressed is dropped on the way in, so a part comes out even and the
-        // instrument's own level is the only thing deciding how loud it is.
         if (IgnoreVelocity) volume = TrackerCell.NoVolume;
 
         PreviewNote(note, volume);
 
         if (CurrentPattern == null || !IsRecording) return;
 
-        // While playing, notes land on the line you can hear, not the line you left the cursor on.
         var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
 
         PatternEdit.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
         if (!IsPlaying) StepDown();
     }
 
-    /// <summary>
-    /// A note from a MIDI keyboard. It arrives on the MIDI thread, and everything it touches
-    /// from there (the cursor, the pattern, the grid's redraw) belongs to the UI thread.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// It arrives on the MIDI thread, and everything it touches from there, the cursor, the
+    /// pattern and the grid's redraw, belongs to the drawing thread.
+    /// </remarks>
     public void PlayMidiNote(Note note, int volume) =>
         Dispatcher.UIThread.Post(() => EnterNote(note, volume));
 
-    /// <summary>
-    /// A key coming up on the keyboard, which writes a note-off when that has been asked for.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
+    /// Here it writes a note-off into the pattern, and only when
+    /// <see cref="RecordNoteOffs"/> has asked for that.
+    ///
     /// The note is not looked at. A note-off ends whatever that track is sounding rather than
     /// one particular note, so which key was let go of does not change what gets written; it
     /// is here because the caller has it and a later reading of this may want it.
@@ -1860,30 +2257,31 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Dispatcher.UIThread.Post(EnterNoteOff);
     }
 
-    /// <summary>
-    /// Sounds one note on any instrument, for the rack's auditioning. The engine lives
-    /// here, so the rack borrows it rather than opening a second one.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// No track is named, deliberately: the rack's keyboard may be playing an instrument that
+    /// is in no song at all, so it goes through nobody's fader and moves no strip's meter.
+    /// The master's still moves, because everything reaches the card through the master and
+    /// that meter is the one measuring what you actually hear.
+    /// </remarks>
     public double Audition(TrackerInstrument instrument, Note note, int volume)
     {
-        // No track, so no strip moves for it, but everything reaches the card through the
-        // master and the master's meter is the one measuring what you actually hear.
         Meters();
 
         return _player.Preview(instrument, note, GainFor(volume));
     }
 
-    /// <summary>Lets go of one note played by hand, which is what a key coming up means.</summary>
+    /// <inheritdoc/>
     public void Let(TrackerInstrument instrument, Note note) => _player.LetPreview(instrument, note);
 
-    /// <summary>Stops what that instrument was sounding by hand, for a panel being left.</summary>
+    /// <inheritdoc/>
     public void Silence(TrackerInstrument instrument) => _player.CutPreview(instrument);
 
-    /// <summary>
-    /// The running plugin behind a plugin instrument, for the editor to show and to read a
-    /// patch out of. Loading it here also means the first note played is not the one that
-    /// waits for the plugin to open.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The engine is brought up first, so the first note played is not the one that waits for
+    /// the plugin to open.
+    /// </remarks>
     public Audio.Plugins.IPluginInstrument? PluginFor(TrackerInstrument instrument)
     {
         if (instrument == null || !instrument.IsPlugin) return null;
@@ -1892,11 +2290,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         return _player.PreviewPlayerFor(instrument);
     }
 
+    /// <summary>
+    /// Turns a volume column into a gain, with an empty column meaning the instrument's own
+    /// level rather than silence.
+    /// </summary>
     private static float GainFor(int volume) =>
         volume == TrackerCell.NoVolume
             ? 1f
             : Math.Clamp(volume, 0, TrackerCell.MaxVolume) / (float)TrackerCell.MaxVolume;
 
+    /// <summary>
+    /// Writes OFF where the cursor is, which ends whatever that track is sounding.
+    /// </summary>
+    /// <remarks>
+    /// Only while record is armed, unlike Delete: this is typing, and typing into a pattern
+    /// nobody armed is how a song gets edited by accident.
+    /// </remarks>
     public void EnterNoteOff()
     {
         if (CurrentPattern == null || !IsRecording) return;
@@ -1905,12 +2314,20 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         StepDown();
     }
 
+    /// <summary>
+    /// Types one hexadecimal digit into whichever column the cursor is in.
+    /// </summary>
+    /// <remarks>
+    /// The caret only steps down when the digit finished the value it was filling, so a two
+    /// digit column takes two keystrokes and moves once.
+    /// </remarks>
     public void EnterHexDigit(char digit)
     {
         if (CurrentPattern == null || !IsRecording) return;
         if (PatternEdit.EnterHexDigit(CurrentPattern, Cursor, digit)) StepDown();
     }
 
+    /// <summary>Types the letter half of an effect, leaving its digits where they are.</summary>
     public void EnterEffectCommand(char command)
     {
         if (CurrentPattern == null || !IsRecording) return;
@@ -1939,16 +2356,25 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         if (IsRecording) StepDown();
     }
 
+    /// <summary>
+    /// Pushes the track's cells down from the cursor, leaving an empty line where it is.
+    /// </summary>
+    /// <remarks>
+    /// One track and not the whole pattern: a line inserted across every track would move parts
+    /// nobody was editing out of time with the ones that were.
+    /// </remarks>
     public void InsertLine()
     {
         if (CurrentPattern != null) PatternEdit.InsertLine(CurrentPattern, Cursor);
     }
 
+    /// <summary>Pulls the track's cells up over the cursor, which is the other half of it.</summary>
     public void DeleteLine()
     {
         if (CurrentPattern != null) PatternEdit.DeleteLine(CurrentPattern, Cursor);
     }
 
+    /// <summary>Moves the cursor and drops whatever block was drawn, which is the plain case.</summary>
     public void MoveCursor(int lineDelta, int trackDelta, int columnDelta) =>
         MoveCursor(lineDelta, trackDelta, columnDelta, extend: false);
 
@@ -1971,6 +2397,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = moved;
     }
 
+    /// <summary>
+    /// Puts the cursor exactly there, for a click on the grid.
+    /// </summary>
+    /// <remarks>
+    /// The block is left alone, since a click that begins a drag sets the cursor before the
+    /// drag has said anything about a selection.
+    /// </remarks>
     public void SetCursor(PatternCursor value) => Cursor = value;
 
     /// <summary>
@@ -1995,7 +2428,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         PointEffectSlot();
         MarkDirty();
 
-        // An instrument lives on one track, so say what moved and what was pushed off.
         if (previous == track)
             Status = $"'{chosen.Name}' is already on track {track + 1:00}";
         else if (displaced != null && displaced != chosen)
@@ -2051,6 +2483,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Moves a whole track to another position: its notes, its instrument, its effects and its
     /// mixer strip, in the song and in what is playing.
     /// </summary>
+    /// <remarks>
+    /// The song and what is playing have to move together, or the notes arrive at the new track
+    /// and the sound answers on the old one.
+    ///
+    /// The cursor follows the track it was on rather than staying at its number, so dragging a
+    /// track does not also move the caret to somebody else's part. An instrument lives on one
+    /// track, which is why the status line says what moved and what was pushed off it.
+    /// </remarks>
     public void MoveTrack(int from, int to)
     {
         if (from == to) return;
@@ -2058,11 +2498,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         var moved = Song.InstrumentAt(Song.GetTrackInstrument(from));
 
-        if (!Song.MoveTrack(from, to)) return;
-
-        // The song and what is playing have to move together, or the notes arrive at the new
-        // track and the sound answers on the old one.
         Changing("moving a track");
+
+        if (!Song.MoveTrack(from, to)) return;
 
         _player.MoveTrack(from, to);
 
@@ -2071,7 +2509,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         PointEffectSlot();
         MarkDirty();
 
-        // The cursor follows the track it was on, so a drag does not also move the caret.
         Cursor = Cursor with { Track = Song.WhereTrackWent(Cursor.Track, from, to) };
 
         Status = moved == null
@@ -2097,11 +2534,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
-    /// The instrument a note typed on this track should carry: the track's own if it has one,
-    /// otherwise whatever is selected in the instrument list.
-    /// </summary>
-    /// <summary>
-    /// What a track plays, and nothing when it plays nothing.
+    /// What a track plays, and nothing when it plays nothing. This is also the instrument a
+    /// note typed on that track carries.
     /// </summary>
     /// <remarks>
     /// The track's own instrument and never the one picked out in the list beside the pattern.
@@ -2117,12 +2551,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private int InstrumentForTrack(int track) => Song.GetTrackInstrument(track);
 
+    /// <summary>
+    /// Drops the caret by the edit step, which is how typing a part walks down a track.
+    /// </summary>
+    /// <remarks>
+    /// A step of nought is a deliberate setting and means the caret stays put, which is how a
+    /// chord is typed into one line.
+    /// </remarks>
     private void StepDown()
     {
         if (CurrentPattern == null || EditStep <= 0) return;
         Cursor = Cursor.MoveLine(EditStep, CurrentPattern.Lines);
     }
 
+    /// <summary>
+    /// Adds an empty pattern and a slot at the end of the order pointing at it, then goes there.
+    /// </summary>
     private void AddPattern()
     {
         Changing("adding a pattern");
@@ -2135,6 +2579,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Added pattern {Song.Patterns[index].Name}";
     }
 
+    /// <summary>
+    /// Takes the picked slot out of the order. The pattern itself stays in the song, since it
+    /// may be in the order somewhere else and is somebody's work either way.
+    /// </summary>
+    /// <remarks>
+    /// The last slot is kept: a song with an empty order has nothing to play and nowhere to put
+    /// the cursor.
+    /// </remarks>
     private void RemoveOrderEntry()
     {
         Changing("removing an order slot");
@@ -2148,6 +2600,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         CurrentPattern = Song.PatternAt(OrderIndex);
     }
 
+    /// <summary>
+    /// Sets how many tracks the song has, clamped to what a song allows rather than refused.
+    /// </summary>
+    /// <remarks>
+    /// The grid redraws off the pattern's own change event, so only the label has to be told
+    /// that the number moved.
+    /// </remarks>
     private void SetTrackCount(int trackCount)
     {
         int clamped = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
@@ -2161,7 +2620,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         RefreshStrips();
         MarkDirty();
 
-        // The grid redraws off the pattern's own Changed event; only the label needs telling.
         OnPropertyChanged(nameof(TrackCount));
     }
 
@@ -2169,6 +2627,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Rebuilds the mixer from the song. Called whenever the track count or the instrument on a
     /// track changes, since a strip is named after what plays through it.
     /// </summary>
+    /// <remarks>
+    /// The master is made separately and kept out of <see cref="Strips"/>, so nothing that
+    /// walks the tracks ever finds it by counting. Rebuilding is what
+    /// <see cref="MixShown"/> exists for: anything holding a strip is holding the last song's.
+    /// </remarks>
     private void RefreshStrips()
     {
         Song.Normalize();
@@ -2184,8 +2647,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             });
         }
 
-        // And the strip that is not a track, kept apart from them so nothing that walks the
-        // tracks ever finds it by counting.
         MasterStrip = new TrackStripViewModel(
             TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
 
@@ -2197,6 +2658,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// here. Updated in place rather than rebuilt: the mixer is full of controls you may be
     /// holding on to.
     /// </summary>
+    /// <remarks>
+    /// The master is remade rather than updated, since it carries no name to update.
+    /// </remarks>
     private void RefreshStripNames()
     {
         foreach (var strip in Strips)
@@ -2205,8 +2669,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             strip.InstrumentName = instrument?.Name ?? "";
         }
 
-        // And the strip that is not a track, kept apart from them so nothing that walks the
-        // tracks ever finds it by counting.
         MasterStrip = new TrackStripViewModel(
             TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
 
@@ -2225,16 +2687,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public Action? MixShown { get; set; }
 
     /// <summary>A fader or a mute moved: hear it now, and remember the song has changed.</summary>
+    /// <remarks>
+    /// The step it takes is gathered by what it says it is about, or a fader dragged across its
+    /// range would be a hundred of them and one undo would move it by a hair.
+    /// </remarks>
     private void OnMixChanged()
     {
-        // Gathered, or a fader dragged across its range would be a hundred steps.
         Changing("the mix");
 
         _player.ApplyMix();
         MarkDirty();
 
-        // And the strip that is not a track, kept apart from them so nothing that walks the
-        // tracks ever finds it by counting.
         MasterStrip = new TrackStripViewModel(
             TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
 
@@ -2247,6 +2710,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// takes the pattern off the screen with it. So the wanted slot is held here and put back
     /// once the list is whole again.
     /// </summary>
+    /// <remarks>
+    /// The pattern and the two neighbours are set outright at the end rather than left to the
+    /// change hooks. Restoring the same slot number is not a change, so nothing would fire and
+    /// the grid would stay empty; and the order is what decides what is either side of this
+    /// pattern, so a slot added or taken out moves both without the number moving at all.
+    /// </remarks>
     private void RefreshOrder()
     {
         int wanted = OrderIndex;
@@ -2260,20 +2729,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);
 
-        // Set outright rather than left to the change hook: restoring the same number is not
-        // a change, and the grid would stay empty.
         CurrentPattern = Song.PatternAt(OrderIndex);
 
-        // And for the same reason: the order is what decides what is either side of this
-        // pattern, so a slot added or taken out changes them without the number moving.
         NeighboursMoved();
     }
 
     /// <summary>
-    /// The rack, refreshed for the picker that brings an instrument into this song.
-    /// </summary>
-    /// <summary>
-    /// The rack has changed under the picker.
+    /// The rack has changed under the picker that brings an instrument into this song.
     /// </summary>
     /// <remarks>
     /// The picker is filled straight from the rack now rather than from a second reading of the
@@ -2293,6 +2755,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// a copy: a song opened without the rack still plays, and the copy is brought back up
     /// to date whenever the rack has the instrument.
     /// </summary>
+    /// <remarks>
+    /// The copy is given an id of its own, because it is the song's from here on: name it what
+    /// you like, set it how you like, and take a second one off the same machine if you want
+    /// one. Sharing the rack's id would have meant one Zampler to a song and a name you could
+    /// not change, since a machine on the rack keeps the machine's name.
+    /// </remarks>
     private void AddInstrument()
     {
         var chosen = PickedMachine?.Instrument;
@@ -2304,10 +2772,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Changing("adding an instrument");
 
-        // A copy with an id of its own, because it is the song's from here on: name it what you
-        // like, set it how you like, and take a second one off the same machine if you want one.
-        // Sharing the rack's id would have meant one Zampler to a song and a name you could not
-        // change, since a machine on the rack keeps the machine's name.
         var taken = chosen.Clone();
 
         taken.Id = "";
@@ -2338,13 +2802,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         RefreshRack();
     }
 
+    /// <summary>
+    /// Takes the picked instrument out of the song, asking first.
+    /// </summary>
+    /// <remarks>
+    /// Cells point at instruments by number, so removing one renumbers every cell that named a
+    /// later one: this rewrites the patterns as well as the list, which is why it is asked
+    /// about and why the step is taken before it happens. It is the edit that reaches furthest,
+    /// and nothing smaller than the whole song would put it back.
+    /// </remarks>
     private async Task RemoveSelectedInstrument()
     {
         int index = SelectedInstrument;
         var instrument = Song.InstrumentAt(index);
         if (instrument == null) return;
 
-        // Cells are renumbered around the gap, so this rewrites the pattern as well.
         bool confirmed = await ConfirmDialog.AskAsync(
             "Remove from song",
             $"Take '{instrument.Name}' out of this song? Cells that used it lose their instrument, "
@@ -2353,9 +2825,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (!confirmed) return;
 
-        // Cells point at instruments by number, so the song renumbers them as it removes one.
-        // Before, because this is the edit that reaches furthest: every pattern that named this
-        // instrument is renumbered, and nothing smaller than the whole song would put it back.
         Changing("taking an instrument out");
 
         if (!Song.RemoveInstrumentAt(index)) return;
@@ -2401,6 +2870,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     ///
     /// Said once, when the song arrives. Not on every glance at an instrument, and not as a bar
     /// across the page.
+    ///
+    /// What it tells you to do depends on where the machine came from, and there are two
+    /// different fixes: one that ships with the program is added under SETTINGS, System, and one
+    /// that arrived in a zip has to be imported from that zip.
     /// </remarks>
     public async Task TellOfMissingMachines()
     {
@@ -2412,7 +2885,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         string names = Listed(wanted.Select(machine => machine.Name).ToList());
 
-        // Two different fixes, and which one it is depends on where the machine came from.
         string how = wanted.All(machine => machine.Ships)
             ? "Add " + (one ? "it" : "them") + " under SETTINGS, System."
             : wanted.Any(machine => machine.Ships)
@@ -2488,6 +2960,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         return wanted.Length == 0 || string.Equals(wanted, Unnamed, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Writes the song into the songs folder under its own name.
+    /// </summary>
+    /// <remarks>
+    /// What is saved is what the tracks are actually playing rather than whatever the song was
+    /// opened with: the chains are read off the player, and the patch of every plugin
+    /// instrument is read back out of the plugin before the file is written, so a knob turned in
+    /// Serum's own window is in the song.
+    ///
+    /// Every track, not the one the cursor is on. The effect slot follows the cursor, so asking
+    /// it alone saved one track's plugin and quietly dropped what every other track's plugin was
+    /// set to.
+    ///
+    /// A real save also drops whatever was being kept: the rescue file is no longer anybody's
+    /// safety net once the work is on disc under its own name.
+    /// </remarks>
     private void Save()
     {
         string name = SongName.Trim();
@@ -2508,15 +2996,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             SongName = name;
             Song.Name = name;
 
-            // What is actually loaded on the tracks is what gets saved, rather than whatever
-            // the song was opened with.
             _player.CaptureChains(Song);
 
-            // And the same for the sound every plugin instrument is making: whatever was
-            // turned in its own window is read back onto the instrument before the song is
-            // written. Every track, not the one the cursor is on: the effect slot follows the
-            // cursor, so asking it alone saved one track's plugin and quietly dropped what
-            // every other track's plugin was set to.
             foreach (var box in _instrumentBoxes.Values) box.SyncPatch();
 
             string path = _store.PathFor(name);
@@ -2527,7 +3008,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             IsDirty = false;
 
-            // Saved for real, so what was being kept is no longer anybody's safety net.
             Drop();
 
             RefreshSavedSongs();
@@ -2544,6 +3024,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// Opens the song picked out in the list.
+    /// </summary>
+    /// <remarks>
+    /// A packed song brought its takes with it and they are on the shelf by the time this
+    /// returns, so <see cref="RecordingsArrived"/> is raised: without it they are there and
+    /// nobody can see them.
+    /// </remarks>
     private void Load()
     {
         var file = SelectedSongFile;
@@ -2562,8 +3050,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Adopt(loaded, file.Name);
 
-        // A packed song brought its takes with it and they are on the shelf now, so the shelf
-        // has to be told to look again or they are there and nobody can see them.
         if (arrived.Count > 0) RecordingsArrived?.Invoke(this, EventArgs.Empty);
 
         Status = arrived.Count == 0
@@ -2630,6 +3116,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// Puts the open song down and starts an empty one under the placeholder name.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is asked, because nothing is lost that was not already unsaved; what was being
+    /// kept goes with it through <see cref="Adopt"/>.
+    /// </remarks>
     private void NewSong()
     {
         Adopt(Song.CreateDefault(), Unnamed);
@@ -2642,36 +3135,59 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// touches the pattern, the order, the instruments, and the cursor, so it all happens here
     /// rather than being spread across the callers.
     /// </summary>
+    /// <remarks>
+    /// The song's instruments are the song's own and are not fetched from the rack on the way
+    /// in: a song opens sounding exactly the way it was saved, and an instrument built here
+    /// belongs to the work it was built for. The rack is where a sound starts, not something
+    /// that reaches back into a song already written.
+    ///
+    /// The history is emptied, because a history outliving its song would hand somebody another
+    /// song's notes back. The octave came with the song, so the pattern editor and every panel
+    /// open on it follow it there.
+    ///
+    /// The plugins the last song had on its tracks belong to that song: left in place they
+    /// would go on playing under the new song's notes. The new song's come back with it, and a
+    /// plugin that is not on this machine is reported rather than passed over in silence, as are
+    /// recordings the song names and this machine has not got: a song missing those opens
+    /// perfectly and plays nothing on those tracks, and nothing about that looks like a fault
+    /// until you go looking for one.
+    ///
+    /// Plugin instruments are loaded now rather than on the note that wants one. Each is a
+    /// process of its own with a patch to swallow, and left to the clock they came up one at a
+    /// time, each stall landing on the first bar somebody was listening to.
+    ///
+    /// The order list is rebuilt before the slot is chosen, so a fresh song opens on its first
+    /// pattern rather than on nothing. The song's own controller layout came with it, so
+    /// anything showing that layout is showing the last song's until it is told; nothing else
+    /// notices, since the mappings are read per message and were already right, and it is only
+    /// the list on the screen that was wrong.
+    ///
+    /// Whatever was being kept belonged to the song that has just been put down. Leaving it
+    /// would offer somebody their old work back every time they opened anything.
+    ///
+    /// The tempo and the track count live on the song, so the whole transport bar is stale and
+    /// is told so at the end.
+    /// </remarks>
     private void Adopt(Song replacement, string name)
     {
         _player.Stop();
 
         replacement.Normalize();
 
-        // The song's instruments are the song's own. They are not fetched from the rack on
-        // the way in: a song opens sounding exactly the way it was saved, and an instrument
-        // built here belongs to the work it was built for. The rack is where a sound
-        // starts, not something that reaches back into a song already written.
         Song = replacement;
         SongName = name;
         Song.Name = name;
 
-        // A history outliving its song would hand somebody another song's notes back.
         History.Forget();
 
-        // The octave came with the song, so the pattern editor and every panel open on it.
         Octave = Math.Clamp(Song.KeyboardOctave, 0, 9);
 
         SyncInstruments();
         RefreshStrips();
 
-        // The plugins the last song had on its tracks belong to that song, not this one.
-        // Left in place they would keep playing under the new song's notes.
         CloseInstrumentBoxes();
         _player.ClearPlayers();
 
-        // The effects come back with the song. A plugin that is not on this machine is
-        // reported rather than passed over in silence.
         var missing = _player.RestoreChains(Song);
         var lost = Lost(Song);
 
@@ -2681,24 +3197,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             if (missing.Count > 0) said.Add("Missing plugin(s): " + string.Join(", ", missing));
 
-            // Said rather than left to be noticed. A song whose recordings are not on this
-            // machine opens perfectly and plays nothing on those tracks, and nothing about
-            // that looks like a fault until you go looking for one.
             if (lost.Count > 0) said.Add("Missing recording(s): " + string.Join(", ", lost));
 
             Status = string.Join("  ", said);
         }
 
-        // The instruments as well, and now rather than on the note that wants one. Each is a
-        // process of its own with a patch to swallow, and left to the clock they came up one
-        // at a time, each stall landing on the first bar somebody was listening to.
         _player.PreloadPlugins(Song);
 
-        // The panel is about a track whose chain has just been rebuilt.
         PointEffectSlot();
 
-        // The order list is rebuilt before the slot is chosen, so a fresh song opens on its
-        // first pattern rather than on nothing.
         RefreshOrder();
 
         OrderIndex = 0;
@@ -2706,25 +3213,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Cursor = PatternCursor.Start.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
         PlayingLine = -1;
 
-        // The song's own controller layout came with it, so anything showing that layout is
-        // showing the last song's until it is told. Nothing else notices: the mappings are
-        // read per message and were already right; it is the list on the screen that was not.
         SongControls?.Reread();
 
-        // Freshly opened or freshly created: it matches what is on disk, or has nothing to lose.
         IsDirty = false;
 
-        // Whatever was being kept belonged to the song that has just been put down. Leaving it
-        // would offer somebody their old work back every time they opened anything.
         Drop();
 
-        // The tempo and track count live on the song, so the whole transport bar is stale.
         OnPropertyChanged(nameof(Bpm));
         OnPropertyChanged(nameof(LinesPerBeat));
         OnPropertyChanged(nameof(TrackCount));
     }
 
-    /// <summary>Rebuilds the list so every row carries its current number.</summary>
     /// <summary>
     /// Gives the song's instrument a name of your choosing.
     /// </summary>
@@ -2735,6 +3234,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public IAsyncRelayCommand RenameInstrumentCommand => new AsyncRelayCommand(RenameInstrument);
 
+    /// <summary>
+    /// Asks for the new name and puts it on the song's own copy.
+    /// </summary>
+    /// <remarks>
+    /// Nothing happens when the name comes back unchanged, so opening the dialog and pressing
+    /// return does not leave a step in the history.
+    /// </remarks>
     private async Task RenameInstrument()
     {
         var slot = Instruments.ElementAtOrDefault(SelectedInstrument);
@@ -2773,6 +3279,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MarkDirty();
     }
 
+    /// <summary>
+    /// Rebuilds the rows beside the pattern so every one carries its current number and the
+    /// track it is on.
+    /// </summary>
+    /// <remarks>
+    /// Rebuilding the list drops the selection, which is then put back where it was: without
+    /// that, every edit that touched the list moved the picked instrument to the top.
+    /// </remarks>
     private void SyncInstruments()
     {
         int selected = SelectedInstrument;
@@ -2781,22 +3295,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int i = 0; i < Song.Instruments.Count; i++)
             Instruments.Add(new InstrumentSlot(i, Song.Instruments[i], Song.GetInstrumentTrack(i)));
 
-        // Rebuilding the list drops the selection; put it back where it was.
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
 
         OnPropertyChanged(nameof(HasInstruments));
     }
 
     /// <summary>
-    /// Removes a saved song from disc.
+    /// Removes the open song from disc, which is what the button in the bar does.
     /// </summary>
     /// <remarks>
-    /// What is open stays open, even when it is the one that was deleted: what you are working
+    /// What is open stays open, even though it is the one that was deleted: what you are working
     /// on is in memory and throwing away the file is not a reason to take it off you. It simply
     /// has nowhere to go back to, which is what an untitled song is, so it is marked unsaved and
     /// the picker forgets it.
+    ///
+    /// The work is <see cref="DeleteSongFile"/>, so there is one delete and one question rather
+    /// than two that could come to disagree.
     /// </remarks>
-    /// <summary>The button in the bar, which is about the song that is open.</summary>
     private async Task DeleteSong()
     {
         string name = SongName.Trim();
@@ -2820,6 +3335,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// not two. Deleting the one that happens to be open leaves it on the screen, unsaved, the
     /// way the button in the bar does: what is in front of you is not something a list of files
     /// gets to take away.
+    ///
+    /// The open song is marked unsaved when its file goes, because what is on the screen is now
+    /// the only copy of itself.
     /// </remarks>
     public async Task DeleteSongFile(SongFile? file)
     {
@@ -2846,7 +3364,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             if (wasOpen)
             {
-                // Still on the screen, and now the only copy of itself.
                 MarkDirty();
                 OnPropertyChanged(nameof(CanDeleteSong));
                 OnPropertyChanged(nameof(CanRevertSong));
@@ -2866,6 +3383,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
+    /// <summary>
+    /// Reads the songs folder again, keeping whichever row was picked.
+    /// </summary>
+    /// <remarks>
+    /// Kept by path rather than by object, since every read builds new
+    /// <see cref="SongFile"/> records and the old one would never match.
+    /// </remarks>
     private void RefreshSavedSongs()
     {
         string? keep = SelectedSongFile?.Path;
@@ -2905,10 +3429,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         OnPropertyChanged(nameof(NoSongsFound));
     }
 
+    /// <summary>
+    /// Whether a song's name carries what was typed, in the reader's own alphabet rather than
+    /// the machine's: an accented name should match the way somebody would expect it to.
+    /// </summary>
     private bool Named(SongFile file) =>
         SongSearch.Length == 0 ||
         (file.Name ?? "").Contains(SongSearch, StringComparison.CurrentCultureIgnoreCase);
 
+    /// <summary>
+    /// Stops the meters and puts the player down, which takes the audio and every plugin with
+    /// it.
+    /// </summary>
+    /// <remarks>
+    /// The player owns the stream and the plugin processes, so this is where they go. Nothing
+    /// here writes the song down: what was unsaved is already in the kept file.
+    /// </remarks>
     public void Dispose()
     {
         _meters.Stop();

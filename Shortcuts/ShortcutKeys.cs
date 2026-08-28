@@ -26,29 +26,47 @@ namespace JingleBox2.Shortcuts;
 /// </remarks>
 public static class ShortcutKeys
 {
-    /// <summary>What the keys are set to. Replaced when the settings change them.</summary>
-    public static ShortcutMap Map { get; set; } = new();
+    /// <summary>
+    /// What the keys are set to. Replaced when the settings change them.
+    /// </summary>
+    /// <remarks>
+    /// One map for the application, since a keystroke means the same thing wherever you press
+    /// it; what differs is who answers, and that is <see cref="IShortcutContext"/>.
+    /// </remarks>
+    public static IShortcutMap Map { get; set; } = new ShortcutMap();
 
-    /// <summary>Has a window answer shortcuts. Every window, including the dialogs.</summary>
+    /// <summary>
+    /// Has a window answer shortcuts. Every window, including the dialogs.
+    /// </summary>
+    /// <remarks>
+    /// Heard on the way down, like the space bar and the pointing mode, so a control that would
+    /// otherwise spend the keystroke does not get the chance. What it must not do is take one
+    /// nobody wants, which is why nothing is marked handled unless a context said yes first.
+    /// </remarks>
     public static void Listen(InputElement window)
     {
         if (window is null) return;
 
-        // On the way down, like the space bar and the pointing mode, so a control that would
-        // otherwise spend the keystroke does not get the chance. What it must not do is take one
-        // nobody wants, which is why nothing is handled unless a context said yes first.
         window.AddHandler(InputElement.KeyDownEvent, Pressed, RoutingStrategies.Tunnel);
     }
 
+    /// <summary>
+    /// A key arrived: work out what it asks for, find who can do it, and let them.
+    /// </summary>
+    /// <remarks>
+    /// Three of the four are refused while a caret is blinking. Undo in a box somebody is
+    /// typing in is the box's own undo, and taking it would be taking away the only thing that
+    /// keystroke has ever meant there. Save is not like that: saving while typing a name is a
+    /// perfectly sensible thing to ask for, and no text box has ever done anything with it.
+    ///
+    /// A page that throws is written down and nothing more. One page that will not do a thing
+    /// is one page, not a broken keyboard.
+    /// </remarks>
     private static void Pressed(object? sender, KeyEventArgs e)
     {
         if (e.Handled) return;
         if (Map.Match(e.Key, e.KeyModifiers) is not { } action) return;
 
-        // Undo in a box somebody is typing in is the box's own undo, and taking it would be
-        // taking away the only thing that keystroke has ever meant while a caret is blinking.
-        // Save is not like that: saving while typing a name is a perfectly sensible thing to ask
-        // for, and no text box has ever done anything with it.
         if (Typing(sender) && action is ShortcutAction.Undo or ShortcutAction.Redo or ShortcutAction.Delete)
             return;
 
@@ -60,7 +78,6 @@ public static class ShortcutKeys
         }
         catch (Exception bad)
         {
-            // One page that will not do a thing is one page, not a broken keyboard.
             Log.Write(LogArea.App, () => "shortcuts: " + action + " threw: " + bad.Message);
         }
 
@@ -79,7 +96,8 @@ public static class ShortcutKeys
     /// Outwards from the focus, and the control itself before its settings, so a view can answer
     /// for itself where that is simpler and hand over to its view model where it is not. The
     /// window's own settings are the last thing asked, which is what makes a page-wide answer
-    /// possible without every control on it knowing.
+    /// possible without every control on it knowing: a page that is not where the focus happens
+    /// to be is still the page you are looking at.
     /// </remarks>
     private static IShortcutContext? Asked(object? sender, ShortcutAction action)
     {
@@ -97,8 +115,6 @@ public static class ShortcutKeys
             at = at.GetVisualParent();
         }
 
-        // Nothing under the pointer answered, so the window itself is asked. A page that is not
-        // where the focus happens to be is still the page you are looking at.
         return top is StyledElement { DataContext: IShortcutContext window } && window.Can(action)
             ? window
             : null;

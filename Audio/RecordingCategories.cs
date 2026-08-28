@@ -5,23 +5,8 @@ using System.Text.Json;
 
 namespace JingleBox2.Audio;
 
-/// <summary>
-/// What each take is filed under, kept in one file beside the takes.
-/// </summary>
-/// <remarks>
-/// A note about a recording rather than a folder to put it in, because the recording itself is
-/// a path somebody wrote down: an instrument plays that file, a pad fires it, a song names it.
-/// Filing a take into a folder would move it out from under all three, and out from under the
-/// pad profiles that are not even loaded. A line in a file moves nothing.
-///
-/// It lives in the recordings folder, so copying the takes somewhere copies how they were
-/// sorted with them. Lose the file and what is lost is the sorting, not a second of audio.
-///
-/// Keyed by name, which for a recording is its file name. A take renamed on this page is
-/// followed; one renamed behind the app's back loses its category rather than inheriting
-/// somebody else's.
-/// </remarks>
-public sealed class RecordingCategories
+/// <inheritdoc/>
+public sealed class RecordingCategories : IRecordingCategories
 {
     private const string FileName = "categories.json";
 
@@ -31,9 +16,16 @@ public sealed class RecordingCategories
 
     private Dictionary<string, string> _of = new(StringComparer.Ordinal);
 
+    /// <summary>Reads the filing of the takes in the application's own recordings folder.</summary>
     public RecordingCategories()
         : this(Path.Combine(Config.AppFolder.Path(), "recordings")) { }
 
+    /// <summary>Reads the filing of the takes in a named folder.</summary>
+    /// <remarks>
+    /// The folder rather than the file, since the file's name is this class's own business and a
+    /// test that named it would be able to disagree with the application about where it is.
+    /// </remarks>
+    /// <param name="folder">Where the takes are, and where their filing sits beside them.</param>
     public RecordingCategories(string folder)
     {
         _path = Path.Combine(folder, FileName);
@@ -41,11 +33,11 @@ public sealed class RecordingCategories
         Load();
     }
 
-    /// <summary>What that take is filed under, or empty when it is filed under nothing.</summary>
+    /// <inheritdoc/>
     public string Of(string name) =>
         _of.TryGetValue(name, out string? category) ? category : "";
 
-    /// <summary>Files a take, or takes it out of its category when given nothing.</summary>
+    /// <inheritdoc/>
     public void Put(string name, string? category)
     {
         string wanted = (category ?? "").Trim();
@@ -58,7 +50,7 @@ public sealed class RecordingCategories
         Save();
     }
 
-    /// <summary>The take is called something else now, and keeps what it was filed under.</summary>
+    /// <inheritdoc/>
     public void Renamed(string from, string to)
     {
         if (!_of.TryGetValue(from, out string? category)) return;
@@ -69,7 +61,7 @@ public sealed class RecordingCategories
         Save();
     }
 
-    /// <summary>The take is gone, so the line about it is too.</summary>
+    /// <inheritdoc/>
     public void Forget(string name)
     {
         if (!_of.Remove(name)) return;
@@ -77,6 +69,11 @@ public sealed class RecordingCategories
         Save();
     }
 
+    /// <summary>Reads the filing off the disc, and starts with none of it when it cannot.</summary>
+    /// <remarks>
+    /// A sorting nobody can read is a sorting rather than a session, so a damaged file costs the
+    /// categories and nothing else.
+    /// </remarks>
     private void Load()
     {
         try
@@ -89,11 +86,11 @@ public sealed class RecordingCategories
         }
         catch (Exception ex)
         {
-            // A sorting nobody can read is a sorting, not a session. Start with none of it.
             Diagnostics.Log.Fault(Diagnostics.LogArea.Audio, "Categories could not be read", ex);
         }
     }
 
+    /// <summary>Writes the filing back beside the takes, after every change.</summary>
     private void Save()
     {
         try

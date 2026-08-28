@@ -22,9 +22,23 @@ namespace JingleBox2.Tracker.Machines;
 ///
 /// It lives wherever you keep your work. Installing copies it in beside the app's own; the
 /// project stays yours.
+///
+/// The whole of it is one machine and nothing about the songs it is played in. A machine is a
+/// fixture on the rack, one of each under a fixed name; an instrument is what a machine becomes
+/// inside a song, with your own name and settings and its own id, and two of those can come off
+/// one of these.
+///
+/// What goes wrong here is written to <see cref="Diagnostics.LogArea.Machines"/> rather than to
+/// the application's own area, as everything under this folder is.
 /// </remarks>
 public sealed class MachineProject
 {
+    /// <summary>What the file at the top of a machine's folder is called.</summary>
+    /// <remarks>
+    /// Written out rather than built, so the one file a machine is recognised by can be found by
+    /// looking for it. The importer looks for this name inside a zip, so it is also the thing a
+    /// bundle has to have to be a machine at all.
+    /// </remarks>
     public const string ManifestName = "machine.json";
 
     /// <summary>Where the samples a machine ships with go.</summary>
@@ -57,6 +71,11 @@ public sealed class MachineProject
     /// </remarks>
     private const string ImageStem = "image";
 
+    /// <summary>How the manifest is written, which is laid out for reading.</summary>
+    /// <remarks>
+    /// Indented on purpose, unlike a song's or a preset's. A machine.json is a file somebody
+    /// builds, hands over and argues with, so it has to be readable in an editor.
+    /// </remarks>
     private static readonly JsonSerializerOptions Layout = new() { WriteIndented = true };
 
     /// <summary>
@@ -80,8 +99,10 @@ public sealed class MachineProject
     /// </remarks>
     public string Id { get; set; } = "";
 
+    /// <summary>What it is called on the rack, which is yours to change and means nothing in a file.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>The one line under the name saying what sort of machine it is.</summary>
     public string Summary { get; set; } = "";
 
     /// <summary>Who made it, for a machine that is going to be handed to somebody else.</summary>
@@ -134,10 +155,21 @@ public sealed class MachineProject
     /// </remarks>
     public MachinePanel Panel { get; set; } = new();
 
+    /// <summary>Whether this project has a folder yet.</summary>
+    /// <remarks>
+    /// A machine being built in the designer has none until it is first saved, and everything
+    /// that touches the disc holds against this rather than against an empty path.
+    /// </remarks>
     [JsonIgnore]
     public bool IsSaved => Folder.Length > 0;
 
     /// <summary>Reads the project in that folder, or null when there is no machine in it.</summary>
+    /// <remarks>
+    /// The folder is put on afterwards rather than read out of the file, so a machine that has
+    /// been copied, zipped or moved knows where it actually is rather than where it once was.
+    /// A manifest that will not parse is nothing rather than a fault: this is called for every
+    /// folder in the machines folder, and one bad manifest should not take the rack with it.
+    /// </remarks>
     public static MachineProject? Open(string folder)
     {
         if (string.IsNullOrWhiteSpace(folder)) return null;
@@ -164,7 +196,16 @@ public sealed class MachineProject
         }
     }
 
-    /// <summary>Writes the project into its folder, making it if it is not there yet.</summary>
+    /// <summary>
+    /// Writes the project into its folder, making it if it is not there yet.
+    /// </summary>
+    /// <remarks>
+    /// The sounds and pictures folders are made whether or not the machine has any, so that a
+    /// machine's folder always has the same shape and there is somewhere to drop a file into.
+    ///
+    /// Throws rather than reporting: this is a save somebody asked for and is waiting on.
+    /// </remarks>
+    /// <param name="folder">Where it goes, or nothing to write it back where it came from.</param>
     public void Save(string? folder = null)
     {
         if (!string.IsNullOrWhiteSpace(folder)) Folder = folder!;
@@ -186,6 +227,10 @@ public sealed class MachineProject
     public const string SourceProperty = "source";
 
     /// <summary>The picker on this machine's panel, if it draws one.</summary>
+    /// <remarks>
+    /// The first one found walking the face. A machine with two pickers on it is a machine
+    /// nobody has finished, and there is no sensible second answer to give.
+    /// </remarks>
     private static MachineElement? Picker(MachineElement element)
     {
         if (element.Element == MachineElementKinds.Preset) return element;
@@ -213,18 +258,19 @@ public sealed class MachineProject
     ///
     /// Falls back to <see cref="StartsFrom"/> for a machine installed before the preset existed,
     /// which is every copy already on somebody's disc.
+    ///
+    /// The picker on the face is asked every time and never remembered. Which of the two
+    /// browsers a machine has is a fact about the control that does the browsing, so the panel
+    /// is where it is said, and while somebody is laying the machine out that answer changes
+    /// under us. The older ways of saying it cost a folder read, so those are asked once.
     /// </remarks>
     public bool? BrowsesTakes()
     {
-        // The picker itself, every time and never remembered. Which of the two browsers a machine
-        // has is a fact about the control that does the browsing, so the panel is where it is
-        // said, and while somebody is laying the machine out that answer changes under us.
         if (Picker(Panel.Root) is { } picker
             && picker.Properties.TryGetValue(SourceProperty, out string? said)
             && said.Trim().Length > 0)
             return string.Equals(said.Trim(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase);
 
-        // The older ways of saying it, which cost a folder read, so they are read once.
         if (_asked) return _browses;
 
         _browses = Asked();
@@ -233,8 +279,14 @@ public sealed class MachineProject
         return _browses;
     }
 
+    /// <summary>What the presets folder said, once somebody has asked.</summary>
     private bool? _browses;
 
+    /// <summary>Whether the folder has been read, since nothing is a real answer here.</summary>
+    /// <remarks>
+    /// Kept apart from <see cref="_browses"/> because null is one of the three answers, so a
+    /// null field cannot also mean "not asked yet".
+    /// </remarks>
     private bool _asked;
 
     /// <summary>
@@ -277,6 +329,7 @@ public sealed class MachineProject
     /// Copies a picture into the machine's own folder, and hands back what the panel should
     /// call it.
     /// </summary>
+    /// <param name="path">The picture wherever it currently is on this disc.</param>
     /// <returns>The name to put on the panel, or null when the machine has nowhere to keep it.</returns>
     /// <remarks>
     /// A copy and not a reference, because a machine pointing at a picture somewhere else on
@@ -292,7 +345,10 @@ public sealed class MachineProject
     /// The number is the first one nothing in the folder is using, so a picture is never written
     /// over. The same file brought in twice is two pictures under two numbers: whether a machine
     /// wants the same artwork in two places is its business, and comparing files to save a few
-    /// kilobytes would be a surprise nobody asked for.
+    /// kilobytes would be a surprise nobody asked for. A number is taken if anything at all is
+    /// called it, whatever the extension: a png and a jpg both landing on image3 would be two
+    /// pictures nobody could tell apart in the folder, and one of them would be a surprise the
+    /// next time either was replaced.
     ///
     /// Taking one out again is <see cref="RemoveImage"/>, which the designer calls when the last
     /// element showing a picture goes.
@@ -313,9 +369,6 @@ public sealed class MachineProject
         {
             string stem = ImageStem + at;
 
-            // Whatever it is called, not just whatever it is called with this extension. A png
-            // and a jpg both landing on image3 would be two pictures nobody could tell apart in
-            // the folder, and one of them would be a surprise the next time either was replaced.
             if (Directory.GetFiles(images, stem + ".*").Length > 0) continue;
 
             File.Copy(path, Path.Combine(images, stem + suffix));
@@ -335,6 +388,7 @@ public sealed class MachineProject
     ///
     /// Only files of ours are considered. Anything else somebody put in the folder is theirs.
     /// </remarks>
+    /// <param name="kept">What the machine still names, as the panel writes it: "images/image1.png".</param>
     public int SweepImages(ISet<string> kept)
     {
         if (Folder.Length == 0) return 0;
@@ -386,6 +440,7 @@ public sealed class MachineProject
     /// Anything in the folder that is not one of ours is left alone. A machine is a folder
     /// somebody can put things in, and renumbering is not a licence to rearrange it.
     /// </remarks>
+    /// <returns>What each picture was called, against what it is called now.</returns>
     public IReadOnlyDictionary<string, string> RenumberImages()
     {
         var moved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -447,6 +502,7 @@ public sealed class MachineProject
     /// it has to land inside this machine's own pictures folder. A name is a claim, and this one
     /// arrives out of a file somebody else may have written.
     /// </remarks>
+    /// <param name="named">What the panel calls it, relative to the machine's own folder.</param>
     public bool RemoveImage(string named)
     {
         if (Folder.Length == 0 || string.IsNullOrWhiteSpace(named)) return false;

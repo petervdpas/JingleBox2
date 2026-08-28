@@ -18,13 +18,31 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public sealed unsafe class ClapEditor : IPluginEditor
 {
+    /// <summary>
+    /// The effect this window belongs to. Held so the registration can be found again when the
+    /// window goes, and so a resize request knows whose it is.
+    /// </summary>
     private readonly ClapEffect _owner;
+
+    /// <summary>The gui extension, owned by the plugin and valid while the plugin is loaded.</summary>
     private readonly ClapPluginGui* _gui;
+
+    /// <summary>The plugin, which every call on the extension is about.</summary>
     private readonly ClapPlugin* _plugin;
 
+    /// <summary>True once the plugin has built its interface. Nothing may be called before it.</summary>
     private bool _created;
+
+    /// <summary>
+    /// True once it has been taken down. Checked by every method, since the window can be closed
+    /// while somebody is still holding the editor.
+    /// </summary>
     private bool _closed;
 
+    /// <summary>
+    /// Private because an editor is only ever made by <see cref="Open"/>, which is the only
+    /// place that knows the plugin has agreed to draw on this platform.
+    /// </summary>
     private ClapEditor(ClapEffect owner, ClapPluginGui* gui, ClapPlugin* plugin)
     {
         _owner = owner;
@@ -32,10 +50,18 @@ public sealed unsafe class ClapEditor : IPluginEditor
         _plugin = plugin;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Starts at a plain window's worth, so a plugin that will not say how big it wants to be
+    /// still gets something a person can work in rather than nothing.
+    /// </remarks>
     public (int Width, int Height) Size { get; private set; } = (640, 480);
 
+    /// <inheritdoc/>
+    /// <remarks>Read once when the window is built, since it is a fact about the plugin.</remarks>
     public bool CanResize { get; private set; }
 
+    /// <inheritdoc/>
     public event Action<int, int>? ResizeRequested;
 
     /// <summary>
@@ -44,6 +70,9 @@ public sealed unsafe class ClapEditor : IPluginEditor
     /// <remarks>
     /// A plugin is asked whether it can do this platform's kind of window before being told to
     /// make one. Refusing is a normal answer: plenty of plugins are parameters and nothing else.
+    ///
+    /// The window is made not floating: it goes inside one of ours, the way an insert on a desk
+    /// sits in the rack rather than on the floor next to it.
     /// </remarks>
     internal static ClapEditor? Open(ClapEffect owner)
     {
@@ -59,8 +88,6 @@ public sealed unsafe class ClapEditor : IPluginEditor
 
         if (gui->IsApiSupported != null && gui->IsApiSupported(plugin, api.Pointer, 0) == 0) return null;
 
-        // Not floating: the window goes inside one of ours, the way an insert on a desk sits in
-        // the rack rather than on the floor next to it.
         if (gui->Create(plugin, api.Pointer, 0) == 0) return null;
 
         var editor = new ClapEditor(owner, gui, plugin) { _created = true };
@@ -74,6 +101,10 @@ public sealed unsafe class ClapEditor : IPluginEditor
         return editor;
     }
 
+    /// <summary>
+    /// Asks the plugin how big it wants to be, and keeps what it says only if it is a real size.
+    /// A plugin that refuses, or answers nought, keeps whatever was there before.
+    /// </summary>
     private void ReadSize()
     {
         if (_gui->GetSize == null) return;
@@ -86,6 +117,11 @@ public sealed unsafe class ClapEditor : IPluginEditor
         if (width > 0 && height > 0) Size = ((int)width, (int)height);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The size is read again after the plugin has been given the window, because plenty of
+    /// plugins lay themselves out at that moment and only then know what they are.
+    /// </remarks>
     public bool Attach(nint window)
     {
         if (_closed || !_created || window == 0) return false;
@@ -103,6 +139,11 @@ public sealed unsafe class ClapEditor : IPluginEditor
         return true;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Hidden rather than destroyed. CLAP has no way to take a window back out of its parent, so
+    /// the interface stays built and is taken down for good in <see cref="Dispose"/>.
+    /// </remarks>
     public void Detach()
     {
         if (_closed || !_created) return;
@@ -110,6 +151,7 @@ public sealed unsafe class ClapEditor : IPluginEditor
         if (_gui->Hide != null) _gui->Hide(_plugin);
     }
 
+    /// <inheritdoc/>
     public void Resized(int width, int height)
     {
         if (_closed || !_created || width <= 0 || height <= 0 || _gui->SetSize == null) return;
@@ -129,6 +171,10 @@ public sealed unsafe class ClapEditor : IPluginEditor
         ResizeRequested?.Invoke(width, height);
     }
 
+    /// <summary>
+    /// Hides the interface and has the plugin destroy it, in that order, and stops the host from
+    /// forwarding any more resize requests to an editor that has gone.
+    /// </summary>
     public void Dispose()
     {
         if (_closed) return;
@@ -161,23 +207,56 @@ public sealed unsafe class ClapEditor : IPluginEditor
 /// </remarks>
 internal static unsafe class ClapHostExtensions
 {
+    /// <summary>
+    /// One entry per loaded plugin, keyed by its own host struct, which is the only thing a
+    /// plain C callback is handed that can identify who is calling.
+    /// </summary>
     private static readonly Dictionary<nint, Registration> Registered = new();
+
+    /// <summary>Held over every read and write of the registrations and the shared structs.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>
+    /// The next key to hand the run loop. One counter for timers and files both, so a key names
+    /// exactly one thing however it was asked for.
+    /// </summary>
     private static nint _next = 1;
 
+    /// <summary>
+    /// The three host extension structs, made on first use and shared by every plugin. They hold
+    /// only function pointers, and which plugin is calling comes from the host pointer each
+    /// function is handed, so one of each is enough.
+    /// </summary>
     private static ClapHostGui* _gui;
+
+    /// <inheritdoc cref="_gui"/>
     private static ClapHostTimerSupport* _timers;
+
+    /// <inheritdoc cref="_gui"/>
     private static ClapHostPosixFd* _files;
 
+    /// <summary>What is known about one loaded plugin: who it is, and what it has asked for.</summary>
     private sealed class Registration
     {
         /// <summary>Filled in once the plugin has finished loading, which is after it may
         /// first ask for a timer.</summary>
         public ClapEffect? Effect;
+        /// <summary>Where a resize request goes, or null while the plugin has no window up.</summary>
         public ClapEditor? Editor;
+
+        /// <summary>
+        /// The plugin's own timer numbers against the run loop's keys. Two dictionaries because
+        /// the plugin counts from one per plugin and the run loop counts once for the process.
+        /// </summary>
         public readonly Dictionary<uint, nint> Timers = new();
+
+        /// <summary>The file descriptors being watched for this plugin, against their keys.</summary>
         public readonly Dictionary<int, nint> Files = new();
+
+        /// <summary>
+        /// The next timer number to give this plugin. Never reused, so a timer that rings after
+        /// being given back rings on nothing rather than on somebody else's timer.
+        /// </summary>
         public uint NextTimer = 1;
     }
 
@@ -225,6 +304,11 @@ internal static unsafe class ClapHostExtensions
     }
 
     /// <summary>Says which editor a resize request should reach.</summary>
+    /// <remarks>
+    /// Walked rather than looked up, because the caller has the effect and not the host struct
+    /// behind it. There is one registration per plugin and a handful of plugins, so the walk
+    /// costs nothing and happens once per window.
+    /// </remarks>
     public static void Watch(ClapEffect effect, ClapEditor editor)
     {
         lock (Gate)
@@ -236,6 +320,10 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>
+    /// Stops sending resize requests to an editor that has gone. Walked rather than looked up,
+    /// for the same reason as <see cref="Watch"/>: the caller has the effect and not its host.
+    /// </summary>
     public static void Unwatch(ClapEffect effect)
     {
         lock (Gate)
@@ -247,6 +335,10 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>
+    /// Which plugin a callback is about. Null for a host struct that has already been forgotten,
+    /// which is what a callback arriving during teardown looks like.
+    /// </summary>
     private static Registration? Find(ClapHost* host)
     {
         if (host == null) return null;
@@ -272,8 +364,10 @@ internal static unsafe class ClapHostExtensions
         return null;
     }
 
+    /// <inheritdoc cref="_gui"/>
     private static ClapHostParams* _parameters;
 
+    /// <summary>The parameters extension, built on first use and never freed.</summary>
     private static void* Params()
     {
         lock (Gate)
@@ -306,6 +400,10 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>
+    /// The plugin asking the host to throw away what it had queued for a parameter. Nothing is
+    /// queued here between blocks, so there is nothing to throw away.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Clear(ClapHost* host, uint id, uint flags) { }
 
@@ -324,6 +422,7 @@ internal static unsafe class ClapHostExtensions
         Find(host)?.Effect?.WantsFlush();
     }
 
+    /// <summary>The gui extension, built on first use and never freed.</summary>
     private static void* Gui()
     {
         lock (Gate)
@@ -342,6 +441,7 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>The timer extension, built on first use and never freed.</summary>
     private static void* Timers()
     {
         lock (Gate)
@@ -357,6 +457,7 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>The file watching extension, built on first use and never freed.</summary>
     private static void* Files()
     {
         lock (Gate)
@@ -373,6 +474,11 @@ internal static unsafe class ClapHostExtensions
         }
     }
 
+    /// <summary>
+    /// A plugin asking for a clock. The number it is given is its own and counts from one; the
+    /// key the run loop is given is the process's and never repeats, so the two cannot be
+    /// confused when several plugins are open.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte RegisterTimer(ClapHost* host, uint milliseconds, uint* id)
     {
@@ -397,6 +503,7 @@ internal static unsafe class ClapHostExtensions
         return 1;
     }
 
+    /// <summary>Giving a clock back. A number nobody knows is refused rather than ignored.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte UnregisterTimer(ClapHost* host, uint id)
     {
@@ -415,6 +522,15 @@ internal static unsafe class ClapHostExtensions
         return 1;
     }
 
+    /// <summary>
+    /// A plugin asking the host to watch a file descriptor, which is its X11 connection. Without
+    /// this its toolkit sits waiting to be told there is something on it and nothing else in the
+    /// process is ever going to look, so the window is a black rectangle.
+    /// </summary>
+    /// <remarks>
+    /// The same descriptor asked for twice replaces the first watch rather than adding a second,
+    /// since two watches on one connection would deliver every event twice.
+    /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte RegisterFile(ClapHost* host, int file, uint flags)
     {
@@ -439,9 +555,14 @@ internal static unsafe class ClapHostExtensions
         return 1;
     }
 
+    /// <summary>
+    /// A plugin changing what it wants a descriptor watched for. Accepted and ignored: the watch
+    /// here is for something to read, which is the only thing an X11 connection ever wants.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte ModifyFile(ClapHost* host, int file, uint flags) => 1;
 
+    /// <summary>Asking the host to stop watching one. A descriptor nobody is watching is refused.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte UnregisterFile(ClapHost* host, int file)
     {
@@ -460,9 +581,17 @@ internal static unsafe class ClapHostExtensions
         return 1;
     }
 
+    /// <summary>
+    /// The plugin saying the shapes it will accept have changed. Nothing here reads those hints,
+    /// so there is nothing to read again.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void HintsChanged(ClapHost* host) { }
 
+    /// <summary>
+    /// The plugin asking to be a different size, which is how one with a fold-out panel opens
+    /// it. Refused when no window is up, since there would be nothing to resize.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte RequestResize(ClapHost* host, uint width, uint height)
     {
@@ -476,12 +605,21 @@ internal static unsafe class ClapHostExtensions
         return 1;
     }
 
+    /// <summary>
+    /// The plugin asking to be shown or hidden. Refused: the window belongs to whoever opened
+    /// it, and a plugin putting its own interface on screen unasked is not wanted here.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte RequestShow(ClapHost* host) => 0;
 
+    /// <inheritdoc cref="RequestShow"/>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte RequestHide(ClapHost* host) => 0;
 
+    /// <summary>
+    /// The plugin saying its window was closed from inside. Nothing is done: the window here is
+    /// only ever closed by the host, so this is a plugin reporting something that did not happen.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Closed(ClapHost* host, byte wasDestroyed) { }
 }

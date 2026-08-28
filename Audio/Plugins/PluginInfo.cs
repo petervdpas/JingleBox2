@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace JingleBox2.Audio.Plugins;
 
 /// <summary>Which plugin standard something speaks.</summary>
@@ -10,7 +7,10 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public enum PluginFormat
 {
+    /// <summary>CLAP, and the number a chain written before VST3 existed reads back as.</summary>
     Clap = 0,
+
+    /// <summary>VST3, which is also the only format that can be an instrument here.</summary>
     Vst3 = 1
 }
 
@@ -18,6 +18,22 @@ public enum PluginFormat
 /// One plugin as it appears in a picker: what it is called, who made it, and enough to find
 /// it again. The id is what a saved song stores, since a path moves between machines.
 /// </summary>
+/// <param name="Id">
+/// The plugin's own identity, its CLAP id or its VST3 class id. What a song writes down, because
+/// a path is about this machine and an id is about the plugin.
+/// </param>
+/// <param name="Name">What the plugin calls itself, which is what a person reads in a list.</param>
+/// <param name="Vendor">Who made it, empty when the plugin does not say.</param>
+/// <param name="Version">The plugin's own version string, as it worded it.</param>
+/// <param name="Path">
+/// Where the bundle is on this machine. Useful for loading and useless for saving, since the
+/// same plugin lives somewhere else on somebody else's computer.
+/// </param>
+/// <param name="Format">Which of the two standards this one speaks.</param>
+/// <param name="IsInstrument">
+/// True when the plugin takes notes rather than audio. A scan works this out from the categories
+/// the plugin lists about itself.
+/// </param>
 public sealed record PluginInfo(
     string Id,
     string Name,
@@ -27,6 +43,7 @@ public sealed record PluginInfo(
     PluginFormat Format = PluginFormat.Clap,
     bool IsInstrument = false)
 {
+    /// <summary>The name with the vendor after it, which is how a picker row reads.</summary>
     public override string ToString() => string.IsNullOrWhiteSpace(Vendor) ? Name : Name + " (" + Vendor + ")";
 
     /// <summary>
@@ -50,6 +67,37 @@ public sealed record PluginInfo(
 /// VST3 gives everything as nought to one and keeps the real units to itself, which is what
 /// <see cref="Normalized"/> is for.
 /// </remarks>
+/// <param name="Id">
+/// The number the plugin knows this parameter by, and the only thing a saved chain can name it
+/// with. Not an index: both standards allow the ids to be scattered, and a plugin is entitled to
+/// list its parameters in a different order next version.
+/// </param>
+/// <param name="Name">What the plugin calls it, for the label under the knob.</param>
+/// <param name="Minimum">The bottom of the range, in whatever units the parameter is in.</param>
+/// <param name="Maximum">The top of the range, in the same units.</param>
+/// <param name="Default">Where the plugin says the parameter sits before anybody touches it.</param>
+/// <param name="Steps">
+/// How many gaps there are between the positions, nought for a continuous sweep. One means two
+/// positions, which is a switch; that off-by-one is the standards' own counting and not a slip.
+/// </param>
+/// <param name="IsHidden">
+/// The plugin asking that this one is not drawn. Usually an internal value the plugin automates
+/// itself; still saved and restored, since hiding it does not stop it mattering.
+/// </param>
+/// <param name="IsReadOnly">
+/// A reading rather than a control, such as a compressor's gain reduction. Excluded from the
+/// parameters that are polled back off a plugin with its window open, or a song could never
+/// settle and so could never be saved.
+/// </param>
+/// <param name="IsBypass">
+/// The parameter the standard reserves for switching the plugin out of circuit.
+/// </param>
+/// <param name="Normalized">
+/// True when the range really is nought to one and the plugin keeps the real units to itself,
+/// which is every VST3 parameter. Whoever draws it has to ask the plugin to word the value,
+/// since the number says nothing on its own.
+/// </param>
+/// <param name="Units">The plugin's own name for the units, empty when it does not say.</param>
 public sealed record PluginParameter(
     uint Id,
     string Name,
@@ -68,122 +116,4 @@ public sealed record PluginParameter(
 
     /// <summary>One step is two positions, which is an on and an off rather than a dial.</summary>
     public bool IsSwitch => Steps == 1;
-}
-
-/// <summary>
-/// The knobs of a loaded plugin, whatever the plugin is doing with them.
-/// </summary>
-/// <remarks>
-/// An effect and an instrument have nothing in common in the audio path and everything in
-/// common here, so this is what the knob controls are written against. It is also what makes
-/// one parameter panel serve both.
-/// </remarks>
-public interface IPluginParameters
-{
-    PluginInfo Info { get; }
-
-    /// <summary>Everything this plugin exposes, in the order it lists them.</summary>
-    IReadOnlyList<PluginParameter> Parameters();
-
-    /// <summary>What a parameter is set to right now.</summary>
-    double ValueOf(uint id);
-
-    /// <summary>How the plugin words a value: "-6.0 dB" rather than -6.</summary>
-    string TextFor(uint id, double value);
-
-    /// <summary>Moves a parameter.</summary>
-    void SetValue(uint id, double value);
-
-    /// <summary>
-    /// The plugin moving one of its own knobs, in its own window. The parameter and its new
-    /// value.
-    /// </summary>
-    /// <remarks>
-    /// Without this a plugin's own interface is a picture: the host never learns what was
-    /// changed, so nothing is marked as worth saving, and for VST3 the sound does not even
-    /// follow, because the half that draws and the half that plays only ever hear about a
-    /// parameter through the host.
-    ///
-    /// Raised on whichever thread the plugin was on, which is not the drawing one. Whoever
-    /// listens has to get itself back there.
-    /// </remarks>
-    event Action<uint, double>? Edited;
-
-    /// <summary>
-    /// The plugin saying that everything about it may have changed at once.
-    /// </summary>
-    /// <remarks>
-    /// What loading a preset looks like from the host's side. A knob moved one at a time comes
-    /// through <see cref="Edited"/>; a whole patch arriving does not, because no plugin reports
-    /// two thousand parameter moves for it. Both standards have a way of saying it and both say
-    /// the same thing: read me again, and whatever you were holding about me is out of date.
-    /// </remarks>
-    event Action? Reloaded;
-
-    /// <summary>
-    /// Everything inside the plugin, as a lump to keep. Not the same as its parameters: a
-    /// Serum patch is wavetables and samples as much as it is knob positions, and none of
-    /// that is a parameter.
-    /// </summary>
-    /// <remarks>
-    /// Here rather than on <see cref="IPluginInstrument"/>, where it used to be, because
-    /// wanting a patch back is nothing to do with what the plugin is being used as. Serum is
-    /// the same program whether a track plays it or a track's audio goes through it, and its
-    /// preset was in both cases the thing that was not saved. The two classes that host
-    /// plugins each implement both interfaces already, so this moved no code.
-    /// </remarks>
-    byte[] SaveState();
-
-    /// <summary>Puts a saved lump back. Anything unreadable is ignored.</summary>
-    void LoadState(byte[]? state);
-}
-
-/// <summary>
-/// A loaded plugin with audio running through it, whatever standard it speaks.
-/// </summary>
-/// <remarks>
-/// Process runs on the audio thread; everything else is called from the UI. A parameter move
-/// is queued rather than written, because both standards expect values to arrive at the start
-/// of a block rather than whenever a knob is dragged.
-/// </remarks>
-public interface IPluginEffect : IAudioInsert, IPluginParameters, System.IDisposable
-{
-    /// <summary>True once the plugin has been switched on and can be given audio.</summary>
-    bool IsActive { get; }
-
-    /// <summary>
-    /// Hands over anything queued now rather than on the next block, for a plugin nothing is
-    /// being played through.
-    /// </summary>
-    void FlushParameters();
-}
-
-
-/// <summary>
-/// A plugin that makes sound from notes rather than from audio.
-/// </summary>
-/// <remarks>
-/// An instrument is not a voice. The tracker's own instruments make one voice per sounding
-/// note; a plugin is polyphonic inside itself and wants to be told about every note on a track,
-/// so there is one of these per track rather than one per note.
-///
-/// Notes are queued and handed over at the start of a block, for the same reason parameter
-/// moves are: that is when a plugin is willing to hear about them.
-/// </remarks>
-public interface IPluginInstrument : IPluginParameters, IDisposable
-{
-    /// <summary>Starts a note. Velocity runs nought to one.</summary>
-    void NoteOn(int semitone, float velocity);
-
-    /// <summary>Ends a note that was started. Unknown notes are ignored rather than guessed at.</summary>
-    void NoteOff(int semitone);
-
-    /// <summary>Ends everything sounding, for a stop button or a track being emptied.</summary>
-    void AllNotesOff();
-
-    /// <summary>
-    /// Fills a block with what the plugin is playing, replacing whatever was in it. Runs on
-    /// the audio thread.
-    /// </summary>
-    void Render(float[] buffer, int frames);
 }

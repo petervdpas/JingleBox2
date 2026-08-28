@@ -63,10 +63,9 @@ public interface ITrackerPanel : INotifyPropertyChanged
     /// Every track's notes, not only the panel's own: which one it belongs to is on the event,
     /// and a panel that filtered nothing would light for the whole song. It can arrive from the
     /// clock thread.
+    ///
+    /// Seconds is how long that note will sound, or zero when nobody knows: a pattern's note
+    /// lasts until the next one, an auditioned recording lasts exactly as long as the recording.
     /// </remarks>
-    /// <param name="Seconds">
-    /// How long that note will sound, or zero when nobody knows: a pattern's note lasts until
-    /// the next one, an auditioned recording lasts exactly as long as the recording.
-    /// </param>
     event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed;
 }

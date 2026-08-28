@@ -11,15 +11,20 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class SynthPatchViewModel : ObservableObject
 {
+    /// <summary>The patch the song holds, written into in place rather than copied.</summary>
     private readonly SynthPatch _patch;
+
+    /// <summary>Told after every change, which is what marks the song unsaved.</summary>
     private readonly Action _changed;
 
+    /// <summary>Shows one patch. Nothing is copied: the patch handed in is the patch edited.</summary>
     public SynthPatchViewModel(SynthPatch patch, Action changed)
     {
         _patch = patch;
         _changed = changed;
     }
 
+    /// <summary>The patch itself, for whatever plays it and whatever draws its shape.</summary>
     public SynthPatch Patch => _patch;
 
     /// <summary>
@@ -28,8 +33,13 @@ public sealed class SynthPatchViewModel : ObservableObject
     /// </summary>
     public int Revision { get; private set; }
 
+    /// <summary>
+    /// Every wave there is, for the picker, read off the enum rather than listed here so a wave
+    /// added later appears without anybody remembering this line.
+    /// </summary>
     public SynthWave[] Waves { get; } = Enum.GetValues<SynthWave>();
 
+    /// <summary>Which wave the oscillator runs. Changing it can hide or show the duty row.</summary>
     public SynthWave Wave
     {
         get => _patch.Wave;
@@ -49,6 +59,7 @@ public sealed class SynthPatchViewModel : ObservableObject
     /// <summary>Duty only means anything to the pulse wave, so the row hides for the others.</summary>
     public bool IsPulse => _patch.Wave == SynthWave.Pulse;
 
+    /// <summary>How wide the pulse is, which only the pulse wave hears.</summary>
     public double Duty
     {
         get => _patch.Duty;
@@ -56,6 +67,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(Duty));
     }
 
+    /// <summary>How long the note takes to reach full level, in milliseconds.</summary>
     public double AttackMs
     {
         get => _patch.AttackMs;
@@ -63,6 +75,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(AttackMs));
     }
 
+    /// <summary>How long it takes to fall from there to the sustain level.</summary>
     public double DecayMs
     {
         get => _patch.DecayMs;
@@ -70,6 +83,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(DecayMs));
     }
 
+    /// <summary>The level it holds at while the key is down.</summary>
     public double Sustain
     {
         get => _patch.Sustain;
@@ -77,6 +91,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(Sustain));
     }
 
+    /// <summary>And how long it takes to go quiet after the key comes up.</summary>
     public double ReleaseMs
     {
         get => _patch.ReleaseMs;
@@ -84,6 +99,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(ReleaseMs));
     }
 
+    /// <summary>The patch's own transposition, in whole semitones.</summary>
     public double TuneSemitones
     {
         get => _patch.TuneSemitones;
@@ -91,6 +107,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinTuneSemitones, SynthPatch.MaxTuneSemitones, nameof(TuneSemitones));
     }
 
+    /// <summary>And the rest of it, in cents, for a detune two voices can beat against.</summary>
     public double FineCents
     {
         get => _patch.FineCents;
@@ -98,6 +115,10 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinFineCents, SynthPatch.MaxFineCents, nameof(FineCents));
     }
 
+    /// <summary>
+    /// How hard the wave is pushed before it leaves the voice. Not in MappoGraph's set: it is
+    /// the one control here that the chiptune synth this patch mirrors never had.
+    /// </summary>
     public double Drive
     {
         get => _patch.Drive;
@@ -105,6 +126,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             nameof(Drive));
     }
 
+    /// <summary>How fast the pitch wobbles, in hertz.</summary>
     public double VibratoRateHz
     {
         get => _patch.VibratoRateHz;
@@ -112,6 +134,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinRateHz, SynthPatch.MaxRateHz, nameof(VibratoRateHz));
     }
 
+    /// <summary>And how far it wobbles, in cents, so the depth means the same at every pitch.</summary>
     public double VibratoDepthCents
     {
         get => _patch.VibratoDepthCents;
@@ -119,6 +142,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinVibratoDepthCents, SynthPatch.MaxVibratoDepthCents, nameof(VibratoDepthCents));
     }
 
+    /// <summary>How fast the level wobbles, in hertz.</summary>
     public double TremoloRateHz
     {
         get => _patch.TremoloRateHz;
@@ -126,6 +150,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinRateHz, SynthPatch.MaxRateHz, nameof(TremoloRateHz));
     }
 
+    /// <summary>And how far, nought being none.</summary>
     public double TremoloDepth
     {
         get => _patch.TremoloDepth;
@@ -133,6 +158,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinTremoloDepth, SynthPatch.MaxTremoloDepth, nameof(TremoloDepth));
     }
 
+    /// <summary>How far the note is bent at the start, in semitones, which is what a kick is.</summary>
     public double PitchEnvSemitones
     {
         get => _patch.PitchEnvSemitones;
@@ -140,6 +166,7 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinPitchEnvSemitones, SynthPatch.MaxPitchEnvSemitones, nameof(PitchEnvSemitones));
     }
 
+    /// <summary>How long that bend takes to arrive at the note itself.</summary>
     public double PitchEnvMs
     {
         get => _patch.PitchEnvMs;
@@ -147,6 +174,14 @@ public sealed class SynthPatchViewModel : ObservableObject
             SynthPatch.MinTimeMs, SynthPatch.MaxPitchEnvMs, nameof(PitchEnvMs));
     }
 
+    /// <summary>
+    /// The cutoff in hertz, which is what the filter is worked out from and what is stored.
+    /// </summary>
+    /// <remarks>
+    /// It announces the knob's position and the reading beside it as well as itself, since all
+    /// three are the same number said three ways and a knob left reading the old value is the
+    /// way that goes wrong.
+    /// </remarks>
     public double FilterCutoffHz
     {
         get => _patch.FilterCutoffHz;
@@ -165,8 +200,10 @@ public sealed class SynthPatchViewModel : ObservableObject
         set => FilterCutoffHz = FrequencyScale.ToHz(value);
     }
 
+    /// <summary>The cutoff in words, in hertz or kilohertz as its size asks for.</summary>
     public string FilterCutoffText => FrequencyScale.Text(_patch.FilterCutoffHz);
 
+    /// <summary>How much the filter rings at its cutoff.</summary>
     public double FilterResonance
     {
         get => _patch.FilterResonance;
@@ -181,12 +218,32 @@ public sealed class SynthPatchViewModel : ObservableObject
         OnPropertyChanged(string.Empty);
     }
 
+    /// <summary>
+    /// Moves the revision on and says so, which is how anything drawing the patch is told to
+    /// read it again: the patch is plain data and says nothing about itself.
+    /// </summary>
     private void Bump()
     {
         Revision++;
         OnPropertyChanged(nameof(Revision));
     }
 
+    /// <summary>
+    /// Writes one value into the patch, held inside its own range, and only when it moved.
+    /// </summary>
+    /// <remarks>
+    /// A value that is not a number is read as the floor rather than written through: a NaN
+    /// reaching a voice is silence at best, and it can arrive from a box somebody emptied. The
+    /// bounds are the patch's own constants, so a value arriving from a knob, a controller or a
+    /// file is held by exactly the same rule. The threshold below which nothing is announced is
+    /// a tenth of a thousandth, which is finer than any of these is drawn or heard.
+    /// </remarks>
+    /// <param name="assign">Puts the value into the patch, which is the only thing that knows where it goes.</param>
+    /// <param name="current">Where the patch stands now, so a value arriving as itself announces nothing.</param>
+    /// <param name="value">What is being asked for, before it has been bounded.</param>
+    /// <param name="min">The bottom of the parameter's own range, and where a NaN lands.</param>
+    /// <param name="max">The top of the parameter's own range.</param>
+    /// <param name="changed">Every name that now reads differently, since one number can be several.</param>
     private void Set(Action<double> assign, double current, double value, double min, double max, params string[] changed)
     {
         double clamped = double.IsNaN(value) ? min : Math.Clamp(value, min, max);

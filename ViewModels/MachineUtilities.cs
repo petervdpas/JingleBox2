@@ -15,6 +15,10 @@ namespace JingleBox2.ViewModels;
 /// <summary>One recording, and how loud it is.</summary>
 public sealed partial class WaveLevel : ObservableObject
 {
+    /// <summary>One row of the level tool's list.</summary>
+    /// <param name="named">What it is called where it was found.</param>
+    /// <param name="path">Where the file really is.</param>
+    /// <param name="peak">Its loudest moment, read off the file.</param>
     public WaveLevel(string named, string path, double peak)
     {
         Named = named;
@@ -34,6 +38,7 @@ public sealed partial class WaveLevel : ObservableObject
     /// <summary>Its loudest moment, 0 to 1.</summary>
     public double Peak { get; }
 
+    /// <summary>Its loudest moment in decibels, which is how anybody reads a level.</summary>
     public string PeakText =>
         Normalization.ToDecibels(Peak).ToString("0.0", CultureInfo.InvariantCulture) + " dB";
 
@@ -49,7 +54,8 @@ public sealed partial class WaveLevel : ObservableObject
     [NotifyPropertyChangedFor(nameof(GainText))]
     private double gain = 1;
 
-    public string GainText => Math.Abs(Gain - 1) < 0.001
+    /// <summary>What it would move by, with a word rather than a nought for a file that stays.</summary>
+    public string GainText => Math.Abs(Gain - 1) < MachineUtilities.SmallestMove
         ? "stays"
         : Normalization.ToDecibels(Gain).ToString("+0.0;-0.0", CultureInfo.InvariantCulture) + " dB";
 }
@@ -60,10 +66,13 @@ public sealed partial class WaveLevel : ObservableObject
 /// <param name="Blurb">One line under the name, for somebody choosing between them.</param>
 public sealed record UtilityTool(string Key, string Name, string Blurb)
 {
+    /// <summary>Renaming a preset, and everything named after it.</summary>
     public const string Rename = "rename";
 
+    /// <summary>Putting a set of recordings on one level.</summary>
     public const string Level = "level";
 
+    /// <summary>The name, which is what a list with no template shows.</summary>
     public override string ToString() => Name;
 }
 
@@ -95,8 +104,16 @@ public enum WaveScope
 /// </remarks>
 public sealed partial class MachineUtilities : ObservableObject
 {
+    /// <summary>
+    /// Whichever machine is open in the designer, asked rather than held.
+    /// </summary>
+    /// <remarks>
+    /// Asked every time, because the machine changes underneath this page and a held one would
+    /// have the tools acting on a machine whose name is no longer at the top of the window.
+    /// </remarks>
     private readonly Func<MachineProject?> _open;
 
+    /// <summary>Reads the open machine's presets and works out which tools apply.</summary>
     public MachineUtilities(Func<MachineProject?> open)
     {
         _open = open;
@@ -104,10 +121,14 @@ public sealed partial class MachineUtilities : ObservableObject
         Reread();
     }
 
-    // The machine, which is whichever one is open ----------------------------------------------
-
+    /// <summary>What the open machine is called, or nothing when none is.</summary>
     public string MachineName => _open() is { Name.Length: > 0 } one ? one.Name : "";
 
+    /// <summary>True when there is a machine on disc to act on.</summary>
+    /// <remarks>
+    /// A folder rather than a name, since a machine being built and never saved has a name and
+    /// nothing on the disc for a tool to touch.
+    /// </remarks>
     public bool HasMachine => _open() is { Folder.Length: > 0 };
 
     /// <summary>Where it keeps its presets.</summary>
@@ -122,8 +143,10 @@ public sealed partial class MachineUtilities : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasPreset))]
     private MachinePresetSlot? preset;
 
+    /// <summary>True when a preset is picked, which is what the rename tool needs.</summary>
     public bool HasPreset => Preset != null;
 
+    /// <summary>Fills the rename box with what it is called now, and reads the levels again.</summary>
     partial void OnPresetChanged(MachinePresetSlot? value)
     {
         Wanted = value?.Name ?? "";
@@ -189,6 +212,10 @@ public sealed partial class MachineUtilities : ObservableObject
     }
 
     /// <summary>What a preset calls itself, or its file name when it does not say.</summary>
+    /// <remarks>
+    /// A preset that will not read at all is still a file, and it is listed under its file name so
+    /// that it can be picked and renamed out of the way rather than vanishing from the page.
+    /// </remarks>
     private static string Called(string path)
     {
         try
@@ -199,14 +226,10 @@ public sealed partial class MachineUtilities : ObservableObject
         }
         catch (Exception)
         {
-            // A preset that will not read is still a file, and it is listed under its own name
-            // so that it can be picked and renamed out of the way.
         }
 
         return Path.GetFileNameWithoutExtension(path);
     }
-
-    // The tools --------------------------------------------------------------------------------
 
     /// <summary>
     /// The tools that apply to what is open, which is what the page offers.
@@ -236,13 +259,28 @@ public sealed partial class MachineUtilities : ObservableObject
     [NotifyPropertyChangedFor(nameof(OnLevel))]
     private UtilityTool? tool;
 
+    /// <summary>
+    /// Which of the three the page is showing, because that is what a set of panels binds to.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than converted from the tool in the view, the same reasoning the level
+    /// tool's three scopes are on: a converter that turns one value into three answers is a
+    /// converter to read before the page can be understood.
+    /// </remarks>
     public bool OnList => Tool == null;
 
+    /// <inheritdoc cref="OnList"/>
     public bool OnRename => Tool?.Key == UtilityTool.Rename;
 
+    /// <inheritdoc cref="OnList"/>
     public bool OnLevel => Tool?.Key == UtilityTool.Level;
 
     /// <summary>Opens one, which is what clicking a line in the list does.</summary>
+    /// <remarks>
+    /// Always enabled; the list only holds tools that apply. What a tool is looking at is read
+    /// again on the way in, since it may have moved while another tool was open, or while the page
+    /// was not being looked at at all.
+    /// </remarks>
     public IRelayCommand<UtilityTool?> OpenCommand => new RelayCommand<UtilityTool?>(one =>
     {
         if (one == null) return;
@@ -252,12 +290,11 @@ public sealed partial class MachineUtilities : ObservableObject
 
         Tool = one;
 
-        // What it is looking at may have moved while another tool was open, or while the page
-        // was not being looked at at all.
         Look();
     });
 
-    /// <summary>And back to the list.</summary>
+    /// <summary>And back to the list, clearing whatever the tool had to say.</summary>
+    /// <remarks>Always enabled.</remarks>
     public IRelayCommand BackCommand => new RelayCommand(() =>
     {
         Tool = null;
@@ -270,6 +307,10 @@ public sealed partial class MachineUtilities : ObservableObject
     public bool HasWork => Tools.Count > 0;
 
     /// <summary>Works out which tools apply now, keeping the one in hand where it still does.</summary>
+    /// <remarks>
+    /// The one in hand stays open if it still applies. Otherwise it goes back to the list, rather
+    /// than quietly swapping the page for a different tool under the same heading.
+    /// </remarks>
     private void Retool()
     {
         string was = Tool?.Key ?? "";
@@ -286,20 +327,25 @@ public sealed partial class MachineUtilities : ObservableObject
 
         OnPropertyChanged(nameof(HasWork));
 
-        // The one in hand stays open if it still applies. Otherwise back to the list, rather
-        // than quietly swapping the page for a different tool under the same heading.
         Tool = was.Length == 0 ? null : Tools.FirstOrDefault(one => one.Key == was);
     }
 
+    /// <summary>What the last thing done here did, in the words the page shows.</summary>
     [ObservableProperty] private string said = "";
 
+    /// <summary>Why the last thing done here did not work, which is said apart from the rest.</summary>
+    /// <remarks>
+    /// Two lines rather than one, because a tool that has just refused to do something and a tool
+    /// that has just done something are two states, and a single line would have the refusal
+    /// wiped by the next success and read as though it had worked.
+    /// </remarks>
     [ObservableProperty] private string problem = "";
 
+    /// <summary>True when there is a refusal to show.</summary>
     public bool HasProblem => Problem.Length > 0;
 
+    /// <summary>Keeps the flag in step with the text, since the page hangs on the flag.</summary>
     partial void OnProblemChanged(string value) => OnPropertyChanged(nameof(HasProblem));
-
-    // Renaming ---------------------------------------------------------------------------------
 
     /// <summary>What the preset is to be called.</summary>
     [ObservableProperty] private string wanted = "";
@@ -317,6 +363,7 @@ public sealed partial class MachineUtilities : ObservableObject
         }
     }
 
+    /// <summary>The picked preset's file name, so the page shows what is really being renamed.</summary>
     public string PresetFile => Preset?.FileName ?? "";
 
     /// <summary>
@@ -333,6 +380,9 @@ public sealed partial class MachineUtilities : ObservableObject
     ///
     /// A folder more than one preset plays from is left alone, since renaming it would move the
     /// recordings out from under the others.
+    ///
+    /// Always enabled: every refusal here has a reason worth reading, and a greyed button says
+    /// none of them.
     /// </remarks>
     public IRelayCommand RenameCommand => new RelayCommand(() =>
     {
@@ -375,7 +425,6 @@ public sealed partial class MachineUtilities : ObservableObject
                 return;
             }
 
-            // The folder moves only when this preset is the only one playing out of it.
             string? folder = PresetWaves.Folder(one.Path, home);
 
             if (folder is { Length: > 0 } && Others(folder, one).Count > 0) folder = null;
@@ -423,11 +472,21 @@ public sealed partial class MachineUtilities : ObservableObject
         }
     });
 
+    /// <summary>What a preset calls the field holding its own name.</summary>
     private const string NameKey = "Name";
 
+    /// <summary>How a preset is written back.</summary>
+    /// <remarks>
+    /// Indented, because a preset is a file somebody may open and read, unlike an undo step, and
+    /// a rename that reflowed the whole file would make every change to it unreadable afterwards.
+    /// </remarks>
     private static readonly System.Text.Json.JsonSerializerOptions Pretty = new() { WriteIndented = true };
 
     /// <summary>The number a preset file starts with, kept through a rename.</summary>
+    /// <remarks>
+    /// The space after the digits belongs to the prefix, so the new name is not run into it:
+    /// "03 Live Drums" renamed to "Studio Kit" comes out as "03 Studio Kit" and stays third.
+    /// </remarks>
     private static string Numbered(string fileName)
     {
         int at = 0;
@@ -436,7 +495,6 @@ public sealed partial class MachineUtilities : ObservableObject
 
         if (at == 0) return "";
 
-        // The space after the digits belongs to the prefix, so the new name is not run into it.
         while (at < fileName.Length && fileName[at] == ' ') at++;
 
         return fileName[..at];
@@ -497,8 +555,6 @@ public sealed partial class MachineUtilities : ObservableObject
             : named;
     }
 
-    // Levels -----------------------------------------------------------------------------------
-
     /// <summary>Which recordings the level tool is looking at.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OnPresetScope))]
@@ -506,6 +562,7 @@ public sealed partial class MachineUtilities : ObservableObject
     [NotifyPropertyChangedFor(nameof(OnFolderScope))]
     private WaveScope scope = WaveScope.Preset;
 
+    /// <summary>Reads whatever the new scope holds, off the disc.</summary>
     partial void OnScopeChanged(WaveScope value) => Look();
 
     /// <summary>
@@ -522,12 +579,14 @@ public sealed partial class MachineUtilities : ObservableObject
         set { if (value) Scope = WaveScope.Preset; }
     }
 
+    /// <inheritdoc cref="OnPresetScope"/>
     public bool OnMachineScope
     {
         get => Scope == WaveScope.Machine;
         set { if (value) Scope = WaveScope.Machine; }
     }
 
+    /// <inheritdoc cref="OnPresetScope"/>
     public bool OnFolderScope
     {
         get => Scope == WaveScope.Folder;
@@ -558,6 +617,7 @@ public sealed partial class MachineUtilities : ObservableObject
     /// <summary>The recordings in scope, with what each one peaks at.</summary>
     public ObservableCollection<WaveLevel> Waves { get; } = new();
 
+    /// <summary>True when there is anything to level, so the page can say <see cref="Nothing"/>.</summary>
     public bool HasWaves => Waves.Count > 0;
 
     /// <summary>
@@ -614,6 +674,13 @@ public sealed partial class MachineUtilities : ObservableObject
         OnPropertyChanged(nameof(PresetFile));
     }
 
+    /// <summary>
+    /// The recordings the current scope holds, each one once.
+    /// </summary>
+    /// <remarks>
+    /// The seen set runs across the whole scope rather than per preset, which is what stops a file
+    /// two presets share being listed and then levelled twice.
+    /// </remarks>
     private IEnumerable<WaveLevel> Found()
     {
         var seen = new HashSet<string>(Tracker.FilePaths.Comparer);
@@ -708,10 +775,13 @@ public sealed partial class MachineUtilities : ObservableObject
     /// <summary>Where the loudest moment is to end up, in dBFS.</summary>
     [ObservableProperty] private double target = Normalization.DefaultTargetDecibels;
 
+    /// <summary>Works out what every file would move by, without touching any of them.</summary>
     partial void OnTargetChanged(double value) => Work();
 
+    /// <summary>The ends of the target slider, which are the levelling code's own limits.</summary>
     public double LeastTarget => Normalization.MinTargetDecibels;
 
+    /// <inheritdoc cref="LeastTarget"/>
     public double MostTarget => Normalization.MaxTargetDecibels;
 
     /// <summary>
@@ -728,6 +798,7 @@ public sealed partial class MachineUtilities : ObservableObject
     /// </remarks>
     [ObservableProperty] private bool keepsBalance = true;
 
+    /// <inheritdoc cref="OnTargetChanged(double)"/>
     partial void OnKeepsBalanceChanged(bool value) => Work();
 
     /// <summary>What the loudest of them peaks at now.</summary>
@@ -751,9 +822,21 @@ public sealed partial class MachineUtilities : ObservableObject
         OnPropertyChanged(nameof(CanLevel));
     }
 
-    /// <summary>How many files a level would actually rewrite.</summary>
-    public int Moves => Waves.Count(one => Math.Abs(one.Gain - 1) >= 0.001);
+    /// <summary>
+    /// The smallest change worth rewriting a file for, as a gain either side of unity.
+    /// </summary>
+    /// <remarks>
+    /// A hundredth of a decibel is under anybody's hearing and a rewrite is a whole file read,
+    /// scaled and written back, so a set that is already where it should be is left alone rather
+    /// than churned. The same figure decides whether a row says it stays put, which keeps the
+    /// column and the button telling the same story.
+    /// </remarks>
+    internal const double SmallestMove = 0.001;
 
+    /// <summary>How many files a level would actually rewrite.</summary>
+    public int Moves => Waves.Count(one => Math.Abs(one.Gain - 1) >= SmallestMove);
+
+    /// <summary>True when there is anything to move, which is what greys the button.</summary>
     public bool CanLevel => Moves > 0;
 
     /// <summary>
@@ -763,6 +846,9 @@ public sealed partial class MachineUtilities : ObservableObject
     /// In place, which is the whole of what levelling a set means: the files inside a machine are
     /// the machine's, they travel with it, and a level held anywhere else would be a level that
     /// arrives on somebody else's rack as a number nothing applies.
+    ///
+    /// Always enabled; <see cref="CanLevel"/> is what the button's own look is bound to, and a
+    /// file that would not move is skipped rather than rewritten with the same samples.
     /// </remarks>
     public IRelayCommand LevelCommand => new RelayCommand(() =>
     {
@@ -772,7 +858,7 @@ public sealed partial class MachineUtilities : ObservableObject
 
         foreach (var wave in Waves.ToList())
         {
-            if (Math.Abs(wave.Gain - 1) < 0.001) continue;
+            if (Math.Abs(wave.Gain - 1) < SmallestMove) continue;
 
             try
             {

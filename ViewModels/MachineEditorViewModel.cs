@@ -80,6 +80,16 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(AccentHex))]
     private MachineProject? project;
 
+    /// <summary>
+    /// Builds the editor with nothing open, and wires the three pages together.
+    /// </summary>
+    /// <remarks>
+    /// The tools tab comes and goes with the tools, and the tab strip is what moves off a page
+    /// that has gone. Doing that here as well put the strip and this in a race: opening the page
+    /// reads the machines again, the list is empty for the instant it takes to rebuild, and a page
+    /// that closed itself on the strength of that instant snapped straight back to the panel every
+    /// time it was opened. So this only says the answer moved and lets the strip decide.
+    /// </remarks>
     public MachineEditorViewModel()
     {
         History.Changed += HistoryMoved;
@@ -90,11 +100,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         Utilities = new MachineUtilities(() => Project);
 
-        // The tab comes and goes with the tools, and the tab strip is what moves off a page
-        // that has gone. Doing that here as well put the strip and this in a race: opening the
-        // page reads the machines again, the list is empty for the instant it takes to rebuild,
-        // and a page that closed itself on the strength of that instant snapped straight back
-        // to the panel every time it was opened.
         Utilities.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MachineUtilities.HasWork)) OnPropertyChanged(nameof(ShowsUtilities));
@@ -149,8 +154,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public bool CanDesign => HasProject && OnScreen;
 
+    /// <summary>True on the page where the presets are filled in.</summary>
     public bool OnPresets => Page == 1;
 
+    /// <summary>True on the page holding the jobs that are neither of those.</summary>
     public bool OnUtilities => Page == 2;
 
     /// <summary>
@@ -170,16 +177,19 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// On being opened rather than on every change, because the folder is a folder: somebody may
     /// have put a file in it from outside, and asking the disc on the way in is the only moment
     /// that could be noticed without watching it.
+    ///
+    /// The tools are read again for the same reason one step further along: a level is a fact
+    /// about a file, and the file may have been rewritten by anything since the last time this
+    /// page was looked at.
     /// </remarks>
     partial void OnPageChanged(int value)
     {
         if (OnPresets) PresetDesk.Reread();
 
-        // The same reason, one step further along: a level is a fact about a file, and the file
-        // may have been rewritten by anything since the last time this page was looked at.
         if (OnUtilities) Utilities.Reread();
     }
 
+    /// <summary>True when a machine is open, which is what most of this page hangs on.</summary>
     public bool HasProject => Project != null;
 
     /// <summary>What the editor says it is showing.</summary>
@@ -187,6 +197,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         ? "No machine open"
         : Project.Name.Length > 0 ? Project.Name : "Untitled machine";
 
+    /// <summary>The line along the bottom: what the last thing done here did, or why it did not.</summary>
     [ObservableProperty] private string status = "";
 
     /// <summary>
@@ -258,6 +269,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <remarks>
     /// Said out loud even where nothing on this page shows it, because the panel beside it is
     /// painted from the theme by the view and has no other way of hearing that it moved.
+    ///
+    /// The colour is part of the machine, so changing it is a change to the machine: the Save
+    /// button has to warm and it has to be something undo can take back. This used to say what it
+    /// did to the two things showing the colour and to nothing else.
     /// </remarks>
     public void Dressed(MachineTheme theme)
     {
@@ -268,9 +283,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(Accent));
         OnPropertyChanged(nameof(AccentHex));
 
-        // The colour is part of the machine, so changing it is a change to the machine: the
-        // Save button has to warm and it has to be something undo can take back. This was
-        // saying what it did to the two things showing the colour and to nothing else.
         Redraw();
     }
 
@@ -284,6 +296,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// The id is made once and never changes, because it is what every song that uses this
     /// machine writes down. Made from the name it is given later would mean a machine losing
     /// its songs the first time it is renamed.
+    ///
+    /// Always enabled. Whatever is open is simply let go of, and what was in a folder is still in
+    /// that folder.
     /// </remarks>
     public IRelayCommand NewCommand => new RelayCommand(() =>
     {
@@ -299,6 +314,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     });
 
     /// <summary>Opens the project in that folder.</summary>
+    /// <remarks>
+    /// The presets are read before the panel is told, or the picker on it is handed a list that has
+    /// not been filled in yet and draws an empty one.
+    /// </remarks>
     public void Open(string folder)
     {
         var opened = MachineProject.Open(folder);
@@ -312,31 +331,39 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Project = opened;
         Status = "Opened '" + opened.Name + "'";
 
-        // Read before the panel is told, or the picker on it is handed a list that has not been
-        // filled in yet and draws an empty one.
         PresetDesk.Reread();
 
         ShelfChanged();
     }
 
-    /// <summary>Writes it where it lives, or where it is being put for the first time.</summary>
+    /// <summary>
+    /// Writes it where it lives, or where it is being put for the first time.
+    /// </summary>
+    /// <remarks>
+    /// What is written down and what is in the folder have to be the same machine, so the pictures
+    /// are put in order first: anything nothing names is deleted, the numbers close up, and the
+    /// panel is pointed at the names the files now have.
+    ///
+    /// A saved machine is a machine that changed, so the number that says which one it is goes up
+    /// by itself. Left to a hand it is bumped when somebody remembers, which is to say it is
+    /// bumped after five changes and not after the sixth. Unless the number was typed: somebody
+    /// who has just written 2.0 in the box means 2.0, and adding a hundredth to it on the way out
+    /// would make the box unusable.
+    ///
+    /// The version is on a plain object the box is bound straight through to, so the whole project
+    /// is said again for the box to show what was just written.
+    ///
+    /// A machine saved for the first time has somewhere to keep presets for the first time, which
+    /// is the moment that page stops being empty.
+    /// </remarks>
     public void Save(string? folder = null)
     {
         if (Project == null) return;
 
         try
         {
-            // What is written down and what is in the folder have to be the same machine, so the
-            // pictures are put in order first: anything nothing names is deleted, the numbers
-            // close up, and the panel is pointed at the names the files now have.
             Tidy();
 
-            // A saved machine is a machine that changed, so the number that says which one it
-            // is goes up by itself. Left to a hand it is bumped when somebody remembers, which
-            // is to say it is bumped after five changes and not after the sixth.
-            //
-            // Unless the number was typed. Somebody who has just written 2.0 in the box means
-            // 2.0, and adding a hundredth to it on the way out would make the box unusable.
             if (string.Equals(Project.Version, _versionWritten, StringComparison.Ordinal))
                 Project.Version = Bumped(Project.Version);
 
@@ -348,15 +375,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Folder));
 
-            // The version is on a plain object the box is bound straight through to, so the
-            // path has to be said again for the box to show what was just written.
             OnPropertyChanged(nameof(Project));
 
-            // What is in the folder is what is on screen, from here until the next edit.
             History.Saved(Project);
 
-            // A machine saved for the first time has somewhere to keep presets for the first
-            // time, which is the moment that page stops being empty.
             PresetDesk.Reread();
         }
         catch (Exception ex)
@@ -420,6 +442,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <remarks>
     /// A machine is its parameters, so this is the ordinary way to build one: add, name, set
     /// the range, and the panel is drawn from what is here.
+    ///
+    /// Always enabled; with nothing open it does nothing.
     /// </remarks>
     public IRelayCommand AddParameterCommand => new RelayCommand(() =>
     {
@@ -450,6 +474,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     });
 
     /// <summary>Takes one out. What a song saved under that key is simply not read again.</summary>
+    /// <remarks>Always enabled; a row exists only while its parameter does.</remarks>
     public IRelayCommand<MachineParameterViewModel> RemoveParameterCommand =>
         new RelayCommand<MachineParameterViewModel>(parameter =>
         {
@@ -503,6 +528,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public IMachinePads PreviewPads { get; } = new MachinePreviewKit();
 
+    /// <inheritdoc cref="PreviewPads"/>
     public IMachineSlices PreviewSlices { get; } = new MachinePreviewSlices();
 
     /// <summary>And a map for the panel to draw, for the same reason there is a kit.</summary>
@@ -515,17 +541,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
 
     /// <summary>
-    /// The shelf the panel's picker offers, which on a machine holding a recording is yours.
-    /// </summary>
-    /// <remarks>
-    /// The same reason the pictures are real. A picker laid out against five made up names is
-    /// laid out against the wrong widths, and the category in front of it cannot be judged at
-    /// all without the categories you actually file takes under.
-    ///
-    /// Set by whoever builds the editor, for the same reason <see cref="Takes"/> is: the shelf
-    /// is the application's and the editor is borrowing it.
-    /// </remarks>
-    /// <summary>
     /// What the picker on the panel being laid out offers.
     /// </summary>
     /// <remarks>
@@ -533,6 +548,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// A picker laid out against the wrong list is laid out against the wrong width: your shelf
     /// carries a category dropdown in front of it and a machine's own presets do not, so a panel
     /// designed against the wrong one is a panel with a control missing or a control too many.
+    ///
+    /// The same reason the pictures are real: a picker laid out against five made up names is laid
+    /// out against the wrong widths, and the category in front of it cannot be judged at all
+    /// without the categories you actually file takes under.
     /// </remarks>
     public IMachinePresets? Presets =>
         Project is { } project && project.BrowsesTakes() != true
@@ -685,6 +704,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _partsHeight = value; }
     }
 
+    /// <inheritdoc cref="PartsHeight"/>
     private GridLength _partsHeight = new(2, GridUnitType.Star);
 
     /// <summary>The room the panel list asks for.</summary>
@@ -694,6 +714,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _panelHeight = value; }
     }
 
+    /// <inheritdoc cref="PanelHeight"/>
     private GridLength _panelHeight = new(1, GridUnitType.Star);
 
     /// <summary>The room the parameters ask for, which the panel above them takes when they fold.</summary>
@@ -703,6 +724,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _parametersHeight = value; }
     }
 
+    /// <inheritdoc cref="ParametersHeight"/>
     private GridLength _parametersHeight = new(220);
 
     /// <summary>The room what is picked asks for.</summary>
@@ -712,6 +734,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _pickedHeight = value; }
     }
 
+    /// <inheritdoc cref="PickedHeight"/>
     private GridLength _pickedHeight = new(1, GridUnitType.Star);
 
     /// <summary>The width of the parts and panel column, or nothing but its two titles.</summary>
@@ -721,6 +744,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _leftWidth = value; }
     }
 
+    /// <inheritdoc cref="LeftWidth"/>
     private GridLength _leftWidth = new(230);
 
     /// <summary>The width of the details column, or nothing but its two titles.</summary>
@@ -730,6 +754,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         set { if (!value.IsAuto) _rightWidth = value; }
     }
 
+    /// <inheritdoc cref="RightWidth"/>
     private GridLength _rightWidth = new(330);
 
     /// <summary>
@@ -773,15 +798,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [ObservableProperty]
     private MachineElementViewModel? selectedElement;
 
-    /// <summary>
-    /// The kinds of element that can be put on a panel here.
-    /// </summary>
-    /// <remarks>
-    /// Written out rather than found by looking over the constants, so that the order is the one
-    /// that suits somebody building a panel, containers first and controls after, and so that a
-    /// constant added for a control this designer cannot yet place does not turn up in the list
-    /// on its own.
-    /// </remarks>
     /// <summary>Every line of the panel list, however deep, for anything that has to touch all of them.</summary>
     public IEnumerable<MachineElementViewModel> Every()
     {
@@ -791,6 +807,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>That element and everything under it, depth first.</summary>
     private static IEnumerable<MachineElementViewModel> Below(MachineElementViewModel element)
     {
         yield return element;
@@ -801,6 +818,15 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// The kinds of element that can be put on a panel here.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than found by looking over the constants, so that the order is the one
+    /// that suits somebody building a panel, containers first and controls after, and so that a
+    /// constant added for a control this designer cannot yet place does not turn up in the list
+    /// on its own.
+    /// </remarks>
     public IReadOnlyList<string> Library { get; } = new[]
     {
         MachineElementKinds.Grid,
@@ -842,6 +868,12 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// Into the root when nothing is picked, because refusing would only mean telling somebody
     /// to click the one element that is certainly there. What has just been added becomes the
     /// selection, since the next thing anybody does to a new element is set it up.
+    ///
+    /// The panel goes back to being laid out, because adding a part is laying the panel out.
+    /// Otherwise what has just been added cannot be picked, and the outline that says which one
+    /// it is never appears.
+    ///
+    /// Always enabled; with nothing open it does nothing.
     /// </remarks>
     public IRelayCommand<string> AddElementCommand => new RelayCommand<string>(kind =>
     {
@@ -853,9 +885,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         SelectedElement = into.Add(Celled(into, Part(kind!)));
 
-        // Adding a part is laying the panel out, so the panel goes back to being laid out.
-        // Otherwise what has just been added cannot be picked, and the outline that says which
-        // one it is never appears.
         Designing = true;
 
         Status = "Added " + kind + ".";
@@ -879,6 +908,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// Landing on something that holds nothing, a knob or a picture, means the thing that holds
     /// it, which is the same rule a part off the library follows and the one that makes dropping
     /// on a crowded panel work at all.
+    ///
+    /// Moving something inside what it is already in is reordering it, which is the ordinary way
+    /// of saying "after that one". It is taken out first so that the place it is going to is
+    /// counted without it, which is what somebody dragging it there is looking at.
     /// </remarks>
     public void MoveInto(MachineElement moved, MachineElement? onto, int at = -1)
     {
@@ -900,9 +933,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             return;
         }
 
-        // Moving something inside what it is already in is reordering it, which is the ordinary
-        // way of saying "after that one". Taking it out first means the place it is going to is
-        // counted without it, which is what somebody dragging it there is looking at.
         bool same = ReferenceEquals(target, from);
 
         int was = from.Children.IndexOf(wrapped);
@@ -934,6 +964,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         return found;
     }
 
+    /// <summary>Adds every picture that element names to the list, and then its children's.</summary>
     private static void Gather(MachineElement element, List<string> into)
     {
         if (element.Element == MachineElementKinds.Image &&
@@ -1022,6 +1053,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Redraw();
     }
 
+    /// <summary>Points every picture element at its file's new name, however deep it sits.</summary>
     private static void Rename(MachineElement element, IReadOnlyDictionary<string, string> moved)
     {
         if (element.Element == MachineElementKinds.Image &&
@@ -1096,7 +1128,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             taken.Add((Whole(child, "row"), Whole(child, "column")));
         }
 
-        for (int at = 0; at < 1024; at++)
+        for (int at = 0; at < MostCells; at++)
         {
             var cell = (at / columns, at % columns);
 
@@ -1110,6 +1142,15 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         return arriving;
     }
+
+    /// <summary>
+    /// How far the search for a free cell goes before giving up.
+    /// </summary>
+    /// <remarks>
+    /// Far past any grid anybody would draw. It is here so that a grid whose cells have somehow
+    /// all been claimed leaves the arriving part where it is rather than looping for ever.
+    /// </remarks>
+    private const int MostCells = 1024;
 
     /// <summary>How many things a comma separated property lists, or none when it says nothing.</summary>
     private static int Split(MachineElement element, string key) =>
@@ -1136,6 +1177,23 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     ///
     /// Values, not placeholders: a picture 120 by 60 is a picture you can see and then adjust,
     /// and an empty width is a picture the panel has to guess about.
+    ///
+    /// A grid is the one container you have to say the shape of, and one that arrives saying
+    /// nothing looks broken: everything dropped in it lands in the same cell. Two by two to start
+    /// with, which is the smallest shape that is plainly a grid.
+    ///
+    /// A group is a frame with a name on it, and the name is the whole point of choosing one over
+    /// a plain row, so it starts with a word to type over rather than an empty frame.
+    ///
+    /// A grid of pads arrives four across with the cap a hand can hit, which is the shape a drum
+    /// machine's pads have had since they were made of rubber; as one pad in a column it would be
+    /// a grid nobody could recognise as pads. Its buttons are keyed from
+    /// <see cref="FirstPadKey"/>, because a grid that arrives with no buttons is a grid nobody
+    /// can see, and it is laid out again from the boxes beside the panel the moment it is meant
+    /// to be a different shape.
+    ///
+    /// A single pad, for adding to a grid that is nearly right, arrives with a key rather than
+    /// empty: its key is what a preset writes its line against.
     /// </remarks>
     private static MachineElement Part(string kind)
     {
@@ -1147,22 +1205,14 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             made.Properties["height"] = "60";
         }
 
-        // A grid is the one container you have to say the shape of, and a grid that arrives
-        // saying nothing is a grid that looks broken: everything dropped in it lands in the same
-        // cell. Two by two to start with, which is the smallest shape that is plainly a grid.
         if (kind == MachineElementKinds.Grid)
         {
             made.Properties["rows"] = "Auto,Auto";
             made.Properties["columns"] = "Auto,Auto";
         }
 
-        // A group is a frame with a name on it, and the name is the whole point of choosing one
-        // over a plain row. Started with a word to type over rather than an empty frame.
         if (kind == MachineElementKinds.Group) made.Properties["caption"] = "Group";
 
-        // Four across and the cap a hand can hit, which is the shape a drum machine's pads have
-        // had since they were made of rubber. Arriving as one pad in a column would be a grid
-        // nobody could recognise as pads.
         if (kind == MachineElementKinds.Pads)
         {
             made.Properties["rows"] = "4";
@@ -1170,26 +1220,36 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             made.Properties["cap"] = "86";
             made.Properties["capHeight"] = "42";
 
-            // Sixteen buttons, keyed from C-4, because a grid that arrives with no buttons is a
-            // grid nobody can see. Laid out again from the boxes beside the panel the moment it
-            // is meant to be a different shape.
-            for (int at = 0; at < 16; at++)
+            for (int at = 0; at < FreshPads; at++)
             {
                 made.Children.Add(new MachineElement
                 {
                     Element = MachineElementKinds.Pad,
                     Parameter = "pad" + (at + 1),
-                    Properties = { ["key"] = (48 + at).ToString(CultureInfo.InvariantCulture) },
+                    Properties = { ["key"] = (FirstPadKey + at).ToString(CultureInfo.InvariantCulture) },
                 });
             }
         }
 
-        // One button, for adding to a grid that is nearly right. Its name is what a preset writes
-        // its line against, so it arrives with one rather than empty.
-        if (kind == MachineElementKinds.Pad) made.Properties["key"] = "48";
+        if (kind == MachineElementKinds.Pad)
+            made.Properties["key"] = FirstPadKey.ToString(CultureInfo.InvariantCulture);
 
         return made;
     }
+
+    /// <summary>The key a fresh grid's first button answers to, which is C-4.</summary>
+    /// <remarks>
+    /// The middle of the keyboard, so a kit laid out here is playable from the octave a keyboard
+    /// opens on rather than from an end of it.
+    /// </remarks>
+    private const int FirstPadKey = 48;
+
+    /// <summary>How many buttons a fresh grid of pads arrives with.</summary>
+    /// <remarks>
+    /// Four by four, the shape a drum machine's pads have had since they were made of rubber, and
+    /// laid out again from the boxes beside the panel the moment it is meant to be another shape.
+    /// </remarks>
+    private const int FreshPads = 16;
 
     /// <summary>
     /// Takes the picked element out, and everything inside it with it.
@@ -1198,6 +1258,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// The root stays, because a panel with no root is not a panel and there would be nothing
     /// left to add to. The selection moves to whatever held the element, so a run of removals
     /// works upwards instead of stopping dead.
+    ///
+    /// What the element and everything inside it was showing is read before it goes, since
+    /// afterwards there is nothing left to ask. The numbers then close up behind what went, so the
+    /// folder reads image1, image2 with nothing missing, and the panel is told what its pictures
+    /// are called now.
+    ///
+    /// Always enabled; the root refuses with a reason rather than being greyed.
     /// </remarks>
     public IRelayCommand RemoveElementCommand => new RelayCommand(() =>
     {
@@ -1209,8 +1276,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             return;
         }
 
-        // What the element and everything inside it was showing, before it goes and there is
-        // nothing left to ask.
         var pictures = Pictures(element.Element);
 
         if (!parent.Remove(element)) return;
@@ -1219,8 +1284,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         int dropped = Forget(pictures);
 
-        // The numbers close up behind what went, so the folder reads image1, image2 with nothing
-        // missing, and the panel is told what its pictures are called now.
         if (dropped > 0) Renumbered();
 
         Status = dropped == 0
@@ -1229,9 +1292,14 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     });
 
     /// <summary>Moves the picked element one place earlier among the things beside it.</summary>
+    /// <remarks>
+    /// Always enabled. A step that would run off the end does nothing rather than wrapping, which
+    /// is what a button held down expects.
+    /// </remarks>
     public IRelayCommand MoveUpCommand => new RelayCommand(() => Shift(-1));
 
     /// <summary>Moves the picked element one place later among the things beside it.</summary>
+    /// <inheritdoc cref="MoveUpCommand" path="/remarks"/>
     public IRelayCommand MoveDownCommand => new RelayCommand(() => Shift(1));
 
     /// <summary>
@@ -1250,22 +1318,15 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The panel as the canvas is handed it, made new every time the tree has been touched.
-    /// </summary>
-    /// <remarks>
-    /// A fresh wrapper around the same root, on purpose. The canvas draws what it is given and
-    /// draws again when it is given something else, and an element added to a tree it is already
-    /// holding is not something else. What gets saved is the project's own panel, which this only
-    /// points at.
-    /// </remarks>
-    /// <summary>
     /// The machine as the panel wants it: what it looks like, what it can be set to, and where
     /// it is kept, made fresh so that a change to any of the three is drawn.
     /// </summary>
     /// <remarks>
-    /// A new object every time on purpose. The panel redraws when it is handed a different
-    /// machine, and the project's own panel is edited in place: without this, moving a knob in
-    /// the designer would change everything except the picture of it.
+    /// A new object every time on purpose, wrapping the same root. The panel draws what it is
+    /// given and draws again when it is given something else, and an element added to a tree it is
+    /// already holding is not something else: without this, moving a knob in the designer would
+    /// change everything except the picture of it. What gets saved is the project's own panel,
+    /// which this only points at.
     /// </remarks>
     public MachineFace? Shown =>
         Project is { } project
@@ -1354,20 +1415,21 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// The elements are plain data and say nothing when they are edited, which is the price of
     /// a machine describing itself without a view model toolkit. So the editor watches its own
     /// wrappers instead and says it here, once, however the edit was made.
+    ///
+    /// Every edit ends here, so this is also where the history hears about it. Told more often
+    /// than there are edits, which is safe: a redraw where nothing about the machine moved reads
+    /// the same as before and leaves no step.
+    ///
+    /// What is picked can turn into a picture without the selection moving, by being changed from
+    /// one kind of element into another, and the way of choosing a file has to come and go with it.
     /// </remarks>
     public void Redraw()
     {
-        // Every edit ends here, however it was made, so this is where the history hears about
-        // it. Told more often than there are edits, which is safe: a redraw where nothing about
-        // the machine moved reads the same as before and leaves no step.
         History.Did(Project);
 
         OnPropertyChanged(nameof(Shown));
         OnPropertyChanged(nameof(Shape));
 
-        // What is picked can turn into a picture without the selection moving, by being changed
-        // from one kind of element into another, and the way of choosing a file has to come and
-        // go with it.
         OnPropertyChanged(nameof(PicturePicked));
         OnPropertyChanged(nameof(PadsPicked));
     }
@@ -1392,11 +1454,19 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <summary>The element the settings pane is showing, watched while it is showing.</summary>
     private MachineElementViewModel? _picked;
 
+    /// <summary>
+    /// The picked element said something about itself that changes the panel rather than the
+    /// element.
+    /// </summary>
+    /// <remarks>
+    /// Which of the two browsers a picker is, is the one: flip it and the control beside it is a
+    /// category list that was not there a moment ago. The list behind the picker is then a
+    /// different list, so the panel is drawn again against it.
+    /// </remarks>
     private void Picked(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(MachineElementViewModel.Source)) return;
 
-        // The list behind the picker is a different list, so the panel is drawn again against it.
         OnPropertyChanged(nameof(Presets));
 
         Redraw();
@@ -1404,19 +1474,25 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Status = "The picker now browses " + (_picked?.Source ?? "") + ". Save when you are happy with it.";
     }
 
+    /// <summary>
+    /// Follows the picked element, opens the way down to it, and fills the grid boxes from it.
+    /// </summary>
+    /// <remarks>
+    /// Picked on the panel, an element may be buried three branches deep in the list. Opening the
+    /// way down to it is what makes the two halves the same selection rather than two.
+    ///
+    /// The boxes for laying a grid out start at what the picked grid already is, so pressing the
+    /// button without changing anything lays out what is already there. How many rows is said by
+    /// the grid, or worked out from the buttons for one written before it said so.
+    /// </remarks>
     partial void OnSelectedElementChanged(MachineElementViewModel? value)
     {
-        // What the picked thing says about itself, for the settings that change the panel rather
-        // than only the element. Which of the two browsers a picker is, is the one: flip it and
-        // the control beside it is a category list that was not there a moment ago.
         if (_picked != null) _picked.PropertyChanged -= Picked;
 
         _picked = value;
 
         if (_picked != null) _picked.PropertyChanged += Picked;
 
-        // Picked on the panel, it may be buried three branches deep in the list. Opening the
-        // way down to it is what makes the two halves the same selection rather than two.
         value?.Reveal();
 
         OnPropertyChanged(nameof(SelectedShape));
@@ -1424,8 +1500,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(PicturePicked));
         OnPropertyChanged(nameof(PadsPicked));
 
-        // The boxes for laying a grid out start at what the picked grid already is, so pressing
-        // it without changing anything lays out what is already there.
         if (value?.Element is { } picked && picked.Element == MachineElementKinds.Pads)
         {
             int held = picked.Children.Count(child => child.Element == MachineElementKinds.Pad);
@@ -1433,7 +1507,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             if (int.TryParse(picked.Properties.GetValueOrDefault("columns"), out int across) && across > 0)
                 PadColumns = across;
 
-            // Said by the grid, or worked out from the buttons for one written before it said so.
             PadRows = int.TryParse(picked.Properties.GetValueOrDefault("rows"), out int down) && down > 0
                 ? down
                 : Math.Max(1, (held + Math.Max(1, PadColumns) - 1) / Math.Max(1, PadColumns));
@@ -1476,6 +1549,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty] private int padRows = 4;
 
+    /// <inheritdoc cref="PadRows"/>
     [ObservableProperty] private int padColumns = 4;
 
     /// <summary>
@@ -1486,6 +1560,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// by. A plain number is taken as well, since somebody may reasonably type 48.
     /// </remarks>
     [ObservableProperty] private string padFirstKey = "C-4";
+
+    /// <summary>The most buttons a grid may have on a side.</summary>
+    /// <remarks>
+    /// Not a shape anybody would draw, and that is the point: it is here so a number typed with an
+    /// extra digit in it cannot ask for a million buttons and take the window with it.
+    /// </remarks>
+    private const int MostPads = 64;
 
     /// <summary>
     /// Lays the picked grid out: that many buttons, that many across, keyed from there.
@@ -1498,6 +1579,16 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     ///
     /// Names already in the grid are kept, in order, because renaming a pad is work somebody
     /// did: laying the grid out again to add a row must not throw away the first sixteen names.
+    ///
+    /// The keys are written as notes, which is what the machine's buttons hold and what its
+    /// presets are keyed by. A grid keyed in numbers would leave every preset naming a button that
+    /// is not there.
+    ///
+    /// The grid is told both its rows and its columns, because neither can be worked out from the
+    /// buttons: sixteen of them is four by four, two by eight or sixteen by one.
+    ///
+    /// Always enabled; anything but a grid of pads is refused, and <see cref="PadsPicked"/> is
+    /// what the button's own look is bound to.
     /// </remarks>
     public IRelayCommand LayPadsCommand => new RelayCommand(() =>
     {
@@ -1505,16 +1596,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         if (pads.Element != MachineElementKinds.Pads) return;
 
-        int across = Math.Clamp(PadColumns, 1, 64);
-        int down = Math.Clamp(PadRows, 1, 64);
+        int across = Math.Clamp(PadColumns, 1, MostPads);
+        int down = Math.Clamp(PadRows, 1, MostPads);
         int wanted = across * down;
 
-        // Written as notes, which is what the machine's buttons hold and what its presets are
-        // keyed by. A grid keyed in numbers would leave every preset naming a button that is not
-        // there.
         int first = MachineNotes.Semitone(PadFirstKey);
 
-        if (first < 0) first = 48;
+        if (first < 0) first = FirstPadKey;
 
         var kept = pads.Children
             .Where(child => child.Element == MachineElementKinds.Pad)
@@ -1533,8 +1621,6 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             });
         }
 
-        // A grid is so many down by so many across, and it says both. Neither can be worked out
-        // from the buttons: sixteen of them is four by four, two by eight or sixteen by one.
         pads.Properties["rows"] = down.ToString(CultureInfo.InvariantCulture);
         pads.Properties["columns"] = across.ToString(CultureInfo.InvariantCulture);
 
@@ -1623,6 +1709,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         foreach (var child in element.Children) Watch(child);
     }
 
+    /// <summary>Something was added to a watched list, so it is watched too and the panel redrawn.</summary>
     private void Grew(object? sender, NotifyCollectionChangedEventArgs e)
     {
         foreach (var added in e.NewItems ?? (System.Collections.IList)Array.Empty<object>())
@@ -1678,30 +1765,42 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(CanCancelChanges));
     }
 
+    /// <summary>
+    /// A different machine was opened, so the history starts again and the wrappers are rebuilt.
+    /// </summary>
+    /// <remarks>
+    /// Only when a different machine is opened, and not when a step is put back into the one that
+    /// already is: putting a step back rebuilds the same wrappers over the same project through
+    /// <see cref="Rewrap"/>, and a history that emptied itself on the way would undo once and then
+    /// refuse to undo again.
+    /// </remarks>
     partial void OnProjectChanged(MachineProject? value)
     {
-        // Only when a different machine is opened, and not when a step is put back into the one
-        // that already is. Putting a step back rebuilds the same wrappers over the same project,
-        // and a history that emptied itself on the way would undo once and then refuse to undo
-        // again.
         History.Opened(value);
 
         Wrap(value);
     }
 
+    /// <summary>
+    /// Hangs a fresh set of wrappers off a project's parameters and its panel.
+    /// </summary>
+    /// <remarks>
+    /// The tools work on whichever machine is open, so opening one is what they hear. Asked
+    /// gently, because this can run before the field has been given anything: a machine opened
+    /// during construction would otherwise reach a tool set that does not exist yet.
+    ///
+    /// The version as the file says it is kept, so the first save of a machine that was only
+    /// looked at still counts as a change, and one whose version was typed over does not get
+    /// bumped as well.
+    /// </remarks>
     private void Wrap(MachineProject? value)
     {
-        // The tools work on whichever machine is open, so opening one is what they hear. Asked
-        // gently, because this can run before the field has been given anything: a machine
-        // opened during construction would otherwise reach a tool set that does not exist yet.
         Utilities?.Reread();
 
         Parameters.Clear();
         Elements.Clear();
         SelectedElement = null;
 
-        // What the file says, so the first save of a machine that was only looked at still
-        // counts as a change, and one whose version was typed over does not get bumped as well.
         _versionWritten = value?.Version ?? "";
 
         if (value == null) return;

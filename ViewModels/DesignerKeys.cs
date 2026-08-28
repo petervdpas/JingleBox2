@@ -30,6 +30,14 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class DesignerKeys : IMachineKeys, IDisposable
 {
+    /// <summary>
+    /// Whoever is showing the panel: the octave, the instrument being edited, and the means to
+    /// sound a note.
+    /// </summary>
+    /// <remarks>
+    /// Asked rather than held, because the instrument under a designer changes while the keyboard
+    /// stays where it is.
+    /// </remarks>
     private readonly IInstrumentDesigner _designer;
 
     /// <summary>
@@ -47,8 +55,16 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// </remarks>
     private readonly IMidiMonitor _keys;
 
+    /// <summary>The kit currently being listened to, so it can be let go when another arrives.</summary>
     private DrumKitViewModel? _watching;
 
+    /// <summary>
+    /// Wires the keyboard to the application's monitor, or to one of its own where there is none.
+    /// </summary>
+    /// <remarks>
+    /// Read once on the way in, since a window opened while a chord is held has to show the chord
+    /// rather than wait for the next key.
+    /// </remarks>
     public DesignerKeys(IInstrumentDesigner designer)
     {
         _designer = designer;
@@ -73,6 +89,7 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// </remarks>
     public IEnumerable Lit => _lit;
 
+    /// <inheritdoc cref="Lit"/>
     private readonly ObservableCollection<int> _lit = new();
 
     /// <summary>
@@ -150,6 +167,11 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
         _designer.Let(new Note(semitone));
     }
 
+    /// <summary>Raised when anything the keyboard draws itself from moved.</summary>
+    /// <remarks>
+    /// One event for all of it: the keys down, the pad in hand, and the octave on show. A keyboard
+    /// reads itself again when it hears this, and reading it is a handful of comparisons.
+    /// </remarks>
     public event EventHandler? Changed;
 
     /// <summary>Stops listening, for a panel nobody can reach any more.</summary>
@@ -159,6 +181,7 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// </remarks>
     public void Dispose() => _keys.Changed -= Moved;
 
+    /// <summary>The kit being edited, or null when the instrument is not one.</summary>
     private DrumKitViewModel? Kit => _designer.Editor?.Kit;
 
     /// <summary>
@@ -180,6 +203,9 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// <remarks>
     /// Only the differences are written: this runs on every half of every key, and a collection
     /// that emptied and refilled itself would redraw a keyboard on which one key had changed.
+    ///
+    /// A key arriving from outside the octaves on show moves them, because a keyboard that cannot
+    /// show the key it is lighting is showing nothing.
     /// </remarks>
     private void Read()
     {
@@ -202,7 +228,6 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
             _lit.Add(semitone);
             moved = true;
 
-            // A keyboard that cannot show the key it is lighting is showing nothing.
             Reveal(semitone);
         }
 
@@ -239,5 +264,10 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
         if (_watching != null) _watching.PropertyChanged += Moved;
     }
 
+    /// <summary>The kit said something moved, which is a pad picked or a sound put on one.</summary>
+    /// <remarks>
+    /// Every property of the kit, not one in particular: what a keyboard draws from a kit is which
+    /// keys have sounds and which pad is in hand, and both are cheap enough to read again.
+    /// </remarks>
     private void Moved(object? sender, PropertyChangedEventArgs e) => Changed?.Invoke(this, EventArgs.Empty);
 }

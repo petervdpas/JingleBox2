@@ -45,6 +45,7 @@ public sealed class DrumPad
     /// </remarks>
     public int Choke { get; set; }
 
+    /// <summary>True when something has been put on this pad. An empty pad makes no sound.</summary>
     [JsonIgnore]
     public bool HasSound => FilePath.Length > 0;
 
@@ -52,6 +53,7 @@ public sealed class DrumPad
     [JsonIgnore]
     public Note Note => new(Semitone);
 
+    /// <summary>A copy nothing else is holding, for a preset landing on a kit already in use.</summary>
     public DrumPad Clone() => new()
     {
         Semitone = Semitone,
@@ -63,6 +65,15 @@ public sealed class DrumPad
         Choke = Choke
     };
 
+    /// <summary>
+    /// Brings a pad read off disc back inside its ends: a key a note column can say, a level
+    /// and a place that are numbers, and a choke group that exists.
+    /// </summary>
+    /// <remarks>
+    /// Everything is clamped rather than refused. A pad with a reading nobody can explain is a
+    /// pad that goes quiet with nothing said, and a file written by a later version is a
+    /// likelier cause of one than damage is.
+    /// </remarks>
     public void Clamp()
     {
         Semitone = Math.Clamp(Semitone, 0, 119);
@@ -107,6 +118,8 @@ public sealed class DrumKit
     /// <summary>The key the first pad answers to: C-4, the note a fresh pattern starts on.</summary>
     public const int FirstSemitone = 48;
 
+    /// <summary>The pads, in order. A chop fills them from the first, which is what
+    /// <see cref="SlicePoints"/> reads back off them.</summary>
     public List<DrumPad> Pads { get; set; } = new();
 
     /// <summary>A kit with that many empty pads, laid out from C-4 upwards.</summary>
@@ -178,11 +191,13 @@ public sealed class DrumKit
     /// Pads past the last slice are emptied rather than left holding a piece of the previous
     /// chop, which would sound and could not be explained. What was set on a pad by hand, its
     /// level, its place in the stereo field, its choke group, stays where it was.
+    ///
+    /// A chop fills the machine it is on: however many pads this kit has, not however many a
+    /// kit used to have. How many pads there are is the machine's business and this kit already
+    /// knows how many it was given.
     /// </remarks>
     public void Reslice(string filePath, IReadOnlyList<double> points)
     {
-        // However many pads this kit has, not however many a kit used to have. A chop fills the
-        // machine it is on.
         int held = Math.Max(1, Pads.Count);
 
         int slices = Slices.CountFor(points, held);
@@ -224,6 +239,9 @@ public sealed class DrumKit
     /// </summary>
     private IEnumerable<DrumPad> Sounding() => Pads.TakeWhile(p => p.HasSound);
 
+    /// <summary>
+    /// A kit nothing else is holding, pads and all, for a preset or a history step.
+    /// </summary>
     public DrumKit Clone()
     {
         var kit = new DrumKit { Sliced = Sliced };
@@ -261,6 +279,15 @@ public sealed class DrumKit
     /// arrives here from three places: a machine that knows how many buttons it declared, an old
     /// file that predates the question, and a copy of another kit. Only the first can answer, and
     /// the other two must not be resized to a number this class made up.
+    ///
+    /// A file may hold fewer pads than the machine has, or none at all; the missing ones are
+    /// added silently rather than the kit being refused. A kit of no pads with nothing said
+    /// about the machine is a kit nothing can be put on, so it starts at the size a machine
+    /// that says nothing has.
+    ///
+    /// One key to a pad, checked last: two pads answering to the same key means one of them can
+    /// never sound, and the second is moved rather than left as a pad that silently does
+    /// nothing.
     /// </remarks>
     public void Clamp(int pads = 0)
     {
@@ -270,8 +297,6 @@ public sealed class DrumKit
 
         if (pads > 0)
         {
-            // A file may hold fewer pads than the machine has, or none at all. The missing ones
-            // are added silently rather than the kit being refused.
             for (int i = Pads.Count; i < pads; i++)
                 Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
 
@@ -279,13 +304,10 @@ public sealed class DrumKit
         }
         else if (Pads.Count == 0)
         {
-            // Nothing said, and nothing there. A kit of no pads is a kit nothing can be put on,
-            // so it starts at the size a machine that says nothing has.
             for (int i = 0; i < PadCount; i++)
                 Pads.Add(new DrumPad { Semitone = FirstSemitone + i, Shape = new SampleShape() });
         }
 
-        // One key to a pad. Two pads on the same key means one of them can never sound.
         for (int i = 0; i < Pads.Count; i++)
             if (Pads.Take(i).Any(p => p.Semitone == Pads[i].Semitone))
                 Pads[i].Semitone = FirstSemitone + i;

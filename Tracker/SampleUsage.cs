@@ -136,24 +136,11 @@ public static class SampleUsage
         return $"'{names[0]}', '{names[1]}' and {rest} {(rest == 1 ? "other" : "others")}";
     }
 
-    private static string Normalize(string path) => FilePaths.Full(path);
-}
-
-/// <summary>
-/// Asked before a recording is removed. Kept as an interface so the RECORD page can put the
-/// question without knowing where instruments are kept.
-/// </summary>
-public interface ISampleUsage
-{
-    /// <summary>The names of the instruments that play this file. Empty when it is free.</summary>
-    IReadOnlyList<string> InstrumentsUsing(string filePath);
-
     /// <summary>
-    /// Points every instrument playing <paramref name="from"/> at <paramref name="to"/> instead,
-    /// and says how many moved. For a recording that has been renamed, which is a recording that
-    /// has been moved.
+    /// A path as it will be compared: resolved, so a name typed by hand and a name off a list
+    /// are the same file when they reach the same file.
     /// </summary>
-    int Repoint(string from, string to);
+    private static string Normalize(string path) => FilePaths.Full(path);
 }
 
 /// <summary>
@@ -167,8 +154,17 @@ public interface ISampleUsage
 /// </remarks>
 public sealed class SampleUsers : ISampleUsage
 {
+    /// <summary>The places to put the question to, in the order they were given.</summary>
     private readonly IReadOnlyList<ISampleUsage> _asked;
 
+    /// <summary>
+    /// Takes however many places there are to ask, nulls included.
+    /// </summary>
+    /// <remarks>
+    /// Nulls are dropped rather than refused, because whether there is a songs folder to ask is
+    /// something the caller finds out while it is being built, and a missing one should mean one
+    /// fewer place to ask rather than a constructor that throws.
+    /// </remarks>
     public SampleUsers(params ISampleUsage?[] asked)
     {
         var list = new List<ISampleUsage>();
@@ -179,6 +175,13 @@ public sealed class SampleUsers : ISampleUsage
         _asked = list;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every place asked and the answers run together, so a recording used by an instrument on
+    /// the shelf and by two songs comes back as three names. One place throwing is one place
+    /// that could not answer: the rest still can, and a question about deleting a file must not
+    /// be turned into a crash.
+    /// </remarks>
     public IReadOnlyList<string> InstrumentsUsing(string filePath)
     {
         var names = new List<string>();
@@ -192,6 +195,11 @@ public sealed class SampleUsers : ISampleUsage
         return names;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Every place is asked, and the counts added. One place throwing leaves the others
+    /// repointed, which is better than a rename that half happened and said nothing.
+    /// </remarks>
     public int Repoint(string from, string to)
     {
         int moved = 0;

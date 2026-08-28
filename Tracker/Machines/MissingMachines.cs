@@ -33,16 +33,20 @@ public static class MissingMachines
     /// Plugins are left out. A missing plugin is already reported when the song's chains are
     /// rebuilt, and there is nothing this program could offer to add: a plugin is somebody
     /// else's, sitting wherever they put it.
+    ///
+    /// What the registry offers is read first for the sake of the names. A machine that is not
+    /// installed has no name of its own here, so the shipped copy is the only place left that
+    /// knows it is called Zampler rather than "Sampler", which is all the engine can say. Where
+    /// the program has no copy either, the song's own remembered name is used, which is the best
+    /// anything can do for a machine that came in from somebody's zip.
     /// </remarks>
+    /// <param name="song">The song being opened, or nothing.</param>
     public static IReadOnlyList<MissingMachine> For(Song song)
     {
         var wanted = new List<MissingMachine>();
 
         if (song?.Instruments is not { } instruments) return wanted;
 
-        // What the program has a copy of, and what those copies call themselves. A machine that
-        // is not installed has no name of its own here, so the crate is the only place left that
-        // knows it is called Zampler rather than "Sampler", which is all the engine can say.
         var offered = MachineRegistry.Available().ToDictionary(one => one.Id, one => one.Name);
 
         var said = new HashSet<string>();

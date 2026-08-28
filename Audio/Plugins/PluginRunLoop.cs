@@ -43,10 +43,19 @@ internal static unsafe class PluginRunLoop
     /// </remarks>
     private const int BusyMilliseconds = 1;
 
+    /// <summary>One clock a plugin has asked for.</summary>
     private sealed class Timer
     {
+        /// <summary>
+        /// The plugin's object for VST3, or a key the host made up for CLAP, which has no
+        /// object to hand over. Either way it is what identifies the timer.
+        /// </summary>
         public nint Handler;
+
+        /// <summary>How often, in milliseconds, floored at one round of the pump.</summary>
         public long Interval;
+
+        /// <summary>When it next comes round, on the same clock as <c>Environment.TickCount64</c>.</summary>
         public long Due;
 
         /// <summary>When it was asked for, so what a window brought with it can go with it.</summary>
@@ -56,9 +65,13 @@ internal static unsafe class PluginRunLoop
         public Action? Fire;
     }
 
+    /// <summary>One file a plugin has asked to be told about.</summary>
     private sealed class Watch
     {
+        /// <inheritdoc cref="Timer.Handler"/>
         public nint Handler;
+
+        /// <summary>The file descriptor. A plugin's X11 connection, in practice.</summary>
         public int File;
 
         /// <summary>When it was asked for. See <see cref="DropSince"/>.</summary>
@@ -81,18 +94,41 @@ internal static unsafe class PluginRunLoop
     /// </remarks>
     private static readonly object Calling = new();
 
+    /// <summary>Every clock asked for, by every plugin. Only touched under <see cref="Gate"/>.</summary>
     private static readonly List<Timer> Timers = new();
+
+    /// <summary>Every file being watched, likewise.</summary>
     private static readonly List<Watch> Watches = new();
+
+    /// <summary>
+    /// Held over every read and write of the two lists. Deliberately not held while a plugin's
+    /// own handler is being called: see <see cref="Calling"/>.
+    /// </summary>
     private static readonly object Gate = new();
 
     /// <summary>Counts registrations, so a moment in time can be named and gone back to.</summary>
     private static long _asked;
 
+    /// <summary>How many timers have gone off, for <see cref="Census"/>.</summary>
     private static long _rings;
+
+    /// <summary>How many files have been reported ready, likewise.</summary>
     private static long _deliveries;
 
+    /// <summary>
+    /// The run loop object a plugin is handed. Made once and never freed, since a plugin holds
+    /// it for as long as it is loaded.
+    /// </summary>
     private static void* _instance;
+
+    /// <summary>The pump's own thread, started with the first registration and never stopped.</summary>
     private static Thread? _pump;
+
+    /// <summary>
+    /// Where a round is posted to, or null while the pump runs rounds itself. Set once a plugin
+    /// has a window: a toolkit drawing into an X11 window expects to be called where the window
+    /// lives.
+    /// </summary>
     private static Action<Action>? _post;
 
     /// <summary>
@@ -137,6 +173,10 @@ internal static unsafe class PluginRunLoop
         }
     }
 
+    /// <summary>
+    /// Starts the pump if it is not already running. A background thread, so the process is
+    /// never held open by a plugin nobody unloaded.
+    /// </summary>
     private static void Start()
     {
         if (_pump != null) return;
@@ -150,6 +190,11 @@ internal static unsafe class PluginRunLoop
         _pump.Start();
     }
 
+    /// <summary>
+    /// The pump: wait, then run a round or hand one to whoever is driving. Nothing registered
+    /// means nothing to do, and there is no reason to wake the drawing thread sixty times a
+    /// second to find that out.
+    /// </summary>
     private static void Run()
     {
         while (true)
@@ -167,8 +212,6 @@ internal static unsafe class PluginRunLoop
                 idle = Timers.Count == 0 && Watches.Count == 0;
             }
 
-            // Nothing registered means nothing to do, and there is no reason to wake the UI
-            // thread sixty times a second to find that out.
             if (idle) continue;
 
             if (post == null)
@@ -196,15 +239,30 @@ internal static unsafe class PluginRunLoop
     }
 
     /// <summary>One round: whatever is due, and whatever has something to read.</summary>
+    /// <remarks>
+    /// Files before timers, deliberately. A plugin's timer is where it draws, and what it draws
+    /// depends on what it has been told; a plugin that repaints before it has read the message
+    /// saying its window is on screen is a plugin drawing into nothing.
+    /// </remarks>
     private static void Pump()
     {
-        // Files before timers, deliberately. A plugin's timer is where it draws, and what it
-        // draws depends on what it has been told; a plugin that repaints before it has read
-        // the message saying its window is on screen is a plugin drawing into nothing.
         Deliver();
         Ring();
     }
 
+    /// <summary>
+    /// Rings whatever is due. The list of due timers is taken under the registration lock and
+    /// they are called under the calling lock, so a plugin taking a timer back mid-round waits
+    /// for the call rather than freeing memory underneath it.
+    /// </summary>
+    /// <remarks>
+    /// Each timer is asked about again right before it rings. A plugin closing its window takes
+    /// its timers away, and it can do that from inside another one of its own timers or from the
+    /// call that closes it, so the list taken a moment ago may already name something freed.
+    ///
+    /// A timer that throws is that plugin's problem for this round rather than a reason to stop
+    /// ringing everybody else's.
+    /// </remarks>
     private static void Ring()
     {
         long now = Environment.TickCount64;
@@ -237,9 +295,6 @@ internal static unsafe class PluginRunLoop
         {
             foreach (var timer in due)
             {
-                // Asked again, right before ringing. A plugin closing its window takes its
-                // timers away, and it can do that from inside another one of its own timers or
-                // from the call that closes it.
                 if (!StillWanted(timer.Handler, Timers)) continue;
 
                 try
@@ -251,8 +306,6 @@ internal static unsafe class PluginRunLoop
                 }
                 catch (Exception)
                 {
-                    // A plugin's timer throwing is that plugin's problem for this round, not a
-                    // reason to stop ringing everybody else's.
                 }
             }
         }
@@ -263,6 +316,17 @@ internal static unsafe class PluginRunLoop
     /// window hears about a mouse or a keystroke: its toolkit is sitting on an X11 connection
     /// and the host is the only thing that will ever look at it.
     /// </summary>
+    /// <remarks>
+    /// Drained rather than one message per round. A toolkit handles one message per call, and a
+    /// mouse being dragged makes hundreds a second; handing over one every sixteen milliseconds
+    /// is a window that answers sixty times a second at best, which is what a plugin that will
+    /// not keep up with a knob feels like. Bounded by <see cref="MaxDrain"/>, so a plugin that
+    /// never empties its own queue cannot hold this thread for ever.
+    ///
+    /// The calling lock is held for the whole drain, because the handler belongs to the plugin
+    /// and the plugin frees it when it takes it back. Each handler is asked about again just
+    /// before it is told, for the same reason the timers are.
+    /// </remarks>
     private static void Deliver()
     {
         Watch[] watching;
@@ -279,15 +343,8 @@ internal static unsafe class PluginRunLoop
 
         for (int index = 0; index < watching.Length; index++) files[index] = watching[index].File;
 
-        // Held for the calls: the handler belongs to the plugin and the plugin frees it when
-        // it takes it back.
         lock (Calling)
         {
-            // Drained rather than one message per round. A toolkit handles one message per
-            // call, and a mouse being dragged makes hundreds a second; handing over one every
-            // sixteen milliseconds is a window that answers sixty times a second at best,
-            // which is what a plugin that will not keep up with a knob feels like. Bounded, so
-            // a plugin that never empties its own queue cannot hold this thread forever.
             for (int pass = 0; pass < MaxDrain; pass++)
             {
                 if (Waiting(files, ready) <= 0) return;
@@ -298,9 +355,6 @@ internal static unsafe class PluginRunLoop
                 {
                     if (!ready[index]) continue;
 
-                    // Same as the timers: a plugin shutting down takes its files back, and
-                    // telling a handler that no longer exists about one is a read of freed
-                    // memory.
                     if (!StillWatched(watching[index].Handler)) continue;
 
                     any = true;
@@ -314,7 +368,6 @@ internal static unsafe class PluginRunLoop
                     }
                     catch (Exception)
                     {
-                        // One plugin's event handling is that plugin's problem for this round.
                     }
                 }
 
@@ -340,6 +393,11 @@ internal static unsafe class PluginRunLoop
     /// every file reads as quiet and no plugin is ever told anything. What that looks like is
     /// a plugin window that opens at the right size and stays black forever, which is why it
     /// is worth a check of its own.
+    ///
+    /// A file that has gone wrong counts as something to hear about, not only one with data on
+    /// it: a plugin told its connection has hung up can tidy up, and one told nothing waits for
+    /// ever. No poll to call means no windows getting events, which is a plugin that does not
+    /// respond rather than an application that stops, so a failure answers nought.
     /// </remarks>
     internal static unsafe int Waiting(int[] files, bool[] ready)
     {
@@ -365,15 +423,11 @@ internal static unsafe class PluginRunLoop
         }
         catch (Exception)
         {
-            // No poll to call means no windows getting events, which is a plugin that does
-            // not respond rather than an application that stops.
             return 0;
         }
 
         for (int index = 0; index < files.Length && index < ready.Length; index++)
         {
-            // A file that has gone wrong counts as something to hear about: a plugin told its
-            // connection has hung up can tidy up, and one told nothing waits forever.
             ready[index] = (polled[index].Returned & (PollIn | PollBroken)) != 0;
         }
 
@@ -398,8 +452,16 @@ internal static unsafe class PluginRunLoop
     [StructLayout(LayoutKind.Sequential)]
     private struct PollFile
     {
+        /// <summary>The descriptor being asked about.</summary>
         public int File;
+
+        /// <summary>What to ask about. <see cref="PollIn"/> here, and nothing else.</summary>
         public short Events;
+
+        /// <summary>
+        /// What the kernel writes back. Written into the same memory that was handed over, which
+        /// is why the array has to be pinned rather than marshalled by copy.
+        /// </summary>
         public short Returned;
     }
 
@@ -409,6 +471,10 @@ internal static unsafe class PluginRunLoop
     /// <summary>The file has gone wrong or the other end has gone away.</summary>
     private const short PollBroken = 0x008 | 0x010 | 0x020;
 
+    /// <summary>
+    /// Asks the kernel which of a set of descriptors is ready. Called with a timeout of nought,
+    /// so it answers at once: this runs on the thread that draws and may not wait for anything.
+    /// </summary>
     [DllImport("libc", EntryPoint = "poll", SetLastError = true)]
     private static extern int Poll(PollFile* files, nuint count, int timeoutMilliseconds);
 
@@ -574,6 +640,10 @@ internal static unsafe class PluginRunLoop
     }
 
     /// <summary>Takes a file to watch from a plugin that speaks in numbers.</summary>
+    /// <remarks>
+    /// The CLAP half of <see cref="RegisterEventHandler"/>. The same key asked for twice moves
+    /// the existing watch rather than adding a second.
+    /// </remarks>
     public static void Watching(nint key, int file, Action<int> fire)
     {
         if (key == 0 || fire == null) return;
@@ -608,6 +678,7 @@ internal static unsafe class PluginRunLoop
         }
     }
 
+    /// <summary>The run loop is an IRunLoop and the root interface, and nothing else.</summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int Query(void* self, byte* id, void** result)
     {
@@ -623,15 +694,28 @@ internal static unsafe class PluginRunLoop
         return Vst3Abi.NoInterface;
     }
 
+    /// <summary>
+    /// AddRef and Release both. There is one run loop for the process and it is never freed, so
+    /// it always answers one: nought would tell a plugin the object had already gone.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static uint KeepAlive(void* self) => 1;
 
+    /// <summary>
+    /// A VST3 plugin asking for a clock, by handing over an object to call. The same handler
+    /// asked for twice moves the existing timer rather than adding a second, since two timers on
+    /// one object would ring it twice per round.
+    /// </summary>
+    /// <remarks>
+    /// Nought means as often as possible, which here means every round of the pump. Floored at
+    /// the round rather than honoured, since asking for a millisecond would only mean the round
+    /// arrives late.
+    /// </remarks>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int RegisterTimer(void* self, void* handler, ulong milliseconds)
     {
         if (handler == null) return Vst3Abi.NoInterface;
 
-        // Nought means as often as possible, which here means every round.
         long interval = Math.Max(TickMilliseconds, (long)milliseconds);
 
         lock (Gate)
@@ -660,6 +744,9 @@ internal static unsafe class PluginRunLoop
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// A plugin giving a clock back. Waits for a call in progress, so nothing is freed mid-call.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterTimer(void* self, void* handler)
     {
@@ -695,6 +782,10 @@ internal static unsafe class PluginRunLoop
         return Vst3Abi.ResultOk;
     }
 
+    /// <summary>
+    /// A plugin giving a watch back. Waits for a call in progress. A plugin that never does this
+    /// is what <see cref="DropSince"/> exists for.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static int UnregisterEventHandler(void* self, void* handler)
     {

@@ -17,32 +17,45 @@ namespace JingleBox2.Tracker.Machines;
 /// Nothing is copied. Two views of one map that each held their own list would disagree the
 /// first time an edge was dragged, and an edge is dragged on every movement of the pointer.
 /// </remarks>
+/// <param name="map">The map on the other side, which is the one the editor is already on.</param>
 public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
 {
+    /// <summary>
+    /// Whether the map is being watched yet.
+    /// </summary>
+    /// <remarks>
+    /// A latch and not a count: the subscription goes on with the first listener and is never
+    /// taken off, so a panel opened twice would otherwise hang two sets of handlers on one map.
+    /// </remarks>
     private bool _listening;
 
+    /// <inheritdoc/>
     public int Count => map.Zones.Count;
 
+    /// <inheritdoc/>
     public string Cap(int at) => Zone(at)?.Title ?? "";
 
+    /// <inheritdoc/>
     public int Low(int at) => Zone(at)?.Zone.Low ?? 0;
 
+    /// <inheritdoc/>
     public int High(int at) => Zone(at)?.Zone.High ?? 0;
 
+    /// <inheritdoc/>
     public int Root(int at) => Zone(at)?.Zone.Root ?? 0;
 
+    /// <inheritdoc/>
     public bool Filled(int at) => Zone(at)?.HasSound ?? false;
 
-    /// <summary>Which zone the settings beside the map are about.</summary>
+    /// <inheritdoc/>
+    /// <remarks>Minus one when nothing is picked, which is what a fresh map looks like.</remarks>
     public int Picked
     {
         get => map.Selected is { } one ? map.Zones.IndexOf(one) : -1;
         set => map.SelectAt(value);
     }
 
-    /// <summary>
-    /// Puts a zone where a drag has left it, all three numbers at once.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// In the order that keeps them from crossing on the way. Each of these clamps itself
     /// against the other two as it is written, so setting a low edge above the current high
@@ -68,9 +81,7 @@ public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
         zone.Root = root;
     }
 
-    /// <summary>
-    /// Told when a zone moves, is picked, or is given a different recording.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Wired on the first listener rather than in the constructor, so a map nothing is watching
     /// costs nothing. The zones are watched as well as the map: an edge dragged is a change to
@@ -87,19 +98,32 @@ public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
         remove => _changed -= value;
     }
 
+    /// <summary>Everyone told when a zone moves, is picked, or is given a different recording.</summary>
     private EventHandler? _changed;
 
+    /// <summary>
+    /// Puts the subscription on, once.
+    /// </summary>
+    /// <remarks>
+    /// A map refilled from a chop or from a folder of samples is a new set of zones, which is
+    /// why the list is watched as well as the zones in it: see
+    /// <see cref="MachineWatch"/>.
+    /// </remarks>
     private void Listen()
     {
         if (_listening) return;
 
         _listening = true;
 
-        // A map refilled from a chop or from a folder of samples is a new set of zones, which is
-        // why the list is watched as well as the zones in it. See <see cref="MachineWatch"/>.
         MachineWatch.Items<SampleZoneViewModel>(
             map, map.Zones, () => map.Zones, () => _changed?.Invoke(this, EventArgs.Empty));
     }
 
+    /// <summary>That zone, or nothing when the number is outside the map.</summary>
+    /// <remarks>
+    /// A described panel can name more zones than the map has, and a number that was right one
+    /// frame ago is ordinary rather than a fault while a map is being refilled, so every reader
+    /// above holds against nothing.
+    /// </remarks>
     private SampleZoneViewModel? Zone(int at) => map.Zones.ElementAtOrDefault(at);
 }

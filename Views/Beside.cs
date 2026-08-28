@@ -39,23 +39,27 @@ public class Beside : Panel
     public static readonly StyledProperty<bool> EvenProperty =
         AvaloniaProperty.Register<Beside, bool>(nameof(Even));
 
+    /// <summary>Any of the three changes the shape, so all three are measured against.</summary>
     static Beside()
     {
         AffectsMeasure<Beside>(GapProperty, LeastProperty, EvenProperty);
     }
 
+    /// <inheritdoc cref="GapProperty"/>
     public double Gap
     {
         get => GetValue(GapProperty);
         set => SetValue(GapProperty, value);
     }
 
+    /// <inheritdoc cref="LeastProperty"/>
     public double Least
     {
         get => GetValue(LeastProperty);
         set => SetValue(LeastProperty, value);
     }
 
+    /// <inheritdoc cref="EvenProperty"/>
     public bool Even
     {
         get => GetValue(EvenProperty);
@@ -65,6 +69,18 @@ public class Beside : Panel
     /// <summary>True while the two are standing side by side rather than stacked.</summary>
     private bool _abreast;
 
+    /// <summary>
+    /// Works out whether the two still fit side by side, and measures them the way they will
+    /// stand.
+    /// </summary>
+    /// <remarks>
+    /// The second child is asked for its own size first when the two are not even, because what
+    /// it wants is what decides whether the first one has enough room left to stand next to it.
+    /// A width of infinity, which is what a scroll viewer offers, always stacks: there is no
+    /// such thing as enough room when there is no room at all to divide.
+    ///
+    /// One child is the whole panel, and none of it is a measurement.
+    /// </remarks>
     protected override Size MeasureOverride(Size available)
     {
         if (Children.Count == 0) return default;
@@ -103,8 +119,6 @@ public class Beside : Panel
                 main.DesiredSize.Height + Gap + aside.DesiredSize.Height);
         }
 
-        // Asked for its own size first: what it wants is what decides whether the other one
-        // still has enough room to stand next to it.
         aside.Measure(new Size(double.PositiveInfinity, available.Height));
 
         double room = available.Width - Gap - aside.DesiredSize.Width;
@@ -127,6 +141,14 @@ public class Beside : Panel
             main.DesiredSize.Height + Gap + aside.DesiredSize.Height);
     }
 
+    /// <summary>
+    /// Puts the two where <see cref="MeasureOverride"/> decided they were going.
+    /// </summary>
+    /// <remarks>
+    /// The decision is not taken again here. Arrange is given a width that can differ from the
+    /// one measured against, and deciding twice is how a panel comes to measure stacked and
+    /// arrange abreast, which draws one child over the other.
+    /// </remarks>
     protected override Size ArrangeOverride(Size final)
     {
         if (Children.Count == 0) return final;

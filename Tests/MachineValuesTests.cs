@@ -17,6 +17,11 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MachineValuesTests
 {
+    /// <summary>A synth instrument and the values adapter over it: the pair under test.</summary>
+    /// <remarks>
+    /// OddSkilla because it has a duty setting to move; any machine with a numbered parameter
+    /// would do, since the rule being tested is the base class's and not the machine's.
+    /// </remarks>
     private static (TrackerInstrument Instrument, SynthValues Values) Synth()
     {
         var instrument = new TrackerInstrument { Name = "OddSkilla", Kind = TrackerInstrumentKind.Synth };
@@ -25,6 +30,11 @@ public class MachineValuesTests
         return (instrument, new SynthValues(new SynthPatchViewModel(instrument.Patch, () => { }), instrument));
     }
 
+    /// <summary>A value moving reaches the owner and every onlooker, and names what moved.</summary>
+    /// <remarks>
+    /// Two names because there is one owner and any number of onlookers, and the owner's is set
+    /// in an object initialiser, which an event cannot be.
+    /// </remarks>
     [Fact]
     public void The_owner_and_anything_showing_them_are_both_told()
     {
@@ -43,6 +53,10 @@ public class MachineValuesTests
         Assert.Equal("duty", which);
     }
 
+    /// <summary>A value set to what it already holds announces nothing.</summary>
+    /// <remarks>
+    /// A controller reporting the position it already holds must not mark a song unsaved.
+    /// </remarks>
     [Fact]
     public void Saying_the_same_thing_again_says_nothing()
     {
@@ -53,12 +67,12 @@ public class MachineValuesTests
         int said = 0;
         values.Said += _ => said++;
 
-        // A controller reporting the position it already holds must not mark a song unsaved.
         values.Set("duty", 0.42);
 
         Assert.Equal(0, said);
     }
 
+    /// <summary>Two panels showing one machine both hear it: neither displaces the other.</summary>
     [Fact]
     public void There_can_be_any_number_of_onlookers()
     {
@@ -75,6 +89,11 @@ public class MachineValuesTests
         Assert.Equal(1, second);
     }
 
+    /// <summary>A value that is not a number leaves the setting where it was.</summary>
+    /// <remarks>
+    /// A knob cannot produce one; a file can, and a NaN reaching a voice spreads through the
+    /// filter and silences the instrument for good.
+    /// </remarks>
     [Fact]
     public void A_value_that_is_not_a_number_is_refused()
     {
@@ -82,13 +101,16 @@ public class MachineValuesTests
 
         double was = values.Get("duty");
 
-        // A knob cannot produce one; a file can, and a NaN reaching a voice spreads through the
-        // filter and silences the instrument for good.
         values.Set("duty", double.NaN);
 
         Assert.Equal(was, values.Get("duty"));
     }
 
+    /// <summary>A key no parameter answers to is dropped without a word.</summary>
+    /// <remarks>
+    /// Which is what a song written against an older machine, or a link pointed at a parameter
+    /// since renamed, arrives as.
+    /// </remarks>
     [Fact]
     public void A_setting_the_machine_has_never_heard_of_changes_nothing()
     {
@@ -102,6 +124,11 @@ public class MachineValuesTests
         Assert.Equal(0, said);
     }
 
+    /// <summary>The rack's preview follows the same rule, told once and then not again.</summary>
+    /// <remarks>
+    /// It holds view models rather than an instrument, so it is a second implementation of the
+    /// same contract, which is exactly the kind of pair that drifts if only one is tested.
+    /// </remarks>
     [Fact]
     public void The_racks_preview_announces_itself_the_same_way()
     {

@@ -62,6 +62,15 @@ public static class PanelOrder
         return ordinal < order.Count ? order[ordinal] : "";
     }
 
+    /// <summary>
+    /// Adds this element's parameter and then everything under it, depth first, which is the
+    /// order somebody's eye takes a panel in.
+    /// </summary>
+    /// <remarks>
+    /// The set of what has already been seen is what makes a parameter named twice count once.
+    /// A value shown beside the knob that turns it is two elements naming one parameter, and a
+    /// controller pointed at "the third control" must not find the same one twice.
+    /// </remarks>
     private static void Walk(MachineElement element, List<string> found, HashSet<string> already)
     {
         if (element.Parameter is { Length: > 0 } key && already.Add(key)) found.Add(key);
@@ -225,6 +234,16 @@ public static class MachineElementKinds
     /// </remarks>
     public const string Switch = "Switch";
 
+    /// <summary>
+    /// A value typed or stepped rather than turned. No properties of its own beyond the ones
+    /// every element has.
+    /// </summary>
+    /// <remarks>
+    /// The range, the step and the wording all come from the parameter, so a number field says
+    /// nothing a dial does not; what it buys is that a value can be read exactly and set exactly.
+    /// For a tempo, a transpose or a count, where somebody knows the number they want and
+    /// hunting for it with a dial is the wrong instrument.
+    /// </remarks>
     public const string Number = "Number";
 
     /// <summary>

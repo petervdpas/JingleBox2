@@ -20,47 +20,100 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class LevelMeter : ThemedControl
 {
-    /// <summary>Above this, the signal is close enough to the ceiling to warn about.</summary>
-    private const double WarnAmplitude = 0.5;      // -6 dB
+    /// <summary>Minus six decibels, above which the signal is close enough to the ceiling to warn about.</summary>
+    private const double WarnAmplitude = 0.5;
 
-    private const double HotAmplitude = 0.89;      // -1 dB
+    /// <summary>Minus one decibel: near enough to the top that the next transient will be over it.</summary>
+    private const double HotAmplitude = 0.89;
 
+    /// <summary>
+    /// How long the peak mark sits still before it starts to come down.
+    /// </summary>
+    /// <remarks>
+    /// Long enough to read a transient that was gone before the eye reached the meter, short
+    /// enough that the mark is still describing the present.
+    /// </remarks>
     private const double PeakHoldSeconds = 1.2;
+
+    /// <summary>How fast the mark falls once the hold is over.</summary>
     private const double PeakFallDecibelsPerSecond = 20;
 
+    /// <summary>
+    /// The two warning colours, fixed rather than taken from the theme.
+    /// </summary>
+    /// <remarks>
+    /// Amber and red mean the same thing on every meter in every studio, and a theme should not
+    /// be able to say otherwise. Only the quiet end of the bar follows the accent.
+    /// </remarks>
     private static readonly Color Warn = Color.FromRgb(0xFD, 0xD8, 0x35);
+
+    /// <inheritdoc cref="Warn"/>
     private static readonly Color Hot = Color.FromRgb(0xE5, 0x39, 0x35);
 
+    /// <summary>Backs <see cref="Left"/>, and is the only bar a mono meter draws.</summary>
     public static readonly StyledProperty<double> LeftProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(Left));
 
+    /// <summary>Backs <see cref="Right"/>, read only when <see cref="Stereo"/> is set.</summary>
     public static readonly StyledProperty<double> RightProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(Right));
 
-    /// <summary>Two bars instead of one. A mono source leaves this off and uses Left alone.</summary>
+    /// <summary>
+    /// Backs <see cref="Stereo"/>: two bars instead of one. A mono source leaves this off and
+    /// uses <see cref="Left"/> alone.
+    /// </summary>
     public static readonly StyledProperty<bool> StereoProperty =
         AvaloniaProperty.Register<LevelMeter, bool>(nameof(Stereo));
 
+    /// <summary>
+    /// Backs <see cref="Orientation"/>: upright, which is a mixer strip, or on its side, which
+    /// is a status bar.
+    /// </summary>
     public static readonly StyledProperty<Orientation> OrientationProperty =
         AvaloniaProperty.Register<LevelMeter, Orientation>(nameof(Orientation), Orientation.Vertical);
 
+    /// <summary>
+    /// Backs <see cref="MinimumDecibels"/>, the bottom of the scale.
+    /// </summary>
+    /// <remarks>
+    /// Minus sixty unless a panel says otherwise, which is quiet enough to be a floor without
+    /// hiding a soft take under it.
+    /// </remarks>
     public static readonly StyledProperty<double> MinimumDecibelsProperty =
         AvaloniaProperty.Register<LevelMeter, double>(nameof(MinimumDecibels), MeterScale.DefaultMinimumDecibels);
 
-    /// <summary>A mark riding the loudest recent moment, so a transient is readable.</summary>
+    /// <summary>
+    /// Backs <see cref="ShowPeak"/>: a mark riding the loudest recent moment, so a transient is
+    /// readable after it has gone.
+    /// </summary>
     public static readonly StyledProperty<bool> ShowPeakProperty =
         AvaloniaProperty.Register<LevelMeter, bool>(nameof(ShowPeak), true);
 
+    /// <summary>
+    /// What the fall of the peak mark is measured against.
+    /// </summary>
+    /// <remarks>
+    /// Real time rather than a count of frames, so the mark comes down at the same rate whatever
+    /// the window is managing, and a dropped frame costs a frame rather than stretching the fall.
+    /// </remarks>
     private readonly Stopwatch _clock = Stopwatch.StartNew();
 
+    /// <summary>Where each mark stands, and when it was last pushed up there.</summary>
     private double _leftPeak;
+
+    /// <inheritdoc cref="_leftPeak"/>
     private double _rightPeak;
+
+    /// <inheritdoc cref="_leftPeak"/>
     private double _leftPeakAt;
+
+    /// <inheritdoc cref="_leftPeak"/>
     private double _rightPeakAt;
 
     /// <summary>Whether a frame has already been asked for, so one is not asked for twice.</summary>
     private bool _waiting;
 
+    /// <summary>Says which properties change the picture. None of them changes the size.</summary>
     static LevelMeter()
     {
         AffectsRender<LevelMeter>(
@@ -68,42 +121,56 @@ public class LevelMeter : ThemedControl
             MinimumDecibelsProperty, ShowPeakProperty);
     }
 
+    /// <summary>How loud the left is, nought to one as amplitude rather than as decibels.</summary>
     public double Left
     {
         get => GetValue(LeftProperty);
         set => SetValue(LeftProperty, value);
     }
 
+    /// <summary>The same for the right, and read only on a stereo meter.</summary>
     public double Right
     {
         get => GetValue(RightProperty);
         set => SetValue(RightProperty, value);
     }
 
+    /// <inheritdoc cref="StereoProperty"/>
     public bool Stereo
     {
         get => GetValue(StereoProperty);
         set => SetValue(StereoProperty, value);
     }
 
+    /// <inheritdoc cref="OrientationProperty"/>
     public Orientation Orientation
     {
         get => GetValue(OrientationProperty);
         set => SetValue(OrientationProperty, value);
     }
 
+    /// <inheritdoc cref="MinimumDecibelsProperty"/>
     public double MinimumDecibels
     {
         get => GetValue(MinimumDecibelsProperty);
         set => SetValue(MinimumDecibelsProperty, value);
     }
 
+    /// <inheritdoc cref="ShowPeakProperty"/>
     public bool ShowPeak
     {
         get => GetValue(ShowPeakProperty);
         set => SetValue(ShowPeakProperty, value);
     }
 
+    /// <summary>
+    /// Draws one bar, or two with a hair between them so a lopsided mix is obvious at a glance,
+    /// and asks for another frame while a peak mark still has somewhere to fall to.
+    /// </summary>
+    /// <remarks>
+    /// A NaN level is read as silence rather than being drawn. Levels arrive off the audio side
+    /// and a bar drawn from a NaN is a bar that is neither empty nor full.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -119,13 +186,14 @@ public class LevelMeter : ThemedControl
         _leftPeak = Track(left, ref _leftPeak, ref _leftPeakAt, now);
         if (Stereo) _rightPeak = Track(right, ref _rightPeak, ref _rightPeakAt, now);
 
+        if (Falling(left, _leftPeak) || (Stereo && Falling(right, _rightPeak))) NextFrame();
+
         if (!Stereo)
         {
             DrawBar(context, palette, new Rect(0, 0, width, height), left, _leftPeak);
             return;
         }
 
-        // Two bars with a hair between them, so a lopsided mix is obvious at a glance.
         double gap = 2;
 
         if (Orientation == Orientation.Vertical)
@@ -140,8 +208,6 @@ public class LevelMeter : ThemedControl
             DrawBar(context, palette, new Rect(0, 0, width, each), left, _leftPeak);
             DrawBar(context, palette, new Rect(0, each + gap, width, each), right, _rightPeak);
         }
-
-        if (Falling(left, _leftPeak) || (Stereo && Falling(right, _rightPeak))) NextFrame();
     }
 
     /// <summary>Whether the mark is above the bar, and so has somewhere left to fall to.</summary>
@@ -183,6 +249,7 @@ public class LevelMeter : ThemedControl
         return MeterScale.DecayPeak(peak, level, now - peakAt, PeakHoldSeconds, PeakFallDecibelsPerSecond);
     }
 
+    /// <summary>One bar: its trough, the part of it that is lit, and the mark over that.</summary>
     private void DrawBar(DrawingContext context, ThemePalette palette, Rect area, double level, double peak)
     {
         if (area.Width <= 0 || area.Height <= 0) return;
@@ -216,6 +283,13 @@ public class LevelMeter : ThemedControl
         return new Rect(area.X, area.Y, area.Width * fraction, area.Height);
     }
 
+    /// <summary>
+    /// The two-pixel mark riding the loudest recent moment.
+    /// </summary>
+    /// <remarks>
+    /// Held inside the bar's own ends, so a mark sitting at the top is drawn inside the trough
+    /// rather than half over the border above it.
+    /// </remarks>
     private void DrawPeakMark(DrawingContext context, ThemePalette palette, Rect area, double at, double peak)
     {
         var brush = new SolidColorBrush(ColourFor(palette, peak));
@@ -261,6 +335,7 @@ public class LevelMeter : ThemedControl
         };
     }
 
+    /// <summary>What a level is worth: the accent while it is quiet, then amber, then red.</summary>
     private static Color ColourFor(ThemePalette palette, double level) =>
         level >= MeterScale.ClipAmplitude || level >= HotAmplitude
             ? Hot

@@ -22,6 +22,19 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class PluginParameters : UserControl
 {
+    /// <summary>
+    /// Builds the panel, and says it is somewhere a hardware knob can be pointed.
+    /// </summary>
+    /// <remarks>
+    /// Both pointer handlers are tunnelled, because a knob takes the move to be dragged and
+    /// would swallow it before this page ever heard about it.
+    ///
+    /// <see cref="LinkKey"/>.Watch puts the panel in the tally of places worth entering the
+    /// other mouse mode for, which is what makes Ctrl+Shift+M mean anything here.
+    ///
+    /// The link list is subscribed to while the panel is on screen and let go of when it
+    /// leaves, so a panel nobody can see is not repainting rings.
+    /// </remarks>
     public PluginParameters()
     {
         InitializeComponent();
@@ -29,8 +42,6 @@ public partial class PluginParameters : UserControl
         AddHandler(PointerMovedEvent, Offers, RoutingStrategies.Tunnel);
         AddHandler(PointerPressedEvent, Pressed, RoutingStrategies.Tunnel);
 
-        // One of the views a controller may be laid out from, which is what makes Ctrl+Shift+M
-        // mean anything here. See LinkKey.
         LinkKey.Watch(this);
 
         AttachedToVisualTree += (_, _) =>
@@ -49,6 +60,7 @@ public partial class PluginParameters : UserControl
     /// <summary>What the pointer last came to rest on, which is what the glow is around.</summary>
     private Knob? _offered;
 
+    /// <summary>The plugin whose knobs these are, or nothing when the panel has been let go of.</summary>
     private PluginControlsViewModel? Controls => DataContext as PluginControlsViewModel;
 
     /// <summary>The knob under the pointer, or nothing when the pointer is between them.</summary>
@@ -64,13 +76,21 @@ public partial class PluginParameters : UserControl
         return null;
     }
 
+    /// <summary>
+    /// Resting the pointer on a knob offers that parameter to whatever is touched next on the
+    /// desk.
+    /// </summary>
+    /// <remarks>
+    /// Between knobs, what was offered is still offered. That is deliberate: pointing a knob
+    /// means looking down at the desk to find the control, and an offer that expired the moment
+    /// the pointer left the dial would be an offer nobody could ever take up.
+    /// </remarks>
     private void Offers(object? sender, PointerEventArgs e)
     {
         if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
 
         var dial = DialAt(e.GetPosition(this));
 
-        // Between knobs. What was offered is still offered, so you can look down at the desk.
         if (dial is null || ReferenceEquals(dial, _offered)) return;
         if (dial.DataContext is not PluginParameterViewModel parameter) return;
         if (Controls is not { } controls) return;
@@ -92,6 +112,11 @@ public partial class PluginParameters : UserControl
     /// <summary>
     /// A press while the controller is being laid out takes a link off, and never turns a knob.
     /// </summary>
+    /// <remarks>
+    /// Handled before anything else sees it whether or not it landed on a knob, since a press
+    /// in this mode is never about the value: a stray click that moved a parameter would be a
+    /// change nobody meant and nobody would notice.
+    /// </remarks>
     private void Pressed(object? sender, PointerPressedEventArgs e)
     {
         if (Midi.ControlLink.Current is not { IsLinking: true } link) return;

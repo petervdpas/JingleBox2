@@ -18,17 +18,26 @@ namespace JingleBox2.Help;
 /// </remarks>
 public static class HelpText
 {
-    // Declared, not composed. Every id in the app is one of these literals.
+    /// <summary>Which device a take is recorded from, and what a loopback is.</summary>
     public const string SettingsRecordingInput = "settings.recording-input";
+    /// <summary>Which ports the pads and the tracker listen to, and what each one is for.</summary>
     public const string SettingsMidiInput = "settings.midi-input";
+    /// <summary>What the audio engine runs at, and how far ahead it mixes.</summary>
     public const string SettingsEngine = "settings.engine";
+    /// <summary>What the log writes down, area by area.</summary>
     public const string SettingsLog = "settings.log";
+    /// <summary>Where plugins are looked for, and what happens when one crashes.</summary>
     public const string SettingsPlugins = "settings.plugins";
+    /// <summary>How many pads there are, and what the limits on that are.</summary>
     public const string SettingsPadMatrix = "settings.pad-matrix";
+    /// <summary>What a song's instruments are, and where they come from.</summary>
     public const string TrackerInstruments = "tracker.song-instruments";
+    /// <summary>What can be written in the effect column.</summary>
     public const string TrackerEffects = "tracker.effects";
+    /// <summary>What each control on a mixer strip does.</summary>
     public const string MixerStrips = "mixer.strips";
 
+    /// <summary>Every topic there is, by its id.</summary>
     private static readonly Dictionary<string, HelpTopic> Topics = new(StringComparer.Ordinal)
     {
         [SettingsRecordingInput] = new(

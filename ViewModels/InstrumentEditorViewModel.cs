@@ -22,6 +22,7 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.IShortcutContext
 {
+    /// <summary>The instrument being edited, written straight through rather than copied.</summary>
     private readonly TrackerInstrument _instrument;
 
     /// <summary>
@@ -49,6 +50,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         return values;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Undo and redo only. Everything else on this page is a control rather than a key.</remarks>
     bool Shortcuts.IShortcutContext.Can(Shortcuts.ShortcutAction action) => action switch
     {
         Shortcuts.ShortcutAction.Undo => History.CanUndo,
@@ -56,6 +59,12 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         _ => false
     };
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A step put back moves the settings under the panel without the panel writing them, which is
+    /// the one case it cannot notice for itself, so it is told to read itself again. The same thing
+    /// a preset landing on the instrument does.
+    /// </remarks>
     void Shortcuts.IShortcutContext.Do(Shortcuts.ShortcutAction action)
     {
         bool walked = action switch
@@ -65,15 +74,38 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
             _ => false
         };
 
-        // The settings under the panel have moved without the panel writing them, which is the
-        // one case it cannot notice for itself. The same thing a preset being loaded does.
         if (walked) SaidAgain();
     }
+
+    /// <summary>Told after every edit, which is how the rack knows to write the file.</summary>
     private readonly Action _changed;
 
+    /// <summary>What the recording turned out to be, or null while it is being read.</summary>
     private WaveformData? _waveform;
+
+    /// <inheritdoc cref="Peaks"/>
     private float[]? _peaks;
 
+    /// <summary>
+    /// Opens one instrument, building whichever half of the page its machine calls for.
+    /// </summary>
+    /// <remarks>
+    /// Both kinds run through the same voice, so both have a patch to edit: a recording has an
+    /// envelope, a filter and modulation exactly as a generated wave does. Only the oscillator half
+    /// is meaningless for a recording, and the page hides that. Which patch there is to edit is the
+    /// machine's business: the mono synth keeps its own and every other kind of ours plays from the
+    /// older one.
+    ///
+    /// A generated wave has no file to read the shape of, so the reading stops there. The machine's
+    /// own face is asked for either way, since it has one whether or not there is a recording
+    /// behind it.
+    /// </remarks>
+    /// <param name="index">Its place in the list, which is the number a pattern cell writes.</param>
+    /// <param name="instrument">The instrument itself, edited in place.</param>
+    /// <param name="changed">Told after every edit.</param>
+    /// <param name="waveforms">Reads a recording down to peaks, or null where nothing draws one.</param>
+    /// <param name="audition">How a note is heard, and how a plugin is reached.</param>
+    /// <param name="recordings">Your takes, the same list RECORD shows.</param>
     /// <param name="play">
     /// How the panel plays a note: through it, a pad or a zone tapped here is the same note as
     /// one played on the keyboard, so the keyboard moves to it and lights it. Without one, a tap
@@ -91,19 +123,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         Index = index;
         _instrument = instrument;
 
-        // Where this instrument stood when the panel was opened. Nothing before that can be
-        // taken back, and a history outliving its instrument would hand back another one's patch.
         History.Opened(instrument);
         _changed = changed;
 
-        // A tap on a pad or a zone is a note played on this panel, and the panel is what knows
-        // the keyboard is there.
         Action<Note> tap = play ?? (note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
         Recordings = recordings ?? new ObservableCollection<Recording>();
 
-        // In front of every picker that offers a take: with a shelf of a hundred, the useful
-        // question is which of the beds, not which of the hundred.
         Takes = new TakeFilter(Recordings);
 
         if (instrument.IsPlugin)
@@ -112,11 +138,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
             return;
         }
 
-        // Both kinds run through the same voice now, so both have a patch to edit: a sample
-        // has an envelope, a filter and modulation exactly as a generated wave does. Only the
-        // oscillator half of it is meaningless for a recording, and the page hides that.
-        // The machine decides which patch there is to edit. The mono synth keeps its own; every
-        // other kind of ours plays from the older one.
         if (instrument.IsMonoSynth)
         {
             instrument.MonoSynth ??= new MonoSynthPatch();
@@ -145,8 +166,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
                 at => instrument.Zones.Zones.ElementAtOrDefault(at)?.Shape,
                 changed);
 
-            // Picking another zone is not a change to the machine, so it does not come through
-            // the change callback, and without this the picture would stay on the zone before.
             Zones.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) FollowSound();
@@ -157,9 +176,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         if (instrument.IsKit)
         {
-            // How many pads there are is the machine's to say, declared as buttons on its panel.
-            // A machine that is not installed as a project says nothing, and the kit keeps
-            // whatever size it was read at.
             int declared = Tracker.Machines.MachineProjects.For(Machine.For(instrument.Kind).SlotId)
                 is { } project
                 ? Tracker.Machines.MachinePresetFile.Buttons(project).Count
@@ -180,7 +196,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
                 at => instrument.Kit.Pads.ElementAtOrDefault(at)?.Shape,
                 changed);
 
-            // The same for the pad in hand.
             Kit.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(DrumKitViewModel.Selected)) FollowSound();
@@ -191,9 +206,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         Patch = new SynthPatchViewModel(instrument.Patch, changed);
 
-        // A generated wave has no file to read the shape of, and nothing below this line is about
-        // anything else. The machine's own face is, though: it has one whether or not there is a
-        // recording behind it, so it is asked for either way.
         if (instrument.IsSynth)
         {
             Describe(waveforms);
@@ -212,7 +224,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// </summary>
     /// <remarks>
     /// Two things have to be true. The machine has to be installed with a panel laid out, which
-    /// is what <see cref="MachineProjects.PanelFor"/> answers; and this build has to know how to
+    /// is what <see cref="Tracker.Machines.MachineProjects.PanelFor"/> answers; and this build has to know how to
     /// turn that machine's parameters into an instrument's settings, which is what the values
     /// are. A machine with a face and nobody to read it draws knobs that turn nothing, so the
     /// panel written by hand is shown instead and nothing is lost.
@@ -221,6 +233,21 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// they have always had until each one has been converted, which is the point of asking
     /// rather than assuming: converting a machine is finished when its knobs move an instrument,
     /// not when its file exists.
+    ///
+    /// How many pads a kit has is the machine's to say, declared as buttons on its panel. A machine
+    /// that is not installed as a project says nothing, and the kit keeps whatever size it was read
+    /// at.
+    ///
+    /// Which adapter reads this machine's settings is a fact about the machine and is said in one
+    /// place, because a preset reader says it too and three copies of it is how three places come
+    /// to disagree about one instrument. The view models are this editor's own and have to be
+    /// handed over: a values adapter over a second copy of the same patch would move a sound
+    /// nobody could see move.
+    ///
+    /// Picking a different pad or zone moves every setting the panel shows at once, since all of
+    /// them are about the thing in hand. The panel is told to read itself again rather than being
+    /// rebuilt: rebuilding would answer that and would also throw away the pad grid the press just
+    /// landed on.
     /// </remarks>
     private void Describe(IWaveformService? waveforms)
     {
@@ -230,8 +257,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         if (Tracker.Machines.MachineProjects.For(id) is not { } project) return;
 
-        // A knob on a described panel is a knob: it changes the instrument, the song is dirty,
-        // and whatever else is showing the same setting has to hear about it.
         void Moved()
         {
             _changed();
@@ -241,11 +266,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
 
-        // Which adapter reads this machine's settings is a fact about the machine and is said
-        // in one place, because a preset reader says it too and three copies of it is how three
-        // places come to disagree about one instrument. The view models are this editor's own
-        // and have to be handed over: the panel edits them, and a values adapter over a second
-        // copy of the same patch would move a sound nobody could see move.
         if (Tracker.Machines.MachineValuesFor.Instrument(
                 _instrument, shelf, Kit, Patch, MonoSynth, Zones, Sampler) is not { } made)
             return;
@@ -254,17 +274,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         Values = Watched(made);
 
-        // What is left here is the part that is about editing rather than about reading: a grid
-        // of pads, a picture of a wave, and the redraw when the thing in hand changes.
         if (IsKit && Kit is { } kit)
         {
             MachinePads = new Tracker.Machines.KitPads(kit);
             MachineSlices = Slices;
 
-            // Every setting the panel shows is about the pad in hand, so picking a different one
-            // moves all of them at once without anything on the panel being touched. The panel
-            // is told to read itself again rather than being rebuilt: rebuilding would answer
-            // this and would also throw away the pad grid the press just landed on.
             kit.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(DrumKitViewModel.Selected)) SayAgain();
@@ -272,7 +286,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
         else if (IsSynth && Patch is { } voice)
         {
-            // The picture of the wave, drawn out of the same engine that makes the sound.
             MachineScope = new Tracker.Machines.SynthScope(voice);
         }
         else if (IsSampler && Zones is { } zones)
@@ -280,8 +293,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
             MachineZones = new Tracker.Machines.SamplerZones(zones);
             MachineSlices = Slices;
 
-            // The same as the kit: half the panel is about the zone in hand, so picking another
-            // one moves all of it without anything on the panel being touched.
             zones.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(ZoneMapViewModel.Selected)) SayAgain();
@@ -324,6 +335,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// </remarks>
     public void SaidAgain() => SayAgain();
 
+    /// <inheritdoc cref="SaidAgain"/>
     private void SayAgain()
     {
         PanelReread++;
@@ -380,8 +392,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         OnPropertyChanged(nameof(Playhead));
     }
 
+    /// <summary>Its place in the list, which is the number a pattern cell writes to reach it.</summary>
     public int Index { get; }
 
+    /// <summary>The instrument itself, for anything that wants the data rather than the controls.</summary>
     public TrackerInstrument Instrument => _instrument;
 
     /// <summary>The machine's own theme: its colour and how far it is carried.</summary>
@@ -399,6 +413,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <summary>BongaBong's kit, when that is the machine. Null on every other.</summary>
     public DrumKitViewModel? Kit { get; }
 
+    /// <summary>True on the machine that holds a kit of drums.</summary>
     public bool IsKit => _instrument.IsKit;
 
     /// <summary>
@@ -446,6 +461,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// </remarks>
     public SliceEditorViewModel? Slices { get; }
 
+    /// <summary>True on a machine that can be filled by cutting one recording up.</summary>
     public bool IsSlicing => Slices != null;
 
     /// <summary>
@@ -514,6 +530,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
     }
 
+    /// <summary>The cuts, or nothing at all where the machine is not one file cut up.</summary>
+    /// <remarks>
+    /// Nothing rather than an empty list, because the two mean different things to the picture: no
+    /// cuts to show, against a recording cut into nought pieces.
+    /// </remarks>
     private static IReadOnlyList<double>? Points(bool sliced, IReadOnlyList<double> points) =>
         sliced ? points : null;
 
@@ -521,6 +542,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// Makes the slice editor and keeps the picture and the settings pointing at the same
     /// piece, whichever of the two was used to choose it.
     /// </summary>
+    /// <remarks>
+    /// Both ways about. The map and the picture are two views of the same pieces, and two views
+    /// that disagree about which piece is in hand are worse than one view.
+    /// </remarks>
     private SliceEditorViewModel Cutting(
         IWaveformService? waveforms,
         int maxSlices,
@@ -539,8 +564,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
             Kit?.SelectAt(slices.SelectedSlice);
         };
 
-        // And the other way about. The map and the picture are two views of the same pieces,
-        // and two views that disagree about which piece is in hand are worse than one view.
         if (Zones != null)
         {
             Zones.PropertyChanged += (_, e) =>
@@ -573,6 +596,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <summary>The sampler's filter and envelopes, when that is the machine.</summary>
     public SamplerPatchViewModel? Sampler { get; }
 
+    /// <summary>True on the machine that lays recordings across the keyboard.</summary>
     public bool IsSampler => _instrument.IsSampler;
 
     /// <summary>
@@ -581,6 +605,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <remarks>
     /// The patches were written into rather than replaced, so the panel is still bound to the
     /// right objects and only has to be told to read them again.
+    ///
+    /// A take landing on the Recording machine is a different file, and the picture was read once
+    /// when this was built, so it is read again or it goes on saying the old one is missing.
+    ///
+    /// A panel drawn from the machine's own description was built from the settings as they were.
+    /// Nothing about the machine has changed, so nothing tells it to draw again: the same face has
+    /// to be handed over as a new one for the picture to catch up with the recording that has just
+    /// landed on it, and said by name as well as in the sweep at the end, because a compiled
+    /// binding is told which property to watch and the panel is the one thing on this page that
+    /// redraws from scratch.
+    ///
+    /// The whole sound has been replaced, which is a different recording as surely as dropping one
+    /// on a zone is. The change callbacks the machines carry do not fire for this, because nothing
+    /// went through them: the instrument was written into from outside.
     /// </remarks>
     public void Reloaded()
     {
@@ -590,28 +628,15 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         Zones?.Refresh();
         Sampler?.RefreshAll();
 
-        // A take landing on the Recording machine is a different file, and the picture was read
-        // once when this was built. Without this it goes on saying the old one is missing.
         Reread();
 
-        // And a panel drawn from the machine's own description was built from the settings as
-        // they were. Nothing about the machine has changed, so nothing tells it to draw again:
-        // the same face has to be handed over as a new one for the picture to catch up with the
-        // recording that has just landed on it.
         if (Described is { } face)
         {
             Described = face.Again();
 
-            // Said by name as well as in the sweep below. A compiled binding is told which
-            // property to watch, and the panel is the one thing on this page that redraws from
-            // scratch: it has to hear it plainly rather than in a list of everything.
             OnPropertyChanged(nameof(Described));
         }
 
-        // The whole sound has been replaced, which is a different recording as surely as
-        // dropping one on a zone is. The change callbacks the machines carry do not fire for
-        // this, because nothing went through them: the instrument was written into from
-        // outside.
         FollowSound();
 
         OnPropertyChanged(string.Empty);
@@ -632,22 +657,28 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// </remarks>
     public string MachineId => Machine.For(_instrument.Kind).SlotId;
 
+    /// <summary>True on the machine with a single voice and its own patch.</summary>
     public bool IsMonoSynth => _instrument.IsMonoSynth;
 
+    /// <summary>True on a machine that generates its sound rather than playing a recording.</summary>
     public bool IsSynth => _instrument.IsSynth;
 
+    /// <summary>True when the sound is somebody else's plugin.</summary>
     public bool IsPlugin => _instrument.IsPlugin;
 
+    /// <summary>True on the plain machine that plays one recording, which is what is left over.</summary>
     public bool IsSample => !IsSynth && !IsPlugin && !IsMonoSynth && !IsKit && !IsSampler;
 
     /// <summary>The plugin's own knobs, when this instrument is a plugin.</summary>
     public PluginControlsViewModel? PluginPanel { get; private set; }
 
+    /// <summary>True when there are plugin knobs to show.</summary>
     public bool HasPluginPanel => PluginPanel != null;
 
     /// <summary>Said plainly when the plugin named by the instrument is not here to open.</summary>
     public string PluginProblem { get; private set; } = "";
 
+    /// <summary>True when there is a refusal to show instead of a panel.</summary>
     public bool HasPluginProblem => !string.IsNullOrWhiteSpace(PluginProblem);
 
     /// <summary>What plugin this instrument is, for the page to name.</summary>
@@ -661,6 +692,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// A knob moved here changes the running plugin, and the patch is read back out of it
     /// afterwards. That is the only way round: a Serum sound is wavetables and samples as much
     /// as knob positions, and only the plugin can hand those over.
+    ///
+    /// The plugin's own interface is not prepared here. It is opened when its window is, because
+    /// Serum wants 1190 by 740 and Vital 1400 by 820, and neither belongs inside a page.
     /// </remarks>
     private void OpenPlugin(IInstrumentAudition? audition)
     {
@@ -682,8 +716,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
         _plugin = plugin;
 
-        // Not prepared here. The plugin's interface is opened when its window is, because
-        // Serum wants 1190 by 740 and Vital 1400 by 820, and neither belongs inside a page.
         PluginPanel = new PluginControlsViewModel(plugin, KeepPatch);
     }
 
@@ -735,8 +767,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         _instrument.PluginState = _plugin.SaveState();
     }
 
+    /// <summary>The index as the pattern prints it, two digits so the column does not jump.</summary>
     public string Number => Index.ToString("00", CultureInfo.InvariantCulture);
 
+    /// <summary>What sort of thing it is, in one word, for the header.</summary>
     public string KindText => IsSynth ? "Synth" : IsPlugin ? "Plugin" : "Sample";
 
     /// <summary>
@@ -787,6 +821,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
     }
 
+    /// <inheritdoc cref="Playhead"/>
     private double _playhead = -1;
 
     /// <summary>What the file turned out to be, for the line under the picture.</summary>
@@ -807,12 +842,9 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
     }
 
+    /// <summary>Why the recording could not be read, or null while it still might be.</summary>
     private string? _sampleProblem;
 
-    /// <summary>
-    /// Reduces the file to peaks, off the UI thread: a long take takes a moment to read, and
-    /// picking an instrument in the list should not wait for it.
-    /// </summary>
     /// <summary>The service that read the picture, kept so it can be read again.</summary>
     private IWaveformService? _waveforms;
 
@@ -836,6 +868,14 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <summary>Which file the picture on show was read from.</summary>
     private string _drawn = "";
 
+    /// <summary>
+    /// Reduces the recording to peaks, off the drawing thread.
+    /// </summary>
+    /// <remarks>
+    /// A long take takes a moment to read, and picking an instrument in the list should not wait
+    /// for it, so the reading is handed off and the picture arrives when it arrives. A file that
+    /// is missing or will not read says so on the line under the picture rather than throwing.
+    /// </remarks>
     private void ReadWaveform(IWaveformService? waveforms)
     {
         _waveforms = waveforms;
@@ -879,6 +919,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }));
     }
 
+    /// <summary>What you have called it in this song, or on the rack.</summary>
     public string Name
     {
         get => _instrument.Name;
@@ -896,13 +937,24 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <summary>Past unity is makeup gain: a quiet sample or a soft patch can be pushed up.</summary>
     public const double MaxVolume = 2.0;
 
+    /// <summary>
+    /// The smallest move worth reporting on a level.
+    /// </summary>
+    /// <remarks>
+    /// A fader dragged across its range reports hundreds of positions, and each one that got
+    /// through would be an edit, a save on the clock and a step in the history. Well under what a
+    /// hundredth of a decibel comes to, so nothing anybody could hear is dropped.
+    /// </remarks>
+    private const double SmallestLevelMove = 0.0001;
+
+    /// <summary>How loud this instrument is before it reaches the track.</summary>
     public double Volume
     {
         get => _instrument.Volume;
         set
         {
             double clamped = Math.Clamp(double.IsNaN(value) ? 0 : value, 0, MaxVolume);
-            if (Math.Abs(_instrument.Volume - clamped) < 0.0001) return;
+            if (Math.Abs(_instrument.Volume - clamped) < SmallestLevelMove) return;
 
             _instrument.Volume = clamped;
             OnPropertyChanged();
@@ -934,6 +986,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
     }
 
+    /// <summary>That pitch written the way the pattern writes it.</summary>
     public string BaseNoteText => _instrument.BaseNote.ToString();
 
     /// <summary>
@@ -947,26 +1000,35 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         set => SetPosition(v => Shape.Start = v, Shape.Start, value, nameof(SampleStart));
     }
 
+    /// <inheritdoc cref="SampleStart"/>
     public double SampleEnd
     {
         get => Shape.End;
         set => SetPosition(v => Shape.End = v, Shape.End, value, nameof(SampleEnd));
     }
 
+    /// <inheritdoc cref="SampleStart"/>
     public double LoopStart
     {
         get => Shape.LoopStart;
         set => SetPosition(v => Shape.LoopStart = v, Shape.LoopStart, value, nameof(LoopStart));
     }
 
+    /// <inheritdoc cref="SampleStart"/>
     public double LoopEnd
     {
         get => Shape.LoopEnd;
         set => SetPosition(v => Shape.LoopEnd = v, Shape.LoopEnd, value, nameof(LoopEnd));
     }
 
+    /// <summary>The ways a recording can loop, read off the enumeration itself.</summary>
     public SampleLoopMode[] LoopModes { get; } = Enum.GetValues<SampleLoopMode>();
 
+    /// <summary>Which of them this instrument uses.</summary>
+    /// <remarks>
+    /// The old loop flag on the instrument is kept saying the same thing, so a build without loop
+    /// modes still loops the instruments that should.
+    /// </remarks>
     public SampleLoopMode LoopMode
     {
         get => Shape.LoopMode;
@@ -976,8 +1038,6 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
 
             Shape.LoopMode = value;
 
-            // The old flag is kept saying the same thing, so a build without loop modes still
-            // loops the instruments that should.
             _instrument.Loop = Shape.IsLooping;
 
             OnPropertyChanged();
@@ -987,8 +1047,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
         }
     }
 
+    /// <summary>True when the loop mode is one that loops, for the picture to draw the marks.</summary>
     public bool IsLooping => Shape.IsLooping;
 
+    /// <summary>Whether the recording plays backwards.</summary>
     public bool Reverse
     {
         get => Shape.Reverse;
@@ -1023,6 +1085,13 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     /// <summary>The old loop flag, still on the instrument, now driven by the loop mode.</summary>
     public bool Loop => Shape.IsLooping;
 
+    /// <summary>
+    /// The window and the loop, made on first use.
+    /// </summary>
+    /// <remarks>
+    /// Made rather than required, because an instrument written before the window existed has
+    /// none, and a whole file played is the same thing as a window over the whole of it.
+    /// </remarks>
     private SampleShape Shape
     {
         get
@@ -1033,13 +1102,26 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.ISho
     }
 
     /// <summary>
+    /// The smallest move worth reporting on one of the four handles, as a fraction of the file.
+    /// </summary>
+    /// <remarks>
+    /// Finer than a level's, because these are fractions of a whole recording: a hundred thousandth
+    /// of a five minute take is three milliseconds, which is inside what a hand can place.
+    /// </remarks>
+    private const double SmallestHandleMove = 0.00001;
+
+    /// <summary>
     /// Writes one of the four positions and tells the view about all of them: moving the start
     /// past a loop point drags that point along, so the picture has to be told.
     /// </summary>
+    /// <remarks>
+    /// A move smaller than <see cref="SmallestHandleMove"/> is dropped, since a handle dragged
+    /// across the picture reports a position per pixel and each one is an edit.
+    /// </remarks>
     private void SetPosition(Action<double> assign, double current, double value, string name)
     {
         double clamped = double.IsNaN(value) ? 0 : Math.Clamp(value, 0, 1);
-        if (Math.Abs(current - clamped) < 0.00001) return;
+        if (Math.Abs(current - clamped) < SmallestHandleMove) return;
 
         assign(clamped);
         Shape.Clamp();

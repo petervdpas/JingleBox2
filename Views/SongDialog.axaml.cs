@@ -18,6 +18,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class SongDialog : Window
 {
+    /// <summary>Builds the window. Its list and its search box are the tracker's own.</summary>
     public SongDialog()
     {
         InitializeComponent();
@@ -27,20 +28,28 @@ public partial class SongDialog : Window
     /// Shows the list over the app's window. True when a song was picked to open, false when
     /// it was cancelled or there is no window to sit over.
     /// </summary>
+    /// <remarks>
+    /// The search is cleared on the way in, whatever was typed the last time it was open,
+    /// because a dialog that opens filtered looks like a dialog that has lost your songs. The
+    /// box takes the keyboard, since typing is the first thing you do on a long list and costs
+    /// nothing on a short one; Enter still opens what is picked, because the Open button is the
+    /// default.
+    /// </remarks>
     public static Task<bool> PickAsync(ViewModels.TrackerViewModel tracker)
     {
-        // Opened showing everything, whatever was typed the last time it was open.
         tracker.SongSearch = "";
 
         var dialog = new SongDialog { DataContext = tracker };
 
-        // Typing is the first thing you do on a long list and costs nothing on a short one.
-        // Enter still opens what is picked, since the Open button is the default.
         dialog.Opened += (_, _) => dialog.FindControl<TextBox>("SearchBox")?.Focus();
 
         return Dialog.ShowAsync(dialog, false);
     }
 
+    /// <summary>
+    /// A double click on a song opens it, which is what anybody who has used a file dialog
+    /// expects of a list.
+    /// </summary>
     private void Songs_DoubleTapped(object? sender, RoutedEventArgs e) => Open_Click(sender, e);
 
     /// <summary>
@@ -50,29 +59,38 @@ public partial class SongDialog : Window
     /// From the button's own row rather than from what is picked in the list, because a press
     /// on a row's button is about that row. Picking it first and then deleting would be one
     /// gesture too many, and picking it is also how you open it.
+    ///
+    /// The press is marked handled so it is not also the list's. Without that, deleting picks
+    /// the row on the way past, and a press meant to remove a song leaves it selected and ready
+    /// to be opened by Enter. With nothing left in the list the dialog has nothing to do, so it
+    /// closes.
     /// </remarks>
     private async void Delete_Click(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not ViewModels.TrackerViewModel tracker) return;
         if (sender is not Control button || button.DataContext is not Tracker.SongFile file) return;
 
-        // Not the list's press. Without this, deleting also picks the row, and a press meant
-        // to remove a song leaves it selected and ready to be opened by Enter.
         e.Handled = true;
 
         await tracker.DeleteSongFile(file);
 
-        // Nothing left to choose from is a dialog with nothing to do.
         if (tracker.ShownSongs.Count == 0) Close(false);
     }
 
+    /// <summary>
+    /// Closes with a yes, and the tracker opens whatever its list has picked.
+    /// </summary>
+    /// <remarks>
+    /// Nothing picked means nothing to open, and the window stays put: the double click landed
+    /// on the empty part of the list.
+    /// </remarks>
     private void Open_Click(object? sender, RoutedEventArgs e)
     {
-        // Nothing picked, nothing to open: the double click landed on the empty part of the list.
         if (this.FindControl<ListBox>("Songs")?.SelectedItem == null) return;
 
         Close(true);
     }
 
+    /// <summary>Closes with a no, leaving the song that is open open.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(false);
 }

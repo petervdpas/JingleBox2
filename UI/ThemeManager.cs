@@ -7,6 +7,13 @@ using System.Linq;
 
 namespace JingleBox2.UI;
 
+/// <summary>
+/// Which theme the application is wearing, and the swap that puts another one on.
+/// </summary>
+/// <remarks>
+/// Two sheets are merged, always: a base every theme is layered on, and the theme itself. So a
+/// theme file says only what it changes, and a rule that is the same everywhere is written once.
+/// </remarks>
 public static class ThemeManager
 {
     /// <summary>
@@ -98,13 +105,20 @@ public static class ThemeManager
     /// <summary>The themes there are, in picker order.</summary>
     public static IReadOnlyList<string> Names { get; } = Sheets.Keys.ToArray();
 
+    /// <summary>What is worn when the settings name nothing, or name something we have not got.</summary>
     public const string Default = "Dark";
 
+    /// <summary>Which theme is on now.</summary>
     public static string CurrentTheme { get; private set; } = Default;
 
     /// <summary>
     /// The name this one really is, or <see cref="Default"/> when it is nothing we have.
     /// </summary>
+    /// <remarks>
+    /// A name saved before the coloured themes gained a light half is followed to what it is
+    /// called now, so somebody's chosen theme does not quietly become the default.
+    /// </remarks>
+    /// <param name="themeName">What the settings say, or null.</param>
     public static string Resolve(string? themeName)
     {
         var wanted = themeName?.Trim();
@@ -119,8 +133,17 @@ public static class ThemeManager
     }
 
     /// <summary>The file a theme is, or the default's file when it is nothing we have.</summary>
+    /// <param name="themeName">What the settings say, or null.</param>
     public static string SheetFor(string? themeName) => Sheets[Resolve(themeName)].Uri;
 
+    /// <summary>Puts a theme on, and tells anything that had mixed a colour of its own.</summary>
+    /// <remarks>
+    /// The requested variant is set as well as the sheet, because Fluent draws its own parts from
+    /// it: the popups, the scrollbars and the text boxes. A pale sheet under the dark variant gets
+    /// dark popups over a white page.
+    /// </remarks>
+    /// <param name="themeName">Which theme, resolved through <see cref="Resolve"/>.</param>
+    /// <exception cref="InvalidOperationException">The application is not up yet.</exception>
     public static void Apply(string themeName)
     {
         var app = Application.Current
@@ -129,7 +152,6 @@ public static class ThemeManager
         var resolved = Resolve(themeName);
         var sheet = Sheets[resolved];
 
-        // ThemeVariant drives Fluent defaults (Light/Dark behaviors)
         app.RequestedThemeVariant = sheet.Lit ? ThemeVariant.Light : ThemeVariant.Dark;
 
         app.Resources.MergedDictionaries.Clear();

@@ -13,10 +13,16 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class HelpWindow : Window
 {
+    /// <summary>The one that is open, so asking again moves it rather than opening a second.</summary>
     private static HelpWindow? _open;
 
+    /// <summary>
+    /// The list down the side, kept because it is both read from and written to: a topic asked
+    /// for elsewhere has to select its row, and a row selected here has to become the page.
+    /// </summary>
     private ListBox? _topics;
 
+    /// <summary>Builds the window and fills its list with every topic there is.</summary>
     public HelpWindow()
     {
         InitializeComponent();
@@ -47,6 +53,10 @@ public partial class HelpWindow : Window
         window.Show(owner);
     }
 
+    /// <summary>
+    /// Shows a topic, and moves the list to it, so arriving from a help badge leaves the list
+    /// agreeing with the page rather than pointing at whatever was read last.
+    /// </summary>
     private void Go(HelpTopic topic)
     {
         DataContext = topic;
@@ -54,10 +64,12 @@ public partial class HelpWindow : Window
         if (_topics != null) _topics.SelectedItem = topic;
     }
 
+    /// <summary>Picking a row shows that topic. This is how the window is browsed.</summary>
     private void OnTopicChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_topics?.SelectedItem is HelpTopic topic) DataContext = topic;
     }
 
+    /// <summary>Closes the window, which frees it to be opened fresh next time.</summary>
     private void OnClose(object? sender, RoutedEventArgs e) => Close();
 }

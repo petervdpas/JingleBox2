@@ -25,6 +25,9 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// <summary>How many rows one page of lamps covers.</summary>
     public const int PageLines = 8;
 
+    /// <summary>
+    /// What is watched: the tracker itself, or <see cref="Still"/> when there is none.
+    /// </summary>
     private readonly ITrackerPanel _tracker;
 
     /// <summary>True while the shown page chases the playhead rather than being held.</summary>
@@ -52,23 +55,44 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// <summary>True when there is a tracker behind this, so the panel knows to grey it.</summary>
     public bool IsLive { get; private set; }
 
-    /// <summary>A tracker that is not there: a pattern of the usual length, never playing.</summary>
+    /// <summary>
+    /// A tracker that is not there: a pattern of the usual length, never playing.
+    /// </summary>
+    /// <remarks>
+    /// A stand-in rather than a null check at every use. The panel is the same panel on the
+    /// rack page, where there is no song at all, and the only difference is that it is greyed;
+    /// see <see cref="IsLive"/>.
+    /// </remarks>
     private sealed class Still : ITrackerPanel
     {
+        /// <inheritdoc/>
+        /// <remarks>Nothing here ever changes, so nothing is ever raised and nothing is kept.</remarks>
         public event PropertyChangedEventHandler? PropertyChanged
         {
             add { }
             remove { }
         }
 
+        /// <inheritdoc/>
+        /// <remarks>Never playing, so no lamp is ever lit.</remarks>
         public int PlayingLine => -1;
 
+        /// <inheritdoc/>
+        /// <remarks>
+        /// A pattern of the usual length, so the row of page buttons is the width it would be
+        /// over a real song rather than empty.
+        /// </remarks>
         public int PatternLines => Tracker.Pattern.DefaultLines;
 
+        /// <inheritdoc/>
+        /// <remarks>Kept, so a panel on the rack page can still be played an octave up.</remarks>
         public int Octave { get; set; } = 4;
 
+        /// <inheritdoc/>
         public void FollowOctave(int octave) => Octave = octave;
 
+        /// <inheritdoc/>
+        /// <remarks>Nothing plays here, so this is never raised.</remarks>
         public event EventHandler<(int Track, Note Note, double Seconds)>? NotePlayed
         {
             add { }
@@ -91,8 +115,19 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
     /// <summary>True while the page is chasing the playhead, for the lamp that says so.</summary>
     [ObservableProperty] private bool isFollowing = true;
 
+    /// <summary>
+    /// Stops watching the tracker, which a panel closed in its own window has to do: the
+    /// tracker outlives the window and would otherwise go on holding a panel that is gone.
+    /// </summary>
     public void Dispose() => _tracker.PropertyChanged -= OnTrackerChanged;
 
+    /// <summary>
+    /// Reads the lamps again when the playhead moves or the pattern changes length.
+    /// </summary>
+    /// <remarks>
+    /// A null name means everything moved, which is what a whole song being opened looks like,
+    /// so it is taken as both.
+    /// </remarks>
     private void OnTrackerChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ITrackerPanel.PlayingLine)
@@ -119,6 +154,14 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
         Update();
     }
 
+    /// <summary>
+    /// Works out which page is shown, which lamp is lit and what is written under the lamps.
+    /// </summary>
+    /// <remarks>
+    /// The lamp is -1 whenever the playhead is on a page other than the one being shown, which
+    /// is what a held page looks like while the song runs past it. Nothing here moves the
+    /// pattern: the buttons choose what the lamps show and never where the song is.
+    /// </remarks>
     private void Update()
     {
         EnsurePages();
@@ -159,8 +202,17 @@ public sealed partial class TrackLocationViewModel : ObservableObject, IDisposab
 /// <summary>One page button: eight rows of the pattern, and whether it is the page on show.</summary>
 public sealed partial class LocationPage : ObservableObject
 {
+    /// <summary>What pressing this button does, which is the location panel's business.</summary>
     private readonly Action _pick;
 
+    /// <summary>
+    /// Builds one button and works out its caption once.
+    /// </summary>
+    /// <remarks>
+    /// The last page of a pattern that does not divide by eight is short, so the caption is
+    /// bounded by the pattern's length rather than always spanning eight: a button reading
+    /// 56-63 over a pattern of sixty rows would be naming rows that are not there.
+    /// </remarks>
     public LocationPage(int index, int lines, Action pick)
     {
         Index = index;
@@ -172,12 +224,18 @@ public sealed partial class LocationPage : ObservableObject
         Text = first.ToString(CultureInfo.InvariantCulture) + "-" + last.ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Which page of eight rows this is, counted from nought.</summary>
     public int Index { get; }
 
     /// <summary>What is written on the cap: the rows this page covers.</summary>
     public string Text { get; }
 
+    /// <summary>True for the page the lamps are showing, which is what lights the cap.</summary>
     [ObservableProperty] private bool isShown;
 
+    /// <summary>
+    /// Shows this page. Pressing the page already shown hands the choice back to the playhead
+    /// rather than doing nothing, which is the only way to let go of a held page.
+    /// </summary>
     public IRelayCommand PickCommand => new RelayCommand(_pick);
 }

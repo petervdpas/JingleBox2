@@ -5,34 +5,16 @@ using System.IO;
 
 namespace JingleBox2.Audio;
 
-public interface IWaveformService
-{
-    WaveformData AnalyzeFile(string filePath);
-
-    /// <summary>Duration of a recording, read from its headers alone.</summary>
-    TimeSpan GetDuration(string filePath);
-
-    /// <summary>How many sample frames a recording holds, from its headers alone.</summary>
-    long GetFrameCount(string filePath);
-
-    /// <summary>
-    /// Rewrites the file to contain only the frames in [startFrame, endFrame). Destructive:
-    /// the original audio outside the region is gone once this returns.
-    /// </summary>
-    void TrimFile(string filePath, long startFrame, long endFrame);
-
-    /// <summary>
-    /// Lifts the whole file so its loudest moment sits on the target, in dBFS. Destructive,
-    /// like the trim. Returns how far it moved in decibels, which is zero when the recording
-    /// was already there or has nothing in it to lift.
-    /// </summary>
-    double NormalizeFile(string filePath, double targetDecibels);
-}
-
+/// <inheritdoc/>
 public sealed class WaveformService : IWaveformService
 {
+    /// <summary>
+    /// How many columns a picture holds, whatever the recording's length. Wide enough that a
+    /// waveform drawn across a full screen is reading real peaks rather than an interpolation.
+    /// </summary>
     private const int PixelWidth = 5000;
 
+    /// <inheritdoc/>
     public WaveformData AnalyzeFile(string filePath)
     {
         if (!File.Exists(filePath))
@@ -49,6 +31,7 @@ public sealed class WaveformService : IWaveformService
         };
     }
 
+    /// <inheritdoc/>
     public TimeSpan GetDuration(string filePath)
     {
         if (!File.Exists(filePath))
@@ -58,6 +41,7 @@ public sealed class WaveformService : IWaveformService
         return TimeSpan.FromSeconds((double)info.FrameCount / info.SampleRate);
     }
 
+    /// <inheritdoc/>
     public long GetFrameCount(string filePath)
     {
         if (!File.Exists(filePath)) return 0;
@@ -65,6 +49,7 @@ public sealed class WaveformService : IWaveformService
         return WavFile.ReadInfo(filePath).FrameCount;
     }
 
+    /// <inheritdoc/>
     public void TrimFile(string filePath, long startFrame, long endFrame)
     {
         if (!File.Exists(filePath))
@@ -80,7 +65,7 @@ public sealed class WaveformService : IWaveformService
             throw new InvalidOperationException("The trim region is empty.");
 
         if (startFrame == 0 && endFrame == info.FrameCount)
-            return; // nothing to cut, leave the file untouched
+            return;
 
         var trimmed = new short[frames * info.Channels];
         Array.Copy(samples, startFrame * info.Channels, trimmed, 0, trimmed.Length);
@@ -88,6 +73,11 @@ public sealed class WaveformService : IWaveformService
         Write(filePath, trimmed, info, ".trim.tmp");
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A recording already on the target, or holding nothing but silence, is left where it is
+    /// rather than rewritten to say the same thing.
+    /// </remarks>
     public double NormalizeFile(string filePath, double targetDecibels)
     {
         if (!File.Exists(filePath))
@@ -98,7 +88,6 @@ public sealed class WaveformService : IWaveformService
         double peak = Normalization.PeakOf(samples);
         double gain = Normalization.GainFor(peak, targetDecibels);
 
-        // Already where it should be, or nothing but silence: the file is not worth rewriting.
         if (Math.Abs(gain - 1) < 0.001) return 0;
 
         Normalization.Apply(samples, gain);
@@ -127,6 +116,16 @@ public sealed class WaveformService : IWaveformService
         }
     }
 
+    /// <summary>The loudest sample under each column of the picture.</summary>
+    /// <remarks>
+    /// Each column's stretch is worked out from the column rather than by stepping a fixed number
+    /// of frames, so the columns cover the whole recording and the last one really is the end of
+    /// it. A fixed step throws away whatever the division left over, which puts every position
+    /// read off the picture out by that much, worst at the end where the error has had the whole
+    /// file to build up. A recording shorter than the picture is wide still gets a frame per
+    /// column, so a short take is drawn across the width instead of squeezed into the left. Each
+    /// sample is widened to an int before Abs, since Abs(short.MinValue) throws.
+    /// </remarks>
     private static float[] ExtractPeaks(short[] samples, int channels, int pixelWidth)
     {
         if (samples.Length == 0) return Array.Empty<float>();
@@ -136,16 +135,9 @@ public sealed class WaveformService : IWaveformService
 
         for (int pixel = 0; pixel < pixelWidth; pixel++)
         {
-            // Worked out from the pixel rather than by stepping a fixed number of frames, so
-            // the columns cover the whole recording and the last one really is the end of it.
-            // A fixed step throws away whatever the division left over, which puts every
-            // position read off the picture out by that much, worst at the end where the
-            // error has had the whole file to build up.
             long from = frames * pixel / pixelWidth;
             long to = frames * (pixel + 1) / pixelWidth;
 
-            // A recording shorter than the picture is wide: every column still gets a frame,
-            // so a short take is drawn across the width instead of squeezed into the left.
             if (to <= from) to = Math.Min(frames, from + 1);
 
             int start = (int)(from * channels);
@@ -154,7 +146,6 @@ public sealed class WaveformService : IWaveformService
             float maxPeak = 0;
             for (int i = start; i < end; i++)
             {
-                // Widen before Abs: Math.Abs(short.MinValue) throws OverflowException.
                 float normalized = Math.Abs((int)samples[i]) / 32768f;
                 if (normalized > maxPeak)
                     maxPeak = normalized;

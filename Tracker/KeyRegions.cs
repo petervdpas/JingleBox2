@@ -31,6 +31,12 @@ public static class KeyRegions
     /// One stretch per piece, in order, covering everything from <paramref name="low"/> to
     /// <paramref name="high"/> with no gaps between them.
     /// </summary>
+    /// <remarks>
+    /// The last stretch takes whatever the division left over rather than stopping short, so
+    /// the top of the range is always reached. Stopping short would leave a handful of keys at
+    /// the top answering to nothing, which reads as a broken instrument rather than as
+    /// arithmetic.
+    /// </remarks>
     public static IReadOnlyList<(int Low, int High)> Split(int low, int high, int count)
     {
         if (count <= 0) return Array.Empty<(int, int)>();
@@ -45,7 +51,6 @@ public static class KeyRegions
         {
             int from = low + span * i / count;
 
-            // The last one takes whatever the division left over rather than stopping short.
             int to = i == count - 1 ? high : low + span * (i + 1) / count - 1;
 
             regions.Add((from, Math.Max(from, to)));

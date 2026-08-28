@@ -109,6 +109,14 @@ public static class SampleSlicer
     /// <param name="peaks">Loudest moment per bucket across the whole recording, 0 to 1.</param>
     /// <param name="lengthSeconds">How long the recording is, for the spacing rules.</param>
     /// <param name="slices">How many pieces to aim for. Fewer come back when fewer are there.</param>
+    /// <remarks>
+    /// Each loud moment is walked back to where its sound began before the spacing rule is
+    /// applied rather than after, so two loud moments inside one hit fall back onto the same
+    /// start and the second is then dropped for being on top of the first.
+    ///
+    /// One attack is not a slicing, it is a recording, so fewer than two falls back to an even
+    /// division: that says more than a single cut in an arbitrary place does.
+    /// </remarks>
     public static List<double> Transients(IReadOnlyList<float>? peaks, double lengthSeconds, int slices)
     {
         slices = Math.Clamp(slices, 1, MaxSlices);
@@ -121,17 +129,12 @@ public static class SampleSlicer
 
         int reach = Math.Max(1, (int)Math.Round(AttackSeconds / perBucket));
 
-        // Where each loud moment's sound began, rather than where it was loudest. Done before
-        // the spacing rule, so two loud moments inside one hit fall back onto the same start
-        // and the second is then dropped for being on top of the first.
         var rises = Rises(peaks, perBucket)
             .Select(rise => (Bucket: Began(peaks, rise.Bucket, reach), rise.Strength))
             .ToList();
 
         var taken = Spaced(rises, slices, apart);
 
-        // One attack is not a slicing, it is a recording. Even division says more than a single
-        // cut in an arbitrary place does.
         if (taken.Count < 2) return Even(slices);
 
         var points = new List<double>(taken.Count + 1);
@@ -156,6 +159,18 @@ public static class SampleSlicer
     ///
     /// The cut goes at the end of each silence rather than the start, because what is being found
     /// is where the next thing begins.
+    ///
+    /// A silence at the very front is the lead-in and one at the very back is what is left after
+    /// the last thing. Neither divides one piece from another, but both say where the sliced
+    /// region begins and ends, which is why the head and the tail are read off them and the rest
+    /// are looked for in between.
+    ///
+    /// Candidates are scored by what starts after the gap rather than by how long the gap is. A
+    /// word decaying away can be quiet for longer than the pause before the next word, so length
+    /// picks the middle of a word over the space between two; what marks a gap as real is that
+    /// something loud begins on the other side of it. They are then kept apart for the same
+    /// reason the attacks are, since two silences a moment apart both hear the same word start
+    /// after them and both would be taken.
     /// </remarks>
     public static List<double> Gaps(IReadOnlyList<float>? peaks, double lengthSeconds, int slices)
     {
@@ -175,18 +190,11 @@ public static class SampleSlicer
 
         var silences = Silences(peaks, quiet, shortest);
 
-        // A silence at the very front is the lead-in, and one at the very back is what is left
-        // after the last thing: neither divides one piece from another, but both say where the
-        // sliced region begins and ends.
         int head = silences.Count > 0 && silences[0].From == 0 ? silences[0].To : 0;
         int tail = silences.Count > 0 && silences[^1].To >= peaks.Count ? silences[^1].From : peaks.Count;
 
         int listen = Math.Max(1, (int)Math.Round(AfterSeconds / perBucket));
 
-        // Scored by what starts after the gap, not by how long the gap is. A word decaying away
-        // can be quiet for longer than the pause before the next word, so length picks the
-        // middle of a word over the space between two. What marks a gap as real is that
-        // something loud begins on the other side of it.
         var candidates = silences
             .Where(gap => gap.From > head && gap.To < tail)
             .Select(gap => (
@@ -194,8 +202,6 @@ public static class SampleSlicer
                 Strength: Loudest(peaks, gap.To, listen)))
             .ToList();
 
-        // And then kept apart, for the same reason the attacks are: two silences a moment apart
-        // both hear the same word start after them, and both would be taken.
         var between = Spaced(candidates, slices - 1, Apart(lengthSeconds, slices, perBucket));
 
         if (between.Count == 0) return Even(slices);
@@ -283,6 +289,10 @@ public static class SampleSlicer
     /// Every moment louder than the recording had just been, with how much louder it was. The
     /// same attack shows up as several of these; keeping them apart is the next step's job.
     /// </summary>
+    /// <remarks>
+    /// What is still ringing is asked before it is updated, or every attack would be measured
+    /// against itself and nothing would ever be loud enough to count.
+    /// </remarks>
     private static List<(int Bucket, double Strength)> Rises(IReadOnlyList<float> peaks, double perBucket)
     {
         var rises = new List<(int, double)>();
@@ -296,7 +306,6 @@ public static class SampleSlicer
 
             if (peak > NoiseFloor && peak > ringing * RiseFactor) rises.Add((i, peak - ringing));
 
-            // Asked before it is updated, or every attack would be measured against itself.
             ringing = Math.Max(peak, ringing * fade);
         }
 
@@ -333,6 +342,10 @@ public static class SampleSlicer
     /// Puts a hand-edited list back in order: inside the recording, rising, and never so close
     /// together that a slice has nothing in it.
     /// </summary>
+    /// <remarks>
+    /// Everything landing in one place leaves no slicing to describe, so the whole recording
+    /// comes back as one piece rather than as a list nobody can draw.
+    /// </remarks>
     public static List<double> Clean(IEnumerable<double> points, double lengthSeconds)
     {
         double apart = lengthSeconds > 0
@@ -354,7 +367,6 @@ public static class SampleSlicer
             cleaned.Add(point);
         }
 
-        // Everything landed in one place: there is no slicing left to describe.
         if (cleaned.Count < 2) return new List<double> { 0, 1 };
 
         if (cleaned.Count > MaxSlices + 1) cleaned.RemoveRange(MaxSlices + 1, cleaned.Count - MaxSlices - 1);

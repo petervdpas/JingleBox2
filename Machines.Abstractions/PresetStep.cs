@@ -17,12 +17,14 @@ public static class PresetStep
     /// Stopping at the ends rather than coming round. A list of presets has a first and a last,
     /// and a button held down that wrapped would carry you past the one you were looking for
     /// without a pause to notice it.
+    ///
+    /// Nothing picked yet counts as before the first, so a step either way lands on the first of
+    /// them: somebody pressing either arrow on an untouched picker wants to start somewhere.
     /// </remarks>
     public static int Moved(int picked, int count, int by)
     {
         if (count <= 0) return picked;
 
-        // Nothing picked yet, so a step in either direction means the first of them.
         if (picked < 0) return 0;
 
         int wanted = picked + by;

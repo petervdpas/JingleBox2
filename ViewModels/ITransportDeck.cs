@@ -28,16 +28,52 @@ public interface ITransportDeck : INotifyPropertyChanged
     /// </remarks>
     bool IsRunning { get; }
 
+    /// <summary>True while a recording is being taken.</summary>
     bool IsRecording { get; }
+
+    /// <summary>True while something is sounding.</summary>
     bool IsPlaying { get; }
+
+    /// <summary>
+    /// True while what was playing is stopped where it stood.
+    /// </summary>
+    /// <remarks>
+    /// Apart from not playing, because a deck that is paused still has a place in it: pressing
+    /// play again carries on from there rather than starting at the top.
+    /// </remarks>
     bool IsPaused { get; }
 
+    /// <summary>
+    /// Whether each cap has anything behind it on this deck.
+    /// </summary>
+    /// <remarks>
+    /// A cap with nothing behind it is greyed rather than being a button that silently does
+    /// nothing. FIRE's deck can only stop: pads are fired by pads, and a space bar that could put
+    /// a jingle to air is not one you want near a desk that is on.
+    /// </remarks>
     bool CanRecord { get; }
+
+    /// <inheritdoc cref="CanRecord"/>
     bool CanPlay { get; }
+
+    /// <inheritdoc cref="CanRecord"/>
     bool CanPause { get; }
 
+    /// <summary>Starts taking a recording.</summary>
     void Record();
+
+    /// <summary>Starts sounding, or carries on from where a pause left it.</summary>
     void Play();
+
+    /// <summary>Stops where it stands, keeping the place.</summary>
     void Pause();
+
+    /// <summary>
+    /// Stops, and lets go of the place.
+    /// </summary>
+    /// <remarks>
+    /// The one thing every deck can do, which is why it is the only cap FIRE offers: whatever a
+    /// page is doing, there is always an answer to being asked to stop.
+    /// </remarks>
     void Stop();
 }

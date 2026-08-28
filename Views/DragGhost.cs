@@ -15,6 +15,10 @@ namespace JingleBox2.Views;
 ///
 /// Told what to draw rather than what is being carried, because a part of a machine and an
 /// instrument going onto a track have nothing in common except that somebody is holding one.
+///
+/// Put down in the <c>finally</c> of the drag rather than on the drop, because a drag is just
+/// as often abandoned: let go over the order list or off the window and no drop is ever raised,
+/// and the picture would be left on the page with nothing under it.
 /// </remarks>
 public sealed class DragGhost
 {
@@ -26,14 +30,19 @@ public sealed class DragGhost
     /// <summary>How solid the picture is where it can land, and where it cannot.</summary>
     private const double Carried = 0.85;
 
+    /// <summary>Fully solid where it cannot land, which is the one place it must not fade.</summary>
     private const double Refusing = 1.0;
 
+    /// <summary>The canvas over the page, which takes no clicks so the drag still reaches it.</summary>
     private readonly Canvas _layer;
 
+    /// <summary>The card on the layer, and null while the hand is empty.</summary>
     private Border? _shown;
 
+    /// <inheritdoc cref="Refused"/>
     private bool _refused;
 
+    /// <summary>Draws onto that layer, which is expected to be laid over the whole page.</summary>
     public DragGhost(Canvas layer) => _layer = layer;
 
     /// <summary>True once there is something in the hand, so a caller can show it only once.</summary>
@@ -62,15 +71,23 @@ public sealed class DragGhost
         }
     }
 
+    /// <summary>
+    /// Puts the card into the state <see cref="Refused"/> says it is in.
+    /// </summary>
+    /// <remarks>
+    /// The ordinary look is cleared rather than set to null. The card is a style, and a local
+    /// null is a value like any other: it would win, and the picture would lose the background
+    /// the theme gave it and be a floating line of text over the pattern.
+    ///
+    /// Refused is a wash of the same red as the border and not only the border, so the card
+    /// reads as red rather than as merely outlined in it.
+    /// </remarks>
     private void Paint()
     {
         if (_shown == null) return;
 
         _shown.Opacity = _refused ? Refusing : Carried;
 
-        // Cleared rather than set to null. The card is a style, and a local null is a value
-        // like any other: it would win, and the picture would lose the background the theme
-        // gave it and be a floating line of text over the pattern.
         if (!_refused)
         {
             _shown.ClearValue(Border.BorderBrushProperty);
@@ -84,8 +101,6 @@ public sealed class DragGhost
         _shown.BorderBrush = red;
         _shown.BorderThickness = new Thickness(2);
 
-        // A wash of the same colour, so the card reads as red rather than merely being
-        // outlined in it.
         _shown.Background = new SolidColorBrush(red.Color, 0.35);
     }
 
@@ -128,6 +143,13 @@ public sealed class DragGhost
         Canvas.SetTop(_shown, at.Y + Offset);
     }
 
+    /// <summary>
+    /// Takes the picture off the page and empties the hand.
+    /// </summary>
+    /// <remarks>
+    /// Safe to call with nothing showing, because it is called from the <c>finally</c> of a drag
+    /// that may have been abandoned before anything was ever put in the hand.
+    /// </remarks>
     public void Hide()
     {
         if (_shown == null) return;

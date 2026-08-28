@@ -25,6 +25,11 @@ namespace JingleBox2.Tracker.Machines;
 /// inside the folder it is being written into. The rest of the app reads what is on the disc
 /// through <see cref="MachineProject.Open"/>, and this is the one place a stranger's file gets
 /// to put anything there.
+///
+/// Everything here writes to <see cref="Diagnostics.LogArea.Machines"/> rather than to the
+/// application's own area, as everything under this folder does. What a bundle was refused for
+/// is the sort of thing somebody goes looking for, and it should not be buried under everything
+/// else the application had to say that session.
 /// </remarks>
 public static class MachineArchive
 {
@@ -42,7 +47,13 @@ public static class MachineArchive
     /// <remarks>
     /// Throws rather than reporting: this is asked for by somebody who has just pressed Export
     /// and is waiting to be told either where the file went or what stopped it.
+    ///
+    /// An existing file is overwritten, which is the ordinary case: exporting twice in a row is
+    /// how a machine gets corrected, and being made to delete the old file first would only be
+    /// in the way.
     /// </remarks>
+    /// <param name="project">The machine to pack, which has to have been saved.</param>
+    /// <param name="zipPath">Where the zip goes, folders made as needed.</param>
     public static void Export(MachineProject project, string zipPath)
     {
         if (string.IsNullOrWhiteSpace(zipPath)) throw new ArgumentException("A zip needs a name.", nameof(zipPath));
@@ -55,8 +66,6 @@ public static class MachineArchive
         string? holds = Path.GetDirectoryName(full);
         if (!string.IsNullOrEmpty(holds)) Directory.CreateDirectory(holds);
 
-        // Overwriting is the ordinary case: exporting twice in a row is how a machine gets
-        // corrected, and being made to delete the old file first would only be in the way.
         if (File.Exists(full)) File.Delete(full);
 
         ZipFile.CreateFromDirectory(project.Folder, full, CompressionLevel.Optimal, includeBaseDirectory: false);
@@ -71,7 +80,12 @@ public static class MachineArchive
     /// <see cref="Export"/> writes, and the folder itself at the top, which is what somebody
     /// gets who right-clicks the folder and zips that. Refusing the second would only teach
     /// people that the importer is broken.
+    ///
+    /// Reported rather than thrown, unlike <see cref="Export"/>: a zip somebody was handed can
+    /// be anything at all, and every way it can be wrong ends the same way, with nothing
+    /// installed and a line in the log.
     /// </remarks>
+    /// <param name="zipPath">The zip somebody was handed.</param>
     public static MachineProject? Import(string zipPath)
     {
         if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath)) return null;
@@ -111,7 +125,11 @@ public static class MachineArchive
     /// from a zip and a machine arriving from the shelf are the same event once the files are in
     /// hand. Both are checked the same way, both land through the same swap, and both are read
     /// back off the disc rather than believed.
+    ///
+    /// Copying the installed folder onto itself is refused. That is not adding a machine, and
+    /// the swap that finishes an install would be moving a folder out from under its own source.
     /// </remarks>
+    /// <param name="fromCrate">The machine on the shelf beside the program.</param>
     public static MachineProject? Add(MachineProject fromCrate)
     {
         try
@@ -120,8 +138,6 @@ public static class MachineArchive
 
             string source = Path.GetFullPath(fromCrate.Folder);
 
-            // Copying the installed folder onto itself is not adding a machine, and the swap
-            // that finishes an install would be moving a folder out from under its own source.
             if (Under(source, MachineRegistry.Installed)) return null;
 
             string id = Named(fromCrate.Id);
@@ -143,6 +159,7 @@ public static class MachineArchive
     /// and is never written to, which is exactly what lets this delete freely: a machine that
     /// ships can be taken again with <see cref="Add"/> the moment it is gone.
     /// </remarks>
+    /// <param name="project">The machine to delete, which has to be an installed one.</param>
     public static bool Remove(MachineProject project)
     {
         try
@@ -170,6 +187,11 @@ public static class MachineArchive
     }
 
     /// <summary>The manifest in that zip, at the top of it or one folder down, or null.</summary>
+    /// <remarks>
+    /// One folder down and no further. A machine is a flat folder with a manifest at the top of
+    /// it, so anything deeper is not a machine's zip and searching for it would only find a
+    /// manifest somebody had put inside their sounds.
+    /// </remarks>
     private static ZipArchiveEntry? Manifest(ZipArchive zip) =>
         zip.Entries.FirstOrDefault(e => Slashed(e.FullName) == MachineProject.ManifestName)
         ?? zip.Entries.FirstOrDefault(e =>
@@ -193,6 +215,10 @@ public static class MachineArchive
     }
 
     /// <summary>What id the manifest in that zip claims, before anybody believes it.</summary>
+    /// <remarks>
+    /// Read straight out of the entry rather than from a file, so nothing is written anywhere
+    /// until the id has been through <see cref="Named"/>.
+    /// </remarks>
     private static string Announced(ZipArchiveEntry manifest)
     {
         using var reading = manifest.Open();
@@ -231,7 +257,15 @@ public static class MachineArchive
     /// fixed and the caller only gets to fill a staging folder. What it filled it with is read
     /// back and has to be the machine that was announced, or the files are swept away: a bundle
     /// that installs one machine under another's name is a bundle built to do that.
+    ///
+    /// Any staging folder already there is cleared first. A crash part way through an earlier
+    /// install leaves one behind, and what is in it is half of somebody else's machine.
     /// </remarks>
+    /// <param name="id">The machine's id, already known to be a plain folder name.</param>
+    /// <param name="fill">
+    /// Fills the staging folder and says whether it could. Where the files come from is the only
+    /// difference between a zip and the shelf beside the program.
+    /// </param>
     private static MachineProject? Install(string id, Func<string, bool> fill)
     {
         Directory.CreateDirectory(MachineRegistry.Installed);
@@ -242,8 +276,6 @@ public static class MachineArchive
 
         try
         {
-            // A crash part way through an earlier install leaves this behind, and what is in it
-            // is half of somebody else's machine.
             if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
 
             Directory.CreateDirectory(staging);
@@ -275,14 +307,17 @@ public static class MachineArchive
     }
 
     /// <summary>Copies a machine's folder, sounds and all, into the folder being staged.</summary>
+    /// <remarks>
+    /// Every destination is checked to be inside the staging folder, the same as an unpacked
+    /// zip's is. A link inside the source folder pointing out of it would otherwise copy a file
+    /// from somewhere else in under the machine's name.
+    /// </remarks>
     private static bool Copy(string from, string into)
     {
         foreach (string file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
         {
             string full = Path.GetFullPath(Path.Combine(into, Path.GetRelativePath(from, file)));
 
-            // A link inside the source folder pointing out of it would otherwise copy a file
-            // from somewhere else in under the machine's name.
             if (!MachinePaths.Under(full, into)) return false;
 
             string? holds = Path.GetDirectoryName(full);
@@ -295,6 +330,14 @@ public static class MachineArchive
     }
 
     /// <summary>Writes every entry under that prefix into the folder, and says whether it could.</summary>
+    /// <remarks>
+    /// One entry landing outside the folder stops the whole unpack rather than being skipped:
+    /// a zip carrying such an entry was built to do that, and the half of it that is honest is
+    /// not worth installing.
+    ///
+    /// An entry naming a folder is passed over. A zip may or may not have bothered to record
+    /// them, and the files themselves make the folders they need.
+    /// </remarks>
     private static bool Unpack(ZipArchive zip, string prefix, string into)
     {
         foreach (var entry in zip.Entries)
@@ -310,8 +353,6 @@ public static class MachineArchive
 
             if (name.Length == 0) continue;
 
-            // A folder, which the zip may or may not have bothered to record. The files
-            // themselves make the folders they need, so there is nothing to do for one.
             if (name.EndsWith('/')) continue;
 
             string full = Path.GetFullPath(Path.Combine(into, name));
@@ -339,6 +380,8 @@ public static class MachineArchive
     /// question is only what happens when the second half of that goes wrong. The old folder is
     /// moved aside rather than deleted, and goes back if the new one cannot be put in its place.
     /// </remarks>
+    /// <param name="staging">The folder that was just filled.</param>
+    /// <param name="target">Where the machine goes, which may already hold an older one.</param>
     private static void Swap(string staging, string target)
     {
         string aside = target + OutgoingSuffix;
@@ -364,6 +407,12 @@ public static class MachineArchive
     }
 
     /// <summary>Clears away a staging folder an import gave up on.</summary>
+    /// <remarks>
+    /// The empty string means there is nothing to sweep, which is what
+    /// <see cref="Install"/> sets once the swap has taken the folder. A failure here is logged
+    /// and let go: half a machine left on the disc is untidy, and throwing out of a finally
+    /// block would hide whatever really went wrong.
+    /// </remarks>
     private static void Sweep(string staging)
     {
         if (staging.Length == 0 || !Directory.Exists(staging)) return;

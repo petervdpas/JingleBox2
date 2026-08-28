@@ -20,12 +20,20 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class CategoryField : AutoCompleteBox
 {
+    /// <summary>
+    /// Sets the box up and takes the three handlers that file a take.
+    /// </summary>
+    /// <remarks>
+    /// A prefix length of nought means nothing typed still drops the whole list down, which is
+    /// how a category is found rather than remembered.
+    ///
+    /// Enter is heard even when the box says it has already dealt with the key, because with a
+    /// suggestion showing that is exactly what it says: Enter closes the list and fills the
+    /// field. A handler that hears only unhandled keys never hears the one press that matters.
+    /// </remarks>
     public CategoryField()
     {
         FilterMode = AutoCompleteFilterMode.Contains;
-
-        // Nothing typed still shows what there is, which is how a category is found rather
-        // than remembered.
         MinimumPrefixLength = 0;
 
         PlaceholderText = "Uncategorized";
@@ -33,15 +41,13 @@ public class CategoryField : AutoCompleteBox
         SelectionChanged += Picked;
         LostFocus += Left;
 
-        // Even when the box says it has dealt with the key, because with a suggestion showing
-        // that is exactly what it says: Enter closes the list and fills the field, and a
-        // handler that only hears unhandled keys never hears the one press that matters.
         AddHandler(KeyDownEvent, Entered, RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     /// <summary>Wears the ordinary box's clothes: a subclass has a theme of its own otherwise.</summary>
     protected override Type StyleKeyOverride => typeof(AutoCompleteBox);
 
+    /// <summary>The page the box is standing on, or null on a page that is not RECORD.</summary>
     private RecordViewModel? Page => DataContext as RecordViewModel;
 
     /// <summary>A suggestion taken off the list is a category chosen, so it is filed at once.</summary>
@@ -52,6 +58,7 @@ public class CategoryField : AutoCompleteBox
         Page?.FileTakeUnder(picked);
     }
 
+    /// <summary>Enter files the take under whatever the field now reads.</summary>
     private void Entered(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;

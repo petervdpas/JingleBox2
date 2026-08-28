@@ -16,6 +16,11 @@ public static class ViewportScroller
     /// is. Scrolls the shortest distance: an item above the viewport comes to the top edge,
     /// one below comes to the bottom edge, rather than being centred every time.
     /// </summary>
+    /// <remarks>
+    /// Nought when there is nothing to scroll, which is a viewport with no length yet or content
+    /// that already fits inside it. Both happen: the first is every control before its first
+    /// layout, and the second is an ordinary short pattern.
+    /// </remarks>
     public static double KeepVisible(
         double offset,
         double viewportLength,
@@ -26,7 +31,6 @@ public static class ViewportScroller
     {
         double maxOffset = Math.Max(0, contentLength - viewportLength);
 
-        // Nothing to scroll: everything already fits.
         if (viewportLength <= 0 || maxOffset <= 0) return 0;
 
         double wantedStart = itemStart - margin;
@@ -57,11 +61,15 @@ public static class ViewportScroller
     /// of following a highlight down the screen and being snapped back when it reaches the
     /// bottom.
     ///
-    /// The two ends of a pattern are the exception, and deliberately so. There is no offset
-    /// that would put line 00 in the middle, and the way to make one is half a screen of blank
-    /// space above the pattern; Renoise does not do that, and neither does this. So the top
-    /// rows come up from the top edge and the bottom rows run down to the bottom one, and in
-    /// between, which is nearly all of a pattern, the cursor does not move at all.
+    /// Always, with no exceptions, including line 00 of a song's first pattern and the last line
+    /// of its last. That is not this function's doing: it works because the metrics leave half a
+    /// screen of room above and below the rows, whether or not a neighbouring pattern is drawn
+    /// into it, so there is an offset that puts even the first row on the middle. Getting that
+    /// wrong is what once made the two ends of a pattern an exception, and the exception is what
+    /// somebody notices, since the cursor jumps as a pattern is entered and left.
+    ///
+    /// Renoise leaves that room and leaves it empty, which is visible in its own screenshots by
+    /// the cursor sitting at the same height on every one of them.
     /// </remarks>
     public static double CentreRow(
         double viewportHeight, PatternMetrics metrics, int row, int lines)

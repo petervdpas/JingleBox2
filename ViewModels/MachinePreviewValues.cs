@@ -15,6 +15,9 @@ namespace JingleBox2.ViewModels;
 /// the editor is showing and go no further, and every one of them starts where the machine says
 /// it should.
 /// </remarks>
+/// <param name="parameters">
+/// The parameters the editor is showing, which are both the description and the store here.
+/// </param>
 public sealed class MachinePreviewValues(ObservableCollection<MachineParameterViewModel> parameters) : IMachineValues
 {
     /// <summary>
@@ -28,8 +31,16 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
     /// </remarks>
     public event System.Action<string>? Said;
 
+    /// <inheritdoc/>
+    /// <remarks>Nought for a key no parameter answers to, since the bench has nothing else to say.</remarks>
     public double Get(string key) => Find(key)?.Value ?? 0;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A write that would not move the knob is dropped rather than announced. A panel reads
+    /// itself again whenever it hears <see cref="Said"/>, and a controller resting against an end
+    /// sends the same number over and over.
+    /// </remarks>
     public void Set(string key, double value)
     {
         var parameter = Find(key);
@@ -53,8 +64,10 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
     /// </remarks>
     private readonly Dictionary<string, string> texts = new();
 
+    /// <inheritdoc/>
     public string GetText(string key) => texts.TryGetValue(key, out string? held) ? held : "";
 
+    /// <inheritdoc/>
     public void SetText(string key, string value)
     {
         if (texts.TryGetValue(key, out string? was) && was == value) return;
@@ -64,6 +77,11 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
         Said?.Invoke(key);
     }
 
+    /// <summary>The parameter with that key, or null when the panel names one the machine has not got.</summary>
+    /// <remarks>
+    /// A walk rather than a dictionary: a machine has a few dozen parameters at most, and the
+    /// list is being edited underneath, so anything cached would go stale as a knob was added.
+    /// </remarks>
     private MachineParameterViewModel? Find(string key) =>
         parameters.FirstOrDefault(p => p.Key == key);
 }

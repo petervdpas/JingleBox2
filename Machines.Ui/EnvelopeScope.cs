@@ -20,15 +20,25 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class EnvelopeScope : ScopeControl
 {
+    /// <summary>
+    /// Backs <see cref="AttackMs"/>, how long the note takes to reach the top.
+    /// </summary>
+    /// <remarks>
+    /// The four defaults together are a plain plucked shape, so a scope nobody has bound
+    /// anything to still draws something a person recognises as an envelope.
+    /// </remarks>
     public static readonly StyledProperty<double> AttackMsProperty =
         AvaloniaProperty.Register<EnvelopeScope, double>(nameof(AttackMs), 2);
 
+    /// <summary>Backs <see cref="DecayMs"/>, how long it takes to fall from the top to the sustain.</summary>
     public static readonly StyledProperty<double> DecayMsProperty =
         AvaloniaProperty.Register<EnvelopeScope, double>(nameof(DecayMs), 40);
 
+    /// <summary>Backs <see cref="Sustain"/>, the level it settles at.</summary>
     public static readonly StyledProperty<double> SustainProperty =
         AvaloniaProperty.Register<EnvelopeScope, double>(nameof(Sustain), 0.6);
 
+    /// <summary>Backs <see cref="ReleaseMs"/>, how long it takes to go quiet once the key is let go.</summary>
     public static readonly StyledProperty<double> ReleaseMsProperty =
         AvaloniaProperty.Register<EnvelopeScope, double>(nameof(ReleaseMs), 80);
 
@@ -36,18 +46,27 @@ public class EnvelopeScope : ScopeControl
     public static readonly StyledProperty<double> HoldSecondsProperty =
         AvaloniaProperty.Register<EnvelopeScope, double>(nameof(HoldSeconds), 0.4);
 
+    /// <summary>
+    /// Says which properties change the picture. None of them changes the size.
+    /// </summary>
+    /// <remarks>
+    /// They also change how long the playhead runs for, through <see cref="AnimationSeconds"/>,
+    /// but that is read when a note starts rather than being a thing the layout has to know.
+    /// </remarks>
     static EnvelopeScope()
     {
         AffectsRender<EnvelopeScope>(
             AttackMsProperty, DecayMsProperty, SustainProperty, ReleaseMsProperty, HoldSecondsProperty);
     }
 
+    /// <summary>How long the note takes to reach the top, in milliseconds.</summary>
     public double AttackMs
     {
         get => GetValue(AttackMsProperty);
         set => SetValue(AttackMsProperty, value);
     }
 
+    /// <summary>How long it takes to fall from the top to the sustain, in milliseconds.</summary>
     public double DecayMs
     {
         get => GetValue(DecayMsProperty);
@@ -61,24 +80,41 @@ public class EnvelopeScope : ScopeControl
         set => SetValue(SustainProperty, value);
     }
 
+    /// <summary>How long it takes to go quiet once the key is let go, in milliseconds.</summary>
     public double ReleaseMs
     {
         get => GetValue(ReleaseMsProperty);
         set => SetValue(ReleaseMsProperty, value);
     }
 
+    /// <inheritdoc cref="HoldSecondsProperty"/>
     public double HoldSeconds
     {
         get => GetValue(HoldSecondsProperty);
         set => SetValue(HoldSecondsProperty, value);
     }
 
+    /// <summary>
+    /// The five numbers gathered into the curve they describe.
+    /// </summary>
+    /// <remarks>
+    /// Built afresh each time rather than kept, since it is a value type over five doubles and
+    /// keeping it would mean noticing when any of the five moved.
+    /// </remarks>
     private EnvelopeShape Shape =>
         EnvelopeShape.FromMilliseconds(AttackMs, DecayMs, Sustain, ReleaseMs, HoldSeconds);
 
     /// <summary>The playhead runs for exactly as long as the note it is drawing.</summary>
     protected override double AnimationSeconds => Shape.Length;
 
+    /// <summary>
+    /// The face, the curve filled under it, and the playhead while a note is running.
+    /// </summary>
+    /// <remarks>
+    /// The dashed line marks the moment the key is let go, so the release reads as its own stage
+    /// rather than as the tail of the sustain. It is left off a shape with no sustain, where
+    /// there is no held stretch for it to be the end of.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -101,7 +137,6 @@ public class EnvelopeScope : ScopeControl
         double X(double seconds) => margin + seconds / shape.Length * (width - margin * 2);
         double Y(double level) => floor - level * span;
 
-        // The moment the key is let go, so the release is readable as a separate stage.
         if (shape.Sustain > 0 && shape.ReleaseSeconds > 0)
         {
             double release = X(shape.ReleaseStarts);
@@ -146,6 +181,13 @@ public class EnvelopeScope : ScopeControl
         return geometry;
     }
 
+    /// <summary>
+    /// Where the note has got to: the stretch already played, a line, and a dot on the curve.
+    /// </summary>
+    /// <remarks>
+    /// The played stretch is shaded rather than only the line drawn, so the movement reads as a
+    /// sweep across the shape instead of as a line wandering over a still picture.
+    /// </remarks>
     private void DrawPlayhead(
         DrawingContext context,
         ThemePalette palette,
@@ -161,7 +203,6 @@ public class EnvelopeScope : ScopeControl
         double at = x(seconds);
         double level = shape.LevelAt(seconds);
 
-        // The stretch already played, so the movement is a sweep and not just a moving line.
         context.FillRectangle(palette.AccentTint(70), new Rect(x(0), margin, Math.Max(0, at - x(0)), floor - margin));
 
         context.DrawLine(new Pen(palette.TextBrush, 2), new Point(at, margin), new Point(at, floor));

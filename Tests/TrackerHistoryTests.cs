@@ -13,12 +13,26 @@ namespace JingleBox2.Tests;
 /// pattern list, which left every cheap step pointing at an object the song no longer held, so
 /// undoing a note after undoing an instrument silently did nothing at all. It only shows when
 /// both kinds are walked in sequence.
+/// <para>
+/// Two groups, in this order. First the patterns: the cheap step, which is a memory copy of one
+/// pattern's cells and its lanes. Then the song: the expensive step, which is the song as its
+/// own file would hold it, covering instruments, the tempo, the track count, the mix and the
+/// song's own controller links.
+/// </para>
 /// </remarks>
 public class TrackerHistoryTests : IDisposable
 {
+    /// <summary>The history under test, hooked to <see cref="PatternEdit"/> for the run.</summary>
     private readonly TrackerHistory _history = new();
+
+    /// <summary>One song with two instruments on it, which every test here edits.</summary>
     private readonly Song _song = new();
 
+    /// <summary>
+    /// Points <see cref="PatternEdit"/> at this history, since edits are recorded inside that
+    /// class rather than at its call sites, and gives the song two named instruments so that
+    /// taking one out is something that can be seen.
+    /// </summary>
     public TrackerHistoryTests()
     {
         PatternEdit.Watching = _history.Taking;
@@ -30,12 +44,19 @@ public class TrackerHistoryTests : IDisposable
         foreach (var one in _song.Instruments) one.EnsureId();
     }
 
+    /// <summary>Unhooks the static watcher, which is process wide and outlives the test.</summary>
     public void Dispose() => PatternEdit.Watching = null;
 
+    /// <summary>The song's first pattern, which is the one every pattern test types into.</summary>
     private Pattern First => _song.PatternAt(0)!;
 
+    /// <summary>A cursor at a line and track, spelled out so the tests read as positions.</summary>
     private static PatternCursor At(int line, int track = 0) => new() { Line = line, Track = track };
 
+    /// <summary>
+    /// Puts a remembered song back into the live one in place, which is what the tracker itself
+    /// does: panels and the rack hold the song they were opened on, so it cannot be replaced.
+    /// </summary>
     private static bool Pour(Song live, Song was)
     {
         live.TakeFrom(was);
@@ -43,10 +64,13 @@ public class TrackerHistoryTests : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Announces a song edit before making it, naming what is about to change so that steps of
+    /// one kind close together gather into one gesture.
+    /// </summary>
     private void Changing(string what) => _history.Taking(_song, what, Pour);
 
-    // ---- patterns ------------------------------------------------------------------------
-
+    /// <summary>A movement recorded into a lane is a pattern edit and walks back as one.</summary>
     /// <remarks>
     /// The lanes had to be part of a pattern step or undo would put the notes back and leave the
     /// movement where it was, which is the shape of failure this codebase has met twice: doing
@@ -81,6 +105,7 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(0.75, First.Lanes[0].Points[0].Value);
     }
 
+    /// <summary>Undoing a note leaves the lane beside it exactly where it was.</summary>
     /// <remarks>
     /// And the other direction: a note typed after a sweep was recorded must not take the sweep
     /// with it. A step holding the live lane rather than a copy of it would do exactly that.
@@ -102,6 +127,7 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(0.25, First.Lanes[0].Points[0].Value);
     }
 
+    /// <summary>Nothing has happened yet, so neither direction is offered.</summary>
     [Fact]
     public void A_fresh_history_has_nothing_to_walk()
     {
@@ -109,6 +135,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(_history.CanRedo);
     }
 
+    /// <summary>
+    /// Typing is not gathered the way a dragged value is: three notes are three things somebody
+    /// did and have to come back one at a time.
+    /// </summary>
     [Fact]
     public void Every_note_typed_is_a_step()
     {
@@ -122,6 +152,7 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(First[0, 0].Note.IsPlayable);
     }
 
+    /// <summary>One step back is one edit back, and the edit before it stays where it is.</summary>
     [Fact]
     public void Undo_takes_the_last_one_and_leaves_the_rest()
     {
@@ -134,6 +165,7 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(First[1, 0].Note.IsPlayable);
     }
 
+    /// <summary>The walk goes both ways, and the cell comes back holding what it held.</summary>
     [Fact]
     public void Redo_puts_it_back()
     {
@@ -146,6 +178,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.True(First[0, 0].Note.IsPlayable);
     }
 
+    /// <summary>
+    /// Typing after an undo abandons what was undone, since keeping it would offer a redo onto a
+    /// pattern that has moved on since.
+    /// </summary>
     [Fact]
     public void Doing_something_new_makes_what_was_undone_unreachable()
     {
@@ -159,12 +195,19 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(_history.CanRedo);
     }
 
+    /// <summary>
+    /// An edit that moved nothing costs no step, or undo would spend presses doing nothing
+    /// visible and read as broken.
+    /// </summary>
+    /// <remarks>
+    /// The two clears in the middle are of cells that are already empty, which is what a hand
+    /// resting on the delete key produces.
+    /// </remarks>
     [Fact]
     public void An_edit_that_changed_nothing_leaves_no_step()
     {
         PatternEdit.EnterNote(First, At(0), new Note(60), 0);
 
-        // Clearing cells that are already empty.
         PatternEdit.ClearAtCursor(First, At(8));
         PatternEdit.ClearAtCursor(First, At(9));
 
@@ -176,6 +219,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(2, steps);
     }
 
+    /// <summary>
+    /// A step names its pattern, so undo after switching patterns goes back to the right one and
+    /// takes the view with it rather than editing out of sight.
+    /// </summary>
     [Fact]
     public void A_step_knows_which_pattern_it_is_about()
     {
@@ -184,8 +231,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Same(First, _history.UndoIsAbout);
     }
 
-    // ---- the song ------------------------------------------------------------------------
-
+    /// <summary>
+    /// Removing an instrument shifts every note's instrument number down, and one step has to put
+    /// the instrument and the renumbering back together.
+    /// </summary>
     [Fact]
     public void Taking_an_instrument_out_renumbers_the_patterns_and_undo_puts_both_back()
     {
@@ -205,11 +254,17 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(1, _song.PatternAt(0)![0, 0].Instrument);
     }
 
+    /// <summary>
+    /// A cheap step under an expensive one still works, which is the only place the two kinds
+    /// meet.
+    /// </summary>
+    /// <remarks>
+    /// The one that used to fail silently: a song step replaced the pattern objects, so the
+    /// pattern step under it was pointing at an orphan and restoring it changed nothing.
+    /// </remarks>
     [Fact]
     public void And_the_note_underneath_it_can_still_be_undone_afterwards()
     {
-        // The one that used to fail silently: a song step replaced the pattern objects, so the
-        // pattern step under it was pointing at an orphan and restoring it changed nothing.
         PatternEdit.EnterNote(First, At(0), new Note(60), instrument: 1);
 
         Changing("taking an instrument out");
@@ -222,6 +277,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(_history.CanUndo);
     }
 
+    /// <summary>
+    /// Two song settings that live nowhere near the patterns, walked back in the order they were
+    /// changed.
+    /// </summary>
     [Fact]
     public void The_tempo_and_the_track_count_come_back()
     {
@@ -241,6 +300,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(bpm, _song.Bpm);
     }
 
+    /// <summary>
+    /// A fader dragged across its range says "the mix" a hundred times and is one thing a person
+    /// did, so it comes back in one press.
+    /// </summary>
     [Fact]
     public void A_drag_of_one_kind_is_gathered_into_one_step()
     {
@@ -262,6 +325,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.False(_history.CanUndo);
     }
 
+    /// <summary>
+    /// Gathering is by time as well as by kind: let go, wait, and move it again, and that is two
+    /// decisions rather than one long one.
+    /// </summary>
     [Fact]
     public void A_pause_between_drags_makes_them_two()
     {
@@ -281,6 +348,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(2, steps);
     }
 
+    /// <summary>
+    /// Something else in between breaks the gathering, however fast it happened, or a tempo change
+    /// would be swallowed by the fader move either side of it.
+    /// </summary>
     [Fact]
     public void A_different_kind_of_edit_is_never_the_same_gesture()
     {
@@ -296,6 +367,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Equal(3, steps);
     }
 
+    /// <summary>
+    /// A song step is about no pattern, so undoing one must not drag the view off to a pattern
+    /// that had nothing to do with it.
+    /// </summary>
     [Fact]
     public void A_step_about_the_song_sends_the_view_nowhere()
     {
@@ -305,6 +380,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Null(_history.UndoIsAbout);
     }
 
+    /// <summary>
+    /// The links a song owns are part of the song, so pointing a knob at something is as
+    /// undoable as typing a note.
+    /// </summary>
     [Fact]
     public void The_songs_own_controller_links_come_back()
     {
@@ -318,6 +397,10 @@ public class TrackerHistoryTests : IDisposable
         Assert.Empty(_song.Controls);
     }
 
+    /// <summary>
+    /// Opening a song empties the history, since the steps in it describe a song nobody is
+    /// looking at any more.
+    /// </summary>
     [Fact]
     public void Forgetting_empties_it()
     {

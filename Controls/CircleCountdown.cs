@@ -5,32 +5,47 @@ using Avalonia.Media;
 
 namespace JingleBox2.Controls;
 
+/// <summary>
+/// A disc that empties as something runs down, drawn as a pie going clockwise from the top.
+/// </summary>
+/// <remarks>
+/// What is left is drawn rather than what has gone, so a countdown reads as something being used
+/// up. A full circle is drawn as an ellipse rather than as an arc of very nearly 360 degrees,
+/// which leaves a hairline seam where the two ends almost meet.
+/// </remarks>
 public class CircleCountdown : Control
 {
+    /// <summary>How far through it is, 0 for just started and 1 for finished.</summary>
     public static readonly StyledProperty<double> ProgressProperty =
         AvaloniaProperty.Register<CircleCountdown, double>(nameof(Progress));
 
+    /// <summary>What the disc is painted with. Nothing is drawn without one.</summary>
     public static readonly StyledProperty<IBrush?> FillProperty =
         AvaloniaProperty.Register<CircleCountdown, IBrush?>(nameof(Fill),
             new SolidColorBrush(Colors.White, 0.6));
 
+    /// <inheritdoc cref="ProgressProperty"/>
     public double Progress
     {
         get => GetValue(ProgressProperty);
         set => SetValue(ProgressProperty, value);
     }
 
+    /// <inheritdoc cref="FillProperty"/>
     public IBrush? Fill
     {
         get => GetValue(FillProperty);
         set => SetValue(FillProperty, value);
     }
 
+    /// <summary>Says which properties make the disc need drawing again.</summary>
     static CircleCountdown()
     {
         AffectsRender<CircleCountdown>(ProgressProperty, FillProperty);
     }
 
+    /// <summary>Draws what is left of the disc.</summary>
+    /// <param name="context">Where to draw.</param>
     public override void Render(DrawingContext context)
     {
         var progress = Math.Clamp(Progress, 0, 1);
@@ -45,7 +60,6 @@ public class CircleCountdown : Control
         var brush = Fill;
         if (brush == null) return;
 
-        // Full circle case
         if (remaining >= 0.999)
         {
             context.DrawEllipse(brush, null, center, radius, radius);

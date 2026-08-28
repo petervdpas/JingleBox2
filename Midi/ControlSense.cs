@@ -39,7 +39,13 @@ public sealed class ControlSense
     /// <summary>How far from either end still counts as the end.</summary>
     private const int Edge = 4;
 
+    /// <summary>The top of a continuous controller's range, and what a button's press reads as.</summary>
+    private const int Top = 127;
+
+    /// <summary>The values so far. Never more than <see cref="Enough"/>: after that it has decided.</summary>
     private readonly int[] _seen = new int[Enough];
+
+    /// <summary>How many of them have arrived.</summary>
     private int _count;
 
     /// <summary>What it decided, or nothing while it is still listening.</summary>
@@ -65,6 +71,30 @@ public sealed class ControlSense
         return true;
     }
 
+    /// <summary>
+    /// What those three values say about the thing that sent them.
+    /// </summary>
+    /// <remarks>
+    /// Asked in this order, and the order is the whole of it.
+    ///
+    /// The same number again and again while a hand is turning is not a position, it is a count
+    /// of notches: one notch, one notch, one notch. That is asked first, because the number an
+    /// encoder repeats is very often 127, and read the other way round 127 three times is a
+    /// button being held down.
+    ///
+    /// Which convention the encoder counts in is given away by the number it repeats.
+    /// <see cref="ControlTurn.Offset"/> counts from the middle of the range, so it rests near
+    /// <see cref="Still"/> and never on it, since the middle itself is what it sends when it is
+    /// standing still. <see cref="ControlTurn.Twos"/> counts from either end, and nought is that
+    /// convention's standing still, so nought is excluded for the same reason.
+    ///
+    /// Two positions with nothing between them, and both of them seen, is a button. Following it
+    /// is the whole of the job and there is no position to pick up from.
+    ///
+    /// Numbers that walk is anything else. It is saying where it is, so it has to be picked up
+    /// rather than jumped to, or touching it drags the parameter to wherever your hand happens
+    /// to be resting.
+    /// </remarks>
     private ControlPickup Decide()
     {
         int first = _seen[0];
@@ -76,38 +106,28 @@ public sealed class ControlSense
             int value = _seen[at];
 
             if (value != first) same = false;
-            if (value != 0 && value != 127) only = false;
+            if (value != 0 && value != Top) only = false;
             if (value == 0) low = true;
-            if (value == 127) high = true;
+            if (value == Top) high = true;
         }
 
-        // The same number again and again while a hand is turning is not a position, it is a
-        // count of notches: one notch, one notch, one notch. Asked first, because the number an
-        // encoder repeats is often 127, which read the other way round is a button held down.
         if (same)
         {
-            // Counting from the middle of the range. Not the middle itself, which is the
-            // number one of these sends when it is standing still.
             if (first != Still && Math.Abs(first - Still) <= Near)
             {
                 Turn = ControlTurn.Offset;
                 return ControlPickup.Relative;
             }
 
-            // Counting from either end. Not nought, which is this convention's standing still.
-            if (first != 0 && (first <= Edge || first >= 127 - Edge))
+            if (first != 0 && (first <= Edge || first >= Top - Edge))
             {
                 Turn = ControlTurn.Twos;
                 return ControlPickup.Relative;
             }
         }
 
-        // Two positions and nothing between them, and both of them seen. Following it is the
-        // whole of the job; there is no position to pick up from.
         if (only && low && high) return ControlPickup.Jump;
 
-        // Numbers that walk. It is saying where it is, so it has to be picked up rather than
-        // jumped to, or touching it drags the parameter to wherever your hand happens to rest.
         return ControlPickup.Takeover;
     }
 

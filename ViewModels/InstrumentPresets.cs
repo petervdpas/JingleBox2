@@ -24,7 +24,10 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class InstrumentPresets : ObservableObject, IMachinePresets
 {
+    /// <summary>The instrument a picked preset is poured into.</summary>
     private readonly TrackerInstrument _instrument;
+
+    /// <summary>Told after a preset has been put on, so the panel and the sound catch up.</summary>
     private readonly Action _applied;
 
     /// <summary>
@@ -50,6 +53,14 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// </remarks>
     private readonly TakeFilter? _narrowing;
 
+    /// <summary>Reads what this machine has to offer and watches the takes if it offers those.</summary>
+    /// <param name="instrument">The instrument being edited, which is what a pick writes into.</param>
+    /// <param name="applied">Called once a preset has been put on.</param>
+    /// <param name="takes">Your recordings, for the one machine whose presets are recordings.</param>
+    /// <param name="narrowing">
+    /// The category filter in front of the takes, so a described panel can offer the categories
+    /// through the one control it has.
+    /// </param>
     public InstrumentPresets(
         TrackerInstrument instrument,
         Action applied,
@@ -69,6 +80,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// <summary>What the picker is called, since on one machine it is offering something else.</summary>
     public string Caption => PicksTakes ? "Take" : "Preset";
 
+    /// <summary>What the picker says when you rest on it, which differs for the same reason.</summary>
     public string Hint => PicksTakes
         ? "One of your recordings, put straight on this machine."
         : "Loads the settings of another sound on this machine. Your name and level are kept; only the sound is replaced.";
@@ -90,7 +102,8 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// on it.
     ///
     /// The kind is still the answer for a machine that has not been converted to a project yet,
-    /// which is the state the rack is in while they move over one at a time.
+    /// which is the state the rack is in while they move over one at a time, and for one
+    /// installed before it could say anything about this.
     /// </remarks>
     private bool StartsFromTakes()
     {
@@ -98,8 +111,6 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
 
         if (Tracker.Machines.MachineProjects.For(id)?.BrowsesTakes() is { } said) return said;
 
-        // The machine says nothing, either because it is not installed as a project or because
-        // it was installed before it could say. The kind is what decided before this field.
         return _instrument.Kind == TrackerInstrumentKind.Sample;
     }
 
@@ -112,6 +123,13 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// <summary>The last one loaded. Setting it loads it.</summary>
     [ObservableProperty] private MachinePreset? selected;
 
+    /// <summary>
+    /// Puts the picked sound on the instrument, and says so.
+    /// </summary>
+    /// <remarks>
+    /// Nothing happens while the list is being rebuilt: the rebuild clears the selection and would
+    /// otherwise be read as somebody picking nothing, and then picking the first thing again.
+    /// </remarks>
     partial void OnSelectedChanged(MachinePreset? value)
     {
         if (_filling || value == null) return;
@@ -121,17 +139,26 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     }
 
     /// <summary>A recording, dressed as a preset so one picker serves every machine.</summary>
+    /// <remarks>
+    /// The take is the whole of what changes. The shape is cleared so that picking a recording
+    /// leaves everything else about the machine where it was, which is the same promise a real
+    /// preset makes about the name and the level.
+    /// </remarks>
     private MachinePreset Take(Models.Recording recording)
     {
         var sound = TrackerInstrument.CreateSample(recording.Name, recording.FilePath, _instrument.BaseNote);
 
-        // The take is the whole of what changes: everything else about the machine stays put.
         sound.Shape = null;
 
         return new MachinePreset(recording.Name, sound);
     }
 
-    /// <summary>Reads the machine's folder again.</summary>
+    /// <summary>Reads the machine's folder again, or your takes on the machine that offers those.</summary>
+    /// <remarks>
+    /// Everything worked out from the list is said at the end rather than as the list is filled,
+    /// since none of it is worth a message per entry and a picker redrawn a hundred times shows
+    /// exactly what one redraw would.
+    /// </remarks>
     public void Refresh()
     {
         _filling = true;

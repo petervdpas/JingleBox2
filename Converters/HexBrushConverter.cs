@@ -17,10 +17,15 @@ namespace JingleBox2.Converters;
 /// </remarks>
 public sealed class HexBrushConverter : IValueConverter
 {
+    /// <inheritdoc/>
+    /// <param name="value">The colour as it is stored, such as "#E53935".</param>
+    /// <param name="targetType">Unused: what comes back is a brush whatever was asked for.</param>
     /// <param name="parameter">
     /// How much of it to use, 0 to 1, for the washes a list row is tinted with. Left out, the
     /// colour is given whole.
     /// </param>
+    /// <param name="culture">Unused: a hex colour reads the same everywhere.</param>
+    /// <returns>The brush, or nothing at all where the string is blank or unreadable.</returns>
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is not string hex || hex.Length == 0) return AvaloniaProperty.UnsetValue;
@@ -35,11 +40,14 @@ public sealed class HexBrushConverter : IValueConverter
         }
     }
 
+    /// <summary>How see-through to paint it, taken from the parameter, and solid without one.</summary>
     private static double Opacity(object? parameter) =>
         parameter is string text && double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double amount)
             ? Math.Clamp(amount, 0, 1)
             : 1;
 
+    /// <inheritdoc/>
+    /// <remarks>A one way conversion: the opacity is applied on the way out and cannot be undone.</remarks>
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException("A brush is not turned back into the colour it was written as.");
 }

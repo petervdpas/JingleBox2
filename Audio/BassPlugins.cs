@@ -28,10 +28,13 @@ public static class BassPlugins
     /// </summary>
     private static readonly string[] BuiltIn = { ".wav", ".aiff", ".aif", ".mp3", ".mp2", ".mp1", ".mpga", ".ogg", ".oga" };
 
+    /// <summary>Held while the add-ons are loaded, since two callers can arrive at once.</summary>
     private static readonly object Gate = new();
 
+    /// <summary>Whether the folder has been walked. It is walked once a session.</summary>
     private static bool _loaded;
 
+    /// <summary>What the add-ons that did load say they read.</summary>
     private static string[] _added = Array.Empty<string>();
 
     /// <summary>Loads every add-on in the program's folder, once.</summary>

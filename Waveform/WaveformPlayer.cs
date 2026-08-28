@@ -10,14 +10,28 @@ namespace JingleBox2.Waveform;
 /// </summary>
 public sealed class WaveformPlayer : IDisposable
 {
+    /// <summary>How wide one sample is, which is sixteen bits everywhere in this app.</summary>
+    private const int WavBytesPerSample = 2;
+
+    /// <summary>How often the position is read. Ten a second, which a moving line does not need beating.</summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>The BASS channel, or 0 when nothing is playing.</summary>
     private int _channel;
+
+    /// <summary>What reads the position, on the drawing thread. Null when nothing is playing.</summary>
     private DispatcherTimer? _timer;
+
+    /// <summary>Where the region ends, in bytes, or 0 when there is no region.</summary>
     private long _endBytes;
+
+    /// <summary>How wide one frame is, read off the file rather than assumed.</summary>
     private long _bytesPerFrame = 4;
+
+    /// <summary>How long the file is in frames, which is what a fraction is a fraction of.</summary>
     private long _totalFrames;
 
+    /// <summary>Whether a region is playing.</summary>
     public bool IsPlaying { get; private set; }
 
     /// <summary>Current position as a fraction of the whole file.</summary>
@@ -27,9 +41,21 @@ public sealed class WaveformPlayer : IDisposable
     public event Action? Stopped;
 
     /// <summary>Plays from one fraction of the file to another. Both are clamped to 0..1.</summary>
+    /// <remarks>
+    /// Whatever was playing is stopped first, so a channel or a timer is never left running behind
+    /// this one.
+    ///
+    /// The position is read on a dispatcher timer rather than a pool one, so whoever is listening
+    /// may touch controls directly. A pool thread raising these would throw inside Avalonia and
+    /// the timer would swallow it.
+    /// </remarks>
+    /// <param name="filePath">The recording.</param>
+    /// <param name="startFraction">Where to start, 0 to 1.</param>
+    /// <param name="endFraction">Where to stop, 0 to 1.</param>
+    /// <param name="totalFrames">How long the file is, which nought makes this do nothing.</param>
     public void Play(string filePath, double startFraction, double endFraction, long totalFrames)
     {
-        Stop(); // never leave a previous channel or timer running
+        Stop();
 
         if (totalFrames <= 0) return;
 
@@ -37,7 +63,7 @@ public sealed class WaveformPlayer : IDisposable
         if (_channel == 0) return;
 
         var info = Bass.ChannelGetInfo(_channel);
-        _bytesPerFrame = Math.Max(1, info.Channels * 2); // the app records 16-bit
+        _bytesPerFrame = Math.Max(1, info.Channels * WavBytesPerSample);
         _totalFrames = totalFrames;
 
         long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
@@ -49,14 +75,13 @@ public sealed class WaveformPlayer : IDisposable
 
         PositionChanged?.Invoke((double)startFrame / _totalFrames);
 
-        // DispatcherTimer ticks on the UI thread so subscribers may touch controls directly.
-        // A System.Timers.Timer would raise these events on a pool thread, where an Avalonia
-        // update throws and the timer silently swallows it.
         _timer = new DispatcherTimer { Interval = PollInterval };
         _timer.Tick += (_, _) => Poll();
         _timer.Start();
     }
 
+    /// <summary>Jumps to a fraction of the file, and does nothing when nothing is playing.</summary>
+    /// <param name="fraction">Where to go, 0 to 1.</param>
     public void SeekTo(double fraction)
     {
         if (!IsPlaying || _channel == 0 || _totalFrames <= 0) return;
@@ -66,6 +91,7 @@ public sealed class WaveformPlayer : IDisposable
         PositionChanged?.Invoke((double)frame / _totalFrames);
     }
 
+    /// <summary>Stops, lets the channel go, and says so. Does nothing twice.</summary>
     public void Stop()
     {
         _timer?.Stop();
@@ -86,6 +112,12 @@ public sealed class WaveformPlayer : IDisposable
         Stopped?.Invoke();
     }
 
+    /// <summary>Reads where playback has got to, and stops it at the end of the region.</summary>
+    /// <remarks>
+    /// The state is compared against Stopped rather than tested for Playing, because
+    /// PlaybackState is not a flags enum: HasFlag does bitwise arithmetic on it and misreads
+    /// Paused and Stalled.
+    /// </remarks>
     private void Poll()
     {
         if (_channel == 0)
@@ -98,8 +130,6 @@ public sealed class WaveformPlayer : IDisposable
 
         bool reachedEnd = _endBytes > 0 && position >= _endBytes;
 
-        // Compare against Stopped rather than testing for Playing: PlaybackState is not a
-        // [Flags] enum, so HasFlag does bitwise maths and misreads Paused and Stalled.
         bool ended = Bass.ChannelIsActive(_channel) == PlaybackState.Stopped;
 
         if (reachedEnd || ended)
@@ -112,5 +142,6 @@ public sealed class WaveformPlayer : IDisposable
             PositionChanged?.Invoke((double)(position / _bytesPerFrame) / _totalFrames);
     }
 
+    /// <summary>Stops whatever is playing.</summary>
     public void Dispose() => Stop();
 }

@@ -11,12 +11,19 @@ namespace JingleBox2.Tests;
 /// device, which is the one rule here subtle enough to be worth checking away from hardware, and
 /// getting it wrong meant every message after the first arriving two bytes long and vanishing
 /// without a word.
+///
+/// The tests run in the order the wire is read: the channel messages first (notes, controllers,
+/// running status, pitch bend), then the statuses that take one data byte rather than two, then
+/// port name matching, then the realtime bytes, and last the system exclusive messages, which
+/// are the only ones with no length and so the only ones that can arrive in pieces.
 /// </remarks>
 public class MidiWireTests
 {
+    /// <summary>Hands one delivery to the reader for the named device, and gives back what it made of it.</summary>
     private static MidiMessage? Read(MidiService service, string device, params byte[] bytes) =>
         service.Read(device, bytes, 0, bytes.Length);
 
+    /// <summary>A note on carries its channel, its note number and its velocity.</summary>
     [Fact]
     public void A_note_on_is_a_note()
     {
@@ -30,6 +37,13 @@ public class MidiWireTests
         Assert.True(message.IsOn);
     }
 
+    /// <summary>
+    /// The other spelling of a release, and the one most keyboards actually send.
+    /// </summary>
+    /// <remarks>
+    /// Read as a press it is a key that goes down and never comes up, which is what a light left
+    /// lit looks like from above.
+    /// </remarks>
     [Fact]
     public void A_note_on_at_no_velocity_is_a_note_off()
     {
@@ -38,6 +52,7 @@ public class MidiWireTests
         Assert.False(message!.IsOn);
     }
 
+    /// <summary>A controller says which number moved and where it moved to, on its own channel.</summary>
     [Fact]
     public void A_controller_carries_its_number_and_value()
     {
@@ -49,6 +64,10 @@ public class MidiWireTests
         Assert.Equal(33, message.Data);
     }
 
+    /// <summary>
+    /// A device that sent a status once may send only data afterwards, and it still means the
+    /// same kind of message.
+    /// </summary>
     [Fact]
     public void Running_status_carries_the_last_kind_across()
     {
@@ -63,6 +82,14 @@ public class MidiWireTests
         Assert.Equal(11, second.Data);
     }
 
+    /// <summary>
+    /// One device's run says nothing about another's.
+    /// </summary>
+    /// <remarks>
+    /// The other device here has said nothing at all, so data with no status in front of it
+    /// means nothing on it. Shared, the run would let one controller's traffic put a kind on
+    /// another's bare bytes and produce a message nobody sent.
+    /// </remarks>
     [Fact]
     public void Running_status_is_kept_per_device()
     {
@@ -70,11 +97,10 @@ public class MidiWireTests
 
         Read(service, "one", 0xB0, 74, 10);
 
-        // The other device has said nothing, so data with no status in front of it means
-        // nothing on it.
         Assert.Null(Read(service, "two", 74, 11));
     }
 
+    /// <summary>A bend is two seven-bit halves, the least significant first, so centre is 8192.</summary>
     [Theory]
     [InlineData(0x00, 0x40, 8192)]
     [InlineData(0x00, 0x00, 0)]
@@ -87,6 +113,10 @@ public class MidiWireTests
         Assert.Equal(wanted, message.Data);
     }
 
+    /// <summary>
+    /// A bend belongs to a channel and not to a controller number, so nothing pointed at a
+    /// controller can be reached by one.
+    /// </summary>
     [Fact]
     public void A_bend_says_which_channel_it_is_on_and_names_no_controller()
     {
@@ -97,6 +127,7 @@ public class MidiWireTests
         Assert.False(message.IsOn);
     }
 
+    /// <summary>Bends are sent in runs while a wheel moves, so the run has to hold for them too.</summary>
     [Fact]
     public void A_bend_carries_through_running_status_too()
     {
@@ -107,18 +138,32 @@ public class MidiWireTests
         Assert.Equal(16383, Read(service, "d", 0x7F, 0x7F)!.Data);
     }
 
+    /// <summary>
+    /// A status that takes one data byte is stepped over by one byte, not two.
+    /// </summary>
+    /// <remarks>
+    /// A program change is not something this reads, and reading it as two bytes would take the
+    /// next message's status byte for a value and lose that message as well. So one message
+    /// nobody wanted would cost the message behind it, which is a key press.
+    /// </remarks>
     [Fact]
     public void A_status_that_takes_one_data_byte_does_not_eat_the_next_message()
     {
         var service = new MidiService();
 
-        // A program change is not something this reads, and reading it as two bytes would take
-        // the next message's status byte for a value and lose that message as well.
         Assert.Null(Read(service, "d", 0xC0, 5));
 
         Assert.Equal(60, Read(service, "d", 0x90, 60, 100)!.Value);
     }
 
+    /// <summary>
+    /// A system exclusive message is read, and it ends whatever run was going on.
+    /// </summary>
+    /// <remarks>
+    /// Reading it rather than dropping it is what makes machine control and the identity reply
+    /// possible at all. What has not changed is that it ends the run: afterwards, data on its
+    /// own means nothing again.
+    /// </remarks>
     [Fact]
     public void System_exclusive_forgets_the_running_status()
     {
@@ -126,20 +171,19 @@ public class MidiWireTests
 
         Read(service, "d", 0xB0, 74, 10);
 
-        // Read now rather than dropped, which is what makes machine control and the identity
-        // reply possible at all. What has not changed is that it ends the run.
         Assert.NotNull(Read(service, "d", 0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7));
 
-        // The run is over, so data on its own means nothing again.
         Assert.Null(Read(service, "d", 74, 11));
     }
 
+    /// <summary>A clock byte on its own is nothing to read, and is not an error either.</summary>
     [Fact]
     public void A_real_time_byte_is_ignored_without_ending_the_run()
     {
         Assert.Null(Read(new MidiService(), "d", 0xF8));
     }
 
+    /// <summary>An empty delivery and a null buffer are both answered rather than thrown at.</summary>
     [Fact]
     public void Nothing_at_all_reads_as_nothing()
     {
@@ -149,6 +193,14 @@ public class MidiWireTests
         Assert.Null(service.Read("d", null!, 0, 3));
     }
 
+    /// <summary>
+    /// Port names are compared with the padding and the casing the driver happened to use.
+    /// </summary>
+    /// <remarks>
+    /// A device is known here by its port name, so a name that fails to match is a controller
+    /// that has lost every link it had. Two ports of one device still have to stay apart, which
+    /// is why the MCU port does not match the main one.
+    /// </remarks>
     [Theory]
     [InlineData("Minilab3 MIDI", "Minilab3 MIDI   ", true)]
     [InlineData("minilab3 midi", "Minilab3 MIDI", true)]
@@ -157,6 +209,14 @@ public class MidiWireTests
     public void Names_are_matched_however_the_driver_padded_them(string? left, string? right, bool same) =>
         Assert.Equal(same, MidiService.SameName(left, right));
 
+    /// <summary>
+    /// Start, continue and stop are one byte each and address no channel.
+    /// </summary>
+    /// <remarks>
+    /// Neither is a press, and <c>IsOn</c> is false on both. That is what keeps a transport byte
+    /// out of the pads without a line being added anywhere: all three of the other routers begin
+    /// by asking for a press.
+    /// </remarks>
     [Theory]
     [InlineData(0xFA)]
     [InlineData(0xFB)]
@@ -170,17 +230,29 @@ public class MidiWireTests
         Assert.Equal(status, message.Value);
         Assert.Equal(0, message.Channel);
 
-        // Not a press, so every other router lets it past without a line being added to any
-        // of them: all three begin by asking for one.
         Assert.False(message.IsOn);
     }
 
+    /// <summary>
+    /// The clock and active sensing are dropped at the wire without a word.
+    /// </summary>
+    /// <remarks>
+    /// At twenty four clocks a beat, a line logged per byte would drown the ones the log is kept
+    /// for.
+    /// </remarks>
     [Theory]
     [InlineData(0xF8)]
     [InlineData(0xFE)]
     public void The_clock_and_active_sensing_are_read_as_nothing(byte status) =>
         Assert.Null(Read(new MidiService(), "d", status));
 
+    /// <summary>
+    /// A realtime byte arriving mid-run leaves the run standing.
+    /// </summary>
+    /// <remarks>
+    /// The clock says nothing about what was being sent, and a device sending clock puts one
+    /// wherever it likes, including between the two data bytes of somebody's knob.
+    /// </remarks>
     [Fact]
     public void A_realtime_byte_does_not_disturb_the_run_it_arrives_in_the_middle_of()
     {
@@ -189,7 +261,6 @@ public class MidiWireTests
         Read(service, "d", 0xB0, 20, 40);
         Read(service, "d", 0xF8);
 
-        // Running status still stands: the clock says nothing about what was being sent.
         var message = Read(service, "d", 21, 41);
 
         Assert.NotNull(message);
@@ -197,6 +268,7 @@ public class MidiWireTests
         Assert.Equal(21, message.Value);
     }
 
+    /// <summary>A system exclusive message arrives with its own opening and closing bytes on it.</summary>
     [Fact]
     public void A_system_exclusive_message_comes_back_whole()
     {
@@ -208,11 +280,16 @@ public class MidiWireTests
         Assert.False(message.IsOn);
     }
 
+    /// <summary>
+    /// One handed over a piece at a time is gathered until its end byte arrives.
+    /// </summary>
+    /// <remarks>
+    /// It is the only message in MIDI with no length, and so the only one that can be handed
+    /// over in pieces at all. The buffer is kept per device, the same way the running status is.
+    /// </remarks>
     [Fact]
     public void And_it_comes_back_whole_when_it_arrived_in_pieces()
     {
-        // The only message in MIDI with no length, and so the only one that can be handed over
-        // a piece at a time.
         var service = new MidiService();
 
         Assert.Null(Read(service, "d", 0xF0, 0x00, 0x20, 0x6B));
@@ -224,11 +301,17 @@ public class MidiWireTests
         Assert.Equal(new byte[] { 0xF0, 0x00, 0x20, 0x6B, 0x7F, 0x42, 0x02, 0xF7 }, message!.Bytes);
     }
 
+    /// <summary>
+    /// A clock threaded through the middle of one is not part of it.
+    /// </summary>
+    /// <remarks>
+    /// Which is what a device sending clock does while it answers an identity request, and the
+    /// specification allows it precisely there. Swallowed into the lump, the reply would come
+    /// back with a byte in it that the sender never meant as data.
+    /// </remarks>
     [Fact]
     public void A_clock_threaded_through_one_is_not_part_of_it()
     {
-        // Which is what a device sending clock does while it answers an identity request, and
-        // the specification allows it precisely there.
         var service = new MidiService();
 
         Read(service, "d", 0xF0, 0x7E, 0x7F);
@@ -240,12 +323,18 @@ public class MidiWireTests
         Assert.Equal(new byte[] { 0xF0, 0x7E, 0x7F, 0x06, 0x02, 0xF7 }, message!.Bytes);
     }
 
+    /// <summary>
+    /// A message abandoned part way through does not swallow what comes after it.
+    /// </summary>
+    /// <remarks>
+    /// A cable pulled mid-message is what this looks like on a desk. Any status byte other than
+    /// a realtime one means the sender gave up, and the note behind it must still be read.
+    /// </remarks>
     [Fact]
     public void One_abandoned_part_way_does_not_swallow_what_follows()
     {
         var service = new MidiService();
 
-        // A cable pulled mid-message. The note after it must still be read.
         Assert.Null(Read(service, "d", 0xF0, 0x00, 0x20));
         Assert.Null(Read(service, "d", 0x90, 60, 100));
 
@@ -256,11 +345,16 @@ public class MidiWireTests
         Assert.Equal(62, message.Value);
     }
 
+    /// <summary>
+    /// Two devices gathering at once do not get each other's bytes.
+    /// </summary>
+    /// <remarks>
+    /// Per device for the same reason the running status is: one stream says nothing about the
+    /// other, and interleaving them would produce a message neither of them sent.
+    /// </remarks>
     [Fact]
     public void Two_devices_send_two_system_exclusive_messages_at_once()
     {
-        // Per device for the same reason running status is: one stream says nothing about the
-        // other, and interleaving them would produce a message neither of them sent.
         var service = new MidiService();
 
         Read(service, "one", 0xF0, 0x01, 0x02);

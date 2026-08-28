@@ -8,33 +8,16 @@ using System.Text.Json;
 
 namespace JingleBox2.Tracker;
 
-/// <summary>
-/// Reads and writes songs, one file per song, alongside the recordings.
-/// </summary>
+/// <inheritdoc/>
 /// <remarks>
-/// Separate files rather than entries in config.json: a song is a document the user names,
-/// copies, and can hand to someone else, and a pad refers to one by path.
-///
-/// A song file is a zip, and what is in it is this:
-/// <code>
-/// song.json      the patterns, the order, the mix, the instruments
-/// state/00.bin   what a plugin instrument saved, as the plugin handed it over
-/// </code>
-///
-/// One file with the patches inside it was the obvious thing and it was the wrong thing. A
-/// plugin's state is the bulk of a song by a wide margin: of one song here, 348 KB, the music
-/// is 781 bytes and one synth's patch is 331 KB of it, base64, which is a third larger than the
-/// bytes it stands for and has to be encoded on the way out and decoded on the way in. Worse,
-/// it was in the same document as the patterns, and a document is all or nothing: a patch that
-/// came back damaged from a plugin did not cost the patch, it cost the song.
-///
-/// Kept apart, a patch is read as the bytes it is, straight into the plugin that wants it, and
-/// a patch that will not read costs that instrument its sound and nothing else. song.json stays
-/// small enough to read in a text editor and to parse before anything heavy is touched, which
-/// is what lets the plugins a song needs be started while the rest of it is still loading.
+/// Songs written before a song was a container are brought across on the way in, and the
+/// document is read and written through <c>System.Text.Json</c> against a shape of its own
+/// rather than against <see cref="Song"/>, so what is on disc can stay still while the model
+/// moves.
 /// </remarks>
-public sealed class SongStore : ISampleUsage
+public sealed class SongStore : ISongStore
 {
+    /// <summary>What a song file is called. A zip, whatever the extension says.</summary>
     public const string Extension = ".jibx";
 
     /// <summary>What songs were called when a song was one JSON file.</summary>
@@ -43,20 +26,39 @@ public sealed class SongStore : ISampleUsage
     /// <summary>What a converted one is left called, so it is kept but no longer found.</summary>
     private const string RetiredExtension = ".json.old";
 
+    /// <summary>The document itself, which is the only entry a song must have.</summary>
     private const string SongEntry = "song.json";
+
+    /// <summary>Where the plugins' own patches sit, apart from the document.</summary>
     private const string StateFolder = "state/";
+
+    /// <summary>What a patch is called, since it is bytes a plugin handed over and not text.</summary>
     private const string StateExtension = ".bin";
 
-    // Defaults are written out rather than skipped. A synth patch is full of settings whose
-    // zero is a real choice (no attack, no sustain, no vibrato), and skipping them would let
-    // the property initializers put their own values back on load.
+    /// <summary>
+    /// Indented, and with defaults written out rather than skipped.
+    /// </summary>
+    /// <remarks>
+    /// A synth patch is full of settings whose zero is a real choice: no attack, no sustain, no
+    /// vibrato. Skipping them would leave the property initialisers to put their own values back
+    /// on load, so a patch saved with the attack at nought would open with whatever a new one
+    /// has.
+    /// </remarks>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true
     };
 
+    /// <inheritdoc/>
     public string SongsDirectory { get; }
 
+    /// <summary>
+    /// Points at the songs folder under the application's own folder, making it if it is not
+    /// there, and brings any song written before this format across.
+    /// </summary>
+    /// <param name="appName">
+    /// Which application folder, so a test can be pointed at one of its own.
+    /// </param>
     public SongStore(string appName = "JingleBox2")
     {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -78,6 +80,9 @@ public sealed class SongStore : ISampleUsage
     /// The original is kept, renamed so it is not found again. Anything that goes wrong with
     /// one song is that song's own business: the rest still come across, and one that will not
     /// read is left alone under its own name for somebody to look at.
+    ///
+    /// A song already brought across is left alone. The container is the one that counts, and
+    /// converting again would put the old work back on top of the new.
     /// </remarks>
     private void BringOldSongsAcross()
     {
@@ -92,8 +97,6 @@ public sealed class SongStore : ISampleUsage
 
             try
             {
-                // Already brought across, and the container is the one that counts. Converting
-                // again would put the old work back on top of the new.
                 if (File.Exists(wanted)) continue;
 
                 var document = JsonSerializer.Deserialize<SongDocument>(File.ReadAllText(path), JsonOptions);
@@ -111,15 +114,17 @@ public sealed class SongStore : ISampleUsage
         }
     }
 
+    /// <inheritdoc/>
     public string PathFor(string songName) =>
         Path.Combine(SongsDirectory, songName + Extension);
 
+    /// <inheritdoc/>
     public IReadOnlyList<string> List() =>
         Directory.Exists(SongsDirectory)
             ? Directory.GetFiles(SongsDirectory, "*" + Extension).OrderBy(p => p).ToArray()
             : Array.Empty<string>();
 
-    /// <summary>Saved songs as name, path and what they say about themselves, for a picker.</summary>
+    /// <inheritdoc/>
     public IReadOnlyList<SongFile> ListSongs() =>
         List()
             .Select(path => new SongFile(Path.GetFileNameWithoutExtension(path), path, DescriptionIn(path)))
@@ -158,25 +163,29 @@ public sealed class SongStore : ISampleUsage
         }
     }
 
+    /// <inheritdoc/>
     public bool Exists(string songName) => File.Exists(PathFor(songName));
 
+    /// <inheritdoc/>
     public void Delete(string filePath)
     {
         if (File.Exists(filePath)) File.Delete(filePath);
     }
 
-    /// <summary>
-    /// The instruments in saved songs that play a recording, said as "instrument in song".
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
+    /// Said as "instrument in song", because a name on its own would not tell anybody which of
+    /// their songs is about to go quiet.
+    ///
     /// Songs are asked as well as the rack, because a recording is deleted from RECORD and the
     /// rack is not the only thing built on one. A take nothing on the rack uses but three songs
     /// do read as free, and deleting it emptied those three tracks with nothing said. Nothing
     /// reported it afterwards either: the songs still opened, and three instruments were simply
     /// silent.
     ///
-    /// Only song.json is read, never the patches and never the audio, so asking this about
-    /// every song in the folder costs a few milliseconds however large the songs are.
+    /// Only song.json is read, never the patches and never the audio, and the answer is cached
+    /// per song by its write time, so asking this about every song in the folder costs a few
+    /// milliseconds however large the songs are.
     /// </remarks>
     public IReadOnlyList<string> InstrumentsUsing(string filePath)
     {
@@ -195,14 +204,15 @@ public sealed class SongStore : ISampleUsage
         return names;
     }
 
-    /// <summary>
-    /// Points every saved song playing one recording at another, for a take that was renamed.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Only song.json is rewritten. The patches and any recordings the song carries are left
     /// exactly as they are rather than read out and written back, so renaming a take does not
     /// mean rebuilding a forty megabyte file. The whole thing still lands in one move, because
     /// half a rewritten song is not a song.
+    ///
+    /// A song that will not open is not one this rename can fix, so it is passed over and the
+    /// rest still move.
     /// </remarks>
     public int Repoint(string from, string to)
     {
@@ -218,7 +228,6 @@ public sealed class SongStore : ISampleUsage
             }
             catch (Exception)
             {
-                // A song that will not open is not one this rename can fix.
             }
         }
 
@@ -282,6 +291,11 @@ public sealed class SongStore : ISampleUsage
     }
 
     /// <summary>Rewrites one song's song.json if it plays that recording. True when it did.</summary>
+    /// <remarks>
+    /// Written beside the file and moved on top, so what is there is the whole old song or the
+    /// whole new one. Updating the container where it lies would leave neither if anything went
+    /// wrong part way, and a half rewritten song is worse than one that was never touched.
+    /// </remarks>
     private static bool Repointed(string path, string from, string to)
     {
         SongDocument? document;
@@ -303,8 +317,6 @@ public sealed class SongStore : ISampleUsage
 
         if (!moved) return false;
 
-        // Beside it and moved on top, so what is there is the whole old song or the whole new
-        // one. Updating the file where it lies would leave neither if anything went wrong.
         string writing = path + ".writing";
 
         try
@@ -331,7 +343,6 @@ public sealed class SongStore : ISampleUsage
         }
     }
 
-    /// <summary>What song.json says, and nothing else out of the container.</summary>
     /// <summary>
     /// The song as its own file would hold it, and back again.
     /// </summary>
@@ -366,6 +377,7 @@ public sealed class SongStore : ISampleUsage
         }
     }
 
+    /// <summary>What song.json says, and nothing else out of the container.</summary>
     private static SongDocument? Written(ZipArchive container)
     {
         var entry = container.GetEntry(SongEntry);
@@ -385,39 +397,38 @@ public sealed class SongStore : ISampleUsage
     private static string StateName(int index) =>
         StateFolder + index.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
 
-    /// <summary>What one effect's patch is called inside the file.</summary>
+    /// <summary>What one effect's patch is called inside the file, by the strip it is on.</summary>
     /// <remarks>
     /// By the track it sits on and its place in that track's chain, for the same reason an
     /// instrument's goes by its place in the list: both numbers are what the reader has in its
     /// hand as it walks the same lists the writer walked. The "t" keeps the two kinds apart in
     /// a folder somebody may well open.
-    /// </remarks>
-    /// <summary>
-    /// Where one effect's patch lives in the container, by the strip it is on.
-    /// </summary>
-    /// <remarks>
-    /// The master is track minus one and gets a name of its own rather than a number, because it
-    /// is not a track and numbering it would make it one the day somebody adds a thirty-third.
+    ///
+    /// The master is track minus one and gets a name of its own, "m" and the device, rather than
+    /// a number. It is not a track, and numbering it would make it one the day somebody adds a
+    /// thirty-third.
     /// </remarks>
     private static string ChainStateName(int track, int device) =>
         StateFolder
         + (track < 0 ? "m" : "t" + track.ToString("00", CultureInfo.InvariantCulture) + "-")
         + device.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
 
-    /// <summary>
-    /// Writes a song, and when asked, the recordings it plays along with it.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// Packing is the deliberate act, not the default. An ordinary save names its recordings,
-    /// which is what keeps it in milliseconds and what keeps the twenty second keep from
-    /// writing tens of megabytes behind your back. See <see cref="SongSamples"/> for what
-    /// travels and what is left named.
+    /// What the song carries is read off the song itself while its paths are still this
+    /// machine's, before the document is built and its paths made portable.
+    ///
+    /// The document goes in compressed well, since it is text and it is small. The patches go in
+    /// compressed quickly rather than well: a patch is the one thing here big enough for the
+    /// difference to be felt, and it is felt on every save.
+    ///
+    /// The whole container is written through <see cref="Config.SafeFile"/>, so a save that goes
+    /// wrong part way costs nothing: the song that was there is still there.
     /// </remarks>
     public void Save(Song song, string filePath, bool withSamples = false)
     {
         song.Normalize();
 
-        // Read off the song itself, while its paths are still this machine's.
         var carrying = withSamples ? SongSamples.Wanted(song) : Array.Empty<string>();
 
         var document = SongDocument.From(song);
@@ -432,8 +443,6 @@ public sealed class SongStore : ISampleUsage
             using (var writing = entry.Open())
                 JsonSerializer.Serialize(writing, document, JsonOptions);
 
-            // Compressed quickly rather than well. A patch is the one thing here big enough
-            // for the difference to be felt, and it is felt on every save.
             foreach (var (index, bytes) in states)
             {
                 var patch = container.CreateEntry(StateName(index), CompressionLevel.Fastest);
@@ -452,16 +461,14 @@ public sealed class SongStore : ISampleUsage
         });
     }
 
-    /// <summary>Loads a song, or null when the file is missing or not a song.</summary>
+    /// <inheritdoc/>
     public Song? Load(string filePath) => Load(filePath, out _);
 
-    /// <summary>
-    /// The same, saying what recordings the song brought with it.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// A packed song puts its recordings on the shelf as it opens, so the shelf has to be told
-    /// to look again. What comes back is what was not already there: opening the same packed
-    /// song twice adds nothing the second time.
+    /// Null for anything that will not read, whatever the reason: a missing file, something that
+    /// is not a zip, a zip with no document in it, or a document that will not parse. There is
+    /// nothing useful to tell the caller apart here, since none of them is a song.
     /// </remarks>
     public Song? Load(string filePath, out IReadOnlyList<string> arrived)
     {
@@ -561,6 +568,11 @@ public sealed class SongStore : ISampleUsage
     /// What song.json holds. Patterns serialize as one string per row rather than an object per
     /// cell, which keeps a 64 line file readable in a text editor and small on disk.
     /// </summary>
+    /// <remarks>
+    /// A shape of its own rather than <see cref="Song"/> itself, so what is on disc can stay
+    /// still while the model moves. The properties that are simply the song's own are named after
+    /// them and mean what they mean there; the ones that differ say so.
+    /// </remarks>
     private sealed class SongDocument
     {
         /// <summary>2 since the patches moved out of here and into the container.</summary>
@@ -586,6 +598,14 @@ public sealed class SongStore : ISampleUsage
         public List<TrackerInstrument> Instruments { get; set; } = new();
         public List<PatternDocument> Patterns { get; set; } = new();
 
+        /// <summary>
+        /// The document for a song, with everything copied rather than shared.
+        /// </summary>
+        /// <remarks>
+        /// Copies throughout, so lifting the patches out of it afterwards cannot reach the song
+        /// that is still being played, and so a save cannot be affected by an edit made while it
+        /// is running.
+        /// </remarks>
         public static SongDocument From(Song song) => new()
         {
             Name = song.Name,
@@ -680,6 +700,11 @@ public sealed class SongStore : ISampleUsage
             return copy;
         }
 
+        /// <summary>The song this document describes, with real paths and its own copies.</summary>
+        /// <remarks>
+        /// The patterns are read last and given the song's track count, since a pattern's width
+        /// is the song's and is not stored per pattern.
+        /// </remarks>
         public Song ToSong()
         {
             var song = new Song
@@ -703,9 +728,20 @@ public sealed class SongStore : ISampleUsage
         }
     }
 
+    /// <summary>
+    /// One pattern as the file holds it: its shape, the cells that hold something, and its lanes.
+    /// </summary>
+    /// <remarks>
+    /// The track count is not here. Every pattern in a song is the song's width, so storing it
+    /// per pattern would be storing the same number once per pattern and giving a hand-edited
+    /// file a way to disagree with itself.
+    /// </remarks>
     private sealed class PatternDocument
     {
+        /// <summary>What the order list calls it.</summary>
         public string Name { get; set; } = "";
+
+        /// <summary>How many steps it has, which is the one part of its shape it does own.</summary>
         public int Lines { get; set; } = Pattern.DefaultLines;
 
         /// <summary>One entry per used cell, as "line:track:cell". Blank cells are not stored.</summary>
@@ -714,6 +750,7 @@ public sealed class SongStore : ISampleUsage
         /// <summary>One entry per automated parameter. Empty for almost every pattern.</summary>
         public List<LaneDocument> Lanes { get; set; } = new();
 
+        /// <summary>The document for a pattern, skipping every cell that holds nothing.</summary>
         public static PatternDocument From(Pattern pattern)
         {
             var document = new PatternDocument { Name = pattern.Name, Lines = pattern.Lines };
@@ -733,6 +770,16 @@ public sealed class SongStore : ISampleUsage
             return document;
         }
 
+        /// <summary>
+        /// The pattern this describes, at the song's width.
+        /// </summary>
+        /// <remarks>
+        /// The lanes go in before the cells, since a lane's points are fitted to the pattern's
+        /// length as it is added. A lane for a track this song no longer has is dropped, with the
+        /// master let through because it is a strip rather than one of the tracks. A cell entry
+        /// that will not parse, or that names a cell outside the pattern, is passed over rather
+        /// than costing the song.
+        /// </remarks>
         public Pattern ToPattern(int trackCount)
         {
             var pattern = new Pattern(Lines, trackCount) { Name = Name };
@@ -773,19 +820,37 @@ public sealed class SongStore : ISampleUsage
     /// </remarks>
     private sealed class LaneDocument
     {
+        /// <summary>Which strip, where minus one is the master rather than a track.</summary>
         public int Track { get; set; }
+
+        /// <summary>What kind of thing is moved: the instrument, an insert, or the strip.</summary>
         public Midi.ControlKind Kind { get; set; } = Midi.ControlKind.Instrument;
+
+        /// <summary>How it gets from one point to the next.</summary>
         public AutomationPlay Play { get; set; } = AutomationPlay.Lines;
+
+        /// <summary>The machine by its slot id, read only for an instrument parameter.</summary>
         public string Machine { get; set; } = "";
+
+        /// <summary>Which of its parameters, by the key it is stored under rather than its name.</summary>
         public string Key { get; set; } = "";
+
+        /// <summary>The plugin by the id the scanner gave it, read only for an insert.</summary>
         public string Plugin { get; set; } = "";
+
+        /// <summary>Which insert, for a chain where the plugin is not named.</summary>
         public int Slot { get; set; }
+
+        /// <summary>Which parameter of it, as the plugin numbers them.</summary>
         public uint Parameter { get; set; }
+
+        /// <summary>Which strip control, read only for a lane about the mix.</summary>
         public Midi.MixControl Mix { get; set; } = Midi.MixControl.Volume;
 
         /// <summary>One entry per point, as "time=value". The time is in lines.</summary>
         public List<string> Points { get; set; } = new();
 
+        /// <summary>The document for one lane, its points written out one string apiece.</summary>
         public static LaneDocument From(AutomationLane lane)
         {
             var document = new LaneDocument
@@ -807,12 +872,22 @@ public sealed class SongStore : ISampleUsage
             return document;
         }
 
+        /// <summary>
+        /// The lane this describes, or null when it describes nothing that can be one.
+        /// </summary>
+        /// <remarks>
+        /// A kind that cannot be automated and a track below nought are both refused. The one
+        /// exception down there is the master, which is a strip without being a track; anything
+        /// else negative is a hand-edited file.
+        ///
+        /// A point that will not parse is passed over rather than costing the lane, and the
+        /// points go in through <see cref="AutomationLane.TakePoints"/>, which sorts them and
+        /// keeps one per time whatever order the file happened to hold them in.
+        /// </remarks>
         public AutomationLane? ToLane()
         {
             if (!AutomationLane.Automatable(Kind)) return null;
 
-            // The master is a strip without being a track, and it is the only thing below
-            // nought that means anything. Anything else there is a hand-edited file.
             if (Track < 0 && Track != TrackerPlayer.MasterStrip) return null;
 
             var lane = new AutomationLane

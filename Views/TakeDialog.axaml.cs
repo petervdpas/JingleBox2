@@ -21,6 +21,7 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class TakeDialog : Window
 {
+    /// <summary>Builds the window. Its list, its categories and its search are all bound.</summary>
     public TakeDialog()
     {
         InitializeComponent();
@@ -39,16 +40,26 @@ public partial class TakeDialog : Window
         return Dialog.ShowAsync<Recording?>(dialog, null);
     }
 
+    /// <summary>
+    /// A double click on a take is the same as picking it and pressing the button, which is
+    /// what anybody who has used a file dialog expects of a list.
+    /// </summary>
     private void Takes_DoubleTapped(object? sender, RoutedEventArgs e) => Pick_Click(sender, e);
 
+    /// <summary>
+    /// Hands the picked take back and closes.
+    /// </summary>
+    /// <remarks>
+    /// Nothing picked means nothing to hand back, and the window stays open: the double click
+    /// landed on the empty part of the list, or Enter was pressed before anything was chosen.
+    /// </remarks>
     private void Pick_Click(object? sender, RoutedEventArgs e)
     {
-        // Nothing picked, nothing to hand back: the double click landed on the empty part of
-        // the list, or Enter was pressed before anything was chosen.
         if (this.FindControl<ListBox>("Takes")?.SelectedItem is not Recording take) return;
 
         Close(take);
     }
 
+    /// <summary>Closes with nothing picked, which the caller reads as the hunt being abandoned.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(null);
 }

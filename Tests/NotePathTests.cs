@@ -19,6 +19,7 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class NotePathTests
 {
+    /// <summary>The plain case: a press and a release, each naming the same note.</summary>
     [Fact]
     public void A_key_pressed_and_let_go_of_arrives_as_both_halves()
     {
@@ -116,10 +117,13 @@ public class NotePathTests
     /// <summary>Somewhere for the two halves to land, in the order they landed.</summary>
     private sealed class Keys : INoteTrigger
     {
+        /// <summary>Each half of each press, in the order it arrived.</summary>
         public List<string> Said { get; } = new();
 
+        /// <inheritdoc/>
         public void TriggerNote(Note note, int volume) => Said.Add("down " + note.Semitone);
 
+        /// <inheritdoc/>
         public void ReleaseNote(Note note) => Said.Add("up " + note.Semitone);
     }
 }

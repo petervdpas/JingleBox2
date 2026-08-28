@@ -13,13 +13,28 @@ namespace JingleBox2.Tracker.Synth;
 /// Reads are by fractional frame, because a note is almost never played at the rate the file
 /// was recorded at. Between two frames the value is interpolated, which is what stops a
 /// resampled sample from sounding gritty.
+///
+/// Read from the audio thread and never written after it is made, so any number of voices can
+/// play the same take at once without a lock.
 /// </remarks>
 public sealed class SampleData
 {
+    /// <summary>What a 16 bit sample is multiplied by to land in -1..1.</summary>
     private const float Scale = 1f / 32768f;
 
     private readonly short[] _samples;
 
+    /// <summary>
+    /// Takes the frames as the file held them.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here refuses bad input: a null array reads as an empty take, and a channel count
+    /// or a rate of nought is corrected rather than thrown on. A decoder that came back with
+    /// nonsense should leave an instrument silent, not stop the audio thread.
+    /// </remarks>
+    /// <param name="samples">Interleaved frames, as the decoder produced them.</param>
+    /// <param name="channels">How many values make up one frame.</param>
+    /// <param name="sampleRate">What the file was recorded at, which is rarely what the card runs at.</param>
     public SampleData(short[] samples, int channels, int sampleRate)
     {
         _samples = samples ?? Array.Empty<short>();
@@ -28,14 +43,19 @@ public sealed class SampleData
         FrameCount = _samples.Length / Channels;
     }
 
+    /// <summary>How many values one frame holds. One is mono and two is a stereo take.</summary>
     public int Channels { get; }
 
+    /// <summary>What the file was recorded at, which is half of how fast a voice reads it.</summary>
     public int SampleRate { get; }
 
+    /// <summary>How many frames there are, which is the length in the file's own time.</summary>
     public long FrameCount { get; }
 
+    /// <summary>Nothing to play, which is what a take that failed to decode looks like.</summary>
     public bool IsEmpty => FrameCount <= 0;
 
+    /// <summary>How long the take is, for anything showing a length rather than reading one.</summary>
     public double Seconds => SampleRate > 0 ? (double)FrameCount / SampleRate : 0;
 
     /// <summary>One frame of one channel, with no interpolation. Outside the file reads silent.</summary>

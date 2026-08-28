@@ -38,8 +38,10 @@ public sealed class LinkGlow : Control
     public static readonly AttachedProperty<bool> LitProperty =
         AvaloniaProperty.RegisterAttached<LinkGlow, Control, bool>("Lit");
 
+    /// <inheritdoc cref="LitProperty"/>
     public static bool GetLit(Control control) => control.GetValue(LitProperty);
 
+    /// <inheritdoc cref="LitProperty"/>
     public static void SetLit(Control control, bool value) => control.SetValue(LitProperty, value);
 
     /// <summary>
@@ -75,12 +77,28 @@ public sealed class LinkGlow : Control
             4, 4);
     }
 
-    /// <summary>How far the rings spread beyond the control.</summary>
+    /// <summary>
+    /// How many rings there are, which is how far the glow spreads beyond the control.
+    /// </summary>
+    /// <remarks>
+    /// Four is enough to read as a glow. Fewer and it is an outline again, which is the one
+    /// thing this must not look like on a panel already covered in borders.
+    /// </remarks>
     private const int Rings = 4;
 
+    /// <summary>
+    /// The rectangle under the pointer, or nothing when the pointer is over no element.
+    /// </summary>
+    /// <remarks>
+    /// Rectangles rather than controls, because the elements of a machine's panel are drawn
+    /// rather than built: there is no control here to ask where it is.
+    /// </remarks>
     private Rect? _offered;
+
+    /// <summary>The elements that already have something pointed at them, drawn one quiet ring each.</summary>
     private IReadOnlyList<Rect> _taken = Array.Empty<Rect>();
 
+    /// <summary>What to light: the one being offered, and the ones already wired.</summary>
     public void Showing(Rect? offered, IReadOnlyList<Rect> taken)
     {
         _offered = offered;
@@ -89,8 +107,24 @@ public sealed class LinkGlow : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// The area a ring is drawn on, which is outside the element rather than over it.
+    /// </summary>
+    /// <remarks>
+    /// The layer has room the element itself has not, so here the rings can spread outward and
+    /// leave the element's own drawing alone. See <see cref="Paint"/> for the case where they
+    /// cannot.
+    /// </remarks>
     private static Rect Around(Rect area, double by) => area.Inflate(by);
 
+    /// <summary>
+    /// The quiet rings on everything already wired, then the glow on the one being offered.
+    /// </summary>
+    /// <remarks>
+    /// The offered one goes last so it is over the quiet ones, and its rings run outward and
+    /// fainter: what is left reads as a glow rather than as an outline, which is what a single
+    /// line would give and what nobody would find on this panel.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         var quiet = new SolidColorBrush(Hot, 0.45);
@@ -100,7 +134,6 @@ public sealed class LinkGlow : Control
 
         if (_offered is not { } wanted) return;
 
-        // Outward and fainter, so what is left is a glow rather than an outline.
         for (int ring = Rings; ring >= 1; ring--)
         {
             double fade = 0.30 * (Rings - ring + 1) / Rings;

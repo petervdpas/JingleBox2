@@ -19,8 +19,10 @@ public static class InstrumentDragData
         DataFormat.CreateInProcessFormat<Payload>(FormatName);
 
     /// <summary>A drag format has to carry a reference type, so the index travels wrapped.</summary>
+    /// <param name="Index">Where the instrument sits in the song's list.</param>
     public sealed record Payload(int Index);
 
+    /// <summary>What to put in the hand when a drag of that instrument starts.</summary>
     public static IDataTransfer For(int instrumentIndex)
     {
         var transfer = new DataTransfer();

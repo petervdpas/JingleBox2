@@ -30,8 +30,23 @@ public sealed partial class TakeFilter : ObservableObject
     /// <summary>And for the takes nobody has put in a category yet.</summary>
     public const string Uncategorized = "Uncategorized";
 
+    /// <summary>
+    /// The shelf itself, held rather than copied.
+    /// </summary>
+    /// <remarks>
+    /// Every filter over a shelf watches the same collection, so a take recorded or deleted on
+    /// RECORD reaches the pickers on the machines without anybody telling them.
+    /// </remarks>
     private readonly ObservableCollection<Recording> _shelf;
 
+    /// <summary>
+    /// Puts a filter in front of that shelf, showing everything on it to begin with.
+    /// </summary>
+    /// <remarks>
+    /// The shelf is watched from here on, and so is every take on it, because a category is a
+    /// fact about a take rather than a list kept anywhere: filing one somewhere else has to
+    /// reach every filter that could be showing it.
+    /// </remarks>
     public TakeFilter(ObservableCollection<Recording> shelf)
     {
         _shelf = shelf;
@@ -52,6 +67,12 @@ public sealed partial class TakeFilter : ObservableObject
     /// <summary>What the list can be narrowed to: everything, the uncategorized, or one category.</summary>
     public ObservableCollection<string> Filters { get; } = new();
 
+    /// <summary>Which of those is picked, and so what the list is narrowed to.</summary>
+    /// <remarks>
+    /// It falls back to <see cref="AllTakes"/> when what it names is gone, since the last take
+    /// out of a category takes the category with it and a filter naming nothing would show an
+    /// empty shelf with no way to say why.
+    /// </remarks>
     [ObservableProperty] private string filter = AllTakes;
 
     /// <summary>Part of a name to look for, or empty to look for nothing in particular.</summary>
@@ -72,10 +93,20 @@ public sealed partial class TakeFilter : ObservableObject
         Restock();
     }
 
+    /// <summary>Picking a different category shows a different set of takes and nothing else.</summary>
     partial void OnFilterChanged(string value) => Restock();
 
+    /// <summary>Typing in the search box narrows what is already shown, a letter at a time.</summary>
     partial void OnSearchChanged(string value) => Restock();
 
+    /// <summary>
+    /// A take arrived on the shelf or left it.
+    /// </summary>
+    /// <remarks>
+    /// Every take is watched again rather than only the ones the event names, because the event
+    /// says nothing on a reset and a take watched twice costs nothing: <see cref="Watch"/>
+    /// unsubscribes before it subscribes.
+    /// </remarks>
     private void OnShelfChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         foreach (var take in _shelf) Watch(take);
@@ -83,17 +114,33 @@ public sealed partial class TakeFilter : ObservableObject
         Sort();
     }
 
+    /// <summary>Listens to one take, having first stopped listening, so it is heard once.</summary>
     private void Watch(Recording take)
     {
         take.PropertyChanged -= OnTakeChanged;
         take.PropertyChanged += OnTakeChanged;
     }
 
+    /// <summary>
+    /// A take was filed somewhere else, which can make a category or take the last one away.
+    /// </summary>
+    /// <remarks>
+    /// Only the category is worth listening for. A take renamed or replayed changes nothing
+    /// about which list it belongs in, and sorting on every property a take has would rebuild
+    /// the list while somebody was reading it.
+    /// </remarks>
     private void OnTakeChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(Recording.Category)) Sort();
     }
 
+    /// <summary>
+    /// Reads the categories off the takes and offers them, since nothing else holds the list.
+    /// </summary>
+    /// <remarks>
+    /// The last take out of a category takes the category with it, and would take the list with
+    /// it as well, so a filter naming one that has gone falls back to <see cref="AllTakes"/>.
+    /// </remarks>
     private void RefreshCategories()
     {
         var found = _shelf
@@ -106,7 +153,6 @@ public sealed partial class TakeFilter : ObservableObject
         Sync(Categories, found);
         Sync(Filters, new[] { AllTakes, Uncategorized }.Concat(found).ToList());
 
-        // The last take out of a category takes the category with it, and the filter with it.
         if (!Filters.Contains(Filter)) Filter = AllTakes;
     }
 
@@ -130,8 +176,14 @@ public sealed partial class TakeFilter : ObservableObject
         OnPropertyChanged(nameof(Showing));
     }
 
+    /// <summary>Whether a take survives both halves of the narrowing at once.</summary>
     private bool Passes(Recording take) => InCategory(take) && Named(take);
 
+    /// <summary>Whether a take is in the category the picker names.</summary>
+    /// <remarks>
+    /// Compared with <see cref="StringComparison.Ordinal"/>, because a category is what somebody
+    /// typed and two spellings that differ in case are two categories, however alike they read.
+    /// </remarks>
     private bool InCategory(Recording take) => Filter switch
     {
         Uncategorized => take.Category.Length == 0,
@@ -139,6 +191,11 @@ public sealed partial class TakeFilter : ObservableObject
         var category => string.Equals(take.Category, category, StringComparison.Ordinal)
     };
 
+    /// <summary>Whether a take's name carries what is being looked for.</summary>
+    /// <remarks>
+    /// Case is ignored here and the culture's rules are used, unlike the category test: this is
+    /// somebody hunting for a word they half remember rather than naming a thing exactly.
+    /// </remarks>
     private bool Named(Recording take) =>
         Search.Length == 0 ||
         take.Name.Contains(Search, StringComparison.CurrentCultureIgnoreCase);

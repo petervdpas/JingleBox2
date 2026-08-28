@@ -52,17 +52,23 @@ public sealed class DefaultLayout
     /// <summary>What has been seen on each device, and what it turned out to be.</summary>
     private readonly Dictionary<string, Device> _devices = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>One controller, and everything seen on it so far.</summary>
     private sealed class Device
     {
+        /// <summary>Its controls, by channel and number.</summary>
         public readonly Dictionary<(int Channel, int Cc), Control> Controls = new();
 
         /// <summary>Bumped whenever a new control turns up, so the places are worked out again.</summary>
         public int Seen;
     }
 
+    /// <summary>One control on one controller, and what it turned out to be.</summary>
     private sealed class Control
     {
+        /// <summary>1 to 16, as the message said it.</summary>
         public int Channel;
+
+        /// <summary>Its controller number, which is half of its address and none of its meaning.</summary>
         public int Cc;
 
         /// <summary>encoder, fader, or nothing while it is still being worked out.</summary>
@@ -71,8 +77,10 @@ public sealed class DefaultLayout
         /// <summary>How it should be read, worked out at the same time as what it is.</summary>
         public ControlPickup Pickup = ControlPickup.Sensed;
 
+        /// <summary>Which way an encoder counts, worked out at the same time.</summary>
         public ControlTurn Turn = ControlTurn.Offset;
 
+        /// <summary>What is watching it, for a device with no file to say.</summary>
         public readonly ControlSense Sense = new();
 
         /// <summary>The mapping handed back for this control, made once and kept.</summary>
@@ -88,7 +96,12 @@ public sealed class DefaultLayout
     /// <remarks>
     /// The same mapping object every time for a given control, which is not tidiness: the router
     /// keeps each mapping's hand state in a table keyed on the mapping itself, so a fresh one per
-    /// message would reset pickup on every message and the knob would jump.
+    /// message would reset pickup on every message and the knob would jump. A control turning up
+    /// that nothing had seen before gives everything a new place among the others, so every
+    /// mapping is worked out again on the next message that mentions it.
+    ///
+    /// A pad or a button is not something a layout has an opinion about. Pressing one nobody has
+    /// assigned should do nothing rather than something surprising.
     /// </remarks>
     public ControlMapping? For(MidiMessage? message)
     {
@@ -114,12 +127,9 @@ public sealed class DefaultLayout
 
                 if (control.Kind.Length == 0) return null;
 
-                // Something new has a place among the others, so everything's place is stale.
                 device.Seen++;
             }
 
-            // A pad or a button is not something a layout has an opinion about: pressing one
-            // nobody assigned should do nothing rather than something surprising.
             if (Job(control.Kind) is not (Mix or Machine)) return null;
 
             if (control.Mapping is not null && control.Made == device.Seen) return control.Mapping;
@@ -161,6 +171,9 @@ public sealed class DefaultLayout
     /// listening twice in a row means a control does nothing for six messages the first time it
     /// is touched, which is long enough to read as broken. This has already listened; the router
     /// is told the answer.
+    ///
+    /// Anything that is neither a position nor a count of notches is a button, and a button is
+    /// not something this has anything to say about.
     /// </remarks>
     private static string Watched(Control control, int value)
     {
@@ -174,13 +187,14 @@ public sealed class DefaultLayout
             ControlPickup.Takeover => "fader",
             ControlPickup.Relative or ControlPickup.Endless => "encoder",
 
-            // A button. Not something this has anything to say about.
             _ => "button"
         };
     }
 
     /// <summary>The mixer, and the machine in front of you. All a layout has to point at.</summary>
     private const string Mix = "mix";
+
+    /// <summary>Whatever face is in front of you, which is what a knob follows.</summary>
     private const string Machine = "machine";
 
     /// <summary>
@@ -196,17 +210,18 @@ public sealed class DefaultLayout
     /// Knobs and encoders share one order rather than having one each, because they are the same
     /// job done two ways. A desk with both would otherwise have two first controls, both pointed
     /// at the same parameter.
+    ///
+    /// A pad and a button get nothing, and so does a modulation strip, which is the one worth
+    /// saying out loud. A strip is picked up exactly as a fader is and it would be easy to file
+    /// it with them, but it is a performance control rather than a mixer one: it springs back, it
+    /// is played while a note sounds, and a track whose level it drove would drop to nothing the
+    /// moment your thumb came off.
     /// </remarks>
     private static string Job(string kind) => kind switch
     {
         "fader" => Mix,
         "knob" or "encoder" => Machine,
 
-        // A pad, a button, and a modulation strip, which is the one worth saying out loud. A
-        // strip is picked up exactly as a fader is and it would be easy to file it with them,
-        // but it is a performance control and not a mixer one: it springs back, it is played
-        // while a note sounds, and a track whose level it drove would drop to nothing the
-        // moment your thumb came off.
         _ => ""
     };
 

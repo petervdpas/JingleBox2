@@ -37,6 +37,7 @@ public class WaveformView : ThemedControl
     /// <summary>Where a pan started, in pixels, or NaN while nothing is being panned.</summary>
     private double _panFrom = double.NaN;
 
+    /// <summary>One cursor for every picture: each instance would otherwise hold a platform handle.</summary>
     private static readonly Cursor PanCursor = new(StandardCursorType.SizeWestEast);
 
     /// <summary>How close a click has to be to a handle to take hold of it.</summary>
@@ -45,6 +46,13 @@ public class WaveformView : ThemedControl
     /// <summary>Handles cannot be dragged onto each other, or the window would vanish.</summary>
     private const double MinGap = 0.005;
 
+    /// <summary>
+    /// Backs <see cref="Peaks"/>: the recording already reduced to one figure per column.
+    /// </summary>
+    /// <remarks>
+    /// A different array is a different recording, so setting this puts the view back to showing
+    /// the whole file. See <see cref="OnPropertyChanged"/>.
+    /// </remarks>
     public static readonly StyledProperty<float[]?> PeaksProperty =
         AvaloniaProperty.Register<WaveformView, float[]?>(nameof(Peaks));
 
@@ -56,21 +64,33 @@ public class WaveformView : ThemedControl
     public static readonly StyledProperty<bool> ShowMarkersProperty =
         AvaloniaProperty.Register<WaveformView, bool>(nameof(ShowMarkers));
 
+    /// <summary>
+    /// Backs <see cref="ShowLoop"/>: the loop's two dashed lines, and their grips.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="ShowMarkers"/> because an instrument can have a window without
+    /// looping in it, and a sliced picture has no window at all but each of its pieces can still
+    /// loop.
+    /// </remarks>
     public static readonly StyledProperty<bool> ShowLoopProperty =
         AvaloniaProperty.Register<WaveformView, bool>(nameof(ShowLoop));
 
+    /// <summary>Backs <see cref="Start"/>, the head of the window as a fraction of the file.</summary>
     public static readonly StyledProperty<double> StartProperty =
         AvaloniaProperty.Register<WaveformView, double>(
             nameof(Start), 0, defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>Backs <see cref="End"/>, its tail.</summary>
     public static readonly StyledProperty<double> EndProperty =
         AvaloniaProperty.Register<WaveformView, double>(
             nameof(End), 1, defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>Backs <see cref="LoopStart"/>, where the loop turns back to.</summary>
     public static readonly StyledProperty<double> LoopStartProperty =
         AvaloniaProperty.Register<WaveformView, double>(
             nameof(LoopStart), 0, defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>Backs <see cref="LoopEnd"/>, where it turns back from.</summary>
     public static readonly StyledProperty<double> LoopEndProperty =
         AvaloniaProperty.Register<WaveformView, double>(
             nameof(LoopEnd), 1, defaultBindingMode: BindingMode.TwoWay);
@@ -115,6 +135,7 @@ public class WaveformView : ThemedControl
         LoopEnd
     }
 
+    /// <summary>Which of the four lines the hand has hold of, and none when it has none.</summary>
     private Handle _dragging = Handle.None;
 
     /// <summary>Which slice point the pointer has hold of, or -1.</summary>
@@ -123,6 +144,16 @@ public class WaveformView : ThemedControl
     /// <summary>The list being watched, so it can be let go of when another arrives.</summary>
     private ObservableCollection<double>? _watching;
 
+    /// <summary>
+    /// Says which properties change the picture, and clips the drawing to the control's own box.
+    /// </summary>
+    /// <remarks>
+    /// Zoomed in, the parts of the file that are off screen are still drawn: a window that
+    /// starts before the left edge is a rectangle beginning at a negative x. Without the clip
+    /// that rectangle lands on whatever the picture happens to be standing next to.
+    ///
+    /// None of these changes the size. A waveform is as big as it is given, whatever is on it.
+    /// </remarks>
     static WaveformView()
     {
         AffectsRender<WaveformView>(
@@ -130,78 +161,87 @@ public class WaveformView : ThemedControl
             StartProperty, EndProperty, LoopStartProperty, LoopEndProperty,
             SlicePointsProperty, SelectedSliceProperty, PlayheadProperty);
 
-        // Zoomed in, the parts of the file that are off screen are still drawn: a window that
-        // starts before the left edge is a rectangle beginning at a negative x. Clipped, so
-        // none of it lands on whatever the picture is standing next to.
         ClipToBoundsProperty.OverrideDefaultValue<WaveformView>(true);
     }
 
+    /// <inheritdoc cref="PeaksProperty"/>
     public float[]? Peaks
     {
         get => GetValue(PeaksProperty);
         set => SetValue(PeaksProperty, value);
     }
 
+    /// <inheritdoc cref="PlaceholderProperty"/>
     public string Placeholder
     {
         get => GetValue(PlaceholderProperty);
         set => SetValue(PlaceholderProperty, value);
     }
 
+    /// <inheritdoc cref="ShowMarkersProperty"/>
     public bool ShowMarkers
     {
         get => GetValue(ShowMarkersProperty);
         set => SetValue(ShowMarkersProperty, value);
     }
 
+    /// <inheritdoc cref="ShowLoopProperty"/>
     public bool ShowLoop
     {
         get => GetValue(ShowLoopProperty);
         set => SetValue(ShowLoopProperty, value);
     }
 
+    /// <summary>The head of the window, as a fraction of the file rather than as a frame.</summary>
     public double Start
     {
         get => GetValue(StartProperty);
         set => SetValue(StartProperty, value);
     }
 
+    /// <summary>Its tail, in the same units.</summary>
     public double End
     {
         get => GetValue(EndProperty);
         set => SetValue(EndProperty, value);
     }
 
+    /// <summary>Where the loop turns back to, kept inside the window it belongs to.</summary>
     public double LoopStart
     {
         get => GetValue(LoopStartProperty);
         set => SetValue(LoopStartProperty, value);
     }
 
+    /// <summary>Where it turns back from.</summary>
     public double LoopEnd
     {
         get => GetValue(LoopEndProperty);
         set => SetValue(LoopEndProperty, value);
     }
 
+    /// <inheritdoc cref="SlicePointsProperty"/>
     public ObservableCollection<double>? SlicePoints
     {
         get => GetValue(SlicePointsProperty);
         set => SetValue(SlicePointsProperty, value);
     }
 
+    /// <inheritdoc cref="SelectedSliceProperty"/>
     public int SelectedSlice
     {
         get => GetValue(SelectedSliceProperty);
         set => SetValue(SelectedSliceProperty, value);
     }
 
+    /// <inheritdoc cref="PlayheadProperty"/>
     public double Playhead
     {
         get => GetValue(PlayheadProperty);
         set => SetValue(PlayheadProperty, value);
     }
 
+    /// <inheritdoc cref="MaxSlicesProperty"/>
     public int MaxSlices
     {
         get => GetValue(MaxSlicesProperty);
@@ -215,12 +255,19 @@ public class WaveformView : ThemedControl
     /// A point moved, arrived or went. The list is the property, so a change to it is a change
     /// to the picture and has to be repainted like any other.
     /// </summary>
+    /// <remarks>
+    /// A new set of peaks also puts the view back to showing the whole file. A different
+    /// recording is a different picture, and being dropped into it eight times magnified at
+    /// somebody else's scroll position tells you nothing about it.
+    ///
+    /// Only one list is watched at a time, and the old one is let go of first: a control handed
+    /// two lists in a row would otherwise go on repainting for the first one for as long as
+    /// anything else held it.
+    /// </remarks>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
 
-        // A different recording is a different picture, and being dropped into it eight times
-        // magnified at somebody else's scroll position tells you nothing about it.
         if (change.Property == PeaksProperty) _view.ZoomTo(WaveformViewport.MinZoom);
 
         if (change.Property != SlicePointsProperty) return;
@@ -232,9 +279,21 @@ public class WaveformView : ThemedControl
         if (_watching != null) _watching.CollectionChanged += OnSlicePointsChanged;
     }
 
+    /// <summary>The list of boundaries was edited by somebody else, so the picture is stale.</summary>
     private void OnSlicePointsChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
         InvalidateVisual();
 
+    /// <summary>
+    /// The recording's shape, with whichever markings it has been given over it.
+    /// </summary>
+    /// <remarks>
+    /// The middle line is drawn under the wave whether or not there is anything to hear.
+    /// Silence at the head and tail of a take is ordinary, and without the line a flat stretch
+    /// reads as nothing having loaded rather than as quiet.
+    ///
+    /// Slicing and the window are alternatives rather than layers: a sliced recording has no
+    /// single window, since each piece is its own.
+    /// </remarks>
     public override void Render(DrawingContext context)
     {
         double width = Bounds.Width;
@@ -256,8 +315,6 @@ public class WaveformView : ThemedControl
             return;
         }
 
-        // Silence at the start and end of a take is common, so the middle line is drawn: a
-        // flat stretch then reads as quiet rather than as nothing loaded.
         double centre = height / 2;
         context.FillRectangle(new SolidColorBrush(palette.Muted, 0.35), new Rect(1, centre, width - 2, 1));
 
@@ -361,8 +418,6 @@ public class WaveformView : ThemedControl
     private void DrawSliceNumbers(
         DrawingContext context, ThemePalette palette, Rect area, IList<double> points)
     {
-        const double Narrowest = 16;
-
         double width = area.Width;
         var brush = new SolidColorBrush(palette.Muted, 0.9);
 
@@ -423,11 +478,30 @@ public class WaveformView : ThemedControl
     /// <summary>How tall the grip on a handle is, and how far up the picture it reaches.</summary>
     private const double GripHeight = 7;
 
+    /// <summary>
+    /// The narrowest a piece can be drawn and still have its number printed inside it.
+    /// </summary>
+    /// <remarks>
+    /// A number in a piece too narrow to hold it sits over its neighbour, where it reads as
+    /// belonging to the wrong one. Better to leave the number off than to print it wrong.
+    /// </remarks>
+    private const double Narrowest = 16;
+
+    /// <summary>
+    /// One of the vertical lines, with a grip at one end of it.
+    /// </summary>
+    /// <remarks>
+    /// A handle that has been scrolled out of the view is left out rather than pinned to the
+    /// edge. Pinned, it looks like something to take hold of, and taking hold of it would point
+    /// at the wrong sample.
+    ///
+    /// The grip is at the foot for a loop and at the head for a boundary, because on a looping
+    /// piece the two lines can lie on the same pixel and something has to say which of them a
+    /// click meant.
+    /// </remarks>
     private static void DrawHandle(
         DrawingContext context, Color colour, double x, Rect area, bool dashed, bool atFoot = false)
     {
-        // Scrolled out of the view. Left where it belongs in the file rather than pinned to the
-        // edge, where it would look like something to take hold of and point at the wrong sample.
         if (x < area.X - 0.5 || x > area.Right + 0.5) return;
 
         var pen = new Pen(new SolidColorBrush(colour, dashed ? 0.9 : 0.75), dashed ? 1 : 1.5)
@@ -438,14 +512,18 @@ public class WaveformView : ThemedControl
         double clamped = Math.Clamp(x, area.X + 1, area.Right - 1);
         context.DrawLine(pen, new Point(clamped, area.Y + 1), new Point(clamped, area.Bottom - 1));
 
-        // A grip, so it is clear the line can be taken hold of. At the foot for a loop and at
-        // the head for a boundary, because on a looping piece the two lines can lie on the same
-        // pixel and something has to say which one a click meant.
         double top = atFoot ? area.Bottom - 1 - GripHeight : area.Y + 1;
 
         context.FillRectangle(new SolidColorBrush(colour, 0.9), new Rect(clamped - 3, top, 6, GripHeight));
     }
 
+    /// <summary>
+    /// What is drawn when there are no peaks: the middle line, and whatever wording was given.
+    /// </summary>
+    /// <remarks>
+    /// The line is drawn even here, so an empty picture and a silent one look alike and neither
+    /// reads as the control having failed.
+    /// </remarks>
     private void DrawPlaceholder(DrawingContext context, ThemePalette palette, Rect area)
     {
         double centre = area.Height / 2;
@@ -494,6 +572,7 @@ public class WaveformView : ThemedControl
         e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed ||
         e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
+    /// <summary>Takes hold of the picture itself, and keeps the pointer until it is let go.</summary>
     private void StartPan(PointerPressedEventArgs e, double x)
     {
         _panFrom = x;
@@ -502,6 +581,14 @@ public class WaveformView : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// What a press means, in order: move the picture, edit the slicing, take hold of a handle.
+    /// </summary>
+    /// <remarks>
+    /// A press that lands on nothing draws the picture along instead, but only while zoomed in:
+    /// with the whole file on screen there is nowhere to move it to, and a drag that did nothing
+    /// would read as the control being dead.
+    /// </remarks>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -526,8 +613,6 @@ public class WaveformView : ThemedControl
 
         _dragging = Nearest(x);
 
-        // Nothing to take hold of here, so the drag moves the picture instead. Only while
-        // zoomed in: with the whole file on screen there is nowhere to move it to.
         if (_dragging == Handle.None && _view.CanPan)
         {
             StartPan(e, x);
@@ -549,12 +634,16 @@ public class WaveformView : ThemedControl
     /// The same gesture both ways round on purpose. A cut and an uncut are the same kind of
     /// thing to want, and asking for them differently, one on the picture and one on a button
     /// somewhere else, makes the picture read as something you can only look at.
+    ///
+    /// A loop handle taken by its grip at the foot of the picture is considered before the
+    /// boundaries are: on a looping piece the two lines can be the same line, and the grips are
+    /// the only thing that tells them apart.
+    ///
+    /// The two ends of the sliced region and the boundaries between pieces drag the same way;
+    /// only what they are next to differs, and <see cref="MovePoint"/> already knows that.
     /// </remarks>
     private void PressedOnSlices(PointerPressedEventArgs e, double x)
     {
-        // A loop handle taken by its grip at the foot of the picture, before the boundaries are
-        // considered: on a looping piece the two lines can be the same line, and the grips are
-        // the only thing that tells them apart.
         if (e.ClickCount < 2 && GrabbedLoop(e, x)) return;
 
         int point = NearestPoint(x);
@@ -570,8 +659,6 @@ public class WaveformView : ThemedControl
 
         if (point >= 0)
         {
-            // The two ends and the boundaries drag the same way; only what they are next to
-            // differs, and MovePoint already knows that.
             _draggingPoint = point;
             e.Pointer.Capture(this);
             MovePoint(point, At(x));
@@ -586,6 +673,13 @@ public class WaveformView : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// Carries on whatever the press started: moving the picture, a boundary, or a handle.
+    /// </summary>
+    /// <remarks>
+    /// A pan is measured against the last position rather than the press, since the scroll it is
+    /// driving has already been clamped and cannot be reconstructed from where the drag began.
+    /// </remarks>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -617,6 +711,7 @@ public class WaveformView : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>Lets go of whatever was being held, and puts the cursor back after a pan.</summary>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -714,6 +809,10 @@ public class WaveformView : ThemedControl
     /// Takes hold of a loop handle when the press was on one of their grips. False when it was
     /// not, and the press goes on to mean whatever else it meant.
     /// </summary>
+    /// <remarks>
+    /// Only the foot of the picture counts, which is where the loop grips are drawn. Anywhere
+    /// higher belongs to the boundaries, and on a looping piece those can be the same line.
+    /// </remarks>
     private bool GrabbedLoop(PointerPressedEventArgs e, double x)
     {
         var points = SlicePoints;
@@ -722,7 +821,6 @@ public class WaveformView : ThemedControl
         if (!ShowLoop || points == null) return false;
         if (selected < 0 || selected >= points.Count - 1) return false;
 
-        // Only the foot of the picture, where the loop grips are drawn.
         if (e.GetPosition(this).Y < Bounds.Height - GripHeight - GrabPixels / 2) return false;
 
         double width = Bounds.Width;
@@ -833,6 +931,10 @@ public class WaveformView : ThemedControl
     /// Cuts a piece in two. Nothing happens outside the sliced region, where a boundary would
     /// belong to no piece, or when there is no room left for another one.
     /// </summary>
+    /// <remarks>
+    /// The new boundary opened a piece before it, and that is the one the click was asking
+    /// about, so it becomes the one being worked on.
+    /// </remarks>
     private void AddPoint(double at)
     {
         var points = SlicePoints;
@@ -849,7 +951,6 @@ public class WaveformView : ThemedControl
 
         points.Insert(index, at);
 
-        // The new boundary opened a piece before it; that is the one the click asked about.
         SelectedSlice = index - 1;
     }
 

@@ -19,18 +19,55 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPluginWindowSource
 {
+    /// <summary>
+    /// Held while the process underneath is being changed or let go: starting again, opening a
+    /// window, disposing. Not held for audio, which is why <see cref="PluginProcess.Enter"/>
+    /// exists.
+    /// </summary>
     private readonly object _gate = new();
+
+    /// <summary>Kept so the plugin can be started again on the same terms it was loaded on.</summary>
     private readonly int _sampleRate;
+
+    /// <summary>The same, and also the size of the shared block, so a restart maps the same shape.</summary>
     private readonly int _maxFrames;
+
+    /// <summary>Whether it was loaded to play notes or to work on audio. A restart must agree.</summary>
     private readonly bool _asInstrument;
+
+    /// <summary>
+    /// A shadow of every parameter that has been moved, from either side.
+    /// </summary>
+    /// <remarks>
+    /// Two jobs. It is what a knob reads when the plugin cannot be asked, so a dead plugin's
+    /// panel still shows what it was set to rather than a page of noughts. And it is what is
+    /// poured back in on a restart, which is why moves the plugin made in its own window are
+    /// written here as well as passed on.
+    /// </remarks>
     private readonly Dictionary<uint, double> _values = new();
 
+    /// <summary>The process the plugin is in, or null while there is none.</summary>
     private PluginProcess? _process;
+
+    /// <summary>
+    /// What the plugin exposes, read once when it loaded and kept. Asking a plugin in another
+    /// process for its list is a round trip, and Serum answers with 2622 of them.
+    /// </summary>
     private PluginParameter[] _parameters = Array.Empty<PluginParameter>();
+
+    /// <summary>The window that is open on the plugin, if one is.</summary>
     private BridgedEditor? _editor;
+
+    /// <summary>
+    /// The last patch known about: what was loaded in, or what was last read out. Put back
+    /// first on a restart, since a patch moves every parameter at once.
+    /// </summary>
     private byte[]? _state;
+
+    /// <summary>Set once this has been let go, so a restart cannot raise the dead.</summary>
     private bool _disposed;
 
+    /// <summary>Takes a process that has already loaded the plugin and said hello.</summary>
     private BridgedPlugin(PluginInfo info, PluginProcess process, int sampleRate, int maxFrames, bool asInstrument)
     {
         Info = info;
@@ -41,9 +78,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         Adopt(process);
     }
 
+    /// <inheritdoc/>
     public PluginInfo Info { get; }
 
-    /// <summary>True while the plugin's process is up and taking audio.</summary>
+    /// <inheritdoc/>
+    /// <remarks>True while the plugin's process is up and taking audio.</remarks>
     public bool IsActive => _process?.Alive == true;
 
     /// <summary>Which process this plugin actually is, for a log or a list of what is running.</summary>
@@ -62,6 +101,18 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     public event Action? Stopped;
 
     /// <summary>Opens a plugin in a process of its own.</summary>
+    /// <remarks>
+    /// Null when the process would not start or the plugin would not load in it, which are the
+    /// same answer here: there is no plugin. Nothing is thrown, because a plugin that will not
+    /// load is an ordinary thing to find on somebody's machine.
+    /// </remarks>
+    /// <param name="info">Which plugin, and in which format.</param>
+    /// <param name="sampleRate">What the audio is running at over here.</param>
+    /// <param name="maxFrames">The most frames one crossing carries, and the size of the shared block.</param>
+    /// <param name="asInstrument">
+    /// True to play notes, false to work on audio that is handed to it. A plugin that can do
+    /// both is told which of them it is being used as.
+    /// </param>
     public static BridgedPlugin? Load(PluginInfo info, int sampleRate, int maxFrames, bool asInstrument)
     {
         var process = PluginProcess.Start(info, sampleRate, maxFrames, asInstrument);
@@ -69,6 +120,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         return process == null ? null : new BridgedPlugin(info, process, sampleRate, maxFrames, asInstrument);
     }
 
+    /// <summary>
+    /// Takes up a freshly started process: its parameters, and the three things it says without
+    /// being asked. Used by the constructor and by <see cref="Restart"/>, so a plugin started
+    /// again is wired exactly as one started for the first time.
+    /// </summary>
     private void Adopt(PluginProcess process)
     {
         _process = process;
@@ -80,10 +136,13 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     }
 
     /// <summary>Everything about the plugin may have changed, which is a preset having arrived.</summary>
+    /// <remarks>
+    /// Nothing that was known about its knobs is worth keeping: a preset moves all of them at
+    /// once, so the shadow is emptied and the values are asked for again on the next look
+    /// rather than compared against what they used to be.
+    /// </remarks>
     private void OnReloaded()
     {
-        // Nothing that was known about its knobs is worth keeping. They are asked for again on
-        // the next look rather than compared against what they used to be.
         lock (_values) _values.Clear();
 
         Reloaded?.Invoke();
@@ -110,6 +169,10 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     /// <summary>Raised when the plugin moves one of its own knobs. Not on the drawing thread.</summary>
     public event Action<uint, double>? Edited;
 
+    /// <summary>
+    /// The process has gone. Writes down why in words fit for a page, tells the window there is
+    /// nothing behind it any more, and says so.
+    /// </summary>
     private void OnDied()
     {
         var process = _process;
@@ -166,8 +229,17 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Answered from the list read when the plugin loaded, not asked for again.</remarks>
     public IReadOnlyList<PluginParameter> Parameters() => _parameters;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A round trip to another process, so it is asked with the short patience: this is called
+    /// from the thread that draws. A plugin that will not answer falls back to the shadow copy,
+    /// which is the last value anybody set or the plugin reported, and that is a better answer
+    /// for a panel than nought.
+    /// </remarks>
     public double ValueOf(uint id)
     {
         var answer = Ask(BridgeCall.ValueOf, BridgeBody.Number(id, 0));
@@ -184,6 +256,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         return value;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Only the plugin knows how it words a value, so there is nothing to fall back to: a
+    /// plugin that cannot be asked gives an empty string and the panel prints the number.
+    /// </remarks>
     public string TextFor(uint id, double value)
     {
         var answer = Ask(BridgeCall.TextFor, BridgeBody.Number(id, value));
@@ -195,6 +272,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         return words.Length > 0 ? words[0] : "";
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Written into the shadow copy before it is sent, so it survives the plugin dying on the
+    /// way and comes back with it.
+    /// </remarks>
     public void SetValue(uint id, double value)
     {
         lock (_values) _values[id] = value;
@@ -202,8 +284,21 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         Send(BridgeCall.SetValue, BridgeBody.Number(id, value));
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Asks the other side to hand everything queued to the plugin now rather than waiting for
+    /// the next block, which matters for a plugin on a track nobody is playing.
+    /// </remarks>
     public void FlushParameters() => Send(BridgeCall.Flush, null);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The slow one: a patch is hundreds of kilobytes for some plugins and is read whole across
+    /// the wire, so it gets the long patience. What comes back is kept, both as the answer and
+    /// as what a restart pours back in. A plugin that will not answer gives up the last patch
+    /// known about rather than nothing, since nothing would be written into a song as a plugin
+    /// with no sound in it.
+    /// </remarks>
     public byte[] SaveState()
     {
         var answer = Ask(BridgeCall.SaveState, null);
@@ -215,6 +310,12 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         return answer.Payload;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Kept here as well as sent, so a plugin that has to be started again comes back with the
+    /// patch it was given. An empty lump is remembered and not sent: there is nothing in it to
+    /// put back.
+    /// </remarks>
     public void LoadState(byte[]? state)
     {
         _state = state;
@@ -224,6 +325,12 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         Send(BridgeCall.LoadState, state);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Queued into the shared block rather than sent as a message, so it costs no round trip
+    /// and is applied by the other side immediately before the block it belongs to. A dead
+    /// plugin swallows it.
+    /// </remarks>
     public void NoteOn(int semitone, float velocity)
     {
         var process = _process;
@@ -235,6 +342,8 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         process.Block.Queue(BridgeEvent.NoteOn, (uint)Math.Clamp(semitone, 0, 127), velocity);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>Queued the same way as the press, so the two halves of a key cannot cross.</remarks>
     public void NoteOff(int semitone)
     {
         var process = _process;
@@ -243,6 +352,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         process.Block.Queue(BridgeEvent.NoteOff, (uint)Math.Clamp(semitone, 0, 127), 0);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// One event rather than one per note, since the plugin knows what it is sounding and this
+    /// side does not.
+    /// </remarks>
     public void AllNotesOff()
     {
         var process = _process;
@@ -253,20 +367,21 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         process.Block.Queue(BridgeEvent.AllNotesOff, 0, 0);
     }
 
-    /// <summary>
-    /// Runs a block of a track's audio through the plugin, over in the other process.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
-    /// A dead plugin leaves the buffer exactly as it found it, which is the track carrying on
-    /// without the effect rather than the track going silent.
+    /// Runs the block through the plugin over in the other process. A dead plugin leaves the
+    /// buffer exactly as it found it, which is the track carrying on without the effect rather
+    /// than the track going silent.
+    ///
+    /// The process is held open for the whole block and not only for the crossing: the copies
+    /// in and out are into memory the other process shares, and that memory is only freed once
+    /// nobody is inside it.
     /// </remarks>
     public void Process(float[] buffer, int frames)
     {
         var process = _process;
         if (process == null || frames <= 0) return;
 
-        // Held open for the whole block, not just the crossing: the copies in and out are into
-        // memory the other process shares, and that memory only goes when nobody is in it.
         if (!process.Enter()) return;
 
         try
@@ -279,6 +394,14 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <summary>
+    /// The crossing itself, for an effect: copy in, ask for a block, copy out.
+    /// </summary>
+    /// <remarks>
+    /// Broken into chunks no larger than the shared block, since a caller may ask for more
+    /// frames at once than the block was made for. A crossing that fails leaves the rest of the
+    /// buffer as it was, which for an effect is the audio going past untouched.
+    /// </remarks>
     private void Run(PluginProcess process, float[] buffer, int frames)
     {
         int done = 0;
@@ -306,10 +429,12 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
-    /// <summary>
-    /// Fills a block with what the instrument is playing. A dead plugin fills it with silence,
-    /// because there is nothing else in it that could be right.
-    /// </summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Fills the block with what the instrument is playing. A dead plugin fills it with
+    /// silence, because there is nothing else in it that could be right: whatever was in the
+    /// buffer before is somebody else's audio.
+    /// </remarks>
     public void Render(float[] buffer, int frames)
     {
         var process = _process;
@@ -330,6 +455,15 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <summary>
+    /// The crossing for an instrument: the input is cleared rather than copied, since an
+    /// instrument is given nothing and hands back what it is playing.
+    /// </summary>
+    /// <remarks>
+    /// A crossing that fails clears the rest of the buffer. Everything that has already come
+    /// back is kept, so an instrument whose process dies part way through a block ends the
+    /// block rather than repeating whatever was in the buffer.
+    /// </remarks>
     private void Play(PluginProcess process, float[] buffer, int frames)
     {
         int done = 0;
@@ -358,7 +492,16 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
-    /// <summary>Opens the plugin's own interface, over in the process where the plugin is.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Opens the plugin's own interface over in the process where the plugin is, and hands back
+    /// something that speaks to it. Null for a plugin that draws no window of its own, which is
+    /// the panel of knobs being used instead.
+    ///
+    /// A second call takes the first window's editor away from it: the other side keeps one
+    /// interface per plugin and puts it into whichever window asks, so two live editors here
+    /// would both believe they had it.
+    /// </remarks>
     public IPluginEditor? OpenEditor()
     {
         lock (_gate)
@@ -378,6 +521,10 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
         }
     }
 
+    /// <summary>
+    /// Told by a window that it has closed. Only the current one is forgotten, so a window that
+    /// was already replaced cannot take the new one down with it on its way out.
+    /// </summary>
     internal void Forget(BridgedEditor editor)
     {
         lock (_gate)
@@ -404,19 +551,33 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
             : process.Call(call, payload, Patience(call));
     }
 
-    /// <summary>How long this question is worth waiting for.</summary>
+    /// <summary>
+    /// How long this question is worth waiting for.
+    /// </summary>
+    /// <remarks>
+    /// A patch is hundreds of kilobytes for some plugins and is read and written whole, so it
+    /// gets the long patience. Everything else is a number or a short string, asked while
+    /// somebody is looking at the window it is going into, and gets the short one.
+    /// </remarks>
     private static int Patience(BridgeCall call) => call switch
     {
-        // A patch is hundreds of kilobytes for some plugins and is read and written whole.
         BridgeCall.SaveState or BridgeCall.LoadState => PluginBridge.CallTimeoutMilliseconds,
 
-        // Everything else is a number or a short string, asked while somebody is looking at
-        // the window it is going into.
         _ => PluginBridge.QuickTimeoutMilliseconds
     };
 
+    /// <summary>
+    /// Says something to the plugin and throws the answer away. Still a round trip: the other
+    /// side answers everything, and reading the answer is what keeps the two in step.
+    /// </summary>
     private void Send(BridgeCall call, byte[]? payload) => Ask(call, payload);
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Closing on purpose, so <see cref="Stopped"/> is not raised: a plugin taken off a track
+    /// is not news. The window goes first, since a plugin drawing into a window whose plugin
+    /// has been disposed is a crash inside somebody else's toolkit.
+    /// </remarks>
     public void Dispose()
     {
         lock (_gate)
@@ -452,11 +613,27 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 /// </remarks>
 public sealed class BridgedEditor : IPluginEditor
 {
+    /// <summary>The plugin this window belongs to, told when the window has gone.</summary>
     private readonly BridgedPlugin _owner;
+
+    /// <summary>The process to say it to. Held directly, since every call here is one message.</summary>
     private readonly PluginProcess _process;
 
+    /// <summary>
+    /// Set once there is nothing left to talk to, whether the window was closed or the plugin
+    /// died underneath it. Everything after that is refused rather than sent into a dead socket.
+    /// </summary>
     private bool _closed;
 
+    /// <summary>
+    /// Takes the size the plugin asked for when it was opened.
+    /// </summary>
+    /// <remarks>
+    /// A plugin that gives no size gets 640 by 480, which is a window somebody can find and
+    /// resize rather than a strip of nothing. Handing a plugin a window of no size at all is
+    /// close to handing it the one-pixel window Avalonia makes before its first layout, which
+    /// is what used to kill Serum.
+    /// </remarks>
     internal BridgedEditor(BridgedPlugin owner, PluginProcess process, int width, int height)
     {
         _owner = owner;
@@ -467,13 +644,27 @@ public sealed class BridgedEditor : IPluginEditor
         _process.ResizeRequested += OnResizeRequested;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// What the plugin last said it wanted, or last agreed to. It changes underneath the window
+    /// when a plugin resizes itself, which is a preset with a bigger panel arriving.
+    /// </remarks>
     public (int Width, int Height) Size { get; private set; }
 
-    /// <summary>True when the plugin will follow a window being dragged bigger.</summary>
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Answered by the plugin when its interface was opened, and carried across with the size.
+    /// </remarks>
     public bool CanResize { get; internal init; }
 
+    /// <inheritdoc/>
+    /// <remarks>Raised on the bridge's reader thread. Whoever listens gets to their own.</remarks>
     public event Action<int, int>? ResizeRequested;
 
+    /// <summary>
+    /// The plugin asking for a size, passed on once it has been written down here. A window
+    /// that has already closed says nothing: the plugin is talking to a window that is gone.
+    /// </summary>
     private void OnResizeRequested(int width, int height)
     {
         if (_closed || width <= 0 || height <= 0) return;
@@ -483,6 +674,13 @@ public sealed class BridgedEditor : IPluginEditor
         ResizeRequested?.Invoke(width, height);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The handle crosses to the other process and the plugin draws straight into it, which is
+    /// what X11 allows and what makes a plugin's interface possible from out here at all. The
+    /// size the plugin settles on comes back with the answer, since a plugin often has its own
+    /// opinion once it has really drawn.
+    /// </remarks>
     public bool Attach(nint window)
     {
         if (_closed) return false;
@@ -498,6 +696,12 @@ public sealed class BridgedEditor : IPluginEditor
         return true;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Takes the interface back out of the window. The interface itself is left standing over
+    /// there on purpose: see the other side, where building a second one is what silences a
+    /// plugin.
+    /// </remarks>
     public void Detach()
     {
         if (_closed) return;
@@ -505,6 +709,11 @@ public sealed class BridgedEditor : IPluginEditor
         _process.Call(BridgeCall.Detach, null, PluginBridge.WindowTimeoutMilliseconds);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The window was dragged, so the plugin is told to lay itself out again. Sent even to a
+    /// plugin that says it cannot resize, since it is the plugin's business what to do about it.
+    /// </remarks>
     public void Resized(int width, int height)
     {
         if (_closed || width <= 0 || height <= 0) return;
@@ -519,6 +728,13 @@ public sealed class BridgedEditor : IPluginEditor
         _process.ResizeRequested -= OnResizeRequested;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A window that was orphaned has nothing left to tell: the plugin it was showing is gone,
+    /// so the owner is told and no message is sent. Otherwise the interface is put away over
+    /// there and then the owner is told, in that order, so the plugin stops drawing before
+    /// anything else lets go of the window.
+    /// </remarks>
     public void Dispose()
     {
         if (_closed)

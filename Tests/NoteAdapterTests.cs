@@ -18,6 +18,7 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class NoteAdapterTests
 {
+    /// <summary>The plain case: the rack is in front, so both halves of the press go there.</summary>
     [Fact]
     public void A_key_goes_to_the_half_that_is_in_front()
     {
@@ -34,6 +35,7 @@ public class NoteAdapterTests
         Assert.Empty(pattern.Said);
     }
 
+    /// <summary>And the pattern takes them when it is the half in front.</summary>
     [Fact]
     public void And_to_the_other_one_when_that_is_in_front()
     {
@@ -139,7 +141,9 @@ public class NoteAdapterTests
     /// <remarks>
     /// A keyboard that misses a note-off sends the next press of that key with nothing between
     /// them. One release is what arrives, and it has to be enough: a second remembered press
-    /// would leave the first waiting for a release that is never coming.
+    /// would leave the first waiting for a release that is never coming. So both presses go to
+    /// the rack, the release that was owed goes after them, and the one nobody owed goes to the
+    /// half in front rather than nowhere.
     /// </remarks>
     [Fact]
     public void A_key_pressed_twice_takes_one_release()
@@ -157,8 +161,6 @@ public class NoteAdapterTests
         adapter.ReleaseNote(new Note(48));
         adapter.ReleaseNote(new Note(48));
 
-        // Both presses went to the rack, the release that was owed went after them, and the
-        // one nobody owed went to the half in front rather than nowhere.
         Assert.Equal(new[] { "down 48", "down 48", "up 48" }, rack.Said);
         Assert.Equal(new[] { "up 48" }, pattern.Said);
     }
@@ -188,10 +190,13 @@ public class NoteAdapterTests
     /// <summary>One of the two halves, and what it was told.</summary>
     private sealed class Half : IPlaysNotes
     {
+        /// <summary>Each half of each press this side was handed, in order.</summary>
         public List<string> Said { get; } = new();
 
+        /// <inheritdoc/>
         public void PlayMidiNote(Note note, int volume) => Said.Add("down " + note.Semitone);
 
+        /// <inheritdoc/>
         public void ReleaseMidiNote(Note note) => Said.Add("up " + note.Semitone);
     }
 }

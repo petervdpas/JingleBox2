@@ -15,16 +15,19 @@ namespace JingleBox2.Tests;
 public class PanelKeyboardTests
 {
     /// <summary>Thirty-seven keys starting at octave 4 is C-4 to C-7.</summary>
+    /// <remarks>
+    /// Both ends of that stretch are on show, C-7 being the last key, which is the C on top of
+    /// the three octaves, so neither of them is a reason to move.
+    /// </remarks>
     [Fact]
     public void A_note_already_on_show_moves_nothing()
     {
         Assert.Equal(4, PanelKeyboard.Reveal(new Note(4 * 12), 4));
         Assert.Equal(4, PanelKeyboard.Reveal(new Note(5 * 12 + 7), 4));
-
-        // The last key, which is the C on top of the three octaves.
         Assert.Equal(4, PanelKeyboard.Reveal(new Note(7 * 12), 4));
     }
 
+    /// <summary>Below the keyboard, the note's own octave becomes the leftmost one.</summary>
     [Fact]
     public void A_note_below_puts_its_own_octave_on_the_left()
     {
@@ -46,14 +49,14 @@ public class PanelKeyboardTests
     /// The highest note does not put the keyboard at the highest octave: three octaves starting
     /// at 7 already reach it, and starting at 9 would be a keyboard mostly showing keys that do
     /// not exist.
+    ///
+    /// A note past either end is not a note at all, and moves nothing.
     /// </remarks>
     [Fact]
     public void And_never_past_the_ends_of_the_range()
     {
         Assert.Equal(7, PanelKeyboard.Reveal(new Note(Note.MaxSemitone), 4));
         Assert.Equal(0, PanelKeyboard.Reveal(new Note(Note.MinSemitone), 4));
-
-        // And a note that is out of range is not a note at all.
         Assert.Equal(4, PanelKeyboard.Reveal(new Note(127), 4));
     }
 

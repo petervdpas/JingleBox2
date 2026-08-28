@@ -12,17 +12,28 @@ namespace JingleBox2.Audio.Plugins;
 /// </remarks>
 public static class ClapScanner
 {
+    /// <summary>What a CLAP bundle is called: a shared library on Linux and Windows, a bundle
+    /// directory on macOS, and the same four letters either way.</summary>
     public const string Extension = ".clap";
 
     /// <summary>
     /// Every directory this platform keeps plugins in, plus any the user has added, whether
     /// or not they exist.
     /// </summary>
+    /// <remarks>
+    /// The list is offered whole rather than filtered, since a folder that does not exist today
+    /// is a folder a plugin can be installed into tomorrow. <c>CLAP_PATH</c> is read as well: the
+    /// format says the environment may name more places to look, and some distributions rely on
+    /// nothing else.
+    /// </remarks>
+    /// <param name="extra">
+    /// Folders somebody has added in SETTINGS. They come first, because a person who names a
+    /// folder means it, and a plugin found in two places should be the one they pointed at.
+    /// </param>
     public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
     {
         var paths = new List<string>();
 
-        // The user's own folders come first: someone who names a folder means it.
         if (extra != null)
         {
             foreach (var folder in extra)
@@ -50,8 +61,6 @@ public static class ClapScanner
             paths.Add("/usr/local/lib/clap");
         }
 
-        // The format lets the environment say where else to look, and some distributions
-        // rely on it.
         string? fromEnvironment = Environment.GetEnvironmentVariable("CLAP_PATH");
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
         {
@@ -63,6 +72,11 @@ public static class ClapScanner
     }
 
     /// <summary>Every .clap found on the search paths, sorted by name. Unreadable ones are skipped.</summary>
+    /// <remarks>
+    /// Followed all the way down, because vendors habitually keep their plugins in a folder of
+    /// their own. A directory that cannot be read is one place with no plugins in it rather than
+    /// a reason for the application to have no plugins at all, so it is stepped over in silence.
+    /// </remarks>
     public static IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null)
     {
         var found = new List<string>();
@@ -74,7 +88,6 @@ public static class ClapScanner
 
             try
             {
-                // Two levels: vendors often keep their plugins in a folder of their own.
                 foreach (var file in Directory.EnumerateFiles(directory, "*" + Extension, SearchOption.AllDirectories))
                 {
                     if (seen.Add(file)) found.Add(file);
@@ -82,8 +95,6 @@ public static class ClapScanner
             }
             catch (Exception)
             {
-                // A directory that cannot be read is one place with no plugins in it, not a
-                // reason for the app to have no plugins at all.
             }
         }
 
@@ -91,6 +102,10 @@ public static class ClapScanner
         return found;
     }
 
+    /// <summary>
+    /// Joins a root that may be missing to the rest of a path. A root the platform does not
+    /// define adds nothing rather than adding a relative path nobody meant.
+    /// </summary>
     private static void Add(List<string> paths, string? root, params string[] parts)
     {
         if (string.IsNullOrWhiteSpace(root)) return;

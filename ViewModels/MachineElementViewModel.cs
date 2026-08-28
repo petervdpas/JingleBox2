@@ -50,6 +50,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     private const string RowsKey = "rows";
 
+    /// <inheritdoc cref="RowsKey"/>
     private const string ColumnsKey = "columns";
 
     /// <summary>
@@ -87,6 +88,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     private const string PresetsSaid = "The machine's own presets";
 
+    /// <inheritdoc cref="PresetsSaid"/>
     private const string TakesSaid = "Your recordings";
 
     /// <summary>Which of the two this picker browses.</summary>
@@ -148,6 +150,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
         }
     }
 
+    /// <inheritdoc cref="Parent"/>
     private MachineElementViewModel? parent;
 
     /// <summary>Which kind of thing this is, by the names in <see cref="MachineElementKinds"/>.</summary>
@@ -416,7 +419,17 @@ public sealed partial class MachineElementViewModel : ObservableObject
 /// </remarks>
 public sealed partial class MachineElementPropertyViewModel : ObservableObject
 {
+    /// <summary>The element whose properties this row is one of, edited in place.</summary>
     private readonly MachineElement element;
+
+    /// <summary>
+    /// Which entry the row is on.
+    /// </summary>
+    /// <remarks>
+    /// Kept here rather than read off the dictionary, because a dictionary entry has no identity:
+    /// renaming one is removing and adding, and a row that looked its key up would lose track of
+    /// itself half way through.
+    /// </remarks>
     private string key;
 
     /// <summary>Takes the row on to an element and the key it is showing.</summary>

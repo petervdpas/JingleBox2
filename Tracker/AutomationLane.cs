@@ -36,8 +36,11 @@ public enum AutomationPlay
 /// driving hertz or decibels: <see cref="IControlTarget"/> carries the range and converts. That
 /// also means a lane survives a machine widening a parameter in a later version.
 /// </remarks>
+/// <param name="Time">When, in lines from the top of the pattern.</param>
+/// <param name="Value">How far, normalised nought to one.</param>
 public readonly record struct AutomationPoint(double Time, double Value)
 {
+    /// <summary>The same point held inside its bounds, for anything arriving from outside.</summary>
     public AutomationPoint Clamped() =>
         new(Math.Max(0, Time), Math.Clamp(Value, 0, 1));
 }
@@ -66,6 +69,7 @@ public sealed class AutomationLane
     /// <summary>Which track's parameter this is about, counted from zero.</summary>
     public int Track { get; set; }
 
+    /// <summary>How it gets from one point to the next. Straight lines unless somebody says otherwise.</summary>
     public AutomationPlay Play { get; set; } = AutomationPlay.Lines;
 
     /// <summary>
@@ -110,8 +114,17 @@ public sealed class AutomationLane
     /// </remarks>
     private readonly List<AutomationPoint> _points = new();
 
+    /// <summary>The points, to be read. <see cref="Put"/> is the only way one goes in.</summary>
     public IReadOnlyList<AutomationPoint> Points => _points;
 
+    /// <summary>
+    /// True for a lane with nothing in it, which says nothing and moves nothing.
+    /// </summary>
+    /// <remarks>
+    /// A lane is never left in this state deliberately: adding one gives it a point holding
+    /// where the parameter already stands, since a lane that listed as automated and moved
+    /// nothing would be a control nobody could account for.
+    /// </remarks>
     public bool IsEmpty => _points.Count == 0;
 
     /// <summary>Which kinds can be a lane at all.</summary>
@@ -170,17 +183,24 @@ public sealed class AutomationLane
     }
 
     /// <summary>The lane a mapping would make, for a track, with nothing in it yet.</summary>
+    /// <remarks>
+    /// Two mappings answer null and both are refusals rather than failures.
+    ///
+    /// A track below nought is nowhere, with one exception: the master is a strip without being
+    /// a track, and <see cref="TrackerPlayer.MasterStrip"/> is the only number down there that
+    /// means anything. That is why a lane names a strip rather than a track, and why a master
+    /// lane stays put when tracks are removed or reordered.
+    ///
+    /// And a link on an instrument that names no parameter means the third knob on whatever face
+    /// is in front of you, which is a fact about a hand rather than about a song. There is
+    /// nothing to write down, because the face will be a different one tomorrow.
+    /// </remarks>
     public static AutomationLane? For(ControlMapping mapping, int track)
     {
         if (mapping is null || !Automatable(mapping.Kind)) return null;
 
-        // The master is a strip without being a track, and it is the only thing below nought
-        // that means anything. Anything else there is a mistake rather than a place.
         if (track < 0 && track != TrackerPlayer.MasterStrip) return null;
 
-        // A link that names no parameter means the third knob on whatever face is in front of
-        // you, which is a fact about a hand and not about a song. There is nothing to write
-        // down: the face will be a different one tomorrow.
         if (mapping.Kind == ControlKind.Instrument && mapping.Key.Length == 0) return null;
 
         return new AutomationLane
@@ -238,6 +258,7 @@ public sealed class AutomationLane
         return gone;
     }
 
+    /// <summary>Empties the lane without taking it out of the pattern.</summary>
     public void Clear() => _points.Clear();
 
     /// <summary>
@@ -282,6 +303,14 @@ public sealed class AutomationLane
         _points.RemoveAll(one => one.Time >= lines);
     }
 
+    /// <summary>
+    /// A lane of its own, about the same parameter, holding the same points.
+    /// </summary>
+    /// <remarks>
+    /// What a history step keeps. A lane is edited in place, so a step holding the live one
+    /// would hold whatever it became rather than what it was, and undo would put the present
+    /// back.
+    /// </remarks>
     public AutomationLane Clone()
     {
         var copy = new AutomationLane
@@ -338,6 +367,12 @@ public sealed class AutomationLane
     }
 
     /// <summary>The point at a time, or the complement of where it would go.</summary>
+    /// <remarks>
+    /// A binary search, which is only correct because the list is kept sorted, and it is what
+    /// keeps the list sorted: everything that puts a point in inserts at the place this names.
+    /// Times are compared exactly, which is right here because a time comes off a line number
+    /// rather than out of any arithmetic.
+    /// </remarks>
     private int IndexOf(double time)
     {
         int low = 0;

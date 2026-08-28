@@ -44,7 +44,11 @@ public sealed class MidiControlRouter
     /// <summary>Where a hand last had one control, and whether it has caught up yet.</summary>
     private sealed class Hand
     {
+        /// <summary>Where the knob was last message, in the parameter's own units.</summary>
+        /// <remarks>Not a number until the first message: there is no side to be on yet.</remarks>
         public double Last = double.NaN;
+
+        /// <summary>True once the hand has passed the value and is driving it.</summary>
         public bool Caught;
 
         /// <summary>Whether a button is down, so a press is told from being held.</summary>
@@ -70,10 +74,29 @@ public sealed class MidiControlRouter
         /// Once per hunt, not once per message. A hand on a knob sends a hundred a second and
         /// every one of them is reaching, so saying so each time would bury the log in the one
         /// situation somebody is reading it to understand.
+        ///
+        /// It was the one outcome on this path that was never said anywhere. A control that picks
+        /// up does nothing at all until your hand passes the value the parameter already holds,
+        /// which is correct and is what a hardware desk does, and from outside is
+        /// indistinguishable from a link that has stopped working. Every other outcome here
+        /// writes a line; this one raised an event nobody had subscribed to.
         /// </remarks>
         public bool Told;
     }
 
+    /// <param name="mappings">
+    /// Asked per message rather than held, because a link made a second ago has to answer now.
+    /// </param>
+    /// <param name="learned">
+    /// Told when a control turned out to be something, so the answer can be written down. What is
+    /// worked out here is written onto the mapping, which is the settings' own object, so all
+    /// this has to do is make the settings be saved.
+    /// </param>
+    /// <param name="targets">
+    /// The application, as things stand this second: what a mapping turns into when it is
+    /// answered. The router knows mappings and nothing else.
+    /// </param>
+    /// <param name="layout">What a control does before anybody has pointed it at anything.</param>
     public MidiControlRouter(Func<IReadOnlyList<ControlMapping>> mappings, IControlTargets targets,
                              Action? learned = null, DefaultLayout? layout = null)
     {
@@ -131,6 +154,26 @@ public sealed class MidiControlRouter
         hand.Last = double.NaN;
     }
 
+    /// <summary>
+    /// Moves whatever this message is pointed at, and nothing when it is pointed at nothing.
+    /// </summary>
+    /// <remarks>
+    /// Every mapping that answers, not the first. One knob on two parameters is a thing people do
+    /// on purpose, and it is not this router's place to decide it is a mistake: a link only
+    /// answers while a track is playing its machine, so two links on one knob naming two machines
+    /// make an encoder "the filter, on whatever machine I am looking at".
+    ///
+    /// The default layout is asked last and only when nothing at all answered. Anything anybody
+    /// pointed at anything wins, always, because a link names its parameter and a layout only
+    /// names a place. The first time a control falls back on the layout it is treated as already
+    /// caught: the layout has just watched three messages of it moving to decide what it is, so
+    /// the hand is demonstrably on it, and made to pick up as well it would sit dead until it
+    /// happened to sweep past the parameter, which reads as a control that does not work.
+    ///
+    /// Nothing is said about a control that reaches nothing. <see cref="ControlTargets"/> says it
+    /// already, in the same breath as which track and which machine were asked, which is the half
+    /// worth having.
+    /// </remarks>
     public void Handle(MidiMessage message)
     {
         if (message is null || message.Type != MidiMessageType.ControlChange) return;
@@ -140,8 +183,6 @@ public sealed class MidiControlRouter
 
         bool answered = false;
 
-        // Every mapping that answers, not the first. One knob on two parameters is a thing
-        // people do on purpose, and it is not this router's place to decide it is a mistake.
         foreach (var mapping in mappings)
         {
             if (!mapping.Answers(message)) continue;
@@ -154,41 +195,59 @@ public sealed class MidiControlRouter
             Apply(mapping, target, message.Data);
         }
 
-        // Nobody has pointed this control at anything, so it does what a control of its kind
-        // does by default: a fader is a track's level, an encoder is a knob on the face in
-        // front of you. Anything anybody linked wins, which is why this is asked last and only
-        // when nothing at all answered. See DefaultLayout.
         if (!answered && _layout?.For(message) is { } fallback
                       && _targets.Find(fallback) is { } waiting)
         {
-            // The first time a control falls back on the layout, the hand is demonstrably on
-            // it: the layout has just watched three messages of it moving to decide what it is.
-            // Made to pick up as well, it would sit dead until it happened to sweep past the
-            // parameter, which reads as a control that does not work. The same reasoning, and
-            // the same call, as a link somebody has just made by hand.
             if (!_hands.TryGetValue(fallback, out _)) Caught(fallback);
 
             Apply(fallback, waiting, message.Data);
         }
-
-        // Nothing said about reaching nothing: ControlTargets says it already, in the same
-        // breath as which track and which machine were asked, which is the half worth having.
     }
 
+    /// <summary>
+    /// One message against one thing it is pointed at.
+    /// </summary>
+    /// <remarks>
+    /// The order of the questions here is the whole of the behaviour, and every one of them was
+    /// arrived at from something going wrong.
+    ///
+    /// What kind of control this is comes from the controller's own file where there is one, and
+    /// from watching otherwise. The file wins, because it is a fact about the hardware and the
+    /// other is an inference from three messages, and the inference is blind to the one case that
+    /// matters most: an endless encoder reporting a position is indistinguishable from a fader
+    /// until it comes round, so it is sensed as a fader, saved as one, and every session then
+    /// opens with a hunt for the value using a knob that has nowhere to hunt from. A saved
+    /// mapping is corrected by this rather than migrated, since the number in the file was a
+    /// guess made before anything knew the device.
+    ///
+    /// Parking is asked before anything else. Nothing a message says can move a parameter past
+    /// its own end, so once a control has driven one into an end the only question left is
+    /// whether this message is still pushing the same way. See <see cref="Parked"/>.
+    ///
+    /// A button is the edge and not the position. A hardware button held down sends the same
+    /// value over and over, so only the change counts, and there is nothing to sense and nothing
+    /// to pick up: a press is a press.
+    ///
+    /// Nothing at all is done with a control until it is known what kind of control it is. Three
+    /// messages, about thirty milliseconds, and holding them back is the point rather than a
+    /// delay to be apologised for: an encoder read as a position throws the parameter to one end
+    /// of its range in front of you. The three that told us are spent, deliberately: they were
+    /// being listened to, not obeyed. Whatever it turned out to be, the hand is on it by then, so
+    /// there is nothing left to pick up from.
+    ///
+    /// A position that crosses more than half the range between two messages ten milliseconds
+    /// apart is not a hand, it is a counter coming round, so the control is read as endless from
+    /// then on, for ever. The wrap is the only moment the difference between an endless knob and
+    /// a fader ever shows.
+    ///
+    /// And when none of that applies the control is still reaching for the value. Where the knob
+    /// is now is written down either way, since it is what the next message is measured against,
+    /// both for the crossing and for the wrap.
+    /// </remarks>
     private void Apply(ControlMapping mapping, IControlTarget target, int data)
     {
         var hand = _hands.GetValue(mapping, _ => new Hand());
 
-        // What the controller's own file says this control is, where there is one, and what was
-        // worked out by watching otherwise. The file wins because it is a fact about the
-        // hardware and the other is an inference from three messages, and the inference is
-        // blind to the one thing that matters most: an endless encoder reporting a position is
-        // indistinguishable from a fader until it comes round, and read as a fader it needs
-        // picking up, which is a hunt with a knob that has nowhere to hunt from.
-        //
-        // A saved mapping is corrected by this rather than migrated. The number in the file was
-        // a guess made before anything knew the device, and the moment a choice of pickup is
-        // offered to a person, that choice has to win over both.
         var pickup = Controllers.ControllerProfiles.Pickup(mapping.Device, mapping.Channel, mapping.Cc)
                      ?? mapping.Pickup;
 
@@ -202,18 +261,12 @@ public sealed class MidiControlRouter
             mapping.Pickup = pickup;
         }
 
-        // Sitting against an end, and still being pushed into it. Nothing a message says can
-        // move a parameter past its own end, so the only question left is whether this message
-        // is still pushing the same way, and until it is not, there is nothing to do.
         if (Parked(hand, mapping, data))
         {
             hand.Was = data;
             return;
         }
 
-        // A button. What matters is the press and not the position, and a hardware button held
-        // down sends the same value over and over, so only the edge counts. Nothing to sense
-        // and nothing to pick up: a press is a press.
         if (mapping.Kind == ControlKind.Action)
         {
             bool down = data >= Still;
@@ -227,9 +280,6 @@ public sealed class MidiControlRouter
             return;
         }
 
-        // Nothing is done with a control until it is known what kind of control it is. Three
-        // messages, about thirty milliseconds, and holding them back is the point: an encoder
-        // read as a position throws the parameter to one end of its range in front of you.
         if (mapping.Pickup == ControlPickup.Sensed)
         {
             if (!hand.Sense.Saw(data)) return;
@@ -237,8 +287,6 @@ public sealed class MidiControlRouter
             mapping.Pickup = hand.Sense.Pickup ?? ControlPickup.Takeover;
             mapping.Turn = hand.Sense.Turn;
 
-            // Whatever it turns out to be, the hand is on it: it has just been turned three
-            // times. Nothing to pick up from.
             hand.Caught = true;
 
             Log.Write(LogArea.Midi, () =>
@@ -247,7 +295,6 @@ public sealed class MidiControlRouter
 
             _learned?.Invoke();
 
-            // The three that told us are spent. They were being listened to, not obeyed.
             return;
         }
 
@@ -260,9 +307,6 @@ public sealed class MidiControlRouter
             return;
         }
 
-        // A knob with no end stop that reports a position anyway. What it sends is a position,
-        // so the movement is the difference between one and the next, and the wrap is unwound:
-        // a step of a hundred and twenty seven down is a step of one up in disguise.
         if (mapping.Pickup == ControlPickup.Endless)
         {
             int step = Step(hand, data);
@@ -276,11 +320,6 @@ public sealed class MidiControlRouter
 
         double wanted = target.Min + Math.Clamp(data / Full, 0, 1) * (target.Max - target.Min);
 
-        // A control that says where it is cannot cross half its range between two messages ten
-        // milliseconds apart. A step that large is a counter coming round, which means the knob
-        // has no end stop and this is not a position after all. It is read as an endless one
-        // from here on, for ever: the wrap is what tells them apart, and there is no other
-        // moment when it shows.
         if (Wrapped(hand, wanted, target))
         {
             mapping.Pickup = ControlPickup.Endless;
@@ -320,17 +359,9 @@ public sealed class MidiControlRouter
             return;
         }
 
-        // Still reaching for it. Where the knob is now is what the next message is measured
-        // against, both for the crossing and for the guard above.
-
         hand.Last = wanted;
         hand.Was = data;
 
-        // Said once, and this is the one thing on this path that was never said anywhere.
-        // A control that picks up does nothing at all until your hand passes the value the
-        // parameter already holds, which is correct and is what a hardware desk does, and from
-        // the outside is indistinguishable from a link that has stopped working. Every other
-        // outcome here writes a line; this one raised an event nobody had subscribed to.
         if (!hand.Told)
         {
             hand.Told = true;
@@ -377,7 +408,9 @@ public sealed class MidiControlRouter
     ///
     /// Which way a message is going is asked of each kind of control in its own words: an
     /// encoder says it outright, a knob that reports positions says it by the difference from
-    /// the last one, and a wrap is unwound before the question is put.
+    /// the last one, and a wrap is unwound before the question is put. Nothing either way is not
+    /// a turn back, so it stays parked; anything the other way takes it off the end and it
+    /// follows again.
     /// </remarks>
     private static bool Parked(Hand hand, ControlMapping mapping, int data)
     {
@@ -385,12 +418,10 @@ public sealed class MidiControlRouter
 
         int going = Going(hand, mapping, data);
 
-        // Nothing either way is not a turn back.
         if (going == 0) return true;
 
         if (going == hand.Against) return true;
 
-        // Turned round. Off the end and following again.
         hand.Against = 0;
 
         return false;
@@ -476,22 +507,27 @@ public sealed class MidiControlRouter
     /// </remarks>
     private static double Notch(IControlTarget target) => (target.Max - target.Min) / Full;
 
+    /// <summary>
+    /// Writes the value, notes whether it landed on an end, and says so once.
+    /// </summary>
+    /// <remarks>
+    /// Landing on an end puts the control aside until it turns round, so nothing it sends
+    /// afterwards can come out the other side. See <see cref="Parked"/>.
+    ///
+    /// One line a message, which is what moved and where to; everything else about the journey is
+    /// only worth saying when something went wrong on it. The log is asked before the line is
+    /// built, unlike almost everywhere else in this application: this is the one that runs per
+    /// message, and the closure holding the target and the mapping is allocated at the call site
+    /// whether or not anybody is reading.
+    /// </remarks>
     private void Put(Hand hand, ControlMapping mapping, int data, IControlTarget target, double value)
     {
         double landed = Math.Clamp(value, target.Min, target.Max);
 
-        // Arrived at an end. From here the control is put aside until it turns round, so that
-        // nothing it sends afterwards can come out the other side.
         hand.Against = landed <= target.Min ? -1 : landed >= target.Max ? 1 : 0;
 
         target.Set(landed);
 
-        // The one line a message earns: what moved, and where to. Everything else about the
-        // journey is only worth saying when something went wrong on it.
-        //
-        // Asked before the line is built, unlike everywhere else. This is the one that runs per
-        // message, and the closure holding the target and the mapping is allocated at the call
-        // whether or not anybody is reading the log.
         if (Log.On(LogArea.Midi))
             Log.Write(LogArea.Midi, () =>
                 "controls: " + target.Name + " moved to " + landed.ToString("0.####")

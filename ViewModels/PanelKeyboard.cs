@@ -28,6 +28,12 @@ public static class PanelKeyboard
     /// Which octave the keyboard has to start at for a note to be on it, moving as little as
     /// it can. A note already showing moves nothing.
     /// </summary>
+    /// <remarks>
+    /// Below the keyboard, the note's own octave becomes the leftmost one. Above it, the note's
+    /// octave becomes the rightmost whole one instead, so the keyboard travels the least
+    /// distance that puts the note on it rather than jumping the note to the far left and
+    /// taking everything under it off the panel.
+    /// </remarks>
     public static int Reveal(Note note, int octave, int keys = Keys)
     {
         if (!note.IsPlayable) return octave;
@@ -39,8 +45,6 @@ public static class PanelKeyboard
 
         int played = note.Semitone / 12;
 
-        // Below, the note's own octave becomes the leftmost. Above, it becomes the rightmost
-        // whole one, so the keyboard travels the least distance that puts the note on it.
         int wanted = note.Semitone < first ? played : played - (keys - 1) / 12 + 1;
 
         return Math.Clamp(wanted, 0, TopOctave);
