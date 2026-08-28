@@ -194,6 +194,8 @@
                         VerticalScrollBarVisibility="Auto">
             <views:PatternGrid x:Name="Grid"
                                Pattern="{Binding CurrentPattern}"
+                               Before="{Binding PatternBefore}"
+                               After="{Binding PatternAfter}"
                                EditCursor="{Binding Cursor, Mode=TwoWay}"
                                PlayingLine="{Binding PlayingLine}"
                                LinesPerBeat="{Binding LinesPerBeat}"

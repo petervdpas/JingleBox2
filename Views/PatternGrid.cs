@@ -40,12 +40,52 @@ public sealed class PatternGrid : ThemedControl
     public static readonly StyledProperty<int> DropTargetTrackProperty =
         AvaloniaProperty.Register<PatternGrid, int>(nameof(DropTargetTrack), -1);
 
+    /// <summary>The pattern before this one in the song, drawn dimmed above line 00.</summary>
+    public static readonly StyledProperty<Pattern?> BeforeProperty =
+        AvaloniaProperty.Register<PatternGrid, Pattern?>(nameof(Before));
+
+    /// <summary>The one after it, drawn dimmed below the last line.</summary>
+    public static readonly StyledProperty<Pattern?> AfterProperty =
+        AvaloniaProperty.Register<PatternGrid, Pattern?>(nameof(After));
+
+    /// <summary>
+    /// Half the height of the window this is being looked at through, less half a row: how far
+    /// the middle of the screen is from either edge.
+    /// </summary>
+    /// <remarks>
+    /// Set by whoever owns the scroll viewer. This control is measured inside one with no
+    /// height limit, so it never learns how tall the hole it is seen through is, and the amount
+    /// of a neighbouring pattern worth drawing is exactly that.
+    /// </remarks>
+    public static readonly StyledProperty<double> HalfViewProperty =
+        AvaloniaProperty.Register<PatternGrid, double>(nameof(HalfView), 0);
+
     static PatternGrid()
     {
         AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty, PlayingLineProperty,
-            LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty);
-        AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty);
+            LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty,
+            BeforeProperty, AfterProperty, HalfViewProperty);
+        AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty,
+            BeforeProperty, AfterProperty, HalfViewProperty);
         FocusableProperty.OverrideDefaultValue<PatternGrid>(true);
+    }
+
+    public Pattern? Before
+    {
+        get => GetValue(BeforeProperty);
+        set => SetValue(BeforeProperty, value);
+    }
+
+    public Pattern? After
+    {
+        get => GetValue(AfterProperty);
+        set => SetValue(AfterProperty, value);
+    }
+
+    public double HalfView
+    {
+        get => GetValue(HalfViewProperty);
+        set => SetValue(HalfViewProperty, value);
     }
 
     public Pattern? Pattern
@@ -112,7 +152,20 @@ public sealed class PatternGrid : ThemedControl
     private Typeface _typeface = new(FontFamily.Default);
 
     /// <summary>Layout for the pattern currently bound, shared with the header control.</summary>
-    public PatternMetrics Metrics => new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0);
+    public PatternMetrics Metrics =>
+        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, PadFor(Before), PadFor(After));
+
+    /// <summary>
+    /// How much room to leave for a neighbouring pattern: half a screen, or as much of it as
+    /// there is, or nothing at all when there is no neighbour.
+    /// </summary>
+    /// <remarks>
+    /// Nothing at all is the case that makes the first and last patterns of a song behave the
+    /// way every tracker's do: the top of the first pattern comes up against the top of the
+    /// window rather than sitting in the middle over a strip of nothing.
+    /// </remarks>
+    private double PadFor(Pattern? neighbour) =>
+        neighbour == null ? 0 : Math.Min(Math.Max(0, HalfView), neighbour.Lines * RowHeight);
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -199,6 +252,10 @@ public sealed class PatternGrid : ThemedControl
 
         int lpb = Math.Max(1, LinesPerBeat);
 
+        // The neighbours first, so the shading and the cursor of the pattern being worked on
+        // are drawn over them rather than under.
+        DrawNeighbours(context, metrics, palette, rowWidth, pattern.Lines);
+
         for (int line = 0; line < pattern.Lines; line++)
         {
             double y = metrics.RowY(line);
@@ -212,31 +269,95 @@ public sealed class PatternGrid : ThemedControl
             if (line == PlayingLine)
                 context.FillRectangle(palette.AccentTint(60), new Rect(0, y, rowWidth, RowHeight));
 
-            DrawText(context, line.ToString("00", CultureInfo.InvariantCulture), 0, y, muted);
-
-            for (int track = 0; track < pattern.TrackCount; track++)
-            {
-                var cell = pattern[line, track];
-
-                DrawText(context, cell.Note.ToString(),
-                    metrics.ColumnX(track, CellColumn.Note), y, cell.Note.IsEmpty ? muted : text);
-
-                DrawText(context, cell.InstrumentText,
-                    metrics.ColumnX(track, CellColumn.Instrument), y,
-                    cell.Instrument == TrackerCell.NoInstrument ? muted : text);
-
-                DrawText(context, cell.VolumeText,
-                    metrics.ColumnX(track, CellColumn.Volume), y,
-                    cell.Volume == TrackerCell.NoVolume ? muted : text);
-
-                DrawText(context, cell.Effect.ToString(),
-                    metrics.ColumnX(track, CellColumn.Effect), y, cell.Effect.IsNone ? muted : text);
-            }
+            DrawRow(context, metrics, pattern, line, y, text, muted);
         }
 
         DrawTrackSeparators(context, metrics, palette, pattern.TrackCount, contentHeight);
         DrawDropTarget(context, metrics, palette, contentHeight);
         DrawCursor(context, metrics, palette, cursor);
+    }
+
+    /// <summary>One line: its number in the gutter and one cell per track.</summary>
+    private void DrawRow(DrawingContext context, PatternMetrics metrics, Pattern pattern,
+        int line, double y, IBrush text, IBrush muted)
+    {
+        DrawText(context, line.ToString("00", CultureInfo.InvariantCulture), 0, y, muted);
+
+        for (int track = 0; track < pattern.TrackCount; track++)
+        {
+            var cell = pattern[line, track];
+
+            DrawText(context, cell.Note.ToString(),
+                metrics.ColumnX(track, CellColumn.Note), y, cell.Note.IsEmpty ? muted : text);
+
+            DrawText(context, cell.InstrumentText,
+                metrics.ColumnX(track, CellColumn.Instrument), y,
+                cell.Instrument == TrackerCell.NoInstrument ? muted : text);
+
+            DrawText(context, cell.VolumeText,
+                metrics.ColumnX(track, CellColumn.Volume), y,
+                cell.Volume == TrackerCell.NoVolume ? muted : text);
+
+            DrawText(context, cell.Effect.ToString(),
+                metrics.ColumnX(track, CellColumn.Effect), y, cell.Effect.IsNone ? muted : text);
+        }
+    }
+
+    /// <summary>
+    /// The end of the pattern before this one above line 00, and the start of the one after it
+    /// below the last line, both dimmed.
+    /// </summary>
+    /// <remarks>
+    /// What the space is for. The cursor stays on the middle of the screen by having half a
+    /// screen of pattern above and below it, and filling that with the song either side is what
+    /// makes it worth having rather than a strip of nothing: the last bar you played into is
+    /// still on screen while you write the first bar of the next.
+    ///
+    /// Dimmed rather than drawn plainly, because these rows are context. Nothing here can be
+    /// typed into or selected, and a click in it lands on the nearest row of the pattern that
+    /// can be: a row that looked the same as the ones you can edit would be a trap.
+    /// </remarks>
+    private void DrawNeighbours(DrawingContext context, PatternMetrics metrics,
+        ThemePalette palette, double rowWidth, int lines)
+    {
+        var ghost = palette.MutedBrush;
+        var text = palette.TextBrush;
+
+        // Faded as a whole rather than by choosing paler colours, so a note that is really
+        // there still reads as one and an empty cell still reads as empty. Picking the muted
+        // colour for everything made a neighbour look exactly like an empty pattern, which is
+        // the one thing it must not look like.
+        using var faded = context.PushOpacity(GhostOpacity);
+
+        if (Before is { } before && metrics.TopPad > 0)
+        {
+            int rows = (int)Math.Ceiling(metrics.TopPad / RowHeight);
+
+            for (int back = 1; back <= rows && back <= before.Lines; back++)
+                DrawGhost(context, metrics, palette, before, before.Lines - back,
+                    metrics.TopPad - back * RowHeight, rowWidth, text, ghost);
+        }
+
+        if (After is { } after && metrics.BottomPad > 0)
+        {
+            int rows = (int)Math.Ceiling(metrics.BottomPad / RowHeight);
+            double first = metrics.RowY(lines);
+
+            for (int ahead = 0; ahead < rows && ahead < after.Lines; ahead++)
+                DrawGhost(context, metrics, palette, after, ahead,
+                    first + ahead * RowHeight, rowWidth, text, ghost);
+        }
+    }
+
+    /// <summary>How much of a neighbouring pattern comes through.</summary>
+    private const double GhostOpacity = 0.4;
+
+    private void DrawGhost(DrawingContext context, PatternMetrics metrics, ThemePalette palette,
+        Pattern pattern, int line, double y, double rowWidth, IBrush text, IBrush muted)
+    {
+        context.FillRectangle(palette.RowShade(0x0A), new Rect(0, y, rowWidth, RowHeight));
+
+        DrawRow(context, metrics, pattern, line, y, text, muted);
     }
 
     /// <summary>

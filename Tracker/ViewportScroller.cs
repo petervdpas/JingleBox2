@@ -49,6 +49,34 @@ public static class ViewportScroller
             metrics.ContentHeight(lines), metrics.RowHeight * DefaultMarginItems);
 
     /// <summary>
+    /// The offset that puts a row on the middle of the screen and leaves it there.
+    /// </summary>
+    /// <remarks>
+    /// What every tracker does, and it is the pattern that moves rather than the cursor: the
+    /// line being worked on stays in the same place, so the eye has one thing to watch instead
+    /// of following a highlight down the screen and being snapped back when it reaches the
+    /// bottom.
+    ///
+    /// The two ends of a pattern are the exception, and deliberately so. There is no offset
+    /// that would put line 00 in the middle, and the way to make one is half a screen of blank
+    /// space above the pattern; Renoise does not do that, and neither does this. So the top
+    /// rows come up from the top edge and the bottom rows run down to the bottom one, and in
+    /// between, which is nearly all of a pattern, the cursor does not move at all.
+    /// </remarks>
+    public static double CentreRow(
+        double viewportHeight, PatternMetrics metrics, int row, int lines)
+    {
+        double content = metrics.ContentHeight(lines);
+        double maxOffset = Math.Max(0, content - viewportHeight);
+
+        if (viewportHeight <= 0 || maxOffset <= 0) return 0;
+
+        double middle = metrics.RowY(row) + metrics.RowHeight / 2;
+
+        return Math.Clamp(middle - viewportHeight / 2, 0, maxOffset);
+    }
+
+    /// <summary>
     /// Keeps a track in view, including its divider and padding. The line numbers scroll with
     /// the pattern rather than being pinned, so the first track counts the gutter as part of
     /// itself: scrolling back to track 0 should put the row numbers back on screen too.

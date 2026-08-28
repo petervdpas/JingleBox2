@@ -89,6 +89,34 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public int PatternLines => CurrentPattern?.Lines ?? 0;
 
     /// <summary>
+    /// What is coming, and what has just been, shown dimmed above and below the pattern being
+    /// worked on. The pattern itself is not dimmed: it is the one you can touch.
+    /// </summary>
+    /// <remarks>
+    /// Whichever pattern really does play next, which is a different question in the two modes
+    /// and is the reason this is not simply the order. In song mode it is the next slot, by its
+    /// place rather than by the pattern, since the same pattern can be in a song twice and what
+    /// follows it is a different answer each time; null at the two ends, because the song does
+    /// not wrap and the first pattern has nothing before it, so its line 00 sits against the top
+    /// of the window the way every tracker's does. In pattern mode the pattern repeats, so what
+    /// comes next is this same pattern from the top, and showing the next slot there would be
+    /// showing something that is not going to be played.
+    /// </remarks>
+    public Pattern? PatternBefore =>
+        PlayMode == TrackerPlayMode.Pattern ? CurrentPattern : Song.PatternAt(OrderIndex - 1);
+
+    public Pattern? PatternAfter =>
+        PlayMode == TrackerPlayMode.Pattern ? CurrentPattern : Song.PatternAt(OrderIndex + 1);
+
+    private void NeighboursMoved()
+    {
+        OnPropertyChanged(nameof(PatternBefore));
+        OnPropertyChanged(nameof(PatternAfter));
+    }
+
+    partial void OnPlayModeChanged(TrackerPlayMode value) => NeighboursMoved();
+
+    /// <summary>
     /// What has been done to this song's patterns, so it can be taken back.
     /// </summary>
     /// <remarks>
@@ -935,7 +963,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 Status = $"Stopped. {failed.Count} instrument file(s) could not be loaded.";
         });
 
-    partial void OnOrderIndexChanged(int value) => CurrentPattern = Song.PatternAt(value);
+    partial void OnOrderIndexChanged(int value)
+    {
+        CurrentPattern = Song.PatternAt(value);
+        NeighboursMoved();
+    }
 
     /// <summary>
     /// Patterns are edited in place, so the one on screen is watched rather than every edit
@@ -948,12 +980,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (oldValue != null) oldValue.Changed -= OnPatternEdited;
         if (newValue != null) newValue.Changed += OnPatternEdited;
+
+        NeighboursMoved();
     }
 
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
 
-    /// <summary>A different song is a different description.</summary>
-    partial void OnSongChanged(Song value) => OnPropertyChanged(nameof(SongDescription));
+    /// <summary>A different song is a different description, and different neighbours.</summary>
+    partial void OnSongChanged(Song value)
+    {
+        OnPropertyChanged(nameof(SongDescription));
+        NeighboursMoved();
+    }
 
     partial void OnSongNameChanged(string value)
     {
@@ -1859,6 +1897,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         // Set outright rather than left to the change hook: restoring the same number is not
         // a change, and the grid would stay empty.
         CurrentPattern = Song.PatternAt(OrderIndex);
+
+        // And for the same reason: the order is what decides what is either side of this
+        // pattern, so a slot added or taken out changes them without the number moving.
+        NeighboursMoved();
     }
 
     /// <summary>

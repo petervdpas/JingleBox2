@@ -55,6 +55,11 @@ public partial class TrackerView : UserControl
             Header.RowHeight = Grid.RowHeight;
         };
 
+        // The viewport is only real once the window has laid itself out, and it changes again
+        // whenever the window is resized or the strip under the pattern grows.
+        GridScroll.GetObservable(ScrollViewer.ViewportProperty)
+            .Subscribe(new AnonymousObserver<Size>(_ => MeasureHalfView()));
+
         // Follow the cursor, and follow the player while it is running.
         Grid.GetObservable(PatternGrid.EditCursorProperty)
             .Subscribe(new AnonymousObserver<PatternCursor>(FollowCursor));
@@ -243,13 +248,34 @@ public partial class TrackerView : UserControl
         if (line >= 0 && ViewModel?.IsPlaying == true) ScrollToRow(line);
     }
 
+    /// <summary>
+    /// Tells the grid how far the middle of the screen is from its edges, which is how much of
+    /// the pattern either side of this one is worth drawing.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in the grid because the grid is measured inside the scroll viewer with
+    /// no height limit and never learns how tall the hole it is seen through is. Re-centred
+    /// afterwards, or resizing the window would leave the cursor wherever the taller pattern
+    /// happened to put it.
+    /// </remarks>
+    private void MeasureHalfView()
+    {
+        double half = Math.Max(0, (GridScroll.Viewport.Height - Grid.RowHeight) / 2);
+
+        if (Math.Abs(half - Grid.HalfView) < 0.5) return;
+
+        Grid.HalfView = half;
+
+        if (ViewModel is { } model) ScrollToRow(model.Cursor.Line);
+    }
+
     private void ScrollToRow(int row)
     {
         var pattern = Grid.Pattern;
         if (pattern == null) return;
 
-        double offset = ViewportScroller.KeepRowVisible(
-            GridScroll.Offset.Y, GridScroll.Viewport.Height, Grid.Metrics, row, pattern.Lines);
+        double offset = ViewportScroller.CentreRow(
+            GridScroll.Viewport.Height, Grid.Metrics, row, pattern.Lines);
 
         SetScrollOffset(offset, GridScroll.Offset.X);
     }

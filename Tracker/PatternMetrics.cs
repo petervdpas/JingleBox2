@@ -7,7 +7,15 @@ namespace JingleBox2.Tracker;
 /// row's height. Pure maths with no drawing in it, so the grid and its header derive their
 /// positions from the same place instead of each keeping a copy that can drift.
 /// </summary>
-public readonly record struct PatternMetrics(double CharWidth, double RowHeight, int TrackCount)
+/// <param name="TopPad">
+/// Space above line 00, where the tail of the pattern before this one in the song is drawn.
+/// Half a viewport of it is what keeps the cursor on the middle of the screen at the top of a
+/// pattern as well as in the thick of one. Nought for the first pattern in a song, which has
+/// nothing before it, and nought for a header, which has no rows to place.
+/// </param>
+/// <param name="BottomPad">The same underneath, for the pattern that comes next.</param>
+public readonly record struct PatternMetrics(
+    double CharWidth, double RowHeight, int TrackCount, double TopPad = 0, double BottomPad = 0)
 {
     /// <summary>Digits in the line number gutter.</summary>
     public const int LineNumberChars = 3;
@@ -35,7 +43,9 @@ public readonly record struct PatternMetrics(double CharWidth, double RowHeight,
 
     public double ContentWidth => GutterWidth + Math.Max(0, TrackCount) * TrackWidth;
 
-    public double ContentHeight(int lines) => Math.Max(0, lines) * RowHeight;
+    /// <summary>The rows, and whatever neighbouring pattern is shown either side of them.</summary>
+    public double ContentHeight(int lines) =>
+        TopPad + Math.Max(0, lines) * RowHeight + BottomPad;
 
     /// <summary>Left edge of a track's divider.</summary>
     public double TrackDividerX(int track) => GutterWidth + track * TrackWidth;
@@ -54,10 +64,10 @@ public readonly record struct PatternMetrics(double CharWidth, double RowHeight,
 
     public double ColumnWidth(CellColumn column) => ColumnWidths[(int)column] * CharWidth;
 
-    public double RowY(int line) => line * RowHeight;
+    public double RowY(int line) => TopPad + line * RowHeight;
 
     public int LineAt(double y, int lines) =>
-        lines <= 0 ? 0 : Math.Clamp((int)(y / RowHeight), 0, lines - 1);
+        lines <= 0 ? 0 : Math.Clamp((int)Math.Floor((y - TopPad) / RowHeight), 0, lines - 1);
 
     public int TrackAt(double x)
     {
