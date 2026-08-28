@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 
-namespace JingleBox2.Models;
+namespace JingleBox2.Audio.Records;
 
 /// <summary>
 /// One take on the shelf: a file this application owns, and what is known about it.
@@ -82,49 +82,7 @@ public sealed partial class Recording : ObservableObject
     /// <remarks>
     /// Every other thing in this app that lands in a list says its own name this way, and this
     /// was the one that did not, so a take picker offered four rows all reading
-    /// "JingleBox2.Models.Recording".
+    /// "JingleBox2.Audio.Records.Recording".
     /// </remarks>
     public override string ToString() => Name;
-}
-
-/// <summary>
-/// A recording's shape, worked out once so a picture of it can be drawn many times.
-/// </summary>
-/// <remarks>
-/// The peaks and not the audio: decoding a take is seconds and there is no reason to do it again
-/// every time a window is resized or a loop point is dragged.
-/// </remarks>
-public class WaveformData
-{
-    /// <summary>The peak of each slice of the recording, in the order they play.</summary>
-    /// <remarks>
-    /// How many slices there are is whatever the reader chose, so a position on the picture is
-    /// worked out from the length rather than from a fixed rate.
-    /// </remarks>
-    public required float[] PeakData { get; set; }
-
-    /// <summary>The recording's own rate, which is what turns a sample number into a time.</summary>
-    public int SampleRate { get; set; }
-
-    /// <summary>How many channels it has.</summary>
-    public int Channels { get; set; }
-
-    /// <summary>Number of sample frames, so this is the length in samples per channel.</summary>
-    public long TotalSamples { get; set; }
-}
-
-/// <summary>
-/// The part of a recording somebody kept, in sample frames.
-/// </summary>
-/// <remarks>
-/// Frames rather than seconds, because this is compared with and turned into positions in the
-/// file, and seconds would put a rounding error between the picture and the sound.
-/// </remarks>
-public class TrimRegion
-{
-    /// <summary>Where it starts.</summary>
-    public long StartSample { get; set; }
-
-    /// <summary>And where it ends. The same as the start means nothing was trimmed.</summary>
-    public long EndSample { get; set; }
 }

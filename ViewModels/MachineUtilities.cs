@@ -15,12 +15,17 @@ using JingleBox2.ViewModels.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio.Records;
 
 namespace JingleBox2.ViewModels;
 
 /// <summary>One recording, and how loud it is.</summary>
 public sealed partial class WaveLevel : ObservableObject
 {
+    /// <summary>The peak normalisation rules. Holds nothing, so one serves the whole object.</summary>
+    private readonly INormalization _levels = new Normalization();
+
     /// <summary>One row of the level tool's list.</summary>
     /// <param name="named">What it is called where it was found.</param>
     /// <param name="path">Where the file really is.</param>
@@ -46,7 +51,7 @@ public sealed partial class WaveLevel : ObservableObject
 
     /// <summary>Its loudest moment in decibels, which is how anybody reads a level.</summary>
     public string PeakText =>
-        Normalization.ToDecibels(Peak).ToString("0.0", CultureInfo.InvariantCulture) + " dB";
+        _levels.ToDecibels(Peak).ToString("0.0", CultureInfo.InvariantCulture) + " dB";
 
     /// <summary>
     /// What this file would move by, once a target has been worked out.
@@ -63,7 +68,7 @@ public sealed partial class WaveLevel : ObservableObject
     /// <summary>What it would move by, with a word rather than a nought for a file that stays.</summary>
     public string GainText => Math.Abs(Gain - 1) < MachineUtilities.SmallestMove
         ? "stays"
-        : Normalization.ToDecibels(Gain).ToString("+0.0;-0.0", CultureInfo.InvariantCulture) + " dB";
+        : _levels.ToDecibels(Gain).ToString("+0.0;-0.0", CultureInfo.InvariantCulture) + " dB";
 }
 
 /// <summary>
@@ -81,6 +86,12 @@ public sealed partial class WaveLevel : ObservableObject
 /// </remarks>
 public sealed partial class MachineUtilities : ObservableObject
 {
+    /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
+    /// <summary>The peak normalisation rules. Holds nothing, so one serves the whole object.</summary>
+    private readonly INormalization _levels = new Normalization();
+
     /// <summary>The waves a preset names.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IPresetWaves WaveFiles = new PresetWaves();
@@ -746,13 +757,18 @@ public sealed partial class MachineUtilities : ObservableObject
     }
 
     /// <summary>The loudest moment in a file, or nought for one that will not read.</summary>
+    /// <remarks>
+    /// Its own reader and its own rules rather than the object's, because it is asked before
+    /// there is an object: the list is built from what is already on disc. Both hold nothing, so
+    /// a second one of each costs nothing.
+    /// </remarks>
     private static double Peak(string path)
     {
         try
         {
-            var (samples, _) = WavFile.Read(path);
+            var (samples, _) = new WavFile().Read(path);
 
-            return Normalization.PeakOf(samples);
+            return new Normalization().PeakOf(samples);
         }
         catch (Exception)
         {
@@ -761,16 +777,16 @@ public sealed partial class MachineUtilities : ObservableObject
     }
 
     /// <summary>Where the loudest moment is to end up, in dBFS.</summary>
-    [ObservableProperty] private double target = Normalization.DefaultTargetDecibels;
+    [ObservableProperty] private double target = Normalization.Target;
 
     /// <summary>Works out what every file would move by, without touching any of them.</summary>
     partial void OnTargetChanged(double value) => Work();
 
     /// <summary>The ends of the target slider, which are the levelling code's own limits.</summary>
-    public double LeastTarget => Normalization.MinTargetDecibels;
+    public double LeastTarget => Normalization.Quietest;
 
     /// <inheritdoc cref="LeastTarget"/>
-    public double MostTarget => Normalization.MaxTargetDecibels;
+    public double MostTarget => Normalization.Loudest;
 
     /// <summary>
     /// True to move the whole set by one gain, false to put every file on the target itself.
@@ -792,17 +808,17 @@ public sealed partial class MachineUtilities : ObservableObject
     /// <summary>What the loudest of them peaks at now.</summary>
     public string LoudestText => Waves.Count == 0
         ? ""
-        : Normalization.ToDecibels(Waves.Max(one => one.Peak)).ToString("0.0", CultureInfo.InvariantCulture) + " dB";
+        : _levels.ToDecibels(Waves.Max(one => one.Peak)).ToString("0.0", CultureInfo.InvariantCulture) + " dB";
 
     /// <summary>What each file would move by, without moving anything.</summary>
     private void Work()
     {
         if (Waves.Count > 0)
         {
-            double whole = Normalization.GainFor(Waves.Max(one => one.Peak), Target);
+            double whole = _levels.GainFor(Waves.Max(one => one.Peak), Target);
 
             foreach (var wave in Waves)
-                wave.Gain = KeepsBalance ? whole : Normalization.GainFor(wave.Peak, Target);
+                wave.Gain = KeepsBalance ? whole : _levels.GainFor(wave.Peak, Target);
         }
 
         OnPropertyChanged(nameof(LoudestText));
@@ -850,11 +866,11 @@ public sealed partial class MachineUtilities : ObservableObject
 
             try
             {
-                var (samples, info) = WavFile.Read(wave.Path);
+                var (samples, info) = _wav.Read(wave.Path);
 
-                Normalization.Apply(samples, wave.Gain);
+                _levels.Apply(samples, wave.Gain);
 
-                WavFile.Write(wave.Path, samples, info.SampleRate, info.Channels);
+                _wav.Write(wave.Path, samples, info.SampleRate, info.Channels);
 
                 moved++;
             }

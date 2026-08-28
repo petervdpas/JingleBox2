@@ -1,8 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -21,6 +22,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class TakeDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
     /// <summary>Builds the window. Its list, its categories and its search are all bound.</summary>
     public TakeDialog()
     {
@@ -37,7 +41,7 @@ public partial class TakeDialog : Window
 
         var dialog = new TakeDialog { DataContext = takes };
 
-        return Dialog.ShowAsync<Recording?>(dialog, null);
+        return Modal.ShowAsync<Recording?>(dialog, null);
     }
 
     /// <summary>

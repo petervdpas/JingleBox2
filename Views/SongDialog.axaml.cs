@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -19,6 +20,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class SongDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
     /// <summary>Builds the window. Its list and its search box are the tracker's own.</summary>
     public SongDialog()
     {
@@ -44,7 +48,7 @@ public partial class SongDialog : Window
 
         dialog.Opened += (_, _) => dialog.FindControl<TextBox>("SearchBox")?.Focus();
 
-        return Dialog.ShowAsync(dialog, false);
+        return Modal.ShowAsync(dialog, false);
     }
 
     /// <summary>

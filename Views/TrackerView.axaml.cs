@@ -17,6 +17,8 @@ using JingleBox2.Music;
 using JingleBox2.UI;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.UI.Interfaces;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 
@@ -37,6 +39,15 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class TrackerView : UserControl
 {
+    /// <summary>What a dragged track carries. Holds nothing, so one serves the page.</summary>
+    private static readonly IDragPayload Tracks = new TrackDragData();
+
+    /// <summary>And what a dragged instrument carries.</summary>
+    private static readonly IDragPayload DraggedInstrument = new InstrumentDragData();
+
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private static readonly IMachineTint Tint = new MachineTint();
+
     /// <summary>Which letter sounds which note.</summary>
     private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
 
@@ -241,7 +252,7 @@ public partial class TrackerView : UserControl
 
         try
         {
-            await DragDrop.DoDragDropAsync(e, InstrumentDragData.For(slot.Index), DragDropEffects.Link);
+            await DragDrop.DoDragDropAsync(e, DraggedInstrument.For(slot.Index), DragDropEffects.Link);
         }
         finally
         {
@@ -276,7 +287,7 @@ public partial class TrackerView : UserControl
 
         try
         {
-            await DragDrop.DoDragDropAsync(e, TrackDragData.For(track), DragDropEffects.Move);
+            await DragDrop.DoDragDropAsync(e, Tracks.For(track), DragDropEffects.Move);
         }
         finally
         {
@@ -329,12 +340,12 @@ public partial class TrackerView : UserControl
     /// </remarks>
     private Control? Carried(DragEventArgs e)
     {
-        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+        int moving = Tracks.IndexFrom(e.DataTransfer);
 
         if (moving >= 0)
             return Picture("Track " + (moving + 1).ToString("00", CultureInfo.InvariantCulture), "", "");
 
-        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        int instrument = DraggedInstrument.IndexFrom(e.DataTransfer);
         if (instrument < 0) return null;
 
         var slot = ViewModel?.Instruments.FirstOrDefault(s => s.Index == instrument);
@@ -366,7 +377,7 @@ public partial class TrackerView : UserControl
             Spacing = 6,
         };
 
-        if (MachineTint.Hue(colour, out var hue))
+        if (Tint.Hue(colour, out var hue))
         {
             row.Children.Add(new Border
             {
@@ -404,7 +415,7 @@ public partial class TrackerView : UserControl
     /// </remarks>
     private void HandleDragOver(DragEventArgs e, int track)
     {
-        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+        int moving = Tracks.IndexFrom(e.DataTransfer);
 
         if (moving >= 0)
         {
@@ -419,7 +430,7 @@ public partial class TrackerView : UserControl
             return;
         }
 
-        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        int instrument = DraggedInstrument.IndexFrom(e.DataTransfer);
         bool valid = instrument >= 0 && track >= 0;
 
         ShowDropTarget(valid ? track : -1);
@@ -445,7 +456,7 @@ public partial class TrackerView : UserControl
     {
         ShowDropTarget(-1);
 
-        int moving = TrackDragData.IndexFrom(e.DataTransfer);
+        int moving = Tracks.IndexFrom(e.DataTransfer);
 
         if (moving >= 0)
         {
@@ -454,7 +465,7 @@ public partial class TrackerView : UserControl
             return;
         }
 
-        int instrument = InstrumentDragData.IndexFrom(e.DataTransfer);
+        int instrument = DraggedInstrument.IndexFrom(e.DataTransfer);
         if (instrument < 0 || track < 0) return;
 
         e.Handled = true;

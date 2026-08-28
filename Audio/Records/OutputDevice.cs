@@ -1,4 +1,4 @@
-namespace JingleBox2.Models;
+namespace JingleBox2.Audio.Records;
 
 /// <summary>
 /// One of the machine's audio outputs, as the settings page and the engine both see it.

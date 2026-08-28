@@ -5,6 +5,8 @@ using System.Text.Json;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -38,7 +40,7 @@ public sealed class PluginCrash
 /// Remembers which plugins have crashed the application while opening their own window, and
 /// refuses to open those again. Stands down while plugins run in their own processes, which
 /// is normally, because then a plugin crashing is not something the application survives by
-/// luck. See <see cref="PluginHost.Isolated"/>.
+/// luck. See <see cref="Interfaces.IPluginHost.Isolated"/>.
 /// </summary>
 /// <remarks>
 /// A plugin runs inside this process, so a plugin that dereferences a null pointer takes the
@@ -56,6 +58,9 @@ public sealed class PluginCrash
 /// </remarks>
 public static class PluginCrashGuard
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private static readonly IPluginHost _plugins = new PluginHost();
+
     /// <summary>
     /// How long a window has to stay up before it counts as having opened. The faults seen so
     /// far happen within a few hundred milliseconds, on the plugin's first timers.
@@ -164,7 +169,7 @@ public static class PluginCrashGuard
             var left = Load<List<PluginCrash>>(MarkerFile);
             if (left == null || left.Count == 0) return;
 
-            if (PluginHost.Isolated)
+            if (_plugins.Isolated)
             {
                 Marks.Clear();
                 Write();
@@ -191,7 +196,7 @@ public static class PluginCrashGuard
     /// <summary>True when this plugin is not to be given a window of its own.</summary>
     public static bool IsBlocked(PluginInfo? plugin)
     {
-        if (plugin == null || PluginHost.Isolated) return false;
+        if (plugin == null || _plugins.Isolated) return false;
 
         Read();
         lock (Gate) return Holds(plugin.Path, plugin.Id);
@@ -203,7 +208,7 @@ public static class PluginCrashGuard
     /// </summary>
     public static bool IsLoadBlocked(PluginInfo? plugin)
     {
-        if (plugin == null || PluginHost.Isolated) return false;
+        if (plugin == null || _plugins.Isolated) return false;
 
         Read();
 
@@ -262,7 +267,7 @@ public static class PluginCrashGuard
     /// </remarks>
     public static void Risky(PluginInfo? plugin, PluginStage stage)
     {
-        if (plugin == null || PluginHost.Isolated) return;
+        if (plugin == null || _plugins.Isolated) return;
 
         Read();
 
@@ -429,7 +434,7 @@ public static class PluginCrashGuard
         try
         {
             string path = System.IO.Path.Combine(Folder, name);
-            JingleBox2.Config.SafeFile.Write(path, JsonSerializer.Serialize(what, Indented));
+            new JingleBox2.Files.SafeFile().Write(path, JsonSerializer.Serialize(what, Indented));
         }
         catch (Exception)
         {

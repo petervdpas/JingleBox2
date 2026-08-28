@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using JingleBox2.Config;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using ManagedBass;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio;
 
@@ -21,6 +20,9 @@ namespace JingleBox2.Audio;
 /// </remarks>
 public sealed class BassAudioEngine : IAudioEngine
 {
+    /// <summary>The add-ons beside the program, loaded once for the process.</summary>
+    private readonly IBassPlugins _plugins = new BassPlugins();
+
     /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
@@ -566,7 +568,7 @@ public sealed class BassAudioEngine : IAudioEngine
     /// beside the program is then the whole of adding a format: the pads play it and the shelf
     /// takes it, without either of them being told it exists.
     /// </remarks>
-    private void LoadPlugins() => BassPlugins.Load();
+    private void LoadPlugins() => _plugins.Load();
 
     /// <inheritdoc/>
     public void EnsureInitialized()

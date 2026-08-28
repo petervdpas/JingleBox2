@@ -8,7 +8,13 @@ namespace JingleBox2.ViewModels.Interfaces;
 /// piece of audio.
 /// </summary>
 /// <remarks>
-/// The host owns the chain and knows what rate it runs at; it does not know what is in it, and
+/// The owner of a chain, and not a plugin host: a plugin host is the program that loads
+/// plugins at all, which here is <see cref="Audio.Plugins.Interfaces.IPluginHost"/>. The two
+/// wore one name for a while and it was the wrong one for this half, since a track owning a
+/// chain hosts nothing and knows nothing about either standard.
+/// </remarks>
+/// <remarks>
+/// The owner owns the chain and knows what rate it runs at; it does not know what is in it, and
 /// the chain does not know what it is hanging off. That is the whole point of the seam. The
 /// tracker points one chain view at the track under the cursor and moves it as the cursor
 /// moves, a pad points one at itself, and the master points one at strip minus one; all three
@@ -19,12 +25,12 @@ namespace JingleBox2.ViewModels.Interfaces;
 /// wanted a name, a chain or a rate. Three small questions on an interface are cheaper than one
 /// class holding a tracker and an audio engine and choosing between them.
 ///
-/// A host is a view onto something that already exists rather than a thing of its own, so it is
+/// An owner is a view onto something that already exists rather than a thing of its own, so it is
 /// cheap to make and can be thrown away and made again: <see cref="TrackPluginTarget"/> holds a
 /// track number and <see cref="PadPluginTarget"/> a pad number, and both go back to the player
 /// or the engine for every answer.
 /// </remarks>
-public interface IPluginHost
+public interface IChainOwner
 {
     /// <summary>What this chain is called on screen: "TR-01", "MASTER", "Pad 03".</summary>
     /// <remarks>

@@ -15,6 +15,8 @@ using System.IO;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.ViewModels;
 
@@ -31,6 +33,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineEditorViewModel : ObservableObject
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>A machine going into a zip and coming back out.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachineArchive Crates = new MachineArchive();
@@ -228,8 +233,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public Color Accent
     {
-        get => Views.MachineTint.Hue(Project?.Theme.Accent, out var hue) ? hue : Colors.Gray;
-        set => Wear(Views.MachineTint.Hex(value));
+        get => _tint.Hue(Project?.Theme.Accent, out var hue) ? hue : Colors.Gray;
+        set => Wear(_tint.Hex(value));
     }
 
     /// <summary>The same colour written down, for somebody who has the number already.</summary>
@@ -242,7 +247,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         get => Project?.Theme.Accent ?? "";
         set
         {
-            if (!Views.MachineTint.Hue((value ?? "").Trim(), out var hue))
+            if (!_tint.Hue((value ?? "").Trim(), out var hue))
             {
                 Status = "'" + value + "' is not a colour, so nothing changed.";
 
@@ -251,7 +256,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
                 return;
             }
 
-            Wear(Views.MachineTint.Hex(hue));
+            Wear(_tint.Hex(hue));
 
             OnPropertyChanged();
         }

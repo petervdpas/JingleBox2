@@ -1,6 +1,6 @@
 using JingleBox2.Audio;
 using JingleBox2.Machines;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,6 +28,9 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 public sealed class TakeLibrary : IMachineTakes
 {
+    /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
 
@@ -165,7 +168,7 @@ public sealed class TakeLibrary : IMachineTakes
 
         try
         {
-            var info = WavFile.ReadInfo(path);
+            var info = _wav.ReadInfo(path);
 
             double seconds = info.SampleRate > 0 ? (double)info.FrameCount / info.SampleRate : 0;
             string channels = info.Channels >= 2 ? "stereo" : "mono";

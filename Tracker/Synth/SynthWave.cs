@@ -20,8 +20,17 @@ public sealed class Oscillator : IOscillator
     };
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// A phase that is not a finite number starts again at nought. It cannot be brought back
+    /// inside the cycle by arithmetic: every comparison against NaN is false, so it passed
+    /// straight through, and infinity took the first branch and came out as infinity less
+    /// infinity, which is NaN as well. Either way the phase is fed back into itself on the next
+    /// sample, so a voice that reached one of those states was silent for the rest of its life.
+    /// </remarks>
     public double Wrap(double phase)
     {
+        if (!double.IsFinite(phase)) return 0.0;
+
         if (phase >= 1.0) phase -= Math.Floor(phase);
         else if (phase < 0.0) phase += Math.Ceiling(-phase);
 

@@ -5,7 +5,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia;
 using JingleBox2.Audio;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System;
@@ -18,6 +18,9 @@ using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 
@@ -33,6 +36,12 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class InstrumentPanel : UserControl
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private readonly IRecordingImport _import = new RecordingImport();
+
     /// <summary>Which letter sounds which note.</summary>
     private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
 
@@ -355,7 +364,7 @@ public partial class InstrumentPanel : UserControl
     private void Later() => Avalonia.Threading.Dispatcher.UIThread.Post(Retint);
 
     /// <summary>Paints the panel in the machine's own colours, mixed against the current theme.</summary>
-    private void Retint() => MachineTint.Apply(this, Editor?.Theme);
+    private void Retint() => _tint.Apply(this, Editor?.Theme);
 
     /// <summary>The instrument being worked on, or nothing when the designer has none.</summary>
     private InstrumentEditorViewModel? Editor => (DataContext as IInstrumentDesigner)?.Editor;
@@ -517,7 +526,7 @@ public partial class InstrumentPanel : UserControl
             {
                 new FilePickerFileType("Samples")
                 {
-                    Patterns = RecordingImport.Kinds.Select(k => "*" + k).ToArray()
+                    Patterns = _import.Kinds.Select(k => "*" + k).ToArray()
                 }
             }
         });

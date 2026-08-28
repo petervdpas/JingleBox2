@@ -6,6 +6,10 @@ using JingleBox2.Tracker.Synth;
 using System.Text.Json;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker;
+using JingleBox2.Config.Interfaces;
+using JingleBox2.Config;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Files;
 
 namespace JingleBox2.Tracker;
 
@@ -40,13 +44,18 @@ public sealed class MachineRack : IMachineRack
     /// Which application folder to sit in. Given rather than fixed so the tests can point the
     /// whole rack at a temporary one.
     /// </param>
-    public MachineRack(string appName = "JingleBox2")
+    /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
+    /// <param name="files">How a file is written whole, defaulted to the real one.</param>
+    public MachineRack(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null)
     {
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        Folder = Path.Combine(baseDir, appName, "instruments");
-        Directory.CreateDirectory(Folder);
+        _files = files ?? new SafeFile();
 
+        Folder = Path.Combine((folder ?? new AppFolder()).Path(appName), "instruments");
+        Directory.CreateDirectory(Folder);
     }
+
+    /// <summary>How a file is written whole, so an instrument save cannot leave half of one.</summary>
+    private readonly ISafeFile _files;
 
     /// <inheritdoc/>
     public string PathFor(string id) => Path.Combine(Folder, id + Extension);
@@ -83,7 +92,7 @@ public sealed class MachineRack : IMachineRack
         if (instrument is null) return;
 
         instrument.EnsureId();
-        Config.SafeFile.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
+        _files.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
     }
 
     /// <inheritdoc/>

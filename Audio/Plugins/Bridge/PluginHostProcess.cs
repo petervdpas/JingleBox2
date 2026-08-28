@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins.Bridge.Enums;
 using System;
 using JingleBox2.Diagnostics;
 using System.Collections.Concurrent;
@@ -8,6 +9,8 @@ using System.Text;
 using System.Threading;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
+using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -26,6 +29,12 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 public static class PluginHostProcess
 {
+    /// <summary>How a message body is written down and read back. Holds nothing, so one is enough.</summary>
+    private static readonly IBridgeBody _body = new BridgeBody();
+
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private static readonly IPluginHost _plugins = new PluginHost();
+
     /// <summary>
     /// Messages read off the socket and waiting for the one thread the plugin may be touched
     /// from. The reader thread never calls into the plugin itself, only puts things here.
@@ -143,7 +152,7 @@ public static class PluginHostProcess
 
         string folder = Environment.GetEnvironmentVariable(PluginBridge.LogFolderVariable) ?? "";
 
-        Log.Open(folder.Length > 0 ? folder : Config.AppFolder.Path(), _trace, LogArea.Plugins);
+        Log.Open(folder.Length > 0 ? folder : new Files.AppFolder().Path(), _trace, LogArea.Plugins);
 
         return args[0] == PluginBridge.ScanArgument ? Scan(args) : Serve(args);
     }
@@ -174,7 +183,7 @@ public static class PluginHostProcess
 
         try
         {
-            var found = PluginHost.ScanHere(folders);
+            var found = new PluginHost().ScanHere(folders);
 
             var json = System.Text.Json.JsonSerializer.Serialize(found);
 
@@ -257,7 +266,7 @@ public static class PluginHostProcess
         if (_plugin == null)
         {
             Say("the plugin would not load");
-            _control.Send(BridgeCall.Fail, BridgeBody.Words("the plugin would not load"));
+            _control.Send(BridgeCall.Fail, _body.Words("the plugin would not load"));
             return 5;
         }
 
@@ -275,7 +284,7 @@ public static class PluginHostProcess
 
         bool hasWindow = _plugin is IPluginWindowSource;
 
-        _control.Send(BridgeCall.Hello, BridgeBody.Words(hasWindow ? "window" : "plain"));
+        _control.Send(BridgeCall.Hello, _body.Words(hasWindow ? "window" : "plain"));
 
         var reader = new Thread(() => Listen(_control)) { IsBackground = true, Name = "bridge control" };
         reader.Start();
@@ -405,7 +414,7 @@ public static class PluginHostProcess
 
             while (Moves.TryDequeue(out var move))
             {
-                try { _control?.Send(BridgeCall.Edited, BridgeBody.Number(move.Id, move.Value)); }
+                try { _control?.Send(BridgeCall.Edited, _body.Number(move.Id, move.Value)); }
                 catch (Exception) { }
             }
 
@@ -469,12 +478,12 @@ public static class PluginHostProcess
         switch (call)
         {
             case BridgeCall.Parameters:
-                control.Send(BridgeCall.Parameters, BridgeBody.Parameters(plugin.Parameters()));
+                control.Send(BridgeCall.Parameters, _body.Parameters(plugin.Parameters()));
                 break;
 
             case BridgeCall.SetValue:
             {
-                var move = BridgeBody.ReadNumber(payload);
+                var move = _body.ReadNumber(payload);
                 plugin.SetValue(move.Id, move.Value);
                 control.Send(BridgeCall.Ok);
                 break;
@@ -482,15 +491,15 @@ public static class PluginHostProcess
 
             case BridgeCall.ValueOf:
             {
-                var ask = BridgeBody.ReadNumber(payload);
-                control.Send(BridgeCall.Value, BridgeBody.Double(plugin.ValueOf(ask.Id)));
+                var ask = _body.ReadNumber(payload);
+                control.Send(BridgeCall.Value, _body.Double(plugin.ValueOf(ask.Id)));
                 break;
             }
 
             case BridgeCall.TextFor:
             {
-                var ask = BridgeBody.ReadNumber(payload);
-                control.Send(BridgeCall.Text, BridgeBody.Words(plugin.TextFor(ask.Id, ask.Value)));
+                var ask = _body.ReadNumber(payload);
+                control.Send(BridgeCall.Text, _body.Words(plugin.TextFor(ask.Id, ask.Value)));
                 break;
             }
 
@@ -513,7 +522,7 @@ public static class PluginHostProcess
                 break;
 
             case BridgeCall.Attach:
-                Attach(control, BridgeBody.ReadHandle(payload));
+                Attach(control, _body.ReadHandle(payload));
                 break;
 
             case BridgeCall.Detach:
@@ -523,7 +532,7 @@ public static class PluginHostProcess
 
             case BridgeCall.Resized:
             {
-                var size = BridgeBody.ReadPair(payload);
+                var size = _body.ReadPair(payload);
                 _editor?.Resized(size.First, size.Second);
                 control.Send(BridgeCall.Ok);
                 break;
@@ -569,7 +578,7 @@ public static class PluginHostProcess
 
             if (editor == null)
             {
-                control.Send(BridgeCall.Fail, BridgeBody.Words("this plugin has no window of its own"));
+                control.Send(BridgeCall.Fail, _body.Words("this plugin has no window of its own"));
                 return;
             }
 
@@ -578,10 +587,10 @@ public static class PluginHostProcess
             _windowMark = PluginRunLoop.Mark();
 
             editor.ResizeRequested += (width, height) =>
-                control.Send(BridgeCall.ResizeRequested, BridgeBody.Pair(width, height));
+                control.Send(BridgeCall.ResizeRequested, _body.Pair(width, height));
         }
 
-        control.Send(BridgeCall.Ok, BridgeBody.Three(editor.Size.Width, editor.Size.Height, editor.CanResize ? 1 : 0));
+        control.Send(BridgeCall.Ok, _body.Three(editor.Size.Width, editor.Size.Height, editor.CanResize ? 1 : 0));
     }
 
     /// <summary>
@@ -601,7 +610,7 @@ public static class PluginHostProcess
 
         if (editor == null || window == 0)
         {
-            control.Send(BridgeCall.Fail, BridgeBody.Words("there is no interface to put in a window"));
+            control.Send(BridgeCall.Fail, _body.Words("there is no interface to put in a window"));
             return;
         }
 
@@ -609,13 +618,13 @@ public static class PluginHostProcess
 
         if (!attached)
         {
-            control.Send(BridgeCall.Fail, BridgeBody.Words("the plugin would not take the window"));
+            control.Send(BridgeCall.Fail, _body.Words("the plugin would not take the window"));
             return;
         }
 
         Say("embedding: " + XEmbed.Complete(window));
 
-        control.Send(BridgeCall.Ok, BridgeBody.Pair(editor.Size.Width, editor.Size.Height));
+        control.Send(BridgeCall.Ok, _body.Pair(editor.Size.Width, editor.Size.Height));
     }
 
     /// <summary>

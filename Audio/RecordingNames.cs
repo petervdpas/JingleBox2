@@ -4,37 +4,47 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 
-/// <summary>
-/// Checks a recording name before it is turned into a file name, and generates the next
-/// name in a "base-001" series. Saving overwrites without asking, so a clash has to be
-/// caught before the take starts rather than after it.
-/// </summary>
-public static class RecordingNameValidator
+/// <inheritdoc/>
+public sealed class RecordingNames : IRecordingNames
 {
-    /// <summary>Why a blank name cannot be used, in the words the page shows.</summary>
+    /// <inheritdoc cref="IRecordingNames.EmptyMessage"/>
     public const string EmptyMessage = "Enter a name for the recording.";
 
-    /// <summary>Why a name holding a character no file name may hold cannot be used.</summary>
+    /// <inheritdoc cref="IRecordingNames.InvalidCharsMessage"/>
     public const string InvalidCharsMessage = "That name cannot be used as a file name.";
 
-    /// <summary>Why a name somebody else's take already has cannot be used.</summary>
+    /// <inheritdoc cref="IRecordingNames.InUseMessage"/>
     public const string InUseMessage = "A recording with this name already exists.";
 
-    /// <summary>The series a take falls into when its name says nothing about one.</summary>
+    /// <inheritdoc cref="IRecordingNames.DefaultBaseName"/>
     public const string DefaultBaseName = "recording";
 
-    /// <summary>Width of the numeric suffix. Numbers past 999 simply grow past it.</summary>
+    /// <inheritdoc cref="IRecordingNames.NumberWidth"/>
     public const int NumberWidth = 3;
+
+    /// <inheritdoc/>
+    string IRecordingNames.EmptyMessage => EmptyMessage;
+
+    /// <inheritdoc/>
+    string IRecordingNames.InvalidCharsMessage => InvalidCharsMessage;
+
+    /// <inheritdoc/>
+    string IRecordingNames.InUseMessage => InUseMessage;
+
+    /// <inheritdoc/>
+    string IRecordingNames.DefaultBaseName => DefaultBaseName;
+
+    /// <inheritdoc/>
+    int IRecordingNames.NumberWidth => NumberWidth;
 
     private static readonly Regex NumberedName = new(@"^(?<base>.*?)-(?<number>\d+)$", RegexOptions.Compiled);
 
-    /// <summary>Returns null when the name can be used, otherwise the reason it cannot.</summary>
-    /// <param name="name">What somebody typed, which is trimmed before it is judged.</param>
-    /// <param name="existingNames">The takes already on the shelf.</param>
-    public static string? Validate(string? name, IEnumerable<string> existingNames)
+    /// <inheritdoc/>
+    public string? Validate(string? name, IEnumerable<string> existingNames)
     {
         string trimmed = (name ?? string.Empty).Trim();
 
@@ -47,12 +57,8 @@ public static class RecordingNameValidator
         return existingNames.Any(n => Matches(n, trimmed)) ? InUseMessage : null;
     }
 
-    /// <summary>
-    /// The series a name belongs to: lowercased, with any "-001" style suffix removed.
-    /// "Jingle-004" and "jingle" both belong to the series "jingle".
-    /// </summary>
-    /// <param name="name">A take's name, or null.</param>
-    public static string BaseNameOf(string? name)
+    /// <inheritdoc/>
+    public string BaseNameOf(string? name)
     {
         string trimmed = (name ?? string.Empty).Trim();
         if (trimmed.Length == 0)
@@ -65,18 +71,8 @@ public static class RecordingNameValidator
         return baseName.Length == 0 ? DefaultBaseName : baseName.ToLowerInvariant();
     }
 
-    /// <summary>
-    /// The next free name in the series <paramref name="baseName"/> belongs to, one past the
-    /// highest number already taken. Numbers are not reused after a delete, so a name never
-    /// points at two different takes over a session.
-    /// </summary>
-    /// <remarks>
-    /// A name in the series carrying no number still occupies the place its number would map to,
-    /// so the search walks upwards until it finds one nothing answers to.
-    /// </remarks>
-    /// <param name="baseName">Any name in the series, numbered or not.</param>
-    /// <param name="existingNames">The takes already on the shelf.</param>
-    public static string NextName(string? baseName, IEnumerable<string> existingNames)
+    /// <inheritdoc/>
+    public string NextName(string? baseName, IEnumerable<string> existingNames)
     {
         string series = BaseNameOf(baseName);
         var taken = existingNames as IList<string> ?? existingNames.ToList();

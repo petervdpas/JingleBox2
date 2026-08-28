@@ -18,7 +18,7 @@ namespace JingleBox2.ViewModels;
 /// level dragged is a hundred of those, so the pad reads its patches when its chain settles, on
 /// the same 600ms tick that makes it save at all.
 /// </remarks>
-public sealed class PadPluginTarget : IPluginHost
+public sealed class PadPluginTarget : IChainOwner
 {
     /// <summary>What a pad's plugin is built for before the pad has played anything.</summary>
     public const int AssumedSampleRate = 44100;

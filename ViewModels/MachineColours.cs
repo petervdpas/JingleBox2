@@ -6,6 +6,7 @@ using System;
 using System.Runtime.CompilerServices;
 using JingleBox2.Machines.Records;
 using JingleBox2.Views.Records;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -24,6 +25,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class MachineColours : ObservableObject
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>Takes a copy of the machine's theme to work on.</summary>
     /// <param name="name">The machine's name, or a stand-in when it has not been given one yet.</param>
     /// <param name="theme">What it is wearing now, which is where the dialog starts.</param>
@@ -31,7 +35,7 @@ public sealed class MachineColours : ObservableObject
     {
         Name = name.Length > 0 ? name : "The machine";
 
-        _accent = MachineTint.Hue(theme.Accent, out var hue) ? MachineTint.Hex(hue) : Bare;
+        _accent = _tint.Hue(theme.Accent, out var hue) ? _tint.Hex(hue) : Bare;
 
         _face = theme.Face;
         _panel = theme.Panel;
@@ -68,8 +72,8 @@ public sealed class MachineColours : ObservableObject
         get => _accent;
         set
         {
-            string wanted = MachineTint.Hue((value ?? "").Trim(), out var hue)
-                ? MachineTint.Hex(hue)
+            string wanted = _tint.Hue((value ?? "").Trim(), out var hue)
+                ? _tint.Hex(hue)
                 : _accent;
 
             if (wanted != _accent)
@@ -88,8 +92,8 @@ public sealed class MachineColours : ObservableObject
     /// <summary>The same colour, as the picker deals in it.</summary>
     public Color Accent
     {
-        get => MachineTint.Hue(_accent, out var hue) ? hue : Colors.Gray;
-        set => AccentHex = MachineTint.Hex(value);
+        get => _tint.Hue(_accent, out var hue) ? hue : Colors.Gray;
+        set => AccentHex = _tint.Hex(value);
     }
 
     /// <summary>
@@ -163,7 +167,7 @@ public sealed class MachineColours : ObservableObject
     }
 
     /// <summary>What the eight come to, for the preview to be painted from.</summary>
-    private MachineShades Shades => MachineTint.Shades(Theme) ?? default;
+    private MachineShades Shades => _tint.Shades(Theme) ?? default;
 
     /// <summary>The chassis, as the preview paints it.</summary>
     public IBrush FaceBrush => new SolidColorBrush(Shades.Face);

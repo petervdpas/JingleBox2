@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
 using JingleBox2.Config;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Views;
 using System;
@@ -45,6 +45,12 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private readonly IRecordingImport _import = new RecordingImport();
+
+    /// <summary>How a take is named and what makes a name unusable. Holds nothing of its own.</summary>
+    private readonly IRecordingNames _names = new RecordingNames();
+
     /// <summary>Which instruments play a given recording, and how to say so.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly ISampleUsers Usage = new SampleUsers();
@@ -230,7 +236,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanRecord))]
-    private string recordingName = RecordingNameValidator.DefaultBaseName;
+    private string recordingName = RecordingNames.DefaultBaseName;
 
     /// <summary>Null when the name is usable, otherwise why it is not.</summary>
     [ObservableProperty]
@@ -331,7 +337,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
             IsPreviewing = false;
         };
 
-        RecordingName = NextRecordingName(RecordingNameValidator.DefaultBaseName);
+        RecordingName = NextRecordingName(RecordingNames.DefaultBaseName);
         ValidateName();
     }
 
@@ -464,7 +470,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             if (string.Equals(wanted, recording.Name, StringComparison.Ordinal)) return null;
 
-            return RecordingNameValidator.Validate(
+            return _names.Validate(
                 wanted,
                 Recordings.Where(r => !ReferenceEquals(r, recording)).Select(r => r.Name));
         }
@@ -502,7 +508,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         if (string.Equals(wanted, recording.Name, StringComparison.Ordinal)) return true;
 
-        string? problem = RecordingNameValidator.Validate(
+        string? problem = _names.Validate(
             wanted, Recordings.Where(r => !ReferenceEquals(r, recording)).Select(r => r.Name));
 
         if (problem != null)
@@ -572,7 +578,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         foreach (var device in _recordingService.GetInputDevices())
             InputDevices.Add(device);
 
-        SelectedDevice = InputDeviceSelector.Pick(InputDevices, previous);
+        SelectedDevice = new InputDeviceSelector().Pick(InputDevices, previous);
     }
 
     /// <summary>
@@ -728,11 +734,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// really there and a check that opened the folder would run on every letter typed.
     /// </remarks>
     private void ValidateName() =>
-        NameError = RecordingNameValidator.Validate(RecordingName, Recordings.Select(r => r.Name));
+        NameError = _names.Validate(RecordingName, Recordings.Select(r => r.Name));
 
     /// <summary>Next free name in the same series as <paramref name="basedOn"/>.</summary>
     private string NextRecordingName(string basedOn) =>
-        RecordingNameValidator.NextName(basedOn, Recordings.Select(r => r.Name));
+        _names.NextName(basedOn, Recordings.Select(r => r.Name));
 
     /// <summary>
     /// The gain reaches the recorder at once and the settings file half a second later.
@@ -848,9 +854,9 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
                 continue;
             }
 
-            bool converts = RecordingImport.Converts(path);
+            bool converts = _import.Converts(path);
 
-            foreach (var recording in RecordingImport.Take(new[] { path }))
+            foreach (var recording in _import.Take(new[] { path }))
             {
                 recording.DurationMs = ReadDurationMs(recording.FilePath);
                 recording.Category = _filing.Of(recording.Name);
@@ -935,13 +941,13 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     }
 
     /// <summary>Where a normalize puts the loudest moment, in dBFS.</summary>
-    [ObservableProperty] private double normalizeTargetDb = Normalization.DefaultTargetDecibels;
+    [ObservableProperty] private double normalizeTargetDb = Normalization.Target;
 
     /// <summary>The two ends of the target slider, taken from the rule so they cannot drift.</summary>
-    public double MinNormalizeDb => Normalization.MinTargetDecibels;
+    public double MinNormalizeDb => Normalization.Quietest;
 
     /// <inheritdoc cref="MinNormalizeDb"/>
-    public double MaxNormalizeDb => Normalization.MaxTargetDecibels;
+    public double MaxNormalizeDb => Normalization.Loudest;
 
     /// <summary>
     /// Lifts the whole recording so its loudest moment sits on the target. The trim region is
@@ -1203,7 +1209,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// else. Inside, every reader would have to learn to skip a folder, and one of them would
     /// not.
     /// </remarks>
-    public static string Bin => Path.Combine(Config.AppFolder.Path(), "recordings", "..", "deleted");
+    public static string Bin => Path.Combine(new Files.AppFolder().Path(), "recordings", "..", "deleted");
 
     /// <summary>
     /// What has been thrown away this session and could still be fetched back.

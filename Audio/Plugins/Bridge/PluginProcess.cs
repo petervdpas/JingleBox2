@@ -1,3 +1,4 @@
+using JingleBox2.Audio.Plugins.Bridge.Enums;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -7,6 +8,7 @@ using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -25,6 +27,9 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 internal sealed class PluginProcess : IDisposable
 {
+    /// <summary>How a message body is written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IBridgeBody _body = new BridgeBody();
+
     /// <summary>How long a wait for one of the child's sockets sits in the kernel before looking up.</summary>
     private const int AcceptPollMicroseconds = 200_000;
 
@@ -264,14 +269,14 @@ internal sealed class PluginProcess : IDisposable
 
         if (hello == null || hello.Value.Call != BridgeCall.Hello) return false;
 
-        var words = BridgeBody.ReadWords(hello.Value.Payload);
+        var words = _body.ReadWords(hello.Value.Payload);
 
         HasOwnWindow = words.Length > 0 && words[0] == "window";
 
         var list = Call(BridgeCall.Parameters, null);
 
         Parameters = list.Call == BridgeCall.Parameters
-            ? BridgeBody.ReadParameters(list.Payload)
+            ? _body.ReadParameters(list.Payload)
             : Array.Empty<PluginParameter>();
 
         return true;
@@ -549,12 +554,12 @@ internal sealed class PluginProcess : IDisposable
             switch (message.Value.Call)
             {
                 case BridgeCall.ResizeRequested:
-                    var size = BridgeBody.ReadPair(message.Value.Payload);
+                    var size = _body.ReadPair(message.Value.Payload);
                     ResizeRequested?.Invoke(size.First, size.Second);
                     break;
 
                 case BridgeCall.Edited:
-                    var move = BridgeBody.ReadNumber(message.Value.Payload);
+                    var move = _body.ReadNumber(message.Value.Payload);
                     Edited?.Invoke(move.Id, move.Value);
                     break;
 

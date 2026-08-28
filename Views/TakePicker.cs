@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using System;
 

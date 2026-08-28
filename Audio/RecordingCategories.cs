@@ -20,7 +20,7 @@ public sealed class RecordingCategories : IRecordingCategories
 
     /// <summary>Reads the filing of the takes in the application's own recordings folder.</summary>
     public RecordingCategories()
-        : this(Path.Combine(Config.AppFolder.Path(), "recordings")) { }
+        : this(Path.Combine(new Files.AppFolder().Path(), "recordings")) { }
 
     /// <summary>Reads the filing of the takes in a named folder.</summary>
     /// <remarks>

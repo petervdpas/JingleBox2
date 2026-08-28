@@ -13,6 +13,8 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker;
+using JingleBox2.Config.Interfaces;
+using JingleBox2.Config;
 
 namespace JingleBox2.Tracker;
 
@@ -91,14 +93,20 @@ public sealed class SongStore : ISongStore
     /// <param name="appName">
     /// Which application folder, so a test can be pointed at one of its own.
     /// </param>
-    public SongStore(string appName = "JingleBox2")
+    /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
+    /// <param name="files">How a file is written whole, defaulted to the real one.</param>
+    public SongStore(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null)
     {
-        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        SongsDirectory = Path.Combine(baseDir, appName, "songs");
+        _files = files ?? new SafeFile();
+
+        SongsDirectory = Path.Combine((folder ?? new AppFolder()).Path(appName), "songs");
         Directory.CreateDirectory(SongsDirectory);
 
         BringOldSongsAcross();
     }
+
+    /// <summary>How a file is written whole, so a song save cannot leave half a zip.</summary>
+    private readonly ISafeFile _files;
 
     /// <summary>
     /// Songs written before a song was a container, turned into one, once each.
@@ -454,7 +462,7 @@ public sealed class SongStore : ISongStore
     /// compressed quickly rather than well: a patch is the one thing here big enough for the
     /// difference to be felt, and it is felt on every save.
     ///
-    /// The whole container is written through <see cref="Config.SafeFile"/>, so a save that goes
+    /// The whole container is written through <see cref="Files.SafeFile"/>, so a save that goes
     /// wrong part way costs nothing: the song that was there is still there.
     /// </remarks>
     public void Save(Song song, string filePath, bool withSamples = false)
@@ -467,7 +475,7 @@ public sealed class SongStore : ISongStore
         var states = document.TakeStatesOut();
         var patches = document.TakeChainStatesOut();
 
-        Config.SafeFile.Write(filePath, stream =>
+        _files.Write(filePath, stream =>
         {
             using var container = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
 

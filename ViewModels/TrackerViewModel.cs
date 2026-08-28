@@ -6,7 +6,7 @@ using JingleBox2.Audio.Plugins;
 using JingleBox2.Config;
 using JingleBox2.Diagnostics;
 using JingleBox2.Machines;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Synth;

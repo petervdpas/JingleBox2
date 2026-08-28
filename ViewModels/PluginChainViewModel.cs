@@ -18,7 +18,7 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 /// <remarks>
 /// The chain is deliberately ignorant of what it is attached to, which is what
-/// <see cref="IPluginHost"/> is for. The tracker points it at the track under the cursor and
+/// <see cref="IChainOwner"/> is for. The tracker points it at the track under the cursor and
 /// moves it as the cursor moves; a pad points it at itself; the master has one of its own on the
 /// mixer rather than the one under the pattern, because that one follows the cursor and the
 /// master is not somewhere a cursor can be. All of them get the same control and the same
@@ -30,6 +30,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PluginChainViewModel : ObservableObject
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private readonly IPluginHost _plugins = new PluginHost();
+
     /// <summary>Big enough for any block the engines hand out, so nothing is split needlessly.</summary>
     public const int MaxFrames = 2048;
 
@@ -98,7 +101,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasTarget))]
     [NotifyPropertyChangedFor(nameof(Label))]
-    private IPluginHost? target;
+    private IChainOwner? target;
 
     /// <summary>Why the last thing somebody asked for did not happen, or empty.</summary>
     /// <remarks>
@@ -128,7 +131,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public IRelayCommand<PluginInfo> AddCommand => new RelayCommand<PluginInfo>(Add);
 
     /// <summary>Shows the new host's chain, without touching either host's audio.</summary>
-    partial void OnTargetChanged(IPluginHost? value)
+    partial void OnTargetChanged(IChainOwner? value)
     {
         Rebuild();
     }
@@ -162,7 +165,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
             return;
         }
 
-        var effect = PluginHost.Load(plugin, Target.SampleRate, MaxFrames);
+        var effect = _plugins.Load(plugin, Target.SampleRate, MaxFrames);
         if (effect == null)
         {
             Status = $"'{plugin.Name}' would not load";

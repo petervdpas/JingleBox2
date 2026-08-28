@@ -3,24 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 
-/// <summary>
-/// The BASS add-ons sitting beside the program, and what they let it read.
-/// </summary>
-/// <remarks>
-/// BASS reads a handful of formats on its own and everything else through a library per format,
-/// dropped in beside it. That used to be one named library loaded in one place, which meant the
-/// program could only ever read one more format than it was born with: adding FLAC would have
-/// been a code change to read a file.
-///
-/// So nothing here is named. Whatever add-on is in the folder is loaded, and each one is asked
-/// what it reads, which is how the import picker knows what to offer. Drop a library in and the
-/// format appears; take it out and the format stops being offered, rather than being offered and
-/// then failing.
-/// </remarks>
-public static class BassPlugins
+/// <inheritdoc/>
+public sealed class BassPlugins : IBassPlugins
 {
     /// <summary>
     /// What BASS reads with no help. Declared rather than asked for, because there is nothing
@@ -28,7 +16,14 @@ public static class BassPlugins
     /// </summary>
     private static readonly string[] BuiltIn = { ".wav", ".aiff", ".aif", ".mp3", ".mp2", ".mp1", ".mpga", ".ogg", ".oga" };
 
-    /// <summary>Held while the add-ons are loaded, since two callers can arrive at once.</summary>
+    /// <summary>
+    /// Held while the add-ons are loaded, since two callers can arrive at once.
+    /// </summary>
+    /// <remarks>
+    /// Static, along with what it guards, and deliberately. Whether an add-on is loaded is a
+    /// fact about the process rather than about this object: loading one twice loads it twice,
+    /// whichever object asked.
+    /// </remarks>
     private static readonly object Gate = new();
 
     /// <summary>Whether the folder has been walked. It is walked once a session.</summary>
@@ -37,8 +32,8 @@ public static class BassPlugins
     /// <summary>What the add-ons that did load say they read.</summary>
     private static string[] _added = Array.Empty<string>();
 
-    /// <summary>Loads every add-on in the program's folder, once.</summary>
-    public static void Load()
+    /// <inheritdoc/>
+    public void Load()
     {
         lock (Gate)
         {
@@ -61,8 +56,8 @@ public static class BassPlugins
         }
     }
 
-    /// <summary>Every file kind BASS can read here, built in and added together.</summary>
-    public static IReadOnlyList<string> Kinds
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Kinds
     {
         get
         {
@@ -79,7 +74,7 @@ public static class BassPlugins
     /// Everything called after BASS except BASS itself. One that turns out not to be an add-on,
     /// the loopback recorder among them, simply refuses to load and is passed over.
     /// </remarks>
-    private static IEnumerable<string> Libraries()
+    private IEnumerable<string> Libraries()
     {
         string home = AppContext.BaseDirectory;
 
@@ -132,7 +127,7 @@ public static class BassPlugins
     };
 
     /// <summary>What an add-on is called, with the platform's dressing taken off.</summary>
-    private static string Named(string library)
+    private string Named(string library)
     {
         string name = Path.GetFileNameWithoutExtension(library);
 

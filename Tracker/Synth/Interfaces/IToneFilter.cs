@@ -46,4 +46,15 @@ public interface IToneFilter
     /// <summary>One sample through. On the audio thread, and open, it is a single comparison.</summary>
     /// <param name="input">The value going in.</param>
     double Process(double input);
+
+    /// <summary>
+    /// Empties the two integrators, so the next sample is heard by a filter with no memory.
+    /// </summary>
+    /// <remarks>
+    /// The coefficients are fixed and are not touched: what is cleared is the history, not the
+    /// setting. The state feeds back into itself, so one value that is not a number stays in
+    /// both integrators for ever, and this is the only way out of that short of a new voice.
+    /// Both of the other two filters have had one from the start.
+    /// </remarks>
+    void Reset();
 }

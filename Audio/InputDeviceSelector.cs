@@ -1,28 +1,28 @@
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;
 
-/// <summary>
-/// Picks which capture device to select after the device list is (re)built.
-/// Devices are matched by name because indexes shift when hardware appears or disappears.
-/// </summary>
-public static class InputDeviceSelector
+/// <inheritdoc/>
+public sealed class InputDeviceSelector : IInputDeviceSelector
 {
-    /// <summary>What is picked when there is nothing to pick, which the system then resolves.</summary>
-    public const string Fallback = "Default";
+    /// <inheritdoc cref="IInputDeviceSelector.Fallback"/>
+    public const string Default = "Default";
 
-    /// <summary>
-    /// Returns <paramref name="preferred"/> when it is still present, otherwise the first
-    /// available device, otherwise <see cref="Fallback"/>.
-    /// </summary>
-    public static string Pick(IEnumerable<string> devices, string? preferred)
+    /// <inheritdoc/>
+    string IInputDeviceSelector.Fallback => Default;
+
+    /// <inheritdoc/>
+    public string Pick(IEnumerable<string> devices, string? preferred)
     {
+        if (devices is null) return Default;
+
         var list = devices as IList<string> ?? devices.ToList();
 
         if (!string.IsNullOrEmpty(preferred) && list.Contains(preferred))
             return preferred;
 
-        return list.FirstOrDefault() ?? Fallback;
+        return list.FirstOrDefault() ?? Default;
     }
 }

@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -1153,7 +1154,7 @@ public sealed unsafe class ClapEffect : IPluginEffect, IPluginWindowSource
     ///
     /// The proper fix is hosting plugins in a process of their own, where a crash costs the
     /// plugin and nothing else. That is a much larger piece of work, and it is what
-    /// <see cref="PluginHost.Isolated"/> is now.
+    /// <see cref="Interfaces.IPluginHost.Isolated"/> is now.
     /// </remarks>
     public void Dispose()
     {

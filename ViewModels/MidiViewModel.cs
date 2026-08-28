@@ -26,6 +26,10 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MidiViewModel : ObservableObject
 {
+    /// <summary>Which device has been pointed at which half of the application.</summary>
+    /// <remarks>Holds nothing of its own, so one is enough for the page's whole life.</remarks>
+    private readonly IMidiDeviceBindings _bindings = new MidiDeviceBindings();
+
     /// <summary>Where the settings are written when a job or a pad mapping moves.</summary>
     private readonly ConfigStore _store;
 
@@ -133,7 +137,7 @@ public sealed partial class MidiViewModel : ObservableObject
     private void RefreshDevices()
     {
         Devices.Clear();
-        foreach (var entry in MidiDeviceBindings.Merge(_midi.GetInputDevices(), _cfg.Midi.Devices))
+        foreach (var entry in _bindings.Merge(_midi.GetInputDevices(), _cfg.Midi.Devices))
             Devices.Add(new MidiDeviceViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged, Forget));
 
         HasDevices = Devices.Count > 0;
@@ -181,7 +185,7 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         if (device is null || device.IsConnected) return;
 
-        MidiDeviceBindings.SetRole(_cfg.Midi.Devices, device.Name, MidiDeviceRole.None);
+        _bindings.SetRole(_cfg.Midi.Devices, device.Name, MidiDeviceRole.None);
 
         int gone = Midi.ControlLink.Current?.Forget(device.Name) ?? 0;
 
@@ -203,7 +207,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <summary>A job was ticked or unticked, so the ports follow and the settings are written.</summary>
     private void OnDeviceRoleChanged(MidiDeviceViewModel device)
     {
-        MidiDeviceBindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
+        _bindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
 
         UpdatePadDevice();
         ApplyBindings();
@@ -220,7 +224,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// </summary>
     private void ApplyBindings()
     {
-        var wanted = MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.AnyRole);
+        var wanted = _bindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.EveryRole);
 
         foreach (var open in _midi.OpenDevices)
         {
@@ -236,7 +240,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <remarks>All of them, joined, since more than one controller can be pointed at the pads.</remarks>
     private void UpdatePadDevice()
     {
-        var pads = MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Pads);
+        var pads = _bindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Pads);
         PadDevice = pads.Count == 0 ? "" : string.Join(", ", pads);
     }
 
@@ -283,7 +287,7 @@ public sealed partial class MidiViewModel : ObservableObject
         MidiDeviceRole.Pads | MidiDeviceRole.Tracker => "the pads and the tracker",
         MidiDeviceRole.Pads | MidiDeviceRole.Controls => "the pads and the knobs",
         MidiDeviceRole.Tracker | MidiDeviceRole.Controls => "the tracker and the knobs",
-        MidiDeviceBindings.AnyRole => "the pads, the tracker and the knobs",
+        MidiDeviceBindings.EveryRole => "the pads, the tracker and the knobs",
         _ => "nothing"
     };
 
@@ -350,7 +354,7 @@ public sealed partial class MidiViewModel : ObservableObject
         if (!msg.IsOn)
             return;
 
-        var role = MidiDeviceBindings.RoleFor(_cfg.Midi.Devices, msg.Device);
+        var role = _bindings.RoleFor(_cfg.Midi.Devices, msg.Device);
         if ((role & MidiDeviceRole.Pads) == 0)
         {
             Status = $"'{msg.Device}' does not drive the pads, so it cannot be learned here.";

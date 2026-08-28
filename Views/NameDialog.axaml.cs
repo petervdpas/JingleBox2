@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -15,6 +16,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class NameDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
     /// <summary>Builds the window. Its prompt, its box and its button are filled in by <see cref="AskAsync"/>.</summary>
     public NameDialog()
     {
@@ -60,7 +64,7 @@ public partial class NameDialog : Window
             };
         }
 
-        return Dialog.ShowAsync<string?>(dialog, null);
+        return Modal.ShowAsync<string?>(dialog, null);
     }
 
     /// <summary>

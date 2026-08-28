@@ -5,7 +5,10 @@ using System.IO;
 using System.Text;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Diagnostics.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Diagnostics;
 
@@ -28,6 +31,19 @@ namespace JingleBox2.Diagnostics;
 /// </remarks>
 public static class CrashReport
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private static readonly IPluginHost _plugins = new PluginHost();
+
+    /// <summary>
+    /// The marker's two directions, and which crashes belong to a run.
+    /// </summary>
+    /// <remarks>
+    /// Static here for the same reason the log is: there is one run and one marker, and the
+    /// handlers this hangs on the application domain cannot be handed anything. What it decides
+    /// is <see cref="IRunMarker"/> and can be asked without a process ending.
+    /// </remarks>
+    private static readonly IRunMarker Marks = new RunMarker();
+
     /// <summary>Where reports are kept, under the folder the settings live in.</summary>
     public const string FolderName = "crashes";
 
@@ -185,12 +201,12 @@ public static class CrashReport
         report.Append("System        : ").Append(Environment.OSVersion).Append(", ")
             .Append(System.Runtime.InteropServices.RuntimeInformation.OSArchitecture).Append(", .NET ")
             .Append(Environment.Version).Append('\n');
-        report.Append("Plugins       : ").Append(Audio.Plugins.PluginHost.Isolated
+        report.Append("Plugins       : ").Append(_plugins.Isolated
             ? "run in processes of their own"
             : "run inside this one, so a plugin that falls over takes the app with it").Append('\n');
 
         var marks = lastTime
-            ? Held(Audio.Plugins.PluginCrashGuard.Blocked, started)
+            ? Marks.Since(Audio.Plugins.PluginCrashGuard.Blocked, started)
             : Audio.Plugins.PluginCrashGuard.InFlight;
 
         if (marks.Count > 0)
@@ -227,26 +243,6 @@ public static class CrashReport
     }
 
     /// <summary>
-    /// The notes that belong to the run that stopped, rather than to any run before it.
-    /// </summary>
-    /// <remarks>
-    /// The blocked list is kept across runs, so without the time it was written down a report
-    /// would name every plugin that has ever fallen over rather than the one that just did.
-    /// </remarks>
-    private static IReadOnlyList<Audio.Plugins.PluginCrash> Held(
-        IReadOnlyList<Audio.Plugins.PluginCrash> blocked, DateTime since)
-    {
-        var held = new List<Audio.Plugins.PluginCrash>();
-
-        foreach (var mark in blocked)
-        {
-            if (mark.When >= since) held.Add(mark);
-        }
-
-        return held;
-    }
-
-    /// <summary>
     /// Looks for a marker from the run before this one and reports it if it is still there.
     /// </summary>
     /// <remarks>
@@ -264,21 +260,9 @@ public static class CrashReport
         try { said = File.ReadAllLines(path); }
         catch (Exception) { said = Array.Empty<string>(); }
 
-        DateTime? began = null;
+        foreach (string line in said) Note("last time: " + line);
 
-        foreach (string line in said)
-        {
-            Note("last time: " + line);
-
-            const string Began = "started ";
-
-            if (line.StartsWith(Began, StringComparison.Ordinal) &&
-                DateTime.TryParse(line[Began.Length..], CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var when))
-            {
-                began = when;
-            }
-        }
+        DateTime? began = Marks.StartedFrom(said);
 
         FromLastTime = Write(
             "the last run ended without saying goodbye, which is what a plugin taking the application down looks like",
@@ -299,8 +283,7 @@ public static class CrashReport
             Directory.CreateDirectory(_folder);
 
             File.WriteAllText(path,
-                "started " + _started.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + "\n" +
-                "version " + (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "?") + "\n",
+                Marks.Compose(_started, System.Reflection.Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "?"),
                 new UTF8Encoding(false));
         }
         catch (Exception)

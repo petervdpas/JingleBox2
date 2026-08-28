@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

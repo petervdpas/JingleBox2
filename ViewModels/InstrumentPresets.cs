@@ -50,7 +50,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// its presets are your takes, and picking one puts it on the machine. Every other machine
     /// reads its own folder beside the program.
     /// </remarks>
-    private readonly ObservableCollection<Models.Recording>? _takes;
+    private readonly ObservableCollection<Audio.Records.Recording>? _takes;
 
     /// <summary>True while the list is being rebuilt, so filling it does not load anything.</summary>
     private bool _filling;
@@ -82,7 +82,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
         TrackerInstrument instrument,
         Action applied,
         IMachineProjects machines,
-        ObservableCollection<Models.Recording>? takes = null,
+        ObservableCollection<Audio.Records.Recording>? takes = null,
         TakeFilter? narrowing = null)
     {
         _machines = machines;
@@ -164,7 +164,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// leaves everything else about the machine where it was, which is the same promise a real
     /// preset makes about the name and the level.
     /// </remarks>
-    private MachinePreset Take(Models.Recording recording)
+    private MachinePreset Take(Audio.Records.Recording recording)
     {
         var sound = TrackerInstrument.CreateSample(recording.Name, recording.FilePath, _instrument.BaseNote);
 

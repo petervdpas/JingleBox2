@@ -12,6 +12,8 @@ using JingleBox2.Shortcuts.Enums;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 
@@ -28,6 +30,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachineRegistry Registry = new MachineRegistry();
@@ -114,7 +119,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
 
     /// <summary>Puts the machine's colours on the plate, so it looks like the box it is.</summary>
     private void Retint() =>
-        MachineTint.Repaint(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
+        _tint.Repaint(this.FindControl<Border>("PanelPreview")!, Editor?.Project?.Theme);
 
     /// <summary>
     /// Opens the colours, and puts back whatever comes out of them.

@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Audio.Records;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -17,6 +19,9 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public sealed class SampleStore : ISampleStore
 {
+    /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
     /// <summary>Roughly fifty megabytes of stereo audio. Past this it is not an instrument.</summary>
     public const int MaxSeconds = 300;
 
@@ -121,17 +126,17 @@ public sealed class SampleStore : ISampleStore
     /// will not sound. The length is checked off the header before the audio is read, so a file
     /// too long to use is never held in memory even briefly.
     /// </remarks>
-    private static SampleData? Read(string filePath)
+    private SampleData? Read(string filePath)
     {
         try
         {
             if (!File.Exists(filePath)) return null;
 
-            var info = WavFile.ReadInfo(filePath);
+            var info = _wav.ReadInfo(filePath);
             if (info.SampleRate <= 0 || info.FrameCount <= 0) return null;
             if (info.FrameCount / (double)info.SampleRate > MaxSeconds) return null;
 
-            var (samples, read) = WavFile.Read(filePath);
+            var (samples, read) = _wav.Read(filePath);
             return new SampleData(samples, read.Channels, read.SampleRate);
         }
         catch (Exception)

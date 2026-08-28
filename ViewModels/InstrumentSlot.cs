@@ -5,6 +5,8 @@ using System.Globalization;
 using JingleBox2.Machines;
 using JingleBox2.Machines.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.ViewModels;
 
@@ -14,6 +16,9 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed partial class InstrumentSlot : ObservableObject
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>Builds one row of the instrument list.</summary>
     /// <param name="index">The number a pattern cell writes to reach this instrument.</param>
     /// <param name="instrument">The instrument itself, held rather than copied.</param>
@@ -66,7 +71,7 @@ public sealed partial class InstrumentSlot : ObservableObject
     /// list's own background and reads as an ordinary row; a grey would read as a state.
     /// </remarks>
     private IBrush Wash(double amount) =>
-        Views.MachineTint.Hue(Theme.Accent, out var hue)
+        _tint.Hue(Theme.Accent, out var hue)
             ? new SolidColorBrush(hue, amount)
             : Brushes.Transparent;
 

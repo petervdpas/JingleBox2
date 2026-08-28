@@ -1,7 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Audio;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
@@ -37,6 +37,9 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private readonly IRecordingImport _import = new RecordingImport();
+
     /// <summary>How a preset file is read and written.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachinePresetFile PresetFiles = new MachinePresetFile();
@@ -485,7 +488,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </remarks>
     public IReadOnlyList<string> Import(IEnumerable<string> paths)
     {
-        var taken = RecordingImport.Take(paths);
+        var taken = _import.Take(paths);
 
         foreach (var recording in taken) Recordings.Add(recording);
 

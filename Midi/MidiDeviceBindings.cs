@@ -2,33 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
 
 namespace JingleBox2.Midi;
 
-/// <summary>
-/// The rules around device bindings, as plain functions on a list. Nothing here opens a port
-/// or touches the UI, so the routing decisions can be tested on their own.
-/// </summary>
-public static class MidiDeviceBindings
+/// <inheritdoc/>
+public sealed class MidiDeviceBindings : IMidiDeviceBindings
 {
-    /// <summary>
-    /// Every job a device can be given.
-    /// </summary>
+    /// <inheritdoc cref="IMidiDeviceBindings.AnyRole"/>
     /// <remarks>
-    /// Const so it can be matched as a pattern, not just tested as a mask, and it has to name
-    /// every flag there is. <see cref="Normalize"/> masks the stored role with this, so a job
-    /// missing from here is a job silently taken off every device on the way in, and a device
-    /// given only that job is a binding that quietly disappears. Adding a role to
-    /// <see cref="MidiDeviceRole"/> means adding it here, in the same breath.
+    /// Const as well as answered, so it can be matched as a pattern rather than only tested as
+    /// a mask, and so a caller that has never held one of these can still name it.
     /// </remarks>
-    public const MidiDeviceRole AnyRole =
+    public const MidiDeviceRole EveryRole =
         MidiDeviceRole.Pads | MidiDeviceRole.Tracker | MidiDeviceRole.Controls | MidiDeviceRole.Transport;
+
+    /// <inheritdoc/>
+    MidiDeviceRole IMidiDeviceBindings.AnyRole => EveryRole;
 
     private static readonly StringComparer NameComparer = StringComparer.OrdinalIgnoreCase;
 
-    /// <summary>The role a message from this device carries, or None when it is not bound.</summary>
-    public static MidiDeviceRole RoleFor(IEnumerable<MidiDeviceBinding>? bindings, string? device)
+    /// <inheritdoc/>
+    public MidiDeviceRole RoleFor(IEnumerable<MidiDeviceBinding>? bindings, string? device)
     {
         if (bindings is null || string.IsNullOrWhiteSpace(device)) return MidiDeviceRole.None;
 
@@ -42,8 +38,8 @@ public static class MidiDeviceBindings
         return role;
     }
 
-    /// <summary>Points a device at a role, adding or dropping its binding as needed.</summary>
-    public static void SetRole(List<MidiDeviceBinding> bindings, string device, MidiDeviceRole role)
+    /// <inheritdoc/>
+    public void SetRole(List<MidiDeviceBinding> bindings, string device, MidiDeviceRole role)
     {
         if (bindings is null || string.IsNullOrWhiteSpace(device)) return;
 
@@ -54,8 +50,8 @@ public static class MidiDeviceBindings
             bindings.Add(new MidiDeviceBinding { Device = name, Role = role });
     }
 
-    /// <summary>The devices carrying any of the given role, in binding order.</summary>
-    public static IReadOnlyList<string> DevicesWith(IEnumerable<MidiDeviceBinding>? bindings, MidiDeviceRole role)
+    /// <inheritdoc/>
+    public IReadOnlyList<string> DevicesWith(IEnumerable<MidiDeviceBinding>? bindings, MidiDeviceRole role)
     {
         if (bindings is null || role == MidiDeviceRole.None) return Array.Empty<string>();
 
@@ -66,11 +62,8 @@ public static class MidiDeviceBindings
             .ToList();
     }
 
-    /// <summary>
-    /// The list the settings page shows: everything connected, then anything bound that is not
-    /// plugged in right now. Unplugging a controller must not lose what it was set to drive.
-    /// </summary>
-    public static IReadOnlyList<MidiDeviceEntry> Merge(
+    /// <inheritdoc/>
+    public IReadOnlyList<MidiDeviceEntry> Merge(
         IEnumerable<string>? connected,
         IEnumerable<MidiDeviceBinding>? bindings)
     {
@@ -95,11 +88,8 @@ public static class MidiDeviceBindings
         return entries;
     }
 
-    /// <summary>
-    /// Cleans the stored list and brings a pre-multi-device config across: the one device it
-    /// could name only ever drove the pads.
-    /// </summary>
-    public static void Normalize(MidiConfig cfg)
+    /// <inheritdoc/>
+    public void Normalize(MidiConfig cfg)
     {
         if (cfg is null) return;
 
@@ -116,7 +106,7 @@ public static class MidiDeviceBindings
             if (binding is null || string.IsNullOrWhiteSpace(binding.Device)) continue;
 
             string name = binding.Device.Trim();
-            var role = binding.Role & AnyRole;
+            var role = binding.Role & EveryRole;
             if (role == MidiDeviceRole.None) continue;
 
             var existing = merged.FirstOrDefault(b => NameComparer.Equals(b.Device, name));

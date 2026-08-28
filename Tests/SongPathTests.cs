@@ -20,7 +20,7 @@ public class SongPathTests
     /// A path under the application folder, wherever that folder is on this machine.
     /// </summary>
     private static string InsideTheAppFolder(params string[] parts) =>
-        Path.Combine(new[] { Config.AppFolder.Path() }.Concat(parts).ToArray());
+        Path.Combine(new[] { new Files.AppFolder().Path() }.Concat(parts).ToArray());
 
     /// <summary>
     /// A recording the application owns is written down as the token and a relative path, never
@@ -81,7 +81,7 @@ public class SongPathTests
     [Fact]
     public void A_folder_whose_name_merely_starts_the_same_is_not_inside_it()
     {
-        string inside = Path.Combine(Config.AppFolder.Path() + "-elsewhere", "take.wav");
+        string inside = Path.Combine(new Files.AppFolder().Path() + "-elsewhere", "take.wav");
 
         Assert.Equal(inside, Portable.Pack(inside));
     }

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -17,6 +18,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class ConfirmDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
     /// <summary>Builds the window. Its text and its buttons are filled in by the two callers.</summary>
     public ConfirmDialog()
     {
@@ -33,7 +37,7 @@ public partial class ConfirmDialog : Window
 
         Fill(dialog, message, confirmText);
 
-        return Dialog.ShowAsync(dialog, false);
+        return Modal.ShowAsync(dialog, false);
     }
 
     /// <summary>
@@ -52,7 +56,7 @@ public partial class ConfirmDialog : Window
         var confirm = dialog.FindControl<Button>("ConfirmButton");
         confirm?.Classes.Remove("danger");
 
-        return Dialog.ShowAsync(dialog, false);
+        return Modal.ShowAsync(dialog, false);
     }
 
     /// <summary>

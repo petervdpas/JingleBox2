@@ -63,7 +63,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         IWaveformService? waveforms = null,
         ITrackerPanel? tracker = null,
         MachineRack? rack = null,
-        System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>? recordings = null,
+        System.Collections.ObjectModel.ObservableCollection<JingleBox2.Audio.Records.Recording>? recordings = null,
         Midi.Interfaces.IMidiMonitor? keys = null)
     {
         _machines = machines;

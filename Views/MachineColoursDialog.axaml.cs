@@ -4,6 +4,8 @@ using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
 using JingleBox2.Machines.Records;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 
@@ -20,6 +22,12 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class MachineColoursDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>Builds the window. Its eight swatches and its preview are filled in by <see cref="AskAsync"/>.</summary>
     public MachineColoursDialog()
     {
@@ -57,7 +65,7 @@ public partial class MachineColoursDialog : Window
         dialog.Opened += (_, _) => Show();
         dialog.Closed += (_, _) => colours.Changed -= Show;
 
-        return Dialog.ShowAsync<MachineTheme?>(dialog, null);
+        return Modal.ShowAsync<MachineTheme?>(dialog, null);
     }
 
     /// <summary>
@@ -66,7 +74,7 @@ public partial class MachineColoursDialog : Window
     /// </summary>
     private void Retint(MachineColours colours)
     {
-        if (this.FindControl<Border>("Preview") is { } preview) MachineTint.Repaint(preview, colours.Theme);
+        if (this.FindControl<Border>("Preview") is { } preview) _tint.Repaint(preview, colours.Theme);
     }
 
     /// <summary>

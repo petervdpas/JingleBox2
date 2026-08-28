@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Audio.Plugins;
 
@@ -108,36 +109,14 @@ public sealed class PluginChainConfig
     }
 }
 
-/// <summary>
-/// Turning a running chain into something a song or a profile can hold, and back again.
-/// </summary>
-/// <remarks>
-/// Both halves, and they answer different questions. The parameter values are readable,
-/// diffable and survive a plugin being updated, and for the many effects that are nothing but
-/// their knobs they are the whole of it. The plugin's own lump is everything the parameters
-/// do not describe, which for anything with presets inside it is most of what somebody set up:
-/// Serum on a track came back sounding right and calling itself "- Init -", because its knobs
-/// were saved and its patch was not.
-///
-/// Reading the lump is a round trip to the plugin's own process and a third of a megabyte, so
-/// it is asked for where a save is a save and not where one chain is merely being compared
-/// with another. See <see cref="Capture"/>.
-/// </remarks>
-public static class PluginChainState
+/// <inheritdoc/>
+public sealed class PluginChainState : IPluginChainState
 {
-    /// <param name="patches">
-    /// Whether to ask each plugin for its own state as well as its parameters. Off by default
-    /// because the cheap half answers most questions.
-    /// </param>
-    /// <summary>
-    /// Reads a running chain into something that can be written down.
-    /// </summary>
-    /// <remarks>
-    /// The patch is read last, because it is the expensive half and there is no point paying for
-    /// it on a plugin whose parameters could not be read either.
-    /// </remarks>
-    /// <param name="chain">The chain to read, or null for a track with nothing on it.</param>
-    public static PluginChainConfig Capture(PluginChain? chain, bool patches = false)
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private readonly IPluginHost _plugins = new PluginHost();
+
+    /// <inheritdoc/>
+    public PluginChainConfig Capture(PluginChain? chain, bool patches = false)
     {
         var config = new PluginChainConfig();
         if (chain == null) return config;
@@ -169,16 +148,8 @@ public static class PluginChainState
         return config;
     }
 
-    /// <summary>
-    /// Just the plugins' own lumps, in chain order, without reading a single knob.
-    /// </summary>
-    /// <remarks>
-    /// For somewhere that is written down far more often than its plugins change. A pad is
-    /// saved on every property it has, and a level dragged across its travel is a hundred of
-    /// those; the patches are read once when the chain settles and carried onto each of those
-    /// saves. Skips whatever <see cref="Capture"/> skips, so the two line up by index.
-    /// </remarks>
-    public static IReadOnlyList<byte[]> Patches(PluginChain? chain)
+    /// <inheritdoc/>
+    public IReadOnlyList<byte[]> Patches(PluginChain? chain)
     {
         if (chain == null) return Array.Empty<byte[]>();
 
@@ -190,27 +161,8 @@ public static class PluginChainState
         return lumps;
     }
 
-    /// <summary>
-    /// Rebuilds a chain from what was saved. Whatever is in the chain now goes first, so this
-    /// is also how a chain is replaced when another song is opened.
-    /// </summary>
-    /// <remarks>
-    /// Each plugin is built with the name it was saved under, so anything the host has to say
-    /// about it later calls it what the user calls it rather than by its id.
-    ///
-    /// The lump goes in first and the knobs after it. A patch moves every parameter at once, so
-    /// writing the values afterwards is either agreement or the correction for a plugin whose
-    /// state did not come back whole. The other order would be a preset landing on top of the
-    /// values and quietly winning.
-    ///
-    /// The values are handed over at once rather than on the next block, or a chain that is not
-    /// being played would sit at the plugin's defaults until somebody pressed play.
-    ///
-    /// A plugin that will not load is a song made on another machine, or one since uninstalled.
-    /// It is named and stepped over: the rest of the chain is still worth having.
-    /// </remarks>
-    /// <returns>The names of plugins that could not be loaded, for reporting.</returns>
-    public static IReadOnlyList<string> Restore(
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Restore(
         PluginChain chain,
         PluginChainConfig? config,
         int sampleRate,
@@ -230,7 +182,7 @@ public static class PluginChainState
         foreach (var saved in config.Devices)
         {
             var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format);
-            var effect = PluginHost.Load(described, sampleRate, maxFrames);
+            var effect = _plugins.Load(described, sampleRate, maxFrames);
 
             if (effect == null)
             {

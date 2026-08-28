@@ -6,7 +6,7 @@ using JingleBox2.Config;
 using JingleBox2.Midi;
 using JingleBox2.Controllers;
 using JingleBox2.Tracker;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.UI;
 using System;
 using System.Collections.ObjectModel;
@@ -24,6 +24,8 @@ using JingleBox2.Midi.Interfaces;
 using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.ViewModels;
 
@@ -43,6 +45,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IPluginChainState _chains = new PluginChainState();
+
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
@@ -578,7 +583,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             _cfg.WriteLog = value;
             _store.Save(_cfg);
 
-            if (value) Diagnostics.Log.Open(Config.AppFolder.Path(), true, Written);
+            if (value) Diagnostics.Log.Open(new Files.AppFolder().Path(), true, Written);
             else Diagnostics.Log.Close();
 
             OnPropertyChanged();
@@ -645,7 +650,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         _cfg.LogAreas = (int)wanted;
         _store.Save(_cfg);
 
-        if (WriteLog) Diagnostics.Log.Open(Config.AppFolder.Path(), true, Written);
+        if (WriteLog) Diagnostics.Log.Open(new Files.AppFolder().Path(), true, Written);
 
         OnPropertyChanged(nameof(LogHint));
     }
@@ -653,10 +658,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <summary>Where the file is, said out loud so it can be found without being hunted for.</summary>
     public string LogHint =>
         WriteLog
-            ? "Writing to " + System.IO.Path.Combine(Config.AppFolder.Path(), Diagnostics.Log.FileName) +
+            ? "Writing to " + System.IO.Path.Combine(new Files.AppFolder().Path(), Diagnostics.Log.FileName) +
               ". Plugin processes write to the same file. Started again from empty when it reaches a few megabytes."
             : "Off. Nothing is written and nothing is slowed down. Turn this on before doing whatever went wrong, then look in " +
-              Config.AppFolder.Path() + ".";
+              new Files.AppFolder().Path() + ".";
 
     /// <summary>What is actually running, as against what has been asked for.</summary>
     public string EngineRateHint =>
@@ -1113,7 +1118,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         var screen = new ArturiaDisplay(
             midiService,
-            () => MidiDeviceBindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Controls));
+            () => new MidiDeviceBindings().DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Controls));
 
         screen.Standing("JingleBox2", Tracker.SongName);
 
@@ -1748,7 +1753,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             pc.FadeOut = vm.FadeOut;
             pc.Color = vm.PadColor;
 
-            var captured = JingleBox2.Audio.Plugins.PluginChainState.Capture(
+            var captured = _chains.Capture(
                 _audio.GetPadInsert(i) as JingleBox2.Audio.Plugins.PluginChain);
 
             for (int device = 0; device < captured.Devices.Count && device < vm.Patches.Count; device++)

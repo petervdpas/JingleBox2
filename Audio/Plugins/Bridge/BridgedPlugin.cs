@@ -1,8 +1,10 @@
+using JingleBox2.Audio.Plugins.Bridge.Enums;
 using System;
 using System.Collections.Generic;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;
 
@@ -22,6 +24,9 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// </remarks>
 public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPluginWindowSource
 {
+    /// <summary>How a message body is written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IBridgeBody _body = new BridgeBody();
+
     /// <summary>
     /// Held while the process underneath is being changed or let go: starting again, opening a
     /// window, disposing. Not held for audio, which is why <see cref="PluginProcess.Enter"/>
@@ -224,7 +229,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 
             if (_state != null) Send(BridgeCall.LoadState, _state);
 
-            foreach (var pair in _values) Send(BridgeCall.SetValue, BridgeBody.Number(pair.Key, pair.Value));
+            foreach (var pair in _values) Send(BridgeCall.SetValue, _body.Number(pair.Key, pair.Value));
 
             Send(BridgeCall.Flush, null);
 
@@ -245,14 +250,14 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     /// </remarks>
     public double ValueOf(uint id)
     {
-        var answer = Ask(BridgeCall.ValueOf, BridgeBody.Number(id, 0));
+        var answer = Ask(BridgeCall.ValueOf, _body.Number(id, 0));
 
         if (answer.Call != BridgeCall.Value)
         {
             return _values.TryGetValue(id, out double known) ? known : 0;
         }
 
-        double value = BridgeBody.ReadDouble(answer.Payload);
+        double value = _body.ReadDouble(answer.Payload);
 
         lock (_values) _values[id] = value;
 
@@ -266,11 +271,11 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     /// </remarks>
     public string TextFor(uint id, double value)
     {
-        var answer = Ask(BridgeCall.TextFor, BridgeBody.Number(id, value));
+        var answer = Ask(BridgeCall.TextFor, _body.Number(id, value));
 
         if (answer.Call != BridgeCall.Text) return "";
 
-        var words = BridgeBody.ReadWords(answer.Payload);
+        var words = _body.ReadWords(answer.Payload);
 
         return words.Length > 0 ? words[0] : "";
     }
@@ -284,7 +289,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     {
         lock (_values) _values[id] = value;
 
-        Send(BridgeCall.SetValue, BridgeBody.Number(id, value));
+        Send(BridgeCall.SetValue, _body.Number(id, value));
     }
 
     /// <inheritdoc/>
@@ -515,7 +520,7 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
             var answer = process.Call(BridgeCall.OpenEditor, null, PluginBridge.WindowTimeoutMilliseconds);
             if (answer.Call != BridgeCall.Ok) return null;
 
-            var size = BridgeBody.ReadThree(answer.Payload);
+            var size = _body.ReadThree(answer.Payload);
 
             _editor?.Orphan();
             _editor = new BridgedEditor(this, process, size.First, size.Second) { CanResize = size.Third != 0 };
@@ -616,6 +621,9 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
 /// </remarks>
 public sealed class BridgedEditor : IPluginEditor
 {
+    /// <summary>How a message body is written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IBridgeBody _body = new BridgeBody();
+
     /// <summary>The plugin this window belongs to, told when the window has gone.</summary>
     private readonly BridgedPlugin _owner;
 
@@ -688,11 +696,11 @@ public sealed class BridgedEditor : IPluginEditor
     {
         if (_closed) return false;
 
-        var answer = _process.Call(BridgeCall.Attach, BridgeBody.Handle(window), PluginBridge.WindowTimeoutMilliseconds);
+        var answer = _process.Call(BridgeCall.Attach, _body.Handle(window), PluginBridge.WindowTimeoutMilliseconds);
 
         if (answer.Call != BridgeCall.Ok) return false;
 
-        var size = BridgeBody.ReadPair(answer.Payload);
+        var size = _body.ReadPair(answer.Payload);
 
         if (size.First > 0 && size.Second > 0) Size = (size.First, size.Second);
 
@@ -721,7 +729,7 @@ public sealed class BridgedEditor : IPluginEditor
     {
         if (_closed || width <= 0 || height <= 0) return;
 
-        _process.Call(BridgeCall.Resized, BridgeBody.Pair(width, height), PluginBridge.WindowTimeoutMilliseconds);
+        _process.Call(BridgeCall.Resized, _body.Pair(width, height), PluginBridge.WindowTimeoutMilliseconds);
     }
 
     /// <summary>Called when the plugin died underneath the window. There is nothing left to tell.</summary>

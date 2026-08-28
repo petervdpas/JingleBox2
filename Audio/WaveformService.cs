@@ -1,14 +1,21 @@
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio;
 
 namespace JingleBox2.Audio;
 
 /// <inheritdoc/>
 public sealed class WaveformService : IWaveformService
 {
+    /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
+    /// <summary>The peak normalisation rules. Holds nothing, so one serves the whole object.</summary>
+    private readonly INormalization _levels = new Normalization();
+
     /// <summary>
     /// How many columns a picture holds, whatever the recording's length. Wide enough that a
     /// waveform drawn across a full screen is reading real peaks rather than an interpolation.
@@ -21,7 +28,7 @@ public sealed class WaveformService : IWaveformService
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        var (samples, info) = WavFile.Read(filePath);
+        var (samples, info) = _wav.Read(filePath);
 
         return new WaveformData
         {
@@ -38,7 +45,7 @@ public sealed class WaveformService : IWaveformService
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        var info = WavFile.ReadInfo(filePath);
+        var info = _wav.ReadInfo(filePath);
         return TimeSpan.FromSeconds((double)info.FrameCount / info.SampleRate);
     }
 
@@ -47,7 +54,7 @@ public sealed class WaveformService : IWaveformService
     {
         if (!File.Exists(filePath)) return 0;
 
-        return WavFile.ReadInfo(filePath).FrameCount;
+        return _wav.ReadInfo(filePath).FrameCount;
     }
 
     /// <inheritdoc/>
@@ -56,7 +63,7 @@ public sealed class WaveformService : IWaveformService
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        var (samples, info) = WavFile.Read(filePath);
+        var (samples, info) = _wav.Read(filePath);
 
         startFrame = Math.Clamp(startFrame, 0, info.FrameCount);
         endFrame = Math.Clamp(endFrame, startFrame, info.FrameCount);
@@ -84,30 +91,30 @@ public sealed class WaveformService : IWaveformService
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"File not found: {filePath}");
 
-        var (samples, info) = WavFile.Read(filePath);
+        var (samples, info) = _wav.Read(filePath);
 
-        double peak = Normalization.PeakOf(samples);
-        double gain = Normalization.GainFor(peak, targetDecibels);
+        double peak = _levels.PeakOf(samples);
+        double gain = _levels.GainFor(peak, targetDecibels);
 
         if (Math.Abs(gain - 1) < 0.001) return 0;
 
-        Normalization.Apply(samples, gain);
+        _levels.Apply(samples, gain);
         Write(filePath, samples, info, ".norm.tmp");
 
-        return Normalization.ToDecibels(gain);
+        return _levels.ToDecibels(gain);
     }
 
     /// <summary>
     /// Writes over a recording through a sibling file, so a failure part way through leaves
     /// the original where it was rather than half of it.
     /// </summary>
-    private static void Write(string filePath, short[] samples, WavFile.Info info, string suffix)
+    private void Write(string filePath, short[] samples, WavInfo info, string suffix)
     {
         string tempPath = filePath + suffix;
 
         try
         {
-            WavFile.Write(tempPath, samples, info.SampleRate, info.Channels);
+            _wav.Write(tempPath, samples, info.SampleRate, info.Channels);
             File.Move(tempPath, filePath, overwrite: true);
         }
         catch

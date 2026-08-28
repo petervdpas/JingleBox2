@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Text;
 using System.Threading;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Diagnostics.Interfaces;
 
 namespace JingleBox2.Diagnostics;
 
@@ -23,9 +22,26 @@ namespace JingleBox2.Diagnostics;
 ///
 /// The file is kept where the settings are and rolled over when it gets big, so a log left
 /// switched on for a week cannot quietly fill a disk.
+///
+/// Static, and the only door here that is. A log is one queue, one writing thread and one file
+/// for the whole process and every process it starts, so handing one about would be handing
+/// about the same object under another name, and fifty three callers including the thread that
+/// fills the audio buffer would pay a field lookup for it. What it decides does not live here:
+/// <see cref="ILogAreas"/>, <see cref="ILogLine"/> and <see cref="ILogFile"/> are the rules on
+/// their own and can be asked anything without a disc or a thread. What is left is the
+/// plumbing.
 /// </remarks>
 public static class Log
 {
+    /// <summary>Which areas are on, and what each is called. Holds nothing, so one is enough.</summary>
+    private static readonly ILogAreas Switch = new LogAreas();
+
+    /// <summary>The shape of a line, which is the same for every line this process writes.</summary>
+    private static readonly ILogLine Shape = new LogLine(Switch);
+
+    /// <summary>The file itself: appending to it, and starting a new one when it gets big.</summary>
+    private static readonly ILogFile Store = new LogFile();
+
     /// <summary>
     /// Set this to log without the settings, for a run that will not get that far.
     /// </summary>
@@ -51,15 +67,6 @@ public static class Log
 
     /// <summary>Guards the settings and the folder, which are read from every thread that writes.</summary>
     private static readonly object Gate = new();
-
-    /// <summary>
-    /// How the file is encoded: UTF-8, and deliberately without the byte order mark.
-    /// </summary>
-    /// <remarks>
-    /// This is a file people open in a text editor and paste out of, not one anything parses,
-    /// and a mark at the front of it is three bytes of rubbish in whatever they paste.
-    /// </remarks>
-    private static readonly UTF8Encoding Text = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>Which areas are being written, and none of them when the log is off.</summary>
     private static LogArea _areas;
@@ -151,14 +158,12 @@ public static class Log
     /// </remarks>
     public static void Open(string folder, bool on, LogArea areas = LogArea.Everything)
     {
-        var asked = Asked(Environment.GetEnvironmentVariable(Variable));
-
-        if (asked != LogArea.None) areas = asked;
+        string? said = Environment.GetEnvironmentVariable(Variable);
 
         lock (Gate)
         {
             _folder = folder ?? "";
-            _areas = on || asked != LogArea.None ? areas : LogArea.None;
+            _areas = Switch.Wanted(on, areas, said);
 
             if (!_hooked)
             {
@@ -249,23 +254,13 @@ public static class Log
 
         if (folder.Length == 0) return;
 
-        var line = new StringBuilder(message.Length + 64);
-
-        line.Append(DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture))
-            .Append("  ")
-            .Append(Short(area).PadRight(7))
-            .Append(Environment.ProcessId.ToString(CultureInfo.InvariantCulture).PadLeft(7))
-            .Append("  ")
-            .Append(message)
-            .Append('\n');
-
         if (Waiting.Count >= MostWaiting)
         {
             Interlocked.Increment(ref _lost);
             return;
         }
 
-        Waiting.Enqueue(line.ToString());
+        Waiting.Enqueue(Shape.Format(area, DateTime.Now, Environment.ProcessId, message));
 
         Scribe();
 
@@ -335,105 +330,16 @@ public static class Log
 
         int lost = Interlocked.Exchange(ref _lost, 0);
 
-        if (lost > 0)
-        {
-            batch.Append("(")
-                .Append(lost.ToString(CultureInfo.InvariantCulture))
-                .Append(" line(s) went unwritten: the log could not keep up)\n");
-        }
+        if (lost > 0) batch.Append(Shape.Lost(lost));
 
         if (batch.Length == 0) return;
 
-        try
-        {
-            Directory.CreateDirectory(folder);
+        string path = System.IO.Path.Combine(folder, FileName);
 
-            string path = System.IO.Path.Combine(folder, FileName);
-
-            Roll(path);
-
-            File.AppendAllText(path, batch.ToString(), Text);
-        }
-        catch (Exception)
-        {
-        }
+        Store.Roll(path, RollBytes);
+        Store.Append(path, batch.ToString());
     }
 
-    /// <summary>
-    /// Keeps one old file and starts a new one when the current gets big. Two files of a few
-    /// megabytes is a bounded cost for something somebody may leave switched on.
-    /// </summary>
-    private static void Roll(string path)
-    {
-        try
-        {
-            var file = new FileInfo(path);
-            if (!file.Exists || file.Length < RollBytes) return;
-
-            string old = path + ".old";
-
-            if (File.Exists(old)) File.Delete(old);
-
-            File.Move(path, old);
-        }
-        catch (Exception)
-        {
-        }
-    }
-
-    /// <summary>
-    /// What the environment variable is asking for, or nothing when it is not asking.
-    /// </summary>
-    /// <remarks>
-    /// "1" is everything, for the hands that have been typing that for months. Anything else is
-    /// read as a list of area names, so one area can be had on its own without the other four
-    /// burying it.
-    /// </remarks>
-    private static LogArea Asked(string? said)
-    {
-        if (string.IsNullOrWhiteSpace(said)) return LogArea.None;
-
-        said = said.Trim();
-
-        if (said == "1" || said.Equals("all", StringComparison.OrdinalIgnoreCase)) return LogArea.Everything;
-        if (said == "0") return LogArea.None;
-
-        var wanted = LogArea.None;
-
-        foreach (string part in said.Split(',', ' ', ';'))
-        {
-            string name = part.Trim();
-            if (name.Length == 0) continue;
-
-            foreach (var (area, called) in Names)
-                if (name.Equals(called, StringComparison.OrdinalIgnoreCase)) wanted |= area;
-        }
-
-        return wanted;
-    }
-
-    /// <summary>Every area there is, with the word each is written under.</summary>
-    /// <remarks>
-    /// For the settings page, so the list of switches is the list of areas and the two cannot
-    /// come apart: an area added here turns up there without anybody being told to add it.
-    /// </remarks>
-    public static IReadOnlyDictionary<LogArea, string> Everywhere => Names;
-
-    /// <summary>The word each area is written under, in the file and in the environment variable.</summary>
-    /// <remarks>
-    /// One list for both, so a name that can be typed is a name that appears in the log and a
-    /// switch on the settings page, and none of the three can drift from the other two.
-    /// </remarks>
-    private static readonly Dictionary<LogArea, string> Names = new()
-    {
-        [LogArea.App] = "app",
-        [LogArea.Audio] = "audio",
-        [LogArea.Plugins] = "plugin",
-        [LogArea.Tracker] = "tracker",
-        [LogArea.Midi] = "midi",
-        [LogArea.Machines] = "machines"
-    };
-
-    /// <summary>The word an area is written under, or a plain one for a line about several.</summary>
-    private static string Short(LogArea area) => Names.TryGetValue(area, out var name) ? name : "log";
+    /// <inheritdoc cref="ILogAreas.Everywhere"/>
+    public static IReadOnlyDictionary<LogArea, string> Everywhere => Switch.Everywhere;
 }

@@ -34,8 +34,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Midi/` - MIDI input handling and routing to pads and to the tracker
 - `Music/` - Notes, pitch and keyboards, knowing nothing about patterns: which key sounds which
   note, a note as a playback rate, concert pitch, and sharing a keyboard out among pieces
-- `Files/` - Whether two paths are the same file on this machine, which is a question about the
-  operating system rather than about the tracker, and is asked from everywhere
+- `Files/` - The three questions about a file that are about this machine rather than about
+  this program, and are asked from everywhere: whether two paths are the same file, where the
+  application keeps its things, and how a file is written whole. `AppFolder` and `SafeFile` sat
+  in `Config/` and were moved here, since neither is about the settings and `AppFolder`'s own
+  remarks said so: a plugin's own process needs it and has no settings to read
 - `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the machine rack
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
@@ -304,7 +307,33 @@ So a static class is a decision to be untestable, and it is almost never worth m
 that were here became sealed instance classes behind interfaces in one pass: the note and
 keyboard maths in `Music/`, the viewport and gain rules in `UI/`, the DSP helpers in
 `Tracker/Synth/`, the machines folder in `Tracker/Machines/`, and the pattern, slice and song
-helpers at the root of `Tracker/`.
+helpers at the root of `Tracker/`. A second pass took `Audio/`, `Midi/`, `Config/`,
+`Diagnostics/`, `Views/` and the theme.
+
+**Three doors stay static, and each one has the same reason.** `Log`, `CrashReport`,
+`ThemeManager`, and the two under them, `LinkKey` and `Pointable`. An application has one log,
+one run, one theme and one set of attached properties: handing one about would be handing the
+same object about under another name, and `Log` alone has fifty three callers including the
+thread that fills the audio buffer. **But nothing in a door decides anything.** What each one
+knows became an instance class behind an interface that can be asked without a process, a
+window or a disc: `ILogAreas` is which areas are on and what each is called, `ILogLine` the
+shape of a line, `ILogFile` the appending and the rolling over, `IRunMarker` the note a run
+leaves and which crashes belong to it, `IThemeCatalogue` which themes there are and what a name
+out of a settings file really means. The door is left holding a queue, a thread and a file.
+
+That is the pattern for anything that genuinely cannot be handed about, and it is worth naming
+because the alternative is what was there before: a rule nobody can reach, inside a class nobody
+can stand in front of. `LinkKey.Answers` was the first of these and arrived at from the same
+direction.
+
+What else stays static, and why. An ABI is not behaviour: `Vst3Abi` and `ClapAbi` are P/Invoke
+declarations, GUIDs and struct layouts, which is data with a compiler attached, and a
+`[LibraryImport]` has to be static anyway. `Pointable` is an Avalonia attached property, which
+the toolkit requires. `XErrors` installs the one X11 error handler a process has. `PanelPreview`
+and `PluginHostProcess` are entry points: this same executable started again, being something
+else. `PadMatrix` is three consts and `MixLinks` is nine templates named from XAML by
+`x:Static`, both data. `PluginCrashGuard` is a door like the log's and its rules came out into
+`IRunMarker`.
 
 What still does not get one: data. Records, enums, and the document types you can already build
 in a test and hand about (`Note`, `TrackerCell`, `Song`, `Pattern`). An `ISong` with forty
@@ -338,6 +367,17 @@ no behaviour, is what several classes agree to say, so it belongs to none of the
 living wherever the first class to need one happened to be. `Midi/ControlMapping.cs` held five
 enums and `Tracker/Synth/MonoSynthPatch.cs` another five; `TrackerPosition.cs` held two records
 and an enum.
+
+There was a `Models/` at the root holding four of these with three of them in one file, which is
+what the rule looks like when it is not applied: they were `Recording`, `WaveformData`,
+`TrimRegion` and `OutputDevice`, all four of them Audio's, and they are one to a file in
+`Audio/Records/` now. Two enums were living inside `PluginBridge.cs` for the same reason and are
+in `Audio/Plugins/Bridge/Enums/`. Nothing declares a record or an enum outside one of these
+folders any more, and that is worth checking rather than believing:
+
+```bash
+grep -rn "^public \(sealed \)\?\(readonly \)\?record\|^public enum" --include=*.cs .   | grep -v '/Records/' | grep -v '/Enums/'
+```
 
 `Records` holds records and record structs together. Every one of them is a record, and whether it
 is also a struct is a decision about copying rather than a statement about what the type is:
@@ -405,7 +445,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-652 of them, in about two seconds, with no window and no hardware. They run in CI on every push
+796 of them, in about three seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -429,6 +469,34 @@ parking, device roles, controller profiles and codecs, shortcuts, all four histo
 and their edits, a song being written down and poured back, the mix, envelopes, portable paths,
 the screen's bytes, the transport's two dialects, and the Lua fence. Several of those tests exist
 because that exact thing was wrong once.
+
+And the seams the second pass made: the filters, the drive curve, the sample window and its
+loop, the ducker, pitch motion, the WAV reader, peak normalisation, naming a take, the log's
+areas, the run marker, the theme catalogue, writing a file whole, and the bridge's message
+bodies. **Five of those found a defect the moment they existed**, which is the argument for the
+whole exercise and is worth writing down rather than summarising:
+
+- `SafeFile` destroyed the file it exists to protect. The writing and the moving were inside one
+  try, so a writer that threw part way fell into the fallback, which opened the real file,
+  emptied it, ran the same writer again and threw again. The old file was gone, the new one was
+  never written, and the exception said nothing about either. A song is built an entry at a
+  time, so any take that would not read reached it. The writing is its own attempt now: if it
+  fails, the old file has not been touched
+- The bridge's two longest messages could take the host down from reading them. `ReadWords` and
+  `ReadParameters` sized an array from a count read off the wire, so a damaged four bytes asked
+  for two thousand million strings, and both read past the end of a truncated payload and threw.
+  A payload from a process that has just crashed is exactly what those look like, and the bridge
+  exists so that a plugin falling over takes nothing with it but itself
+- The ducker never ducked from a quiet key track. The floor that stops the follower creeping
+  towards nought for ever was applied on the way up as well, and one attack step from nought at
+  five milliseconds is the target times 0.004525, so every key below 0.0221, about -33 dB, was
+  snapped back to nought on every frame for ever
+- `ToneFilter` guarded its cutoff against NaN and not its resonance, and `Math.Clamp` hands NaN
+  back by design, so a patch off disc could make all three coefficients NaN and the voice was
+  silent for the whole of its life. `SweepFilter` had always guarded both
+- The drive knob stepped 1.6 dB as it left its own minimum, since the makeup levels the curve at
+  full scale and nowhere else. Faded in over the first unit of the range now, so a drive of two
+  and above is exactly what it always was
 
 ## Technical Notes
 

@@ -10,46 +10,24 @@ using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Audio.Plugins;
 
-/// <summary>
-/// The one place that knows both plugin standards, so nothing above here has to.
-/// </summary>
-/// <remarks>
-/// CLAP and VST3 are different enough underneath to be worth keeping apart, and similar enough
-/// above to be worth hiding. A picker, a chain and a saved song all deal in
-/// <see cref="PluginInfo"/> and <see cref="IPluginEffect"/>; only this class chooses which
-/// loader to call.
-/// </remarks>
-public static class PluginHost
+/// <inheritdoc/>
+public sealed class PluginHost : IPluginHost
 {
-    /// <summary>
-    /// True when plugins are given a process of their own, which is Linux and macOS. Windows
-    /// loads them into this one.
-    /// </summary>
-    /// <remarks>
-    /// A plugin in its own process cannot take the application down, so everything the crash
-    /// guard was written for stops applying: nothing needs blocking, because nothing that goes
-    /// wrong in a plugin is fatal any more. See <see cref="PluginCrashGuard"/>, which stands
-    /// down while this is true.
-    ///
-    /// Windows is the exception because of how a plugin's window is handed over there: the
-    /// embedding used here only works within one process, so a VST3 plugin has to be loaded into
-    /// this one for its own interface to answer a mouse at all.
-    ///
-    /// <c>JB_PLUGINS_INPROCESS=1</c> turns it off everywhere, which is how a plugin is debugged
-    /// with the application's own debugger attached.
-    /// </remarks>
-    public static bool Isolated => !OperatingSystem.IsWindows() && !InProcessAsked;
+    /// <summary>Where CLAP plugins live on this machine. Holds nothing, so one is enough.</summary>
+    private readonly IClapScanner _clap = new ClapScanner();
+
+    /// <summary>And where VST3 ones do.</summary>
+    private readonly IVst3Scanner _vst3 = new Vst3Scanner();
+
+    /// <inheritdoc/>
+    public bool Isolated => !OperatingSystem.IsWindows() && !InProcessAsked;
 
     /// <summary>True when somebody has asked for plugins in this process, whatever the platform.</summary>
-    private static bool InProcessAsked =>
+    private bool InProcessAsked =>
         Environment.GetEnvironmentVariable(PluginBridge.InProcessVariable) == "1";
 
-    /// <summary>Opens a plugin as an effect, whichever standard it speaks.</summary>
-    /// <remarks>
-    /// The block size is a promise: a plugin allocates against it and may not be handed a bigger
-    /// one afterwards.
-    /// </remarks>
-    public static IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
+    /// <inheritdoc/>
+    public IPluginEffect? Load(PluginInfo plugin, int sampleRate, int maxFrames)
     {
         return Open(plugin, sampleRate, maxFrames, false) as IPluginEffect;
     }
@@ -66,7 +44,7 @@ public static class PluginHost
     /// None of that applies on the normal path, where the plugin gets a process of its own:
     /// nothing is written down beforehand because nothing in this process is at risk.
     /// </remarks>
-    private static object? Open(PluginInfo? plugin, int sampleRate, int maxFrames, bool asInstrument)
+    private object? Open(PluginInfo? plugin, int sampleRate, int maxFrames, bool asInstrument)
     {
         if (plugin == null) return null;
 
@@ -115,39 +93,31 @@ public static class PluginHost
         }
     }
 
-    /// <summary>
-    /// Opens a plugin as an instrument: something that takes notes and gives audio back.
-    /// </summary>
-    /// <remarks>
-    /// Only VST3 for now. CLAP carries notes just as well and the plumbing here is the same
-    /// shape, but nothing has been written for it yet, so a CLAP instrument is refused rather
-    /// than loaded and then found to be silent. <see cref="CanPlay"/> is what a picker should
-    /// ask so nobody is offered one.
-    /// </remarks>
-    public static IPluginInstrument? LoadInstrument(PluginInfo plugin, int sampleRate, int maxFrames)
+    /// <inheritdoc/>
+    public IPluginInstrument? LoadInstrument(PluginInfo plugin, int sampleRate, int maxFrames)
     {
         if (plugin == null || plugin.Format != PluginFormat.Vst3) return null;
 
         return Open(plugin, sampleRate, maxFrames, true) as IPluginInstrument;
     }
 
-    /// <summary>True when this host can play notes into a plugin of this kind.</summary>
-    public static bool CanPlay(PluginInfo plugin) =>
+    /// <inheritdoc/>
+    public bool CanPlay(PluginInfo plugin) =>
         plugin != null && plugin.IsInstrument && plugin.Format == PluginFormat.Vst3 &&
         (Isolated || !PluginCrashGuard.IsLoadBlocked(plugin));
 
-    /// <summary>Every directory either standard keeps plugins in, plus the user's own.</summary>
-    public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
+    /// <inheritdoc/>
+    public IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
     {
         var paths = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var path in ClapScanner.SearchPaths(extra))
+        foreach (var path in _clap.SearchPaths(extra))
         {
             if (seen.Add(path)) paths.Add(path);
         }
 
-        foreach (var path in Vst3Scanner.SearchPaths(extra))
+        foreach (var path in _vst3.SearchPaths(extra))
         {
             if (seen.Add(path)) paths.Add(path);
         }
@@ -155,31 +125,16 @@ public static class PluginHost
         return paths;
     }
 
-    /// <summary>
-    /// True when a plugin is still where it was found. A CLAP plugin is a file and a VST3
-    /// plugin is usually a folder, so both have to be asked about.
-    /// </summary>
-    public static bool Exists(PluginInfo plugin)
+    /// <inheritdoc/>
+    public bool Exists(PluginInfo plugin)
     {
         if (plugin == null || string.IsNullOrWhiteSpace(plugin.Path)) return false;
 
         return File.Exists(plugin.Path) || Directory.Exists(plugin.Path);
     }
 
-    /// <summary>
-    /// Looks in every standard place, opens what it finds, and asks each bundle what is in it.
-    /// A bundle that will not open is skipped rather than stopping the scan: one bad plugin is
-    /// not a machine with no plugins.
-    /// </summary>
-    /// <remarks>
-    /// In a process of its own on every platform, Windows included, where plugins are otherwise
-    /// loaded into this one. Scanning is the one thing that needs nothing from the window
-    /// embedding that keeps Windows in-process: the child opens each bundle, asks what is in it,
-    /// writes a list and goes away. And it is the worst place to be running somebody else's code
-    /// unprotected, because a plugin that dies while being asked what it is would take the
-    /// application down every time it started, before anybody had chosen to use it.
-    /// </remarks>
-    public static List<PluginInfo> Scan(IReadOnlyList<string> folders)
+    /// <inheritdoc/>
+    public List<PluginInfo> Scan(IReadOnlyList<string> folders)
     {
         return InProcessAsked ? ScanHere(folders) : ScanElsewhere(folders);
     }
@@ -201,7 +156,7 @@ public static class PluginHost
     /// executable, in which case the assembly has to be named as the first argument or the child
     /// would be a bare runtime with nothing to run.
     /// </remarks>
-    private static List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders)
+    private List<PluginInfo> ScanElsewhere(IReadOnlyList<string> folders)
     {
         string? self = Environment.ProcessPath;
         if (string.IsNullOrEmpty(self)) return ScanHere(folders);
@@ -270,11 +225,11 @@ public static class PluginHost
     /// Sorted by name and then by format, so a vendor who ships both a CLAP and a VST3 of the
     /// same plugin has them next to each other rather than at opposite ends of the list.
     /// </remarks>
-    internal static List<PluginInfo> ScanHere(IReadOnlyList<string> folders)
+    internal List<PluginInfo> ScanHere(IReadOnlyList<string> folders)
     {
         var found = new List<PluginInfo>();
 
-        foreach (var path in ClapScanner.Bundles(folders))
+        foreach (var path in _clap.Bundles(folders))
         {
             var bundle = ClapBundle.Acquire(path);
             if (bundle == null) continue;
@@ -284,7 +239,7 @@ public static class PluginHost
             bundle.Dispose();
         }
 
-        foreach (var path in Vst3Scanner.Bundles(folders))
+        foreach (var path in _vst3.Bundles(folders))
         {
             var module = Vst3Module.Acquire(path);
             if (module == null) continue;

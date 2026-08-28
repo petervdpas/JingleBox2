@@ -8,12 +8,17 @@ using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio;
 
 namespace JingleBox2.Tracker;
 
 /// <inheritdoc/>
 public sealed class SongSamples : ISongSamples
 {
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private readonly IRecordingImport _import = new RecordingImport();
+
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachineRegistry Registry = new MachineRegistry();
@@ -159,7 +164,7 @@ public sealed class SongSamples : ISongSamples
 
         if (manifest == null || manifest.Files.Count == 0) return landed;
 
-        string home = Audio.RecordingImport.Directory;
+        string home = _import.Directory;
         Directory.CreateDirectory(home);
 
         foreach (var carried in manifest.Files)

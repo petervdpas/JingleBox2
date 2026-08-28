@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Diagnostics;
 using JingleBox2.Audio;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Machines;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
@@ -20,6 +20,8 @@ using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.ViewModels;
 
@@ -34,6 +36,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private readonly IPluginHost _host = new PluginHost();
+
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
@@ -548,7 +553,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     public System.Collections.Generic.IReadOnlyList<Audio.Plugins.Records.PluginInfo> AvailablePlugins =>
         _plugins == null
             ? System.Array.Empty<Audio.Plugins.Records.PluginInfo>()
-            : _plugins.Plugins.Where(Audio.Plugins.PluginHost.CanPlay).ToList();
+            : _plugins.Plugins.Where(_host.CanPlay).ToList();
 
     /// <summary>True when there is any plugin worth offering, so the menu can be hidden.</summary>
     public bool HasAvailablePlugins => AvailablePlugins.Count > 0;
@@ -570,7 +575,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             return;
         }
 
-        if (!Audio.Plugins.PluginHost.CanPlay(plugin))
+        if (!_host.CanPlay(plugin))
         {
             Status = $"'{plugin.Name}' cannot be played as an instrument here.";
             return;

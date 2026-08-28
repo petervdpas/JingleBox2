@@ -1,12 +1,10 @@
 using Avalonia.Input;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
-/// <summary>
-/// The payload for dragging an instrument onto a track. One place that knows the format and
-/// how to read it back, so the drag source and the drop target cannot disagree.
-/// </summary>
-public static class InstrumentDragData
+/// <inheritdoc/>
+public sealed class InstrumentDragData : IDragPayload
 {
     /// <summary>Declared, not composed, so the format is greppable from both ends.</summary>
     private const string FormatName = "jinglebox.instrument.index";
@@ -22,15 +20,15 @@ public static class InstrumentDragData
     /// <param name="Index">Where the instrument sits in the song's list.</param>
     public sealed record Payload(int Index);
 
-    /// <summary>What to put in the hand when a drag of that instrument starts.</summary>
-    public static IDataTransfer For(int instrumentIndex)
+    /// <inheritdoc/>
+    public IDataTransfer For(int instrumentIndex)
     {
         var transfer = new DataTransfer();
         transfer.Add(DataTransferItem.Create(Format, new Payload(instrumentIndex)));
         return transfer;
     }
 
-    /// <summary>The instrument index a drag carries, or -1 when it carries something else.</summary>
-    public static int IndexFrom(IDataTransfer? transfer) =>
+    /// <inheritdoc/>
+    public int IndexFrom(IDataTransfer? transfer) =>
         transfer?.TryGetValue(Format) is Payload payload ? payload.Index : -1;
 }

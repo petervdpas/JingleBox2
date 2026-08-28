@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Audio.Plugins.Records;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -24,6 +25,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PluginLibraryViewModel : ObservableObject
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private readonly IPluginHost _plugins = new PluginHost();
+
     /// <summary>Set while a scan is running, so a second one cannot start on top of it.</summary>
     private bool _scanning;
 
@@ -77,7 +81,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
 
         foreach (var plugin in known)
         {
-            if (!PluginHost.Exists(plugin))
+            if (!_plugins.Exists(plugin))
             {
                 gone++;
                 continue;
@@ -248,7 +252,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
     /// Printed because a plugin somebody expects and cannot see is nearly always a plugin
     /// somewhere nobody looked.
     /// </remarks>
-    public string SearchPaths => string.Join("\n", PluginHost.SearchPaths(Folders));
+    public string SearchPaths => string.Join("\n", _plugins.SearchPaths(Folders));
 
     /// <summary>True when anything at all is known, scanned now or remembered from last time.</summary>
     public bool HasPlugins => Plugins.Count > 0;
@@ -282,7 +286,7 @@ public sealed partial class PluginLibraryViewModel : ObservableObject
         try
         {
             var folders = Folders.ToList();
-            var found = await Task.Run(() => PluginHost.Scan(folders));
+            var found = await Task.Run(() => _plugins.Scan(folders));
 
             Plugins.Clear();
             foreach (var plugin in found) Plugins.Add(plugin);

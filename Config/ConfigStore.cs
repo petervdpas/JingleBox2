@@ -7,6 +7,8 @@ using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Config.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Files.Interfaces;
+using JingleBox2.Files;
 
 namespace JingleBox2.Config;
 
@@ -37,6 +39,9 @@ public sealed class ConfigStore : IConfigStore
     /// </remarks>
     private const int FirstPadNote = 36;
 
+    /// <summary>How a file is written whole, so a settings save cannot leave half of one.</summary>
+    private readonly ISafeFile _files;
+
     /// <inheritdoc/>
     public string ConfigPath { get; }
 
@@ -47,9 +52,13 @@ public sealed class ConfigStore : IConfigStore
     /// The folder under the user's application data. Taken as an argument only so a test can
     /// point the whole thing at somewhere temporary; nothing in the application passes it.
     /// </param>
-    public ConfigStore(string appName = AppFolder.Name)
+    /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
+    /// <param name="files">How a file is written whole, defaulted to the real one.</param>
+    public ConfigStore(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null)
     {
-        var dir = AppFolder.Path(appName);
+        _files = files ?? new SafeFile();
+
+        var dir = (folder ?? new AppFolder()).Path(appName);
         Directory.CreateDirectory(dir);
 
         ConfigPath = Path.Combine(dir, "config.json");
@@ -83,7 +92,7 @@ public sealed class ConfigStore : IConfigStore
     {
         Normalize(cfg);
         var json = JsonSerializer.Serialize(cfg, JsonOptions);
-        SafeFile.Write(ConfigPath, json);
+        _files.Write(ConfigPath, json);
     }
 
     /// <summary>
@@ -105,7 +114,7 @@ public sealed class ConfigStore : IConfigStore
     /// matrix here, which is the only place that count is enforced.
     ///
     /// Two migrations live here and stay: pads written before profiles existed are moved into a
-    /// "default" profile, and <see cref="MidiDeviceBindings.Normalize"/> brings a file that
+    /// "default" profile, and <see cref="Midi.Interfaces.IMidiDeviceBindings.Normalize"/> brings a file that
     /// named one MIDI device across to the roles. Both are cheap and both have to keep working
     /// for as long as anybody has an old file, which is for ever.
     /// </remarks>
@@ -137,7 +146,7 @@ public sealed class ConfigStore : IConfigStore
         cfg.Midi ??= new MidiConfig();
         cfg.Midi.Pads ??= new List<MidiMapping>();
 
-        MidiDeviceBindings.Normalize(cfg.Midi);
+        new MidiDeviceBindings().Normalize(cfg.Midi);
 
         while (cfg.Midi.Pads.Count < padCount)
         {

@@ -56,7 +56,10 @@ public sealed class ToneFilter : IToneFilter
     /// </summary>
     /// <remarks>
     /// A cutoff that is not a number at all reads as wide open rather than poisoning every
-    /// sample the voice will ever produce: a patch off disc can hold anything.
+    /// sample the voice will ever produce: a patch off disc can hold anything. The resonance is
+    /// read the same way, and for a while was not: <see cref="Math.Clamp(double, double, double)"/>
+    /// hands NaN back by design, so a NaN resonance reached the damping, and through it all three
+    /// coefficients, and the voice was silent for the whole of its life with nothing said.
     /// </remarks>
     /// <param name="cutoffHz">Where the filter turns over, in hertz, as the patch holds it.</param>
     /// <param name="resonance">How hard it rings at the cutoff, held between <see cref="MinResonance"/> and <see cref="MaxResonance"/>.</param>
@@ -67,12 +70,13 @@ public sealed class ToneFilter : IToneFilter
 
         double nyquist = rate / 2;
         double cutoff = Math.Clamp(double.IsNaN(cutoffHz) ? OpenHz : cutoffHz, MinHz, OpenHz);
+        double ring = Math.Clamp(double.IsNaN(resonance) ? MinResonance : resonance, MinResonance, MaxResonance);
 
         _bypass = cutoff >= OpenHz || cutoff >= nyquist * NyquistMargin;
         if (_bypass) return;
 
         double g = Math.Tan(Math.PI * cutoff / rate);
-        double k = 2.0 - 1.9 * Math.Clamp(resonance, MinResonance, MaxResonance);
+        double k = 2.0 - 1.9 * ring;
 
         _a1 = 1.0 / (1.0 + g * (g + k));
         _a2 = g * _a1;
@@ -95,5 +99,12 @@ public sealed class ToneFilter : IToneFilter
         _second = 2.0 * v2 - _second;
 
         return v2;
+    }
+
+    /// <inheritdoc/>
+    public void Reset()
+    {
+        _first = 0;
+        _second = 0;
     }
 }

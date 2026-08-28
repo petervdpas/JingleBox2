@@ -1,67 +1,48 @@
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio;
 
 namespace JingleBox2.Audio;
 
-/// <summary>
-/// Brings recordings in from anywhere on the disc by copying them into JingleBox's own.
-/// </summary>
-/// <remarks>
-/// The machines only play recordings JingleBox holds, and this is the one door in. A sample
-/// that lives in somebody's downloads folder is a song waiting to break: the folder gets tidied
-/// and the kit goes silent, which is exactly what happened to the first kit built here. Copied
-/// in, the file is ours, and a song depending on it depends on something that will still be
-/// there.
-///
-/// It is also the Emulator's own arrangement, and where the word comes from: you loaded your
-/// sounds onto the machine's disk, and after that the machine played from its disk.
-/// </remarks>
-public static class RecordingImport
+/// <inheritdoc/>
+public sealed class RecordingImport : IRecordingImport
 {
-    /// <summary>What can be brought in.</summary>
-    /// <remarks>
-    /// WAV first, because that is what the shelf holds, then everything the decoder can turn
-    /// into one. A machine still only ever plays a WAV: an instrument is read into memory by
-    /// <c>SampleStore</c>, which decodes WAV alone, and the shelf is what it reads from.
-    ///
-    /// So this is not a list of what a machine can play. It is a list of what can be made into
-    /// something a machine can play, on the way in, once, before the file is on the shelf at
-    /// all. What is offered follows what is really installed, so nothing is offered here that
-    /// would then fail: see <see cref="BassPlugins"/>.
-    /// </remarks>
-    public static string[] Kinds =>
-        new[] { WavKind }.Concat(AudioDecode.Kinds).ToArray();
+    /// <summary>Where the application keeps its things, which the shelf sits under.</summary>
+    private readonly Files.Interfaces.IAppFolder _folder = new Files.AppFolder();
+
+    /// <summary>Reading and writing WAV files, which is what everything here ends as.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
+    /// <summary>Turning everything that is not a WAV into one, at the door.</summary>
+    private readonly IAudioDecode _decode = new AudioDecode();
+
+    /// <inheritdoc/>
+    public string[] Kinds =>
+        new[] { WavKind }.Concat(_decode.Kinds).ToArray();
 
     /// <summary>What the shelf holds, and what everything written here is written as.</summary>
     private const string WavKind = ".wav";
 
-    /// <summary>Where JingleBox keeps its recordings.</summary>
-    public static string Directory =>
-        System.IO.Path.Combine(Config.AppFolder.Path(), "recordings");
+    /// <inheritdoc/>
+    public string Directory =>
+        System.IO.Path.Combine(_folder.Path(), "recordings");
 
-    /// <summary>True when this is something worth offering to bring in.</summary>
-    public static bool Playable(string path) =>
+    /// <inheritdoc/>
+    public bool Playable(string path) =>
         Kinds.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>True when a file will be rewritten on the way in rather than copied.</summary>
-    /// <remarks>
-    /// For a panel that wants to say what it did with a file. The answer is the same one
-    /// <see cref="Convert"/> acts on, asked without doing anything.
-    ///
-    /// Anything that is not a WAV is decoded and written out as one, whatever is inside it. A
-    /// file that cannot be read as a WAV either is copied as it is, so nothing is converted.
-    /// </remarks>
-    /// <param name="path">The file, wherever it is.</param>
-    public static bool Converts(string path)
+    /// <inheritdoc/>
+    public bool Converts(string path)
     {
-        if (AudioDecode.Handles(path)) return true;
+        if (_decode.Handles(path)) return true;
 
         try
         {
-            return !WavFile.StoredAs(path).IsOurs;
+            return !_wav.StoredAs(path).IsOurs;
         }
         catch (Exception)
         {
@@ -69,20 +50,8 @@ public static class RecordingImport
         }
     }
 
-    /// <summary>
-    /// Copies each file in and hands back what they became. Files already ours are left where
-    /// they are and reported as themselves, so importing twice does not make two.
-    /// </summary>
-    /// <remarks>
-    /// Only a WAV already sitting on the shelf is left alone. Anything else is brought in even
-    /// from that same folder, since an mp3 lying there is not on the shelf: nothing reads it.
-    ///
-    /// One file that will not copy is one file rather than a failed import, so the rest still
-    /// arrive.
-    /// </remarks>
-    /// <param name="paths">The files, or null.</param>
-    /// <returns>What each became, in the order they were given.</returns>
-    public static IReadOnlyList<Recording> Take(IEnumerable<string> paths)
+    /// <inheritdoc/>
+    public IReadOnlyList<Recording> Take(IEnumerable<string> paths)
     {
         var taken = new List<Recording>();
         if (paths == null) return taken;
@@ -130,7 +99,7 @@ public static class RecordingImport
     /// <param name="path">The file being brought in.</param>
     /// <param name="home">The recordings folder.</param>
     /// <returns>Where it landed.</returns>
-    private static string Copy(string path, string home)
+    private string Copy(string path, string home)
     {
         string stem = Path.GetFileNameWithoutExtension(path);
 
@@ -171,23 +140,23 @@ public static class RecordingImport
     /// <param name="path">The file being brought in.</param>
     /// <param name="wanted">Where it is to land.</param>
     /// <exception cref="InvalidOperationException">It could not be decoded.</exception>
-    private static void Convert(string path, string wanted)
+    private void Convert(string path, string wanted)
     {
-        if (AudioDecode.Handles(path))
+        if (_decode.Handles(path))
         {
-            if (AudioDecode.Read(path) is not { } decoded)
-                throw new InvalidOperationException(AudioDecode.Trouble(path));
+            if (_decode.Read(path) is not { } decoded)
+                throw new InvalidOperationException(_decode.Trouble(path));
 
-            WavFile.Write(wanted, decoded.Samples, decoded.SampleRate, decoded.Channels);
+            _wav.Write(wanted, decoded.Samples, decoded.SampleRate, decoded.Channels);
 
             return;
         }
 
-        WavFile.Stored stored;
+        WavStored stored;
 
         try
         {
-            stored = WavFile.StoredAs(path);
+            stored = _wav.StoredAs(path);
         }
         catch (Exception)
         {
@@ -201,23 +170,19 @@ public static class RecordingImport
             return;
         }
 
-        var (samples, info) = WavFile.Read(path);
+        var (samples, info) = _wav.Read(path);
 
-        WavFile.Write(wanted, samples, info.SampleRate, info.Channels);
+        _wav.Write(wanted, samples, info.SampleRate, info.Channels);
     }
 
-    /// <summary>How a file is written, for a panel that wants to say what it did with it.</summary>
-    /// <remarks>
-    /// A compressed file has no bit depth worth reporting, so what it is called is what it is.
-    /// </remarks>
-    /// <param name="path">The file.</param>
-    public static string Describe(string path)
+    /// <inheritdoc/>
+    public string Describe(string path)
     {
-        if (AudioDecode.Handles(path)) return Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        if (_decode.Handles(path)) return Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
 
         try
         {
-            return WavFile.StoredAs(path).ToString();
+            return _wav.StoredAs(path).ToString();
         }
         catch (Exception)
         {

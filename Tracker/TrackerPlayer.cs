@@ -34,6 +34,12 @@ namespace JingleBox2.Tracker;
 /// </remarks>
 public sealed class TrackerPlayer : ITrackerPlayer
 {
+    /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
+    private readonly IPluginHost _plugins = new PluginHost();
+
+    /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IPluginChainState _chains = new PluginChainState();
+
     /// <summary>What the mix adds up to, mute and solo included.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMixLevels Levels = new MixLevels();
@@ -478,7 +484,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (StripOf(song, track) is not { } strip) continue;
 
             var chain = InsertOn(track) as PluginChain;
-            var captured = PluginChainState.Capture(chain, patches);
+            var captured = _chains.Capture(chain, patches);
 
             strip.Plugins = captured.IsEmpty ? null : captured;
         }
@@ -501,7 +507,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (strip.Plugins is null or { IsEmpty: true } && InsertOn(track) is null) continue;
 
             var chain = ChainFor(track);
-            missing.AddRange(PluginChainState.Restore(
+            missing.AddRange(_chains.Restore(
                 chain, strip.Plugins, _synth.SampleRate, MaxPluginFrames));
         }
 
@@ -531,11 +537,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             if (chain is null && (wanted is null || wanted.IsEmpty)) continue;
 
-            var loaded = PluginChainState.Capture(chain);
+            var loaded = _chains.Capture(chain);
 
             if (Same(loaded, wanted)) continue;
 
-            PluginChainState.Restore(ChainFor(track), wanted, _synth.SampleRate, MaxPluginFrames);
+            _chains.Restore(ChainFor(track), wanted, _synth.SampleRate, MaxPluginFrames);
 
             changed.Add(track);
         }
@@ -740,7 +746,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         try
         {
-            player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
+            player = _plugins.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
             if (player == null) return null;
 
             player.LoadState(instrument.PluginState);
@@ -884,7 +890,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             var description = instrument.Plugin;
             if (description == null) return null;
 
-            var player = PluginHost.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
+            var player = _plugins.LoadInstrument(description, _synth.SampleRate, MaxPluginFrames);
             if (player == null) return null;
 
             player.LoadState(instrument.PluginState);

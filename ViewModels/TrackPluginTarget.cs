@@ -11,7 +11,7 @@ namespace JingleBox2.ViewModels;
 /// a track: it is not in the song's mix, nothing that walks the tracks reaches it by counting,
 /// and it does not move when they are reordered.
 /// </remarks>
-public sealed class TrackPluginTarget : IPluginHost
+public sealed class TrackPluginTarget : IChainOwner
 {
     /// <summary>Where the buses are, since a track's chain belongs to the player.</summary>
     private readonly TrackerPlayer _player;

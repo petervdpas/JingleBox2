@@ -8,7 +8,7 @@ namespace JingleBox2.Config.Interfaces;
 /// </summary>
 /// <remarks>
 /// One file for the whole application, written whole every time and never appended to, so a
-/// save is either the old settings or the new ones. That is <see cref="SafeFile"/>'s job
+/// save is either the old settings or the new ones. That is <see cref="Files.Interfaces.ISafeFile"/>'s job
 /// rather than this one, but it is the reason a save here can be asked for as often as a level
 /// being dragged wants it.
 ///

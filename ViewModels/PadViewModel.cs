@@ -8,13 +8,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
 using JingleBox2.Config;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Audio.Records;
 using JingleBox2.UI;
 using JingleBox2.UI.Interfaces;
+using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.ViewModels;
 
@@ -34,6 +35,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
+    /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
+    private readonly IPluginChainState _chains = new PluginChainState();
+
     /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
     private readonly IGainScale _gain = new GainScale();
 
@@ -128,7 +132,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     {
         Patches = Effect?.Target == null
             ? Array.Empty<byte[]>()
-            : JingleBox2.Audio.Plugins.PluginChainState.Patches(Effect.Target.Chain);
+            : _chains.Patches(Effect.Target.Chain);
     }
 
     /// <summary>
@@ -144,7 +148,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     {
         if (Effect?.Target == null || saved == null || saved.IsEmpty) return;
 
-        var missing = JingleBox2.Audio.Plugins.PluginChainState.Restore(
+        var missing = _chains.Restore(
             Effect.Target.Chain,
             saved,
             Effect.Target.SampleRate,

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -14,6 +15,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class SongDetailsDialog : Window
 {
+    /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
+    private static readonly IDialogs Modal = new Dialogs();
+
     /// <summary>What came back: the name, and what the song says about itself.</summary>
     public sealed record Details(string Name, string Description);
 
@@ -48,7 +52,7 @@ public partial class SongDetailsDialog : Window
             nameBox?.SelectAll();
         };
 
-        return Dialog.ShowAsync<Details?>(dialog, null);
+        return Modal.ShowAsync<Details?>(dialog, null);
     }
 
     /// <summary>

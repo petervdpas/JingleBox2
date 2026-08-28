@@ -112,23 +112,23 @@ public class SaturationTests
         Assert.Equal(1.0, _drive.Makeup(double.NaN), 12);
     }
 
-    /// <summary>
-    /// An endless drive is a hard clip, and a sample of exactly nought at an endless drive is
-    /// not a number at all.
-    /// </summary>
+    /// <summary>An endless drive is a hard clip, silence included.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. Nought times
-    /// infinity is NaN before the tangent ever sees it, so the one sample that should certainly
-    /// come back as nought is the one that comes back poisoned. Nothing in the patch can reach
-    /// an infinite drive; a file somebody has edited can.
+    /// Silence used to come back as not a number. Nought times infinity is NaN before the
+    /// tangent ever sees it, so the one sample no curve can move was the one that came back
+    /// poisoned. Nothing in the patch can reach an infinite drive; a file somebody has edited
+    /// can. Silence is answered before the curve is reached now, which is free for every other
+    /// drive as well, since a curve through the origin has nothing to say about nought.
     /// </remarks>
     [Fact]
-    public void An_endless_drive_clips_and_loses_the_sample_at_nought()
+    public void An_endless_drive_clips_and_leaves_silence_alone()
     {
         Assert.Equal(1.0, _drive.Apply(0.5, double.PositiveInfinity), 12);
         Assert.Equal(-1.0, _drive.Apply(-0.5, double.PositiveInfinity), 12);
 
-        Assert.True(double.IsNaN(_drive.Apply(0.0, double.PositiveInfinity)));
+        Assert.Equal(0.0, _drive.Apply(0.0, double.PositiveInfinity), 12);
+        Assert.Equal(0.0, _drive.Apply(0.0, 4.0), 12);
+        Assert.Equal(0.0, _drive.Apply(0.0, 1.0), 12);
     }
 
     /// <summary>A sample that is not a number stays that way, driven or not.</summary>
@@ -150,21 +150,60 @@ public class SaturationTests
         Assert.False(double.IsNaN(_drive.Apply(0.5, 4.0)));
     }
 
-    /// <summary>
-    /// The bottom of the drive range is a step rather than a slope: a hair above one is
-    /// audibly louder in the middle of the wave than one exactly.
-    /// </summary>
+    /// <summary>The bottom of the drive range is a slope rather than a step.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. The makeup levels
-    /// the curve at full scale and nowhere else, so everything below full scale is lifted the
-    /// moment the control leaves its bottom end. Half scale jumps from 0.5 to 0.607, which is
-    /// about a decibel and a half, on a knob movement of nothing at all.
+    /// It used to be a step. The makeup levels the curve at full scale and nowhere else, so
+    /// everything below full scale was lifted the moment the control left its bottom end, and
+    /// half scale jumped from 0.5 to 0.607, about a decibel and a half, on a knob movement of
+    /// nothing at all. The curve is faded in over the first unit of the range instead, so a
+    /// drive of two and anything above it is exactly what it always was.
     /// </remarks>
     [Fact]
-    public void Crossing_the_bottom_of_the_drive_range_is_a_step()
+    public void The_bottom_of_the_drive_range_is_a_slope()
     {
         Assert.Equal(0.5, _drive.Apply(0.5, 1.0), 6);
-        Assert.Equal(0.607, _drive.Apply(0.5, 1.0000001), 3);
+        Assert.Equal(0.5, _drive.Apply(0.5, 1.0000001), 6);
+
+        Assert.Equal(Math.Tanh(1.0) / Math.Tanh(2.0), _drive.Apply(0.5, 2.0), 12);
+        Assert.Equal(Math.Tanh(2.0) / Math.Tanh(4.0), _drive.Apply(0.5, 4.0), 12);
+    }
+
+    /// <summary>Nothing in the drive range jumps: the curve walks the knob without a break.</summary>
+    /// <remarks>
+    /// Ten thousand steps from the bottom of the range to the top, at three points on the wave.
+    /// A step of a thousandth of the range may not move a sample by more than a hundredth,
+    /// which is far looser than the curve really is and far tighter than the 0.107 the bottom
+    /// end used to jump by.
+    /// </remarks>
+    [Fact]
+    public void The_whole_drive_range_is_continuous()
+    {
+        const int steps = 10000;
+        double span = (SynthPatch.MaxDrive - SynthPatch.MinDrive) / steps;
+
+        foreach (double sample in new[] { 0.25, 0.5, 0.9 })
+        {
+            double last = _drive.Apply(sample, SynthPatch.MinDrive);
+
+            for (int i = 1; i <= steps; i++)
+            {
+                double next = _drive.Apply(sample, SynthPatch.MinDrive + i * span);
+
+                Assert.True(Math.Abs(next - last) < 0.01, $"a jump of {Math.Abs(next - last)} at {sample}");
+                last = next;
+            }
+        }
+    }
+
+    /// <summary>Full scale still comes out at full scale, which is what the makeup is for.</summary>
+    [Fact]
+    public void Full_scale_survives_every_drive()
+    {
+        for (double drive = SynthPatch.MinDrive; drive <= SynthPatch.MaxDrive; drive += 0.25)
+        {
+            Assert.Equal(1.0, _drive.Apply(1.0, drive), 12);
+            Assert.Equal(-1.0, _drive.Apply(-1.0, drive), 12);
+        }
     }
 
     /// <summary>
@@ -328,22 +367,23 @@ public class SaturationTests
         Assert.Equal(1.0, _osc.Wrap(-1e-18), 12);
     }
 
-    /// <summary>
-    /// A phase that is not a number, or is endless, comes back not a number.
-    /// </summary>
+    /// <summary>A phase that is not a finite number starts the cycle again.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. Both comparisons
-    /// are false for NaN, so it passes through untouched; infinity takes the first branch and
-    /// infinity less infinity is NaN. A voice whose phase reaches either state is silent for
-    /// the rest of its life, since the phase is a running sum and never recovers. Nothing in
-    /// the patch can produce it: a step worked out from a ratio of a bad tuning can.
+    /// All three used to come back as not a number and stay that way. Both comparisons are
+    /// false for NaN, so it passed through untouched, and infinity took the first branch and
+    /// came out as infinity less infinity, which is NaN as well. The phase is a running sum, so
+    /// a voice that reached either state was silent for the rest of its life. Nothing in the
+    /// patch can produce one: a step worked out from the ratio of a bad tuning can.
     /// </remarks>
     [Fact]
-    public void A_phase_that_is_not_a_number_stays_that_way()
+    public void A_phase_that_is_not_a_finite_number_starts_again()
     {
-        Assert.True(double.IsNaN(_osc.Wrap(double.NaN)));
-        Assert.True(double.IsNaN(_osc.Wrap(double.PositiveInfinity)));
-        Assert.True(double.IsNaN(_osc.Wrap(double.NegativeInfinity)));
+        Assert.Equal(0.0, _osc.Wrap(double.NaN), 12);
+        Assert.Equal(0.0, _osc.Wrap(double.PositiveInfinity), 12);
+        Assert.Equal(0.0, _osc.Wrap(double.NegativeInfinity), 12);
+
+        Assert.Equal(0.25, _osc.Wrap(0.25), 12);
+        Assert.Equal(0.25, _osc.Wrap(4.25), 12);
     }
 
     /// <summary>Reading a shape does not wrap the phase for its caller.</summary>

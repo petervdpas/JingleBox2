@@ -35,7 +35,7 @@ public static class ControllerFolder
     public static string Shipped => Path.Combine(AppContext.BaseDirectory, Name);
 
     /// <summary>And where the ones this installation has live.</summary>
-    public static string Installed => Path.Combine(Config.AppFolder.Path(), Name);
+    public static string Installed => Path.Combine(new Files.AppFolder().Path(), Name);
 
     /// <summary>What has already been offered, so a new file can arrive and a deleted one cannot.</summary>
     private const string OfferedName = "offered.txt";

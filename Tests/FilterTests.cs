@@ -279,23 +279,60 @@ public class FilterTests
     }
 
     /// <summary>
-    /// A resonance that is not a number poisons every sample the filter will ever produce.
+    /// A resonance that is not a number reads as none, exactly as a cutoff reads as wide open.
     /// </summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. The constructor
-    /// reads a NaN cutoff as wide open and says so in its own remarks, and then hands the
-    /// resonance straight to a clamp, which propagates NaN by design. The coefficients come out
-    /// NaN, and since a fixed filter has nothing to reset, the voice is silent for its whole
-    /// life. <see cref="ISweepFilter.Set"/> guards both halves, which is what this one should do.
+    /// It used to poison every sample the filter would ever produce. The constructor read a NaN
+    /// cutoff as wide open and said so in its own remarks, and then handed the resonance
+    /// straight to a clamp, which propagates NaN by design, so all three coefficients came out
+    /// NaN and the voice was silent for the whole of its life.
+    /// <see cref="ISweepFilter.Set"/> has always guarded both halves.
     /// </remarks>
     [Fact]
-    public void A_resonance_that_is_not_a_number_poisons_the_whole_filter()
+    public void A_resonance_that_is_not_a_number_reads_as_none()
     {
         IToneFilter filter = new ToneFilter(1000, double.NaN, Rate);
+        IToneFilter plain = new ToneFilter(1000, ToneFilter.MinResonance, Rate);
 
         Assert.False(filter.IsOpen);
-        Assert.True(double.IsNaN(filter.Process(1.0)));
-        Assert.True(double.IsNaN(filter.Process(0.0)));
+
+        foreach (double sample in new[] { 1.0, 0.5, -0.25, 0.0 })
+            Assert.Equal(plain.Process(sample), filter.Process(sample), 12);
+    }
+
+    /// <summary>Emptying the integrators is the only way a poisoned fixed filter recovers.</summary>
+    /// <remarks>
+    /// The coefficients are fixed and are untouched by this: what a reset clears is the memory,
+    /// so a filter handed one value that is not a number is usable again afterwards rather than
+    /// silent until the note ends.
+    /// </remarks>
+    [Fact]
+    public void A_reset_empties_the_filters_memory()
+    {
+        IToneFilter filter = new ToneFilter(1000, 0.5, Rate);
+
+        Assert.True(double.IsNaN(filter.Process(double.NaN)));
+        Assert.True(double.IsNaN(filter.Process(0.5)));
+
+        filter.Reset();
+
+        double first = filter.Process(0.5);
+        Assert.True(double.IsFinite(first));
+
+        IToneFilter fresh = new ToneFilter(1000, 0.5, Rate);
+        Assert.Equal(fresh.Process(0.5), first, 12);
+    }
+
+    /// <summary>A reset on a filter that is out of the way is allowed and does nothing.</summary>
+    [Fact]
+    public void A_reset_on_an_open_filter_changes_nothing()
+    {
+        IToneFilter filter = new ToneFilter(ToneFilter.OpenHz, 0, Rate);
+
+        Assert.True(filter.IsOpen);
+        filter.Reset();
+
+        Assert.Equal(0.75, filter.Process(0.75), 12);
     }
 
     /// <summary>One bad sample stays in a fixed filter for the rest of its life.</summary>
@@ -737,29 +774,36 @@ public class FilterTests
     }
 
     /// <summary>
-    /// A key quieter than about two percent of full scale never ducks anything at all.
+    /// A key quieter than about two percent of full scale ducks in proportion, like any other.
     /// </summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. The floor that
-    /// stops the follower creeping towards nought for ever is applied on the way up as well as
-    /// on the way down, and one attack step from nought towards a target of 0.02 is smaller
-    /// than the floor. So the follower is put back to nought on every frame and a quiet key
-    /// track keys nothing, permanently. A key at half scale is unaffected and works as it reads.
+    /// It used to duck nothing at all. The floor that stops the follower creeping towards
+    /// nought for ever was applied on the way up as well as on the way down, and one attack
+    /// step from nought towards a target of 0.02 is smaller than the floor, so the follower was
+    /// put back to nought on every frame for ever and a quiet key track keyed nothing, silently.
+    /// A key at half scale was unaffected, which is what made it hard to see.
     /// </remarks>
     [Fact]
-    public void A_key_below_the_floor_never_ducks_at_all()
+    public void A_key_below_the_floor_still_ducks()
     {
         IDucker quiet = new Ducker(TrackMix.DefaultDuckReleaseMs, Rate);
 
         for (int i = 0; i < 10000; i++) quiet.Next(0.02);
 
-        Assert.Equal(0.0, quiet.Level);
+        Assert.Equal(0.02, quiet.Level, 3);
 
         IDucker loud = new Ducker(TrackMix.DefaultDuckReleaseMs, Rate);
 
         for (int i = 0; i < 10000; i++) loud.Next(0.5);
 
         Assert.Equal(0.5, loud.Level, 3);
+
+        IDucker silent = new Ducker(TrackMix.DefaultDuckReleaseMs, Rate);
+
+        for (int i = 0; i < 500; i++) silent.Next(1.0);
+        for (int i = 0; i < 200000; i++) silent.Next(0);
+
+        Assert.Equal(0.0, silent.Level);
     }
 
     /// <summary>The release is held inside the strip's own ends, and nonsense reads as the default.</summary>
@@ -848,20 +892,20 @@ public class FilterTests
         Assert.Equal(0.0, (double)ducker.GainFor(double.PositiveInfinity, 1), 6);
     }
 
-    /// <summary>A depth that is not a number makes a gain that is not a number.</summary>
+    /// <summary>Either argument being not a number at all reads as no ducking.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do.
-    /// <see cref="IDucker.Next"/> guards its key against NaN and says so; the gain guards
-    /// neither of its two, and a clamp propagates NaN by design. The depth comes off the
-    /// strip, which is JSON in a song, so a song somebody has edited multiplies a whole track
-    /// by NaN. The same holds for a follower nobody got from <see cref="IDucker.Next"/>.
+    /// It used to make a gain that was not a number. <see cref="IDucker.Next"/> guarded its key
+    /// and said so; the gain guarded neither of its two and a clamp propagates NaN by design,
+    /// so a depth off a song somebody had edited multiplied a whole track by NaN and silenced
+    /// it. An infinite depth is a separate question and is still held at full scale.
     /// </remarks>
     [Fact]
-    public void A_depth_that_is_not_a_number_makes_a_gain_that_is_not_a_number()
+    public void A_gain_argument_that_is_not_a_number_reads_as_no_ducking()
     {
         IDucker ducker = new Ducker(TrackMix.DefaultDuckReleaseMs, Rate);
 
-        Assert.True(float.IsNaN(ducker.GainFor(1, double.NaN)));
-        Assert.True(float.IsNaN(ducker.GainFor(double.NaN, 1)));
+        Assert.Equal(1.0, (double)ducker.GainFor(1, double.NaN), 6);
+        Assert.Equal(1.0, (double)ducker.GainFor(double.NaN, 1), 6);
+        Assert.Equal(1.0, (double)ducker.GainFor(double.NaN, double.NaN), 6);
     }
 }

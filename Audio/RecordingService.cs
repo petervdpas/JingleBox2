@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Records;
+using JingleBox2.Audio;
 
 namespace JingleBox2.Audio;
 
@@ -16,6 +17,9 @@ namespace JingleBox2.Audio;
 /// </remarks>
 public sealed class RecordingService : IRecordingService, IDisposable
 {
+    /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
+    private readonly IWavFile _wav = new WavFile();
+
     /// <summary>No device at all, which is neither a real one nor the default.</summary>
     private const int NoDevice = int.MinValue;
 
@@ -435,7 +439,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             try
             {
-                WavFile.Write(filePath, pcmData, _sampleRate, _channels);
+                _wav.Write(filePath, pcmData, _sampleRate, _channels);
                 return filePath;
             }
             catch (Exception ex)

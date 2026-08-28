@@ -286,27 +286,54 @@ public class SamplePlaybackTests
     }
 
     /// <summary>
-    /// Reopening a window that had nothing in it leaves the loop where the old window put it.
+    /// Reopening a window that had nothing in it opens the loop out with it.
     /// </summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. The window opens
-    /// back out to the whole file, which is what it says it does; the loop is then held inside
-    /// the new window rather than opened out with it, so a shape whose handles were dragged
-    /// together comes back playing the whole file with a half frame loop at its very start. A
-    /// forward loop on one is a voice that never leaves the first frame. Nothing reaches this
+    /// The loop used to be left where the old window had put it. The window opens back out to
+    /// the whole file, which is what it says it does; the loop was then merely held inside the
+    /// new window rather than opened out with it, so a shape whose handles had been dragged
+    /// together came back playing the whole file with a half frame loop at its very start, and
+    /// a forward loop on one is a voice that never leaves the first frame. Nothing reaches this
     /// from the editor, which does not let the handles cross; a preset or a song written by
     /// hand does.
     /// </remarks>
     [Fact]
-    public void Reopening_a_window_leaves_the_loop_where_it_was()
+    public void Reopening_a_window_reopens_the_loop_with_it()
     {
         SampleWindow window = _play.WindowFor(
             new SampleShape { Start = 0, End = 0.0005, LoopMode = SampleLoopMode.Forward },
             1001);
 
+        Assert.Equal(0.0, window.Start, 6);
         Assert.Equal(1000.0, window.End, 6);
         Assert.Equal(0.0, window.LoopStart, 6);
-        Assert.Equal(0.5, window.LoopEnd, 6);
+        Assert.Equal(1000.0, window.LoopEnd, 6);
+        Assert.True(window.IsLooping);
+    }
+
+    /// <summary>A loop with nothing in it to play is the whole window, not a buzz at one frame.</summary>
+    /// <remarks>
+    /// The window itself is wide open here, so the only thing collapsed is the loop. Shorter
+    /// than a frame there is nothing between the two marks to read, and
+    /// <see cref="SampleWindow.IsLooping"/> only refuses a loop of no length at all, so half a
+    /// frame passed as a real loop and the voice repeated inside it until the note was let go.
+    /// </remarks>
+    [Fact]
+    public void A_loop_shorter_than_a_frame_becomes_the_whole_window()
+    {
+        SampleWindow window = _play.WindowFor(
+            new SampleShape
+            {
+                Start = 0,
+                End = 1,
+                LoopStart = 0.4,
+                LoopEnd = 0.4004,
+                LoopMode = SampleLoopMode.Forward
+            },
+            1001);
+
+        Assert.Equal(0.0, window.LoopStart, 6);
+        Assert.Equal(1000.0, window.LoopEnd, 6);
         Assert.True(window.IsLooping);
     }
 
@@ -567,31 +594,33 @@ public class SamplePlaybackTests
         Assert.False(_play.Advance(ref position, ref direction, 1, window));
     }
 
-    /// <summary>A step that is not a number ends a one-shot and strands a loop.</summary>
+    /// <summary>A step that is not a finite number ends the note, looping or not.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. A one-shot comes
-    /// off best by accident: both of its bounds are comparisons, both are false for NaN, so the
-    /// note is simply over. A looping window asks the same kind of question, gets the same
-    /// false, and reports that there is more to play with a read head that is nowhere. The
-    /// voice then reads silence for ever and never ends itself. A step is a pitch ratio times a
-    /// rate ratio, so a tuning read off a damaged file is the way in.
+    /// A one-shot used to come off best by accident: both of its bounds are comparisons, both
+    /// are false for NaN, so the note was simply over. A looping window asked the same kind of
+    /// question, got the same false, and reported that there was more to play with a read head
+    /// that was nowhere, so the voice read silence for ever and never ended itself. A step is a
+    /// pitch ratio times a rate ratio, so a tuning read off a damaged file is the way in, and
+    /// the position is left where it was rather than being made nonsense along with the step.
     /// </remarks>
     [Fact]
-    public void A_step_that_is_not_a_number_strands_a_looping_voice()
+    public void A_step_that_is_not_a_finite_number_ends_the_note()
     {
         double oneShot = 50;
         int forwards = 1;
 
         Assert.False(_play.Advance(ref oneShot, ref forwards, double.NaN, OneShot));
+        Assert.Equal(50.0, oneShot, 12);
 
         double looping = 50;
         int direction = 1;
 
-        Assert.True(_play.Advance(ref looping, ref direction, double.NaN, Looping));
-        Assert.True(double.IsNaN(looping));
+        Assert.False(_play.Advance(ref looping, ref direction, double.NaN, Looping));
+        Assert.Equal(50.0, looping, 12);
 
-        Assert.True(_play.Advance(ref looping, ref direction, 1, Looping));
-        Assert.True(double.IsNaN(looping));
+        double endless = 50;
+        Assert.False(_play.Advance(ref endless, ref direction, double.PositiveInfinity, Looping));
+        Assert.Equal(50.0, endless, 12);
     }
 
     /// <summary>No patch at all is no tuning and no movement.</summary>
@@ -713,36 +742,43 @@ public class SamplePlaybackTests
             12);
     }
 
-    /// <summary>A moment before the note began bends the pitch further than the control allows.</summary>
+    /// <summary>A moment before the note began reads as the start of it.</summary>
     /// <remarks>
-    /// This records what the code does today rather than what it should do. The envelope is a
-    /// straight line worked out from how far through it the moment is, and a moment before the
-    /// start is more than none of the way through: at one envelope length before the note, a
-    /// two octave drop reads as four. Nothing in the voice asks for a negative time, since a
-    /// note's clock starts at nought; a scope drawing a moment either side of the start does.
+    /// It used to bend the pitch further than the control allows. The envelope is a straight
+    /// line worked out from how far through it the moment is, and a moment before the start is
+    /// more than none of the way through, so at one envelope length before the note a two
+    /// octave drop read as four and it ran away without limit from there. Nothing in the voice
+    /// asks for a negative time, since a note's clock starts at nought; a scope drawing a
+    /// moment either side of the start does.
     /// </remarks>
     [Fact]
-    public void A_moment_before_the_note_began_bends_further_than_the_control_allows()
+    public void A_moment_before_the_note_began_reads_as_the_start_of_it()
     {
         var patch = new SynthPatch { PitchEnvSemitones = 12, PitchEnvMs = 100 };
 
-        Assert.Equal(24.0, _pitch.MotionAt(patch, -0.1), 9);
-        Assert.Equal(132.0, _pitch.MotionAt(patch, -1.0), 9);
+        double start = _pitch.MotionAt(patch, 0);
+
+        Assert.Equal(12.0, start, 9);
+        Assert.Equal(start, _pitch.MotionAt(patch, -0.1), 9);
+        Assert.Equal(start, _pitch.MotionAt(patch, -1.0), 9);
+        Assert.Equal(start, _pitch.MotionAt(patch, double.NegativeInfinity), 9);
     }
 
-    /// <summary>A moment that is not a number moves nothing, unless the vibrato is on.</summary>
+    /// <summary>A moment that is not a number reads as the start of the note.</summary>
     /// <remarks>
-    /// This records what the code does today. The envelope's guard is a comparison and lets it
-    /// through as no movement; the vibrato has no guard at all, and a sine of NaN is NaN.
+    /// The envelope's guard was a comparison and let it through as no movement, which was right
+    /// by accident; the vibrato had no guard at all, and the sine of NaN is NaN, so a patch
+    /// with vibrato on it answered with a pitch nobody can play.
     /// </remarks>
     [Fact]
-    public void A_moment_that_is_not_a_number_moves_nothing_unless_the_vibrato_is_on()
+    public void A_moment_that_is_not_a_number_reads_as_the_start_of_the_note()
     {
         var envelopeOnly = new SynthPatch { PitchEnvSemitones = 12, PitchEnvMs = 100 };
-        Assert.Equal(0.0, _pitch.MotionAt(envelopeOnly, double.NaN), 12);
+        Assert.Equal(_pitch.MotionAt(envelopeOnly, 0), _pitch.MotionAt(envelopeOnly, double.NaN), 12);
 
         var vibrato = new SynthPatch { VibratoRateHz = 5, VibratoDepthCents = 100 };
-        Assert.True(double.IsNaN(_pitch.MotionAt(vibrato, double.NaN)));
+        Assert.Equal(0.0, _pitch.MotionAt(vibrato, double.NaN), 12);
+        Assert.Equal(0.0, _pitch.MotionAt(vibrato, double.PositiveInfinity), 12);
     }
 
     /// <summary>A dozen semitones is an octave, which is a doubling, in both directions.</summary>

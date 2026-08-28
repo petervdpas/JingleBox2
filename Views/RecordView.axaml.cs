@@ -7,12 +7,13 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Machines.Ui;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Linq;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -26,6 +27,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class RecordView : UserControl
 {
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private readonly IRecordingImport _import = new RecordingImport();
+
     /// <summary>
     /// The whole recording, no zoom and no scroll, which is the only view this page's picture
     /// ever shows. Windowing a take is the slice editor's job.
@@ -210,7 +214,7 @@ public partial class RecordView : UserControl
             {
                 new FilePickerFileType("Recordings")
                 {
-                    Patterns = RecordingImport.Kinds.Select(k => "*" + k).ToArray()
+                    Patterns = _import.Kinds.Select(k => "*" + k).ToArray()
                 }
             }
         });

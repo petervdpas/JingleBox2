@@ -7,6 +7,8 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Config.Interfaces;
+using JingleBox2.Config;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -41,11 +43,16 @@ public sealed class MachineRegistry : IMachineRegistry
     /// How this system decides two paths are the same. Left out, the rule this system really
     /// has; given, whatever a test wants to hold it to.
     /// </param>
-    public MachineRegistry(IMachineArchive? archive = null, IFilePaths? paths = null)
+    /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
+    public MachineRegistry(IMachineArchive? archive = null, IFilePaths? paths = null, IAppFolder? folder = null)
     {
         _paths = paths ?? new FilePaths();
+        _folder = folder ?? new AppFolder();
         _archive = archive ?? new MachineArchive(this, new MachinePaths(_paths));
     }
+
+    /// <summary>Where the application keeps its things, which the installed folder sits under.</summary>
+    private readonly IAppFolder _folder;
 
     /// <summary>What the folder holding the machines is called, in both places it appears.</summary>
     /// <remarks>
@@ -64,7 +71,7 @@ public sealed class MachineRegistry : IMachineRegistry
 
     /// <inheritdoc/>
     public string Installed =>
-        Path.Combine(Config.AppFolder.Path(), FolderName);
+        Path.Combine(_folder.Path(), FolderName);
 
     /// <inheritdoc/>
     public bool Ships(string path)

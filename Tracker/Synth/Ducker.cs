@@ -18,6 +18,13 @@ public sealed class Ducker : IDucker
     /// <remarks>
     /// A one pole follower approaches nought and never arrives, so left alone it keeps a track
     /// very slightly down for ever, for no reason anyone can hear.
+    ///
+    /// It applies on the way down only, and that is the whole of what it is for. Applied on the
+    /// way up as well it is not a floor but a gate, and a loud one: a single attack step from
+    /// nought moves the follower by the target times the coefficient, which at five
+    /// milliseconds and 44100 is 0.004525, so every target below 0.0221, about -33 dB, produced
+    /// a step smaller than this and was snapped back to nought again on every frame for ever. A
+    /// quiet key track never ducked at all, and said nothing about it.
     /// </remarks>
     private const double Gone = 0.0001;
 
@@ -77,7 +84,7 @@ public sealed class Ducker : IDucker
 
         _follower += (target - _follower) * coefficient;
 
-        if (_follower < Gone) _follower = 0;
+        if (_follower < Gone && target <= _follower) _follower = 0;
 
         return _follower;
     }
@@ -92,8 +99,17 @@ public sealed class Ducker : IDucker
     /// </remarks>
     /// <param name="follower">Where the follower stands, from <see cref="Next"/> or <see cref="Level"/>.</param>
     /// <param name="depth">How far down the strip's knob says the track goes at full scale.</param>
+    /// <remarks>
+    /// Either argument being not a number at all reads as no ducking. Both are clamped, and
+    /// <see cref="Math.Clamp(double, double, double)"/> hands NaN back by design, so one came
+    /// out the far end as a gain that was not a number and the track it multiplied was silent
+    /// for as long as it lasted. An infinite depth is still held at full scale, since that is
+    /// what the clamp is for and infinity is an answer to how far down, if a silly one.
+    /// </remarks>
     public static float GainFor(double follower, double depth)
     {
+        if (double.IsNaN(depth) || double.IsNaN(follower)) return 1f;
+
         double amount = Math.Clamp(depth, 0, 1) * Math.Clamp(follower, 0, 1);
         return (float)Math.Clamp(1 - amount, 0, 1);
     }

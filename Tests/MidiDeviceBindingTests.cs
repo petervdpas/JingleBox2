@@ -3,6 +3,7 @@ using System.Linq;
 using JingleBox2.Midi;
 using Xunit;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -11,7 +12,7 @@ namespace JingleBox2.Tests;
 /// </summary>
 /// <remarks>
 /// The class says it exists to be tested away from ports and windows, and this is the test it
-/// was written for. The rule that matters most is in <see cref="MidiDeviceBindings.AnyRole"/>:
+/// was written for. The rule that matters most is in <see cref="IMidiDeviceBindings.AnyRole"/>:
 /// a job missing from that mask is a job silently stripped off every device on the way in, and a
 /// device given only that job is a binding that quietly disappears. That happened once.
 ///
@@ -21,6 +22,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MidiDeviceBindingTests
 {
+    /// <summary>The rules under test. Holds nothing, so one serves every test in the class.</summary>
+    private readonly IMidiDeviceBindings _bindings = new MidiDeviceBindings();
+
     /// <summary>A list holding one device with one job, which is what most of these start from.</summary>
     private static List<MidiDeviceBinding> One(string device, MidiDeviceRole role) =>
         new() { new MidiDeviceBinding { Device = device, Role = role } };
@@ -44,9 +48,9 @@ public class MidiDeviceBindingTests
         {
             var config = new MidiConfig { Devices = One("Minilab3 MIDI", role) };
 
-            MidiDeviceBindings.Normalize(config);
+            _bindings.Normalize(config);
 
-            Assert.Equal(role, MidiDeviceBindings.RoleFor(config.Devices, "Minilab3 MIDI"));
+            Assert.Equal(role, _bindings.RoleFor(config.Devices, "Minilab3 MIDI"));
         }
     }
 
@@ -56,7 +60,7 @@ public class MidiDeviceBindingTests
     {
         var config = new MidiConfig { Devices = One("Nothing", MidiDeviceRole.None) };
 
-        MidiDeviceBindings.Normalize(config);
+        _bindings.Normalize(config);
 
         Assert.Empty(config.Devices);
     }
@@ -80,11 +84,11 @@ public class MidiDeviceBindingTests
             }
         };
 
-        MidiDeviceBindings.Normalize(config);
+        _bindings.Normalize(config);
 
         Assert.Single(config.Devices);
         Assert.Equal(MidiDeviceRole.Pads | MidiDeviceRole.Controls,
-                     MidiDeviceBindings.RoleFor(config.Devices, "Minilab3 MIDI"));
+                     _bindings.RoleFor(config.Devices, "Minilab3 MIDI"));
     }
 
     /// <summary>
@@ -100,9 +104,9 @@ public class MidiDeviceBindingTests
     {
         var config = new MidiConfig { InputDevice = "MPD218 Port A" };
 
-        MidiDeviceBindings.Normalize(config);
+        _bindings.Normalize(config);
 
-        Assert.Equal(MidiDeviceRole.Pads, MidiDeviceBindings.RoleFor(config.Devices, "MPD218 Port A"));
+        Assert.Equal(MidiDeviceRole.Pads, _bindings.RoleFor(config.Devices, "MPD218 Port A"));
         Assert.Null(config.InputDevice);
     }
 
@@ -118,7 +122,7 @@ public class MidiDeviceBindingTests
     {
         var bindings = One("MPD218 Port A", MidiDeviceRole.Pads);
 
-        Assert.Equal(MidiDeviceRole.Pads, MidiDeviceBindings.RoleFor(bindings, "MPD218 Port A   "));
+        Assert.Equal(MidiDeviceRole.Pads, _bindings.RoleFor(bindings, "MPD218 Port A   "));
     }
 
     /// <summary>Setting a job replaces the row rather than adding a second one for that device.</summary>
@@ -127,9 +131,9 @@ public class MidiDeviceBindingTests
     {
         var bindings = One("d", MidiDeviceRole.Pads);
 
-        MidiDeviceBindings.SetRole(bindings, "d", MidiDeviceRole.Controls);
+        _bindings.SetRole(bindings, "d", MidiDeviceRole.Controls);
 
-        Assert.Equal(MidiDeviceRole.Controls, MidiDeviceBindings.RoleFor(bindings, "d"));
+        Assert.Equal(MidiDeviceRole.Controls, _bindings.RoleFor(bindings, "d"));
         Assert.Single(bindings);
     }
 
@@ -139,7 +143,7 @@ public class MidiDeviceBindingTests
     {
         var bindings = One("d", MidiDeviceRole.Pads);
 
-        MidiDeviceBindings.SetRole(bindings, "d", MidiDeviceRole.None);
+        _bindings.SetRole(bindings, "d", MidiDeviceRole.None);
 
         Assert.Empty(bindings);
     }
@@ -160,7 +164,7 @@ public class MidiDeviceBindingTests
             new() { Device = "Here", Role = MidiDeviceRole.Controls }
         };
 
-        var shown = MidiDeviceBindings.Merge(new[] { "Here", "Fresh" }, bindings);
+        var shown = _bindings.Merge(new[] { "Here", "Fresh" }, bindings);
 
         Assert.Equal(new[] { "Here", "Fresh", "Gone" }, shown.Select(one => one.Device));
         Assert.True(shown[0].IsConnected);
@@ -186,7 +190,7 @@ public class MidiDeviceBindingTests
             new() { Device = "b", Role = MidiDeviceRole.Tracker }
         };
 
-        Assert.Equal(new[] { "a" }, MidiDeviceBindings.DevicesWith(bindings, MidiDeviceRole.Controls));
-        Assert.Equal(new[] { "a", "b" }, MidiDeviceBindings.DevicesWith(bindings, MidiDeviceBindings.AnyRole));
+        Assert.Equal(new[] { "a" }, _bindings.DevicesWith(bindings, MidiDeviceRole.Controls));
+        Assert.Equal(new[] { "a", "b" }, _bindings.DevicesWith(bindings, MidiDeviceBindings.EveryRole));
     }
 }

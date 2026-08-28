@@ -15,6 +15,8 @@ using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Audio.Interfaces;
+using JingleBox2.Audio;
 
 namespace JingleBox2.Views;
 
@@ -32,6 +34,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public static class PanelPreview
 {
+    /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
+    private static readonly IRecordingImport _import = new RecordingImport();
+
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachineRegistry Registry = new MachineRegistry();
@@ -130,21 +135,21 @@ public static class PanelPreview
     /// crash: this window exists to be looked at, and a panel with no takes on it is still a
     /// panel.
     /// </remarks>
-    private static System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording> Takes()
+    private static System.Collections.ObjectModel.ObservableCollection<JingleBox2.Audio.Records.Recording> Takes()
     {
-        var takes = new System.Collections.ObjectModel.ObservableCollection<JingleBox2.Models.Recording>();
+        var takes = new System.Collections.ObjectModel.ObservableCollection<JingleBox2.Audio.Records.Recording>();
 
         try
         {
-            string home = JingleBox2.Audio.RecordingImport.Directory;
+            string home = _import.Directory;
 
             if (!System.IO.Directory.Exists(home)) return takes;
 
             foreach (string path in System.IO.Directory.EnumerateFiles(home).OrderBy(p => p))
             {
-                if (!JingleBox2.Audio.RecordingImport.Playable(path)) continue;
+                if (!_import.Playable(path)) continue;
 
-                takes.Add(new JingleBox2.Models.Recording
+                takes.Add(new JingleBox2.Audio.Records.Recording
                 {
                     Id = System.IO.Path.GetFileNameWithoutExtension(path),
                     FilePath = path,

@@ -28,6 +28,9 @@ namespace JingleBox2.Audio.Routing;
 /// </remarks>
 public sealed class PipeWireRouting : IAudioRouting
 {
+    /// <summary>Reading what the PipeWire tools print. Holds nothing, so one serves the whole object.</summary>
+    private readonly IPipeWireGraph _graph = new PipeWireGraph();
+
     /// <summary>The tool that lists ports and links, and makes and breaks them.</summary>
     private const string LinkTool = "pw-link";
 
@@ -90,10 +93,10 @@ public sealed class PipeWireRouting : IAudioRouting
     public IReadOnlyList<AudioRoute> GetRoutes() =>
         Guarded(Array.Empty<AudioRoute>(), deadline =>
         {
-            var ports = PipeWireGraph.ParsePorts(Run(LinkTool, "-o"));
+            var ports = _graph.ParsePorts(Run(LinkTool, "-o"));
             if (Expired(deadline)) return Array.Empty<AudioRoute>();
 
-            return PipeWireGraph.RoutesFrom(ports, Descriptions(), OwnNodeMarker);
+            return _graph.RoutesFrom(ports, Descriptions(), OwnNodeMarker);
         });
 
     /// <inheritdoc/>
@@ -110,12 +113,12 @@ public sealed class PipeWireRouting : IAudioRouting
             var capture = CapturePorts();
             if (capture.Count == 0 || Expired(deadline)) return null;
 
-            foreach (var link in PipeWireGraph.ParseLinks(Run(LinkTool, "-l")))
+            foreach (var link in _graph.ParseLinks(Run(LinkTool, "-l")))
             {
                 if (!capture.Any(p => p.Node == link.To.Node && p.Port == link.To.Port)) continue;
 
-                var ports = PipeWireGraph.ParsePorts(Run(LinkTool, "-o"));
-                var match = PipeWireGraph.RoutesFrom(ports, Descriptions(), OwnNodeMarker)
+                var ports = _graph.ParsePorts(Run(LinkTool, "-o"));
+                var match = _graph.RoutesFrom(ports, Descriptions(), OwnNodeMarker)
                     .FirstOrDefault(r => r.Node == link.From.Node);
 
                 return match ?? new AudioRoute(link.From.Node, link.From.Node, AudioRouteKind.Input);
@@ -143,7 +146,7 @@ public sealed class PipeWireRouting : IAudioRouting
             var capture = CapturePorts();
             if (capture.Count == 0) return false;
 
-            foreach (var link in PipeWireGraph.ParseLinks(Run(LinkTool, "-l")))
+            foreach (var link in _graph.ParseLinks(Run(LinkTool, "-l")))
             {
                 if (Expired(deadline)) return false;
 
@@ -151,8 +154,8 @@ public sealed class PipeWireRouting : IAudioRouting
                     Run(LinkTool, $"-d {Quote(link.From)} {Quote(link.To)}");
             }
 
-            var sources = PipeWireGraph.ParsePorts(Run(LinkTool, "-o"))
-                .Where(p => p.Node == route.Node && PipeWireGraph.IsStereoAudio(p.Port))
+            var sources = _graph.ParsePorts(Run(LinkTool, "-o"))
+                .Where(p => p.Node == route.Node && _graph.IsStereoAudio(p.Port))
                 .ToList();
 
             if (sources.Count == 0) return false;
@@ -163,9 +166,9 @@ public sealed class PipeWireRouting : IAudioRouting
             {
                 if (Expired(deadline)) break;
 
-                string channel = PipeWireGraph.Channel(target.Port);
+                string channel = _graph.Channel(target.Port);
 
-                var source = sources.FirstOrDefault(p => PipeWireGraph.Channel(p.Port) == channel);
+                var source = sources.FirstOrDefault(p => _graph.Channel(p.Port) == channel);
                 if (source == default) continue;
 
                 if (Run(LinkTool, $"{Quote(source)} {Quote(target)}") != null) linked = true;
@@ -238,9 +241,9 @@ public sealed class PipeWireRouting : IAudioRouting
         var captureNodes = OwnCaptureNodes();
         if (captureNodes.Count == 0) return Array.Empty<PipeWirePort>();
 
-        return PipeWireGraph.ParsePorts(Run(LinkTool, "-i"))
+        return _graph.ParsePorts(Run(LinkTool, "-i"))
             .Where(p => captureNodes.Contains(p.Node))
-            .Where(p => PipeWireGraph.IsStereoAudio(p.Port))
+            .Where(p => _graph.IsStereoAudio(p.Port))
             .ToList();
     }
 

@@ -152,15 +152,15 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _routing = AudioRouting.Create(_recording);
+        _routing = new AudioRoutingFactory().Create(_recording);
 
         var cfg = _store.LoadOrCreateDefault();
 
-        Diagnostics.Log.Open(Config.AppFolder.Path(), cfg.WriteLog, Areas(cfg));
+        Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");
 
-        Diagnostics.CrashReport.Watch(Config.AppFolder.Path());
+        Diagnostics.CrashReport.Watch(new Files.AppFolder().Path());
         Diagnostics.CrashReport.Note("started, " + cfg.Rows + " by " + cfg.Columns + " pads");
 
         var machines = Registry.Load();

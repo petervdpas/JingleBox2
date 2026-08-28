@@ -3,14 +3,19 @@ using System.IO;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Config;
+using JingleBox2.Config.Interfaces;
 
 namespace JingleBox2.Tracker;
 
 /// <inheritdoc/>
-public sealed class SongPaths(IFilePaths? paths = null) : ISongPaths
+public sealed class SongPaths(IFilePaths? paths = null, IAppFolder? folder = null) : ISongPaths
 {
     /// <summary>How this system decides a path is under the application folder.</summary>
     private readonly IFilePaths _paths = paths ?? new FilePaths();
+
+    /// <summary>Where the application keeps its things, which is what a packed path stands in for.</summary>
+    private readonly IAppFolder _folder = folder ?? new AppFolder();
 
     /// <summary>
     /// What stands in for the application folder. Forward slash, on every platform.
@@ -27,7 +32,7 @@ public sealed class SongPaths(IFilePaths? paths = null) : ISongPaths
     {
         if (string.IsNullOrEmpty(path)) return "";
 
-        string root = Config.AppFolder.Path();
+        string root = _folder.Path();
 
         if (path.Length <= root.Length + 1) return path;
         if (!path.AsSpan(0, root.Length).Equals(root, _paths.Comparison)) return path;
@@ -44,7 +49,7 @@ public sealed class SongPaths(IFilePaths? paths = null) : ISongPaths
 
         string rest = path.Substring(Token.Length).Replace('/', Path.DirectorySeparatorChar);
 
-        return Path.Combine(Config.AppFolder.Path(), rest);
+        return Path.Combine(_folder.Path(), rest);
     }
 
     /// <inheritdoc/>

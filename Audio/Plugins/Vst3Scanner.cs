@@ -1,38 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio.Plugins;
 
-/// <summary>Where VST3 plugins live, and what is actually there.</summary>
-/// <remarks>
-/// The search paths are the ones Steinberg's own specification names, so a plugin installed the
-/// normal way for the platform is found without anybody being told where it is. A .vst3 is a
-/// directory on every platform this runs on, which is what makes the walk below different from
-/// the CLAP one: the thing being looked for is itself a folder.
-/// </remarks>
-public static class Vst3Scanner
+/// <inheritdoc/>
+public sealed class Vst3Scanner : IVst3Scanner
 {
-    /// <summary>What a VST3 bundle is called. A directory rather than a file, on every platform.</summary>
+    /// <inheritdoc cref="IVst3Scanner.Extension"/>
     public const string Extension = ".vst3";
 
     /// <summary>How far down a folder is followed before giving up on finding bundles.</summary>
     private const int MaxDepth = 5;
 
-    /// <summary>
-    /// Every directory this platform keeps plugins in, plus any the user has added, whether
-    /// or not they exist.
-    /// </summary>
-    /// <remarks>
-    /// Offered whole rather than filtered, since a folder that does not exist today is a folder
-    /// a plugin can be installed into tomorrow. <c>VST3_PATH</c> is read as well, the same way
-    /// the CLAP scanner reads <c>CLAP_PATH</c>.
-    /// </remarks>
-    /// <param name="extra">
-    /// Folders somebody has added in SETTINGS. They come first, because a person who names a
-    /// folder means it.
-    /// </param>
-    public static IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
+    /// <inheritdoc/>
+    string IVst3Scanner.Extension => Extension;
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> SearchPaths(IEnumerable<string>? extra = null)
     {
         var paths = new List<string>();
 
@@ -73,9 +59,8 @@ public static class Vst3Scanner
         return paths;
     }
 
-    /// <summary>Every .vst3 found on the search paths, sorted by name.</summary>
-    /// <remarks>Unreadable folders are skipped rather than reported: see <see cref="Walk"/>.</remarks>
-    public static IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null)
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Bundles(IEnumerable<string>? extra = null)
     {
         var found = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -103,7 +88,7 @@ public static class Vst3Scanner
     /// A directory that cannot be read is one place with no plugins in it and is stepped over in
     /// silence, rather than being a reason for the application to have no plugins at all.
     /// </remarks>
-    private static void Walk(string directory, List<string> found, HashSet<string> seen, int depth)
+    private void Walk(string directory, List<string> found, HashSet<string> seen, int depth)
     {
         if (depth > MaxDepth) return;
 
@@ -129,7 +114,7 @@ public static class Vst3Scanner
     /// Joins a root that may be missing to the rest of a path. A root the platform does not
     /// define adds nothing rather than adding a relative path nobody meant.
     /// </summary>
-    private static void Add(List<string> paths, string? root, params string[] parts)
+    private void Add(List<string> paths, string? root, params string[] parts)
     {
         if (string.IsNullOrWhiteSpace(root)) return;
 

@@ -5,12 +5,17 @@ using JingleBox2.Machines;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Views.Interfaces;
+using JingleBox2.Views;
 
 namespace JingleBox2.ViewModels;
 
 /// <summary>One row in the instrument rack. No number: a rack has no cell to answer to.</summary>
 public sealed partial class RackMachine : ObservableObject
 {
+    /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly IMachineTint _tint = new MachineTint();
+
     /// <summary>Shows one instrument off the rack. The instrument itself is held, not copied.</summary>
     public RackMachine(TrackerInstrument instrument) => Instrument = instrument;
 
@@ -49,7 +54,7 @@ public sealed partial class RackMachine : ObservableObject
     /// be read: a row painted a colour nobody chose is worse than a row painted none.
     /// </summary>
     private IBrush Wash(double amount) =>
-        Views.MachineTint.Hue(Theme.Accent, out var hue)
+        _tint.Hue(Theme.Accent, out var hue)
             ? new SolidColorBrush(hue, amount)
             : Brushes.Transparent;
 

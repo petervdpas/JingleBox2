@@ -2,6 +2,7 @@ using System;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
 
@@ -35,15 +36,21 @@ public sealed class MidiDispatcher
     /// Every one of the four is optional, because the pieces are wired at different points as the
     /// window is built and a half wired dispatcher is better than a null one.
     /// </remarks>
+    /// <param name="bindings">Which device does which job, defaulted to the real rules.</param>
     public MidiDispatcher(MidiConfig cfg, Action<MidiMessage>? pads, Action<MidiMessage>? tracker,
-                          Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null)
+                          Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null,
+                          IMidiDeviceBindings? bindings = null)
     {
+        _bindings = bindings ?? new MidiDeviceBindings();
         _cfg = cfg;
         _pads = pads;
         _tracker = tracker;
         _controls = controls;
         _transport = transport;
     }
+
+    /// <summary>Which device has been pointed at which half of the application.</summary>
+    private readonly IMidiDeviceBindings _bindings;
 
     /// <summary>
     /// Hands the message to each half its device has been pointed at.
@@ -58,7 +65,7 @@ public sealed class MidiDispatcher
     {
         if (msg is null) return;
 
-        var role = MidiDeviceBindings.RoleFor(_cfg.Devices, msg.Device);
+        var role = _bindings.RoleFor(_cfg.Devices, msg.Device);
 
         if (role == MidiDeviceRole.None)
             Log.Write(LogArea.Midi, () =>

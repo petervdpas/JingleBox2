@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using JingleBox2.Config;
-using JingleBox2.Models;
+using JingleBox2.Audio.Records;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Records;
 
 namespace JingleBox2.Audio.Interfaces;
 
