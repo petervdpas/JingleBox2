@@ -177,18 +177,33 @@
             </Setter>
         </Style>
         <!-- The same handle laid on its side, for a split between rows. The line has to run
-             the other way or a horizontal handle draws a vertical hairline. -->
+             the other way or a horizontal handle draws a vertical hairline.
+
+             And a grip in the middle of it, which the upright one does not need. A handle
+             between two columns lies in the gap between two cards, where the eye is already
+             expecting an edge; one between two rows lies against the bottom of a card, where a
+             hairline is exactly what a card's own edge looks like and reads as the end of the
+             thing above rather than as something to take hold of. -->
         <Style Selector="GridSplitter.handle.rows">
             <Setter Property="Cursor" Value="SizeNorthSouth" />
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border Background="{TemplateBinding Background}">
-                        <Rectangle x:Name="Line" Height="1" VerticalAlignment="Center"
-                                   HorizontalAlignment="Stretch">
-                            <Rectangle.Fill>
-                                <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
-                            </Rectangle.Fill>
-                        </Rectangle>
+                        <Panel>
+                            <Rectangle x:Name="Line" Height="1" VerticalAlignment="Center"
+                                       HorizontalAlignment="Stretch">
+                                <Rectangle.Fill>
+                                    <SolidColorBrush Color="{DynamicResource Color.Border}" Opacity="0.75" />
+                                </Rectangle.Fill>
+                            </Rectangle>
+
+                            <Border x:Name="Grip" Width="46" Height="4" CornerRadius="2"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border.Background>
+                                    <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.55" />
+                                </Border.Background>
+                            </Border>
+                        </Panel>
                     </Border>
                 </ControlTemplate>
             </Setter>
@@ -199,10 +214,20 @@
                 <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.55" />
             </Setter>
         </Style>
+        <Style Selector="GridSplitter.handle.rows:pointerover /template/ Border#Grip">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
         <Style Selector="GridSplitter.handle.rows:pressed /template/ Rectangle#Line">
             <Setter Property="Height" Value="2" />
             <Setter Property="Fill">
                 <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.9" />
+            </Setter>
+        </Style>
+        <Style Selector="GridSplitter.handle.rows:pressed /template/ Border#Grip">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
             </Setter>
         </Style>
 
@@ -230,6 +255,154 @@
         <!-- The tracker's page buttons. Not transport: they change what you are looking at
              rather than what the song is doing, so they read as words rather than symbols and
              sit apart from the run of them. -->
+        <!-- A title that doubles as the handle folding what is under it away. A toggle that
+             must not look like one: no frame and no fill in any state, so it reads as a line
+             that opens and closes rather than as something to press. Out here rather than on
+             one page because the machine editor's cards and the tracker's automation both fold
+             the same way, and two spellings of one gesture would eventually disagree. -->
+        <Style Selector="ToggleButton.fold">
+          <Setter Property="Padding" Value="0" />
+          <Setter Property="MinHeight" Value="0" />
+          <Setter Property="HorizontalAlignment" Value="Stretch" />
+          <Setter Property="HorizontalContentAlignment" Value="Left" />
+          <Setter Property="Cursor" Value="Hand" />
+
+          <!-- Its own template rather than a setter for every state the theme has an opinion
+               about. The fill a toggle gets when it is on is painted inside the template, where
+               a setter out here cannot reach it, and a title row lit up in the accent colour is
+               the button this is trying not to be. Transparent rather than nothing, so the
+               whole row still catches the pointer. -->
+          <Setter Property="Template">
+            <ControlTemplate>
+              <ContentPresenter Background="Transparent"
+                                Content="{TemplateBinding Content}" />
+            </ControlTemplate>
+          </Setter>
+        </Style>
+
+        <!-- The two things under the pattern, wearing the one shape: a line with a name on it
+             and whatever it folds away underneath. Only the line is here; the room the open
+             one gets belongs to the grid it stands in, since only a grid can share it out. -->
+        <Style Selector="views|FoldStrip">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid RowDefinitions="Auto,Auto,Auto">
+                        <!-- The grip along the strip's own top edge. Its own rather than a
+                             splitter between two rows: a splitter shares one length out
+                             between the rows it lies between, so a strip's handle would take
+                             its room off the strip above rather than off the pattern. -->
+                        <Thumb Grid.Row="0" x:Name="Grip" Classes="strip"
+                               IsVisible="{TemplateBinding IsOpen}" />
+
+                        <!-- Air on both sides of the name. Without it the word sits against
+                             whatever line is above it and reads as that thing's caption rather
+                             than as the lid of what is under it. -->
+                        <ToggleButton Grid.Row="1" Classes="fold" Margin="0,4"
+                                      HorizontalAlignment="Left"
+                                      IsChecked="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <!-- A tab rather than a line of text. Folded, the whole of one of
+                                 these is two words at the foot of the page, and two words with
+                                 nothing round them read as a caption for the thing above rather
+                                 than as the way to open the thing below. -->
+                            <Border Classes="foldBar">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Classes="chevron" Text="▾" FontSize="12"
+                                               Width="14" VerticalAlignment="Center" />
+                                    <TextBlock Classes="foldName" VerticalAlignment="Center"
+                                               Text="{TemplateBinding Title}" />
+                                </StackPanel>
+                            </Border>
+                        </ToggleButton>
+
+                        <ContentPresenter Grid.Row="2"
+                                          Height="{TemplateBinding StripHeight}"
+                                          Content="{TemplateBinding Content}"
+                                          IsVisible="{TemplateBinding IsOpen}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+
+        <Style Selector="Border.foldBar">
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.12" />
+            </Setter>
+        </Style>
+
+        <Style Selector="ToggleButton.fold:pointerover Border.foldBar">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" Opacity="0.22" />
+            </Setter>
+        </Style>
+
+        <Style Selector="Border.foldBar > StackPanel > TextBlock.foldName">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Opacity" Value="0.9" />
+        </Style>
+
+        <Style Selector="ToggleButton.fold:pointerover Border.foldBar > StackPanel > TextBlock.foldName">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
+        <!-- The grip itself, drawn the way the handle between two rows is drawn, because it is
+             the same gesture: a short bar you take hold of, quiet until the pointer is on it. -->
+        <Style Selector="Thumb.strip">
+            <Setter Property="Cursor" Value="SizeNorthSouth" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <Border x:Name="Bar" Width="46" Height="4" CornerRadius="2"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Border.Background>
+                                <SolidColorBrush Color="{DynamicResource Color.TextMuted}" Opacity="0.55" />
+                            </Border.Background>
+                        </Border>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+
+        <Style Selector="Thumb.strip:pointerover /template/ Border#Bar">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
+
+        <Style Selector="Thumb.strip:pressed /template/ Border#Bar">
+            <Setter Property="Background">
+                <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+            </Setter>
+        </Style>
+
+        <!-- The mark beside it: pointing right when there is something folded behind it, down
+             when there is not, and turning between the two rather than swapping, because that
+             is what says the two states are one thing. -->
+        <Style Selector="ToggleButton.fold TextBlock.chevron">
+          <Setter Property="FontSize" Value="10" />
+          <Setter Property="Width" Value="12" />
+          <Setter Property="TextAlignment" Value="Center" />
+          <Setter Property="Opacity" Value="0.7" />
+          <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+          <Setter Property="Transitions">
+            <Transitions>
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+            </Transitions>
+          </Setter>
+        </Style>
+
+        <Style Selector="ToggleButton.fold:checked TextBlock.chevron">
+          <Setter Property="RenderTransform" Value="none" />
+        </Style>
+
+        <Style Selector="ToggleButton.fold:pointerover TextBlock.chevron">
+          <Setter Property="Opacity" Value="1" />
+        </Style>
+
         <Style Selector="Button.page">
             <Setter Property="FontSize" Value="11" />
             <Setter Property="Height" Value="34" />

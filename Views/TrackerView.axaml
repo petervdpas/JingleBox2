@@ -12,27 +12,6 @@
       <Setter Property="Opacity" Value="0.8" />
       <Setter Property="FontSize" Value="12" />
     </Style>
-
-    <!-- The word that folds the automation open and shut. Flat and quiet: it is a label that
-         happens to be pressable, and a button's usual box under the pattern would read as
-         another thing on the chain rather than as the lid of what is below it. -->
-    <Style Selector="Button.fold">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="MinWidth" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="2,1" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="Opacity" Value="0.7" />
-    </Style>
-
-    <Style Selector="Button.fold:pointerover">
-      <Setter Property="Opacity" Value="1" />
-    </Style>
-
-    <Style Selector="Button.fold:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-    </Style>
   </UserControl.Styles>
 
   <!-- The page, with the picture of whatever is being dragged laid over it. The canvas takes
@@ -208,130 +187,135 @@
                              Margin="6,0,0,0" />
           </Grid>
 
-          <!-- What the track the cursor is on has under it: the chain it plays through, and
-               then what moves over the pattern. Both are about the column the cursor is in, and
-               both change when it moves between tracks.
+          <!-- The pattern, and under it what the track the cursor is on has: the chain it
+               plays through, then what moves over the pattern. Both change when the cursor
+               moves between tracks.
 
-               In one panel docked at the foot rather than three docked separately, because a
-               DockPanel puts the first one it is given lowest and reading them upside down is a
-               thing somebody would get wrong later. -->
-          <StackPanel DockPanel.Dock="Bottom">
-            <views:PluginStrip Margin="0,8,0,0"
-                               DataContext="{Binding TrackEffect}" />
+               Rows rather than things docked at the foot, so the handle between them has two
+               sides to share out. Everything below the handle is one row, and inside it the
+               chain takes what it needs and the automation takes the rest: dragging the handle
+               therefore trades pattern for curve, which is the only trade on this page worth
+               offering. -->
+          <Grid RowDefinitions="*,Auto,Auto">
 
-            <!-- One row tall whether it is open or shut. This is under the pattern, where every
-                 pixel taken is a line of music nobody can see, so what is folded away costs a
-                 word and an arrow. -->
-            <Button Classes="fold"
-                    HorizontalAlignment="Left"
-                    Margin="0,4,0,0"
-                    Content="{Binding LanesHandle}"
-                    Command="{Binding ToggleLanesCommand}"
-                    ToolTip.Tip="What this track makes move over the pattern, and what else on it could be made to." />
+            <ScrollViewer x:Name="GridScroll" Grid.Row="0"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto">
+              <views:PatternGrid x:Name="Grid"
+                                 Pattern="{Binding CurrentPattern}"
+                                 Before="{Binding PatternBefore}"
+                                 After="{Binding PatternAfter}"
+                                 EditCursor="{Binding Cursor, Mode=TwoWay}"
+                                 PlayingLine="{Binding PlayingLine}"
+                                 LinesPerBeat="{Binding LinesPerBeat}"
+                                 Selection="{Binding Selection, Mode=TwoWay}">
 
-            <views:AutomationStrip IsVisible="{Binding ShowsLanes}" />
-          </StackPanel>
-
-          <ScrollViewer x:Name="GridScroll"
-                        HorizontalScrollBarVisibility="Auto"
-                        VerticalScrollBarVisibility="Auto">
-            <views:PatternGrid x:Name="Grid"
-                               Pattern="{Binding CurrentPattern}"
-                               Before="{Binding PatternBefore}"
-                               After="{Binding PatternAfter}"
-                               EditCursor="{Binding Cursor, Mode=TwoWay}"
-                               PlayingLine="{Binding PlayingLine}"
-                               LinesPerBeat="{Binding LinesPerBeat}"
-                               Selection="{Binding Selection, Mode=TwoWay}">
-
-              <!-- Everything here acts on the track the cursor is on, and a right click puts
-                   the cursor where it was clicked first, so the menu always means the column
-                   under the pointer. -->
-              <views:PatternGrid.ContextMenu>
-                <ContextMenu>
-                  <MenuItem Header="{Binding SelectionLabel}" IsEnabled="False" />
-                  <Separator />
-
-                  <MenuItem Header="Copy" InputGesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
-                  <MenuItem Header="Cut" InputGesture="Ctrl+X" Command="{Binding CutSelectionCommand}" />
-                  <MenuItem Header="Paste" InputGesture="Ctrl+V"
-                            IsEnabled="{Binding HasClipboard}"
-                            Command="{Binding PasteCommand}"
-                            ToolTip.Tip="{Binding ClipboardLabel, StringFormat='Puts down what was copied: {0}. The cursor is its top left corner.'}" />
-
-                  <Separator />
-
-                  <MenuItem Header="Delete selection"
-                            InputGesture="Delete"
-                            IsEnabled="{Binding HasSelection}"
-                            Command="{Binding ClearSelectionCommand}" />
-                  <MenuItem Header="Select whole pattern"
-                            InputGesture="Ctrl+A"
-                            Command="{Binding SelectAllCommand}" />
-
-                  <Separator />
-
-                  <MenuItem Header="Quantize to">
-                    <MenuItem Header="Every 2 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="2" />
-                    <MenuItem Header="Every 3 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="3" />
-                    <MenuItem Header="Every 4 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="4" />
-                    <MenuItem Header="Every 6 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="6" />
-                    <MenuItem Header="Every 8 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="8" />
-                    <MenuItem Header="Every 16 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="16" />
-                  </MenuItem>
-
-                  <MenuItem Header="Transpose">
-                    <MenuItem Header="Up a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="1" />
-                    <MenuItem Header="Down a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="-1" />
-                    <MenuItem Header="Up an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="12" />
-                    <MenuItem Header="Down an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="-12" />
-                  </MenuItem>
-
-                  <MenuItem Header="Note volume">
-                    <MenuItem Header="Same for every note (use the instrument's level)"
-                              Command="{Binding SetTrackVolumeCommand}" CommandParameter="-1" />
+                <!-- Everything here acts on the track the cursor is on, and a right click puts
+                     the cursor where it was clicked first, so the menu always means the column
+                     under the pointer. -->
+                <views:PatternGrid.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="{Binding SelectionLabel}" IsEnabled="False" />
                     <Separator />
-                    <MenuItem Header="All at full (40)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="64" />
-                    <MenuItem Header="All at three quarters (30)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="48" />
-                    <MenuItem Header="All at half (20)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="32" />
-                    <MenuItem Header="All at a quarter (10)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="16" />
-                  </MenuItem>
 
-                  <!-- And the same thing for what comes next: a velocity sensitive keyboard
-                       writes a different level for every hit unless it is told not to. -->
-                  <MenuItem Header="Ignore key velocity"
-                            ToggleType="CheckBox"
-                            IsChecked="{Binding IgnoreVelocity}"
-                            ToolTip.Tip="How hard you play stops being written into the pattern. Remembered between runs." />
+                    <MenuItem Header="Copy" InputGesture="Ctrl+C" Command="{Binding CopySelectionCommand}" />
+                    <MenuItem Header="Cut" InputGesture="Ctrl+X" Command="{Binding CutSelectionCommand}" />
+                    <MenuItem Header="Paste" InputGesture="Ctrl+V"
+                              IsEnabled="{Binding HasClipboard}"
+                              Command="{Binding PasteCommand}"
+                              ToolTip.Tip="{Binding ClipboardLabel, StringFormat='Puts down what was copied: {0}. The cursor is its top left corner.'}" />
 
-                  <!-- And what the other half of a key press does. Off by default: at a step
-                       of one, every release writing a note-off fills a pattern quickly. -->
-                  <MenuItem Header="Record note-offs"
-                            ToggleType="CheckBox"
-                            IsChecked="{Binding RecordNoteOffs}"
-                            ToolTip.Tip="Letting a key up on a MIDI keyboard writes OFF where the cursor is, the way Renoise does. Remembered between runs." />
+                    <Separator />
 
-                  <!-- The third hand a pattern can be written by, and the one nobody is holding
-                       on purpose: a knob leant on while a song loops would edit it. So it is
-                       armed deliberately, like the two above, and off unless somebody said. -->
-                  <MenuItem Header="Record knob movements"
-                            ToggleType="CheckBox"
-                            IsChecked="{Binding IsAutomating}"
-                            ToolTip.Tip="While the song plays, a controller knob pointed at a parameter writes its movement into the pattern." />
+                    <MenuItem Header="Delete selection"
+                              InputGesture="Delete"
+                              IsEnabled="{Binding HasSelection}"
+                              Command="{Binding ClearSelectionCommand}" />
+                    <MenuItem Header="Select whole pattern"
+                              InputGesture="Ctrl+A"
+                              Command="{Binding SelectAllCommand}" />
 
-                  <Separator />
+                    <Separator />
 
-                  <MenuItem Header="Clear track" Command="{Binding ClearTrackCommand}" />
-                  <MenuItem Header="Clear pattern" Command="{Binding ClearPatternCommand}" />
+                    <MenuItem Header="Quantize to">
+                      <MenuItem Header="Every 2 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="2" />
+                      <MenuItem Header="Every 3 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="3" />
+                      <MenuItem Header="Every 4 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="4" />
+                      <MenuItem Header="Every 6 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="6" />
+                      <MenuItem Header="Every 8 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="8" />
+                      <MenuItem Header="Every 16 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="16" />
+                    </MenuItem>
 
-                  <Separator />
+                    <MenuItem Header="Transpose">
+                      <MenuItem Header="Up a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="1" />
+                      <MenuItem Header="Down a semitone" Command="{Binding TransposeTrackCommand}" CommandParameter="-1" />
+                      <MenuItem Header="Up an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="12" />
+                      <MenuItem Header="Down an octave" Command="{Binding TransposeTrackCommand}" CommandParameter="-12" />
+                    </MenuItem>
 
-                  <MenuItem Header="Take the instrument off this track"
-                            Command="{Binding ClearTrackInstrumentCommand}" />
-                </ContextMenu>
-              </views:PatternGrid.ContextMenu>
-            </views:PatternGrid>
-          </ScrollViewer>
+                    <MenuItem Header="Note volume">
+                      <MenuItem Header="Same for every note (use the instrument's level)"
+                                Command="{Binding SetTrackVolumeCommand}" CommandParameter="-1" />
+                      <Separator />
+                      <MenuItem Header="All at full (40)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="64" />
+                      <MenuItem Header="All at three quarters (30)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="48" />
+                      <MenuItem Header="All at half (20)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="32" />
+                      <MenuItem Header="All at a quarter (10)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="16" />
+                    </MenuItem>
+
+                    <!-- And the same thing for what comes next: a velocity sensitive keyboard
+                         writes a different level for every hit unless it is told not to. -->
+                    <MenuItem Header="Ignore key velocity"
+                              ToggleType="CheckBox"
+                              IsChecked="{Binding IgnoreVelocity}"
+                              ToolTip.Tip="How hard you play stops being written into the pattern. Remembered between runs." />
+
+                    <!-- And what the other half of a key press does. Off by default: at a step
+                         of one, every release writing a note-off fills a pattern quickly. -->
+                    <MenuItem Header="Record note-offs"
+                              ToggleType="CheckBox"
+                              IsChecked="{Binding RecordNoteOffs}"
+                              ToolTip.Tip="Letting a key up on a MIDI keyboard writes OFF where the cursor is, the way Renoise does. Remembered between runs." />
+
+                    <!-- The third hand a pattern can be written by, and the one nobody is holding
+                         on purpose: a knob leant on while a song loops would edit it. So it is
+                         armed deliberately, like the two above, and off unless somebody said. -->
+                    <MenuItem Header="Record knob movements"
+                              ToggleType="CheckBox"
+                              IsChecked="{Binding IsAutomating}"
+                              ToolTip.Tip="While the song plays, a controller knob pointed at a parameter writes its movement into the pattern." />
+
+                    <Separator />
+
+                    <MenuItem Header="Clear track" Command="{Binding ClearTrackCommand}" />
+                    <MenuItem Header="Clear pattern" Command="{Binding ClearPatternCommand}" />
+
+                    <Separator />
+
+                    <MenuItem Header="Take the instrument off this track"
+                              Command="{Binding ClearTrackInstrumentCommand}" />
+                  </ContextMenu>
+                </views:PatternGrid.ContextMenu>
+              </views:PatternGrid>
+            </ScrollViewer>
+
+            <!-- Each strip asks for what it wants and the pattern is measured in what is
+                 left, so a grip on one of them moves that one and nothing else. Both rows are
+                 Auto for the same reason: a strip that was given a share of a row would be
+                 taking its room off its neighbour rather than off the music. -->
+            <views:FoldStrip Grid.Row="1" Title="chain"
+                             IsOpen="{Binding ShowsChain, Mode=TwoWay}"
+                             StripHeight="{Binding ChainHeight, Mode=TwoWay}">
+              <views:PluginStrip DataContext="{Binding TrackEffect}" />
+            </views:FoldStrip>
+
+            <views:FoldStrip Grid.Row="2" Title="automation"
+                             IsOpen="{Binding ShowsLanes, Mode=TwoWay}"
+                             StripHeight="{Binding LanesHeight, Mode=TwoWay}">
+              <views:AutomationStrip />
+            </views:FoldStrip>
+          </Grid>
+
         </DockPanel>
       </Border>
 

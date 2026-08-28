@@ -19,13 +19,13 @@ Pattern.Lanes                     held by the pattern, moved, cleared, copied, u
 SongStore.LaneDocument            in and out of song.json
 IControlTargets.On(track)         what a track has on it that could be automated
 ViewModels/AutomationViewModel    one track's automation, and adding and clearing a lane
-Views/AutomationStrip.axaml       the strip under the mixer's tracks
+Views/AutomationStrip.axaml       the strip under the pattern, below the chain
+Views/AutomationCurve.cs          the picture: the grid, the shape, and the points you drag
 ```
 
-Two ways in. AUTO on a mixer strip opens that track's automation below the row, where a head
-block chooses the parameter and the room after it is that parameter's. Record knob movements in
-the pattern menu arms the recorder, which is off by default and does nothing unless the song is
-playing.
+Two ways in. The automation handle under the chain folds open a strip where a head block chooses
+the parameter and the room after it is that parameter's. Record knob movements in the pattern
+menu arms the recorder, which is off by default and does nothing unless the song is playing.
 
 Not built: the typed view, which is a parameter column in the pattern and shares its foundation
 with note columns.
@@ -213,31 +213,55 @@ hand, and asking again later would give a target's name, which is written for a 
 ends in the track it is on. Forty rows all ending in the same three words is a list nobody can
 scan.
 
-It is a strip under the mixer's tracks, opened per track from an AUTO button on the track's own
-strip, and it is the same shape as the chain under the pattern: a block at the head saying which
-part you are working on, and the room after it given to that part. There the head is the
-instrument and what follows is its effects; here the head is the parameter and what follows is
-its lane. A person who has used one already knows where to look on the other, and the room to
-the right of the head block is where the curve goes when there is one to draw.
+It sits under the pattern, below the chain, and it is the same shape as the chain: a block at the
+head saying which part you are working on, and the room after it given to that part. There the
+head is the instrument and what follows is its effects; here the head is the parameter and what
+follows is its lane. A person who has used one already knows where to look on the other.
 
-Under the mixer because that is where a track's settings are, and automation is a track's
-settings moving. One button per strip and one panel below them all, so pressing another track's
-button moves the panel rather than opening a second one, and pressing the lit one is the way
-back. Hidden until asked for, unlike the chain, which is always there because a track always has
-a chain: automation a track has not got is nothing to look at.
+Under the pattern because a lane is written against the pattern's own lines, which is where it is
+drawn and where it is recorded from. It is about the track the cursor is in, the same track the
+chain above it is about, and it follows the cursor through `FollowCursorTrack`, which is the one
+place the chain already did.
 
-The head block says which track and which pattern, because the pattern is not on the screen when
-the mixer is and a lane belongs to one as much as to a track. It carries a search box as well,
-which a machine's dozen parameters do not need and a plugin's two hundred make unavoidable.
+Folded away behind a line that says "automation", and the chain above it folds the same way, by
+`Views/FoldStrip.cs`: a `ContentControl` with a title and an open flag, holding whatever it is
+given. One shape for both, because they are the same offer, a track's business taking room the
+pattern would otherwise have and worth keeping only while you are working on it, and two
+spellings of that would eventually disagree about which way the mark points. The line itself is
+the machine editor's own fold, moved out to `App.axaml` when the tracker wanted it too: a chevron
+that turns rather than swaps.
+
+The chain starts open because a track always has one; the automation starts shut because a track
+usually has none.
+
+How much room each gets is dragged rather than decided, and each strip carries its own grip along
+its top edge. That is the whole reason `FoldStrip` is a control rather than two rows of a grid
+with a `GridSplitter` between them: a splitter shares one length out between the two rows it lies
+between, so the automation's handle took its room off the chain above it and moving one moved the
+other. A strip that owns its height answers only for itself, and the pattern, being the one thing
+measured in what is left, gives up or takes back the difference without being asked.
+
+The grip is a `Thumb`, drawn as the short bar the handle between two rows uses, because it is the
+same gesture. A hairline alone would not do: along the bottom of a card that is exactly what the
+card's own edge looks like, and it reads as the end of the thing above rather than as something
+to take hold of.
+
+The head block does not say which track. The pattern is on the screen above it, the cursor is in
+the column it is about, and the track's number is already on the tab, on the status line and in
+the pattern itself; the chain beside it had its own badge taken off for exactly that reason. It
+carries a search box instead, which a machine's dozen parameters do not need and a plugin's two
+hundred make unavoidable.
 
 Adding a lane gives it one point, holding where the parameter stands. Renoise does the same and
 it is the only useful answer: an empty lane says nothing, so the parameter would be listed as
 automated and would not move.
 
-It was a page first, listing every parameter of a track with a button on each row. That was
-wrong twice over: a page is somewhere you go instead of the mixer rather than a thing you open
-beside it, and a list of forty rows with a button on each is a form to fill in rather than an
-instrument to work on.
+It was in two wrong places first, and both are worth remembering. A page of its own, listing
+every parameter of a track with a button on each row, which is a form to fill in rather than an
+instrument to work on and somewhere you go instead of the music rather than something you open
+beside it. Then per track in the mixer, with an AUTO button on every strip, which is where a
+track's settings live but not where its lines are: a lane is written against lines, and the
+lines are under the pattern.
 
 **The typed view.** A parameter column, riding on the column axis described above. Cheap once
 the axis exists, and the axis is note columns' bill.
@@ -325,9 +349,12 @@ mostly entry rules and the mixer's per column cut.
 
 ## Still open
 
-- Whether the strip should follow the song while it is open rather than being read when it is
-  opened. It is read on the way in and stays as it was found, and it shuts itself when the
-  strips are rebuilt, which is what a song being opened or the track count changing does.
+- Whether the handle should live in the chain's own leading block, beside the track number,
+  rather than on a line of its own. It would save a line, which under the pattern is a line of
+  music; against that, a word on its own line is easier to find than a button in a gutter.
+- Whether the strip should follow the song while it is open rather than being read when the
+  cursor changes track. It is read then and on the way in, and nothing else it is built out of
+  says when it moves.
 
 - Whether a lane can address a track's insert plugin as well as its instrument. The addressing
   supports it; the editor has to offer it, and a chain can be rearranged under a lane.

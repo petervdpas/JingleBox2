@@ -300,16 +300,28 @@ because that exact thing was wrong once.
   one undo step per lane and not one per point, which is the same rule the instrument knobs use
   and arrived at from the same direction. Lanes are part of a pattern's undo step, because left
   out, undo would put the notes back and leave the movement where it was
-- AUTO on a mixer strip opens that track's automation under the row of tracks, and it is the
-  same shape as the chain under the pattern: a block at the head saying which part you are
-  working on, and the room after it given to that part. There the head is the instrument and
-  what follows is its effects; here it is the parameter and its lane, and the room to the right
-  is where the curve goes. Under the mixer because that is where a track's settings are and
-  automation is a track's settings moving. One button per strip and one panel below them all, so
-  another track's button moves it and the lit one shuts it. The head block says which track and
-  which pattern, since the pattern is not on screen when the mixer is. It was a page first, a
-  list of forty rows with a button on each, which was somewhere you went instead of the mixer
-  rather than a thing you opened beside it
+- The automation handle under the chain folds open a strip built to the chain's own shape: a
+  block at the head saying which part you are working on, and the room after it given to that
+  part. There the head is the instrument and what follows is its effects; here it is the
+  parameter and its lane, and the room to the right is where the curve goes. Under the pattern
+  because a lane is written against the pattern's lines, about the track the cursor is in, and
+  following it through `FollowCursorTrack`, which is where the chain already followed. Folded
+  away by default and one line tall either way, since every pixel under the pattern is a line of
+  music nobody can see. `Views/FoldStrip.cs` is that line and nothing else: a `ContentControl`
+  with a title and an open flag, holding whatever it is given, so the chain and the automation
+  fold identically rather than in two spellings that would eventually disagree. The chain starts
+  open because a track always has one, the automation shut because a track usually has none. Each
+  carries its own grip along its top edge, a `Thumb` setting that strip's height, and that is why
+  it is a control rather than two grid rows with a `GridSplitter` between them: a splitter shares
+  one length between the rows it lies between, so the automation's handle took its room off the
+  chain and moving one moved the other. A strip that owns its height answers only for itself, and
+  the pattern, measured in what is left, gives up or takes back the difference. The grip is a
+  short bar rather than a hairline, since along the bottom of a card a hairline is what that
+  card's own edge looks like. The strip does not say which track it is about: the tab, the status
+  line and the pattern all do already, which is why the chain's own
+  badge came off. It was in two wrong places first, a page of its own and then a button per
+  mixer strip. A page is somewhere you go instead of the music; the mixer is where a track's
+  settings live but not where its lines are
 - `IControlTargets.On` answers a `ControlChoice`, the device and the parameter's own name beside
   the mapping: the machine's parameters in panel order, then each insert's, then the strip. Named
   there rather than asked for later, because a target's name is written for a status line and

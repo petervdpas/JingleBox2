@@ -62,52 +62,6 @@
       <Setter Property="Background" Value="{DynamicResource PadHoverBrush}" />
     </Style>
 
-    <!-- A card's title, doubling as the handle that folds the card away. A toggle that must not
-         look like one: no frame and no fill in any state, so it reads as a line that opens and
-         closes rather than as something to press. -->
-    <Style Selector="ToggleButton.fold">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Left" />
-      <Setter Property="Cursor" Value="Hand" />
-
-      <!-- Its own template rather than a setter for every state the theme has an opinion
-           about. The fill a toggle gets when it is on is painted inside the template, where a
-           setter out here cannot reach it, and a title row lit up in the accent colour is the
-           button this is trying not to be. Transparent rather than nothing, so the whole row
-           still catches the pointer. -->
-      <Setter Property="Template">
-        <ControlTemplate>
-          <ContentPresenter Background="Transparent"
-                            Content="{TemplateBinding Content}" />
-        </ControlTemplate>
-      </Setter>
-    </Style>
-
-    <!-- The same mark the panel list turns beside each of its own lines: pointing right when
-         there is something folded behind it, down when there is not, and turning between the
-         two rather than swapping, because that is what says the two states are one thing. -->
-    <Style Selector="ToggleButton.fold TextBlock.chevron">
-      <Setter Property="FontSize" Value="10" />
-      <Setter Property="Width" Value="12" />
-      <Setter Property="TextAlignment" Value="Center" />
-      <Setter Property="Opacity" Value="0.7" />
-      <Setter Property="RenderTransform" Value="rotate(-90deg)" />
-      <Setter Property="Transitions">
-        <Transitions>
-          <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
-        </Transitions>
-      </Setter>
-    </Style>
-
-    <Style Selector="ToggleButton.fold:checked TextBlock.chevron">
-      <Setter Property="RenderTransform" Value="none" />
-    </Style>
-
-    <Style Selector="ToggleButton.fold:pointerover TextBlock.chevron">
-      <Setter Property="Opacity" Value="1" />
-    </Style>
   </UserControl.Styles>
 
   <!-- The page, with a layer over it for the thing being carried. The layer is deaf to the

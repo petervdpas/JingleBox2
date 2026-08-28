@@ -1410,26 +1410,42 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// has one; automation a track has not got is nothing to look at, and the handle is one row
     /// tall whether it is open or shut.
     /// </remarks>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LanesHandle))]
-    private bool showsLanes;
+    [ObservableProperty] private bool showsLanes;
 
-    /// <summary>What the handle says, which is also which way it would go.</summary>
-    public string LanesHandle => (ShowsLanes ? "▾" : "▸") + "  automation";
-
-    /// <summary>Folds the automation strip open or shut.</summary>
-    /// <remarks>
+    /// <summary>
     /// Read when it is opened rather than kept in step while it is shut. Everything on it moves
     /// underneath it, an instrument swapped, a plugin taken off a chain, a pattern changed to,
     /// and following all of that would be a subscription per kind for a panel that is folded
     /// away most of the time.
-    /// </remarks>
-    public IRelayCommand ToggleLanesCommand => new RelayCommand(() =>
+    /// </summary>
+    partial void OnShowsLanesChanged(bool value)
     {
-        ShowsLanes = !ShowsLanes;
+        if (value) Lanes?.Show(Cursor.Track);
+    }
 
-        if (ShowsLanes) Lanes?.Show(Cursor.Track);
-    });
+    /// <summary>
+    /// True while the chain under the pattern is unfolded. It starts open.
+    /// </summary>
+    /// <remarks>
+    /// The chain and the automation fold the same way and for the same reason, which is that
+    /// every pixel under the pattern is a line of music nobody can see. The chain starts open
+    /// because a track always has one; the automation starts shut because a track usually has
+    /// none.
+    /// </remarks>
+    [ObservableProperty] private bool showsChain = true;
+
+    /// <summary>
+    /// How tall each strip stands while it is open, kept here rather than in the control.
+    /// </summary>
+    /// <remarks>
+    /// Kept so a strip folded away and opened again comes back the size it was, and so the two
+    /// answers survive changing page. Neither is a share of anything: each strip asks for what
+    /// it wants and the pattern is measured in what is left, which is what makes one grip move
+    /// one strip.
+    /// </remarks>
+    [ObservableProperty] private double chainHeight = 104;
+
+    [ObservableProperty] private double lanesHeight = 120;
 
     /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
     /// <remarks>
