@@ -21,6 +21,8 @@ using JingleBox2.Music.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Machines;
 
 namespace JingleBox2.Views;
 
@@ -36,6 +38,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class InstrumentPanel : UserControl
 {
+    /// <summary>Walking a shelf of presets: which way, and where it stops.</summary>
+    private readonly IPresetStep _step = new PresetStep();
+
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IMachineTint _tint = new MachineTint();
 
@@ -81,7 +86,7 @@ public partial class InstrumentPanel : UserControl
         MachineFace.UnlinkWanted += Drop;
 
         DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
-        UI.ThemeManager.Changed += Later;
+        UI.ThemeSwitch.Changed += Later;
 
         LinkKey.Watch(this);
 
@@ -96,7 +101,7 @@ public partial class InstrumentPanel : UserControl
 
         DetachedFromVisualTree += (_, _) =>
         {
-            UI.ThemeManager.Changed -= Later;
+            UI.ThemeSwitch.Changed -= Later;
 
             if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
 
@@ -199,7 +204,7 @@ public partial class InstrumentPanel : UserControl
     {
         if (MachineFace.Presets is not { } shelf) return;
 
-        int wanted = Machines.PresetStep.Moved(shelf.Picked, shelf.Names.Count, by);
+        int wanted = _step.Moved(shelf.Picked, shelf.Names.Count, by);
 
         if (wanted != shelf.Picked) shelf.Picked = wanted;
     }

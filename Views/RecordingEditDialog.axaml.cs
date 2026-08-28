@@ -11,6 +11,7 @@ using System.ComponentModel;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Waveform.Enums;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -29,6 +30,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class RecordingEditDialog : Window
 {
+    /// <summary>A recording's outline, and which part of it a viewport is showing.</summary>
+    private readonly IWaveformGeometry _shape = new WaveformGeometry();
+
     /// <summary>How wide a trim handle is drawn. Narrow, because it is a boundary and not a control.</summary>
     private const double TrimHandleWidth = 3;
 
@@ -237,7 +241,7 @@ public partial class RecordingEditDialog : Window
 
         _canvas.Children.Add(new Path
         {
-            Data = WaveformGeometry.Build(waveform.PeakData, _viewport, width, height),
+            Data = _shape.Build(waveform.PeakData, _viewport, width, height),
             Fill = palette.AccentBrush,
             Opacity = 0.85
         });

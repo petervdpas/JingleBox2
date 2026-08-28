@@ -8,6 +8,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -33,6 +34,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class ControlSurfaceViewModel : ObservableObject
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles = new ControllerProfiles();
+
     /// <summary>The rows underneath, which are what is actually stored and opened.</summary>
     private readonly IReadOnlyList<MidiDeviceViewModel> _ports;
 
@@ -56,7 +60,7 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
         _forget = forget;
 
         Ports = new ObservableCollection<ControlSurfacePort>(
-            ports.Select(one => new ControlSurfacePort(one.Name, ControllerProfiles.PortIs(one.Name), one.IsConnected)));
+            ports.Select(one => new ControlSurfacePort(one.Name, _profiles.PortIs(one.Name), one.IsConnected)));
 
         _reading = true;
 
@@ -146,7 +150,7 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
 
         foreach (var port in _ports)
         {
-            bool on = wanted && ControllerProfiles.PortTakes(port.Name, role);
+            bool on = wanted && _profiles.PortTakes(port.Name, role);
 
             switch (role)
             {

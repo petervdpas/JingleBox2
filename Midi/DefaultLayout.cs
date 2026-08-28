@@ -5,6 +5,8 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Controllers;
 
 namespace JingleBox2.Midi;
 
@@ -47,6 +49,16 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class DefaultLayout
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
+    /// <summary>Takes what is known about the controllers, or asks for its own.</summary>
+    /// <param name="profiles">
+    /// What is known about the controllers plugged in. Left out, one of its own; the application
+    /// hands the same one to everything, since what a device is doing is remembered in it.
+    /// </param>
+    public DefaultLayout(IControllerProfiles? profiles = null) => _profiles = profiles ?? new ControllerProfiles();
+
     /// <summary>Whether a controller does anything before it has been pointed at something.</summary>
     public bool On { get; set; } = true;
 
@@ -153,13 +165,13 @@ public sealed class DefaultLayout
     }
 
     /// <summary>What the controller's own file says this is, when there is one.</summary>
-    private static string? Told(Control control, MidiMessage message)
+    private string? Told(Control control, MidiMessage message)
     {
-        var said = Controllers.ControllerProfiles.Control(message.Device, message.Channel, message.Value);
+        var said = _profiles.Control(message.Device, message.Channel, message.Value);
 
         if (said?.Kind is not { Length: > 0 } kind) return null;
 
-        control.Pickup = Controllers.ControllerProfiles.Pickup(message.Device, message.Channel, message.Value)
+        control.Pickup = _profiles.Pickup(message.Device, message.Channel, message.Value)
                          ?? ControlPickup.Sensed;
 
         return kind;

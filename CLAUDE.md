@@ -245,10 +245,26 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   else: anything that is neither is moved to `instruments/retired/` on the next open, since
   there is no longer any way to make one. A machine cannot be renamed, deleted or duplicated; a
   plugin can be deleted but takes its name from the VST3 or CLAP
-- **Machines and instruments are not the same word.** A machine is a fixture on the rack: one of
-  each, fixed name, always there. An instrument is what a machine becomes inside a song: your
-  name, your settings, its own id, stored with the song, and two of them can come off one
-  machine. `TrackerInstrument` is the data type for both, but the rack's types say machine
+- **Engine, machine and instrument are three words and not one.** They are the three layers of
+  the same thing and confusing any two of them leads somewhere wrong, so:
+  - An **engine** is what makes the sound. There are six, they are `TrackerInstrumentKind`, they
+    are compiled into the application, and their numbers are in every song ever saved so they do
+    not move. An engine has no face and no name a person sees
+  - A **machine** is a face over an engine: a folder holding `machine.json`, its badge, its
+    presets and its own `sounds`, made in the designer and travelling as a zip. It carries no
+    engine and cannot: which engine it is on is decided by its id, and `Machine.Register` refuses
+    an id it has no engine for. That is why a machine designed under a new id is read off disc
+    and never reaches the rack, and it is the one thing standing between here and a machine
+    somebody else can ship
+  - An **instrument** is a machine in use: your name, your settings, its own id, stored with the
+    song. Two of them can come off one machine
+
+  So a song whose machine is not installed still plays, because the song carries the instrument
+  and the engine is in the program; what it has lost is the face, the presets and the name, and
+  it shows a grey "Sampler". A machine's own recordings do travel with it, inside the zip
+
+- A machine is a fixture on the rack: one of each, fixed name, always there. `TrackerInstrument`
+  is the data type for both a machine and an instrument, but the rack's types say machine
   (`MachineRack`, `MachineRackViewModel`, `RackMachine`, `MachinesView`) and the tracker's say
   instrument (`Song.Instruments`, `InstrumentSlot`, `AddInstrumentCommand`)
 - `SampleSlicer` (Tracker/): Where a recording gets cut into pieces. Finds the attacks off the
@@ -292,6 +308,12 @@ and, under it, only what is true of that implementation and untrue of the contra
 usually how it does the thing rather than what the thing is. A remark that would still be true of
 a second implementation belongs upstairs.
 
+**A class is named for what it is, never for what it is to somebody else.** No `Helper`, no
+`Util`, no `Manager`, no `Common`: those name a relationship rather than a thing, so they attract
+whatever nobody could place and end up as a bag. `KeyRegions` shares a keyboard out, `SampleUsers`
+answers who plays a recording, `RunMarker` is the note a run leaves. If a name cannot be found,
+the class is usually two classes.
+
 **Every class that does something gets one.** That is the rule, and it is wider than the one
 that used to be written here, which said a pure rule holder was already answerable and could stay
 static. It was wrong twice over. A static class cannot be stood in front of, so the moment
@@ -305,13 +327,15 @@ machine.
 
 So a static class is a decision to be untestable, and it is almost never worth making. The ones
 that were here became sealed instance classes behind interfaces in one pass: the note and
-keyboard maths in `Music/`, the viewport and gain rules in `UI/`, the DSP helpers in
+keyboard maths in `Music/`, the viewport and gain rules in `UI/`, the filters and curves in
 `Tracker/Synth/`, the machines folder in `Tracker/Machines/`, and the pattern, slice and song
-helpers at the root of `Tracker/`. A second pass took `Audio/`, `Midi/`, `Config/`,
-`Diagnostics/`, `Views/` and the theme.
+rules at the root of `Tracker/`. A second pass took `Audio/`, `Midi/`, `Config/`,
+`Diagnostics/`, `Views/` and the theme; a third took the two machine assemblies, `Shortcuts/`,
+`Controllers/`, `Help/` and what was left in `ViewModels/`. What is left static is twenty one
+things and every one of them is on the list below.
 
 **Three doors stay static, and each one has the same reason.** `Log`, `CrashReport`,
-`ThemeManager`, and the two under them, `LinkKey` and `Pointable`. An application has one log,
+`ThemeSwitch`, and the two under them, `LinkKey` and `Pointable`. An application has one log,
 one run, one theme and one set of attached properties: handing one about would be handing the
 same object about under another name, and `Log` alone has fifty three callers including the
 thread that fills the audio buffer. **But nothing in a door decides anything.** What each one
@@ -332,8 +356,33 @@ declarations, GUIDs and struct layouts, which is data with a compiler attached, 
 the toolkit requires. `XErrors` installs the one X11 error handler a process has. `PanelPreview`
 and `PluginHostProcess` are entry points: this same executable started again, being something
 else. `PadMatrix` is three consts and `MixLinks` is nine templates named from XAML by
-`x:Static`, both data. `PluginCrashGuard` is a door like the log's and its rules came out into
-`IRunMarker`.
+`x:Static`, both data, and so are `MachineActions`, `MachineStarts`, `MachineElementKinds`,
+`MachinePresetWords` and `PatternFont`. `PluginCrashGuard` is a door like the log's and its
+rules came out into `IRunMarker`. `ShortcutKeys` is one more door: one map for the application,
+hung on every window, and what it knows is `IShortcutMap` and `IShortcutContext` already.
+
+**The two machine assemblies are published, and the rule there is narrower.** `Machines.Abstractions`
+is what an outside machine links to and is the assembly `LICENSE.EXCEPTION` names, so everything
+public in either of them is a promise. The test is not "can it be stood in front of" but **would
+an outside machine ever write this down**. The parts every range control shares are public,
+because a machine drawing a control of its own should feel like the ones we ship: `IRangeValue`,
+`IMeterScale`, `INumericInput`, `IWaveformGeometry`, `INaming`, and in the contract itself
+`IPanelOrder`, `IMachineNotes` and `IPresetStep`. How our own knob sweeps its 270 degrees, how
+our own fader reads its track and how our own tick attribute is spelled are not: `KnobMath`,
+`FaderMath` and `TickList` are internal, with `InternalsVisibleTo` for the tests. Internal is not
+untested, and that line in the csproj is the whole of what it costs to keep the promise small.
+
+Five files in `Machines.Ui` declared `JingleBox2.UI`, the application's own namespace, inside the
+assembly this codebase is otherwise careful to keep clear of it. The compiler proved they were
+the only ones: taking the namespace away left nothing else in that assembly needing it.
+
+`ControllerProfiles` is the one that had to be shared rather than merely made an instance. It
+remembers what a device has been seen doing, and which of a device's programs is running is
+worked out from the numbers arriving, so a second one is told nothing and answers for a device
+it has never heard speak. `MainViewModel` makes one and hands it to the router, the layout, the
+codecs and the three pages; everything that takes one still defaults to its own, so a panel or a
+test built on its own works. `Tests/DefaultLayoutTests.cs` failed the moment it stopped sharing,
+which is the hazard the static had been hiding.
 
 What still does not get one: data. Records, enums, and the document types you can already build
 in a test and hand about (`Note`, `TrackerCell`, `Song`, `Pattern`). An `ISong` with forty
@@ -445,7 +494,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-796 of them, in about three seconds, with no window and no hardware. They run in CI on every push
+835 of them, in about three seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -497,6 +546,14 @@ whole exercise and is worth writing down rather than summarising:
 - The drive knob stepped 1.6 dB as it left its own minimum, since the makeup levels the curve at
   full scale and nowhere else. Faded in over the first unit of the range now, so a drive of two
   and above is exactly what it always was
+- A WAV cut off inside its own headers came back as the runtime saying it could not read beyond
+  the end of a stream, which reaches RECORD as a message about a stream rather than about the
+  file somebody just tried to open. The audio itself is still salvaged rather than refused, and
+  that is deliberate: what a take really holds beats what its header claims
+- `MachineNotes.Semitone` chose between a note and a plain number by how long the text was, and
+  three characters is both. Every plain number from 100 to 119 was read as a note, failed to be
+  one, and came back as nothing: the top two octaves, which are notes a machine can be asked to
+  play. The note is tried first now and the number second
 
 ## Technical Notes
 

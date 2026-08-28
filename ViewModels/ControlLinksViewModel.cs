@@ -9,6 +9,7 @@ using System.Globalization;
 using System.Linq;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -23,6 +24,16 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class ControlLinksViewModel : ObservableObject
 {
+    /// <summary>
+    /// What is known about the controllers plugged in.
+    /// </summary>
+    /// <remarks>
+    /// Handed in and passed down to every row rather than made again per row. It remembers what
+    /// a device has been seen doing, so two of them are two different answers to the same
+    /// question, and the rows would be reading one nobody is telling anything.
+    /// </remarks>
+    private readonly IControllerProfiles _profiles;
+
     /// <summary>Where the links live, read for the list and told when one is taken off.</summary>
     private readonly ControlLink _link;
 
@@ -44,8 +55,13 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// <summary>Reads one layer's links and follows them for as long as this list is on screen.</summary>
     /// <param name="link">Where the links live.</param>
     /// <param name="songOnly">True for the song's own layer, false for the desk.</param>
-    public ControlLinksViewModel(ControlLink link, bool songOnly = false)
+    /// <param name="profiles">
+    /// What is known about the controllers plugged in. Left out, one of its own; the application
+    /// hands the same one to everything, since what a device is doing is remembered in it.
+    /// </param>
+    public ControlLinksViewModel(ControlLink link, bool songOnly = false, IControllerProfiles? profiles = null)
     {
+        _profiles = profiles ?? new ControllerProfiles();
         _link = link;
         _songOnly = songOnly;
 
@@ -118,12 +134,13 @@ public sealed class ControlLinksViewModel : ObservableObject
             .ThenBy(one => one.Machine, StringComparer.Ordinal)
             .ToList();
 
-        foreach (var mapping in order) Links.Add(new ControlLinkRow(mapping, _link));
+        foreach (var mapping in order) Links.Add(new ControlLinkRow(mapping, _link, _profiles));
 
         foreach (var group in order.GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase))
             Controllers.Add(new ControlDeviceLinks(
                 group.Key,
-                group.Select(one => new ControlLinkRow(one, _link))));
+                group.Select(one => new ControlLinkRow(one, _link, _profiles)),
+                _profiles));
 
         OnPropertyChanged(nameof(HasLinks));
     }
@@ -134,9 +151,16 @@ public sealed class ControlLinksViewModel : ObservableObject
 /// </summary>
 public sealed class ControlDeviceLinks
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
     /// <summary>Gathers one controller's rows under its own heading.</summary>
-    public ControlDeviceLinks(string device, IEnumerable<ControlLinkRow> links)
+    /// <param name="device">What the controller is called, or nothing for links that name none.</param>
+    /// <param name="links">Everything learned on it.</param>
+    /// <param name="profiles">What is known about the controllers, handed down rather than made again.</param>
+    public ControlDeviceLinks(string device, IEnumerable<ControlLinkRow> links, IControllerProfiles profiles)
     {
+        _profiles = profiles;
         Device = device;
 
         foreach (var one in links) Links.Add(one);
@@ -154,19 +178,26 @@ public sealed class ControlDeviceLinks
     /// sitting under a blank heading as if the name had gone missing.
     /// </remarks>
     public string Said =>
-        (Device.Length > 0 ? ControllerProfiles.Called(Device) : "Learned before controllers were recorded")
+        (Device.Length > 0 ? _profiles.Called(Device) : "Learned before controllers were recorded")
         + "  ·  " + Links.Count + (Links.Count == 1 ? " control" : " controls");
 }
 
 /// <summary>One line of it: which control, what it moves, and how it picks it up.</summary>
 public sealed class ControlLinkRow
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
     /// <summary>Where the links live, so a row can change or remove its own.</summary>
     private readonly ControlLink _link;
 
     /// <summary>One row over one mapping, which it edits in place rather than copying.</summary>
-    public ControlLinkRow(ControlMapping mapping, ControlLink link)
+    /// <param name="mapping">The link this row is about.</param>
+    /// <param name="link">Where the links live, for a row that takes itself off.</param>
+    /// <param name="profiles">What is known about the controllers, handed down rather than made again.</param>
+    public ControlLinkRow(ControlMapping mapping, ControlLink link, IControllerProfiles profiles)
     {
+        _profiles = profiles;
         Mapping = mapping;
         _link = link;
     }
@@ -186,7 +217,7 @@ public sealed class ControlLinkRow
     /// until now and it works, which is the entire reason a profile is allowed to be optional.
     /// </remarks>
     public string Control =>
-        ControllerProfiles.Named(Mapping.Device, Mapping.Channel, Mapping.Cc) is { Length: > 0 } named
+        _profiles.Named(Mapping.Device, Mapping.Channel, Mapping.Cc) is { Length: > 0 } named
             ? named
             : "CC " + Mapping.Cc.ToString(CultureInfo.InvariantCulture)
               + "  ch " + Mapping.Channel.ToString(CultureInfo.InvariantCulture);

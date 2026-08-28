@@ -3,6 +3,7 @@ using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using System;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -11,6 +12,9 @@ namespace JingleBox2.ViewModels;
 /// </summary>
 public sealed partial class MidiDeviceViewModel : ObservableObject
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles = new ControllerProfiles();
+
     /// <summary>Told when a job was ticked or unticked, so the settings can be written.</summary>
     private readonly Action<MidiDeviceViewModel> _roleChanged;
 
@@ -45,7 +49,7 @@ public sealed partial class MidiDeviceViewModel : ObservableObject
     /// Empty for a device with no profile, which is most of them, and the row reads as it always
     /// did.
     /// </remarks>
-    public string PortIs => ControllerProfiles.PortIs(Name);
+    public string PortIs => _profiles.PortIs(Name);
 
     /// <summary>True when there is something to say about this port.</summary>
     public bool HasProfile => PortIs.Length > 0;

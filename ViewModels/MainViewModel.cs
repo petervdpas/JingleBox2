@@ -26,6 +26,7 @@ using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -45,6 +46,19 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    /// <summary>
+    /// What is known about the controllers plugged in, for the whole application.
+    /// </summary>
+    /// <remarks>
+    /// One of them, made here and handed to everything that asks. It remembers what a device
+    /// has been seen doing, and which of a device's programs is running is worked out from the
+    /// numbers arriving: a second one would be told nothing and would answer for a device it
+    /// had never heard speak. Everything that takes one defaults to its own, so a test or a
+    /// panel built on its own still works; the application passes this.
+    /// </remarks>
+    private readonly IControllerProfiles _profiles = new ControllerProfiles();
+
     /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
     private readonly IPluginChainState _chains = new PluginChainState();
 
@@ -62,7 +76,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// face in front of you, on hardware this application has never heard of and with nothing
     /// stored. Anything anybody linked beats it. See <see cref="Midi.DefaultLayout"/>.
     /// </remarks>
-    public Midi.DefaultLayout Layout { get; } = new();
+    public Midi.DefaultLayout Layout { get; }
 
     /// <summary>
     /// What has been done to the pads, so it can be taken back.
@@ -708,13 +722,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public ObservableCollection<string> ProfileNames { get; } = new();
 
     /// <summary>
-    /// The themes, taken from <see cref="ThemeManager"/> rather than written out again.
+    /// The themes, taken from <see cref="ThemeSwitch"/> rather than written out again.
     /// </summary>
     /// <remarks>
     /// Which themes there are is that class's to say, since it is the one that knows which file
     /// each of them is. A second list here could only drift from it.
     /// </remarks>
-    public ObservableCollection<string> ThemeNames { get; } = new(ThemeManager.Names);
+    public ObservableCollection<string> ThemeNames { get; } = new(ThemeSwitch.Names);
 
     /// <summary>
     /// The theme in force, which is applied and stored the moment it is picked.
@@ -723,7 +737,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// A name the settings hold that is not one of the themes is resolved to the default rather
     /// than left standing, so a hand-edited settings file cannot leave the window unstyled.
     /// </remarks>
-    [ObservableProperty] private string selectedTheme = ThemeManager.Default;
+    [ObservableProperty] private string selectedTheme = ThemeSwitch.Default;
 
     /// <summary>
     /// Where the sound goes. Changing it takes everything down and brings it up on the new
@@ -933,7 +947,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         _store = store;
         _cfg = cfg;
 
-        Midi = new MidiViewModel(store, cfg, midiService);
+        Layout = new Midi.DefaultLayout(_profiles);
+
+        Midi = new MidiViewModel(store, cfg, midiService, _profiles);
 
         Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
@@ -1039,7 +1055,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             SelectedProfileName = resolved;
             _cfg.SelectedProfile = resolved;
 
-            SelectedTheme = ThemeManager.Resolve(_cfg.SelectedTheme);
+            SelectedTheme = ThemeSwitch.Resolve(_cfg.SelectedTheme);
             _cfg.SelectedTheme = SelectedTheme;
         }
         finally
@@ -1070,7 +1086,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             () => ControlLink.Mappings,
             targets,
             () => ControlLink.Say(),
-            Layout);
+            Layout,
+            _profiles);
         ControlLink.UseThis();
 
         Tracker.UseAutomation(targets);
@@ -1082,9 +1099,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink.SongChanging = () => Tracker.ControlsChanging();
 
-        Links = new ControlLinksViewModel(ControlLink);
+        Links = new ControlLinksViewModel(ControlLink, profiles: _profiles);
 
-        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true);
+        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true, profiles: _profiles);
 
         var transport = new MidiTransportRouter(new TransportAdapter(Transport));
 
@@ -1145,9 +1162,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 target.Reads(value));
         };
 
-        _codecs = new ControllerCodecs(midiService);
+        _codecs = new ControllerCodecs(midiService, _profiles);
 
-        ControllerProfiles.Reload();
+        _profiles.Reload();
 
         controlRouter.Reaching += (mapping, target, wanted) =>
         {
@@ -1166,12 +1183,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             if (_codecs.Read(msg) is not { } read) return;
 
             if (read.Type == MidiMessageType.ControlChange)
-                ControllerProfiles.Saw(read.Device, read.Channel, read.Value);
+                _profiles.Saw(read.Device, read.Channel, read.Value);
 
             dispatcher.Handle(read);
         };
 
-        ThemeManager.Apply(SelectedTheme);
+        ThemeSwitch.Apply(SelectedTheme);
 
         PropertyChanged += OnMainChanged;
     }
@@ -1401,10 +1418,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     {
         if (_suspendSave) return;
 
-        var resolved = ThemeManager.Resolve(value);
+        var resolved = ThemeSwitch.Resolve(value);
 
         _cfg.SelectedTheme = resolved;
-        ThemeManager.Apply(resolved);
+        ThemeSwitch.Apply(resolved);
 
         _store.Save(_cfg);
     }

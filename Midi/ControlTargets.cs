@@ -34,6 +34,9 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class ControlTargets : IControlTargets
 {
+    /// <summary>The order a panel reads in. Holds nothing, so one is enough.</summary>
+    private readonly IPanelOrder _order = new PanelOrder();
+
     /// <summary>The machines this run has.</summary>
     private readonly IMachineProjects _machines;
 
@@ -149,7 +152,7 @@ public sealed class ControlTargets : IControlTargets
         {
             var byKey = project.Parameters.ToDictionary(one => one.Key, StringComparer.Ordinal);
 
-            foreach (var key in Machines.PanelOrder.Of(project.Panel))
+            foreach (var key in _order.Of(project.Panel))
             {
                 if (!byKey.TryGetValue(key, out var parameter) || !parameter.Saved) continue;
 
@@ -313,7 +316,7 @@ public sealed class ControlTargets : IControlTargets
 
         string key = mapping.Key.Length > 0
             ? mapping.Key
-            : Machines.PanelOrder.At(project.Panel, mapping.Ordinal);
+            : _order.At(project.Panel, mapping.Ordinal);
 
         if (key.Length == 0) return null;
 

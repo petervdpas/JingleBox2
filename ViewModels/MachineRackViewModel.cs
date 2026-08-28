@@ -22,6 +22,7 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 
@@ -36,6 +37,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
 {
+    /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
+    private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
+
     /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
     private readonly IPluginHost _host = new PluginHost();
 
@@ -395,7 +399,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Sounding.Struck(note, held > 0 ? held : HoldSeconds);
 
-        Octave = PanelKeyboard.Reveal(note, Octave);
+        Octave = _keyboard.Reveal(note, Octave);
 
         NoteTrigger++;
 
@@ -513,7 +517,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         if (key is not { } semitone) return;
 
-        Octave = PanelKeyboard.Reveal(new Note(semitone), Octave);
+        Octave = _keyboard.Reveal(new Note(semitone), Octave);
     }
 
     /// <summary>A preset has landed on the instrument being edited: reread it and write it.</summary>

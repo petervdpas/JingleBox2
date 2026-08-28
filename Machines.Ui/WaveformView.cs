@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -21,6 +23,9 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class WaveformView : ThemedControl
 {
+    /// <summary>A recording's outline, and which part of it a viewport is showing.</summary>
+    private readonly IWaveformGeometry _shape = new WaveformGeometry();
+
     /// <summary>
     /// How much of the file is on screen. Its own, not a shared one: two pictures of the same
     /// recording, on a panel and in a chop editor, are looked at separately.
@@ -319,7 +324,7 @@ public class WaveformView : ThemedControl
         double centre = height / 2;
         context.FillRectangle(new SolidColorBrush(palette.Muted, 0.35), new Rect(1, centre, width - 2, 1));
 
-        var geometry = WaveformGeometry.Build(peaks, _view, width, height);
+        var geometry = _shape.Build(peaks, _view, width, height);
         context.DrawGeometry(new SolidColorBrush(palette.Accent, 0.85), null, geometry);
 
         if (Slicing) DrawSlices(context, palette, area);

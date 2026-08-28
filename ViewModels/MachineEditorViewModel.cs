@@ -33,6 +33,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MachineEditorViewModel : ObservableObject
 {
+    /// <summary>What a key is called, both ways round.</summary>
+    private readonly IMachineNotes _notes = new MachineNotes();
+
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IMachineTint _tint = new MachineTint();
 
@@ -1612,7 +1615,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         int down = Math.Clamp(PadRows, 1, MostPads);
         int wanted = across * down;
 
-        int first = MachineNotes.Semitone(PadFirstKey);
+        int first = _notes.Semitone(PadFirstKey);
 
         if (first < 0) first = FirstPadKey;
 
@@ -1629,7 +1632,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             {
                 Element = MachineElementKinds.Pad,
                 Parameter = at < kept.Count && kept[at].Length > 0 ? kept[at] : "pad" + (at + 1),
-                Properties = { ["key"] = MachineNotes.Name(first + at) },
+                Properties = { ["key"] = _notes.Name(first + at) },
             });
         }
 

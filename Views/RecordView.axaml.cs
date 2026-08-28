@@ -14,6 +14,7 @@ using System.ComponentModel;
 using System.Linq;
 using JingleBox2.Machines.Ui.Records;
 using JingleBox2.Audio.Interfaces;
+using JingleBox2.Machines.Ui.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -27,6 +28,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class RecordView : UserControl
 {
+    /// <summary>A recording's outline, and which part of it a viewport is showing.</summary>
+    private readonly IWaveformGeometry _shape = new WaveformGeometry();
+
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();
 
@@ -281,7 +285,7 @@ public partial class RecordView : UserControl
 
         var waveformPath = new Path
         {
-            Data = WaveformGeometry.Build(peakData, FullView, canvasWidth, canvasHeight),
+            Data = _shape.Build(peakData, FullView, canvasWidth, canvasHeight),
             Fill = palette.AccentBrush,
             Opacity = WaveformOpacity
         };

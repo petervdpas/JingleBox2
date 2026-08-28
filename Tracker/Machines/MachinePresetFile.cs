@@ -23,6 +23,9 @@ namespace JingleBox2.Tracker.Machines;
 /// </param>
 public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePresetFile
 {
+    /// <summary>What a key is called, both ways round.</summary>
+    private readonly IMachineNotes _notes = new MachineNotes();
+
     /// <summary>Where a name written inside a machine really is, and back again.</summary>
     private readonly IMachinePaths _paths = paths ?? new MachinePaths();
 
@@ -534,7 +537,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
 
             string said = child.Properties.TryGetValue(KeyProperty, out string? held) ? held : "";
 
-            found.Add((child.Parameter, said, MachineNotes.Semitone(said)));
+            found.Add((child.Parameter, said, _notes.Semitone(said)));
         }
 
         return found;

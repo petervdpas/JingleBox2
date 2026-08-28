@@ -1,31 +1,39 @@
 using System;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.UI;
+namespace JingleBox2.Machines.Ui;
 
-/// <summary>
-/// Where a knob's pointer sits. The value maths it shares with the other range controls lives
-/// in <see cref="RangeValue"/>.
-/// </summary>
-public static class KnobMath
+/// <inheritdoc/>
+internal sealed class KnobMath : IKnobMath
 {
-    /// <summary>A pot turns three quarters of a circle, from seven o'clock to five o'clock.</summary>
+    /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
+    private readonly IRangeValue _range = new RangeValue();
+
+    /// <inheritdoc cref="IKnobMath.SweepDegrees"/>
     public const double SweepDegrees = 270;
 
-    /// <summary>Where the sweep begins, which is seven o'clock, measured from twelve.</summary>
+    /// <inheritdoc cref="IKnobMath.StartDegrees"/>
     public const double StartDegrees = -135;
 
-    /// <summary>Pixels of vertical drag that cover the whole range.</summary>
+    /// <inheritdoc cref="IKnobMath.DragPixelsForFullRange"/>
     public const double DragPixelsForFullRange = 150;
 
-    /// <summary>Pointer angle in degrees, clockwise from twelve o'clock.</summary>
-    public static double AngleFor(double value, double minimum, double maximum) =>
-        StartDegrees + RangeValue.Fraction(value, minimum, maximum) * SweepDegrees;
+    /// <inheritdoc/>
+    double IKnobMath.SweepDegrees => SweepDegrees;
 
-    /// <summary>
-    /// A point on the dial at that angle. Screen coordinates, so y grows downwards and twelve
-    /// o'clock is straight up.
-    /// </summary>
-    public static (double X, double Y) PointAt(double centerX, double centerY, double radius, double angleDegrees)
+    /// <inheritdoc/>
+    double IKnobMath.StartDegrees => StartDegrees;
+
+    /// <inheritdoc/>
+    double IKnobMath.DragPixelsForFullRange => DragPixelsForFullRange;
+
+    /// <inheritdoc/>
+    public double AngleFor(double value, double minimum, double maximum) =>
+        StartDegrees + _range.Fraction(value, minimum, maximum) * SweepDegrees;
+
+    /// <inheritdoc/>
+    public (double X, double Y) PointAt(double centerX, double centerY, double radius, double angleDegrees)
     {
         double radians = angleDegrees * Math.PI / 180.0;
 

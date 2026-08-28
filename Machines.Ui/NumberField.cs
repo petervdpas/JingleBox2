@@ -3,6 +3,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -16,6 +18,9 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class NumberField : TemplatedControl
 {
+    /// <summary>Stepping, clamping and reading a typed number. Holds nothing, so one is enough.</summary>
+    private readonly INumericInput _number = new NumericInput();
+
     /// <summary>
     /// The names the template gives its three parts.
     /// </summary>
@@ -291,7 +296,7 @@ public class NumberField : TemplatedControl
     private void StepBy(double direction, KeyModifiers modifiers)
     {
         double step = modifiers.HasFlag(KeyModifiers.Shift) ? LargeStep : SmallStep;
-        Commit(NumericInput.Step(Value, direction, step, Minimum, Maximum));
+        Commit(_number.Step(Value, direction, step, Minimum, Maximum));
     }
 
     /// <summary>
@@ -299,10 +304,10 @@ public class NumberField : TemplatedControl
     /// </summary>
     /// <remarks>
     /// A stray keystroke should not wipe a tempo, which is why the fallback is the current value
-    /// rather than nought. See <see cref="NumericInput.Parse"/>.
+    /// rather than nought. See <see cref="INumericInput.Parse"/>.
     /// </remarks>
     private void CommitTypedText() =>
-        Commit(NumericInput.Parse(_textBox?.Text ?? Text, Value, Minimum, Maximum));
+        Commit(_number.Parse(_textBox?.Text ?? Text, Value, Minimum, Maximum));
 
     /// <summary>
     /// Takes a new value, or puts the old one back when it turns out not to be new.
@@ -335,7 +340,7 @@ public class NumberField : TemplatedControl
         if (_syncing) return;
 
         _syncing = true;
-        Text = NumericInput.Format(Value, Format);
+        Text = _number.Format(Value, Format);
         if (_textBox != null) _textBox.Text = Text;
         _syncing = false;
     }

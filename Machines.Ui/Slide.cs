@@ -1,9 +1,10 @@
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.UI;
 using System;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -29,6 +30,9 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Slide : ThemedControl
 {
+    /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
+    private readonly IRangeValue _range = new RangeValue();
+
     /// <summary>
     /// Backs <see cref="Value"/>, where the handle stands.
     /// </summary>
@@ -238,7 +242,7 @@ public class Slide : ThemedControl
         if (travel <= 0) return;
 
         double left = HandleWidth / 2;
-        double at = left + RangeValue.Fraction(Value, Minimum, Maximum) * travel;
+        double at = left + _range.Fraction(Value, Minimum, Maximum) * travel;
 
         var rail = new Rect(left, middle - RailThickness / 2, travel, RailThickness);
 
@@ -334,7 +338,7 @@ public class Slide : ThemedControl
         Focus();
 
         double x = e.GetPosition(this).X;
-        double at = HandleWidth / 2 + RangeValue.Fraction(Value, Minimum, Maximum) * Travel();
+        double at = HandleWidth / 2 + _range.Fraction(Value, Minimum, Maximum) * Travel();
 
         if (HandleAt(at).Contains(new Point(x, Bounds.Height / 2)))
         {
@@ -378,7 +382,7 @@ public class Slide : ThemedControl
         bool fine = _fineDrag || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         Value = fine
-            ? RangeValue.FromDrag(_dragStartValue, x - _dragStartX, Minimum, Maximum, SmallStep, Travel(), fine: true)
+            ? _range.FromDrag(_dragStartValue, x - _dragStartX, Minimum, Maximum, SmallStep, Travel(), fine: true)
             : ValueAt(x - _grabOffset);
 
         e.Handled = true;
@@ -439,11 +443,11 @@ public class Slide : ThemedControl
                 break;
 
             case Key.Home:
-                Value = RangeValue.Quantize(Minimum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Minimum, Minimum, Maximum, SmallStep);
                 break;
 
             case Key.End:
-                Value = RangeValue.Quantize(Maximum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Maximum, Minimum, Maximum, SmallStep);
                 break;
 
             default:
@@ -460,7 +464,7 @@ public class Slide : ThemedControl
 
         if (DefaultValue is not double reset) return;
 
-        Value = RangeValue.Quantize(reset, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(reset, Minimum, Maximum, SmallStep);
 
         e.Handled = true;
     }
@@ -472,7 +476,7 @@ public class Slide : ThemedControl
 
         double step = modifiers.HasFlag(KeyModifiers.Shift) ? LargeStep : SmallStep;
 
-        Value = RangeValue.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
     }
 
     /// <summary>The value the middle of the handle would have at that point on the rail.</summary>
@@ -484,6 +488,6 @@ public class Slide : ThemedControl
 
         double fraction = Math.Clamp((x - HandleWidth / 2) / travel, 0, 1);
 
-        return RangeValue.Quantize(Minimum + fraction * (Maximum - Minimum), Minimum, Maximum, SmallStep);
+        return _range.Quantize(Minimum + fraction * (Maximum - Minimum), Minimum, Maximum, SmallStep);
     }
 }

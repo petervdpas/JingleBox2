@@ -2,6 +2,7 @@ using JingleBox2.Controllers;
 using JingleBox2.Midi;
 using Xunit;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -15,6 +16,12 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class ControllerProfileTests
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles = new ControllerProfiles();
+
+    /// <summary>Where a controller's own files live, and how one is matched to a port.</summary>
+    private readonly IControllerFolder _folder = new ControllerFolder();
+
     /// <summary>A MiniLab 3's main port, the one its knobs, faders and pads arrive on.</summary>
     private const string Lab = "Minilab3 MIDI";
 
@@ -31,7 +38,7 @@ public class ControllerProfileTests
     /// Reads the controller folder again before each test, so every one of them starts from the
     /// files as they are on disc rather than from whatever the last one left behind.
     /// </summary>
-    public ControllerProfileTests() => ControllerProfiles.Reload();
+    public ControllerProfileTests() => _profiles.Reload();
 
     /// <summary>One device turns up under several port names, all of them that device.</summary>
     /// <remarks>
@@ -43,14 +50,14 @@ public class ControllerProfileTests
     [InlineData("Minilab3 MCU/HUI")]
     [InlineData("2- MiniLab3 MIDI")]
     public void A_minilab_is_known_by_any_of_the_names_it_goes_by(string port) =>
-        Assert.Equal("MiniLab 3", ControllerProfiles.Called(port));
+        Assert.Equal("MiniLab 3", _profiles.Called(port));
 
     /// <summary>With no file a device keeps its port's name and nothing else is claimed.</summary>
     [Fact]
     public void A_device_with_no_file_is_called_what_its_port_is_called()
     {
-        Assert.Equal(Nobodys, ControllerProfiles.Called(Nobodys));
-        Assert.False(ControllerProfiles.Knows(Nobodys));
+        Assert.Equal(Nobodys, _profiles.Called(Nobodys));
+        Assert.False(_profiles.Knows(Nobodys));
     }
 
     /// <summary>Each of a device's ports has a stated job, which is the answer to why one
@@ -61,11 +68,11 @@ public class ControllerProfileTests
     [Fact]
     public void Each_port_says_what_it_is_for()
     {
-        Assert.Contains("notes", ControllerProfiles.PortIs(Lab));
-        Assert.Contains("Mackie", ControllerProfiles.PortIs("Minilab3 MCU/HUI"));
-        Assert.Contains("output", ControllerProfiles.PortIs("Minilab3 DIN THRU"));
+        Assert.Contains("notes", _profiles.PortIs(Lab));
+        Assert.Contains("Mackie", _profiles.PortIs("Minilab3 MCU/HUI"));
+        Assert.Contains("output", _profiles.PortIs("Minilab3 DIN THRU"));
 
-        Assert.Equal("", ControllerProfiles.PortIs(Nobodys));
+        Assert.Equal("", _profiles.PortIs(Nobodys));
     }
 
     /// <summary>
@@ -83,13 +90,13 @@ public class ControllerProfileTests
     [Fact]
     public void Which_program_the_device_is_in_is_worked_out_from_what_arrives()
     {
-        Assert.Equal("", ControllerProfiles.ProgramOn(Lab));
+        Assert.Equal("", _profiles.ProgramOn(Lab));
 
-        ControllerProfiles.Saw(Lab, 1, 86);
-        Assert.Equal("DAW", ControllerProfiles.ProgramOn(Lab));
+        _profiles.Saw(Lab, 1, 86);
+        Assert.Equal("DAW", _profiles.ProgramOn(Lab));
 
-        ControllerProfiles.Saw(Lab, 1, 74);
-        Assert.Equal("Arturia", ControllerProfiles.ProgramOn(Lab));
+        _profiles.Saw(Lab, 1, 74);
+        Assert.Equal("Arturia", _profiles.ProgramOn(Lab));
     }
 
     /// <summary>
@@ -99,11 +106,11 @@ public class ControllerProfileTests
     [Fact]
     public void A_controller_is_named_as_the_front_of_the_device_names_it()
     {
-        ControllerProfiles.Saw(Lab, 1, 86);
+        _profiles.Saw(Lab, 1, 86);
 
-        Assert.Equal("Encoder 1", ControllerProfiles.Named(Lab, 1, 86));
-        Assert.Equal("Slider 4", ControllerProfiles.Named(Lab, 1, 31));
-        Assert.Equal("Play", ControllerProfiles.Named(Lab, 1, 107));
+        Assert.Equal("Encoder 1", _profiles.Named(Lab, 1, 86));
+        Assert.Equal("Slider 4", _profiles.Named(Lab, 1, 31));
+        Assert.Equal("Play", _profiles.Named(Lab, 1, 107));
     }
 
     /// <summary>
@@ -113,7 +120,7 @@ public class ControllerProfileTests
     [Fact]
     public void A_control_true_in_every_program_is_named_whatever_the_device_is_doing()
     {
-        Assert.Equal("Mod strip", ControllerProfiles.Named(Lab, 1, 1));
+        Assert.Equal("Mod strip", _profiles.Named(Lab, 1, 1));
     }
 
     /// <summary>
@@ -123,8 +130,8 @@ public class ControllerProfileTests
     [Fact]
     public void A_number_the_file_does_not_mention_is_named_nothing()
     {
-        Assert.Equal("", ControllerProfiles.Named(Lab, 1, 3));
-        Assert.Equal("", ControllerProfiles.Named(Nobodys, 1, 86));
+        Assert.Equal("", _profiles.Named(Lab, 1, 3));
+        Assert.Equal("", _profiles.Named(Nobodys, 1, 86));
     }
 
     /// <summary>
@@ -140,9 +147,9 @@ public class ControllerProfileTests
     [Fact]
     public void An_encoder_that_reports_a_position_is_read_as_movement()
     {
-        ControllerProfiles.Saw(Lab, 1, 86);
+        _profiles.Saw(Lab, 1, 86);
 
-        Assert.Equal(ControlPickup.Endless, ControllerProfiles.Pickup(Lab, 1, 86));
+        Assert.Equal(ControlPickup.Endless, _profiles.Pickup(Lab, 1, 86));
     }
 
     /// <summary>
@@ -152,10 +159,10 @@ public class ControllerProfileTests
     [Fact]
     public void A_fader_still_picks_up_and_a_button_still_jumps()
     {
-        ControllerProfiles.Saw(Lab, 1, 86);
+        _profiles.Saw(Lab, 1, 86);
 
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Lab, 1, 31));
-        Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Lab, 1, 107));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Lab, 1, 31));
+        Assert.Equal(ControlPickup.Jump, _profiles.Pickup(Lab, 1, 107));
     }
 
     /// <summary>
@@ -166,9 +173,9 @@ public class ControllerProfileTests
     [Fact]
     public void Nothing_is_claimed_for_an_encoder_that_counts_notches()
     {
-        ControllerProfiles.Saw(Lab, 1, 74);
+        _profiles.Saw(Lab, 1, 74);
 
-        Assert.Null(ControllerProfiles.Pickup(Lab, 1, 74));
+        Assert.Null(_profiles.Pickup(Lab, 1, 74));
     }
 
     /// <summary>
@@ -183,7 +190,7 @@ public class ControllerProfileTests
     [Fact]
     public void A_device_that_answers_who_it_is_has_that_written_down()
     {
-        var known = ControllerProfiles.For(Mpd)?.Identity;
+        var known = _profiles.For(Mpd)?.Identity;
 
         Assert.NotNull(known);
         Assert.Equal("47", known!.Manufacturer);
@@ -208,18 +215,18 @@ public class ControllerProfileTests
     [Fact]
     public void A_knob_that_reports_a_position_is_picked_up()
     {
-        ControllerProfiles.Saw(Mpd, 1, 22);
+        _profiles.Saw(Mpd, 1, 22);
 
-        Assert.Equal("Knob 1", ControllerProfiles.Named(Mpd, 1, 22));
-        Assert.Equal("Knob 6", ControllerProfiles.Named(Mpd, 1, 27));
+        Assert.Equal("Knob 1", _profiles.Named(Mpd, 1, 22));
+        Assert.Equal("Knob 6", _profiles.Named(Mpd, 1, 27));
 
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 22));
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 27));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Mpd, 1, 22));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Mpd, 1, 27));
 
-        ControllerProfiles.Saw(Mpd, 1, 3);
+        _profiles.Saw(Mpd, 1, 3);
 
-        Assert.Equal("Knob 3", ControllerProfiles.Named(Mpd, 1, 12));
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Mpd, 1, 15));
+        Assert.Equal("Knob 3", _profiles.Named(Mpd, 1, 12));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Mpd, 1, 15));
     }
 
     /// <summary>
@@ -236,14 +243,14 @@ public class ControllerProfileTests
     [Fact]
     public void The_knob_banks_are_told_apart_by_the_numbers_arriving()
     {
-        ControllerProfiles.Saw(Mpd, 1, 3);
-        Assert.Equal("Control Bank A", ControllerProfiles.ProgramOn(Mpd));
+        _profiles.Saw(Mpd, 1, 3);
+        Assert.Equal("Control Bank A", _profiles.ProgramOn(Mpd));
 
-        ControllerProfiles.Saw(Mpd, 1, 17);
-        Assert.Equal("Control Bank B", ControllerProfiles.ProgramOn(Mpd));
+        _profiles.Saw(Mpd, 1, 17);
+        Assert.Equal("Control Bank B", _profiles.ProgramOn(Mpd));
 
-        ControllerProfiles.Saw(Mpd, 1, 27);
-        Assert.Equal("Control Bank C", ControllerProfiles.ProgramOn(Mpd));
+        _profiles.Saw(Mpd, 1, 27);
+        Assert.Equal("Control Bank C", _profiles.ProgramOn(Mpd));
     }
 
     /// <summary>
@@ -259,10 +266,10 @@ public class ControllerProfileTests
     [Fact]
     public void A_knob_the_file_does_not_describe_is_left_to_be_watched()
     {
-        ControllerProfiles.Saw(Mpd, 1, 3);
+        _profiles.Saw(Mpd, 1, 3);
 
-        Assert.Equal("", ControllerProfiles.Named(Mpd, 1, 111));
-        Assert.Null(ControllerProfiles.Pickup(Mpd, 1, 111));
+        Assert.Equal("", _profiles.Named(Mpd, 1, 111));
+        Assert.Null(_profiles.Pickup(Mpd, 1, 111));
     }
 
     /// <summary>
@@ -272,8 +279,8 @@ public class ControllerProfileTests
     [Fact]
     public void Nothing_is_claimed_for_a_device_with_no_file()
     {
-        Assert.Null(ControllerProfiles.Pickup(Nobodys, 1, 86));
-        Assert.Null(ControllerProfiles.Pickup(Nobodys, 1, 20));
+        Assert.Null(_profiles.Pickup(Nobodys, 1, 86));
+        Assert.Null(_profiles.Pickup(Nobodys, 1, 20));
     }
 
     /// <summary>
@@ -288,16 +295,16 @@ public class ControllerProfileTests
     [Fact]
     public void Which_port_takes_which_job_comes_from_the_file()
     {
-        Assert.True(ControllerProfiles.PortTakes(Lab, MidiDeviceRole.Controls));
-        Assert.True(ControllerProfiles.PortTakes(Lab, MidiDeviceRole.Transport));
+        Assert.True(_profiles.PortTakes(Lab, MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes(Lab, MidiDeviceRole.Transport));
 
-        Assert.True(ControllerProfiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Transport));
-        Assert.False(ControllerProfiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Pads));
+        Assert.True(_profiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Transport));
+        Assert.False(_profiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Pads));
 
-        Assert.False(ControllerProfiles.PortTakes("Minilab3 ALV", MidiDeviceRole.Controls));
-        Assert.False(ControllerProfiles.PortTakes("Minilab3 DIN THRU", MidiDeviceRole.Pads));
+        Assert.False(_profiles.PortTakes("Minilab3 ALV", MidiDeviceRole.Controls));
+        Assert.False(_profiles.PortTakes("Minilab3 DIN THRU", MidiDeviceRole.Pads));
 
-        Assert.True(ControllerProfiles.PortTakes(Nobodys, MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes(Nobodys, MidiDeviceRole.Controls));
     }
 
     /// <summary>The other files here name their devices as the MiniLab's does.</summary>
@@ -306,7 +313,7 @@ public class ControllerProfileTests
     [InlineData("KeyLab mkII 88 MCU/HUI", "KeyLab mkII")]
     [InlineData("MPD218 Port A", "MPD218")]
     public void The_other_controllers_with_a_file(string port, string called) =>
-        Assert.Equal(called, ControllerProfiles.Called(port));
+        Assert.Equal(called, _profiles.Called(port));
 
     /// <summary>
     /// A KeyLab is several ports with nearly the same name too, and its file says which is which
@@ -315,8 +322,8 @@ public class ControllerProfileTests
     [Fact]
     public void A_keylabs_ports_say_what_they_are_for()
     {
-        Assert.Contains("notes", ControllerProfiles.PortIs("KeyLab mkII 49 MIDI"));
-        Assert.Contains("Mackie", ControllerProfiles.PortIs("KeyLab mkII 49 MCU/HUI"));
+        Assert.Contains("notes", _profiles.PortIs("KeyLab mkII 49 MIDI"));
+        Assert.Contains("Mackie", _profiles.PortIs("KeyLab mkII 49 MCU/HUI"));
     }
 
     /// <summary>
@@ -337,19 +344,19 @@ public class ControllerProfileTests
     [Fact]
     public void A_nanokontrol_is_a_mixer_and_its_knobs_are_not()
     {
-        ControllerProfiles.Saw(Korg, 1, 0);
+        _profiles.Saw(Korg, 1, 0);
 
-        Assert.Equal("nanoKONTROL2", ControllerProfiles.Called(Korg));
+        Assert.Equal("nanoKONTROL2", _profiles.Called(Korg));
 
-        Assert.Equal("Slider 1", ControllerProfiles.Named(Korg, 1, 0));
-        Assert.Equal("Slider 8", ControllerProfiles.Named(Korg, 1, 7));
-        Assert.Equal("Knob 1", ControllerProfiles.Named(Korg, 1, 16));
-        Assert.Equal("Mute 3", ControllerProfiles.Named(Korg, 1, 50));
-        Assert.Equal("Play", ControllerProfiles.Named(Korg, 1, 41));
+        Assert.Equal("Slider 1", _profiles.Named(Korg, 1, 0));
+        Assert.Equal("Slider 8", _profiles.Named(Korg, 1, 7));
+        Assert.Equal("Knob 1", _profiles.Named(Korg, 1, 16));
+        Assert.Equal("Mute 3", _profiles.Named(Korg, 1, 50));
+        Assert.Equal("Play", _profiles.Named(Korg, 1, 41));
 
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 0));
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Korg, 1, 16));
-        Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Korg, 1, 41));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Korg, 1, 0));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Korg, 1, 16));
+        Assert.Equal(ControlPickup.Jump, _profiles.Pickup(Korg, 1, 41));
     }
 
     /// <summary>
@@ -368,18 +375,18 @@ public class ControllerProfileTests
     [Fact]
     public void The_main_knob_is_the_same_whatever_program_is_running()
     {
-        ControllerProfiles.Saw(Lab, 1, 86);
-        Assert.Equal("Main knob", ControllerProfiles.Named(Lab, 1, 114));
+        _profiles.Saw(Lab, 1, 86);
+        Assert.Equal("Main knob", _profiles.Named(Lab, 1, 114));
 
-        ControllerProfiles.Saw(Lab, 1, 74);
-        Assert.Equal("Main knob", ControllerProfiles.Named(Lab, 1, 114));
+        _profiles.Saw(Lab, 1, 74);
+        Assert.Equal("Main knob", _profiles.Named(Lab, 1, 114));
 
-        Assert.Equal("Main knob + Shift", ControllerProfiles.Named(Lab, 1, 112));
-        Assert.Equal("Main knob click", ControllerProfiles.Named(Lab, 1, 115));
+        Assert.Equal("Main knob + Shift", _profiles.Named(Lab, 1, 112));
+        Assert.Equal("Main knob click", _profiles.Named(Lab, 1, 115));
 
-        Assert.Null(ControllerProfiles.Pickup(Lab, 1, 114));
+        Assert.Null(_profiles.Pickup(Lab, 1, 114));
 
-        Assert.Equal(ControlPickup.Jump, ControllerProfiles.Pickup(Lab, 1, 115));
+        Assert.Equal(ControlPickup.Jump, _profiles.Pickup(Lab, 1, 115));
     }
 
     /// <summary>
@@ -403,12 +410,12 @@ public class ControllerProfileTests
     {
         const string Ksp = "KeyStep Pro MIDI 1";
 
-        Assert.Equal("KeyStep Pro", ControllerProfiles.Called(Ksp));
-        Assert.Equal("", ControllerProfiles.Named(Ksp, 1, 74));
-        Assert.Null(ControllerProfiles.Pickup(Ksp, 1, 74));
+        Assert.Equal("KeyStep Pro", _profiles.Called(Ksp));
+        Assert.Equal("", _profiles.Named(Ksp, 1, 74));
+        Assert.Null(_profiles.Pickup(Ksp, 1, 74));
 
-        Assert.Equal("Looper strip", ControllerProfiles.Named(Ksp, 1, 9));
-        Assert.Equal(ControlPickup.Takeover, ControllerProfiles.Pickup(Ksp, 1, 9));
+        Assert.Equal("Looper strip", _profiles.Named(Ksp, 1, 9));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(Ksp, 1, 9));
     }
 
     /// <summary>
@@ -426,8 +433,8 @@ public class ControllerProfileTests
     [Fact]
     public void A_file_with_no_control_map_claims_nothing_about_any_control()
     {
-        Assert.Equal("", ControllerProfiles.Named("KeyLab mkII 49 MIDI", 1, 74));
-        Assert.Null(ControllerProfiles.Pickup("KeyLab mkII 49 MIDI", 1, 74));
+        Assert.Equal("", _profiles.Named("KeyLab mkII 49 MIDI", 1, 74));
+        Assert.Null(_profiles.Pickup("KeyLab mkII 49 MIDI", 1, 74));
     }
 
     /// <summary>
@@ -436,10 +443,10 @@ public class ControllerProfileTests
     [Fact]
     public void And_the_transport_still_lands_on_the_right_port()
     {
-        Assert.True(ControllerProfiles.PortTakes("KeyLab mkII 49 MIDI", MidiDeviceRole.Controls));
-        Assert.True(ControllerProfiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Transport));
-        Assert.False(ControllerProfiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Pads));
-        Assert.False(ControllerProfiles.PortTakes("KeyLab mkII 49 DIN THRU", MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 MIDI", MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Transport));
+        Assert.False(_profiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Pads));
+        Assert.False(_profiles.PortTakes("KeyLab mkII 49 DIN THRU", MidiDeviceRole.Controls));
     }
 
     /// <summary>
@@ -454,5 +461,5 @@ public class ControllerProfileTests
     [InlineData("", "anything", false)]
     public void A_port_is_matched_by_pattern_because_it_is_not_called_the_same_thing_everywhere(
         string pattern, string port, bool matches) =>
-        Assert.Equal(matches, ControllerFolder.Like(pattern, port));
+        Assert.Equal(matches, _folder.Like(pattern, port));
 }

@@ -12,6 +12,7 @@ using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Scripting.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Controllers;
 
 namespace JingleBox2.Controllers;
 
@@ -23,8 +24,14 @@ namespace JingleBox2.Controllers;
 /// </remarks>
 public sealed class ControllerCodecs : IControllerCodecs
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
+    /// <summary>Where a controller's own files live, and how one is matched to a port.</summary>
+    private readonly IControllerFolder _folder = new ControllerFolder();
+
     /// <summary>Where a controller's files live. Shared with the profiles beside them.</summary>
-    public static string Installed => ControllerFolder.Installed;
+    public string Installed => _folder.Installed;
 
     /// <summary>Where a script's bytes go when it answers a device rather than reading one.</summary>
     private readonly IMidiService _midi;
@@ -42,11 +49,17 @@ public sealed class ControllerCodecs : IControllerCodecs
     private FileSystemWatcher? _watch;
 
     /// <summary>Fills the folder if this is a first run, reads what is in it, and watches it.</summary>
-    public ControllerCodecs(IMidiService midi)
+    /// <param name="midi">Where a script's bytes go when it answers a device rather than reading one.</param>
+    /// <param name="profiles">
+    /// What is known about the controllers plugged in. Left out, one of its own; the application
+    /// hands the same one to everything, since what a device is doing is remembered in it.
+    /// </param>
+    public ControllerCodecs(IMidiService midi, IControllerProfiles? profiles = null)
     {
+        _profiles = profiles ?? new ControllerProfiles();
         _midi = midi;
 
-        ControllerFolder.FirstRun();
+        _folder.FirstRun();
         Reload();
         Watch();
     }
@@ -279,7 +292,7 @@ public sealed class ControllerCodecs : IControllerCodecs
         {
             if (_decided.TryGetValue(device, out var known)) return known;
 
-            Codec? found = _codecs.FirstOrDefault(one => ControllerFolder.Like(one.Matches, device));
+            Codec? found = _codecs.FirstOrDefault(one => _folder.Like(one.Matches, device));
             _decided[device] = found;
 
             if (found is not null)
@@ -341,7 +354,7 @@ public sealed class ControllerCodecs : IControllerCodecs
         try
         {
             Reload();
-            ControllerProfiles.Reload();
+            _profiles.Reload();
         }
         catch (Exception bad)
         {

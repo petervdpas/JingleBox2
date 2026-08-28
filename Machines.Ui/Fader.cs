@@ -3,11 +3,12 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.UI;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -22,6 +23,18 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Fader : ThemedControl
 {
+    /// <summary>The scale marks beside a fader, as they are written in markup.</summary>
+    private readonly ITickList _marks = new TickList();
+
+    /// <summary>Stepping, clamping and reading a typed number. Holds nothing, so one is enough.</summary>
+    private readonly INumericInput _number = new NumericInput();
+
+    /// <summary>Where this fader's cap sits on its track, and what a height on it means.</summary>
+    private readonly IFaderMath _track = new FaderMath();
+
+    /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
+    private readonly IRangeValue _range = new RangeValue();
+
     /// <summary>
     /// How wide the groove is, and the cap that rides it.
     /// </summary>
@@ -250,7 +263,7 @@ public class Fader : ThemedControl
     ///
     /// The ends are in the measure list because they decide how long a reading can be. The value
     /// is deliberately not, because it no longer decides anything about the width: see
-    /// <see cref="NumericInput.Widest"/> and <see cref="MeasureOverride"/>.
+    /// <see cref="INumericInput.Widest"/> and <see cref="MeasureOverride"/>.
     /// </remarks>
     static Fader()
     {
@@ -364,11 +377,11 @@ public class Fader : ThemedControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == TicksProperty) _ticks = TickList.Parse(Ticks);
+        if (change.Property == TicksProperty) _ticks = _marks.Parse(Ticks);
     }
 
     /// <summary>The reading printed under the groove: the number and its unit.</summary>
-    public string ValueText => NumericInput.Format(Value, Format) + Unit;
+    public string ValueText => _number.Format(Value, Format) + Unit;
 
     /// <summary>
     /// Room for the name, the throw, the cap, the reading, and the scale beside all of it.
@@ -379,7 +392,7 @@ public class Fader : ThemedControl
     /// current reading is as wide as the number under it: on the mixer, "-10.0 dB" is a
     /// character wider than "0.0 dB", so the strips turned down far enough to need it came out
     /// wider inside than the others and pushed their meters into the card's own border. See
-    /// <see cref="NumericInput.Widest"/>.
+    /// <see cref="INumericInput.Widest"/>.
     ///
     /// A stretching fader asks for the shortest throw it can live with rather than for what it
     /// wants, since a panel handing out the space left over gives it the whole area anyway.
@@ -392,7 +405,7 @@ public class Fader : ThemedControl
         double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
 
         var widest = BuildText(
-            NumericInput.Widest(Value, Minimum, Maximum, Format, Unit),
+            _number.Widest(Value, Minimum, Maximum, Format, Unit),
             ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double width = Math.Max(CapWidth, Math.Max(label.Width, widest.Width)) + ScaleWidth();
@@ -444,7 +457,7 @@ public class Fader : ThemedControl
     private void DrawTrack(DrawingContext context, ThemePalette palette, double trackTop, double trackLength)
     {
         double centerX = TrackCenterX();
-        double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
+        double capY = _track.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         var groove = new Rect(centerX - GrooveWidth / 2, trackTop, GrooveWidth, trackLength);
         context.DrawRectangle(palette.BorderBrush, null, new RoundedRect(groove, GrooveWidth / 2));
@@ -522,7 +535,7 @@ public class Fader : ThemedControl
         {
             if (mark < Minimum || mark > Maximum) continue;
 
-            double y = FaderMath.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
+            double y = _track.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
             bool unity = Math.Abs(mark) < 0.0001;
 
             context.DrawLine(
@@ -559,7 +572,7 @@ public class Fader : ThemedControl
 
         bool Fits(double mark)
         {
-            double y = FaderMath.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
+            double y = _track.CapCenterY(mark, trackTop, trackLength, Minimum, Maximum);
             double half = BuildText(TickText(mark), TickFontSize, FontFamily.Default, Brushes.Black).Height / 2;
 
             foreach (var (top, bottom) in taken)
@@ -652,7 +665,7 @@ public class Fader : ThemedControl
 
         double y = e.GetPosition(this).Y;
         var (trackTop, trackLength) = Track();
-        double capY = FaderMath.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
+        double capY = _track.CapCenterY(Value, trackTop, trackLength, Minimum, Maximum);
 
         if (CapRect(capY).Contains(new Point(TrackCenterX(), y)))
         {
@@ -661,7 +674,7 @@ public class Fader : ThemedControl
         else
         {
             _grabOffset = 0;
-            Value = FaderMath.ValueAt(y, trackTop, trackLength, Minimum, Maximum, SmallStep);
+            Value = _track.ValueAt(y, trackTop, trackLength, Minimum, Maximum, SmallStep);
         }
 
         _dragging = true;
@@ -697,8 +710,8 @@ public class Fader : ThemedControl
         bool fine = _fineDrag || e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         Value = fine
-            ? RangeValue.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, trackLength, fine: true)
-            : FaderMath.ValueAt(y - _grabOffset, trackTop, trackLength, Minimum, Maximum, SmallStep);
+            ? _range.FromDrag(_dragStartValue, _dragStartY - y, Minimum, Maximum, SmallStep, trackLength, fine: true)
+            : _track.ValueAt(y - _grabOffset, trackTop, trackLength, Minimum, Maximum, SmallStep);
 
         e.Handled = true;
     }
@@ -758,11 +771,11 @@ public class Fader : ThemedControl
                 break;
 
             case Key.Home:
-                Value = RangeValue.Quantize(Maximum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Maximum, Minimum, Maximum, SmallStep);
                 break;
 
             case Key.End:
-                Value = RangeValue.Quantize(Minimum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Minimum, Minimum, Maximum, SmallStep);
                 break;
 
             default:
@@ -779,7 +792,7 @@ public class Fader : ThemedControl
 
         if (DefaultValue is not double reset) return;
 
-        Value = RangeValue.Quantize(reset, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(reset, Minimum, Maximum, SmallStep);
         e.Handled = true;
     }
 
@@ -789,7 +802,7 @@ public class Fader : ThemedControl
         if (direction == 0) return;
 
         double step = modifiers.HasFlag(KeyModifiers.Shift) ? LargeStep : SmallStep;
-        Value = RangeValue.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
     }
 
     /// <summary>A colour taken towards white, keeping its transparency, for the lit top of the cap.</summary>

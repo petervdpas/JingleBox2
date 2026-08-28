@@ -11,6 +11,7 @@ using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
+using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 
@@ -34,6 +35,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed class DesignerKeys : IMachineKeys, IDisposable
 {
+    /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
+    private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
+
     /// <summary>
     /// Whoever is showing the panel: the octave, the instrument being edited, and the means to
     /// sound a note.
@@ -244,7 +248,7 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
         var note = new Note(semitone);
         if (!note.IsPlayable) return;
 
-        Octave = PanelKeyboard.Reveal(note, Octave);
+        Octave = _keyboard.Reveal(note, Octave);
     }
 
     /// <summary>

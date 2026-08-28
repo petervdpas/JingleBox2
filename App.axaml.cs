@@ -30,7 +30,7 @@ public partial class App : Application
     {
         AvaloniaXamlLoader.Load(this);
 
-        ThemeManager.Apply(ThemeManager.Default);
+        ThemeSwitch.Apply(ThemeSwitch.Default);
     }
 
     /// <summary>

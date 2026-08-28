@@ -8,30 +8,24 @@ using JingleBox2.Midi;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Controllers;
 
 namespace JingleBox2.Controllers;
 
-/// <summary>
-/// What this installation knows about the controllers plugged into it.
-/// </summary>
-/// <remarks>
-/// Static, like <see cref="Tracker.Machines.MachineRegistry"/> and for the same reason: what a
-/// device is called is wanted in a list on one page, a heading on another and a log line in a
-/// third, and threading a registry through five constructors to produce a display string is a
-/// worse answer than one place that knows.
-///
-/// It answers nothing when it has nothing to say, which is the ordinary case. A device with no
-/// file is not a problem to report; it is a device with no file, and everything about it works.
-/// </remarks>
-public static class ControllerProfiles
+/// <inheritdoc/>
+public sealed class ControllerProfiles : IControllerProfiles
 {
+    /// <summary>Where a controller's own files live, and how one is matched to a port.</summary>
+    private readonly IControllerFolder _folder = new ControllerFolder();
+
     /// <summary>How a profile is read: forgivingly, since these are files people write by hand.</summary>
     /// <remarks>
     /// Comments and a trailing comma are allowed and the casing of a field is not held against
     /// anybody, because the alternative is a file that is refused for a reason nobody can see
     /// and a controller that quietly loses its names.
     /// </remarks>
-    private static readonly JsonSerializerOptions Reading = new()
+    private readonly JsonSerializerOptions Reading = new()
     {
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
@@ -39,48 +33,40 @@ public static class ControllerProfiles
     };
 
     /// <summary>Guards everything below, which is read from the MIDI thread and written from others.</summary>
-    private static readonly object Lock = new();
+    private readonly object Lock = new();
 
     /// <summary>Every profile this installation has, in the order the files were read.</summary>
-    private static readonly List<ControllerProfile> Held = new();
+    private readonly List<ControllerProfile> Held = new();
 
     /// <summary>Which profile answers for a port, worked out once and kept.</summary>
-    private static readonly Dictionary<string, ControllerProfile?> Decided =
+    private readonly Dictionary<string, ControllerProfile?> Decided =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Which program each device is believed to be in, from what it has sent.</summary>
-    private static readonly Dictionary<string, string> Running =
+    private readonly Dictionary<string, string> Running =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Whether the folder has been read at all, so the first question reads it.</summary>
-    private static bool _read;
+    private bool _read;
 
-    /// <summary>
-    /// Reads every profile again, from scratch.
-    /// </summary>
-    /// <remarks>
-    /// Called at startup and whenever a file in the folder is saved, which is what makes writing
-    /// one of these a matter of editing and touching a knob rather than editing and restarting.
-    /// Everything worked out from the old files is thrown away with them: what was decided about
-    /// a port, which program a device was believed to be in, and what a number implied.
-    /// </remarks>
-    public static void Reload()
+    /// <inheritdoc/>
+    public void Reload()
     {
         var found = new List<ControllerProfile>();
 
         try
         {
-            ControllerFolder.FirstRun();
+            _folder.FirstRun();
 
-            if (Directory.Exists(ControllerFolder.Installed))
+            if (Directory.Exists(_folder.Installed))
                 foreach (string file in Directory
-                             .GetFiles(ControllerFolder.Installed, "*.json")
+                             .GetFiles(_folder.Installed, "*.json")
                              .OrderBy(f => f, StringComparer.Ordinal))
                     if (Take(file) is { } one) found.Add(one);
         }
         catch (Exception bad)
         {
-            Log.Write(LogArea.Midi, () => "profiles: cannot read '" + ControllerFolder.Installed + "': " + bad.Message);
+            Log.Write(LogArea.Midi, () => "profiles: cannot read '" + _folder.Installed + "': " + bad.Message);
         }
 
         lock (Lock)
@@ -94,7 +80,7 @@ public static class ControllerProfiles
             _read = true;
         }
 
-        Log.Write(LogArea.Midi, () => "profiles: " + found.Count + " read from '" + ControllerFolder.Installed + "'");
+        Log.Write(LogArea.Midi, () => "profiles: " + found.Count + " read from '" + _folder.Installed + "'");
     }
 
     /// <summary>Reads one file, or says in the log why it did not.</summary>
@@ -104,7 +90,7 @@ public static class ControllerProfiles
     /// the same reason: a device called nothing is worse in every list than a device called by
     /// its port.
     /// </remarks>
-    private static ControllerProfile? Take(string path)
+    private ControllerProfile? Take(string path)
     {
         try
         {
@@ -130,15 +116,15 @@ public static class ControllerProfiles
     }
 
     /// <summary>Reads the folder if nobody has yet, so nothing has to be started in any order.</summary>
-    private static void Ready()
+    private void Ready()
     {
         lock (Lock) if (_read) return;
 
         Reload();
     }
 
-    /// <summary>The profile for a port, or nothing, which is ordinary.</summary>
-    public static ControllerProfile? For(string? device)
+    /// <inheritdoc/>
+    public ControllerProfile? For(string? device)
     {
         if (string.IsNullOrWhiteSpace(device)) return null;
 
@@ -148,7 +134,7 @@ public static class ControllerProfiles
         {
             if (Decided.TryGetValue(device, out var known)) return known;
 
-            var found = Held.FirstOrDefault(one => one.Matches.Any(like => ControllerFolder.Like(like, device)));
+            var found = Held.FirstOrDefault(one => one.Matches.Any(like => _folder.Like(like, device)));
             Decided[device] = found;
 
             if (found is not null)
@@ -158,27 +144,15 @@ public static class ControllerProfiles
         }
     }
 
-    /// <summary>What to call a device: its own name where one is known, else the port's.</summary>
-    public static string Called(string? device) =>
+    /// <inheritdoc/>
+    public string Called(string? device) =>
         For(device) is { } profile ? profile.Name : device ?? "";
 
-    /// <summary>True when that port has a profile, so a page can say the match happened.</summary>
-    public static bool Knows(string? device) => For(device) is not null;
+    /// <inheritdoc/>
+    public bool Knows(string? device) => For(device) is not null;
 
-    /// <summary>
-    /// Another controller message arrived, which is a clue about which program is running.
-    /// </summary>
-    /// <remarks>
-    /// The device will not say, and cannot be asked without speaking its manufacturer's own
-    /// language. But its programs do not overlap: a MiniLab's knobs send 86 in one and 74 in
-    /// another and never both, so a single number is usually enough to know which is in front of
-    /// you. A number that appears in more than one program says nothing and is ignored, and one
-    /// that appears in none is somebody's control this file does not describe.
-    ///
-    /// Self correcting by construction. Switch the device to another program and its first
-    /// message moves this along with it.
-    /// </remarks>
-    public static void Saw(string? device, int channel, int cc)
+    /// <inheritdoc/>
+    public void Saw(string? device, int channel, int cc)
     {
         if (string.IsNullOrWhiteSpace(device)) return;
         if (For(device) is not { } profile || profile.Programs.Count < 2) return;
@@ -209,7 +183,7 @@ public static class ControllerProfiles
     /// fifty-eight comparisons and a couple of hundred bytes of rubbish per message, to arrive
     /// at the same answer it arrived at last time.
     /// </remarks>
-    private static readonly Dictionary<(string Device, int Channel, int Cc), string?> Implied = new();
+    private readonly Dictionary<(string Device, int Channel, int Cc), string?> Implied = new();
 
     /// <summary>
     /// Which program a number belongs to, or nothing when it belongs to none or to several.
@@ -218,7 +192,7 @@ public static class ControllerProfiles
     /// A number found in two programs at once says nothing about which of them is running, so it
     /// is thrown away rather than resolved by whichever was walked first.
     /// </remarks>
-    private static string? Implies(ControllerProfile profile, string device, int channel, int cc)
+    private string? Implies(ControllerProfile profile, string device, int channel, int cc)
     {
         var asked = (device, channel, cc);
 
@@ -246,15 +220,8 @@ public static class ControllerProfiles
         return only;
     }
 
-    /// <summary>Which program a device is believed to be in, or nothing while nobody knows.</summary>
-    /// <remarks>
-    /// A device whose file describes exactly one program is in it, and nothing has to be watched
-    /// to find that out. <see cref="Saw"/> declines to work on such a device, correctly, since
-    /// there is no ambiguity for it to resolve; without this the declining would mean no program
-    /// was ever running, and a file that puts its controls in its one program would describe a
-    /// device whose every control came back unknown. Which is what a nanoKONTROL2 did.
-    /// </remarks>
-    public static string ProgramOn(string? device)
+    /// <inheritdoc/>
+    public string ProgramOn(string? device)
     {
         if (string.IsNullOrWhiteSpace(device)) return "";
 
@@ -264,21 +231,8 @@ public static class ControllerProfiles
         return For(device) is { Programs.Count: 1 } profile ? profile.Programs[0].Name : "";
     }
 
-    /// <summary>
-    /// What a control is called on the front of the device, or nothing when nobody knows.
-    /// </summary>
-    /// <remarks>
-    /// Answering nothing is the common case and is not a failure. Everywhere this is asked has
-    /// something perfectly good to fall back on, which is the number itself, and a list that
-    /// says `CC 89 ch 1` is a list that works.
-    ///
-    /// Three questions in order: the program that is running, where that is known; then anything
-    /// true whatever program the device is in; and failing those, any program at all, but only
-    /// when they agree. Before a device has said anything there is no way to tell its programs
-    /// apart, and a name from the wrong one is worse than a number, since a number is merely
-    /// unhelpful and a wrong name is a lie.
-    /// </remarks>
-    public static string Named(string? device, int channel, int cc)
+    /// <inheritdoc/>
+    public string Named(string? device, int channel, int cc)
     {
         if (For(device) is not { } profile) return "";
 
@@ -304,45 +258,23 @@ public static class ControllerProfiles
         return across.Count == 1 ? across[0] : "";
     }
 
-    /// <summary>
-    /// What a port is for, as a line to put under its name in a list.
-    /// </summary>
-    /// <remarks>
-    /// Nothing at all for a device with no profile, and nothing for a port the profile does not
-    /// mention, which is right: a blank line says the honest thing, and a guess would not.
-    /// </remarks>
-    public static string PortIs(string? device)
+    /// <inheritdoc/>
+    public string PortIs(string? device)
     {
         if (For(device) is not { } profile) return "";
 
-        var port = profile.Ports.FirstOrDefault(one => ControllerFolder.Like(one.Match, device!));
+        var port = profile.Ports.FirstOrDefault(one => _folder.Like(one.Match, device!));
         if (port is null) return profile.Name;
 
         return port.Note.Length > 0 ? profile.Name + "  ·  " + port.Note : profile.Name;
     }
 
-    /// <summary>
-    /// Whether a job belongs on this port, for a device that presents several.
-    /// </summary>
-    /// <remarks>
-    /// The thing a person cannot be expected to know and should not have to. A MiniLab 3 is four
-    /// ports, its notes and knobs come out one of them, and the name of that one is no more
-    /// suggestive than the other three. Ticking Transport against the port called MCU/HUI is the
-    /// obvious guess and it is wrong whenever the device is in a DAW program, which is a whole
-    /// evening lost to a checkbox.
-    ///
-    /// Transport goes on both, deliberately. The two are alternatives on the hardware and the
-    /// device sends one or the other depending on its program, never both, so listening to both
-    /// costs nothing and removes the only decision that needed a manual.
-    ///
-    /// A port the profile does not mention takes everything, because nothing is known about it
-    /// and a silent refusal is worse than a port that does too much.
-    /// </remarks>
-    public static bool PortTakes(string? device, MidiDeviceRole role)
+    /// <inheritdoc/>
+    public bool PortTakes(string? device, MidiDeviceRole role)
     {
         if (For(device) is not { } profile) return true;
 
-        var port = profile.Ports.FirstOrDefault(one => ControllerFolder.Like(one.Match, device!));
+        var port = profile.Ports.FirstOrDefault(one => _folder.Like(one.Match, device!));
         if (port is null) return true;
 
         return port.Role switch
@@ -353,33 +285,8 @@ public static class ControllerProfiles
         };
     }
 
-    /// <summary>
-    /// How a control should be read, when the file knows the hardware well enough to say.
-    /// </summary>
-    /// <remarks>
-    /// A fact beating a guess, which is the whole of what a profile buys here.
-    /// <see cref="ControlSense"/> works out what a control is from what it sends, and it is
-    /// right about everything it can see. What it cannot see is the shape of the thing under
-    /// the hand. An endless encoder reporting a position walks smoothly through its range and
-    /// is, to three messages, indistinguishable from a fader; so it is read as a fader, saved
-    /// as one, and from then on every session begins by hunting for the value with a knob that
-    /// has no beginning and no end to hunt with. Which is exactly what happened to nine links
-    /// in one song, five of them on encoders.
-    ///
-    /// So a control the file calls an encoder in a program that sends positions is read as
-    /// movement between messages instead, which works whether the firmware wraps at the top or
-    /// stops there: a wrap unwinds and a stop reads as no movement, and turning back moves it
-    /// at once either way.
-    ///
-    /// Nothing is claimed for an encoder in a program that counts notches. Which of the two
-    /// conventions it counts in is not in the file and getting it wrong throws the parameter
-    /// across its range, so that one is left to be watched rather than assumed.
-    ///
-    /// Asked on every message, so the answer is worked out once per control per program and
-    /// looked up after that. It cannot change without the program changing, and the program is
-    /// part of the question.
-    /// </remarks>
-    public static ControlPickup? Pickup(string? device, int channel, int cc)
+    /// <inheritdoc/>
+    public ControlPickup? Pickup(string? device, int channel, int cc)
     {
         if (device is null || For(device) is not { } profile) return null;
 
@@ -397,7 +304,7 @@ public static class ControllerProfiles
     }
 
     /// <summary>What was decided about a control, per program, so it is decided once.</summary>
-    private static readonly Dictionary<(string Device, int Channel, int Cc, string Program), ControlPickup?> Decided2 = new();
+    private readonly Dictionary<(string Device, int Channel, int Cc, string Program), ControlPickup?> Decided2 = new();
 
     /// <summary>
     /// What the file says a control should be read as, before anything is remembered about it.
@@ -413,7 +320,7 @@ public static class ControllerProfiles
     /// settable in Akai's own editor and one set that way, read as a position, would do nothing
     /// whatever.
     /// </remarks>
-    private static ControlPickup? Work(ControllerProfile profile, string device, int channel, int cc, string program)
+    private ControlPickup? Work(ControllerProfile profile, string device, int channel, int cc, string program)
     {
         var control = Control(device, channel, cc);
         if (control is null || control.Kind.Length == 0) return null;
@@ -433,8 +340,8 @@ public static class ControllerProfiles
         };
     }
 
-    /// <summary>Everything the profile says about a control, for a tip or a log line.</summary>
-    public static ControllerControl? Control(string? device, int channel, int cc)
+    /// <inheritdoc/>
+    public ControllerControl? Control(string? device, int channel, int cc)
     {
         if (For(device) is not { } profile) return null;
 
@@ -455,6 +362,6 @@ public static class ControllerProfiles
     /// is: a device that sends its knobs on one channel says so once, and the few controls that
     /// are pinned to a channel of their own are the exceptions worth writing down.
     /// </remarks>
-    private static bool Answers(ControllerControl one, int channel, int cc) =>
+    private bool Answers(ControllerControl one, int channel, int cc) =>
         one.Cc == cc && (one.Channel <= 0 || one.Channel == channel);
 }

@@ -2,10 +2,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using JingleBox2.UI;
 using System;
 using System.Diagnostics;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -21,6 +22,9 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class LevelMeter : ThemedControl
 {
+    /// <summary>Where a level sits on a meter, which is decibels rather than amplitude.</summary>
+    private readonly IMeterScale _scale = new MeterScale();
+
     /// <summary>Minus six decibels, above which the signal is close enough to the ceiling to warn about.</summary>
     private const double WarnAmplitude = 0.5;
 
@@ -214,7 +218,7 @@ public class LevelMeter : ThemedControl
     /// <summary>Whether the mark is above the bar, and so has somewhere left to fall to.</summary>
     private bool Falling(double level, double peak) =>
         ShowPeak
-        && MeterScale.Position(peak, MinimumDecibels) > MeterScale.Position(level, MinimumDecibels);
+        && _scale.Position(peak, MinimumDecibels) > _scale.Position(level, MinimumDecibels);
 
     /// <summary>
     /// Asks to be drawn once more, because the mark is still coming down.
@@ -247,7 +251,7 @@ public class LevelMeter : ThemedControl
     {
         if (level >= peak) peakAt = now;
 
-        return MeterScale.DecayPeak(peak, level, now - peakAt, PeakHoldSeconds, PeakFallDecibelsPerSecond);
+        return _scale.DecayPeak(peak, level, now - peakAt, PeakHoldSeconds, PeakFallDecibelsPerSecond);
     }
 
     /// <summary>One bar: its trough, the part of it that is lit, and the mark over that.</summary>
@@ -262,13 +266,13 @@ public class LevelMeter : ThemedControl
             new Pen(palette.BorderBrush, 1),
             new RoundedRect(area, radius));
 
-        double filled = MeterScale.Position(level, MinimumDecibels);
+        double filled = _scale.Position(level, MinimumDecibels);
         if (filled > 0)
             context.DrawRectangle(Fill(palette, level), null, new RoundedRect(Portion(area, filled), radius));
 
         if (!ShowPeak || peak <= 0) return;
 
-        double at = MeterScale.Position(peak, MinimumDecibels);
+        double at = _scale.Position(peak, MinimumDecibels);
         DrawPeakMark(context, palette, area, at, peak);
     }
 
@@ -330,7 +334,7 @@ public class LevelMeter : ThemedControl
             GradientStops =
             {
                 new GradientStop(palette.Accent, 0),
-                new GradientStop(palette.Accent, MeterScale.Position(WarnAmplitude, MinimumDecibels)),
+                new GradientStop(palette.Accent, _scale.Position(WarnAmplitude, MinimumDecibels)),
                 new GradientStop(top, 1)
             }
         };

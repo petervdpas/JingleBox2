@@ -596,8 +596,8 @@ public sealed unsafe class Vst3Plugin : IPluginEffect, IPluginInstrument, IPlugi
     /// plugin reading past the end of the list.
     /// </summary>
     /// <remarks>
-    /// The pointer array is asked for in bytes rather than through the generic helper, because a
-    /// pointer is not something a generic type argument can be.
+    /// The pointer array is asked for in bytes rather than by element type, because a pointer
+    /// is not something a generic type argument can be.
     /// </remarks>
     private AudioBusBuffers* AllocBusses(int[] busses, int frames, out float* data, out float** pointers)
     {

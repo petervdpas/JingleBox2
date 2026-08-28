@@ -10,6 +10,7 @@ using System.Linq;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
+using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -26,6 +27,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class MidiViewModel : ObservableObject
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
     /// <summary>Which device has been pointed at which half of the application.</summary>
     /// <remarks>Holds nothing of its own, so one is enough for the page's whole life.</remarks>
     private readonly IMidiDeviceBindings _bindings = new MidiDeviceBindings();
@@ -90,8 +94,16 @@ public sealed partial class MidiViewModel : ObservableObject
     /// an older version, or by hand, can be short of any of them, and a page that assumed they
     /// were there would fail before it had drawn anything.
     /// </remarks>
-    public MidiViewModel(ConfigStore store, AppConfig cfg, IMidiService midi)
+    /// <param name="store">Where the settings are written when a device's job changes.</param>
+    /// <param name="cfg">The settings as they stand, which is what the page shows.</param>
+    /// <param name="midi">The ports, for what is plugged in and what it is saying.</param>
+    /// <param name="profiles">
+    /// What is known about the controllers plugged in. Left out, one of its own; the application
+    /// hands the same one to everything, since what a device is doing is remembered in it.
+    /// </param>
+    public MidiViewModel(ConfigStore store, AppConfig cfg, IMidiService midi, IControllerProfiles? profiles = null)
     {
+        _profiles = profiles ?? new ControllerProfiles();
         _store = store;
         _cfg = cfg;
         _midi = midi;
@@ -161,7 +173,7 @@ public sealed partial class MidiViewModel : ObservableObject
         Surfaces.Clear();
 
         foreach (var group in Devices
-                     .GroupBy(one => ControllerProfiles.Called(one.Name), StringComparer.OrdinalIgnoreCase)
+                     .GroupBy(one => _profiles.Called(one.Name), StringComparer.OrdinalIgnoreCase)
                      .OrderByDescending(group => group.Any(one => one.IsConnected))
                      .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
             Surfaces.Add(new ControlSurfaceViewModel(group.Key, group.ToList(), Forget));

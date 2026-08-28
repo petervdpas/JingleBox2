@@ -3,6 +3,7 @@ using Avalonia.Input;
 using JingleBox2.Shortcuts;
 using Xunit;
 using JingleBox2.Shortcuts.Enums;
+using JingleBox2.Shortcuts.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -19,6 +20,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class ShortcutTests
 {
+    /// <summary>What each shortcut is called and what it ships on.</summary>
+    private readonly IShortcutActions _actions = new ShortcutActions();
+
     /// <summary>The three shortcuts a fresh installation answers.</summary>
     [Theory]
     [InlineData(Key.S, KeyModifiers.Control, ShortcutAction.Save)]
@@ -165,11 +169,11 @@ public class ShortcutTests
     [Fact]
     public void Every_action_has_a_name_and_a_default()
     {
-        foreach (var (action, name, keys) in ShortcutActions.Everything)
+        foreach (var (action, name, keys) in _actions.Everything)
         {
             Assert.False(string.IsNullOrWhiteSpace(name));
             Assert.NotNull(KeyGesture.Parse(keys));
-            Assert.Equal(name, ShortcutActions.Named(action));
+            Assert.Equal(name, _actions.Named(action));
         }
     }
 }

@@ -1,5 +1,6 @@
-using JingleBox2.UI;
+using JingleBox2.Machines.Ui;
 using Xunit;
+using JingleBox2.Machines.Ui.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -14,6 +15,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MeterFallTests
 {
+    /// <summary>Where a level sits on a meter, which is decibels rather than amplitude.</summary>
+    private readonly IMeterScale _scale = new MeterScale();
+
     /// <summary>How long the mark sits still before it starts down, in seconds.</summary>
     private const double Hold = 1.2;
 
@@ -27,7 +31,7 @@ public class MeterFallTests
     [Fact]
     public void A_mark_is_held_before_it_starts_to_drop()
     {
-        Assert.Equal(1.0, MeterScale.DecayPeak(1.0, 0, Hold, Hold, PerSecond));
+        Assert.Equal(1.0, _scale.DecayPeak(1.0, 0, Hold, Hold, PerSecond));
     }
 
     /// <summary>The fall is in decibels, not in a fraction of the bar.</summary>
@@ -37,7 +41,7 @@ public class MeterFallTests
     [Fact]
     public void And_then_falls_at_the_stated_rate()
     {
-        double after = MeterScale.DecayPeak(1.0, 0, Hold + 1, Hold, PerSecond);
+        double after = _scale.DecayPeak(1.0, 0, Hold + 1, Hold, PerSecond);
 
         Assert.Equal(0.1, after, 3);
     }
@@ -49,9 +53,9 @@ public class MeterFallTests
     [Fact]
     public void And_reaches_the_floor_it_is_drawn_against()
     {
-        double after = MeterScale.DecayPeak(1.0, 0, Hold + 4, Hold, PerSecond);
+        double after = _scale.DecayPeak(1.0, 0, Hold + 4, Hold, PerSecond);
 
-        Assert.Equal(0, MeterScale.Position(after));
+        Assert.Equal(0, _scale.Position(after));
     }
 
     /// <summary>
@@ -60,6 +64,6 @@ public class MeterFallTests
     [Fact]
     public void A_louder_level_takes_the_mark_with_it()
     {
-        Assert.Equal(0.8, MeterScale.DecayPeak(0.5, 0.8, 10, Hold, PerSecond));
+        Assert.Equal(0.8, _scale.DecayPeak(0.5, 0.8, 10, Hold, PerSecond));
     }
 }

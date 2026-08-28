@@ -6,6 +6,7 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Shortcuts.Enums;
 using JingleBox2.Shortcuts.Interfaces;
+using JingleBox2.Shortcuts;
 
 namespace JingleBox2.Shortcuts;
 
@@ -26,6 +27,9 @@ public sealed class ShortcutBinding
 /// <inheritdoc/>
 public sealed class ShortcutMap : IShortcutMap
 {
+    /// <summary>What each shortcut is called and what it ships on.</summary>
+    private readonly IShortcutActions _actions = new ShortcutActions();
+
     /// <summary>What each action is on, and nothing at all for one somebody took off.</summary>
     /// <remarks>
     /// A dictionary of four, walked rather than indexed by keystroke: see <see cref="Match"/>.
@@ -40,7 +44,7 @@ public sealed class ShortcutMap : IShortcutMap
     {
         _held.Clear();
 
-        foreach (var (action, _, keys) in ShortcutActions.Everything)
+        foreach (var (action, _, keys) in _actions.Everything)
             if (Read(keys) is { } gesture) _held[action] = gesture;
     }
 
@@ -106,7 +110,7 @@ public sealed class ShortcutMap : IShortcutMap
     {
         var written = new List<ShortcutBinding>();
 
-        foreach (var (action, _, keys) in ShortcutActions.Everything)
+        foreach (var (action, _, keys) in _actions.Everything)
         {
             var now = For(action);
             var was = Read(keys);

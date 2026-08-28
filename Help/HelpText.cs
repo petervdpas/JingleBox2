@@ -2,22 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Help.Records;
+using JingleBox2.Help.Interfaces;
 
 namespace JingleBox2.Help;
 
-/// <summary>
-/// Everything the app explains about itself, in one place, looked up by id.
-/// </summary>
-/// <remarks>
-/// The ids are declared as constants and the table is written out in full, rather than being
-/// built from a prefix and a name at the point of use. That way every id that exists appears
-/// here as a literal, so it can be searched for, and a page asking for one that was never
-/// written says so instead of showing an empty window.
-///
-/// Prose lives here rather than in the pages so the pages stay about their controls, and so
-/// an explanation can be improved without touching a layout.
-/// </remarks>
-public static class HelpText
+/// <inheritdoc/>
+public sealed class HelpText : IHelpText
 {
     /// <summary>Which device a take is recorded from, and what a loopback is.</summary>
     public const string SettingsRecordingInput = "settings.recording-input";
@@ -39,7 +29,7 @@ public static class HelpText
     public const string MixerStrips = "mixer.strips";
 
     /// <summary>Every topic there is, by its id.</summary>
-    private static readonly Dictionary<string, HelpTopic> Topics = new(StringComparer.Ordinal)
+    private readonly Dictionary<string, HelpTopic> Topics = new(StringComparer.Ordinal)
     {
         [SettingsRecordingInput] = new(
             SettingsRecordingInput,
@@ -212,11 +202,16 @@ public static class HelpText
             """)
     };
 
-    /// <summary>The topic with that id, or null when nothing has been written for it.</summary>
-    public static HelpTopic? Find(string? id) =>
+    /// <inheritdoc/>
+    public HelpTopic? Find(string? id) =>
         !string.IsNullOrWhiteSpace(id) && Topics.TryGetValue(id, out var topic) ? topic : null;
 
-    /// <summary>Everything there is, for the help window's list.</summary>
-    public static IReadOnlyList<HelpTopic> All { get; } =
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Worked out when it is asked for rather than when one of these is made, because the table
+    /// it is built from is static and a field initialiser cannot reach it. Sorting nine entries
+    /// is not worth keeping.
+    /// </remarks>
+    public IReadOnlyList<HelpTopic> All =>
         Topics.Values.OrderBy(topic => topic.Title, StringComparer.OrdinalIgnoreCase).ToList();
 }

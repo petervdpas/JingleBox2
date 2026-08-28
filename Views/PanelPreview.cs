@@ -276,7 +276,7 @@ public static class PanelPreview
         {
             Styles.Add(new FluentTheme());
 
-            foreach (var sheet in new[] { UI.ThemeManager.BaseSheet, UI.ThemeManager.SheetFor("Industrial Dark") })
+            foreach (var sheet in new[] { UI.ThemeSwitch.BaseSheet, UI.ThemeSwitch.SheetFor("Industrial Dark") })
             {
                 try
                 {

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using JingleBox2.Help;
 using JingleBox2.Help.Records;
+using JingleBox2.Help.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -14,6 +15,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class HelpWindow : Window
 {
+    /// <summary>Everything the app explains about itself, looked up by id.</summary>
+    private static readonly IHelpText _help = new HelpText();
+
     /// <summary>The one that is open, so asking again moves it rather than opening a second.</summary>
     private static HelpWindow? _open;
 
@@ -29,13 +33,13 @@ public partial class HelpWindow : Window
         InitializeComponent();
 
         _topics = this.FindControl<ListBox>("TopicList");
-        if (_topics != null) _topics.ItemsSource = HelpText.All;
+        if (_topics != null) _topics.ItemsSource = _help.All;
     }
 
     /// <summary>Shows the help for a topic, or the whole list when there is nothing for it.</summary>
     public static void Show(string? topicId, Window owner)
     {
-        var topic = HelpText.Find(topicId) ?? (HelpText.All.Count > 0 ? HelpText.All[0] : null);
+        var topic = _help.Find(topicId) ?? (_help.All.Count > 0 ? _help.All[0] : null);
         if (topic == null || owner == null) return;
 
         if (_open != null)

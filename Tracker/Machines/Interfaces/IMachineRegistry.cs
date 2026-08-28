@@ -75,6 +75,12 @@ public interface IMachineRegistry
     /// <remarks>
     /// Everything read last time is forgotten first. A machine thrown out in SETTINGS has to be
     /// gone from the list the moment it is rebuilt, not at the next start.
+    ///
+    /// Read is not taken, and the difference is the whole of why a machine can be on disc and
+    /// not on the rack. Every folder here is read; each is then offered to
+    /// <c>Machine.Register</c>, which refuses any id it has no engine for and is passed over
+    /// without a word. So what comes back is what the rack will show, which is a subset of what
+    /// is installed, and a machine designed under an id of its own is in neither.
     /// </remarks>
     /// <returns>What was taken, for the log and for the settings page to show.</returns>
     IReadOnlyList<MachineProject> Load();

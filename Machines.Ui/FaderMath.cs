@@ -1,15 +1,17 @@
 using System;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
-namespace JingleBox2.UI;
+namespace JingleBox2.Machines.Ui;
 
-/// <summary>
-/// Where a fader's cap sits on its track, and what the pointer at a given height means.
-/// The track runs bottom to top: the minimum is at the bottom, where a fader's zero belongs.
-/// </summary>
-public static class FaderMath
+/// <inheritdoc/>
+internal sealed class FaderMath : IFaderMath
 {
-    /// <summary>The value at a point on the track, snapped to the step grid.</summary>
-    public static double ValueAt(
+    /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
+    private readonly IRangeValue _range = new RangeValue();
+
+    /// <inheritdoc/>
+    public double ValueAt(
         double y,
         double trackTop,
         double trackLength,
@@ -21,10 +23,10 @@ public static class FaderMath
 
         double fraction = Math.Clamp((trackTop + trackLength - y) / trackLength, 0, 1);
 
-        return RangeValue.Quantize(minimum + fraction * (maximum - minimum), minimum, maximum, step);
+        return _range.Quantize(minimum + fraction * (maximum - minimum), minimum, maximum, step);
     }
 
-    /// <summary>The middle of the cap for a value, in the same coordinates.</summary>
-    public static double CapCenterY(double value, double trackTop, double trackLength, double minimum, double maximum) =>
-        trackTop + (1.0 - RangeValue.Fraction(value, minimum, maximum)) * trackLength;
+    /// <inheritdoc/>
+    public double CapCenterY(double value, double trackTop, double trackLength, double minimum, double maximum) =>
+        trackTop + (1.0 - _range.Fraction(value, minimum, maximum)) * trackLength;
 }

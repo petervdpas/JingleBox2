@@ -71,8 +71,8 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
         AddHandler(PointerReleasedEvent, Carrying_PointerReleased, RoutingStrategies.Tunnel);
 
         DataContextChanged += (_, _) => Watch();
-        UI.ThemeManager.Changed += Later;
-        DetachedFromVisualTree += (_, _) => UI.ThemeManager.Changed -= Later;
+        UI.ThemeSwitch.Changed += Later;
+        DetachedFromVisualTree += (_, _) => UI.ThemeSwitch.Changed -= Later;
     }
 
     /// <summary>What the tint is following, so it can stop following the machine before it.</summary>

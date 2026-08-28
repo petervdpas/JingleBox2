@@ -45,4 +45,23 @@
     <ProjectReference Include="..\Machines.Abstractions\JingleBox2.Machines.Abstractions.csproj" />
   </ItemGroup>
 
+  <!--
+    The tests can see what is internal here, and only the tests.
+
+    This assembly is published: an outside machine links against it, and the licence exception
+    names its companion. So what is public is a promise, and the rule for what earns one is
+    whether an outside machine would write it down. The parts every range control shares are
+    public because a machine drawing a control of its own should feel like the ones we ship; how
+    our own knob sweeps its 270 degrees and how our own fader reads its track are not, and a
+    contract carrying them would be a promise about our drawing rather than about their machine.
+
+    Internal is not untested. A rule nobody can reach is exactly what this whole pass was
+    against, and the answer is this line rather than a wider contract.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>JingleBox2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

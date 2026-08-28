@@ -24,8 +24,16 @@ public interface IMachine
     /// <remarks>
     /// Written into every song and every instrument that was made on it, so it can never
     /// change: a machine that renames itself orphans everything anybody made with it. Two
-    /// machines with the same id are the same machine, whoever wrote them, which is also how a
-    /// machine that arrives in a DLL replaces one that used to be built in.
+    /// machines with the same id are the same machine, whoever wrote them, which is how a
+    /// machine edited in its own project replaces the installed copy of itself.
+    ///
+    /// It is also what decides whether a machine can be seen at all. A machine is a face over
+    /// one of the engines built into the application, and the id is what says which:
+    /// <c>Machine.Register</c> looks the id up and refuses one it has no engine for, so a
+    /// machine designed elsewhere, under an id of its own, is read off disc and never reaches
+    /// the rack. That is deliberate today, since a box that cannot make a sound is worse than
+    /// no box, and it is the piece that has to move before a machine written by somebody else
+    /// can be installed. There is no mechanism for a machine to bring an engine with it.
     /// </remarks>
     string Id { get; }
 

@@ -70,8 +70,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     /// <remarks>
-    /// Shared, because the walk that reports a song's missing recordings is a static helper
-    /// and cannot reach an instance field. The rule holds nothing of its own.
+    /// Shared, because the walk that reports a song's missing recordings is static and cannot
+    /// reach an instance field. The rule holds nothing of its own.
     /// </remarks>
     private static readonly IFilePaths _paths = new FilePaths();
 

@@ -2,12 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -28,6 +28,9 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Switch : ThemedControl
 {
+    /// <summary>How a value's name is written on a panel. Holds nothing, so one is enough.</summary>
+    private readonly INaming _naming = new Naming();
+
     /// <summary>The air between the recess and the words that say what its positions mean.</summary>
     private const double LabelGap = 7;
 
@@ -367,7 +370,7 @@ public class Switch : ThemedControl
 
         foreach (var position in positions)
         {
-            var text = Text(Naming.Of(position), FontSize, Brushes.Black);
+            var text = Text(_naming.Of(position), FontSize, Brushes.Black);
             widest = Math.Max(widest, text.Width);
             lines += text.Height;
         }
@@ -430,8 +433,8 @@ public class Switch : ThemedControl
     /// </remarks>
     private void RenderStacked(DrawingContext context, ThemePalette palette, IReadOnlyList<object> positions, double top)
     {
-        var upper = Text(Naming.Of(positions[0]), FontSize, Index == 0 ? palette.TextBrush : palette.MutedBrush);
-        var lower = Text(Naming.Of(positions[1]), FontSize, Index == 1 ? palette.TextBrush : palette.MutedBrush);
+        var upper = Text(_naming.Of(positions[0]), FontSize, Index == 0 ? palette.TextBrush : palette.MutedBrush);
+        var lower = Text(_naming.Of(positions[1]), FontSize, Index == 1 ? palette.TextBrush : palette.MutedBrush);
 
         double middle = Bounds.Width / 2;
 
@@ -463,7 +466,7 @@ public class Switch : ThemedControl
         {
             double centre = top + 3 + HandleHeight / 2 + step * index;
 
-            var text = Text(Naming.Of(positions[index]), FontSize,
+            var text = Text(_naming.Of(positions[index]), FontSize,
                 index == Index ? palette.TextBrush : palette.MutedBrush);
 
             context.DrawText(text, new Point(SlotWidth + LabelGap, centre - text.Height / 2));
@@ -626,56 +629,4 @@ public class Switch : ThemedControl
     /// a control how much room it is being given.
     /// </remarks>
     private double _room = double.PositiveInfinity;
-}
-
-/// <summary>How a value's name is written on a panel.</summary>
-public static class Naming
-{
-    /// <summary>
-    /// The words a panel prints in capitals whatever else is done to them.
-    /// </summary>
-    /// <remarks>
-    /// Spelled out rather than guessed at from the length or the vowels. The set is small, it
-    /// is the set this application actually uses, and a rule clever enough to find them would
-    /// also find words that are not acronyms at all.
-    /// </remarks>
-    private static readonly string[] Acronyms = { "LFO", "VCO", "VCF", "VCA", "EG", "PW" };
-
-    /// <summary>
-    /// An enum's name with the words spaced out: LowPass reads as "Low pass", which is what a
-    /// panel would have printed on it. Acronyms keep their capitals.
-    /// </summary>
-    /// <remarks>
-    /// Only the first letter of the name is left as it was written, so the result is a phrase
-    /// rather than a run of capitalised words: a front panel prints "Low pass", not "Low Pass".
-    /// </remarks>
-    public static string Of(object? value)
-    {
-        string raw = value?.ToString() ?? "";
-        if (raw.Length == 0) return raw;
-
-        foreach (var acronym in Acronyms)
-        {
-            if (string.Equals(raw, acronym, StringComparison.OrdinalIgnoreCase)) return acronym;
-        }
-
-        var text = new System.Text.StringBuilder(raw.Length + 4);
-
-        for (int index = 0; index < raw.Length; index++)
-        {
-            char letter = raw[index];
-
-            if (index > 0 && char.IsUpper(letter))
-            {
-                text.Append(' ');
-                text.Append(char.ToLowerInvariant(letter));
-            }
-            else
-            {
-                text.Append(letter);
-            }
-        }
-
-        return text.ToString();
-    }
 }

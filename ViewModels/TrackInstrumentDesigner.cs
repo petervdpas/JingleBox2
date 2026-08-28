@@ -10,6 +10,7 @@ using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 
@@ -24,6 +25,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrumentDesigner
 {
+    /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
+    private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
+
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
@@ -265,7 +269,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// </remarks>
     private void Reveal(Note note)
     {
-        int wanted = PanelKeyboard.Reveal(note, Octave);
+        int wanted = _keyboard.Reveal(note, Octave);
         if (wanted == Octave) return;
 
         if (_tracker != null)

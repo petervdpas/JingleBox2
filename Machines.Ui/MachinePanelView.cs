@@ -16,6 +16,7 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -40,6 +41,12 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class MachinePanelView : Decorator
 {
+    /// <summary>Walking a shelf of presets: which way, and where it stops.</summary>
+    private readonly IPresetStep _step = new PresetStep();
+
+    /// <summary>What a key is called, both ways round.</summary>
+    private static readonly IMachineNotes _notes = new MachineNotes();
+
     /// <summary>
     /// The machine being drawn: its panel, its parameters and where it is kept, as one thing.
     /// </summary>
@@ -2508,7 +2515,7 @@ public class MachinePanelView : Decorator
     {
         if (Text(element, "key") is not { Length: > 0 } said) return "";
 
-        return int.TryParse(said, out int semitone) ? MachineNotes.Name(semitone) : said;
+        return int.TryParse(said, out int semitone) ? _notes.Name(semitone) : said;
     }
 
     /// <summary>
@@ -3073,7 +3080,7 @@ public class MachinePanelView : Decorator
 
         if (!_frames.TryGetValue(under, out var built) || Placed(built) is not { } area) return "";
 
-        return PresetStep.Side(at.X, area.Center.X);
+        return _step.Side(at.X, area.Center.X);
     }
 
     /// <summary>Puts the glow where the pointer is and a quiet ring on everything already taken.</summary>

@@ -3,10 +3,11 @@ using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.UI;
 using System;
 using System.Globalization;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 
@@ -21,6 +22,15 @@ namespace JingleBox2.Machines.Ui;
 /// </remarks>
 public class Knob : ThemedControl
 {
+    /// <summary>Stepping, clamping and reading a typed number. Holds nothing, so one is enough.</summary>
+    private readonly INumericInput _number = new NumericInput();
+
+    /// <summary>Where this knob's pointer sits, which is about a pot rather than about a value.</summary>
+    private readonly IKnobMath _dial = new KnobMath();
+
+    /// <summary>Where a value sits in its range, and what a drag does to it. Holds nothing, so one is enough.</summary>
+    private readonly IRangeValue _range = new RangeValue();
+
     /// <summary>
     /// The air between a knob's name and its dial, and between its dial and its value.
     /// </summary>
@@ -199,7 +209,7 @@ public class Knob : ThemedControl
     ///
     /// <see cref="ValueProperty"/> is deliberately absent from the measure list. A control
     /// measured off its current reading is as wide as the number under it, and a knob would then
-    /// change width as it was turned; the width comes from <see cref="NumericInput.Widest"/>
+    /// change width as it was turned; the width comes from <see cref="INumericInput.Widest"/>
     /// instead, which is the longest thing it could ever say.
     /// </remarks>
     static Knob()
@@ -418,7 +428,7 @@ public class Knob : ThemedControl
 
     /// <summary>What is printed under the dial: the wording if there is any, the number otherwise.</summary>
     public string ValueText =>
-        string.IsNullOrEmpty(Display) ? NumericInput.Format(Value, Format) + Unit : Display;
+        string.IsNullOrEmpty(Display) ? _number.Format(Value, Format) + Unit : Display;
 
     /// <summary>
     /// Room for the dial, the ring of marks all the way round it, the name and the reading.
@@ -525,8 +535,8 @@ public class Knob : ThemedControl
                 double at = KnobMath.StartDegrees + KnobMath.SweepDegrees * mark / (Ticks - 1.0);
                 bool major = mark == 0 || mark == Ticks - 1 || mark * 2 == Ticks - 1;
 
-                var (ax, ay) = KnobMath.PointAt(centerX, centerY, radius + 3, at);
-                var (bx, by) = KnobMath.PointAt(
+                var (ax, ay) = _dial.PointAt(centerX, centerY, radius + 3, at);
+                var (bx, by) = _dial.PointAt(
                     centerX, centerY, radius + (major ? MajorTickReach : MinorTickReach), at);
 
                 context.DrawLine(new Pen(ink, major ? 1.6 : 1), new Point(ax, ay), new Point(bx, by));
@@ -549,9 +559,9 @@ public class Knob : ThemedControl
 
 
 
-        double angle = KnobMath.AngleFor(Value, Minimum, Maximum);
-        var (innerX, innerY) = KnobMath.PointAt(centerX, centerY, radius * 0.15, angle);
-        var (outerX, outerY) = KnobMath.PointAt(centerX, centerY, radius * 0.82, angle);
+        double angle = _dial.AngleFor(Value, Minimum, Maximum);
+        var (innerX, innerY) = _dial.PointAt(centerX, centerY, radius * 0.15, angle);
+        var (outerX, outerY) = _dial.PointAt(centerX, centerY, radius * 0.82, angle);
 
         var pointer = new Pen(palette.AccentBrush, 2, lineCap: PenLineCap.Round);
         context.DrawLine(pointer, new Point(innerX, innerY), new Point(outerX, outerY));
@@ -655,7 +665,7 @@ public class Knob : ThemedControl
 
         double draggedUp = _dragStartY - e.GetPosition(this).Y;
 
-        Value = RangeValue.FromDrag(
+        Value = _range.FromDrag(
             _dragStartValue, draggedUp, Minimum, Maximum, SmallStep,
             KnobMath.DragPixelsForFullRange, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
 
@@ -716,11 +726,11 @@ public class Knob : ThemedControl
                 break;
 
             case Key.Home:
-                Value = RangeValue.Quantize(Minimum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Minimum, Minimum, Maximum, SmallStep);
                 break;
 
             case Key.End:
-                Value = RangeValue.Quantize(Maximum, Minimum, Maximum, SmallStep);
+                Value = _range.Quantize(Maximum, Minimum, Maximum, SmallStep);
                 break;
 
             default:
@@ -737,7 +747,7 @@ public class Knob : ThemedControl
 
         if (DefaultValue is not double reset) return;
 
-        Value = RangeValue.Quantize(reset, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(reset, Minimum, Maximum, SmallStep);
         e.Handled = true;
     }
 
@@ -747,7 +757,7 @@ public class Knob : ThemedControl
         if (direction == 0) return;
 
         double step = modifiers.HasFlag(KeyModifiers.Shift) ? LargeStep : SmallStep;
-        Value = RangeValue.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
+        Value = _range.Quantize(Value + direction * step, Minimum, Maximum, SmallStep);
     }
 
     /// <summary>A colour taken towards white, keeping its transparency, for the lit top of the face.</summary>

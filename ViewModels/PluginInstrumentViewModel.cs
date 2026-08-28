@@ -7,6 +7,8 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Machines;
 
 namespace JingleBox2.ViewModels;
 
@@ -24,6 +26,9 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class PluginInstrumentViewModel : ObservableObject
 {
+    /// <summary>The order a panel reads in. Holds nothing, so one is enough.</summary>
+    private readonly IPanelOrder _order = new PanelOrder();
+
     /// <summary>Which values adapter reads a given instrument.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachineValuesFor ValuesFor = new MachineValuesFor();
@@ -212,7 +217,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         if (_machines.For(_instrument.Machine.SlotId) is not { } project) return found;
         if (ValuesFor.Instrument(_instrument) is not { } values) return found;
 
-        foreach (string key in JingleBox2.Machines.PanelOrder.Of(project.Panel))
+        foreach (string key in _order.Of(project.Panel))
         {
             if (found.Count >= Shown) break;
 

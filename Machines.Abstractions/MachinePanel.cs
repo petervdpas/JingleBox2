@@ -26,59 +26,6 @@ public sealed class MachinePanel
     public MachineElement Root { get; set; } = new() { Element = MachineElementKinds.Grid };
 }
 
-/// <summary>
-/// The order a panel reads in.
-/// </summary>
-/// <remarks>
-/// Depth first through the tree, which is the order somebody's eye goes over the face: a grid's
-/// first row before its second, and everything in a group before whatever stands after it. So
-/// "the third knob" means the third knob you would point at, without anybody numbering them.
-///
-/// It exists so that a controller nobody has written a file for is still useful the moment it
-/// is plugged in: encoder three drives the third parameter on whatever machine is in front of
-/// you, on every machine, including one written next year. See docs/hardware-integration.md.
-///
-/// A parameter named twice on one panel, which happens where a value is shown beside the knob
-/// that turns it, counts once and keeps the place of the first.
-/// </remarks>
-public static class PanelOrder
-{
-    /// <summary>The parameters a panel turns, in the order it reads.</summary>
-    public static IReadOnlyList<string> Of(MachinePanel? panel)
-    {
-        var found = new List<string>();
-
-        if (panel?.Root is { } root) Walk(root, found, new HashSet<string>(StringComparer.Ordinal));
-
-        return found;
-    }
-
-    /// <summary>The parameter at that place, or nothing when the panel has fewer than that.</summary>
-    public static string At(MachinePanel? panel, int ordinal)
-    {
-        if (ordinal < 0) return "";
-
-        var order = Of(panel);
-
-        return ordinal < order.Count ? order[ordinal] : "";
-    }
-
-    /// <summary>
-    /// Adds this element's parameter and then everything under it, depth first, which is the
-    /// order somebody's eye takes a panel in.
-    /// </summary>
-    /// <remarks>
-    /// The set of what has already been seen is what makes a parameter named twice count once.
-    /// A value shown beside the knob that turns it is two elements naming one parameter, and a
-    /// controller pointed at "the third control" must not find the same one twice.
-    /// </remarks>
-    private static void Walk(MachineElement element, List<string> found, HashSet<string> already)
-    {
-        if (element.Parameter is { Length: > 0 } key && already.Add(key)) found.Add(key);
-
-        foreach (var child in element.Children) Walk(child, found, already);
-    }
-}
 
 /// <summary>
 /// One thing on a panel: a container, a control, or a label.

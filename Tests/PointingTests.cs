@@ -4,6 +4,7 @@ using JingleBox2.Views;
 using System;
 using Xunit;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Machines.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -21,6 +22,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class PointingTests
 {
+    /// <summary>Walking a shelf of presets: which way, and where it stops.</summary>
+    private readonly IPresetStep _step = new PresetStep();
+
     /// <summary>The mode is offered where there is at least one thing on screen to point at.</summary>
     /// <remarks>
     /// A pointable control joins the tally when it comes on screen and leaves it when it goes,
@@ -111,16 +115,16 @@ public class PointingTests
     [Fact]
     public void The_preset_picker_offers_the_step_the_hand_is_reaching_for()
     {
-        Assert.Equal(MachineActions.PresetPrevious, PresetStep.Side(10, 50));
-        Assert.Equal(MachineActions.PresetNext, PresetStep.Side(90, 50));
+        Assert.Equal(MachineActions.PresetPrevious, _step.Side(10, 50));
+        Assert.Equal(MachineActions.PresetNext, _step.Side(90, 50));
     }
 
     /// <summary>A step moves one place along the shelf, either way.</summary>
     [Fact]
     public void A_step_walks_the_shelf()
     {
-        Assert.Equal(3, PresetStep.Moved(2, 20, 1));
-        Assert.Equal(1, PresetStep.Moved(2, 20, -1));
+        Assert.Equal(3, _step.Moved(2, 20, 1));
+        Assert.Equal(1, _step.Moved(2, 20, -1));
     }
 
     /// <summary>The first and the last preset are where the walking stops.</summary>
@@ -131,23 +135,23 @@ public class PointingTests
     [Fact]
     public void And_stops_at_either_end_rather_than_coming_round()
     {
-        Assert.Equal(0, PresetStep.Moved(0, 20, -1));
-        Assert.Equal(19, PresetStep.Moved(19, 20, 1));
+        Assert.Equal(0, _step.Moved(0, 20, -1));
+        Assert.Equal(19, _step.Moved(19, 20, 1));
     }
 
     /// <summary>With no preset picked, either direction lands on the first one.</summary>
     [Fact]
     public void A_step_with_nothing_picked_takes_the_first()
     {
-        Assert.Equal(0, PresetStep.Moved(-1, 20, 1));
-        Assert.Equal(0, PresetStep.Moved(-1, 20, -1));
+        Assert.Equal(0, _step.Moved(-1, 20, 1));
+        Assert.Equal(0, _step.Moved(-1, 20, -1));
     }
 
     /// <summary>A shelf with nothing on it keeps whatever index it was holding.</summary>
     [Fact]
     public void And_an_empty_shelf_is_left_alone()
     {
-        Assert.Equal(4, PresetStep.Moved(4, 0, 1));
+        Assert.Equal(4, _step.Moved(4, 0, 1));
     }
 
     /// <summary>Offering a mapping hands out a copy and leaves the template as it shipped.</summary>

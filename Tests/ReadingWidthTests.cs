@@ -1,5 +1,6 @@
 using JingleBox2.Machines.Ui;
 using Xunit;
+using JingleBox2.Machines.Ui.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -18,6 +19,9 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class ReadingWidthTests
 {
+    /// <summary>Stepping, clamping and reading a typed number. Holds nothing, so one is enough.</summary>
+    private readonly INumericInput _number = new NumericInput();
+
     /// <summary>
     /// The mixer's own fader: -60 to +6, one decimal, in decibels. Wherever it is set, it asks
     /// for the same room, which is the whole point. Which of the equally long readings comes
@@ -29,28 +33,28 @@ public class ReadingWidthTests
         int room = "-60.0 dB".Length;
 
         foreach (double value in new double[] { 6, 0, -1, -10, -60 })
-            Assert.Equal(room, NumericInput.Widest(value, -60, 6, "0.0", " dB").Length);
+            Assert.Equal(room, _number.Widest(value, -60, 6, "0.0", " dB").Length);
     }
 
     /// <summary>And it is the ends that say how much room that is, not the value.</summary>
     [Fact]
     public void The_room_comes_from_the_ends()
     {
-        Assert.Equal("-60.0 dB", NumericInput.Widest(0, -60, 6, "0.0", " dB"));
+        Assert.Equal("-60.0 dB", _number.Widest(0, -60, 6, "0.0", " dB"));
     }
 
     /// <summary>Nothing stops a control being handed a value from outside its own ends.</summary>
     [Fact]
     public void And_at_a_value_longer_than_either_end()
     {
-        Assert.Equal("-120.0 dB", NumericInput.Widest(-120, -60, 6, "0.0", " dB"));
+        Assert.Equal("-120.0 dB", _number.Widest(-120, -60, 6, "0.0", " dB"));
     }
 
     /// <summary>A range that is all positive is at its longest at the top.</summary>
     [Fact]
     public void The_widest_end_is_not_always_the_lowest()
     {
-        Assert.Equal("1000ms", NumericInput.Widest(20, 20, 1000, "0", "ms"));
+        Assert.Equal("1000ms", _number.Widest(20, 20, 1000, "0", "ms"));
     }
 
     /// <summary>
@@ -60,7 +64,7 @@ public class ReadingWidthTests
     [Fact]
     public void A_reading_with_no_unit_is_just_the_number()
     {
-        Assert.Equal("-1.00", NumericInput.Widest(0, -1, 1, "0.00", ""));
-        Assert.Equal("-1.00", NumericInput.Widest(0, -1, 1, "0.00", null));
+        Assert.Equal("-1.00", _number.Widest(0, -1, 1, "0.00", ""));
+        Assert.Equal("-1.00", _number.Widest(0, -1, 1, "0.00", null));
     }
 }

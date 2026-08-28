@@ -5,6 +5,8 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Controllers;
 
 namespace JingleBox2.Midi;
 
@@ -25,6 +27,9 @@ namespace JingleBox2.Midi;
 /// </remarks>
 public sealed class MidiControlRouter
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles;
+
     /// <summary>The top of a continuous controller's range.</summary>
     private const double Full = 127.0;
 
@@ -100,9 +105,15 @@ public sealed class MidiControlRouter
     /// answered. The router knows mappings and nothing else.
     /// </param>
     /// <param name="layout">What a control does before anybody has pointed it at anything.</param>
+    /// <param name="profiles">
+    /// What is known about the controllers plugged in. Left out, one of its own; the application
+    /// hands the same one to everything, since what a device is doing is remembered in it.
+    /// </param>
     public MidiControlRouter(Func<IReadOnlyList<ControlMapping>> mappings, IControlTargets targets,
-                             Action? learned = null, DefaultLayout? layout = null)
+                             Action? learned = null, DefaultLayout? layout = null,
+                             IControllerProfiles? profiles = null)
     {
+        _profiles = profiles ?? new ControllerProfiles();
         _mappings = mappings;
         _targets = targets;
         _learned = learned;
@@ -251,7 +262,7 @@ public sealed class MidiControlRouter
     {
         var hand = _hands.GetValue(mapping, _ => new Hand());
 
-        var pickup = Controllers.ControllerProfiles.Pickup(mapping.Device, mapping.Channel, mapping.Cc)
+        var pickup = _profiles.Pickup(mapping.Device, mapping.Channel, mapping.Cc)
                      ?? mapping.Pickup;
 
         if (pickup != mapping.Pickup)

@@ -21,7 +21,7 @@ namespace JingleBox2.UI;
 /// Two sheets are merged, always: a base every theme is layered on, and the theme itself. So a
 /// theme file says only what it changes, and a rule that is the same everywhere is written once.
 /// </remarks>
-public static class ThemeManager
+public static class ThemeSwitch
 {
     /// <summary>Which themes there are and what each one is. Holds nothing, so one is enough.</summary>
     private static readonly IThemeCatalogue Catalogue = new ThemeCatalogue();

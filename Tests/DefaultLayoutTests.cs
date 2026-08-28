@@ -5,6 +5,9 @@ using JingleBox2.Midi;
 using Xunit;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Machines.Interfaces;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Controllers;
 
 namespace JingleBox2.Tests;
 
@@ -26,6 +29,12 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class DefaultLayoutTests
 {
+    /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
+    private readonly IControllerProfiles _profiles = new ControllerProfiles();
+
+    /// <summary>The order a panel reads in. Holds nothing, so one is enough.</summary>
+    private readonly IPanelOrder _order = new PanelOrder();
+
     /// <summary>A controller nobody has ever written a file for.</summary>
     private const string Nobodys = "Some Other Box Port 1";
 
@@ -71,7 +80,7 @@ public class DefaultLayoutTests
     [Fact]
     public void A_fader_is_a_tracks_level_and_is_pinned_to_that_track()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         var link = Fader(layout, 20);
 
@@ -94,7 +103,7 @@ public class DefaultLayoutTests
     [Fact]
     public void Faders_take_the_tracks_in_the_order_their_numbers_run()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Fader(layout, 22);
         Fader(layout, 20);
@@ -117,7 +126,7 @@ public class DefaultLayoutTests
     [Fact]
     public void An_encoder_is_a_control_on_the_face_in_front_of_you()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         var link = Encoder(layout, 30);
 
@@ -137,7 +146,7 @@ public class DefaultLayoutTests
     [Fact]
     public void Encoders_and_faders_are_counted_apart()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Fader(layout, 10);
         Encoder(layout, 20);
@@ -158,7 +167,7 @@ public class DefaultLayoutTests
     [Fact]
     public void Nothing_is_claimed_until_it_is_known_what_the_control_is()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Assert.Null(layout.For(Cc(20, 40)));
         Assert.Null(layout.For(Cc(20, 41)));
@@ -172,7 +181,7 @@ public class DefaultLayoutTests
     [Fact]
     public void A_button_is_not_something_a_layout_has_an_opinion_about()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Assert.Null(Turn(layout, 20, 0, 127, 0, 127));
     }
@@ -187,7 +196,7 @@ public class DefaultLayoutTests
     [Fact]
     public void The_same_control_is_handed_back_the_same_mapping()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         var first = Fader(layout, 20);
         var again = layout.For(Cc(20, 50));
@@ -202,7 +211,7 @@ public class DefaultLayoutTests
     [Fact]
     public void Two_controllers_are_counted_apart()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Turn(layout, 20, 40, 41, 43);
         foreach (int value in new[] { 40, 41, 43 }) layout.For(Cc(20, value, "Another Box"));
@@ -218,9 +227,9 @@ public class DefaultLayoutTests
     [Fact]
     public void A_controllers_own_file_says_what_a_control_is_without_waiting()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
-        Controllers.ControllerProfiles.Saw("Minilab3 MIDI", 1, 86);
+        _profiles.Saw("Minilab3 MIDI", 1, 86);
 
         var link = layout.For(new MidiMessage
         {
@@ -245,9 +254,9 @@ public class DefaultLayoutTests
     [Fact]
     public void An_mpd218s_knobs_drive_the_machine_rather_than_the_mixer()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
-        Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
+        _profiles.Saw(Mpd, 1, 22);
 
         var link = Knobbed(layout, 22);
 
@@ -270,9 +279,9 @@ public class DefaultLayoutTests
     [Fact]
     public void And_they_take_the_machines_controls_in_the_order_their_numbers_run()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
-        Controllers.ControllerProfiles.Saw(Mpd, 1, 22);
+        _profiles.Saw(Mpd, 1, 22);
 
         Knobbed(layout, 25);
         Knobbed(layout, 22);
@@ -298,7 +307,7 @@ public class DefaultLayoutTests
     [Fact]
     public void A_device_nobody_has_written_a_file_for_keeps_its_knobs_on_the_mixer()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         var link = Fader(layout, 20);
 
@@ -320,9 +329,9 @@ public class DefaultLayoutTests
     [Fact]
     public void A_nanokontrols_sliders_go_to_the_mixer_and_its_knobs_to_the_machine()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
-        Controllers.ControllerProfiles.Saw(Korg, 1, 0);
+        _profiles.Saw(Korg, 1, 0);
 
         var slider = layout.For(Cc(0, 40, Korg));
         var knob = layout.For(Cc(16, 40, Korg));
@@ -358,9 +367,9 @@ public class DefaultLayoutTests
     [Fact]
     public void A_modulation_strip_is_left_alone()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
-        Controllers.ControllerProfiles.Saw("Minilab3 MIDI", 1, 86);
+        _profiles.Saw("Minilab3 MIDI", 1, 86);
 
         Assert.Null(layout.For(new MidiMessage
         {
@@ -381,7 +390,7 @@ public class DefaultLayoutTests
     [Fact]
     public void What_it_worked_out_is_carried_on_the_mapping()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Assert.Equal(ControlPickup.Takeover, Fader(layout, 20)!.Pickup);
         Assert.Equal(ControlPickup.Relative, Encoder(layout, 30)!.Pickup);
@@ -391,7 +400,7 @@ public class DefaultLayoutTests
     [Fact]
     public void It_can_be_switched_off_and_then_says_nothing()
     {
-        var layout = new DefaultLayout { On = false };
+        var layout = new DefaultLayout(_profiles) { On = false };
 
         Assert.Null(Fader(layout, 20));
     }
@@ -403,7 +412,7 @@ public class DefaultLayoutTests
     [Fact]
     public void Notes_are_not_its_business()
     {
-        var layout = new DefaultLayout();
+        var layout = new DefaultLayout(_profiles);
 
         Assert.Null(layout.For(new MidiMessage
         {
@@ -421,6 +430,9 @@ public class DefaultLayoutTests
 /// </remarks>
 public class PanelOrderTests
 {
+    /// <summary>The order a panel reads in. Holds nothing, so one is enough.</summary>
+    private readonly IPanelOrder _order = new PanelOrder();
+
     /// <summary>A knob on a panel, which is the one element kind that always turns something.</summary>
     private static MachineElement Knob(string parameter) =>
         new() { Element = MachineElementKinds.Knob, Parameter = parameter };
@@ -440,7 +452,7 @@ public class PanelOrderTests
     {
         var panel = Panel(Knob("cutoff"), Knob("resonance"), Knob("drive"));
 
-        Assert.Equal(new[] { "cutoff", "resonance", "drive" }, PanelOrder.Of(panel));
+        Assert.Equal(new[] { "cutoff", "resonance", "drive" }, _order.Of(panel));
     }
 
     /// <summary>
@@ -456,7 +468,7 @@ public class PanelOrderTests
 
         var panel = Panel(Knob("cutoff"), group, Knob("level"));
 
-        Assert.Equal(new[] { "cutoff", "attack", "decay", "level" }, PanelOrder.Of(panel));
+        Assert.Equal(new[] { "cutoff", "attack", "decay", "level" }, _order.Of(panel));
     }
 
     /// <summary>
@@ -468,7 +480,7 @@ public class PanelOrderTests
     {
         var panel = Panel(Knob("cutoff"), Knob("resonance"), Knob("cutoff"));
 
-        Assert.Equal(new[] { "cutoff", "resonance" }, PanelOrder.Of(panel));
+        Assert.Equal(new[] { "cutoff", "resonance" }, _order.Of(panel));
     }
 
     /// <summary>
@@ -482,7 +494,7 @@ public class PanelOrderTests
 
         var panel = Panel(label, Knob("cutoff"));
 
-        Assert.Equal(new[] { "cutoff" }, PanelOrder.Of(panel));
+        Assert.Equal(new[] { "cutoff" }, _order.Of(panel));
     }
 
     /// <summary>
@@ -495,7 +507,7 @@ public class PanelOrderTests
     [InlineData(9, "")]
     [InlineData(-1, "")]
     public void And_a_place_answers_the_parameter_at_it(int ordinal, string wanted) =>
-        Assert.Equal(wanted, PanelOrder.At(Panel(Knob("cutoff"), Knob("resonance")), ordinal));
+        Assert.Equal(wanted, _order.At(Panel(Knob("cutoff"), Knob("resonance")), ordinal));
 
     /// <summary>
     /// No panel is not a failure: a knob turned with nothing open reaches nothing quietly.
@@ -503,7 +515,7 @@ public class PanelOrderTests
     [Fact]
     public void A_panel_that_is_not_there_reads_as_nothing()
     {
-        Assert.Empty(PanelOrder.Of(null));
-        Assert.Equal("", PanelOrder.At(null, 0));
+        Assert.Empty(_order.Of(null));
+        Assert.Equal("", _order.At(null, 0));
     }
 }

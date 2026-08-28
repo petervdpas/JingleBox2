@@ -6,6 +6,7 @@ using JingleBox2.Help;
 using System.Globalization;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Help.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -24,6 +25,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public class HelpBadge : ThemedControl
 {
+    /// <summary>Everything the app explains about itself, looked up by id.</summary>
+    private readonly IHelpText _help = new HelpText();
+
     /// <summary>
     /// Which explanation this badge is about, as one of the ids declared in HelpText. An id
     /// nothing has been written for says so rather than opening an empty window.
@@ -94,7 +98,7 @@ public class HelpBadge : ThemedControl
     /// </summary>
     private void UpdateTip()
     {
-        var topic = HelpText.Find(Topic);
+        var topic = _help.Find(Topic);
 
         string line = !string.IsNullOrWhiteSpace(Tip)
             ? Tip
