@@ -93,20 +93,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// worked on. The pattern itself is not dimmed: it is the one you can touch.
     /// </summary>
     /// <remarks>
-    /// Whichever pattern really does play next, which is a different question in the two modes
-    /// and is the reason this is not simply the order. In song mode it is the next slot, by its
-    /// place rather than by the pattern, since the same pattern can be in a song twice and what
-    /// follows it is a different answer each time; null at the two ends, because the song does
-    /// not wrap and the first pattern has nothing before it, so its line 00 sits against the top
-    /// of the window the way every tracker's does. In pattern mode the pattern repeats, so what
-    /// comes next is this same pattern from the top, and showing the next slot there would be
-    /// showing something that is not going to be played.
+    /// A pattern that is really coming, and nothing otherwise. In song mode that is the
+    /// neighbouring slot, by its place rather than by the pattern, since the same pattern can be
+    /// in a song twice and what follows it is a different answer each time; null at the two
+    /// ends, because a song does not wrap. In pattern mode nothing is coming but this pattern
+    /// again, so both are null and the space either side is simply blank.
+    ///
+    /// Null is not the same as no space. The room above and below is always there and the
+    /// cursor is on the middle of the screen whatever is in it; these two only decide whether
+    /// anything is drawn there.
     /// </remarks>
     public Pattern? PatternBefore =>
-        PlayMode == TrackerPlayMode.Pattern ? CurrentPattern : Song.PatternAt(OrderIndex - 1);
+        PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex - 1);
 
     public Pattern? PatternAfter =>
-        PlayMode == TrackerPlayMode.Pattern ? CurrentPattern : Song.PatternAt(OrderIndex + 1);
+        PlayMode == TrackerPlayMode.Pattern ? null : Song.PatternAt(OrderIndex + 1);
 
     private void NeighboursMoved()
     {

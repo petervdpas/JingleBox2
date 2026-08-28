@@ -153,19 +153,19 @@ public sealed class PatternGrid : ThemedControl
 
     /// <summary>Layout for the pattern currently bound, shared with the header control.</summary>
     public PatternMetrics Metrics =>
-        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, PadFor(Before), PadFor(After));
+        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, Pad, Pad);
 
     /// <summary>
-    /// How much room to leave for a neighbouring pattern: half a screen, or as much of it as
-    /// there is, or nothing at all when there is no neighbour.
+    /// Half a screen, above the pattern and below it, whether or not there is anything to put
+    /// in it.
     /// </summary>
     /// <remarks>
-    /// Nothing at all is the case that makes the first and last patterns of a song behave the
-    /// way every tracker's do: the top of the first pattern comes up against the top of the
-    /// window rather than sitting in the middle over a strip of nothing.
+    /// Always, which is the point: the cursor is on the middle of the screen at line 00 of the
+    /// first pattern in a song exactly as it is anywhere else, and what is above it there is
+    /// blank rather than absent. The space is the rule; a neighbouring pattern is only what
+    /// fills it when one is really coming.
     /// </remarks>
-    private double PadFor(Pattern? neighbour) =>
-        neighbour == null ? 0 : Math.Min(Math.Max(0, HalfView), neighbour.Lines * RowHeight);
+    private double Pad => Math.Max(0, HalfView);
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -308,10 +308,10 @@ public sealed class PatternGrid : ThemedControl
     /// below the last line, both dimmed.
     /// </summary>
     /// <remarks>
-    /// What the space is for. The cursor stays on the middle of the screen by having half a
-    /// screen of pattern above and below it, and filling that with the song either side is what
-    /// makes it worth having rather than a strip of nothing: the last bar you played into is
-    /// still on screen while you write the first bar of the next.
+    /// What the space is for, when there is anything to put in it. The last bar you played
+    /// into stays on screen while you write the first bar of the next. Nothing at all is drawn
+    /// where a song has no pattern coming, and that is not a gap to be closed up: the space
+    /// stays and the cursor stays on the middle of the screen with it.
     ///
     /// Dimmed rather than drawn plainly, because these rows are context. Nothing here can be
     /// typed into or selected, and a click in it lands on the nearest row of the pattern that

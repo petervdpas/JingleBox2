@@ -173,21 +173,24 @@ because that exact thing was wrong once.
   a read is the end of the lump rather than a failure, which is how a plugin knows to stop asking
 - The cursor stays on the middle of the screen and the pattern runs under it, which is what
   every tracker does and what makes the line you are working on somewhere your eye can rest
-  rather than a highlight to follow down the page. It works by having half a screen of pattern
-  above the cursor and half below, and what fills that is the song either side, drawn at 40%:
-  the last bars of the pattern before and the first of the one after. `PatternMetrics.TopPad`
-  and `BottomPad` are that space, so `RowY`, `LineAt` and `ContentHeight` all shift together and
-  a click still lands where it looks. `ViewportScroller.CentreRow` is the offset
-- Which pattern is either side is decided by what will actually play, and so it is a different
-  question in the two modes. In song mode it is the neighbouring slot, by its place in the order
-  rather than by the pattern, since the same pattern can be in a song twice; in pattern mode the
-  pattern repeats, so it is this same pattern wrapping, and showing the next slot there would be
-  showing something that is not going to be played. The rule therefore stops holding in exactly
-  two places, and deliberately: the top of a song's first pattern and the bottom of its last,
-  where there is no song either side, so the rows come up against the edge of the window. Renoise
-  is the same and is where this came from. `HalfView` is set on the grid by `TrackerView`, since
-  the grid is measured inside the scroll viewer with no height limit and never learns how tall
-  the hole it is seen through is
+  rather than a highlight to follow down the page. Always, with no exceptions: line 00 of a
+  song's first pattern is on the middle exactly as any other row is, and what is above it there
+  is blank. `PatternMetrics.TopPad` and `BottomPad` are half a screen each, whether or not there
+  is anything to draw in them, so `RowY`, `LineAt` and `ContentHeight` all shift together and a
+  click still lands where it looks. `ViewportScroller.CentreRow` is the offset. `HalfView` is
+  set on the grid by `TrackerView`, since the grid is measured inside the scroll viewer with no
+  height limit and never learns how tall the hole it is seen through is
+- The space is the rule and a neighbouring pattern is only what fills it, drawn at 40% opacity
+  so a note that is really there still reads as one. Only a pattern that is really coming: in
+  song mode the neighbouring slot, by its place in the order rather than by the pattern, since
+  the same pattern can be in a song twice and what follows it is a different answer each time;
+  nothing at the two ends, because a song does not wrap; and nothing at all in pattern mode,
+  where the only thing coming is this pattern again. Getting this wrong twice is what it took:
+  first the space was left out at the ends, which moved the cursor off the middle, and then the
+  pattern was ghosted against itself in pattern mode. Renoise leaves the room and leaves it
+  empty, which is visible in its own screenshots by the cursor sitting at the same height on
+  every one of them. Faded as a whole rather than by choosing paler colours, because picking the
+  muted colour for every cell made a neighbouring pattern look exactly like an empty one
 - A song can also be packed, which is Pack in the TRACKER bar: the same `.jibx` with the
   recordings inside it, written where you choose and never to the songs folder. Saving does not
   do this, because a song built on a long take is tens of megabytes and the open song is written
