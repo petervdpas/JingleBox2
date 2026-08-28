@@ -392,9 +392,17 @@ public sealed class SongStore : ISampleUsage
     /// hand as it walks the same lists the writer walked. The "t" keeps the two kinds apart in
     /// a folder somebody may well open.
     /// </remarks>
+    /// <summary>
+    /// Where one effect's patch lives in the container, by the strip it is on.
+    /// </summary>
+    /// <remarks>
+    /// The master is track minus one and gets a name of its own rather than a number, because it
+    /// is not a track and numbering it would make it one the day somebody adds a thirty-third.
+    /// </remarks>
     private static string ChainStateName(int track, int device) =>
-        StateFolder + "t" + track.ToString("00", CultureInfo.InvariantCulture)
-        + "-" + device.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
+        StateFolder
+        + (track < 0 ? "m" : "t" + track.ToString("00", CultureInfo.InvariantCulture) + "-")
+        + device.ToString("00", CultureInfo.InvariantCulture) + StateExtension;
 
     /// <summary>
     /// Writes a song, and when asked, the recordings it plays along with it.
@@ -507,17 +515,26 @@ public sealed class SongStore : ISampleUsage
         }
 
         for (int track = 0; track < document.Mix.Count; track++)
-        {
-            var devices = document.Mix[track].Plugins?.Devices;
-            if (devices == null) continue;
+            PutChainBack(container, document.Mix[track], track);
 
-            for (int device = 0; device < devices.Count; device++)
-            {
-                var bytes = Lump(container, ChainStateName(track, device));
-                if (bytes != null) devices[device].State = bytes;
-            }
+        PutChainBack(container, document.Master, MasterStrip);
+    }
+
+    /// <summary>The patches of one strip's effects, put back where the plugins will look.</summary>
+    private static void PutChainBack(ZipArchive container, TrackMix? strip, int track)
+    {
+        var devices = strip?.Plugins?.Devices;
+        if (devices == null) return;
+
+        for (int device = 0; device < devices.Count; device++)
+        {
+            var bytes = Lump(container, ChainStateName(track, device));
+            if (bytes != null) devices[device].State = bytes;
         }
     }
+
+    /// <summary>The master, which is a strip without being a track. See ChainStateName.</summary>
+    private const int MasterStrip = -1;
 
     /// <summary>One patch out of the container, or null when it is not there or will not read.</summary>
     private static byte[]? Lump(ZipArchive container, string name)
@@ -558,6 +575,12 @@ public sealed class SongStore : ISampleUsage
         public List<int> TrackInstruments { get; set; } = new();
         public List<TrackMix> Mix { get; set; } = new();
 
+        /// <summary>
+        /// The master strip. A song written before this existed reads back with a fresh one,
+        /// which is unity and no effect, so it sounds exactly as it did.
+        /// </summary>
+        public TrackMix Master { get; set; } = new();
+
         /// <summary>This song's own controller layout. See <see cref="Song.Controls"/>.</summary>
         public List<Midi.ControlMapping> Controls { get; set; } = new();
         public List<TrackerInstrument> Instruments { get; set; } = new();
@@ -574,6 +597,7 @@ public sealed class SongStore : ISampleUsage
             Order = new List<int>(song.Order),
             TrackInstruments = new List<int>(song.TrackInstruments),
             Mix = song.Mix.Select(m => m.Clone()).ToList(),
+            Master = song.Master.Clone(),
             Controls = song.Controls.Select(Midi.ControlMapping.Copy).ToList(),
             Instruments = song.Instruments.Select(Written).ToList(),
             Patterns = song.Patterns.Select(PatternDocument.From).ToList()
@@ -626,10 +650,16 @@ public sealed class SongStore : ISampleUsage
         {
             var states = new List<(int Track, int Device, byte[] Bytes)>();
 
-            for (int track = 0; track < Mix.Count; track++)
+            for (int track = 0; track < Mix.Count; track++) Take(Mix[track], track);
+
+            Take(Master, MasterStrip);
+
+            return states;
+
+            void Take(TrackMix? strip, int track)
             {
-                var devices = Mix[track].Plugins?.Devices;
-                if (devices == null) continue;
+                var devices = strip?.Plugins?.Devices;
+                if (devices == null) return;
 
                 for (int device = 0; device < devices.Count; device++)
                 {
@@ -640,8 +670,6 @@ public sealed class SongStore : ISampleUsage
                     devices[device].State = Array.Empty<byte>();
                 }
             }
-
-            return states;
         }
 
         /// <summary>One instrument as this machine has it: a copy, with real paths.</summary>
@@ -665,6 +693,7 @@ public sealed class SongStore : ISampleUsage
                 Order = new List<int>(Order),
                 TrackInstruments = new List<int>(TrackInstruments),
                 Mix = Mix.Select(m => m.Clone()).ToList(),
+                Master = (Master ?? new TrackMix()).Clone(),
                 Controls = Controls.Select(Midi.ControlMapping.Copy).ToList(),
                 Instruments = Instruments.Select(Read).ToList()
             };

@@ -15,8 +15,17 @@ public sealed class TrackPluginTarget : IPluginHost
         _track = track;
     }
 
-    /// <summary>The same two-digit form the pattern header and the mixer use.</summary>
-    public string Label => "TR-" + (_track + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+    /// <summary>
+    /// The same two-digit form the pattern header and the mixer use, or the master by name.
+    /// </summary>
+    /// <remarks>
+    /// The master is a strip without being a track, and it is named rather than numbered for the
+    /// same reason it is strip minus one everywhere else: numbering it would make it a track the
+    /// day somebody adds a thirty-third.
+    /// </remarks>
+    public string Label => _track < 0
+        ? "MASTER"
+        : "TR-" + (_track + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
 
     public PluginChain Chain => _player.ChainFor(_track);
 

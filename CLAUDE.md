@@ -63,6 +63,29 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
 - `MixLevels` (Tracker/): What the mix adds up to, mute and solo included
+- The mixer has a master, and it is a strip without being a track: `Song.Master` is a `TrackMix`
+  because it is the same handful of settings, but it is not in `Song.Mix`, so nothing that walks
+  the tracks reaches it by counting and it does not move when they are reordered. It has a
+  level, a place and one effect chain the whole song goes through, no ducking because everything
+  is already summed by the time it is reached, and no solo because soloing everything is what it
+  is already doing. Applied where the fixed `MasterGain` always was, in this order: sum, effect,
+  level and pan, then the saturation, which has to stay last or the fader could put the mix back
+  outside it. Its meter reads what is leaving, which makes it the one meter on the page measuring
+  what you actually hear. It is strip -1 everywhere: `TrackerPlayer.MasterStrip`, the chain
+  walks, and `state/mDD.bin` in the song file rather than a number, so nobody can collide with it
+  by adding a thirty-third track. A song written before it existed opens at unity with nothing
+  across it and sounds exactly as it did
+- Its chain is folded away under the mixer, the same `FoldStrip` the pattern's two use, holding
+  the same `PluginStrip`, because a chain is a chain and what differs is only which strip it is
+  about. Its own `PluginChainViewModel` rather than the one under the pattern, which follows the
+  cursor: pointing that at the master would lose it the moment somebody touched an arrow key
+- The master's meter is a peak measured off the last buffer, so it is only true while buffers are
+  being asked for, and it went on showing the last thing that played after the stream stopped.
+  Clearing it where the rendering rests only covers the one path that goes through the mixer, and
+  there are several ways for rendering to stop. So the reading is stamped when it is taken and
+  says nothing once it is older than `MeterHoldMs`, which is gone whichever way the music
+  stopped. A track's meter needs none of that: it is worked out from the voices that are
+  sounding, so it falls on its own
 - `TrackMixer` (Tracker/Synth/): The song's tracks, summed. A bus, a level, a pan, an insert
   chain, a ducker and an instrument apiece, and one voice per track the tracker way: a new note
   cuts the one still ringing. Auditions carry no track at all and pile up, which is why a
@@ -806,6 +829,13 @@ because that exact thing was wrong once.
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
   you start from and a sound you own turned out to be the same object. A fresh library seeds
   itself with six starters, and from then on they are ordinary instruments
+- A note played by hand on the tracker's keyboard is that track playing. It goes on the track
+  the cursor is in, through its inserts and its fader, and moves that track's meter and the
+  master's, which is the whole point of auditioning: it tells you what the part will sound like.
+  Only the plugin path did that; everything else, synth, mono synth, sampler, kit and recording,
+  went to the loose audition bus and moved no track meter at all. Every preview takes the track
+  now and defaults to none. The rack's keyboard still names none, and rightly: the instrument it
+  is playing may not be in any song, so it goes through nobody's fader
 - A note played by hand holds for a fixed moment on a generated sound, which would otherwise
   never stop, and for its own length on a recording: a take cut off part way through is not the
   sound the instrument makes. `SampleVoice.WindowSeconds` is that length, and the hold is passed

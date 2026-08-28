@@ -173,6 +173,66 @@ public class SongTests
         Assert.Equal(TrackerCell.NoInstrument, song.GetTrackInstrument(3));
     }
 
+    /// <remarks>
+    /// The master is a strip and not a track: it is not in the list of them, so nothing that
+    /// walks the tracks can reach it by counting, and it does not move when they are reordered.
+    /// </remarks>
+    [Fact]
+    public void The_master_is_not_one_of_the_tracks()
+    {
+        var song = Made();
+
+        Assert.Equal(song.TrackCount, song.Mix.Count);
+        Assert.DoesNotContain(song.Master, song.Mix);
+    }
+
+    [Fact]
+    public void And_stays_where_it_is_when_the_tracks_move()
+    {
+        var song = Made();
+
+        song.Master.Volume = 0.5;
+
+        song.MoveTrack(0, 3);
+
+        Assert.Equal(0.5, song.Master.Volume);
+    }
+
+    [Fact]
+    public void A_master_written_down_and_read_back_is_the_same_master()
+    {
+        var song = Made();
+
+        song.Master.Volume = 0.4;
+        song.Master.Pan = -0.25;
+        song.Master.Mute = true;
+
+        var was = SongStore.Uncopy(SongStore.Copy(song));
+
+        Assert.NotNull(was);
+        Assert.Equal(0.4, was!.Master.Volume);
+        Assert.Equal(-0.25, was.Master.Pan);
+        Assert.True(was.Master.Mute);
+    }
+
+    /// <remarks>
+    /// A song written before the master existed has none in its file, and has to open sounding
+    /// exactly as it did: unity, centred, and nothing across it.
+    /// </remarks>
+    [Fact]
+    public void A_song_from_before_the_master_opens_at_unity()
+    {
+        var song = Made();
+
+        song.Master = null!;
+        song.Normalize();
+
+        Assert.NotNull(song.Master);
+        Assert.Equal(TrackMix.DefaultVolume, song.Master.Volume);
+        Assert.Equal(0, song.Master.Pan);
+        Assert.False(song.Master.Mute);
+    }
+
     [Fact]
     public void A_song_written_down_and_read_back_is_the_same_song()
     {

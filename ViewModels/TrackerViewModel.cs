@@ -296,6 +296,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     public PluginChainViewModel TrackEffect { get; }
 
+    /// <summary>The effects across the whole mix, which belong to the master and not to a track.</summary>
+    public PluginChainViewModel MasterEffect { get; }
+
+    /// <summary>
+    /// True while the master's chain is unfolded under the mixer.
+    /// </summary>
+    /// <remarks>
+    /// Shut to begin with, the same as the automation under the pattern and for the same reason:
+    /// almost no song has an effect across the whole mix, and a strip showing nothing is a strip
+    /// taking room from the thing you came to look at.
+    /// </remarks>
+    [ObservableProperty] private bool showsMasterChain;
+
+    /// <summary>How tall it stands while it is open. See the strips under the pattern.</summary>
+    [ObservableProperty] private double masterChainHeight = 104;
+
     /// <summary>Which track the effect slot is pointed at, so the cursor does not retarget it
     /// on every keystroke that stays in the same column.</summary>
     private int _effectTrack = -1;
@@ -509,6 +525,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>One channel strip per track, for the MIXER page.</summary>
     public ObservableCollection<TrackStripViewModel> Strips { get; } = new();
 
+    /// <summary>
+    /// The whole mix, after every track: a level, a place and one effect the song goes through.
+    /// </summary>
+    /// <remarks>
+    /// Its own property rather than the last of <see cref="Strips"/>, because everything that
+    /// walks the strips means the tracks: the meters, the surface's eight faders, the mix that
+    /// is written down. A master on the end of that list would be found by all of them and be
+    /// wrong in each.
+    /// </remarks>
+    [ObservableProperty] private TrackStripViewModel? masterStrip;
+
     /// <summary>The rack, for bringing an instrument into this song.</summary>
 
     [ObservableProperty] private RackMachine? pickedMachine;
@@ -565,6 +592,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         TrackEffect = new PluginChainViewModel(Plugins);
         TrackEffect.Changed += MarkDirty;
 
+        // The chain across the whole mix. Its own view model rather than the one under the
+        // pattern, because that one follows the cursor and the master is not a track the cursor
+        // can be in: pointing it at the master would mean losing it the moment you touched an
+        // arrow key.
+        MasterEffect = new PluginChainViewModel(Plugins)
+        {
+            Nothing = "No effect across the mix yet."
+        };
+
+        MasterEffect.Changed += MarkDirty;
+
 
 
         // Assigned to the field rather than the property: this is what was saved, not a
@@ -600,6 +638,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             Changing("a plugin on a track");
         };
+
+        MasterEffect.Changing += () =>
+        {
+            _player.CaptureChains(Song);
+
+            Changing("a plugin on the master");
+        };
+
+        // Pointed once and never again: unlike a track's, this is about the one strip that is
+        // always the same one.
+        MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
 
         // Before anything sounds: the rate cannot move once the engine is built.
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
@@ -1023,6 +1072,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
             strip.Left = left;
             strip.Right = right;
+        }
+
+        if (MasterStrip is { } master)
+        {
+            var (left, right) = _player.LevelFor(TrackerPlayer.MasterStrip);
+
+            master.Left = left;
+            master.Right = right;
         }
 
         foreach (var instrument in Instruments)
@@ -2012,6 +2069,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             });
         }
 
+        // And the strip that is not a track, kept apart from them so nothing that walks the
+        // tracks ever finds it by counting.
+        MasterStrip = new TrackStripViewModel(
+            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
+
         MixShown?.Invoke();
     }
 
@@ -2027,6 +2089,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             var instrument = Song.InstrumentAt(Song.GetTrackInstrument(strip.Track));
             strip.InstrumentName = instrument?.Name ?? "";
         }
+
+        // And the strip that is not a track, kept apart from them so nothing that walks the
+        // tracks ever finds it by counting.
+        MasterStrip = new TrackStripViewModel(
+            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
 
         MixShown?.Invoke();
     }
@@ -2050,6 +2117,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _player.ApplyMix();
         MarkDirty();
+
+        // And the strip that is not a track, kept apart from them so nothing that walks the
+        // tracks ever finds it by counting.
+        MasterStrip = new TrackStripViewModel(
+            TrackerPlayer.MasterStrip, Song.Master, "", Song.TrackCount, OnMixChanged);
 
         MixShown?.Invoke();
     }

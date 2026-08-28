@@ -276,6 +276,13 @@ public sealed class TrackerPlayer : IDisposable
         _synth.Mixer.LetAudition(instrument.Id, note.Semitone);
     }
 
+    /// <param name="track">
+    /// Which strip it sounds on, or below nought for a note that belongs to no track. The
+    /// tracker's keyboard names the track the cursor is in, so a note played by hand goes
+    /// through that track's inserts and its fader and moves its meter and the master's, which
+    /// is what makes it tell you what the part will sound like. The rack's keyboard names none,
+    /// because the instrument it is playing may not be in any song.
+    /// </param>
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return 0;
@@ -330,7 +337,7 @@ public sealed class TrackerPlayer : IDisposable
 
             return _synth.Mixer.Preview(
                 zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, note,
-                (float)(level * zone.Volume), PreviewHoldSeconds, instrument.Id);
+                (float)(level * zone.Volume), PreviewHoldSeconds, instrument.Id, track);
         }
 
         if (instrument.IsKit)
@@ -342,26 +349,26 @@ public sealed class TrackerPlayer : IDisposable
 
             return _synth.Mixer.Preview(
                 pad, instrument.Patch, padSample, note,
-                (float)(level * pad.Volume), PreviewHoldSeconds, instrument.Id);
+                (float)(level * pad.Volume), PreviewHoldSeconds, instrument.Id, track);
         }
 
         if (instrument.IsMonoSynth)
         {
             _synth.Mixer.Preview(instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
-                note, level, PreviewHoldSeconds, instrument.Id);
+                note, level, PreviewHoldSeconds, instrument.Id, track);
             return PreviewHoldSeconds;
         }
 
         if (instrument.IsSynth)
         {
-            _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds, instrument.Id);
+            _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds, instrument.Id, track);
             return PreviewHoldSeconds;
         }
 
         var sample = _samples.Load(instrument.FilePath);
         if (sample == null) return 0;
 
-        return _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds, instrument.Id);
+        return _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds, instrument.Id, track);
     }
 
     /// <summary>
@@ -373,6 +380,11 @@ public sealed class TrackerPlayer : IDisposable
         // Asked several times a second by the meters, and before anything has played there is
         // no mixer yet. Building one here would fix the rate before the device is even open.
         if (!_synth.HasMixer) return (0, 0);
+
+        // The master reads what is leaving rather than what any track is doing, which is the
+        // only meter on the page measuring the thing you actually hear.
+        if (track == MasterStrip) return _synth.Mixer.MasterLevel;
+
         if (track < 0 || track >= _noteGain.Length) return (0, 0);
 
         var (left, right) = _synth.Mixer.LevelFor(track);
@@ -405,9 +417,19 @@ public sealed class TrackerPlayer : IDisposable
     /// The chain of effects on a track, made and put into the mix the first time it is asked
     /// for. A track with nothing on it costs an empty chain, which does nothing per block.
     /// </summary>
+    /// <summary>
+    /// The strip that is not a track: the whole mix, after all of them.
+    /// </summary>
+    /// <remarks>
+    /// Minus one rather than a number past the last track, so it cannot be reached by counting
+    /// and cannot collide with a song that grows another track. Everything that walks the strips
+    /// walks the tracks and then this.
+    /// </remarks>
+    public const int MasterStrip = -1;
+
     public PluginChain ChainFor(int track)
     {
-        if (_synth.Mixer.InsertOn(track) is PluginChain existing) return existing;
+        if (InsertOn(track) is PluginChain existing) return existing;
 
         // The engine has to be running for an effect to be given anything at all. Until now it
         // was opened by the first note, so a track with an effect on it and nothing playing was
@@ -416,9 +438,29 @@ public sealed class TrackerPlayer : IDisposable
         EnsureEngine();
 
         var chain = new PluginChain();
-        _synth.Mixer.SetInsert(track, chain);
+
+        if (track < 0) _synth.Mixer.SetMasterInsert(chain);
+        else _synth.Mixer.SetInsert(track, chain);
 
         return chain;
+    }
+
+    /// <summary>What is on a strip, whether that strip is a track or the master.</summary>
+    private IAudioInsert? InsertOn(int track) =>
+        track < 0
+            ? (_synth.HasMixer ? _synth.Mixer.MasterInsert : null)
+            : (_synth.HasMixer ? _synth.Mixer.InsertOn(track) : null);
+
+    /// <summary>The settings of one strip, the master included.</summary>
+    private static TrackMix? StripOf(Song song, int track) =>
+        track < 0 ? song.Master : track < song.Mix.Count ? song.Mix[track] : null;
+
+    /// <summary>Every strip a song has, its tracks and then the master.</summary>
+    private static IEnumerable<int> StripsOf(Song song)
+    {
+        for (int track = 0; track < song.Mix.Count; track++) yield return track;
+
+        yield return MasterStrip;
     }
 
     /// <summary>
@@ -433,14 +475,16 @@ public sealed class TrackerPlayer : IDisposable
     {
         if (song == null) return;
 
-        for (int track = 0; track < song.Mix.Count; track++)
+        foreach (int track in StripsOf(song))
         {
-            var chain = _synth.Mixer.InsertOn(track) as PluginChain;
+            if (StripOf(song, track) is not { } strip) continue;
+
+            var chain = InsertOn(track) as PluginChain;
             var captured = PluginChainState.Capture(chain, patches);
 
             // Null rather than an empty list: a song with no effects should not be full of
             // empty chains.
-            song.Mix[track].Plugins = captured.IsEmpty ? null : captured;
+            strip.Plugins = captured.IsEmpty ? null : captured;
         }
     }
 
@@ -453,11 +497,17 @@ public sealed class TrackerPlayer : IDisposable
         var missing = new List<string>();
         if (song == null) return missing;
 
-        for (int track = 0; track < song.Mix.Count; track++)
+        foreach (int track in StripsOf(song))
         {
+            if (StripOf(song, track) is not { } strip) continue;
+
+            // Nothing loaded and nothing wanted costs nothing, which matters most for the
+            // master: almost no song has an effect on it and none should pay for a chain.
+            if (strip.Plugins is null or { IsEmpty: true } && InsertOn(track) is null) continue;
+
             var chain = ChainFor(track);
             missing.AddRange(PluginChainState.Restore(
-                chain, song.Mix[track].Plugins, _synth.SampleRate, MaxPluginFrames));
+                chain, strip.Plugins, _synth.SampleRate, MaxPluginFrames));
         }
 
         return missing;
@@ -487,11 +537,11 @@ public sealed class TrackerPlayer : IDisposable
         var changed = new List<int>();
         if (song == null) return changed;
 
-        for (int track = 0; track < song.Mix.Count; track++)
+        foreach (int track in StripsOf(song))
         {
-            var wanted = song.Mix[track].Plugins;
+            var wanted = StripOf(song, track)?.Plugins;
 
-            var chain = _synth.HasMixer ? _synth.Mixer.InsertOn(track) as PluginChain : null;
+            var chain = InsertOn(track) as PluginChain;
 
             // Nothing loaded and nothing wanted is the ordinary case and costs nothing: no
             // chain is made for a track that has never had one.
@@ -1344,6 +1394,15 @@ public sealed class TrackerPlayer : IDisposable
                 MixLevels.KeyFor(song.Mix, track, song.TrackCount),
                 MixLevels.DuckReleaseFor(song.Mix, track));
         }
+
+        // And the strip everything has already been through. Muted is nothing rather than a
+        // level, the same as a track: a fader pulled to the bottom and a mute are two different
+        // gestures and only one of them is remembered when it is undone.
+        var master = song.Master;
+
+        _synth.Mixer.SetMaster(
+            master.Mute ? 0f : (float)master.Volume,
+            (float)master.Pan);
     }
 
     /// <summary>

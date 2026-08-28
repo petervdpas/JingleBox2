@@ -23,7 +23,9 @@ public sealed class TrackStripViewModel : ObservableObject
         instrument = instrumentName;
         _changed = changed;
 
-        DuckKeys = BuildKeys(track, trackCount);
+        // Nothing keys the master and nothing is keyed off it: everything has already been
+        // summed by the time it is reached.
+        DuckKeys = track < 0 ? Array.Empty<DuckKey>() : BuildKeys(track, trackCount);
     }
 
     /// <summary>
@@ -82,7 +84,12 @@ public sealed class TrackStripViewModel : ObservableObject
     public bool HasEffect => EffectName.Length > 0;
 
     /// <summary>The same two-digit form the pattern header and the instrument badges use.</summary>
-    public string Label => "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
+    /// <summary>True for the strip the whole mix goes through, which is not a track.</summary>
+    public bool IsMaster => Track < 0;
+
+    public string Label => IsMaster
+        ? "MASTER"
+        : "TR-" + (Track + 1).ToString("00", CultureInfo.InvariantCulture);
 
     private string instrument;
 

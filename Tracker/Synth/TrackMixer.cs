@@ -36,6 +36,29 @@ public sealed class TrackMixer
     /// <summary>As many tracks as a song can have, so a strip always has a bus of its own.</summary>
     private const int MaxTracks = Song.MaxTrackCount;
 
+    /// <summary>
+    /// The whole mix, after every track has been added to it.
+    /// </summary>
+    /// <remarks>
+    /// Not a track and deliberately not one: it has no bus, no voices, no instrument and nothing
+    /// keying it, because everything has already been summed by the time it is reached. What it
+    /// has is a level, a place in the stereo field, and one effect the whole song goes through,
+    /// which is the thing there was nowhere to put before.
+    ///
+    /// Applied where the fixed <see cref="MasterGain"/> always was, so the order is the same as
+    /// it ever was with one thing added to it: sum, effect, level, the saturation that keeps it
+    /// inside.
+    /// </remarks>
+    private float _masterGain = 1f;
+
+    private float _masterPan;
+
+    private IAudioInsert? _masterInsert;
+
+    private float _masterLeft;
+
+    private float _masterRight;
+
     private readonly List<IVoice> _voices = new();
     private readonly object _lock = new();
 
@@ -562,11 +585,20 @@ public sealed class TrackMixer
     }
 
     /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
-    public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition)
+    /// <param name="track">
+    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
+    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
+    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
+    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
+    /// its level and its meter, which is what makes an audition tell you what the part will
+    /// actually sound like.
+    /// </param>
+    public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition,
+                        int track = SynthVoice.NoTrack)
     {
         if (patch is null || !note.IsPlayable) return;
 
-        var voice = new SynthVoice(patch, note, SynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed())
+        var voice = new SynthVoice(patch, note, track, gain, 0f, SampleRate, NextSeed())
         {
             Audition = audition
         };
@@ -581,12 +613,21 @@ public sealed class TrackMixer
     /// No glide: an audition has no note before it to slide from. It belongs to no track
     /// either, so it piles up with the other auditions rather than cutting one.
     /// </remarks>
-    public void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition)
+    /// <param name="track">
+    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
+    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
+    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
+    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
+    /// its level and its meter, which is what makes an audition tell you what the part will
+    /// actually sound like.
+    /// </param>
+    public void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition,
+                        int track = MonoSynthVoice.NoTrack)
     {
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new MonoSynthVoice(
-            patch, note, MonoSynthVoice.NoTrack, gain, 0f, SampleRate, NextSeed(), null)
+            patch, note, track, gain, 0f, SampleRate, NextSeed(), null)
         {
             Audition = audition
         };
@@ -690,15 +731,24 @@ public sealed class TrackMixer
 
     /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    /// <param name="track">
+    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
+    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
+    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
+    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
+    /// its level and its meter, which is what makes an audition tell you what the part will
+    /// actually sound like.
+    /// </param>
     public double Preview(
         SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain,
-        double holdSeconds, string audition)
+        double holdSeconds, string audition,
+        int track = SynthVoice.NoTrack)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
-            SynthVoice.NoTrack, gain, 0f, SampleRate, patch)
+            track, gain, 0f, SampleRate, patch)
         {
             Audition = audition
         };
@@ -714,15 +764,24 @@ public sealed class TrackMixer
 
     /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    /// <param name="track">
+    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
+    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
+    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
+    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
+    /// its level and its meter, which is what makes an audition tell you what the part will
+    /// actually sound like.
+    /// </param>
     public double Preview(
         DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
-        double holdSeconds, string audition)
+        double holdSeconds, string audition,
+        int track = SynthVoice.NoTrack)
     {
         if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, patch, pad.Shape, note, note,
-            SynthVoice.NoTrack, gain, 0f, SampleRate)
+            track, gain, 0f, SampleRate)
         {
             Choke = pad.Choke,
             Audition = audition
@@ -739,15 +798,24 @@ public sealed class TrackMixer
 
     /// <summary>A recording sounded once, for auditioning while editing.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
+    /// <param name="track">
+    /// The strip it sounds on, or nothing for a note that belongs to no track. A machine's own
+    /// keyboard on the rack is played on an instrument that may not be in any song, so it goes
+    /// through nobody's fader and nobody's meter. The tracker's keyboard is the opposite: it is
+    /// playing the instrument that track holds, so it sounds on that track, through its inserts,
+    /// its level and its meter, which is what makes an audition tell you what the part will
+    /// actually sound like.
+    /// </param>
     public double Preview(
         TrackerInstrument instrument, SampleData sample, Note note, float gain,
-        double holdSeconds, string audition)
+        double holdSeconds, string audition,
+        int track = SynthVoice.NoTrack)
     {
         if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
-            SynthVoice.NoTrack, gain, 0f, SampleRate)
+            track, gain, 0f, SampleRate)
         {
             Audition = audition
         };
@@ -977,11 +1045,134 @@ public sealed class TrackMixer
         for (int i = 0; i < samples; i++)
             buffer[i] += _loose[i];
 
-        for (int i = 0; i < samples; i++)
-            buffer[i] = SoftClip(buffer[i] * MasterGain);
+        Master(buffer, samples);
 
         Reap();
     }
+
+    /// <summary>
+    /// What the whole mix goes through on its way out: an effect, a level, a place, a limit.
+    /// </summary>
+    /// <remarks>
+    /// The effect first, because a limiter on the master is put there to catch what the mix
+    /// does and not what the fader does; then the level and the pan, which is the fader doing
+    /// its one job; then the saturation, which is the last thing before the card and has to be,
+    /// or the fader could put the mix outside it again.
+    ///
+    /// Measured after all of that rather than before, so the meter beside the fader reads what
+    /// is actually leaving.
+    /// </remarks>
+    private void Master(float[] buffer, int samples)
+    {
+        float gain;
+        float pan;
+        IAudioInsert? insert;
+
+        lock (_lock)
+        {
+            gain = _masterGain;
+            pan = _masterPan;
+            insert = _masterInsert;
+        }
+
+        if (insert != null)
+        {
+            try
+            {
+                insert.Process(buffer, samples / 2);
+            }
+            catch
+            {
+                // A plugin that throws on the audio thread takes the application with it. The
+                // mix carries on without it, which is the same bargain a track's chain makes.
+            }
+        }
+
+        float left = gain * MasterGain * (pan <= 0 ? 1f : 1f - pan);
+        float right = gain * MasterGain * (pan >= 0 ? 1f : 1f + pan);
+
+        float loudestLeft = 0;
+        float loudestRight = 0;
+
+        for (int i = 0; i < samples; i += 2)
+        {
+            float one = SoftClip(buffer[i] * left);
+            float two = SoftClip(buffer[i + 1] * right);
+
+            buffer[i] = one;
+            buffer[i + 1] = two;
+
+            one = Math.Abs(one);
+            two = Math.Abs(two);
+
+            if (one > loudestLeft) loudestLeft = one;
+            if (two > loudestRight) loudestRight = two;
+        }
+
+        _masterLeft = loudestLeft;
+        _masterRight = loudestRight;
+        _masterAt = Environment.TickCount64;
+    }
+
+    /// <summary>Moves the master fader, which is the last thing between the mix and the card.</summary>
+    public void SetMaster(float gain, float? pan)
+    {
+        lock (_lock)
+        {
+            _masterGain = Math.Max(0, gain);
+
+            if (pan.HasValue) _masterPan = Math.Clamp(pan.Value, -1f, 1f);
+        }
+    }
+
+    /// <summary>Puts an effect across the whole mix, or takes one off with null.</summary>
+    public void SetMasterInsert(IAudioInsert? insert)
+    {
+        lock (_lock) _masterInsert = insert;
+    }
+
+    /// <summary>What is across the whole mix, if anything.</summary>
+    public IAudioInsert? MasterInsert
+    {
+        get { lock (_lock) return _masterInsert; }
+    }
+
+    /// <summary>
+    /// How long a master reading is worth anything, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Longer than a block, which is a few milliseconds, and shorter than anyone would call a
+    /// pause. Nothing turns on the exact number: it only has to be long enough that a reading
+    /// never flickers while the mix is running, and short enough that it is gone before a hand
+    /// leaves the fader.
+    /// </remarks>
+    public const double MeterHoldMs = 250;
+
+    /// <summary>Whether a reading taken that long ago still says anything.</summary>
+    /// <remarks>
+    /// The rule on its own so it can be put a question to without an audio device. See
+    /// <see cref="MasterLevel"/> for why there is a rule at all.
+    /// </remarks>
+    public static bool Fresh(double ageMs) => ageMs <= MeterHoldMs;
+
+    /// <summary>
+    /// What is leaving, for the meter beside the master fader.
+    /// </summary>
+    /// <remarks>
+    /// A peak measured off the last buffer, and therefore only true while buffers are being
+    /// asked for. A track's meter is worked out from the voices that are sounding, so it falls
+    /// on its own the moment they stop; this one would sit at whatever the last thing to play
+    /// was until something asked for another buffer, and nothing does when the stream is not
+    /// running. So it is stamped when it is taken and goes out on its own if nothing renews it.
+    ///
+    /// Aged rather than cleared where the rendering stops, because there are several ways for it
+    /// to stop and only one of them passes through this class.
+    /// </remarks>
+    public (float Left, float Right) MasterLevel =>
+        Fresh(Environment.TickCount64 - _masterAt) ? (_masterLeft, _masterRight) : (0f, 0f);
+
+    /// <summary>When the master's reading was taken, so an old one can be seen to be old.</summary>
+    private long _masterAt;
 
     /// <summary>Lets go of every note on every plugin, for a stop.</summary>
     public void AllPluginNotesOff()
@@ -1002,13 +1193,27 @@ public sealed class TrackMixer
     }
 
     /// <summary>Nothing is playing: the side chains fall back open rather than staying shut.</summary>
+    /// <summary>
+    /// Nothing to render: the duckers let go and every meter falls to nothing.
+    /// </summary>
+    /// <remarks>
+    /// The levels have to be cleared here and not only in the render, because this is the path
+    /// that skips the render. A track's meter falls on its own, since it is worked out from the
+    /// voices that are sounding and there are none; the master's is a peak measured off the last
+    /// buffer, so left alone it would hold whatever the last thing to play was, for ever. The
+    /// mixer looked as though the song were still going after it had stopped.
+    /// </remarks>
     private void Rest()
     {
         for (int track = 0; track < MaxTracks; track++)
         {
             _duckGain[track] = 1f;
             _duckers[track]?.Reset();
+            _trackLevels[track] = 0f;
         }
+
+        _masterLeft = 0f;
+        _masterRight = 0f;
     }
 
     /// <summary>Puts every voice on its own track's bus, auditions aside.</summary>

@@ -64,6 +64,20 @@ public sealed class Song
     public List<TrackMix> Mix { get; set; } = new();
 
     /// <summary>
+    /// The whole mix, after every track: a level, a place and one effect the song goes through.
+    /// </summary>
+    /// <remarks>
+    /// A <see cref="TrackMix"/> because it is the same handful of settings and there is nothing
+    /// to gain by writing them out twice, but it is not a track and is not in the list of them:
+    /// nothing plays through it, nothing is keyed off it, and it does not move when the tracks
+    /// are reordered. Its ducking is left where it starts and nothing reads it.
+    ///
+    /// Never null. A song written before this existed gets a fresh one on the way in, which is
+    /// unity and no effect, so an old song sounds exactly as it did.
+    /// </remarks>
+    public TrackMix Master { get; set; } = new();
+
+    /// <summary>
     /// What this song's own controller layout is, over the top of the one in the settings.
     /// </summary>
     /// <remarks>
@@ -221,6 +235,9 @@ public sealed class Song
 
         foreach (var strip in Mix)
             strip.Clamp();
+
+        Master ??= new TrackMix();
+        Master.Clamp();
     }
 
     /// <summary>Adds a pattern sized to match the song and returns its index.</summary>

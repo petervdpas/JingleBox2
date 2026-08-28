@@ -221,6 +221,17 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
     public bool HasInstrument => Instrument != null;
 
+    /// <summary>
+    /// What to say when the strip is empty, since not every strip could hold an instrument.
+    /// </summary>
+    /// <remarks>
+    /// A track's chain begins with whatever the track plays, so an empty one has neither. The
+    /// master has no instrument and never will: everything has already been played by the time
+    /// it is reached. Offering it one in the only sentence it ever shows would be an offer
+    /// nothing could accept.
+    /// </remarks>
+    public string Nothing { get; init; } = "No instrument or effect yet.";
+
     public event System.Action? Changed;
 
     /// <summary>Says something changed here. Called by the devices as well as by this class.</summary>

@@ -397,7 +397,7 @@
 
         <TextBlock Classes="cardHint" VerticalAlignment="Center"
                    IsVisible="{Binding IsEmpty}"
-                   Text="No instrument or effect yet." />
+                   Text="{Binding Nothing}" />
 
         <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Status}" />
       </StackPanel>

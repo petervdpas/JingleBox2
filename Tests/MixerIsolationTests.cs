@@ -112,6 +112,175 @@ public class MixerIsolationTests
             Assert.Equal(0, mixer.LevelFor(track).Left);
     }
 
+    /// <remarks>
+    /// The master is the last thing between the mix and the card, so what it is set to has to be
+    /// audible in what leaves rather than in what any one track is doing.
+    /// </remarks>
+    [Fact]
+    public void The_master_fader_turns_the_whole_mix_down()
+    {
+        var mixer = Playing(0);
+
+        mixer.SetMaster(0f, null);
+
+        var buffer = new float[Frames * 2];
+        mixer.Render(buffer, Frames);
+
+        float loudest = 0;
+        foreach (var sample in buffer) loudest = System.Math.Max(loudest, System.Math.Abs(sample));
+
+        Assert.Equal(0, loudest, 4);
+    }
+
+    /// <remarks>
+    /// And it is not a track: turning the master down does not turn a track down, which is what
+    /// the strip's own meter would show if the two were the same thing.
+    /// </remarks>
+    [Fact]
+    public void And_leaves_the_track_reading_what_the_track_is_doing()
+    {
+        var mixer = Playing(0);
+
+        mixer.SetMaster(0f, null);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(mixer.LevelFor(0).Left > 0);
+    }
+
+    [Fact]
+    public void The_master_meter_reads_what_is_leaving()
+    {
+        var mixer = Playing(0);
+
+        mixer.SetMaster(1f, null);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(mixer.MasterLevel.Left > 0);
+
+        mixer.SetMaster(0f, null);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.Equal(0, mixer.MasterLevel.Left, 4);
+    }
+
+    /// <remarks>
+    /// The effect goes before the fader, because a limiter across the mix is put there to catch
+    /// what the music does rather than what the hand on the fader does.
+    /// </remarks>
+    [Fact]
+    public void An_effect_across_the_master_hears_the_whole_mix()
+    {
+        var mixer = Playing(0);
+        var heard = new Listener();
+
+        mixer.SetMasterInsert(heard);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(heard.Loudest > 0);
+        Assert.Same(heard, mixer.MasterInsert);
+    }
+
+    /// <remarks>
+    /// The meter falls when there is nothing left to render, which is the one path that skips
+    /// the render altogether. A track's own meter falls by itself, since it is worked out from
+    /// the voices that are sounding; the master's is a peak measured off the last buffer, so
+    /// without this it holds whatever the last thing to play was and the mixer goes on looking
+    /// as though the song were still going.
+    /// </remarks>
+    [Fact]
+    public void The_master_meter_falls_when_there_is_nothing_left_to_play()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.NoteOn(0, Loud(), new Note(60), 1f, 0f);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(mixer.MasterLevel.Left > 0);
+
+        mixer.StopAll();
+
+        // Two blocks: the first lets the cut fade out, the second finds nothing to render.
+        mixer.Render(new float[Frames * 2], Frames);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.Equal(0, mixer.MasterLevel.Left, 4);
+        Assert.Equal(0, mixer.MasterLevel.Right, 4);
+    }
+
+    /// <remarks>
+    /// A note played by hand on a track is that track playing: it moves the track's own meter
+    /// and the master's, and it goes through the track's fader on the way. Without that the
+    /// keyboard told you nothing about what the part would sound like, because it was not going
+    /// anywhere near the strip the part will play through.
+    /// </remarks>
+    [Fact]
+    public void A_note_played_by_hand_on_a_track_moves_that_tracks_meter()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Loud(), new Note(60), 1f, 1.0, "by hand", 2);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(mixer.LevelFor(2).Left > 0);
+        Assert.Equal(0, mixer.LevelFor(0).Left);
+    }
+
+    [Fact]
+    public void And_the_masters()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Loud(), new Note(60), 1f, 1.0, "by hand", 2);
+        mixer.Render(new float[Frames * 2], Frames);
+
+        Assert.True(mixer.MasterLevel.Left > 0);
+    }
+
+    /// <remarks>
+    /// And the rack's keyboard still belongs to nobody's track, because the instrument it is
+    /// playing may not be in any song.
+    /// </remarks>
+    [Fact]
+    public void While_the_racks_keyboard_still_belongs_to_no_track()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Loud(), new Note(60), 1f, 1.0, "on the rack");
+        mixer.Render(new float[Frames * 2], Frames);
+
+        for (int track = 0; track < 8; track++)
+            Assert.Equal(0, mixer.LevelFor(track).Left);
+
+        Assert.True(mixer.MasterLevel.Left > 0);
+    }
+
+    /// <remarks>
+    /// The master's meter is a peak off the last buffer, so it is only true while buffers are
+    /// being asked for. It went on showing the last thing that played after the stream stopped,
+    /// because nothing was left to notice: clearing it where the rendering stops only helps on
+    /// the one path that goes through this class, and there are several. A reading that ages is
+    /// gone whichever way the music stopped.
+    /// </remarks>
+    [Fact]
+    public void A_master_reading_says_nothing_once_it_is_old()
+    {
+        Assert.True(TrackMixer.Fresh(0));
+        Assert.True(TrackMixer.Fresh(TrackMixer.MeterHoldMs));
+        Assert.False(TrackMixer.Fresh(TrackMixer.MeterHoldMs + 1));
+    }
+
+    /// <summary>An effect that listens and passes the audio through untouched.</summary>
+    private sealed class Listener : JingleBox2.Audio.Plugins.IAudioInsert
+    {
+        public float Loudest { get; private set; }
+
+        public void Process(float[] buffer, int frames)
+        {
+            for (int i = 0; i < frames * 2; i++)
+                Loudest = System.Math.Max(Loudest, System.Math.Abs(buffer[i]));
+        }
+    }
+
     /// <summary>An effect that does nothing, so it can be recognised rather than heard.</summary>
     private sealed class Marker : JingleBox2.Audio.Plugins.IAudioInsert
     {
