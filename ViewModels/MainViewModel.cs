@@ -1130,6 +1130,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         var screen = new ControllerScreens(
             () => new MidiDeviceBindings().DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.EveryRole),
+            _profiles,
             new ArturiaDisplay(midiService, null, _profiles),
             new MackieDisplay(midiService, _profiles, () => surface.Device));
 

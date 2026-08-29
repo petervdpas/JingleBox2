@@ -106,6 +106,7 @@ public class ControllerScreenTests
 
         var screens = new ControllerScreens(
             () => new[] { Lab, KeyDaw, KeyMidi, "MPD218 Port A" },
+            _profiles,
             new ArturiaDisplay(midi, null, _profiles),
             new MackieDisplay(midi, _profiles));
 
@@ -375,5 +376,90 @@ public class ControllerScreenTests
 
         Assert.Equal(2, midi.Sent.Count);
         Assert.Equal(0x02, midi.Sent[0].Bytes[6]);
+    }
+
+    /// <summary>
+    /// A reading reaches the controller's screen even though the knob is on another of its ports.
+    /// </summary>
+    /// <remarks>
+    /// The thing that would have made a KeyLab's screen useless. Its knobs arrive on the MIDI port
+    /// and its screen is on the DAW port, so a reading written back to the port it came from
+    /// reaches nothing, and the screen could only ever have said hello. A MiniLab hides this
+    /// completely, since there both are the same port.
+    /// </remarks>
+    [Fact]
+    public void A_reading_goes_to_the_controllers_screen_not_the_port_it_came_from()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, KeyDaw, KeyMidi, "MPD218 Port A" },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved(KeyMidi, ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.Single(midi.Sent);
+        Assert.Equal(KeyDaw, midi.Sent[0].Device);
+        Assert.Contains("Cutoff", System.Text.Encoding.ASCII.GetString(midi.Sent[0].Bytes));
+    }
+
+    /// <summary>Where the two are one port, which is a MiniLab, nothing is redirected.</summary>
+    [Fact]
+    public void A_reading_on_the_screens_own_port_stays_there()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, KeyDaw, KeyMidi },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved(Lab, ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.All(midi.Sent, one => Assert.Equal(Lab, one.Device));
+    }
+
+    /// <summary>A controller with no screen anywhere still receives nothing.</summary>
+    [Fact]
+    public void A_reading_from_a_controller_with_no_screen_goes_nowhere()
+    {
+        var midi = new NoMidi();
+
+        var screens = new ControllerScreens(
+            () => new[] { Lab, KeyDaw, KeyMidi, "MPD218 Port A" },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved("MPD218 Port A", ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.Empty(midi.Sent);
+    }
+
+    /// <summary>
+    /// With two of the same controller on the desk, a reading goes to that one's screen.
+    /// </summary>
+    /// <remarks>
+    /// Decided by how much of the port name is shared, which is all there is to go on: the
+    /// operating system does not say which ports are one controller, and both units answer an
+    /// identity request identically.
+    /// </remarks>
+    [Fact]
+    public void With_two_of_them_a_reading_goes_to_the_right_one()
+    {
+        var midi = new NoMidi();
+
+        const string second = "2- KeyLab mkII 49 MIDI";
+        const string secondDaw = "2- KeyLab mkII 49 DAW";
+
+        var screens = new ControllerScreens(
+            () => new[] { KeyMidi, KeyDaw, second, secondDaw },
+            _profiles,
+            new ArturiaDisplay(midi, null, _profiles));
+
+        screens.Moved(second, ScreenKind.Knob, 0.5, "Cutoff", "50%");
+
+        Assert.Single(midi.Sent);
+        Assert.Equal(secondDaw, midi.Sent[0].Device);
     }
 }
