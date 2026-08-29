@@ -1,4 +1,5 @@
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker.Synth.Interfaces;
@@ -8,11 +9,12 @@ namespace JingleBox2.Tracker.Synth.Interfaces;
 /// and an instrument apiece.
 /// </summary>
 /// <remarks>
-/// One voice per track, the tracker way: a new note cuts the one still ringing there. Auditions
-/// sit outside that, carry no track at all and simply pile up, which is why a panel's keyboard
-/// cannot be heard on a strip or turned down by one. The one exception is a kit, where a crash
-/// has to go on ringing under the snare that follows it and only a pad in the same choke group
-/// stops another.
+/// Room is made on a track for each new note before it starts, and what that means is the
+/// instrument's to say: cut, which is what a tracker has always done and is still the default,
+/// release, or nothing at all. Auditions sit outside it, carry no track and simply pile up,
+/// which is why a panel's keyboard cannot be heard on a strip or turned down by one. A kit
+/// answers the same question with its choke groups, since a crash has to go on ringing under
+/// the snare that follows it, so it is the one thing here that makes no room at all.
 ///
 /// It was called SynthMixer, which was true when it summed synth voices and nothing else. It
 /// grew a bus and a level and a ducker and a plugin slot for every track and went on wearing the
@@ -140,7 +142,13 @@ public interface ITrackMixer
     /// Plays a note on the audition plugin, letting go of it after a while. There is no key to
     /// release when a note is played by clicking on it, so it releases itself.
     /// </summary>
-    void PreviewPlugin(Note note, float gain, double holdSeconds);
+    /// <remarks>
+    /// Notes played by hand pile up, as a keyboard does and as an audition on every other
+    /// machine already did, each let go of at its own moment. An instrument set to one voice
+    /// asks for <see cref="VoiceEnding.Cut"/> instead.
+    /// </remarks>
+    void PreviewPlugin(Note note, float gain, double holdSeconds,
+                       VoiceEnding ending = VoiceEnding.Sustain);
 
     /// <summary>
     /// Plays a note by hand on the plugin a track is already playing, letting go of it after a
@@ -151,14 +159,32 @@ public interface ITrackMixer
     /// window is open and whose knobs have just been turned; a second copy would be a second
     /// sound, playing whatever the song was last saved with.
     /// </remarks>
-    void PreviewOnTrack(int track, Note note, float gain, double holdSeconds);
+    void PreviewOnTrack(int track, Note note, float gain, double holdSeconds,
+                        VoiceEnding ending = VoiceEnding.Sustain);
+
+    /// <summary>Lets go of one note a track's plugin was given by hand, for a key coming up.</summary>
+    /// <remarks>
+    /// A note nothing remembers is not passed on, since a note off for something that never
+    /// started would end a note the plugin is holding for somebody else.
+    /// </remarks>
+    void LetPluginNote(int track, int semitone);
+
+    /// <summary>The same, for the plugin in the audition slot.</summary>
+    void LetPreviewNote(int semitone);
 
     /// <summary>Starts a note on a track's plugin. The volume column rides its bus after.</summary>
     /// <remarks>
-    /// One note a track, as a tracker has always worked. The note that was there is let go
-    /// rather than cut off, so a plugin plays its own release instead of clicking.
+    /// The note that was there is let go rather than cut off, so a plugin plays its own release
+    /// instead of clicking. A plugin has only that one ending, so cut and release both mean the
+    /// same thing to it and only <see cref="VoiceEnding.Sustain"/> reads differently: under it
+    /// the note before is left holding and the track plays a chord.
+    ///
+    /// Which notes a plugin is holding is remembered on this side, because a plugin cannot be
+    /// asked. Without that record the only thing a host can say is all notes off, which is
+    /// right for one note a track and takes a whole chord down to end one note of it.
     /// </remarks>
-    void PluginNoteOn(int track, Note note, float gain, float pan);
+    void PluginNoteOn(int track, Note note, float gain, float pan,
+                      VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>Lets go of whatever a track's plugin is holding.</summary>
     void PluginNoteOff(int track);
@@ -173,8 +199,14 @@ public interface ITrackMixer
     /// <summary>How far a track is being pushed down right now, 1 being not at all.</summary>
     float DuckGainFor(int track);
 
-    /// <summary>Starts a note on a synth patch, cutting whatever that track was sounding.</summary>
-    void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan);
+    /// <summary>Starts a note on a synth patch, making room for it on the track first.</summary>
+    /// <remarks>
+    /// What making room means is the instrument's to say: see <see cref="VoiceEnding"/>. Cut is
+    /// the default here rather than at the call sites, so a caller with no instrument in its
+    /// hand, a test or an audition, plays what this engine has always played.
+    /// </remarks>
+    void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan,
+                VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>
     /// Starts a note on Ouroboros, sliding from whatever the track was sounding.
@@ -184,12 +216,19 @@ public interface ITrackMixer
     /// what it was. It is read before the old voice is cut, because cutting it is what makes it
     /// stop being the note before.
     /// </remarks>
-    void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan);
+    void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan,
+                VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>
-    /// Sounds a recording on a track, under the same rules: the track's last note is cut, and
-    /// the voice takes its place. The caller brings the audio, so the mixer never reads a file.
+    /// Sounds a recording on a track, under the same rules, room being made for it first. The
+    /// caller brings the audio, so the mixer never reads a file.
     /// </summary>
+    /// <remarks>
+    /// The one overload that is not told what to do with the note before it, because it is
+    /// handed the instrument and can read it: this method already takes that instrument's
+    /// patch, its window and its base note off it, and a second way of saying the same thing
+    /// is a second thing that can disagree.
+    /// </remarks>
     void NoteOn(int track, TrackerInstrument instrument, SampleData sample, Note note, float gain, float pan);
 
     /// <summary>
@@ -197,10 +236,10 @@ public interface ITrackMixer
     /// already sounding on the track.
     /// </summary>
     /// <remarks>
-    /// The one place in this engine where a track's last note is not cut. Everywhere else one
-    /// voice to a track is the rule and glide, legato and the tracker's own habits are built on
-    /// it; a kit is the exception, because a crash has to go on ringing under the snare that
-    /// follows it. The only thing that stops a pad is another pad in its choke group.
+    /// The one place in this engine where nothing is done about the note before. Everywhere
+    /// else the instrument says what happens to it; a kit has already answered that question
+    /// with its choke groups, because a crash has to go on ringing under the snare that follows
+    /// it and the only thing that stops a pad is another pad in its group.
     ///
     /// The pad's own note is passed as the base note as well, so the ratio comes out at one and
     /// nothing is resampled. That is the machine: a key chooses which recording sounds, not how
@@ -216,10 +255,12 @@ public interface ITrackMixer
     /// the ratio comes out at one; here the zone's own root goes in, so the note decides how
     /// fast to read. That one word is the whole difference between BongaBong and Zampler.
     ///
-    /// And unlike a kit, the track's last note is cut: this is an instrument rather than a rack
-    /// of them, and one voice to a track is how the tracker has always played one.
+    /// And unlike a kit, room is made on the track for the note: this is an instrument rather
+    /// than a rack of them, and what a note does to the one before it is the instrument's to
+    /// say.
     /// </remarks>
-    void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain, float pan);
+    void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note,
+                float gain, float pan, VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
     /// <param name="patch">The sound being built.</param>

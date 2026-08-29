@@ -1,7 +1,7 @@
 # Polyphony
 
-Not built. This is the plan, written down while the reading was fresh, so whoever picks it up
-starts from what the code already does rather than from the beginning.
+Half built. The new note action is in, note columns are not, and this is what was decided,
+what it cost and what is left.
 
 ## Two features share the word
 
@@ -15,12 +15,12 @@ still sounding, what happens to the old voice? Cut it, let it release, or leave 
 release, a piano part in a single column overlaps by itself, because the previous note is still
 decaying while the next one starts.
 
-They are orthogonal and they cost wildly different amounts here. One is a setting and a method
-that already exists; the other is the pattern editor. Take them in that order.
+They are orthogonal and they cost wildly different amounts here. One was a setting and two
+methods that already existed; the other is the pattern editor. They were taken in that order.
 
-## What a track is today
+## What a track is
 
-One note, and the code says so in three places.
+One note, in one column, and three places said so:
 
 ```
 Pattern             TrackerCell[line * TrackCount + track]      one cell per track per line
@@ -28,44 +28,65 @@ TrackMixer.NoteOn   Cut(track) before the new voice is added    "one voice per t
 PluginNoteOn        instrument.AllNotesOff() before NoteOn      "one note a track"
 ```
 
-The audio side has nothing to learn, which is the part worth knowing before estimating any of
-this. Auditions are already polyphonic through the same mixer: a voice played by hand carries
+The second and third have moved. `MakeWay` is what makes room now and it does what the
+instrument asks; `PluginNoteOn` sends a note off for the note it remembers rather than all
+notes off. The first is the pattern and is the whole of what note columns are.
+
+The audio side had nothing to learn, which is the part worth knowing before estimating any of
+this. Auditions were already polyphonic through the same mixer: a voice played by hand carries
 `SynthVoice.NoTrack` and an `Audition` id instead of a track, and they pile up until the
-instrument says `OneVoice`. Voices already carry an owner, tracks already render on their own
-bus, and 48 of them already sum. What is monophonic here is the pattern and the cut, not the
-engine.
+instrument says `OneVoice`. Voices already carried an owner, tracks already rendered on their
+own bus, and 48 of them already summed. What was monophonic here was the pattern and the cut,
+not the engine.
 
-## New note action, which is nearly built
+## New note action, which is built
 
-`IVoice` already has both endings, and they are different methods:
+`Tracker/Enums/VoiceEnding.cs`: cut, release, sustain, on `TrackerInstrument.NewNoteAction`
+beside `OneVoice`, cut being the default so nothing anybody had already made changed. Renoise
+offers exactly the same three (`NEW_NOTE_ACTION_NOTE_CUT`, `NOTE_OFF`, `SUSTAIN`, from
+`renoise/song/instrument/sample.lua`), having dropped Impulse Tracker's fourth, Fade, which
+needs a fadeout rate no patch here has.
+
+`IVoice` already had both endings and they were already different methods, so the voice half
+was a choice between two calls that both existed:
 
 ```
-SynthVoice.Cut()       NoteOff(CutSeconds)   a 4ms fade, what a new note does today
+SynthVoice.Cut()       NoteOff(CutSeconds)   a 4ms fade, what a new note did everywhere
 SynthVoice.NoteOff()   the patch's release   what a pattern's OFF does
 ```
 
-So the action is a choice between two calls that both exist, plus the third case of making
-neither. Renoise offers exactly three (`NEW_NOTE_ACTION_NOTE_CUT`, `NOTE_OFF`, `SUSTAIN`, from
-`renoise/song/instrument/sample.lua`), having dropped Impulse Tracker's fourth, Fade, which
-needs a fadeout rate no patch here has. Three is the right number.
+`TrackMixer.MakeWay` is that choice, held under the mixer's lock because what it decides about
+has to still be true when the new voice is added. The same note arriving where it is already
+sounding is cut under all three: two copies of one note are a retrigger everywhere in music,
+and letting them pile up is how a sustaining part walks into `MaxVoices` and starts stealing.
 
-Where it goes: on `TrackerInstrument`, beside `OneVoice`, because it is a fact about the sound
-and not about the track. `RecordingPatch` and `RecordingValues` already show how a flag is
-stored and offered as a machine parameter. Cut stays the default, so nothing anybody has
-already made changes.
+**Per-note offs for plugins** was the real work, as expected, and it is also the piece note
+columns cannot do without. A plugin cannot be asked what it is holding, so the host remembers
+what it said: `HeldNotes` is that record, one per track and one for the audition slot, bounded
+at sixteen and stealing its oldest when it is full. Every method that lets go writes the notes
+out to the caller rather than ending them itself, because the mixer holds a lock while it
+decides and may not hold one while it talks to a plugin. Where nothing is remembered the whole
+plugin is still asked to let go, which is what that path always did and costs one message on
+the first note after a stop.
 
-Two things need building rather than choosing.
+Two things fell out of that record and were taken:
 
-**Per-note offs for plugins.** `PluginNoteOn` calls `AllNotesOff()` before every note, which is
-correct for one voice and wrong for anything else. `IPluginInstrument.NoteOff(int semitone)`
-already exists; the mixer has to remember which note each track is holding, and later which
-note each column is. This is the only real work in this half, and it is also the piece note
-columns need, which is the second reason to do this first.
+- A note played by hand on a plugin now piles up like every other audition, each let go of at
+  its own moment rather than the panel holding one moment for whatever it last played. A chord
+  is several keys and they are not pressed at one instant, so one moment for all of them meant
+  the first key outliving its own hold by however long the hand took.
+- A key coming up on a plugin ends that key's note. It ended nothing before: there was no way
+  to name one note, so `LetPreview` had a plugin branch that did nothing at all.
 
-**Duplicate check.** Without it a fast run in release mode reaches `MaxVoices` and steals.
-Stealing already works and takes the oldest first, so the failure is graceful rather than a
-crash, but Impulse Tracker's rule is worth having: the same note arriving on the same track
-cuts the previous instance of that note. A few lines inside `Cut`.
+The kit is left out on purpose. Its answer to the same question is its choke groups, and a
+crash has to ring under the snare that follows it. So BongaBong has no `new_note` on its face
+and `TrackMixer`'s pad overload is the one place that still makes no room at all.
+
+Where it shows: `new_note` on Recording, Zampler, OddSkilla and Ouroboros, a three position
+switch in each machine's own design, next to the voices switch on Recording and in the
+amplifier group on the other three. It is a machine parameter like any other, so it is saved
+with a preset, pointable from a controller and automatable, and a machine written by somebody
+else can draw it or leave it out.
 
 ## Note columns, which is the editor's work
 
@@ -123,16 +144,16 @@ because doing nothing looks like working.
 ## Effort
 
 ```
-new note action, three actions                    half a day
-per-note plugin offs, and the note bookkeeping    a day, and note columns need it too
+new note action, three actions                    done
+per-note plugin offs, and the note bookkeeping    done, and note columns need it too
 column axis: pattern, file, sequencer, mixer      two days
 cursor, metrics, selection, entry, history        three to four days, all of it interface
 ```
 
 ## Decided already
 
-- New note action first. It is a day, it is worth having on its own, and it builds the per-note
-  plugin bookkeeping that note columns cannot do without.
+- New note action first, which is done. It was worth having on its own and it built the
+  per-note plugin bookkeeping that note columns cannot do without.
 - Three actions, cut, release and sustain, cut being the default. Renoise's set, for Renoise's
   reason: fade needs a rate no patch here has.
 - The action belongs to the instrument, beside `OneVoice`, not to the track.
@@ -149,7 +170,9 @@ cursor, metrics, selection, entry, history        three to four days, all of it 
   one voice of a chord would set the level of the others.
 - Whether `MaxVoices`, 48, still holds. Eight tracks of four-note chords in release is over it,
   and stealing the oldest during a sustained chord is audible in a way that stealing during a
-  monophonic part is not.
+  monophonic part is not. Sustain makes this reachable today, before note columns exist at all.
+- Whether a track's ending should be readable from the pattern. A track left sustaining looks
+  exactly like a track that is not, until you wonder why the mix is filling up.
 - Column mutes and column names, which Renoise has. Cheap once the axis exists, and no use at
   all until somebody has written a chord with them.
 - Whether a track's insert chain and a future automation lane stay per track. They should:

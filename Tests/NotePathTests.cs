@@ -15,8 +15,9 @@ namespace JingleBox2.Tests;
 /// Both halves of a press have to arrive, and they have to name the same note, or whoever is
 /// holding the light has nothing to put it out with.
 ///
-/// <see cref="MidiService.Read"/> and <see cref="INoteTrigger"/> are both public, so the whole
-/// of it can be played without a keyboard plugged in.
+/// <see cref="MidiService.Read(string, byte[], int, int, out int)"/> and
+/// <see cref="INoteTrigger"/> are both public, so the whole of it can be played without a
+/// keyboard plugged in.
 /// </remarks>
 public class NotePathTests
 {

@@ -83,6 +83,9 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
     /// <summary>Whether a new key cuts the one still ringing.</summary>
     private const string OneVoiceKey = "one_voice";
 
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    private const string NewNoteKey = "new_note";
+
     /// <summary>The amplifier envelope: how long the note takes to come up.</summary>
     private const string AttackKey = "attack";
 
@@ -188,6 +191,7 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
         LoopEndKey => instrument.Shape?.LoopEnd ?? 1,
         ReverseKey => instrument.Shape?.Reverse == true ? 1 : 0,
         OneVoiceKey => instrument.OneVoice ? 1 : 0,
+        NewNoteKey => (double)instrument.NewNoteAction,
         AttackKey => Voice.AttackMs,
         DecayKey => Voice.DecayMs,
         SustainKey => Voice.Sustain,
@@ -226,6 +230,8 @@ public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? s
             LoopEndKey => Number(instrument.Shape?.LoopEnd ?? Most, value, Least, Most, v => Window.LoopEnd = v),
             ReverseKey => Flag(instrument.Shape?.Reverse == true, value, v => Window.Reverse = v),
             OneVoiceKey => Flag(instrument.OneVoice, value, v => instrument.OneVoice = v),
+            NewNoteKey => Moved((int)instrument.NewNoteAction, value, 0, (int)VoiceEnding.Sustain,
+                at => instrument.NewNoteAction = (VoiceEnding)at),
             AttackKey => Number(Voice.AttackMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxAttackMs, v => Voice.AttackMs = v),
             DecayKey => Number(Voice.DecayMs, value, SynthPatch.MinTimeMs, SynthPatch.MaxDecayMs, v => Voice.DecayMs = v),
             SustainKey => Number(Voice.Sustain, value, SynthPatch.MinSustain, SynthPatch.MaxSustain, v => Voice.Sustain = v),

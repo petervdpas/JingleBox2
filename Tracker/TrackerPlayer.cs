@@ -306,6 +306,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
     {
         if (instrument == null || !note.IsPlayable) return;
 
+        if (instrument.IsPlugin)
+        {
+            int playing = TrackPlaying(instrument.Id);
+
+            if (playing >= 0) _synth.Mixer.LetPluginNote(playing, note.Semitone);
+            else _synth.Mixer.LetPreviewNote(note.Semitone);
+
+            return;
+        }
+
         _synth.Mixer.LetAudition(instrument.Id, note.Semitone);
     }
 
@@ -321,6 +331,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// An instrument whose machine is not registered here makes no sound at all, and answers
     /// with no length, so nothing lights and nothing waits for it to finish. It is on that
     /// machine, and without it there is nothing here to play.
+    ///
+    /// A plugin's notes pile up here as every other machine's audition already did, since a
+    /// hand plays chords. <see cref="TrackerInstrument.OneVoice"/> is what asks for the other
+    /// behaviour, and it is asked here rather than in the mixer because it is a fact about the
+    /// instrument and the mixer is handed a track.
     /// </remarks>
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
@@ -345,16 +360,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
                 playing = TrackPlaying(instrument.Id);
             }
 
+            var ending = instrument.OneVoice ? VoiceEnding.Cut : VoiceEnding.Sustain;
+
             if (playing >= 0)
             {
-                _synth.Mixer.PreviewOnTrack(playing, note, level, PreviewHoldSeconds);
+                _synth.Mixer.PreviewOnTrack(playing, note, level, PreviewHoldSeconds, ending);
                 return PreviewHoldSeconds;
             }
 
             var player = PreviewPlayerFor(instrument);
             if (player == null) return 0;
 
-            _synth.Mixer.PreviewPlugin(note, level, PreviewHoldSeconds);
+            _synth.Mixer.PreviewPlugin(note, level, PreviewHoldSeconds, ending);
             return PreviewHoldSeconds;
         }
 
@@ -1132,9 +1149,10 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// Starts a note on a track, on whichever machine that track's instrument is.
     /// </summary>
     /// <remarks>
-    /// One voice per track, as a tracker has always worked: the mixer cuts whatever that track
-    /// was sounding, whichever kind of instrument it was. A plugin holds its own notes, so the
-    /// track's voices are let go rather than left ringing underneath it.
+    /// Room is made on the track first, and what that means is the instrument's to say through
+    /// <see cref="TrackerInstrument.NewNoteAction"/>: cut, which is what a tracker has always
+    /// done, release, or nothing at all. A plugin holds its own notes, so the track's voices
+    /// are let go rather than left ringing underneath it.
     ///
     /// The note is announced once, before the kinds part company: a note played on a plugin is
     /// as much a note this track played as one played on Ouroboros. With no length, since a note
@@ -1174,12 +1192,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         if (instrument.IsPlugin)
         {
-            _synth.Mixer.NoteOff(e.Track);
+            LetGo(instrument, e.Track);
 
             if (PlayerFor(e.Track, instrument) != null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "sent to its plugin");
-                _synth.Mixer.PluginNoteOn(e.Track, e.Note, mixed, placed ?? 0f);
+                _synth.Mixer.PluginNoteOn(e.Track, e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
             }
             else
             {
@@ -1196,7 +1214,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (zone == null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "no zone on its map answers to that note");
-                _synth.Mixer.NoteOff(e.Track);
+                LetGo(instrument, e.Track);
                 return;
             }
 
@@ -1205,7 +1223,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (zoneSample == null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "its zone's recording would not load");
-                _synth.Mixer.NoteOff(e.Track);
+                LetGo(instrument, e.Track);
                 return;
             }
 
@@ -1213,7 +1231,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             _synth.Mixer.NoteOn(
                 e.Track, zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, e.Note,
-                (float)(mixed * zone.Volume), Placed(placed, zone.Pan));
+                (float)(mixed * zone.Volume), Placed(placed, zone.Pan), instrument.NewNoteAction);
 
             return;
         }
@@ -1249,14 +1267,15 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
             _synth.Mixer.NoteOn(e.Track, instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
-                e.Note, mixed, placed ?? 0f);
+                e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
             return;
         }
 
         if (instrument.IsSynth)
         {
             Where(e.Track, e.Instrument, instrument, song, "played as a synth voice");
-            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f);
+            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f,
+                instrument.NewNoteAction);
             return;
         }
 
@@ -1264,12 +1283,33 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (sample == null)
         {
             Where(e.Track, e.Instrument, instrument, song, "its recording would not load, so nothing was played");
-            _synth.Mixer.NoteOff(e.Track);
+            LetGo(instrument, e.Track);
             return;
         }
 
         Where(e.Track, e.Instrument, instrument, song, "played as a recording");
         _synth.Mixer.NoteOn(e.Track, instrument, sample, e.Note, mixed, placed ?? 0f);
+    }
+
+    /// <summary>
+    /// Lets go of what a track was sounding where the note meant to follow it is not going to
+    /// be added to that track's voices.
+    /// </summary>
+    /// <remarks>
+    /// Two of those: a note going to the track's plugin instead, which holds its own, and a
+    /// note that could not be played at all. Both used to end the track's voices outright, and
+    /// still do, because a track sounding the tail of an instrument it is no longer pointed at
+    /// is not something anybody asked for.
+    ///
+    /// Nothing is let go of under <see cref="VoiceEnding.Sustain"/>. That is the whole of what
+    /// sustain asks for, and a note that could not be played is not a reason to end the ones
+    /// that could.
+    /// </remarks>
+    private void LetGo(TrackerInstrument instrument, int track)
+    {
+        if (instrument.NewNoteAction == VoiceEnding.Sustain) return;
+
+        _synth.Mixer.NoteOff(track);
     }
 
     /// <summary>What the last note on each track was addressed to, so it is said once a second.</summary>

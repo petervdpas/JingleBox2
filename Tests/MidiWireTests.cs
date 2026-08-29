@@ -8,10 +8,10 @@ namespace JingleBox2.Tests;
 /// What comes off the wire, and what it is read as.
 /// </summary>
 /// <remarks>
-/// <see cref="MidiService.Read"/> is public for exactly this: it holds the running status per
-/// device, which is the one rule here subtle enough to be worth checking away from hardware, and
-/// getting it wrong meant every message after the first arriving two bytes long and vanishing
-/// without a word.
+/// <see cref="MidiService.Read(string, byte[], int, int)"/> is public for exactly this: it
+/// holds the running status per device, which is the one rule here subtle enough to be worth
+/// checking away from hardware, and getting it wrong meant every message after the first
+/// arriving two bytes long and vanishing without a word.
 ///
 /// The tests run in the order the wire is read: the channel messages first (notes, controllers,
 /// running status, pitch bend), then the statuses that take one data byte rather than two, then

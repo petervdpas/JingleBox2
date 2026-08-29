@@ -3,7 +3,7 @@
   "Name": "OddSkilla",
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
-  "Version": "1.01",
+  "Version": "1.02",
   "Engine": "",
   "Theme": {
     "Accent": "#E2A03F",
@@ -124,6 +124,16 @@
       "Max": 6,
       "Default": 0,
       "Step": 0.5
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "cutoff",
@@ -452,6 +462,16 @@
                     "span": "3",
                     "ticks": "6,0,-12,-40",
                     "tip": "Unity is 0 dB, and above it is makeup gain."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Switch",
+                  "Parameter": "new_note",
+                  "Label": "",
+                  "Properties": {
+                    "options": "Cut,Release,Sustain",
+                    "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
                   },
                   "Children": []
                 }

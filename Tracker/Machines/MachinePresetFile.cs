@@ -142,8 +142,8 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
                 var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
                 var patch = new SamplerPatchViewModel(sound.Sampler, () => { });
 
-                wide = new SamplerValues(zones, patch);
-                inside = at => new SamplerValues(zones, patch, () => zones.Zones[at]);
+                wide = new SamplerValues(zones, patch, sound);
+                inside = at => new SamplerValues(zones, patch, sound, () => zones.Zones[at]);
                 which = blocks.IndexOf;
             }
             else
@@ -151,7 +151,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
                 if (kind == TrackerInstrumentKind.Synth)
                     wide = new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound);
                 else if (kind == TrackerInstrumentKind.MonoSynth)
-                    wide = new MonoSynthValues(Mono(sound));
+                    wide = new MonoSynthValues(Mono(sound), sound);
                 else
                     loose = new RecordingValues(sound);
             }
@@ -229,7 +229,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
             var zones = new ZoneMapViewModel(sound.Zones, () => { }, _ => { });
             var patch = new SamplerPatchViewModel(sound.Sampler, () => { });
 
-            var settings = new SamplerValues(zones, patch);
+            var settings = new SamplerValues(zones, patch, sound);
 
             foreach (string key in owned.OutsideWords) held[key] = settings.GetText(key);
             foreach (string key in owned.Outside) held[key] = JsonValue.Create(settings.Get(key));
@@ -241,7 +241,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
                 var zone = one;
 
                 held[Once(zone.Title, used)] =
-                    Block(new SamplerValues(zones, patch, () => zone), owned, home);
+                    Block(new SamplerValues(zones, patch, sound, () => zone), owned, home);
             }
 
             return held.ToJsonString(Layout);
@@ -253,7 +253,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
         {
             TrackerInstrumentKind.Synth =>
                 new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
-            TrackerInstrumentKind.MonoSynth => new MonoSynthValues(Mono(sound)),
+            TrackerInstrumentKind.MonoSynth => new MonoSynthValues(Mono(sound), sound),
             _ => new RecordingValues(sound),
         };
 

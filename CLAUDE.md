@@ -232,8 +232,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   fader wherever you are; given the tracks' template it would have driven whichever track was
   selected, which is a knob doing something other than what you pointed it at
 - `TrackMixer` (Tracker/Synth/): The song's tracks, summed. A bus, a level, a pan, an insert
-  chain, a ducker and an instrument apiece, and one voice per track the tracker way: a new note
-  cuts the one still ringing. Auditions carry no track at all and pile up, which is why a
+  chain, a ducker and an instrument apiece, and room made on a track for each new note the way
+  that track's instrument asks for it: cut, which is what a tracker has always done, release or
+  sustain. Auditions carry no track at all and pile up, which is why a
   panel's keyboard cannot be heard on a strip or turned down by one. It was called `SynthMixer`,
   which was true when it summed synth voices and nothing else; it grew all of the above and went
   on wearing the old name, which said the wrong thing about the one class the whole mix goes
@@ -534,7 +535,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-835 of them, in about three seconds, with no window and no hardware. They run in CI on every push
+877 of them, in about three seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -558,6 +559,18 @@ parking, device roles, controller profiles and codecs, shortcuts, all four histo
 and their edits, a song being written down and poured back, the mix, envelopes, portable paths,
 the screen's bytes, the transport's two dialects, and the Lua fence. Several of those tests exist
 because that exact thing was wrong once.
+
+And the three endings a new note can give the one before it, which are counted rather than
+listened to: a cut is four milliseconds, a release is the patch's own and a sustain is neither,
+so how many voices are alive after a given stretch of rendering says which of the three
+happened without anybody measuring a waveform. The plugin half cannot be counted that way,
+because a plugin holds its own voices, so it is asked instead: a plugin that makes no sound and
+writes down every note on and note off it is sent, which is the only way to check the one thing
+a host has to get right there. And once, out of caution, the buffer itself, since a voice alive
+in the list and silent in the audio would pass every count. That measurement had to be taken at
+a low level: at full level one loud sine is driven most of the way to a square by the master's
+saturation and two a fifth apart cancel at the bottom of every beat, so the pair reads quieter
+than the one and the test says the opposite of the truth.
 
 And the seams the second pass made: the filters, the drive curve, the sample window and its
 loop, the ducker, pitch motion, the WAV reader, peak normalisation, naming a take, the log's
@@ -866,14 +879,44 @@ whole exercise and is worth writing down rather than summarising:
 - The typed view is not built: a parameter column in the pattern, which shares its whole
   foundation with note columns. The split is by the nature of the data, deliberate changes typed
   and recorded gestures drawn, because no column can display a hundred values a second
-- Polyphony is not built, and it is two features sharing a word. `docs/polyphony.md` is
-  the plan. A new note action (what happens to the voice a new note lands on) is a setting and
-  two methods `SynthVoice` already has, `Cut` being a 4ms fade and `NoteOff` the patch's own
-  release, so it costs a day and the only real work in it is per-note offs for plugins, which
-  `PluginNoteOn` does not do today. Note columns, a track playing chords, are a week and all of
-  it is the pattern and its editor: the audio side has nothing to learn, since auditions are
-  already polyphonic through the same mixer and a track already renders on its own bus. The
+- Polyphony is two features sharing a word, and one of them is built. `docs/polyphony.md` is
+  the plan and now also the record. Note columns, a track playing chords, are still a week and
+  all of it is the pattern and its editor: the audio side has nothing to learn, since auditions
+  are already polyphonic through the same mixer and a track already renders on its own bus. The
   numbers came off the Renoise 3.5.4 install rather than from memory
+- **What a new note does to the one still sounding is the instrument's to say.** `VoiceEnding`
+  is cut, release or sustain, on `TrackerInstrument.NewNoteAction`, cut being what a tracker has
+  always done and therefore the default: nothing anybody had already made sounds any different
+  for this existing. On the instrument rather than on the track because it is a fact about the
+  sound, a piano overlapping and a bass not, wherever either is played, which is also why it
+  travels with a preset. Renoise's three, for Renoise's reason: Impulse Tracker's fourth, Fade,
+  needs a fadeout rate no patch here has. `TrackMixer.MakeWay` is the whole of it for voices,
+  since `IVoice` already had both endings as two methods. The same note arriving where it is
+  already sounding is cut under all three, because two copies of one note are a retrigger
+  everywhere in music and letting them pile up is how a sustaining part walks into `MaxVoices`
+  and starts stealing notes somebody meant to hear
+- A kit answers the same question with its choke groups and is left out of it: a crash has to
+  ring under the snare that follows it. So BongaBong is the one machine with no `new_note` on
+  its face, and the pad overload is the one place in the mixer that still makes no room at all
+- **A plugin cannot be asked what it is holding, so the host writes down what it said.**
+  `HeldNotes` is that record, one per track and one for the audition slot. Without it the only
+  thing a host can say is all notes off, which is right for one note a track and takes a whole
+  chord down to end one note of it. Bounded at sixteen and stealing its oldest when it is full,
+  which is the answer `MaxVoices` gives and for the same reason: a limit that grows is a limit
+  that fails further away, on the audio thread, after somebody has left a part sustaining for
+  an hour. Every method that lets go writes the notes out to the caller rather than ending them
+  itself, because the mixer holds a lock while it decides and may not hold one while it talks
+  to a plugin, and that is also what lets the record be put a question to without a plugin, a
+  process or a sound card. Where nothing is remembered the whole plugin is still asked to let
+  go, which is what that path always did and is worth keeping: the record is what this side
+  said, and a plugin sent a note by anything else is exactly what a per-note off cannot reach
+- Two things fell out of that record and were taken. A note played by hand on a plugin piles up
+  like every other audition now, each let go of at its own moment rather than the panel holding
+  one moment for whatever it last played: a chord is several keys and they are not pressed at
+  one instant, so one moment for all of them meant the first key of a chord outliving its own
+  hold by however long the hand took to finish the chord. And a key coming up ends that key's
+  note, where before it ended nothing, since there was no way to name one note and
+  `LetPreview`'s plugin branch did not exist
 - A controller with a screen is written to: `ArturiaDisplay` puts the parameter's name, its
   reading and a value bar on a MiniLab 3 while a knob is turned. Arturia's own system exclusive,
   on the device's main port, and only while it is in a DAW mode. `MidiService.Send` opens an

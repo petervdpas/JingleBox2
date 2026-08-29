@@ -1,6 +1,7 @@
 using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Enums;
 
 namespace JingleBox2.Tracker.Machines;
@@ -24,8 +25,15 @@ namespace JingleBox2.Tracker.Machines;
 /// machine.json written by a later version has to open on an older app rather than take it down.
 /// </remarks>
 /// <param name="patch">The oscillator, the filter, the envelope and the two routes.</param>
-public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValues
+/// <param name="instrument">
+/// Whose new note action it is. On the instrument rather than on the patch, because it is not
+/// part of the sound this machine makes: it is what the tracker does with the note before.
+/// </param>
+public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
 {
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    private const string NewNoteKey = "new_note";
+
     /// <summary>The oscillator: which shape the wave is.</summary>
     /// <remarks>
     /// The keys are written out one by one, never built from a name or a loop, so every key in
@@ -142,6 +150,8 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
         VcfAmountKey => patch.VcfModAmount,
         VcfPolarityKey => patch.VcfModInverted ? 1 : 0,
 
+        NewNoteKey => (double)instrument.NewNoteAction,
+
         _ => 0,
     };
 
@@ -190,6 +200,9 @@ public sealed class MonoSynthValues(MonoSynthPatchViewModel patch) : MachineValu
                 at => patch.VcfModSource = (ModSource)at),
             VcfAmountKey => Moved(patch.VcfModAmount, value, () => patch.VcfModAmount = value),
             VcfPolarityKey => Flagged(patch.VcfModInverted, value, on => patch.VcfModInverted = on),
+
+            NewNoteKey => Moved((int)instrument.NewNoteAction, value, 0, (int)VoiceEnding.Sustain,
+                at => instrument.NewNoteAction = (VoiceEnding)at),
 
             _ => false,
         };

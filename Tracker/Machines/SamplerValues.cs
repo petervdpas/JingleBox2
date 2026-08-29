@@ -30,6 +30,7 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 /// <param name="map">The zones these settings are on.</param>
 /// <param name="patch">The filter and the two envelopes they all go through.</param>
+/// <param name="instrument">Whose new note action it is, which belongs to none of the zones.</param>
 /// <param name="about">
 /// Which zone, or nothing for whichever is in hand. The panel wants the zone in hand, because
 /// that is what a front panel shows; a preset wants a named one, because a preset holds the
@@ -39,8 +40,15 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class SamplerValues(
     ZoneMapViewModel map,
     SamplerPatchViewModel patch,
+    TrackerInstrument instrument,
     Func<SampleZoneViewModel?>? about = null) : MachineValues
 {
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    /// <remarks>
+    /// The instrument's rather than this machine's, and not a zone's: a map is one instrument
+    /// however many recordings are on it, and a track plays one of them at a time.
+    /// </remarks>
+    private const string NewNoteKey = "new_note";
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
 
@@ -225,6 +233,8 @@ public sealed class SamplerValues(
         ReleaseKey => patch.ReleaseMs,
         LevelOutKey => patch.Volume,
 
+        NewNoteKey => (double)instrument.NewNoteAction,
+
         _ => 0,
     };
 
@@ -285,6 +295,11 @@ public sealed class SamplerValues(
         switch (key)
         {
             case ChoppedKey: moved = Moved(map.Map.Sliced, value, on => map.Map.Sliced = on); break;
+
+            case NewNoteKey:
+                moved = Moved((int)instrument.NewNoteAction, value, 0, (int)VoiceEnding.Sustain,
+                    at => instrument.NewNoteAction = (VoiceEnding)at);
+                break;
 
             case CutoffKey: moved = Moved(patch.Cutoff, value, () => patch.Cutoff = value); break;
             case ResonanceKey: moved = Moved(patch.Resonance, value, () => patch.Resonance = value); break;

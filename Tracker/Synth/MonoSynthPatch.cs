@@ -79,9 +79,9 @@ public sealed class MonoSynthPatch
     /// How long a note takes to slide from the last one to its own pitch. Zero is off.
     /// </summary>
     /// <remarks>
-    /// The thing this machine has that nothing here had. A tracker is one voice to a track, so
-    /// every note follows the one before it, which is exactly the arrangement glide was made
-    /// for: a bass line slides rather than steps.
+    /// The thing this machine has that nothing here had. A track cuts one note as it starts
+    /// the next unless it is told otherwise, so every note follows the one before it, which is
+    /// exactly the arrangement glide was made for: a bass line slides rather than steps.
     /// </remarks>
     public double GlideMs { get; set; }
 

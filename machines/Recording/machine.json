@@ -3,7 +3,7 @@
   "Name": "Recording",
   "Summary": "One of your recordings, pitched by resampling.",
   "Author": "Peter van de Pas",
-  "Version": "1.02",
+  "Version": "1.03",
   "Engine": "",
   "Theme": {
     "Accent": "#3FA6A0",
@@ -93,6 +93,16 @@
       "Unit": "",
       "Min": 0,
       "Max": 1,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
       "Default": 0,
       "Step": 1,
       "Saved": true
@@ -434,7 +444,17 @@
                           "Properties": {
                             "on": "One",
                             "off": "Many",
-                            "tip": "One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. A track is one voice either way."
+                            "tip": "One: a key played by hand stops the note before it. Many: they sound over each other, as a keyboard does. This is about the panel's own keys; what a track does is New note, beside it."
+                          },
+                          "Children": []
+                        },
+                        {
+                          "Element": "Switch",
+                          "Parameter": "new_note",
+                          "Label": "",
+                          "Properties": {
+                            "options": "Cut,Release,Sustain",
+                            "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
                           },
                           "Children": []
                         }

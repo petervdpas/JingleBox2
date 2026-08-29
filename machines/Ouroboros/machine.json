@@ -3,7 +3,7 @@
   "Name": "Ouroboros",
   "Summary": "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
   "Author": "Peter van de Pas",
-  "Version": "1.01",
+  "Version": "1.02",
   "Engine": "",
   "Theme": {
     "Accent": "#9B6DD6",
@@ -115,6 +115,16 @@
       "Max": 2,
       "Default": 0.5,
       "Step": 0.01
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "attack",
@@ -471,6 +481,16 @@
                         "dial": "40",
                         "headroom": "50",
                         "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
                       },
                       "Children": []
                     }

@@ -42,8 +42,8 @@ public sealed class DrumPad
     /// <remarks>
     /// What a hihat needs and nothing else does: the closed one has to stop the open one dead,
     /// because on a real kit the same piece of metal cannot be doing both. Everything else on
-    /// a kit rings over everything else, which is why a kit does not take the tracker's usual
-    /// one voice to a track.
+    /// a kit rings over everything else, which is why a kit is the one machine that is not
+    /// asked what a new note should do to the one before it: its choke groups are that answer.
     /// </remarks>
     public int Choke { get; set; }
 

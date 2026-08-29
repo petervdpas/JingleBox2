@@ -39,6 +39,9 @@ public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
     /// <summary>Whether a new key cuts the one still ringing.</summary>
     private const string OneVoiceKey = "oneVoice";
 
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    private const string NewNoteKey = "newNote";
+
     /// <summary>Which part of the take plays, and whether it loops.</summary>
     private const string WindowKey = "window";
 
@@ -61,6 +64,7 @@ public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
         writer.WriteNumber(BaseNoteKey, instrument.BaseNoteSemitone);
         writer.WriteNumber(LevelKey, instrument.Volume);
         writer.WriteBoolean(OneVoiceKey, instrument.OneVoice);
+        writer.WriteNumber(NewNoteKey, (int)instrument.NewNoteAction);
 
         writer.WritePropertyName(WindowKey);
         JsonSerializer.Serialize(writer, instrument.Shape ?? new SampleShape(), Layout);
@@ -97,6 +101,12 @@ public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
             (one.ValueKind == JsonValueKind.True || one.ValueKind == JsonValueKind.False))
         {
             instrument.OneVoice = one.GetBoolean();
+        }
+
+        if (json.TryGetProperty(NewNoteKey, out var ending) && ending.TryGetInt32(out int action)
+            && action >= 0 && action <= (int)Enums.VoiceEnding.Sustain)
+        {
+            instrument.NewNoteAction = (Enums.VoiceEnding)action;
         }
 
         if (json.TryGetProperty(WindowKey, out var window) && window.ValueKind == JsonValueKind.Object)

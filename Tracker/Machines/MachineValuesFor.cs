@@ -29,7 +29,7 @@ public sealed class MachineValuesFor : IMachineValuesFor
             case TrackerInstrumentKind.MonoSynth:
                 instrument.MonoSynth ??= new MonoSynthPatch();
 
-                return new MonoSynthValues(mono ?? new MonoSynthPatchViewModel(instrument.MonoSynth, Nothing));
+                return new MonoSynthValues(mono ?? new MonoSynthPatchViewModel(instrument.MonoSynth, Nothing), instrument);
 
             case TrackerInstrumentKind.Kit:
                 instrument.Kit ??= DrumKit.Empty(1);
@@ -42,7 +42,8 @@ public sealed class MachineValuesFor : IMachineValuesFor
 
                 return new SamplerValues(
                     zones ?? new ZoneMapViewModel(instrument.Zones, Nothing, _ => { }),
-                    sampler ?? new SamplerPatchViewModel(instrument.Sampler, Nothing));
+                    sampler ?? new SamplerPatchViewModel(instrument.Sampler, Nothing),
+                    instrument);
 
             case TrackerInstrumentKind.Sample:
                 return new RecordingValues(instrument, shelf);

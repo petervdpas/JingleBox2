@@ -2,6 +2,7 @@ using JingleBox2.Machines;
 using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Enums;
 using JingleBox2.UI.Interfaces;
 
@@ -75,6 +76,13 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// The instrument's, not the patch's: it sits on top of whatever the wave comes out at, and
     /// it is the same setting on every machine here, which is why they all read it the same way.
     /// </remarks>
+    /// <summary>What a new note does to the one the track is still sounding.</summary>
+    /// <remarks>
+    /// The instrument's rather than the patch's, like the level above it: it is not part of
+    /// the sound this machine makes, it is what the tracker does with the note before.
+    /// </remarks>
+    private const string NewNoteKey = "new_note";
+
     private const string LevelKey = "level";
 
     /// <summary>The filter: where it opens to.</summary>
@@ -153,6 +161,8 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
 
         CyclesKey => _cycles,
 
+        NewNoteKey => (double)instrument.NewNoteAction,
+
         _ => 0,
     };
 
@@ -199,6 +209,9 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
             TremoloDepthKey => Moved(patch.TremoloDepth, value, () => patch.TremoloDepth = value),
 
             CyclesKey => Zoomed(value),
+
+            NewNoteKey => Moved((int)instrument.NewNoteAction, value, 0, (int)VoiceEnding.Sustain,
+                at => instrument.NewNoteAction = (VoiceEnding)at),
 
             _ => false,
         };

@@ -3,7 +3,7 @@
   "Name": "Zampler",
   "Summary": "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
   "Author": "Peter van de Pas",
-  "Version": "1.02",
+  "Version": "1.03",
   "Engine": "",
   "Theme": {
     "Accent": "#4E86D8",
@@ -275,6 +275,16 @@
       "Max": 1,
       "Default": 1,
       "Step": 0.01,
+      "Saved": true
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1,
       "Saved": true
     }
   ],
@@ -819,6 +829,16 @@
                       "Parameter": "level",
                       "Label": "",
                       "Properties": {},
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
+                      },
                       "Children": []
                     }
                   ]

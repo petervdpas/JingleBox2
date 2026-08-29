@@ -57,6 +57,20 @@ public sealed class TrackerInstrument
     public bool OneVoice { get; set; }
 
     /// <summary>
+    /// What happens to the note a track is still sounding when the next one lands on it.
+    /// </summary>
+    /// <remarks>
+    /// A fact about the sound and not about the track, which is why it is here: a piano part
+    /// wants the note before it to go on decaying and a bass line wants it gone, and both are
+    /// true wherever either is played. Cut is the default and is what a tracker has always
+    /// done, so nothing anybody has already made sounds any different for this existing.
+    ///
+    /// Not read on a kit, whose answer to the same question is its choke groups: a crash has to
+    /// ring under the snare that follows it, and only a pad in the same group stops another.
+    /// </remarks>
+    public VoiceEnding NewNoteAction { get; set; } = VoiceEnding.Cut;
+
+    /// <summary>
     /// Which part of the recording plays, and how it repeats. Null on an instrument written
     /// before samples had a shape at all, which is the one reliable sign that its envelope
     /// was never heard: see <see cref="EnsureShape"/>.
@@ -402,6 +416,7 @@ public sealed class TrackerInstrument
         Volume = other.Volume;
         Loop = other.Loop;
         OneVoice = other.OneVoice;
+        NewNoteAction = other.NewNoteAction;
         Shape = other.Shape?.Clone();
 
         PluginPath = other.PluginPath;
@@ -424,10 +439,16 @@ public sealed class TrackerInstrument
     ///
     /// A plugin's patch moves only between two instruments on the same plugin. Another
     /// plugin's state is not a preset for this one, it is a file it cannot read.
+    ///
+    /// <see cref="NewNoteAction"/> travels with the sound rather than with the machine, since
+    /// it is part of what the sound does: a preset for a pad that overlaps is not that preset
+    /// with the overlap taken off it.
     /// </remarks>
     public void TakeSoundFrom(TrackerInstrument other)
     {
         if (other is null || ReferenceEquals(other, this) || other.Kind != Kind) return;
+
+        NewNoteAction = other.NewNoteAction;
 
         switch (Kind)
         {
@@ -494,6 +515,7 @@ public sealed class TrackerInstrument
         Volume = Volume,
         Loop = Loop,
         OneVoice = OneVoice,
+        NewNoteAction = NewNoteAction,
         Shape = Shape?.Clone(),
         PluginPath = PluginPath,
         PluginId = PluginId,

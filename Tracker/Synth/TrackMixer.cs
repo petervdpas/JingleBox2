@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using JingleBox2.Audio.Plugins.Interfaces;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
 using JingleBox2.Tracker.Records;
 
@@ -143,9 +144,6 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <summary>How loud the audition plays, which is applied as its scratch is added in.</summary>
     private float _previewGain = 1f;
-
-    /// <summary>When the audition lets go of its note. Zero while nothing is being auditioned.</summary>
-    private long _previewUntil;
 
     /// <summary>How long the last block was, so the busses are only rebuilt when it changes.</summary>
     private int _bufferFrames;
@@ -430,7 +428,7 @@ public sealed class TrackMixer : ITrackMixer
             Shift(_inserts, from, to);
             Shift(_instrumentGain, from, to);
             Shift(_instrumentPan, from, to);
-            Shift(_heldUntil, from, to);
+            Shift(_pluginHeld, from, to);
             Shift(_ducking, from, to);
             Shift(_trackLevels, from, to);
 
@@ -466,9 +464,15 @@ public sealed class TrackMixer : ITrackMixer
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// What the one leaving was holding is forgotten along with it, and the notes are thrown
+    /// away rather than sent: it is being told to let go of everything in one message, which is
+    /// the right way to end a plugin that is on its way out of the slot.
+    /// </remarks>
     public void SetPreviewInstrument(IPluginInstrument? instrument)
     {
         IPluginInstrument? leaving;
+        Span<int> letting = stackalloc int[HeldNotes.Most];
 
         lock (_lock)
         {
@@ -476,7 +480,7 @@ public sealed class TrackMixer : ITrackMixer
             if (ReferenceEquals(leaving, instrument)) return;
 
             _preview = instrument;
-            _previewUntil = 0;
+            _previewHeld.LetAll(letting);
         }
 
         leaving?.AllNotesOff();
@@ -490,54 +494,193 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The hold is a wall clock instant rather than a count of samples, and the render checks
-    /// it once a block. A twentieth of a second is the shortest it will honour, since anything
-    /// less would be let go of in the same block it started in.
+    /// Each note is let go of at its own moment rather than the panel holding one moment for
+    /// whatever it last played: a chord is several keys and they are not pressed at one
+    /// instant, so one moment for all of them means the first key of a chord outliving its own
+    /// hold by however long the hand took to finish the chord.
     /// </remarks>
-    public void PreviewPlugin(Note note, float gain, double holdSeconds)
+    public void PreviewPlugin(Note note, float gain, double holdSeconds,
+                              VoiceEnding ending = VoiceEnding.Sustain)
     {
         if (!note.IsPlayable) return;
 
         IPluginInstrument? instrument;
+        Span<int> letting = stackalloc int[HeldNotes.Most];
+        int count;
 
         lock (_lock)
         {
             instrument = _preview;
             _previewGain = gain;
-            _previewUntil = Environment.TickCount64 + (long)(Math.Max(0.05, holdSeconds) * 1000);
+
+            count = instrument == null
+                ? 0
+                : MakeWay(_previewHeld, note.Semitone, Until(holdSeconds), ending, letting);
         }
 
         if (instrument == null) return;
 
-        instrument.AllNotesOff();
-        instrument.NoteOn(note.Semitone, 1f);
+        Play(instrument, note.Semitone, letting, count, ending);
     }
 
-    /// <summary>When a track's plugin lets go of a note played by hand. Zero when there is none.</summary>
-    private readonly long[] _heldUntil = new long[MaxTracks];
+    /// <summary>What each track's plugin has been told to play and has not been told to end.</summary>
+    /// <remarks>
+    /// One apiece and never null, so a note can be written down for a track whose plugin has
+    /// not loaded yet without anything having to be made on the way past. They move with the
+    /// track when the song moves it, since what a plugin is holding is the plugin's, not the
+    /// position's.
+    /// </remarks>
+    private readonly IHeldNotes[] _pluginHeld = PerTrack();
+
+    /// <summary>The same, for the instrument being auditioned off a track.</summary>
+    private readonly IHeldNotes _previewHeld = new HeldNotes();
 
     /// <summary>Reused, because this runs on the audio thread and must not make work for the collector.</summary>
-    private readonly List<IPluginInstrument> _letting = new(MaxTracks);
+    private readonly List<(IPluginInstrument Instrument, int Semitone)> _letting = new(MaxTracks);
+
+    /// <summary>A record per track, made once.</summary>
+    private static IHeldNotes[] PerTrack()
+    {
+        var held = new IHeldNotes[MaxTracks];
+
+        for (int track = 0; track < MaxTracks; track++) held[track] = new HeldNotes();
+
+        return held;
+    }
+
+    /// <summary>The moment a note played by hand should be let go of.</summary>
+    /// <remarks>
+    /// A wall clock instant rather than a count of samples, since the render checks it once a
+    /// block. A twentieth of a second is the shortest it will honour, because anything less
+    /// would be let go of in the same block it started in.
+    /// </remarks>
+    private static long Until(double holdSeconds) =>
+        Environment.TickCount64 + (long)(Math.Max(0.05, holdSeconds) * 1000);
+
+    /// <summary>
+    /// Decides what a plugin has to be told to let go of before it is told to start a note, and
+    /// writes those notes into <paramref name="letting"/>.
+    /// </summary>
+    /// <remarks>
+    /// Held under the lock, because it changes the record; the plugin is told outside it. A
+    /// plugin has one ending of its own, its release, so cut and release are the same thing
+    /// here and only sustain reads differently: under it nothing is let go of but the note
+    /// arriving again, which is a retrigger.
+    /// </remarks>
+    private static int MakeWay(IHeldNotes held, int semitone, long until, VoiceEnding ending, Span<int> letting)
+    {
+        int count = 0;
+
+        if (ending == VoiceEnding.Sustain)
+        {
+            if (held.Let(semitone)) letting[count++] = semitone;
+        }
+        else
+        {
+            count = held.LetAll(letting);
+        }
+
+        int stolen = held.Press(semitone, until);
+
+        if (stolen >= 0 && count < letting.Length) letting[count++] = stolen;
+
+        return count;
+    }
+
+    /// <summary>
+    /// Tells a plugin to let go of what it was holding and then to start the new note.
+    /// </summary>
+    /// <remarks>
+    /// Where there was nothing to let go of the whole plugin is asked to let go instead, which
+    /// is what this always did and is worth keeping: the record is what this side said, and a
+    /// plugin that has been sent a note by anything else is exactly the case a per-note off
+    /// cannot reach. It costs one message on the first note after a stop.
+    /// </remarks>
+    private static void Play(IPluginInstrument instrument, int semitone, ReadOnlySpan<int> letting,
+                             int count, VoiceEnding ending)
+    {
+        if (count == 0 && ending != VoiceEnding.Sustain) instrument.AllNotesOff();
+
+        for (int i = 0; i < count; i++) instrument.NoteOff(letting[i]);
+
+        instrument.NoteOn(semitone, 1f);
+    }
+
+    /// <summary>
+    /// Moves whatever a plugin should have let go of by now onto the list the render empties
+    /// once it is out of the lock.
+    /// </summary>
+    /// <remarks>
+    /// Runs on the audio thread, so the notes go into a span on the stack and from there into
+    /// a list that is kept rather than made. A note from a pattern has no moment and is never
+    /// reached by this: it is held until an OFF, the next note or the transport.
+    /// </remarks>
+    private static void Expired(IHeldNotes held, IPluginInstrument plugin, long now, Span<int> into,
+                                List<(IPluginInstrument Instrument, int Semitone)> letting)
+    {
+        if (held.Count == 0) return;
+
+        int count = held.LetExpired(now, into);
+
+        for (int i = 0; i < count; i++) letting.Add((plugin, into[i]));
+    }
 
     /// <inheritdoc/>
-    public void PreviewOnTrack(int track, Note note, float gain, double holdSeconds)
+    public void PreviewOnTrack(int track, Note note, float gain, double holdSeconds,
+                               VoiceEnding ending = VoiceEnding.Sustain)
     {
         if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
 
         IPluginInstrument? instrument;
+        Span<int> letting = stackalloc int[HeldNotes.Most];
+        int count;
 
         lock (_lock)
         {
             instrument = _instruments[track];
 
             _instrumentGain[track] = gain;
-            _heldUntil[track] = Environment.TickCount64 + (long)(Math.Max(0.05, holdSeconds) * 1000);
+
+            count = instrument == null
+                ? 0
+                : MakeWay(_pluginHeld[track], note.Semitone, Until(holdSeconds), ending, letting);
         }
 
         if (instrument == null) return;
 
-        instrument.AllNotesOff();
-        instrument.NoteOn(note.Semitone, 1f);
+        Play(instrument, note.Semitone, letting, count, ending);
+    }
+
+    /// <inheritdoc/>
+    public void LetPluginNote(int track, int semitone)
+    {
+        if (track < 0 || track >= MaxTracks) return;
+
+        IPluginInstrument? instrument;
+        bool held;
+
+        lock (_lock)
+        {
+            instrument = _instruments[track];
+            held = _pluginHeld[track].Let(semitone);
+        }
+
+        if (held) instrument?.NoteOff(semitone);
+    }
+
+    /// <inheritdoc/>
+    public void LetPreviewNote(int semitone)
+    {
+        IPluginInstrument? instrument;
+        bool held;
+
+        lock (_lock)
+        {
+            instrument = _preview;
+            held = _previewHeld.Let(semitone);
+        }
+
+        if (held) instrument?.NoteOff(semitone);
     }
 
     /// <inheritdoc/>
@@ -550,31 +693,50 @@ public sealed class TrackMixer : ITrackMixer
     /// because a plugin's own velocity is part of its patch and turning a note down with it
     /// would change the sound rather than the level.
     /// </remarks>
-    public void PluginNoteOn(int track, Note note, float gain, float pan)
+    public void PluginNoteOn(int track, Note note, float gain, float pan,
+                             VoiceEnding ending = VoiceEnding.Cut)
     {
         if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
 
         IPluginInstrument? instrument;
+        Span<int> letting = stackalloc int[HeldNotes.Most];
+        int count;
+
         lock (_lock)
         {
             instrument = _instruments[track];
             _instrumentGain[track] = gain;
             _instrumentPan[track] = Math.Clamp(pan, -1f, 1f);
+
+            count = instrument == null
+                ? 0
+                : MakeWay(_pluginHeld[track], note.Semitone, 0, ending, letting);
         }
 
         if (instrument == null) return;
 
-        instrument.AllNotesOff();
-        instrument.NoteOn(note.Semitone, 1f);
+        Play(instrument, note.Semitone, letting, count, ending);
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// All notes off rather than one message per note, because an OFF ends everything the track
+    /// was holding and the plugin knows what that is better than this side does. The record is
+    /// emptied with it, or the next note would ask the plugin to let go of notes it has already
+    /// let go of.
+    /// </remarks>
     public void PluginNoteOff(int track)
     {
         if (track < 0 || track >= MaxTracks) return;
 
         IPluginInstrument? instrument;
-        lock (_lock) instrument = _instruments[track];
+        Span<int> letting = stackalloc int[HeldNotes.Most];
+
+        lock (_lock)
+        {
+            instrument = _instruments[track];
+            _pluginHeld[track].LetAll(letting);
+        }
 
         instrument?.AllNotesOff();
     }
@@ -606,7 +768,8 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     /// <remarks>The voice is built outside the lock, since making one is the expensive half.</remarks>
-    public void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan)
+    public void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan,
+                       VoiceEnding ending = VoiceEnding.Cut)
     {
         if (patch is null || !note.IsPlayable) return;
 
@@ -614,7 +777,7 @@ public sealed class TrackMixer : ITrackMixer
 
         lock (_lock)
         {
-            Cut(track);
+            MakeWay(track, note, ending);
             Add(voice);
         }
     }
@@ -624,7 +787,8 @@ public sealed class TrackMixer : ITrackMixer
     /// The one note-on built inside the lock rather than outside it, because what it slides
     /// from is read off the voice list and has to be read before that voice is cut.
     /// </remarks>
-    public void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan)
+    public void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan,
+                       VoiceEnding ending = VoiceEnding.Cut)
     {
         if (patch is null || !note.IsPlayable) return;
 
@@ -641,20 +805,34 @@ public sealed class TrackMixer : ITrackMixer
                 }
             }
 
-            Cut(track);
+            MakeWay(track, note, ending);
 
             Add(new MonoSynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from));
         }
     }
 
-    /// <summary>Lets go of whatever a track was sounding. Held under the lock by its callers.</summary>
-    private void Cut(int track)
+    /// <summary>
+    /// Makes room on a track for the note that is about to start there.
+    /// </summary>
+    /// <remarks>
+    /// Held under the lock by its callers, since what it decides about has to still be true
+    /// when the new voice is added.
+    ///
+    /// The same note arriving where it is already sounding is cut whichever ending was asked
+    /// for. Two copies of one note are a retrigger, and letting them pile up is how a part left
+    /// sustaining walks into <see cref="MaxVoices"/> and starts stealing notes somebody meant
+    /// to hear.
+    /// </remarks>
+    private void MakeWay(int track, Note note, VoiceEnding ending)
     {
         if (track < 0) return;
 
         foreach (var playing in _voices)
         {
-            if (playing.Track == track) playing.Cut();
+            if (playing.Track != track) continue;
+
+            if (ending == VoiceEnding.Cut || playing.Note.Semitone == note.Semitone) playing.Cut();
+            else if (ending == VoiceEnding.Release) playing.NoteOff();
         }
     }
 
@@ -703,14 +881,7 @@ public sealed class TrackMixer : ITrackMixer
 
         lock (_lock)
         {
-            if (track >= 0)
-            {
-                foreach (var playing in _voices)
-                {
-                    if (playing.Track == track) playing.Cut();
-                }
-            }
-
+            MakeWay(track, note, instrument.NewNoteAction);
             Add(voice);
         }
     }
@@ -751,7 +922,8 @@ public sealed class TrackMixer : ITrackMixer
     /// voice takes both: the plain path's shaping is left doing nothing and the four pole
     /// filters do the work instead.
     /// </remarks>
-    public void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain, float pan)
+    public void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note,
+                       float gain, float pan, VoiceEnding ending = VoiceEnding.Cut)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
@@ -761,7 +933,7 @@ public sealed class TrackMixer : ITrackMixer
 
         lock (_lock)
         {
-            Cut(track);
+            MakeWay(track, note, ending);
             Add(voice);
         }
     }
@@ -954,8 +1126,9 @@ public sealed class TrackMixer : ITrackMixer
         DuckSetting[] ducking;
         IPluginInstrument?[] instruments;
         IPluginInstrument? preview;
-        IPluginInstrument? releasing = null;
         float previewGain;
+
+        Span<int> expired = stackalloc int[HeldNotes.Most];
 
         var letting = _letting;
         letting.Clear();
@@ -1002,27 +1175,21 @@ public sealed class TrackMixer : ITrackMixer
             preview = _preview;
             previewGain = _previewGain;
 
-            if (_previewUntil != 0 && Environment.TickCount64 >= _previewUntil)
-            {
-                _previewUntil = 0;
-                releasing = preview;
-            }
+            long now = Environment.TickCount64;
+
+            if (preview != null) Expired(_previewHeld, preview, now, expired, letting);
 
             for (int track = 0; track < MaxTracks; track++)
             {
-                if (_heldUntil[track] == 0 || Environment.TickCount64 < _heldUntil[track]) continue;
-
-                _heldUntil[track] = 0;
-
-                if (_instruments[track] != null) letting.Add(_instruments[track]!);
+                if (_instruments[track] is IPluginInstrument plugin)
+                    Expired(_pluginHeld[track], plugin, now, expired, letting);
             }
+
             Array.Copy(_ducking, _ducked, MaxTracks);
             ducking = _ducked;
         }
 
-        releasing?.AllNotesOff();
-
-        foreach (var held in letting) held.AllNotesOff();
+        foreach (var (plugin, semitone) in letting) plugin.NoteOff(semitone);
 
         letting.Clear();
 
@@ -1177,12 +1344,16 @@ public sealed class TrackMixer : ITrackMixer
     {
         IPluginInstrument?[] instruments;
         IPluginInstrument? preview;
+        Span<int> letting = stackalloc int[HeldNotes.Most];
 
         lock (_lock)
         {
             instruments = (IPluginInstrument?[])_instruments.Clone();
             preview = _preview;
-            _previewUntil = 0;
+
+            _previewHeld.LetAll(letting);
+
+            for (int track = 0; track < MaxTracks; track++) _pluginHeld[track].LetAll(letting);
         }
 
         foreach (var instrument in instruments) instrument?.AllNotesOff();

@@ -24,7 +24,7 @@ The pages you play on are kept apart from the pages you set things up on, so not
 
 **FIRE** is the page you use while the show is running. Large pads, click or MIDI to fire, click again to stop, as many at once as you like. Nothing on this page can be set up by accident, and the transport's only live button is stop.
 
-**TRACKER** writes songs: patterns, an order list, and instruments the song owns rather than borrows. Instruments come off five machines, Zampler, BongaBong, Ouroboros, OddSkilla and Recording, or from a VST3 or CLAP plugin. Every track has a mixer strip with pan, mute, solo and ducking, and an insert chain. Machines are registered in SETTINGS and can be added, removed and imported from a zip.
+**TRACKER** writes songs: patterns, an order list, and instruments the song owns rather than borrows. Instruments come off five machines, Zampler, BongaBong, Ouroboros, OddSkilla and Recording, or from a VST3 or CLAP plugin. Every track has a mixer strip with pan, mute, solo and ducking, and an insert chain. A track plays one note at a time and the instrument says what becomes of it when the next arrives: cut it, let it play its own release under the new note, or leave it holding. Machines are registered in SETTINGS and can be added, removed and imported from a zip.
 
 **MACHINES** is the designer, where a machine's front panel is laid out: drag the knobs, faders, switches, pads and keyboards onto the face and say what each one is wired to. It is a page of its own only when you ask for it in SETTINGS, for when the instrument is the work rather than the song; it is inside the tracker either way.
 
