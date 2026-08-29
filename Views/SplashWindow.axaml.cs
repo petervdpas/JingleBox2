@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Avalonia;
 using Avalonia.Controls;
 
 namespace JingleBox2.Views;
@@ -30,6 +31,34 @@ public partial class SplashWindow : Window
         InitializeComponent();
 
         VersionText.Text = Version();
+    }
+
+    /// <summary>
+    /// Squares the corners off where the machine will not give us a transparent window.
+    /// </summary>
+    /// <remarks>
+    /// The rounded corners are a hole in the window, and a hole needs the compositor's
+    /// permission. Where that is refused, and it is refused on a Windows box with composition
+    /// off, in a remote session, and on a Linux desktop running without a compositor, what is
+    /// outside the rounding is not nothing: it is the window's own background, which is
+    /// transparent, which draws as black. The splash would arrive with four black corners on
+    /// exactly the machines nobody tests on.
+    ///
+    /// So it is asked rather than assumed. Granted, the corners stay round and the window keeps
+    /// its hole; refused, the frame is squared off and the window is filled with the same purple,
+    /// which is a plain rectangle and correct. Asked here because the answer is not known until
+    /// there is a window: it is what the platform actually gave, not what was hinted for.
+    /// </remarks>
+    /// <param name="e">Unused: the question is about the window rather than about the opening.</param>
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+
+        if (ActualTransparencyLevel != WindowTransparencyLevel.Transparent)
+        {
+            Background = Frame.Background;
+            Frame.CornerRadius = new CornerRadius(0);
+        }
     }
 
     /// <summary>

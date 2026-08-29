@@ -22,7 +22,7 @@
 
        The rim is the disc's dark end, so the one purple that left the background is still on
        the window. -->
-  <Border CornerRadius="10" ClipToBounds="True" BorderThickness="1">
+  <Border x:Name="Frame" CornerRadius="10" ClipToBounds="True" BorderThickness="1">
     <Border.Background>
       <SolidColorBrush Color="#2E0042" />
     </Border.Background>
