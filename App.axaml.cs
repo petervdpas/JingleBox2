@@ -132,7 +132,7 @@ public partial class App : Application
     /// Which is the whole reason for it: a splash nobody can read is worse than none, since it
     /// reads as the window having flickered. Long enough to be looked at rather than glimpsed.
     /// </remarks>
-    private static readonly TimeSpan SplashLeast = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan SplashLeast = TimeSpan.FromSeconds(2.4);
 
     /// <summary>
     /// Puts the window up and takes the splash down, in that order.
