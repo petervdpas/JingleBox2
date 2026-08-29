@@ -73,7 +73,7 @@
 
     <Border DockPanel.Dock="Top" Classes="card">
       <StackPanel Classes="cardBody">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
                      Text="{Binding MachineEditor.Title}" />
 
@@ -100,13 +100,20 @@
                   IsEnabled="{Binding MachineEditor.HasProject}"
                   ToolTip.Tip="Writes the machine to its folder. The button warms while there are changes that are not on disc yet." />
 
+          <!-- The whole folder, not the manifest alone: a machine is its pictures, its presets
+               and its sounds as much as its description. Beside Save because that is where a
+               hand looks for it, and because the two differ by one question. -->
+          <Button Grid.Column="6" Content="Save as..." Click="SaveAs_Click"
+                  IsEnabled="{Binding MachineEditor.CanExport}"
+                  ToolTip.Tip="Writes the whole machine into a folder you choose, pictures and presets and sounds and all, and works there from now on. The folder it came from is left as it was." />
+
           <!-- Back to the folder, not back one step. Dead for a machine that has never been
                written down, whose changes are the whole of it. -->
-          <Button Grid.Column="6" Content="Cancel changes" Click="Cancel_Click"
+          <Button Grid.Column="7" Content="Cancel changes" Click="Cancel_Click"
                   IsEnabled="{Binding MachineEditor.CanCancelChanges}"
                   ToolTip.Tip="Throws away everything done since the last save and reads the machine back as it was. Asked first, because it cannot be undone." />
 
-          <Button Grid.Column="7" Content="Export..." Click="Export_Click"
+          <Button Grid.Column="8" Content="Export..." Click="Export_Click"
                   IsEnabled="{Binding MachineEditor.CanExport}"
                   ToolTip.Tip="Writes the whole machine out as a zip: the manifest, the panel and the sounds it ships with. That zip is what somebody else imports on the SETTINGS tab." />
         </Grid>

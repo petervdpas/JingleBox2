@@ -47,6 +47,32 @@ public interface IMachineArchive
     void Export(MachineProject project, string zipPath);
 
     /// <summary>
+    /// Copies everything a machine keeps beside its manifest into another folder.
+    /// </summary>
+    /// <remarks>
+    /// What a machine is, is the folder: the manifest names pictures, presets and sounds by the
+    /// names they have inside it, so a manifest written into an empty folder somewhere else is a
+    /// machine that draws nothing and has no presets. Writing the manifest is
+    /// <see cref="MachineProject.Save"/>'s job and it does only that, correctly, since it is
+    /// called on every ordinary save and copying the whole folder onto itself each time would be
+    /// absurd. This is the other half, for the one case where the folder changes.
+    ///
+    /// The manifest itself is not copied. The one in the source folder is what was last written
+    /// and is behind whatever is on screen, so the caller writes the current one afterwards
+    /// rather than copying a stale one and overwriting it a moment later.
+    ///
+    /// Nothing in the destination is deleted, including a file this machine no longer has. The
+    /// same rule the registry keeps for a shipped machine being updated, and for the same
+    /// reason: what else is in that folder is not this machine's business.
+    ///
+    /// Throws rather than reporting, as <see cref="Export"/> does: somebody has just pressed
+    /// Save as and is waiting to be told either where it went or what stopped it.
+    /// </remarks>
+    /// <param name="project">The machine to carry, which has to have been saved.</param>
+    /// <param name="folder">Where its files go, made as needed.</param>
+    void CopyInto(MachineProject project, string folder);
+
+    /// <summary>
     /// Unpacks a machine out of that zip and into the installed machines.
     /// </summary>
     /// <returns>The machine as it now sits on the disc, or null when the zip held none.</returns>

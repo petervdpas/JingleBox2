@@ -66,6 +66,40 @@ public sealed class MachineArchive : IMachineArchive
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// A folder copied onto itself is nothing to do, rather than an error: somebody who picks
+    /// the folder the machine is already in has asked for a save, and that is what they get.
+    /// </remarks>
+    public void CopyInto(MachineProject project, string folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder)) throw new ArgumentException("A machine needs a folder.", nameof(folder));
+
+        if (!project.IsSaved || !Directory.Exists(project.Folder))
+            throw new InvalidOperationException("A machine has to be saved before it can be copied.");
+
+        string from = Path.GetFullPath(project.Folder);
+        string into = Path.GetFullPath(folder);
+
+        if (Same(from, into)) return;
+
+        Directory.CreateDirectory(into);
+
+        if (!Copy(from, into, MachineProject.ManifestName))
+            throw new InvalidOperationException("A file in " + from + " points outside the machine.");
+
+        Diagnostics.Log.Write(
+            Diagnostics.Enums.LogArea.Machines,
+            () => "machine " + project.Id + " copied from " + from + " to " + into);
+    }
+
+    /// <summary>Whether two paths name one folder, by this machine's rules about case.</summary>
+    private bool Same(string one, string other) =>
+        string.Equals(
+            one.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            other.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    /// <inheritdoc/>
     public MachineProject? Import(string zipPath)
     {
         if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath)) return null;
@@ -269,11 +303,15 @@ public sealed class MachineArchive : IMachineArchive
     /// zip's is. A link inside the source folder pointing out of it would otherwise copy a file
     /// from somewhere else in under the machine's name.
     /// </remarks>
-    private bool Copy(string from, string into)
+    private bool Copy(string from, string into, string? except = null)
     {
         foreach (string file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
         {
-            string full = Path.GetFullPath(Path.Combine(into, Path.GetRelativePath(from, file)));
+            string named = Path.GetRelativePath(from, file);
+
+            if (except != null && string.Equals(named, except, StringComparison.OrdinalIgnoreCase)) continue;
+
+            string full = Path.GetFullPath(Path.Combine(into, named));
 
             if (!Under(full, into)) return false;
 

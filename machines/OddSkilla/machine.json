@@ -3,7 +3,7 @@
   "Name": "OddSkilla",
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
-  "Version": "1.02",
+  "Version": "1.11",
   "Engine": "",
   "Theme": {
     "Accent": "#E2A03F",
@@ -24,7 +24,8 @@
       "Min": 0,
       "Max": 5,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "duty",
@@ -33,7 +34,8 @@
       "Min": 0.05,
       "Max": 0.95,
       "Default": 0.5,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "tune",
@@ -42,7 +44,8 @@
       "Min": -24,
       "Max": 24,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "fine",
@@ -51,7 +54,8 @@
       "Min": -100,
       "Max": 100,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "pitch_env",
@@ -60,7 +64,8 @@
       "Min": -24,
       "Max": 24,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "pitch_time",
@@ -69,7 +74,8 @@
       "Min": 0,
       "Max": 2000,
       "Default": 60,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "attack",
@@ -78,7 +84,8 @@
       "Min": 0,
       "Max": 2000,
       "Default": 2,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "decay",
@@ -87,7 +94,8 @@
       "Min": 0,
       "Max": 5000,
       "Default": 40,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "sustain",
@@ -96,7 +104,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0.6,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "release",
@@ -105,7 +114,8 @@
       "Min": 0,
       "Max": 5000,
       "Default": 80,
-      "Step": 5
+      "Step": 5,
+      "Saved": true
     },
     {
       "Key": "drive",
@@ -114,7 +124,8 @@
       "Min": 1,
       "Max": 10,
       "Default": 1,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     },
     {
       "Key": "level",
@@ -123,7 +134,8 @@
       "Min": -60,
       "Max": 6,
       "Default": 0,
-      "Step": 0.5
+      "Step": 0.5,
+      "Saved": true
     },
     {
       "Key": "new_note",
@@ -142,7 +154,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 1,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "resonance",
@@ -151,7 +164,8 @@
       "Min": 0,
       "Max": 0.98,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "vib_rate",
@@ -160,7 +174,8 @@
       "Min": 0,
       "Max": 20,
       "Default": 0,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     },
     {
       "Key": "vib_depth",
@@ -169,7 +184,8 @@
       "Min": 0,
       "Max": 200,
       "Default": 0,
-      "Step": 1
+      "Step": 1,
+      "Saved": true
     },
     {
       "Key": "trem_rate",
@@ -178,7 +194,8 @@
       "Min": 0,
       "Max": 20,
       "Default": 0,
-      "Step": 0.1
+      "Step": 0.1,
+      "Saved": true
     },
     {
       "Key": "trem_depth",
@@ -187,7 +204,8 @@
       "Min": 0,
       "Max": 1,
       "Default": 0,
-      "Step": 0.01
+      "Step": 0.01,
+      "Saved": true
     },
     {
       "Key": "cycles",
@@ -219,13 +237,26 @@
           },
           "Children": [
             {
+              "Element": "Image",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "width": "300",
+                "height": "94",
+                "file": "images/image1.svg"
+              },
+              "Children": []
+            },
+            {
               "Element": "Preset",
               "Parameter": "",
               "Label": "",
               "Properties": {
                 "source": "presets",
                 "caption": "Presets",
-                "width": "258"
+                "width": "260",
+                "margin": "0,0,0,14",
+                "align": "bottom"
               },
               "Children": []
             }
@@ -305,7 +336,8 @@
           "Parameter": "",
           "Label": "",
           "Properties": {
-            "caption": "Oscillator"
+            "caption": "Oscillator",
+            "height": "150"
           },
           "Children": [
             {
@@ -404,7 +436,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "4",
-                "columns": "4 3 3 3 3 3"
+                "columns": "3 3 3 3 3 3"
               },
               "Children": [
                 {
@@ -494,7 +526,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "4",
-                "columns": "4 3 3 3 3 3"
+                "columns": "3 3 3 3 3 3"
               },
               "Children": [
                 {

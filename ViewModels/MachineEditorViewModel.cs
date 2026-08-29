@@ -370,7 +370,33 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// A machine saved for the first time has somewhere to keep presets for the first time, which
     /// is the moment that page stops being empty.
     /// </remarks>
-    public void Save(string? folder = null)
+    public void Save(string? folder = null) => Write(folder, carry: false);
+
+    /// <summary>
+    /// Writes the machine into another folder, and works there from now on.
+    /// </summary>
+    /// <remarks>
+    /// The whole machine, not the manifest alone. A machine is its folder: the manifest names
+    /// pictures, presets and sounds by the names they have inside it, so writing it into an
+    /// empty folder somewhere else would leave a machine that draws nothing. The files go first
+    /// and the manifest after them, through <see cref="IMachineArchive.CopyInto"/>.
+    ///
+    /// Save as, in the ordinary sense: the editor is pointed at the new folder afterwards and
+    /// the old one is left exactly as it was. That is what makes it the way to put an edited
+    /// machine back over the copy that ships beside the program, which is the case it was
+    /// written for.
+    ///
+    /// The id does not change, deliberately. A machine's id is what songs write down and what
+    /// decides which engine it runs on, so a copy of a machine is that machine somewhere else,
+    /// not a new one. Making a new machine is New.
+    /// </remarks>
+    /// <param name="folder">Where the machine is to live from now on.</param>
+    public void SaveAs(string folder) => Write(folder, carry: true);
+
+    /// <summary>Both of the above, since only one line differs between them.</summary>
+    /// <param name="folder">Where to write, or null for wherever the machine already lives.</param>
+    /// <param name="carry">Whether the folder's other files go too, which is what Save as means.</param>
+    private void Write(string? folder, bool carry)
     {
         if (Project == null) return;
 
@@ -382,6 +408,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
                 Project.Version = Bumped(Project.Version);
 
             _versionWritten = Project.Version;
+
+            if (carry && Project.IsSaved) Crates.CopyInto(Project, folder!);
 
             Project.Save(folder);
             Status = "Saved " + Project.Version + " to " + Project.Folder;

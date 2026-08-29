@@ -342,6 +342,68 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     }
 
     /// <summary>
+    /// Writes the whole machine into a folder somebody chooses, and works there afterwards.
+    /// </summary>
+    /// <remarks>
+    /// Asked here rather than in the view model for the same reason saving is: choosing a folder
+    /// is a window's job.
+    ///
+    /// A folder already holding a different machine is asked about first, naming both. The case
+    /// this exists for is writing an edited machine back over the copy that ships beside the
+    /// program, so overwriting has to be allowed; landing on somebody else's machine by picking
+    /// the wrong folder is the same gesture and would silently bury it.
+    ///
+    /// Nothing in the folder is deleted either way, so a machine written over another leaves
+    /// behind whatever the other had and this one has not. That is the registry's rule for a
+    /// shipped machine being updated and it is right here too: what else is in that folder is
+    /// not this machine's business.
+    /// </remarks>
+    private async void SaveAs_Click(object? sender, RoutedEventArgs e)
+    {
+        if (Editor is not { CanExport: true } editor || editor.Project == null) return;
+
+        string? folder = await PickFolder("Where to keep this machine from now on");
+
+        if (folder == null) return;
+
+        if (Holder(folder) is { Length: > 0 } other)
+        {
+            bool confirmed = await ConfirmDialog.AskAsync(
+                "Write over that machine",
+                $"'{other}' is already in that folder. Write '{editor.Project.Name}' over it? "
+                    + "Files that only the other machine has are left where they are.",
+                "Write over it");
+
+            if (!confirmed) return;
+        }
+
+        editor.SaveAs(folder);
+    }
+
+    /// <summary>
+    /// The name of the machine already in that folder, when it is a different one.
+    /// </summary>
+    /// <remarks>
+    /// By id rather than by name, since the name is the part somebody is free to change and the
+    /// id is the part that cannot be. A folder holding this same machine is not a collision: it
+    /// is the ordinary case of saving an edited copy back over where it came from, and asking
+    /// about it every time would train somebody to press the button without reading it.
+    ///
+    /// A folder with no manifest, or one that will not read, is nothing to warn about: there is
+    /// no machine there to lose.
+    /// </remarks>
+    private string? Holder(string folder)
+    {
+        if (Editor?.Project is not { } mine) return null;
+
+        var there = Tracker.Machines.MachineProject.Open(folder);
+
+        if (there == null || string.Equals(there.Id, mine.Id, StringComparison.OrdinalIgnoreCase)) return null;
+
+        return there.Name.Length > 0 ? there.Name : there.Id;
+    }
+
+    /// <summary>
     /// Writes the machine out where the pointer says.
     /// </summary>
     /// <remarks>
