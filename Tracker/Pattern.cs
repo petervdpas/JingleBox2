@@ -63,6 +63,11 @@ public sealed class Pattern
     /// write racing a reshape is lost rather than misplaced. Every write comes from the drawing
     /// thread and every reshape with it, so that race does not arise; the read is the one that
     /// crosses threads.
+    ///
+    /// **That is this type's whole thread contract: written by the drawing thread, read by the
+    /// clock thread while it is being written.** No lock, deliberately: one over the pattern
+    /// would put the clock behind whoever is typing. See <c>docs/threads.md</c>, where this is
+    /// the worked example of the difference between sharing a value and sharing a shape.
     /// </remarks>
     private Layout _layout;
 

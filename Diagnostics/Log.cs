@@ -30,6 +30,14 @@ namespace JingleBox2.Diagnostics;
 /// <see cref="ILogAreas"/>, <see cref="ILogLine"/> and <see cref="ILogFile"/> are the rules on
 /// their own and can be asked anything without a disc or a thread. What is left is the
 /// plumbing.
+///
+/// **The thread contract, which is written down in full in <c>docs/threads.md</c>.**
+///
+/// Every thread there is may write, including the one filling the audio buffer, and none of them
+/// ever touches the file: a line goes on a queue and the writing thread does the disc. That is
+/// the whole reason the audio path is allowed to call this at all. Whether an area is on is one
+/// comparison, and a line that will not be printed is never built, so a switched-off area costs
+/// the comparison and nothing else.
 /// </remarks>
 public static class Log
 {

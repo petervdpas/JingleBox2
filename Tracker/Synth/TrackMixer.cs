@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Synth.Interfaces;
@@ -1205,11 +1206,82 @@ public sealed class TrackMixer : ITrackMixer
     /// A plugin is never told anything with the lock held. What has to be let go of is
     /// collected under it into <see cref="_letting"/>, which is kept rather than made, and
     /// emptied outside.
+    ///
+    /// **One thread renders at a time, and a second one asking is given silence rather than a
+    /// place in a queue.** Everything the mixing uses is sized from the frame count it was
+    /// called with, so two threads rendering at once with different counts is not a race over a
+    /// value, it is one of them shortening the arrays the other is halfway through: the bus, the
+    /// loose bus and the scratch are all reallocated by <see cref="EnsureBusses"/> whenever the
+    /// block size changes. It crashed inside the loop that adds the preview onto the loose bus,
+    /// which is simply the first place a shortened array is indexed.
+    ///
+    /// It was never meant to have two, and for almost all of a run it does not: either the sound
+    /// card's own thread renders in step, or a thread of its own renders ahead into a queue, and
+    /// which of those is happening is decided by one number. The window is the changeover.
+    /// <c>SynthOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread and
+    /// then carries on regardless, which is right, since a plugin holding it up must not hang the
+    /// application, but it leaves that thread still inside here while the sound card's own thread
+    /// starts. Changing the output device, or the render-ahead setting, is exactly that moment.
+    ///
+    /// So the guard is here rather than there. Here it is true whoever calls, which is what a
+    /// rule about this class ought to be, and it can be put a question to without a sound card.
+    /// Refused rather than waited on, deliberately, and it is the rule this file already keeps
+    /// for a queue that has run dry: one quiet block is a click, and a blocked callback is every
+    /// stream on the device stuttering.
     /// </remarks>
     public void Render(float[] buffer, int frames)
     {
-        int samples = frames * 2;
-        Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
+        if (!Monitor.TryEnter(_rendering))
+        {
+            Array.Clear(buffer, 0, Math.Min(Math.Max(0, frames) * 2, buffer.Length));
+            return;
+        }
+
+        try
+        {
+            Mix(buffer, frames);
+        }
+        finally
+        {
+            Monitor.Exit(_rendering);
+        }
+    }
+
+    /// <summary>Held for the whole of a render, so only one thread is ever inside one.</summary>
+    /// <remarks>
+    /// Its own lock and not <see cref="_lock"/>, which is about the mixer's state and is taken
+    /// and let go of several times during a render, including by callers who are not rendering
+    /// at all. Sharing them would have a note being played wait behind a block of audio.
+    /// </remarks>
+    private readonly object _rendering = new();
+
+    /// <summary>
+    /// One block, with the caller already established as the only one in here.
+    /// </summary>
+    /// <remarks>
+    /// How long the block really is, is decided once and here, and everything after it works to
+    /// that number. It used to be <c>frames * 2</c> taken on trust, with only the first clear
+    /// asking whether the buffer was that long: the bus mixing, the loose bus and the master all
+    /// wrote past the end of a buffer smaller than the caller claimed, which is the same crash
+    /// as two threads rendering at once and arrives from the other direction. Half of a fault
+    /// guarded is worse than none, because the guard that is there reads as the question having
+    /// been asked.
+    ///
+    /// Rounded down to whole frames, so nothing downstream can be handed half of one, and
+    /// nothing at all is done for a block with no room in it. Clamped rather than refused, since
+    /// the caller has a sound card waiting either way and a short block of real audio beats an
+    /// exception on the audio thread.
+    /// </remarks>
+    private void Mix(float[] buffer, int frames)
+    {
+        if (frames <= 0 || buffer.Length < 2) return;
+
+        int samples = (int)Math.Min((long)frames * 2, buffer.Length & ~1);
+        if (samples < 2) return;
+
+        frames = samples / 2;
+
+        Array.Clear(buffer, 0, samples);
 
         IVoice[] playing;
         int sounding;

@@ -279,6 +279,27 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   is overwritten because that is the machine; anything else in the folder is yours, which is how
   a preset you saved onto a machine survives the next version of it arriving.
 
+  **A machine is its folder, and Save as is the half of saving that knows it.** The manifest
+  names pictures, presets and sounds by the names they have inside the folder, so a
+  `machine.json` written into an empty folder somewhere else is a machine that draws nothing and
+  has no presets. `MachineProject.Save` writes the manifest and only that, rightly, since it is
+  called on every ordinary save and copying the whole folder onto itself each time would be
+  absurd; `IMachineArchive.CopyInto` is the other half, for the one case where the folder
+  changes. The files first and the manifest after them, because the one on disc is behind
+  whatever is on screen and copying a stale one would only be overwriting it a moment later.
+
+  The editor is pointed at the new folder afterwards and the old one is left exactly as it was,
+  which is what makes it the way to put an edited machine back over the copy that ships beside
+  the program. That is the case it was written for: the installed copy is what you actually
+  edit, and until this there was no way back to the shipped one but a zip and a hand.
+
+  The id does not change. A machine's id is what songs write down and what decides its engine,
+  so a copy of a machine is that machine somewhere else and not a new one; New is how you make
+  a different one. Nothing in the destination is deleted, the same rule as above and for the
+  same reason. A folder already holding a **different** machine is asked about first and names
+  it, since overwriting has to be allowed for the case this exists for and landing on somebody
+  else's machine by picking the wrong folder is the same gesture.
+
   Everything asks it. What the rack shows, what a panel is drawn from, what a song can sound,
   and which machines a song is missing are all one question with one answer, and there is one
   list that gives it: `IMachineRegistry` reads the folders and `IMachineProjects` holds what it
@@ -535,7 +556,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-969 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+990 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -552,6 +573,16 @@ is public for exactly that. What was missing was somewhere to put the tests.
 `Tests/` is inside the application's folder, so `JingleBox2.csproj` has to remove it from its own
 globs the way it already does for the machine assemblies. Without that the app compiles the test
 sources into itself and every generated assembly attribute is defined twice.
+
+Four of the newer files are about rules that used to be a comparison buried in a control, and
+each one was written because the buried version was wrong. `Tests/VolumeScaleTests.cs` is the
+old 0 to 64 column being brought onto the new one, including the trap that conversion always
+falls into: a song of this build going through twice and being doubled the second time.
+`Tests/QuantizeGridTests.cs` is which note values a setting can offer. `Tests/PointerDragTests.cs`
+is when a press has become a drag, and it exists because a row is under twenty pixels tall and
+the old rule read a click as a block. `Tests/MachineSaveAsTests.cs` is a machine's folder being
+carried to another place, which is where "nothing in the destination is deleted" and "the folder
+it came from is untouched" are actually checked rather than believed.
 
 And the column axis, which is indexed arithmetic over a shape that is no longer a rectangle:
 where a cell sits, where it is drawn, where a click lands, what the file says, what the
@@ -1187,6 +1218,30 @@ whole exercise and is worth writing down rather than summarising:
   taken on purpose and asked about first. One `Color.Unsaved` became the two, per theme as it
   always was, and the same pair is on the machine editor's header, which has the identical two
   buttons doing the identical job
+- **Which page you are on is said in the accent colour and in bold, never with an underline.**
+  Fluent draws a line under the selected tab and that reads as a web page rather than as a piece
+  of gear, so the pipe is hidden on any strip that runs across
+  (`TabControl[TabStripPlacement=Top]`) and the word carries the colour the line had. Asked of
+  the placement rather than of a class, because which way a strip runs is the whole difference
+  and there are four strips: a class would be four chances to forget. The line **stays** on a
+  strip that runs down the side, which is not an inconsistency: down a column the words are a
+  list, the mark is at the head of the row rather than under it, and it is what tells a selected
+  row from a hovered one
+- Colour alone was not enough and bold is the second signal. On a light theme the accent and the
+  ordinary lettering are near enough in weight and darkness that the strip read as six words
+  with nothing chosen, which is worse than the underline was. It costs two pixels of drift
+  across the whole strip, measured, which is nothing beside the star this codebase refused on
+  the Save button
+- The colour is `TabItemHeaderForegroundSelected` and its `PointerOver` and `Pressed` twins in
+  `Themes/Base.axaml`, all three pointing at `Color.Accent`. Three because Fluent sets them
+  inside the tab's own template where a style on the TabItem cannot reach, and setting only the
+  first meant resting the mouse on the page you are on took the colour straight back off it.
+  There is nothing to feed back about hovering somewhere you already are
+- **Dark and Light are the plain pair and are one theme in two lightnesses.** They were green
+  and blue respectively, for no reason anybody wrote down, which the plain pair least of all can
+  afford. Blue now, `#0B6BFF` and `#4A93FF`, deeper on the light half and brighter on the dark.
+  Citrus, Ember, Industrial, Neon and Orchid are the coloured themes and each is its own thing,
+  which is why the same argument does not reach them
 - Setting `currentPattern` rather than `CurrentPattern` in the tracker's constructor meant the
   song the application starts on never subscribed to its own pattern's changes: typing a note
   into it left the song looking saved. Every song opened afterwards went through the property and
@@ -1575,6 +1630,62 @@ whole exercise and is worth writing down rather than summarising:
   hand resting on a chord rather than somebody filling a column, and every repeat sprayed a
   single note down the pattern under the chord that had just been written. Hardware never
   reaches it, since a key that is down cannot be pressed again
+- **`docs/threads.md` is the thread contract, and it is written down because the alternative
+  has already cost real work.** Which threads this application has, what each may touch, and the
+  rule at every seam two of them meet. Around eleven on a busy session and five that matter: the
+  drawing thread, the sound card's, the one that mixes ahead, the tracker's clock and the MIDI
+  port's. Each of those seams now says so on its own interface as well, since a reader holding
+  `ITrackMixer` should not have to find a document to learn that two threads can be in it
+- Every threading fault this codebase has had was one shape, and the document says so in those
+  words: a rule that was true when it was written, held in somebody's head, and quietly untrue
+  once a second caller arrived. Never a lock forgotten. Always a lock guarding the wrong thing.
+  The mixer guarded its state and not its arrays; the pattern was three fields where the clock
+  needed one object; a control target read where a parameter was rather than where it was going.
+  So the question to ask of a new seam is not "is this locked" but **is what they share a value
+  or the shape of something**: a value wants a lock, a shape wants to be one object swapped
+  whole
+- And on the audio path the loser refuses rather than waits. One quiet block is a click; a
+  blocked callback is every stream on the device stuttering. That rule was already there for a
+  queue that has run dry and is now the mixer's answer to a second renderer as well
+- **One thread renders the mixer at a time, and a second one asking is given silence.** It
+  crashed with an index outside the bounds of the array, on the audio thread, inside the loop
+  that adds the preview onto the loose bus. That loop is only where it showed: everything the
+  mixing uses is sized from the frame count it was called with, and `EnsureBusses` reallocates
+  the bus, the loose bus and the scratch whenever that count changes, so two threads rendering
+  at once with different counts is one of them shortening the arrays the other is halfway
+  through
+- There are two threads for one moment. The sound card's own thread renders in step, or a thread
+  of its own renders ahead into a queue, never both, except while one is being swapped for the
+  other: `SynthOutput.StopMixingAhead` waits two tenths of a second for the ahead thread and
+  then carries on regardless, which is right, since a plugin holding it up must not hang the
+  application, and it leaves that thread still inside the mixer while the sound card's thread
+  starts. Changing the output device or the render-ahead setting is exactly that moment, which
+  is why it turned up an afternoon into a session rather than at startup
+- A buffer shorter than the frame count claimed was the same crash from the other direction, and
+  it was found while writing the tests rather than by it happening. The top of the method clamped
+  its clear to the buffer and the three stages after it did not, so the bus mixing, the loose bus
+  and the master all wrote past the end. Half a fault guarded is worse than none: the guard that
+  is there reads as the question having been asked. The block is decided once now, held to what
+  the buffer can take and rounded down to whole frames
+- The guard is on `TrackMixer.Render` and not on the thing with the two threads in it, because
+  there it is true whoever calls and it can be put a question to without a sound card, which is
+  `Tests/MixerRenderTests.cs`. Refused rather than waited on, which is the rule this file
+  already keeps for a queue that has run dry: one quiet block is a click and a blocked callback
+  is every stream on the device stuttering. Its own lock rather than the mixer's state lock,
+  which is taken and let go of several times during a render and by callers who are not
+  rendering at all: sharing them would have a note played by hand wait behind a block of audio.
+  A thread that would not stop is now said in the log, since it means a plugin took longer than
+  a fifth of a second over one block and that is worth knowing on its own
+- `Tests/MixerRenderTests.cs` is twenty one tests on that path and almost none of them are happy:
+  it is the one place in the application where a fault is the process gone rather than a message
+  on the status bar, so what it asks is never "does it sound right", it is "what does it do when
+  it is lied to". Threads at six block sizes at once, the mix being edited while two threads
+  render it, no frames, a negative count, a count that overflows when doubled, a buffer with no
+  room, plugins that throw, that write past their block, that hand back NaN, that never return,
+  inserts that throw on a track and on the master, more voices than the mix holds, and track and
+  column numbers off both ends. Each guard was checked by taking it out and seeing which tests
+  noticed: the render guard four, the block clamp four others, the instrument catch two, the
+  master insert catch one. A test that passes with the fix removed is testing nothing
 - The audio engine runs whenever a track has a chain, not only while something is playing. A
   plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
   and cannot tell the host what its own window did. `TrackMixer` therefore does not rest while

@@ -26,6 +26,25 @@ namespace JingleBox2.Tracker.Interfaces;
 /// It also owns the plugins, one process each, and that is most of the size of it. A plugin is
 /// slow to start, holds its own notes, has a release to finish, and must be put down when a song
 /// is closed or it goes on running with nothing holding it.
+///
+/// **The thread contract, which is written down in full in <c>docs/threads.md</c>.**
+///
+/// The clock is a thread of its own, above normal priority, and it walks the song a line at a
+/// time. The drawing thread works the transport and the mix; the MIDI thread plays notes by
+/// hand. All three are here at once whenever anybody touches the keyboard during a pass.
+///
+/// The song is read under the lock and the reference is taken once, at the top of a pass, so a
+/// song opened part way through does not tear that pass in half. A clock thread that outlives
+/// its own stop is answered by the generation number rather than by the cancellation alone:
+/// every pass carries the number it started on and returns the moment it stops matching, which
+/// is what makes stopping and starting again in quick succession safe.
+///
+/// **The document it walks is edited from the drawing thread while it walks it, and that is
+/// allowed.** What makes it safe is not a lock over the pattern, which would put the clock
+/// behind whoever is typing: it is that a pattern's cells, its per-track column counts and the
+/// running totals that place a cell are one object, swapped whole. A track widened mid-pass is
+/// either wholly there or wholly not. They were three fields once, and the clock could read the
+/// new running total against the old array and walk off the end of it.
 /// </remarks>
 public interface ITrackerPlayer : IDisposable
 {

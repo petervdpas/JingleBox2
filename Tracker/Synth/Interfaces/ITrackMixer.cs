@@ -37,11 +37,28 @@ namespace JingleBox2.Tracker.Synth.Interfaces;
 /// is a plugin switched off without being told, and a knob turned in its window then reaches
 /// nothing and nobody.
 ///
-/// <see cref="Render"/> runs on the audio callback thread while notes are started from the clock
-/// and from the UI, so what it renders is a snapshot taken under a lock. Everything else here is
-/// called from those other threads and is safe to call while a block is in flight. Inside the
-/// render nothing allocates, nothing waits on another process, and a plugin is never told
-/// anything while the lock is held: somebody else's code has no business running inside it.
+/// **The thread contract, which is written down in full in <c>docs/threads.md</c>.**
+///
+/// <see cref="Render"/> is entered by the sound card's own thread, or by the thread that mixes
+/// ahead into a queue, and **one at a time whoever asks**: a second caller is handed a cleared
+/// buffer and returns at once rather than waiting. That is not defensiveness. The block size is
+/// not a value the two callers share, it is the size of the arrays the mixing works in, all of
+/// which are built again whenever the frame count changes; two threads rendering at once with
+/// different counts is one of them shortening the arrays the other is halfway through, and it
+/// has taken the application down on the audio thread after an afternoon's work. Refused rather
+/// than waited on, because one quiet block is a click and a blocked callback is every stream on
+/// the device stuttering.
+///
+/// There are two callers at all only for a moment, and the moment is real: the output swaps
+/// between rendering in step and rendering ahead, and it gives the ahead thread two tenths of a
+/// second to stop and then carries on regardless, since a plugin holding it up must not hang the
+/// application. Changing the output device or the render-ahead setting is that moment.
+///
+/// Everything else here may be called from any thread at any time, including from the clock, the
+/// drawing thread and the MIDI thread while a block is in flight. What a render sees is a
+/// snapshot taken under the lock. Inside the render nothing allocates, nothing waits on another
+/// process, and a plugin is never told anything while the lock is held: somebody else's code has
+/// no business running inside it.
 /// </remarks>
 public interface ITrackMixer
 {
@@ -466,15 +483,26 @@ public interface ITrackMixer
     /// buffer: the audio callback has no way to say "nothing this time".
     /// </summary>
     /// <remarks>
-    /// The audio thread. In order: every sounding track onto its own bus, each bus through its
-    /// insert, each bus into the mix through its side chain, the loose bus of auditions on top,
-    /// and then the master. Nothing here allocates, takes a lock for longer than a few list
-    /// operations, or waits on another process.
+    /// The audio thread, and one of them at a time: see the thread contract on this interface.
+    /// A second caller gets a cleared buffer and returns, which is silence for that block and
+    /// never a wait.
+    ///
+    /// In order: every sounding track onto its own bus, each bus through its insert, each bus
+    /// into the mix through its side chain, the loose bus of auditions on top, and then the
+    /// master. Nothing here allocates, takes a lock for longer than a few list operations, or
+    /// waits on another process.
     ///
     /// A plugin that throws costs the block it threw in and nothing else. A managed fault on
     /// the audio thread would otherwise take the whole application with it, which is the same
     /// bargain a track's chain makes everywhere else.
+    ///
+    /// The block is however much of <paramref name="frames"/> the buffer can actually hold,
+    /// rounded down to whole frames. A caller that asks for more than it brought room for gets
+    /// what fits rather than an exception on the audio thread, and a caller that asks for none,
+    /// or for a nonsense count, gets its buffer left alone.
     /// </remarks>
+    /// <param name="buffer">Interleaved stereo, written from the start.</param>
+    /// <param name="frames">How many frames are wanted. Held to what the buffer can take.</param>
     void Render(float[] buffer, int frames);
 
     /// <summary>Moves the master fader, which is the last thing between the mix and the card.</summary>

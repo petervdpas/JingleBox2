@@ -22,6 +22,22 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// Two sockets rather than one. The audio thread has a socket to itself so that a slow question
 /// from the interface, reading a Serum patch for instance, can never sit in front of the block
 /// that is due in ten milliseconds.
+///
+/// **The thread contract, which is written down in full in <c>docs/threads.md</c>.**
+///
+/// Three threads meet here. The audio path sends blocks, the drawing thread asks about
+/// parameters and windows, and a reader thread of this class's own takes replies off the child's
+/// control socket. The two sockets are what keeps the first two from queueing behind each other.
+///
+/// The shared block is memory two processes have mapped, and freeing it while the audio thread
+/// is copying into it is a fault in this process rather than in a plugin. So it is a counted
+/// gate rather than a lock: <see cref="Enter"/> counts up before it checks, so whoever got in
+/// before the door closed is waited for and whoever came after is turned away, and disposal
+/// waits a bounded moment for the count to reach nought before the memory goes.
+///
+/// A plugin's process going away is not a fault to be guarded against on the caller's thread.
+/// It is the reason this class exists: an effect passes its audio through, an instrument goes
+/// quiet, and the panel offers to start it again.
 /// </remarks>
 internal sealed class PluginProcess : IDisposable
 {

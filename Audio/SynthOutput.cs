@@ -66,8 +66,12 @@ public sealed class SynthOutput : ISynthOutput
     /// other one exactly as it did.
     ///
     /// What it costs is the size of the queue: the sound you hear was mixed that long ago.
+    ///
+    /// Volatile because it is the answer to "which of the two ways is running", written by the
+    /// drawing thread while starting or stopping and read by the sound card's own thread on
+    /// every block. See <c>docs/threads.md</c>.
     /// </remarks>
-    private int _cushion;
+    private volatile int _cushion;
 
     /// <summary>Finished audio, waiting to be asked for. Written by the mixing thread, read by BASS.</summary>
     private float[] _queue = Array.Empty<float>();
@@ -297,6 +301,15 @@ public sealed class SynthOutput : ISynthOutput
     }
 
     /// <summary>Stops that thread and waits a moment for it, and does nothing when there is none.</summary>
+    /// <remarks>
+    /// A moment and not for ever: a plugin taking its time inside a block must not hang the
+    /// application, so this carries on regardless once the wait is up. That does mean the thread
+    /// can still be inside the mixer when the sound card's own thread starts rendering in step,
+    /// which is a real overlap and is guarded where it matters, in
+    /// <see cref="Tracker.Synth.TrackMixer.Render"/>. It is said here because a thread that
+    /// would not stop is worth knowing about on its own: it means a plugin took longer than a
+    /// fifth of a second over one block.
+    /// </remarks>
     private void StopMixingAhead()
     {
         _mixing = false;
@@ -305,10 +318,21 @@ public sealed class SynthOutput : ISynthOutput
         var ahead = _ahead;
         _ahead = null;
 
-        try { ahead?.Join(200); } catch (Exception) { }
+        bool stopped = true;
+
+        try { if (ahead != null) stopped = ahead.Join(AheadStopMs); } catch (Exception) { }
+
+        if (!stopped)
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                "the mixing thread did not stop within " + AheadStopMs + " ms and was left to finish on its own");
+        }
 
         _cushion = 0;
     }
+
+    /// <summary>How long the mixing thread is given to notice it should stop.</summary>
+    private const int AheadStopMs = 200;
 
     /// <summary>
     /// Mixes whenever the queue has room, and waits when it is full.

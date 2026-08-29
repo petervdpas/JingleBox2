@@ -14,6 +14,24 @@ namespace JingleBox2.Audio.Interfaces;
 /// The rate is fixed for the life of the mixer. Voices, filters and plugins all work their
 /// timings out from it, so it cannot move under them: it is asked for once, when the device is
 /// opened, and everything is built for it after that.
+///
+/// **The thread contract, which is written down in full in <c>docs/threads.md</c>.**
+///
+/// This is where the mixer's two callers come from, and it is the only place in the application
+/// that has any. The sound card's own thread calls the fill; the mixing-ahead thread, when there
+/// is one, renders in advance into a ring and the fill only takes from it. Which of the two ways
+/// is running is one volatile number, written by the drawing thread while starting or stopping.
+/// The ring itself is one lock and nothing else touches it.
+///
+/// **Stopping the ahead thread is not a guarantee that it has stopped.** It is given two tenths
+/// of a second and then left to finish on its own, because a plugin taking its time inside a
+/// block must not hang the application, and that is exactly how both threads come to be inside
+/// the mixer at once. The mixer's own guard is what makes it safe rather than anything here, and
+/// a thread that would not stop in time is written to the log, since it means a plugin took
+/// longer than a fifth of a second over one block.
+///
+/// Everything else here is the drawing thread: opening a device, choosing how far ahead to run,
+/// and disposing.
 /// </remarks>
 public interface ISynthOutput : IDisposable
 {
