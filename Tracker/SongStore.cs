@@ -38,6 +38,10 @@ public sealed class SongStore : ISongStore
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly ISampleUsers Usage = new SampleUsers();
 
+    /// <summary>What the volume column means, and how a song written on the old scale is read.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IVolumeScale Volumes = new VolumeScale();
+
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     /// <remarks>
     /// Static because the cache below is keyed by path and a field initializer cannot read an
@@ -610,8 +614,24 @@ public sealed class SongStore : ISongStore
     /// </remarks>
     private sealed class SongDocument
     {
-        /// <summary>2 since the patches moved out of here and into the container.</summary>
-        public int Version { get; set; } = 2;
+        /// <summary>
+        /// What this build writes: 3 since the volume column was widened to 0x80.
+        /// </summary>
+        /// <remarks>
+        /// 2 was the patches moving out of the document and into the container, and 1 is every
+        /// song written before either.
+        /// </remarks>
+        public const int Current = 3;
+
+        /// <summary>
+        /// What wrote the song being read, which decides what its numbers mean.
+        /// </summary>
+        /// <remarks>
+        /// 1 rather than <see cref="Current"/> when the file does not say, deliberately. A song
+        /// with no version in it is older than the field, so reading it as current would skip
+        /// every conversion the file needs and do it silently.
+        /// </remarks>
+        public int Version { get; set; } = 1;
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
@@ -650,6 +670,7 @@ public sealed class SongStore : ISongStore
         /// </remarks>
         public static SongDocument From(Song song) => new()
         {
+            Version = Current,
             Name = song.Name,
             Description = song.Description,
             Bpm = song.Bpm,
@@ -747,6 +768,11 @@ public sealed class SongStore : ISongStore
         /// <remarks>
         /// The patterns are read last and given the song's track count, since a pattern's width
         /// is the song's and is not stored per pattern.
+        ///
+        /// And then brought onto this build's volume scale where the file was written on the
+        /// old one, which is <see cref="IVolumeScale"/>. After the patterns rather than while
+        /// they are being read, because it is a fact about the song and not about a cell: every
+        /// pattern in one file was written by the same build.
         /// </remarks>
         public Song ToSong()
         {
@@ -768,6 +794,9 @@ public sealed class SongStore : ISongStore
             };
 
             song.Patterns = Patterns.Select(p => p.ToPattern(TrackCount, NoteColumns)).ToList();
+
+            if (Version < Current) Volumes.Widen(song);
+
             return song;
         }
     }

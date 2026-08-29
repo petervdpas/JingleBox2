@@ -108,6 +108,7 @@ public partial class TrackerView : UserControl
         _ghost = new DragGhost(GhostLayer);
 
         Grid.CursorMoved += (_, cursor) => ViewModel?.SetCursor(cursor);
+        Grid.Clicked += (_, cursor) => FollowCursor(cursor);
         AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnGridKeyUp, RoutingStrategies.Tunnel);
         Grid.LostFocus += OnGridLostFocus;
@@ -505,8 +506,18 @@ public partial class TrackerView : UserControl
     /// <summary>
     /// Keeps the cursor on the middle of the screen and its track in view.
     /// </summary>
+    /// <remarks>
+    /// Not while the hand has hold of the pattern. There the pointer is what is moving the
+    /// cursor, so scrolling to put that cursor back under the middle pulls the content out from
+    /// under the hand: the next movement lands several lines further on than it was aimed at,
+    /// that moves the cursor again, and the block runs away down the pattern on its own. The
+    /// press alone was enough to do it, before any movement at all. The grid says so again when
+    /// the button comes up, which is when this catches up.
+    /// </remarks>
     private void FollowCursor(PatternCursor cursor)
     {
+        if (Grid.Grabbed) return;
+
         ScrollToRow(cursor.Line);
         ScrollToTrack(cursor.Track);
     }

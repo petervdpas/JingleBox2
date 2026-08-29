@@ -938,10 +938,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         set
         {
             if (Song.LinesPerBeat == value) return;
-        Changing("lines per beat");
+
+            Changing("lines per beat");
 
             Song.LinesPerBeat = Math.Clamp(value, TrackerTiming.MinLinesPerBeat, TrackerTiming.MaxLinesPerBeat);
             OnPropertyChanged();
+            OnPropertyChanged(nameof(QuantizeChoices));
             MarkDirty();
         }
     }
@@ -1749,8 +1751,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         }
     }
 
-    /// <summary>Pulls the notes onto every nth line, the grid coming from the menu as text.</summary>
-    public IRelayCommand<string> QuantizeTrackCommand => new RelayCommand<string>(QuantizeTrack);
+    /// <summary>Pulls the notes onto every nth line. See <see cref="QuantizeChoices"/>.</summary>
+    public IRelayCommand<int> QuantizeTrackCommand => new RelayCommand<int>(QuantizeTrack);
+
+    /// <summary>What quantizing can snap to. See <see cref="IQuantizeGrid"/>.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IQuantizeGrid Grids = new QuantizeGrid();
+
+    /// <summary>
+    /// The quantize menu, which is worked out from the song's lines per beat rather than being
+    /// a list of numbers somebody has to translate.
+    /// </summary>
+    /// <remarks>
+    /// Read again whenever lines per beat moves, since every entry in it is about that number.
+    /// </remarks>
+    public IReadOnlyList<QuantizeChoice> QuantizeChoices => Grids.Choices(LinesPerBeat);
 
     /// <summary>Empties the track the cursor is on, across the whole pattern.</summary>
     public IRelayCommand ClearTrackCommand => new RelayCommand(ClearTrack);
@@ -1769,18 +1784,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         new RelayCommand(() => ClearTrackInstrument(Cursor.Track));
 
     /// <summary>
-    /// Pulls the track's notes onto every nth line. The grid comes from the menu as text,
-    /// since that is what a menu item can carry.
+    /// Pulls the track's notes onto every nth line, the menu having already worked out which n
+    /// the chosen note value comes to at this song's lines per beat.
     /// </summary>
     /// <remarks>
     /// A block quantises whole tracks even when it covers only part of their height: a note is
     /// early or late against the beat, which is a property of the track's timeline rather than
     /// of the lines somebody happened to draw round.
     /// </remarks>
-    private void QuantizeTrack(string? grid)
+    private void QuantizeTrack(int lines)
     {
         if (CurrentPattern == null) return;
-        if (!int.TryParse(grid, NumberStyles.Integer, CultureInfo.InvariantCulture, out int lines)) return;
+        if (lines < 1) return;
 
         int moved = 0;
 
@@ -1794,9 +1809,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             moved = Edits.Quantize(CurrentPattern, Cursor.Track, lines);
         }
 
+        string grid = lines == 1 ? "every line" : $"every {lines} lines";
+
         Status = moved == 0
-            ? $"{SelectionLabel} was already on {lines}"
-            : $"Quantized {SelectionLabel} to {lines}: {moved} note(s) moved";
+            ? $"{SelectionLabel} was already on {grid}"
+            : $"Quantized {SelectionLabel} to {grid}: {moved} note(s) moved";
     }
 
     /// <summary>
@@ -3538,6 +3555,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         OnPropertyChanged(nameof(Bpm));
         OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(QuantizeChoices));
         OnPropertyChanged(nameof(TrackCount));
     }
 

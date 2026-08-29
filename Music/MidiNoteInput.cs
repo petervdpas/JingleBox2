@@ -45,14 +45,5 @@ public sealed class MidiNoteInput : IMidiNoteInput
     }
 
     /// <inheritdoc/>
-    public int VolumeFor(int velocity)
-    {
-        if (velocity <= 0) return 0;
-        if (velocity >= MaxVelocity) return TrackerCell.MaxVolume;
-
-        int volume = (int)Math.Round(velocity * (double)TrackerCell.MaxVolume / MaxVelocity,
-            MidpointRounding.AwayFromZero);
-
-        return Math.Clamp(volume, 0, TrackerCell.MaxVolume);
-    }
+    public int VolumeFor(int velocity) => Math.Clamp(velocity, 0, MaxVelocity);
 }

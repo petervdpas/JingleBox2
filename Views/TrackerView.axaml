@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
+             xmlns:rec="clr-namespace:JingleBox2.Tracker.Records"
              x:Class="JingleBox2.Views.TrackerView"
              x:DataType="vm:TrackerViewModel">
 
@@ -253,13 +254,20 @@
 
                     <Separator />
 
-                    <MenuItem Header="Quantize to">
-                      <MenuItem Header="Every 2 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="2" />
-                      <MenuItem Header="Every 3 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="3" />
-                      <MenuItem Header="Every 4 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="4" />
-                      <MenuItem Header="Every 6 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="6" />
-                      <MenuItem Header="Every 8 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="8" />
-                      <MenuItem Header="Every 16 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="16" />
+                    <!-- The values are worked out from the song's lines per beat rather than
+                         listed here, since 4 lines is a beat at one setting and half of one at
+                         another. See IQuantizeGrid. -->
+                    <MenuItem Header="Quantize to" ItemsSource="{Binding QuantizeChoices}">
+                      <MenuItem.ItemContainerTheme>
+                        <ControlTheme TargetType="MenuItem"
+                                      BasedOn="{StaticResource {x:Type MenuItem}}"
+                                      x:DataType="rec:QuantizeChoice">
+                          <Setter Property="Header" Value="{Binding Label}" />
+                          <Setter Property="Command"
+                                  Value="{Binding $parent[ContextMenu].((vm:TrackerViewModel)DataContext).QuantizeTrackCommand}" />
+                          <Setter Property="CommandParameter" Value="{Binding Lines}" />
+                        </ControlTheme>
+                      </MenuItem.ItemContainerTheme>
                     </MenuItem>
 
                     <MenuItem Header="Transpose">
@@ -273,10 +281,10 @@
                       <MenuItem Header="Same for every note (use the instrument's level)"
                                 Command="{Binding SetTrackVolumeCommand}" CommandParameter="-1" />
                       <Separator />
-                      <MenuItem Header="All at full (40)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="64" />
-                      <MenuItem Header="All at three quarters (30)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="48" />
-                      <MenuItem Header="All at half (20)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="32" />
-                      <MenuItem Header="All at a quarter (10)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="16" />
+                      <MenuItem Header="All at full (80)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="128" />
+                      <MenuItem Header="All at three quarters (60)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="96" />
+                      <MenuItem Header="All at half (40)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="64" />
+                      <MenuItem Header="All at a quarter (20)" Command="{Binding SetTrackVolumeCommand}" CommandParameter="32" />
                     </MenuItem>
 
                     <!-- And the same thing for what comes next: a velocity sensitive keyboard

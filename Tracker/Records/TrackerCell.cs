@@ -12,7 +12,7 @@ namespace JingleBox2.Tracker.Records;
 /// Which instrument, or <see cref="NoInstrument"/>, which the sequencer reads as "whatever this
 /// track last played" rather than as an error.
 /// </param>
-/// <param name="Volume">How loud, on the classic 0 to 64 scale, or <see cref="NoVolume"/>.</param>
+/// <param name="Volume">How loud, 0 to <see cref="MaxVolume"/>, or <see cref="NoVolume"/>.</param>
 /// <param name="Effect">One effect command, or <see cref="TrackerEffect.None"/>.</param>
 public readonly record struct TrackerCell(Note Note, int Instrument, int Volume, TrackerEffect Effect)
 {
@@ -22,8 +22,20 @@ public readonly record struct TrackerCell(Note Note, int Instrument, int Volume,
     /// <summary>A blank volume column, which leaves the instrument's own level to decide.</summary>
     public const int NoVolume = -1;
 
-    /// <summary>Full volume, in the classic 0-64 tracker scale.</summary>
-    public const int MaxVolume = 64;
+    /// <summary>
+    /// Full volume, which is 0x80 and is written as two hex digits like everything else here.
+    /// </summary>
+    /// <remarks>
+    /// 128 rather than the 64 a tracker has had since FastTracker, because MIDI has 128
+    /// velocities and the old scale could hold only half of them: two keys struck a little
+    /// apart wrote the same number and a hit at full read 40. A velocity is written in
+    /// unchanged now, so the pattern shows what the keyboard sent and 0x80 is the one level
+    /// above anything a key can produce, reached by typing it.
+    ///
+    /// Songs written on the old scale are doubled on the way in, which is exact. See
+    /// <see cref="Interfaces.IVolumeScale"/>.
+    /// </remarks>
+    public const int MaxVolume = 128;
 
     /// <summary>Every column blank, which is what a pattern is filled with.</summary>
     public static readonly TrackerCell Empty =

@@ -535,7 +535,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-921 of them, in about three seconds, with no window and no hardware. They run in CI on every push
+961 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -908,6 +908,51 @@ whole exercise and is worth writing down rather than summarising:
   number into every entry would leave an older copy of this application opening the song and
   finding every cell unreadable. This way it reads what it can play and leaves behind what it
   cannot. Old songs load untouched, no migration and no version flag
+- **The volume column is 0x00 to 0x80, which is 128 steps, and it used to be 64.** MIDI has 128
+  velocities and the old FastTracker scale could hold half of them, so every second velocity
+  landed on the number below it and there was no way to tell a rounding from a hand. A velocity
+  is now written in unchanged: what the pattern shows is the number the keyboard sent, and it
+  can be read back against whatever the keyboard says it sent, which is the whole point of the
+  width. 0x80 is the one level above anything a key can produce, typed rather than played, and a
+  key at full velocity is 0x7F, a fifteenth of a decibel under it. It also made the column
+  readable: full is 80 rather than 40, so a normal hit reads 5C instead of 2E, which is a number
+  nobody could place against a full of 40
+- Every song already written is on the old scale and is doubled on the way in, which is exact
+  rather than a rescaling, since 64 is precisely half of 128. `IVolumeScale` is that rule and
+  `SongDocument.Version` is what asks for it: 3 is this build, 2 was the patches moving into the
+  container, and 1 is the default for a file that does not say, deliberately, because a song
+  with no version in it is older than the field and reading it as current would skip the
+  conversion silently. The V command is doubled with the column, since the two set the same
+  thing and the effect wins where both are written: leaving one on each scale would mean 40
+  being full in one column of a cell and half in the next
+- **Dragging a block out with the mouse was unusable, and the cause was the centred cursor
+  rather than the pointer handling.** A press moves the cursor, the cursor is kept on the middle
+  of the screen, so the pattern scrolls under a pointer that has not moved at all. In the grid's
+  own coordinates that scroll reads as the hand having flown across the page, and it happens
+  between the press and the first movement every single time. Then each movement of the drag
+  moved the cursor again, which scrolled again, so the next movement landed further on than it
+  was aimed at and the block ran away down the pattern on its own. The old rule, that a drag
+  begins once the pointer is over a different cell from the one it was pressed on, could not
+  survive any of that: a row is under twenty pixels tall
+- Three things, and each one is needed. `PatternGrid.Grabbed` says the hand has hold of the
+  pattern, from the press rather than from the drag, and `FollowCursor` does nothing while it is
+  true. The drag threshold is measured in the window's coordinates, which do not scroll, and is
+  `IPointerDrag`: six pixels, a little past what a hand does by accident. And the cell test is
+  kept beside it rather than replaced, since the two answer different questions and a drag has
+  to pass both
+- The page catches up on `Clicked`, which is a press that left no block behind it, and not on
+  the cursor moving, because the cursor moves throughout a drag as well. So a click centres its
+  line a fraction of a second later than it used to and a drag leaves the view where it is:
+  yanking the pattern about the moment somebody lets go of a block they have just drawn moves it
+  out from under the eyes that drew it
+- Quantizing is offered as note values and not as line counts. A line count means nothing on its
+  own, since 4 lines is a beat at four lines to the beat and half of one at eight, and the old
+  menu's fixed 2, 3, 4, 6, 8 and 16 asked for that arithmetic before you could tell which entry
+  you wanted. `IQuantizeGrid` works the list out from the song's lines per beat and drops
+  anything that does not come out whole, which is what earns a setting its triplets rather than
+  handing them to it: at four lines to the beat the list is 1/16 through 1/1 with no triplets,
+  and at six it is 1/16T, 1/8T, 1/8, 1/4T, 1/4, 1/2 and 1/1. Each entry says what it comes to in
+  lines, because that is what the pattern will actually do
 - Both of the sequencer's memories are per column. The volume has to be, or one voice of a
   chord would set the level of the others; the instrument is Renoise's arrangement and the only
   one that holds up once a column is a voice, since a blank instrument column means the last

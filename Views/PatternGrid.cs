@@ -9,6 +9,8 @@ using JingleBox2.Machines.Ui;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Ui.Records;
 using JingleBox2.Tracker.Records;
+using JingleBox2.UI;
+using JingleBox2.UI.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -579,6 +581,8 @@ public sealed class PatternGrid : ThemedControl
         else if (left)
         {
             _dragAnchor = cursor;
+            _pressedAt = e.GetPosition(null);
+            Grabbed = true;
             Selection = PatternSelection.None;
         }
         else if (!Selection.Contains(cursor.Line, cursor.Track))
@@ -596,11 +600,56 @@ public sealed class PatternGrid : ThemedControl
     private PatternCursor? _dragAnchor;
 
     /// <summary>
-    /// Grows the block as the hand moves, once it has really left the cell it started on.
+    /// The same press in pixels, in the window's coordinates rather than the grid's.
     /// </summary>
     /// <remarks>
-    /// A press and a release on one cell is a click and selects nothing, which is why the cell it
-    /// started on is checked rather than the distance moved.
+    /// The cell is not enough on its own: a press near the edge of a row is a pixel away from
+    /// the row below it, so a block would begin before the hand had really moved.
+    ///
+    /// And the window's coordinates rather than this control's, which is the part that made the
+    /// whole thing misbehave. Pressing a cell moves the cursor, the cursor is kept on the middle
+    /// of the screen, so the pattern scrolls under a pointer that has not moved at all. In this
+    /// control's own coordinates that scroll reads as the hand having flown across the page, and
+    /// it happens between the press and the first movement every single time. The window does
+    /// not scroll.
+    /// </remarks>
+    private Point _pressedAt;
+
+    /// <summary>
+    /// Whether the hand has hold of the pattern: a button is down on it and has not come up.
+    /// </summary>
+    /// <remarks>
+    /// The page reads this to stop chasing the cursor while that is true. Following it here
+    /// scrolls the pattern under a pointer that is trying to point at it, and it goes wrong in
+    /// two ways rather than one. During a drag the block runs away downwards on its own, since
+    /// each movement lands further on than it was aimed at, moves the cursor, and scrolls again.
+    /// And on the press itself, before any movement at all, the pattern jumps to put the pressed
+    /// line on the middle, so a drag that follows begins from a page that has moved out from
+    /// under the hand and its first cell is several lines from the one that was clicked.
+    ///
+    /// So it covers the press and not only the drag, and the page catches up when the button
+    /// comes up. Whoever is dragging is already looking at the place they are dragging to, and
+    /// a click gets its line centred a fraction of a second later than it used to.
+    /// </remarks>
+    public bool Grabbed { get; private set; }
+
+    /// <summary>When a press has become a drag. See <see cref="IPointerDrag"/>.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IPointerDrag Drags = new PointerDrag();
+
+    /// <summary>
+    /// Grows the block as the hand moves, once it has really begun to move.
+    /// </summary>
+    /// <remarks>
+    /// Two tests before a block starts and both have to pass. The hand has to have moved far
+    /// enough to be dragging at all, which is <see cref="IPointerDrag"/>, and it has to be over
+    /// a different cell from the one it was pressed on, so a drag inside one cell selects
+    /// nothing. The cell test used to be the only one, and a row is under twenty pixels tall:
+    /// a click landing near the edge of one needed a single pixel of movement to select two
+    /// lines, which made clicking to move the cursor select a block about as often as not.
+    ///
+    /// Only the start is guarded. Once a block exists the hand is dragging, and it goes on
+    /// dragging however far back towards the press it wanders.
     /// </remarks>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
@@ -613,7 +662,13 @@ public sealed class PatternGrid : ThemedControl
         var point = e.GetPosition(this);
         var at = Metrics.CursorAt(point.X, point.Y, pattern.Lines);
 
-        if (Selection.IsEmpty && at.Line == _dragAnchor.Value.Line && at.Track == _dragAnchor.Value.Track) return;
+        if (Selection.IsEmpty)
+        {
+            var now = e.GetPosition(null);
+
+            if (!Drags.Begun(_pressedAt.X, _pressedAt.Y, now.X, now.Y)) return;
+            if (at.Line == _dragAnchor.Value.Line && at.Track == _dragAnchor.Value.Track) return;
+        }
 
         Selection = Selection.IsEmpty
             ? PatternSelection.At(_dragAnchor.Value).ExtendTo(at)
@@ -624,12 +679,33 @@ public sealed class PatternGrid : ThemedControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// A press that turned out to be a click: it left no block behind it.
+    /// </summary>
+    /// <remarks>
+    /// The page centres the clicked line on this rather than on the cursor moving, because the
+    /// cursor also moves throughout a drag and the view is deliberately still for all of that.
+    /// Not raised for a drag, deliberately: yanking the pattern about the moment somebody lets
+    /// go of a block they have just drawn moves it out from under the eyes that drew it.
+    /// </remarks>
+    public event EventHandler<PatternCursor>? Clicked;
+
     /// <summary>Lets go of the anchor, so the next move is not read as a continuing drag.</summary>
+    /// <remarks>
+    /// And says whether it was a click, which is what gives the page back the job of following
+    /// the cursor. Without that the page would sit wherever the press left it until something
+    /// else moved the cursor, and a click would never centre its line at all.
+    /// </remarks>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
 
+        bool held = Grabbed;
+
         _dragAnchor = null;
+        Grabbed = false;
+
+        if (held && Selection.IsEmpty) Clicked?.Invoke(this, EditCursor);
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.Tracker.Records;
@@ -157,20 +158,38 @@ public class MusicTests
         Assert.False(_midi.TryNote(0, out _));
     }
 
-    /// <summary>Velocity fills the volume column end to end.</summary>
+    /// <summary>
+    /// Velocity is written into the volume column unchanged, which is what the column being
+    /// 128 wide bought. Every one of the 128 velocities has a number of its own, so no two
+    /// hits can be told apart by the hand and not by the pattern.
+    /// </summary>
     [Fact]
     public void VelocityFillsTheVolumeColumn()
     {
         Assert.Equal(0, _midi.VolumeFor(0));
         Assert.Equal(0, _midi.VolumeFor(-5));
-        Assert.Equal(TrackerCell.MaxVolume, _midi.VolumeFor(_midi.MaxVelocity));
-        Assert.Equal(TrackerCell.MaxVolume, _midi.VolumeFor(200));
+        Assert.Equal(_midi.MaxVelocity, _midi.VolumeFor(_midi.MaxVelocity));
+        Assert.Equal(_midi.MaxVelocity, _midi.VolumeFor(200));
 
-        for (int velocity = 1; velocity < _midi.MaxVelocity; velocity++)
+        var seen = new HashSet<int>();
+
+        for (int velocity = 0; velocity <= _midi.MaxVelocity; velocity++)
         {
+            Assert.Equal(velocity, _midi.VolumeFor(velocity));
             Assert.InRange(_midi.VolumeFor(velocity), 0, TrackerCell.MaxVolume);
-            Assert.True(_midi.VolumeFor(velocity) <= _midi.VolumeFor(velocity + 1));
+            Assert.True(seen.Add(_midi.VolumeFor(velocity)));
         }
+    }
+
+    /// <summary>
+    /// And the one level above them, which a key cannot reach and a person can type.
+    /// </summary>
+    [Fact]
+    public void FullIsAboveAnythingAKeyCanPlay()
+    {
+        Assert.Equal(128, TrackerCell.MaxVolume);
+        Assert.True(_midi.VolumeFor(_midi.MaxVelocity) < TrackerCell.MaxVolume);
+        Assert.Equal("80", new TrackerCell(new Note(60), 0, TrackerCell.MaxVolume, TrackerEffect.None).VolumeText);
     }
 
     /// <summary>The two letter rows are exactly one octave apart, which is the whole layout.</summary>
