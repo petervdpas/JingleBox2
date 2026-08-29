@@ -13,6 +13,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using JingleBox2.ViewModels.Records;
 using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
@@ -223,7 +224,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>In pattern mode nothing is coming but this pattern again, so both go blank.</summary>
-    partial void OnPlayModeChanged(TrackerPlayMode value) => NeighboursMoved();
+    /// <summary>
+    /// Tells the transport as well as the page, so a pass already running answers it.
+    /// </summary>
+    /// <remarks>
+    /// It only moved the ghosted neighbours before, which is the drawing half. The pass took its
+    /// mode when it started and kept it, so switching to Song while a pattern was looping did
+    /// nothing at all until the transport was stopped and started again. From the outside that
+    /// is a song that will not move on.
+    /// </remarks>
+    partial void OnPlayModeChanged(TrackerPlayMode value)
+    {
+        _player.Mode = value;
+
+        NeighboursMoved();
+    }
 
     /// <summary>
     /// What has been done to this song's patterns, so it can be taken back.
@@ -323,6 +338,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// hold the song they were opened on, so handing back a different object would leave every
     /// one of them playing the song as it was before the undo. What comes back is its contents.
     ///
+    /// The order list is built again here, and it was not before, which made every undo of an
+    /// order change look like an undo that did nothing: the song went back and the rows on the
+    /// screen were the strings from before it. Adding a pattern and removing a slot both had
+    /// this, and copying one and dragging one both would have. The list is a list of strings
+    /// rather than of the order itself, so nothing tells it the numbers underneath have moved.
+    /// The picked slot is held inside the order it now has, since an undo can leave a shorter
+    /// one than the slot that was picked.
+    ///
     /// Field by field and found rather than listed, the same as the machine designer's, and for
     /// the same reason: a list written out here would be right the day it was written and wrong
     /// the first time a field is added to a song, and an undo that silently drops one is worse
@@ -355,6 +378,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
                 "history: " + rebuilt.Count + " track(s) had their inserts built again to match the step");
 
         SyncInstruments();
+
+        RefreshOrder();
+
+        if (Song.Order.Count > 0) OrderIndex = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
 
         CurrentPattern = Song.PatternAt(OrderIndex) ?? Song.PatternAt(0);
 
@@ -720,7 +747,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty] private RackMachine? pickedMachine;
 
     /// <summary>The order, as rows: which pattern is played at each slot, in words.</summary>
-    public ObservableCollection<string> OrderEntries { get; } = new();
+    public ObservableCollection<OrderSlot> OrderEntries { get; } = new();
 
     /// <summary>Every song on the shelf, which is what the open dialog is narrowed from.</summary>
     public ObservableCollection<SongFile> SavedSongs { get; } = new();
@@ -841,8 +868,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
+        loopPlayback = config?.LoopPlayback ?? true;
 
-        _player = new TrackerPlayer(audio, machines);
+        _player = new TrackerPlayer(audio, machines) { Loop = loopPlayback };
 
         Automation = new AutomationRecorder(
             () => Song,
@@ -1053,6 +1081,54 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>Takes the picked slot out of the order, leaving the pattern itself alone.</summary>
     public IRelayCommand RemoveOrderEntryCommand => new RelayCommand(RemoveOrderEntry);
+
+    /// <summary>Copies the pattern this slot plays, and puts the copy in the order after it.</summary>
+    public IRelayCommand CopyPatternCommand => new RelayCommand(CopyPattern);
+
+    /// <summary>Plays this slot's pattern again, in a slot of its own after it.</summary>
+    public IRelayCommand RepeatPatternCommand => new RelayCommand(RepeatPattern);
+
+    /// <summary>Points the picked slot at another pattern, named by its place in the song.</summary>
+    public IRelayCommand<int> PlayPatternCommand => new RelayCommand<int>(PlayPattern);
+
+    /// <summary>Takes the loop range off the order, leaving the song playing straight through.</summary>
+    public IRelayCommand ClearLoopCommand => new RelayCommand(() => MarkLoop(Song.NoLoop, Song.NoLoop));
+
+    /// <summary>True while the order has a loop range on it, for the menu that clears it.</summary>
+    public bool HasLoop => Song.HasLoop;
+
+    /// <summary>
+    /// Marks a loop range over the order, or takes one off.
+    /// </summary>
+    /// <remarks>
+    /// An edit of the song like any other: undoable, and it makes the song unsaved, since the
+    /// range travels in the file. Drawn by dragging, so it arrives many times a second while a
+    /// hand is moving; the history gathers by description and time the same as a fader does, so
+    /// one drag is one step rather than one per row crossed.
+    ///
+    /// The transport is told nothing. It reads the range off the song when it works out where
+    /// to go next, so a range drawn while something is playing is answered at the end of the
+    /// slot it is on, with no jump.
+    /// </remarks>
+    /// <param name="from">One end, or <see cref="Song.NoLoop"/> to clear it.</param>
+    /// <param name="to">The other end.</param>
+    public void MarkLoop(int from, int to)
+    {
+        if (Song.LoopFrom == from && Song.LoopTo == to) return;
+
+        Changing("the loop range");
+
+        Song.SetLoop(from, to);
+
+        RefreshOrder();
+        MarkDirty();
+
+        OnPropertyChanged(nameof(HasLoop));
+
+        Status = Song.HasLoop
+            ? $"Looping slots {Song.LoopFirst:00} to {Song.LoopLast:00}"
+            : "The order plays straight through";
+    }
 
     /// <summary>
     /// Saves the song, asking for a name only if it has never had one.
@@ -1890,6 +1966,41 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         else Edits.TransposeTrack(CurrentPattern, Cursor.Track, steps);
 
         Status = $"Transposed {SelectionLabel} by {steps:+0;-0} semitone(s)";
+    }
+
+    /// <summary>
+    /// Whether the transport comes round again at the end of what it is playing. On, and
+    /// remembered between runs.
+    /// </summary>
+    /// <remarks>
+    /// What "the end" is depends on the picker beside it: the end of the pattern in Pattern
+    /// mode, the end of the order in Song mode. Off, playing a song is a play-through that stops
+    /// on its own, which is what you want when you are listening to the whole thing rather than
+    /// working on a part of it.
+    /// </remarks>
+    [ObservableProperty] private bool loopPlayback = true;
+
+    /// <summary>
+    /// Tells the transport at once, so a pass already running answers it.
+    /// </summary>
+    /// <remarks>
+    /// Live, the same as the mode beside it: the clock reads the flag when it works out where to
+    /// go next, so switching it while a pattern is looping is answered at the end of that
+    /// pattern rather than at the end of the pass. Being made to stop and start again to be
+    /// believed is what made the mode picker look broken.
+    /// </remarks>
+    partial void OnLoopPlaybackChanged(bool value)
+    {
+        _player.Loop = value;
+
+        Status = value
+            ? "Looping: it comes round again at the end"
+            : "Not looping: it plays to the end and stops";
+
+        if (_configStore == null || _config == null) return;
+
+        _config.LoopPlayback = value;
+        _configStore.Save(_config);
     }
 
     /// <summary>
@@ -2931,6 +3042,141 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>
+    /// Copies the pattern the picked slot plays, and puts the copy in the order right after it.
+    /// </summary>
+    /// <remarks>
+    /// After it rather than at the end, because copying a pattern is almost always the start of
+    /// a variation on the part you are listening to and you want to hear it in its place. Adding
+    /// a fresh empty pattern still goes on the end, which is a different thing to want.
+    ///
+    /// A copy and not a second slot pointing at the same pattern. The order already allows the
+    /// same pattern twice, and it is what you want for a part that really does repeat; this is
+    /// for the other case, where the second one is about to become different. The cells and the
+    /// automation lanes are both taken, so nothing moves together afterwards.
+    ///
+    /// The cursor follows it, since a copy nobody is looking at is a copy nobody asked for.
+    /// </remarks>
+    private void CopyPattern()
+    {
+        if (Song.Order.Count == 0) return;
+
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        int pattern = Song.Order[at];
+
+        if (Song.PatternAt(at) == null) return;
+
+        Changing("copying a pattern");
+
+        int copy = Song.ClonePattern(pattern);
+        if (copy < 0) return;
+
+        Song.Order.Insert(at + 1, copy);
+
+        RefreshOrder();
+        MarkDirty();
+
+        OrderIndex = at + 1;
+
+        Status = $"Copied pattern {Song.Patterns[pattern].Name} into {Song.Patterns[copy].Name}";
+    }
+
+    /// <summary>
+    /// Puts this slot's pattern into the order again, right after it.
+    /// </summary>
+    /// <remarks>
+    /// The other half of copying, and the half that was missing altogether: the order is a list
+    /// of patterns and until now there was no way to put one in it twice. A song is verse,
+    /// verse, chorus, verse, and without this the only way to get the second verse was to copy
+    /// the first, which makes two patterns that then have to be edited together for ever.
+    ///
+    /// Renoise offers both from the same button, a copy on the left and a repeat on the right,
+    /// which is a distinction nobody can see. Two commands here, since the difference between
+    /// them is the whole question: one of them makes a pattern and one of them does not.
+    /// </remarks>
+    private void RepeatPattern()
+    {
+        if (Song.Order.Count == 0) return;
+
+        Changing("repeating a pattern");
+
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+
+        Song.Order.Insert(at + 1, Song.Order[at]);
+
+        RefreshOrder();
+        MarkDirty();
+
+        OrderIndex = at + 1;
+
+        Status = $"Pattern {Song.PatternAt(at)?.Name} plays again at slot {OrderIndex:00}";
+    }
+
+    /// <summary>What patterns a slot could be pointed at, for the menu that offers them.</summary>
+    /// <remarks>
+    /// Every pattern the song holds, whether or not it is in the order: one that has fallen out
+    /// of the order is still somebody's work and pointing a slot back at it is how it is
+    /// recovered. Named the way the order list names them, so the two read alike.
+    /// </remarks>
+    public IReadOnlyList<PatternChoice> PatternChoices =>
+        Song.Patterns.Select((pattern, index) => new PatternChoice(index, pattern.Name)).ToList();
+
+    /// <summary>
+    /// Points the picked slot at another pattern.
+    /// </summary>
+    /// <remarks>
+    /// The slot changes and nothing about either pattern does, which is what makes an order a
+    /// list of what plays rather than a list of what exists. Renoise spells this as arrows
+    /// beside the number and a number you can type into; the list here has no number field of
+    /// its own, so it is offered where the rest of what a slot can do is.
+    /// </remarks>
+    /// <param name="pattern">Which pattern, by its place in the song.</param>
+    private void PlayPattern(int pattern)
+    {
+        if (Song.Order.Count == 0) return;
+        if (pattern < 0 || pattern >= Song.Patterns.Count) return;
+
+        int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        if (Song.Order[at] == pattern) return;
+
+        Changing("pointing a slot at a pattern");
+
+        Song.Order[at] = pattern;
+
+        RefreshOrder();
+        MarkDirty();
+
+        CurrentPattern = Song.PatternAt(at);
+
+        Status = $"Slot {at:00} plays pattern {Song.Patterns[pattern].Name}";
+    }
+
+    /// <summary>
+    /// Moves one slot of the order to another place in it, which is what dragging a row does.
+    /// </summary>
+    /// <remarks>
+    /// The slot moves and the pattern stays where it is in the song: a pattern in the order
+    /// three times has three slots and only the dragged one is touched. The cursor goes with the
+    /// slot rather than staying at the number it was on, since the hand that dragged it is
+    /// looking at where it landed.
+    /// </remarks>
+    /// <param name="from">The slot picked up.</param>
+    /// <param name="to">Where it was let go of.</param>
+    public void MoveOrderEntry(int from, int to)
+    {
+        Changing("moving an order slot");
+
+        if (!Song.MoveOrder(from, to)) return;
+
+        RefreshOrder();
+        MarkDirty();
+
+        OrderIndex = Math.Clamp(to, 0, Song.Order.Count - 1);
+        CurrentPattern = Song.PatternAt(OrderIndex);
+
+        Status = $"Moved slot {from:00} to {OrderIndex:00}";
+    }
+
+    /// <summary>
     /// Takes the picked slot out of the order. The pattern itself stays in the song, since it
     /// may be in the order somewhere else and is somebody's work either way.
     /// </summary>
@@ -3066,16 +3312,24 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// change hooks. Restoring the same slot number is not a change, so nothing would fire and
     /// the grid would stay empty; and the order is what decides what is either side of this
     /// pattern, so a slot added or taken out moves both without the number moving at all.
+    ///
+    /// What patterns there are to choose from is said again here as well. Every path that makes
+    /// a pattern or reads a song back ends at this method, so it is the one place that knows the
+    /// list has moved: <see cref="PatternChoices"/> is worked out on demand from the song and
+    /// has nothing of its own to notice a change with, and left unsaid the menu offering them
+    /// shows whatever there was the last time something happened to think of it.
     /// </remarks>
     private void RefreshOrder()
     {
         int wanted = OrderIndex;
 
+        OnPropertyChanged(nameof(PatternChoices));
+
         OrderEntries.Clear();
         for (int i = 0; i < Song.Order.Count; i++)
         {
             var pattern = Song.PatternAt(i);
-            OrderEntries.Add($"{i:00}   {pattern?.Name ?? "--"}");
+            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.Loops(i)));
         }
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);

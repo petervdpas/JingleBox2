@@ -84,6 +84,66 @@ public sealed class Song
     /// <summary>Indexes into <see cref="Patterns"/>, in playing order.</summary>
     public List<int> Order { get; set; } = new();
 
+    /// <summary>The first slot of the loop range, or <see cref="NoLoop"/> for none.</summary>
+    /// <remarks>
+    /// A range over the order rather than over the patterns: it is slots that are looped, so a
+    /// pattern that appears twice can be inside the range once and outside it once.
+    ///
+    /// Part of the song rather than a preference, unlike the loop switch beside the mode picker.
+    /// The switch is about how you are working; a range is about a piece of the music, the eight
+    /// bars you are going round while you write the solo, and it is worth still being there when
+    /// the song is opened again. Renoise keeps it in the song for the same reason.
+    /// </remarks>
+    public int LoopFrom { get; set; } = NoLoop;
+
+    /// <summary>The last slot of the loop range, or <see cref="NoLoop"/> for none.</summary>
+    public int LoopTo { get; set; } = NoLoop;
+
+    /// <summary>What either end of the loop range holds when there is no range at all.</summary>
+    public const int NoLoop = -1;
+
+    /// <summary>True when the order has a range marked on it.</summary>
+    /// <remarks>
+    /// Both ends have to be inside the order, so an order that has shrunk under a range leaves
+    /// no range rather than one pointing at slots that are not there. Asked rather than repaired
+    /// on the way in, since a range is cheap to check and a repair would be a write from
+    /// whatever happened to look first.
+    /// </remarks>
+    public bool HasLoop =>
+        LoopFrom >= 0 && LoopTo >= 0 &&
+        LoopFrom < Order.Count && LoopTo < Order.Count;
+
+    /// <summary>The first slot of the range, whichever end it was drawn from.</summary>
+    public int LoopFirst => Math.Min(LoopFrom, LoopTo);
+
+    /// <summary>And the last, so nothing above has to know which way somebody dragged.</summary>
+    public int LoopLast => Math.Max(LoopFrom, LoopTo);
+
+    /// <summary>Whether that slot is inside the range.</summary>
+    /// <param name="slot">Where in the order.</param>
+    public bool Loops(int slot) => HasLoop && slot >= LoopFirst && slot <= LoopLast;
+
+    /// <summary>Marks a range over the order, or takes one off with <see cref="NoLoop"/>.</summary>
+    /// <remarks>
+    /// Either end may be given first, since it is drawn by dragging and a drag goes both ways.
+    /// Held inside the order rather than refused, so a range drawn past the last row is a range
+    /// to the last row, which is what the hand doing it meant.
+    /// </remarks>
+    /// <param name="from">One end, or <see cref="NoLoop"/> to clear the range.</param>
+    /// <param name="to">The other end. Ignored when the first is <see cref="NoLoop"/>.</param>
+    public void SetLoop(int from, int to)
+    {
+        if (from < 0 || Order.Count == 0)
+        {
+            LoopFrom = NoLoop;
+            LoopTo = NoLoop;
+            return;
+        }
+
+        LoopFrom = Math.Clamp(from, 0, Order.Count - 1);
+        LoopTo = Math.Clamp(to < 0 ? from : to, 0, Order.Count - 1);
+    }
+
     /// <summary>
     /// The song's own instruments, which are its copies and not the rack's.
     /// </summary>
@@ -447,6 +507,63 @@ public sealed class Song
 
         Patterns.Add(pattern);
         return Patterns.Count - 1;
+    }
+
+    /// <summary>
+    /// Adds a pattern holding the same music as another, and hands back where it landed.
+    /// </summary>
+    /// <remarks>
+    /// A copy and not a second name for the same thing: <see cref="Pattern.Clone"/> takes the
+    /// cells and the automation lanes, so editing one afterwards leaves the other alone. That is
+    /// the whole point of copying a pattern rather than putting the one you have into the order
+    /// twice, which the order already allows and which is a different thing to want.
+    ///
+    /// Named the way a new one is, by how many there are, so the two ways of getting a pattern
+    /// cannot end up with two ways of naming one. The name is what the order list shows and is
+    /// not an identity: nothing looks a pattern up by it.
+    /// </remarks>
+    /// <param name="index">Which pattern to copy.</param>
+    /// <returns>Where the copy is in <see cref="Patterns"/>, or -1 for a pattern that is not there.</returns>
+    public int ClonePattern(int index)
+    {
+        if (index < 0 || index >= Patterns.Count) return -1;
+
+        var copy = Patterns[index].Clone();
+        copy.Name = (Patterns.Count + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+
+        Patterns.Add(copy);
+        return Patterns.Count - 1;
+    }
+
+    /// <summary>
+    /// Moves one slot of the order to another place in it, taking its pattern with it.
+    /// </summary>
+    /// <remarks>
+    /// The slot moves, not the pattern: a pattern that is in the order three times has three
+    /// slots and only the one being dragged is touched.
+    ///
+    /// The destination is read as where the slot should end up once it has been taken out, which
+    /// is what dragging a row down a list means to the hand doing it. Out of range at either end
+    /// is held to the ends rather than refused, since a drop below the last row is a drop on the
+    /// last row as far as anybody dragging is concerned.
+    /// </remarks>
+    /// <param name="from">The slot being moved.</param>
+    /// <param name="to">Where it should sit afterwards.</param>
+    /// <returns>False when nothing moved, which is a slot dropped where it already was.</returns>
+    public bool MoveOrder(int from, int to)
+    {
+        if (Order.Count < 2) return false;
+        if (from < 0 || from >= Order.Count) return false;
+
+        to = Math.Clamp(to, 0, Order.Count - 1);
+        if (to == from) return false;
+
+        int slot = Order[from];
+
+        Order.RemoveAt(from);
+        Order.Insert(to, slot);
+
+        return true;
     }
 
     /// <summary>

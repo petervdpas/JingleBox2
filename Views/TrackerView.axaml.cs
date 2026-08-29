@@ -42,6 +42,10 @@ public partial class TrackerView : UserControl
     /// <summary>What a dragged track carries. Holds nothing, so one serves the page.</summary>
     private static readonly IDragPayload Tracks = new TrackDragData();
 
+    /// <summary>What a slot of the order carries while it is being dragged up or down it.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IDragPayload Slots = new OrderDragData();
+
     /// <summary>And what a dragged instrument carries.</summary>
     private static readonly IDragPayload DraggedInstrument = new InstrumentDragData();
 
@@ -228,8 +232,262 @@ public partial class TrackerView : UserControl
         Grid.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         Grid.AddHandler(DragDrop.DropEvent, OnGridDrop);
 
+        OrderList.AddHandler(PointerPressedEvent, OnOrderPointerPressed,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+
+        OrderList.AddHandler(PointerWheelChangedEvent, OnOrderWheel, RoutingStrategies.Tunnel);
+
+        OrderList.AddHandler(PointerMovedEvent, OnOrderPointerMoved,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+
+        OrderList.AddHandler(PointerReleasedEvent, OnOrderPointerReleased,
+            RoutingStrategies.Bubble, handledEventsToo: true);
+
+        DragDrop.SetAllowDrop(OrderList, true);
+        OrderList.AddHandler(DragDrop.DragOverEvent, OnOrderDragOver);
+        OrderList.AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+        OrderList.AddHandler(DragDrop.DropEvent, OnOrderDrop);
+
         DragDrop.SetAllowDrop(this, true);
         AddHandler(DragDrop.DragOverEvent, OnPageDragOver);
+    }
+
+    /// <summary>
+    /// Picks a slot of the order up.
+    /// </summary>
+    /// <remarks>
+    /// Releasing without moving ends the drag with no effect, so this does not get in the way of
+    /// clicking a row to go to it, which is the same bargain the instrument list and the track
+    /// headers already make.
+    ///
+    /// The row under the pointer rather than the selected one. A press selects before this runs,
+    /// so the two are the same in every ordinary case, and asking the pointer is what makes a
+    /// press on an unselected row drag that row rather than the one that happened to be lit.
+    ///
+    /// A right press picks the row and does no more: what a slot can do is on the menu that
+    /// follows, and every one of those things is about the row you pointed at. Left unpicked,
+    /// the menu would act on whatever was lit before, which is the one way a menu on a list can
+    /// be genuinely dangerous. The event is left unhandled deliberately, since handling it here
+    /// swallows the request for the menu itself, which is the same bargain the pattern grid
+    /// already makes.
+    /// </remarks>
+    private async void OnOrderPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var pressed = e.GetCurrentPoint(OrderList).Properties;
+
+        var point = e.GetPosition(OrderList);
+        int slot = SlotAt(point);
+
+        if (pressed.IsLeftButtonPressed && slot >= 0 && OnLoopStrip(point))
+        {
+            StartLoop(slot, e);
+            return;
+        }
+
+        if (pressed.IsRightButtonPressed)
+        {
+            if (slot >= 0 && ViewModel is { } model) model.OrderIndex = slot;
+            return;
+        }
+
+        if (!pressed.IsLeftButtonPressed) return;
+        if (slot < 0) return;
+
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, Slots.For(slot), DragDropEffects.Move);
+        }
+        finally
+        {
+            LetGo();
+        }
+    }
+
+    /// <summary>
+    /// The wheel over the order list steps from one slot to the next.
+    /// </summary>
+    /// <remarks>
+    /// Moving the pick rather than scrolling the view, which is what the list would do with the
+    /// wheel on its own and is nearly useless here: an order is a handful of rows in a tall
+    /// panel, so there is usually nothing to scroll, and what somebody wheeling over it wants is
+    /// the next pattern rather than a different view of the same three. The list is told to keep
+    /// the picked row in sight, so a long order still scrolls, as a side effect of the pick
+    /// moving rather than instead of it.
+    ///
+    /// One slot a notch. A wheel that moved several would make the pattern being edited jump
+    /// past the one somebody was going to, and the whole point of this is arriving at a pattern
+    /// without aiming at a row.
+    ///
+    /// It stops at the two ends rather than coming round, which is the rule the preset stepper
+    /// already keeps and for the same reason: a wheel that wrapped would carry you past the one
+    /// you were looking for and back to the far end of the song.
+    ///
+    /// Tunnelled, so it is answered before the scroll viewer inside the list takes it. Marked
+    /// handled either way, including at the ends, or the viewer would scroll underneath a pick
+    /// that could not move and the list would drift away from the row that is lit.
+    /// </remarks>
+    private void OnOrderWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (ViewModel is not { } model || model.OrderEntries.Count == 0) return;
+
+        e.Handled = true;
+
+        int step = e.Delta.Y > 0 ? -1 : e.Delta.Y < 0 ? 1 : 0;
+        if (step == 0) return;
+
+        int wanted = Math.Clamp(model.OrderIndex + step, 0, model.OrderEntries.Count - 1);
+        if (wanted == model.OrderIndex) return;
+
+        model.OrderIndex = wanted;
+
+        OrderList.ScrollIntoView(wanted);
+    }
+
+    /// <summary>Whether that point is on the strip down the left of a row rather than on the row.</summary>
+    /// <remarks>
+    /// By the class the strip wears rather than by measuring, so the two cannot disagree when
+    /// the template moves. The strip is drawn even on a slot that is not looped, faintly, so
+    /// there is always something there to start a drag on.
+    /// </remarks>
+    private bool OnLoopStrip(Point point)
+    {
+        var hit = OrderList.InputHitTest(point) as Visual;
+
+        while (hit != null && hit != OrderList)
+        {
+            if (hit is Control control && control.Classes.Contains("loopbar")) return true;
+
+            hit = Avalonia.VisualTree.VisualExtensions.GetVisualParent(hit);
+        }
+
+        return false;
+    }
+
+    /// <summary>Where a loop range being drawn started, or -1 while none is being drawn.</summary>
+    private int _loopFrom = -1;
+
+    /// <summary>
+    /// Begins a loop range at that slot, or takes off the one that is already exactly there.
+    /// </summary>
+    /// <remarks>
+    /// Pressing the strip of a slot that is on its own in the range clears it, which is the one
+    /// gesture Renoise's manual spells out: "to remove a loop just click on a single slot
+    /// twice". Everything else starts a range of one slot that the drag then grows.
+    ///
+    /// The pointer is captured, so a drag that leaves the list still ends here rather than
+    /// leaving a range half drawn.
+    /// </remarks>
+    private void StartLoop(int slot, PointerPressedEventArgs e)
+    {
+        if (ViewModel is not { } model) return;
+
+        e.Handled = true;
+
+        if (model.Song.HasLoop && model.Song.LoopFirst == slot && model.Song.LoopLast == slot)
+        {
+            model.MarkLoop(JingleBox2.Tracker.Song.NoLoop, JingleBox2.Tracker.Song.NoLoop);
+            return;
+        }
+
+        _loopFrom = slot;
+
+        model.MarkLoop(slot, slot);
+
+        e.Pointer.Capture(OrderList);
+    }
+
+    /// <summary>Grows the range as the hand moves down or up the strip.</summary>
+    private void OnOrderPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_loopFrom < 0 || ViewModel is not { } model) return;
+        if (!e.GetCurrentPoint(OrderList).Properties.IsLeftButtonPressed) { _loopFrom = -1; return; }
+
+        int slot = SlotAt(e.GetPosition(OrderList));
+        if (slot < 0) return;
+
+        model.MarkLoop(_loopFrom, slot);
+
+        e.Handled = true;
+    }
+
+    /// <summary>Lets go of the range being drawn, however the press ended.</summary>
+    private void OnOrderPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_loopFrom < 0) return;
+
+        _loopFrom = -1;
+        e.Pointer.Capture(null);
+    }
+
+    /// <summary>Which row of the order list is under that point, or -1 for none of them.</summary>
+    /// <remarks>
+    /// By hit testing rather than by dividing the height, since a row's height is the theme's to
+    /// decide and the list scrolls. The walk outwards stops at the list itself, so a point in
+    /// the padding around the rows answers -1 rather than the nearest one.
+    /// </remarks>
+    private int SlotAt(Point point)
+    {
+        var hit = OrderList.InputHitTest(point) as Visual;
+
+        while (hit != null && hit != OrderList)
+        {
+            if (hit is ListBoxItem row) return OrderList.IndexFromContainer(row);
+
+            hit = Avalonia.VisualTree.VisualExtensions.GetVisualParent(hit);
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The hand is over the order list, and it will take a slot and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// A drop between the rows, or below the last one, is read as the nearest row rather than as
+    /// nowhere: somebody dragging to the bottom of a list means the bottom of the list, and
+    /// refusing that would leave the one drop everybody tries doing nothing.
+    /// </remarks>
+    private void OnOrderDragOver(object? sender, DragEventArgs e)
+    {
+        Carry(e);
+
+        int moving = Slots.IndexFrom(e.DataTransfer);
+
+        _ghost.Refused = moving < 0;
+        e.DragEffects = moving < 0 ? DragDropEffects.None : DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    /// <summary>Let go over the order list, onto the row it landed on.</summary>
+    private void OnOrderDrop(object? sender, DragEventArgs e)
+    {
+        e.Handled = true;
+
+        int moving = Slots.IndexFrom(e.DataTransfer);
+        if (moving < 0 || ViewModel is not { } model) return;
+
+        var point = e.GetPosition(OrderList);
+        int onto = SlotAt(point);
+
+        if (onto < 0) onto = Below(point) ? model.OrderEntries.Count - 1 : 0;
+
+        model.MoveOrderEntry(moving, onto);
+    }
+
+    /// <summary>Whether a point that landed on no row landed under them rather than over them.</summary>
+    /// <remarks>
+    /// Measured against the last row that is really there rather than against the middle of the
+    /// list, since a list with three rows in a tall panel is mostly empty space below them and
+    /// all of it means the end.
+    /// </remarks>
+    private bool Below(Point point)
+    {
+        if (OrderList.ItemCount == 0) return false;
+
+        var last = OrderList.ContainerFromIndex(OrderList.ItemCount - 1);
+        if (last == null) return true;
+
+        return point.Y > last.Bounds.Top;
     }
 
     /// <summary>
@@ -358,6 +616,11 @@ public partial class TrackerView : UserControl
 
         if (moving >= 0)
             return Picture("Track " + (moving + 1).ToString("00", CultureInfo.InvariantCulture), "", "");
+
+        int order = Slots.IndexFrom(e.DataTransfer);
+
+        if (order >= 0)
+            return Picture(ViewModel?.OrderEntries.ElementAtOrDefault(order)?.Text ?? "", "", "");
 
         int instrument = DraggedInstrument.IndexFrom(e.DataTransfer);
         if (instrument < 0) return null;

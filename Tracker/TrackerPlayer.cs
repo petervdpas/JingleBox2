@@ -167,10 +167,33 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public TrackerPosition Position { get; private set; } = TrackerPosition.Start;
 
     /// <inheritdoc/>
-    public TrackerPlayMode Mode { get; private set; } = TrackerPlayMode.Song;
+    /// <remarks>
+    /// Volatile, since the clock thread reads it on every line and the drawing thread writes it
+    /// whenever the picker moves. See <c>docs/threads.md</c>.
+    /// </remarks>
+    public TrackerPlayMode Mode
+    {
+        get => (TrackerPlayMode)Volatile.Read(ref _mode);
+        set => Volatile.Write(ref _mode, (int)value);
+    }
+
+    /// <summary>Backs <see cref="Mode"/> as an int, which is what can be read atomically.</summary>
+    private int _mode = (int)TrackerPlayMode.Song;
 
     /// <inheritdoc/>
-    public bool Loop { get; set; } = true;
+    /// <remarks>
+    /// Volatile, and read on every line rather than taken at the start of a pass, so switching
+    /// it while something is playing is answered at the end of that pattern. The clock thread
+    /// reads it and the drawing thread writes it: see <c>docs/threads.md</c>.
+    /// </remarks>
+    public bool Loop
+    {
+        get => Volatile.Read(ref _loop);
+        set => Volatile.Write(ref _loop, value);
+    }
+
+    /// <summary>Backs <see cref="Loop"/>. On, which is what the transport has always done.</summary>
+    private bool _loop = true;
 
     /// <inheritdoc/>
     public System.Collections.Generic.IReadOnlyCollection<string> FailedInstruments => _samples.FailedPaths;
@@ -1085,6 +1108,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// thread's business to report. A newer run may already have started, in which case this
     /// thread has none.
     /// </remarks>
+    /// <remarks>
+    /// The mode is read on every line rather than taken once at the top, so switching between
+    /// looping a pattern and playing the song is answered on the next line. Taken once, the
+    /// picker changed nothing until the transport was stopped and started again, which reads as
+    /// a song that will not move past its first pattern.
+    /// </remarks>
     private void RunClock(CancellationToken token, int generation)
     {
         Song song;
@@ -1100,7 +1129,6 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         var position = Position;
         double nextLine = 0;
-        bool loopPattern = Mode == TrackerPlayMode.Pattern;
 
         while (!token.IsCancellationRequested)
         {
@@ -1112,7 +1140,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             Position = position;
             PositionChanged?.Invoke(this, position);
 
-            var next = loopPattern
+            var next = Mode == TrackerPlayMode.Pattern
                 ? TrackerSequencer.AdvanceWithinPattern(song, position, Loop)
                 : TrackerSequencer.Advance(song, position, Loop);
 

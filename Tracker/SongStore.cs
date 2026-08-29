@@ -646,6 +646,18 @@ public sealed class SongStore : ISongStore
         public List<int> NoteColumns { get; set; } = new();
 
         public List<int> Order { get; set; } = new();
+
+        /// <summary>
+        /// The loop range over the order, either end, or -1 apiece for none.
+        /// </summary>
+        /// <remarks>
+        /// Absent in a song written before the range existed, which reads back as no range and
+        /// is exactly what that song had.
+        /// </remarks>
+        public int LoopFrom { get; set; } = Song.NoLoop;
+
+        /// <inheritdoc cref="LoopFrom"/>
+        public int LoopTo { get; set; } = Song.NoLoop;
         public List<int> TrackInstruments { get; set; } = new();
         public List<TrackMix> Mix { get; set; } = new();
 
@@ -679,6 +691,8 @@ public sealed class SongStore : ISongStore
             TrackCount = song.TrackCount,
             NoteColumns = new List<int>(song.NoteColumns),
             Order = new List<int>(song.Order),
+            LoopFrom = song.LoopFrom,
+            LoopTo = song.LoopTo,
             TrackInstruments = new List<int>(song.TrackInstruments),
             Mix = song.Mix.Select(m => m.Clone()).ToList(),
             Master = song.Master.Clone(),
@@ -786,6 +800,8 @@ public sealed class SongStore : ISongStore
                 TrackCount = TrackCount,
                 NoteColumns = new List<int>(NoteColumns),
                 Order = new List<int>(Order),
+                LoopFrom = LoopFrom,
+                LoopTo = LoopTo,
                 TrackInstruments = new List<int>(TrackInstruments),
                 Mix = Mix.Select(m => m.Clone()).ToList(),
                 Master = (Master ?? new TrackMix()).Clone(),

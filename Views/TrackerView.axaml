@@ -4,10 +4,26 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
              xmlns:rec="clr-namespace:JingleBox2.Tracker.Records"
+             xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              x:Class="JingleBox2.Views.TrackerView"
              x:DataType="vm:TrackerViewModel">
 
   <UserControl.Styles>
+    <!-- The loop strip beside a slot of the order: barely there until the slot is in the range,
+         and the accent colour when it is. Always drawn rather than made visible, so there is
+         somewhere to start a drag on a row that is not looped yet. -->
+    <Style Selector="Border.loopbar">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" Opacity="0.10" />
+      </Setter>
+    </Style>
+
+    <Style Selector="Border.loopbar.looped">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.Accent}" />
+      </Setter>
+    </Style>
+
     <Style Selector="TextBlock.field">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Opacity" Value="0.8" />
@@ -35,7 +51,17 @@
              in front of a pattern. -->
         <ComboBox ItemsSource="{Binding PlayModes}"
                   SelectedItem="{Binding PlayMode}"
-                  MinWidth="104" />
+                  MinWidth="104"
+                  ToolTip.Tip="Whether the transport plays this pattern or works through the order. Switchable while it is playing: it is answered at the end of the pattern, so nothing jumps." />
+
+        <!-- Beside the picker, because the two are one question: the picker says what "the end"
+             is and this says what happens when it is reached. A switch rather than a tick, since
+             what it holds is a state the transport is in rather than an option on a form, and it
+             reads as on or off from across the room the way the coloured buttons do. -->
+        <ToggleSwitch Margin="12,0,0,0" VerticalAlignment="Center"
+                      IsChecked="{Binding LoopPlayback}"
+                      OnContent="Loop" OffContent="Loop"
+                      ToolTip.Tip="On, it comes round again at the end: the end of this pattern in Pattern mode, the end of the order in Song mode, or the end of the loop range when the order has one. Off, it plays to the end and stops. Switchable while it is playing, and remembered between runs." />
 
         <!-- Every label the same distance from the field before it and from its own, so the
              row reads as five settings rather than as one run of digits. -->
@@ -160,13 +186,79 @@
           <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="Order" />
           <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
             <Button Content="+ Pattern" HorizontalAlignment="Stretch"
-                    Command="{Binding AddPatternCommand}" />
+                    Command="{Binding AddPatternCommand}"
+                    ToolTip.Tip="A new empty pattern, and a slot at the end of the order playing it." />
             <Button Content="Remove slot" HorizontalAlignment="Stretch" Classes="danger"
-                    Command="{Binding RemoveOrderEntryCommand}" />
+                    Command="{Binding RemoveOrderEntryCommand}"
+                    ToolTip.Tip="Takes this slot out of the order. The pattern stays in the song, since it may be in the order somewhere else." />
           </StackPanel>
-          <ListBox ItemsSource="{Binding OrderEntries}"
+          <!-- What a slot can do is on the slot, by right clicking it, rather than as a row of
+               buttons under the list: these are all about the one you are pointing at, and a
+               button at the foot of the panel is about none of them until you have remembered
+               which row is picked. -->
+          <ListBox x:Name="OrderList"
+                   ItemsSource="{Binding OrderEntries}"
                    SelectedIndex="{Binding OrderIndex}"
-                   FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
+                   FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
+                   ToolTip.Tip="The order the patterns play in. Drag a row to move it, wheel to step through them, right click for what a slot can do. Drag down the strip on the left to loop a range of slots.">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vmr:OrderSlot">
+                <!-- The loop strip down the left, then the row. A column of its own rather than
+                     a mark on the row, because a range is drawn by dragging down it and a drag
+                     needs somewhere to start that is not the row itself, which is already how a
+                     slot is moved. Renoise puts it in the same place for the same reason. -->
+                <Grid ColumnDefinitions="10,*" ColumnSpacing="6">
+                  <Border Grid.Column="0" Classes="loopbar"
+                          Classes.looped="{Binding Loops}"
+                          CornerRadius="2" />
+
+                  <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Copy pattern"
+                          Command="{Binding CopyPatternCommand}"
+                          ToolTip.Tip="A pattern of its own holding the same notes and the same automation, in the order just after this one. Editing either afterwards leaves the other alone." />
+
+                <MenuItem Header="Play it again"
+                          Command="{Binding RepeatPatternCommand}"
+                          ToolTip.Tip="The same pattern once more, in a slot of its own after this one. Nothing is copied, so editing it changes both places it plays." />
+
+                <Separator />
+
+                <!-- Which pattern this slot plays, which is what makes an order a list of what
+                     plays rather than a list of what exists. Every pattern the song holds is
+                     offered, including one that has fallen out of the order, since pointing a
+                     slot back at it is how that is recovered. -->
+                <MenuItem Header="Plays pattern" ItemsSource="{Binding PatternChoices}">
+                  <MenuItem.ItemContainerTheme>
+                    <ControlTheme TargetType="MenuItem"
+                                  BasedOn="{StaticResource {x:Type MenuItem}}"
+                                  x:DataType="vmr:PatternChoice">
+                      <Setter Property="Header" Value="{Binding Name}" />
+                      <Setter Property="Command"
+                              Value="{Binding $parent[ContextMenu].((vm:TrackerViewModel)DataContext).PlayPatternCommand}" />
+                      <Setter Property="CommandParameter" Value="{Binding Index}" />
+                    </ControlTheme>
+                  </MenuItem.ItemContainerTheme>
+                </MenuItem>
+
+                <Separator />
+
+                <MenuItem Header="Clear the loop range"
+                          IsEnabled="{Binding HasLoop}"
+                          Command="{Binding ClearLoopCommand}"
+                          ToolTip.Tip="Takes the range off, so the order plays straight through. Pressing the strip beside a slot that is looped on its own does the same." />
+
+                <Separator />
+
+                <MenuItem Header="Remove slot" Command="{Binding RemoveOrderEntryCommand}"
+                          ToolTip.Tip="Takes this slot out of the order. The pattern stays in the song, since it may be in the order somewhere else." />
+              </ContextMenu>
+            </ListBox.ContextMenu>
+          </ListBox>
         </DockPanel>
       </Border>
 

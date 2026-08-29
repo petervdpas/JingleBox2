@@ -556,7 +556,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-990 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+1014 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -956,6 +956,63 @@ whole exercise and is worth writing down rather than summarising:
   conversion silently. The V command is doubled with the column, since the two set the same
   thing and the effect wins where both are written: leaving one on each scale would mean 40
   being full in one column of a cell and half in the next
+- **Pattern or Song is a transport setting and is answered on the next line, not on the next
+  pass.** It was taken once when a pass started, and the picker only moved the ghosted
+  neighbours, so switching to Song while a pattern was looping did nothing whatever until the
+  transport was stopped and started again. From the outside that is a song that will not move
+  past its first pattern, which is exactly what it was reported as. The clock reads
+  `TrackerPlayer.Mode` on every line now, and the mode is volatile, since the clock thread reads
+  it and the drawing thread writes it
+- **A loop range over the order is a strip down the left of the list, dragged.** Renoise's loop
+  column, and the manual's own gesture for taking one off: "to remove a loop just click on a
+  single slot twice". A column of its own rather than a mark on the row, because a range is
+  drawn by dragging and a drag needs somewhere to start that is not the row itself, which is
+  already how a slot is moved. The strip is drawn faintly on every row, so there is always
+  somewhere to start
+- **A range loops whatever the loop switch says**, and that is the one place the two could have
+  been made to agree and should not be. Marking a range is somebody saying "go round these" in
+  as many words; the switch is a standing preference about what happens when there is nothing
+  else to play. A range that did nothing while the switch was off would be a mark on the screen
+  with no effect and nothing to explain it
+- It is answered only at the last slot of the range, so playing from before it runs into it and
+  then goes round, and playing from after it is not dragged backwards: somebody who starts the
+  transport past the range meant to hear what is past it. It lives in the song rather than in
+  the settings, unlike the switch, because it is about a piece of the music, the eight bars you
+  are going round while you write the solo, and it is worth still being there tomorrow. Renoise
+  keeps it in the song for the same reason. Absent in an older song file, which reads back as no
+  range, which is what that song had
+- **Loop is in the bar beside the picker, because the two are one question**: the picker says
+  what the end is, the end of this pattern or the end of the order, and the loop says what
+  happens when it is reached. It was true on the player from the beginning and nothing ever set
+  it, so everything played round for ever and that was a default nobody had chosen. Live and
+  volatile, like the mode, and remembered between runs beside the other two tracker preferences
+  rather than in the song: it is about how you are working at this moment, and a song handed to
+  somebody else has no business telling their transport what to do
+- The sequencer itself was never wrong about any of it: it walks slots rather than patterns, so
+  the same pattern in two slots is two passes over the same cells. `Tests/SongOrderTests.cs`
+  walks it the way the clock does, with no audio and no window, which is how that was ruled out
+  in a minute rather than by listening
+- **The order list copies a pattern and takes a drag.** Copy pattern is a copy and not a second
+  slot pointing at the same one: the order already allows a pattern twice and that is what you
+  want for a part that really repeats, while this is for the case where the second one is about
+  to become different. `Pattern.Clone` takes the cells and the automation lanes, so nothing moves
+  together afterwards, and the copy is named the way a new pattern is so the two ways of getting
+  one cannot end up with two ways of naming one. It lands in the order right after the slot it
+  was copied from, because copying is almost always the start of a variation on the part you are
+  listening to, where a fresh empty pattern still goes on the end
+- A slot dragged up or down the order moves the slot and not the pattern, so a pattern in the
+  order three times has three slots and only the dragged one is touched. `OrderDragData` is a
+  format of its own rather than the track one with a flag on it, for the reason the drag contract
+  already gives: an order slot and a track are both a number, and one format would make dragging
+  a track onto the order list appear to work. A drop between the rows or below the last is read
+  as the nearest row, since somebody dragging to the bottom of a list means the bottom of it
+- **And undo of any of it looked dead, which was a fault older than either.** `Pour` puts the
+  song back but never rebuilt the order list, and the list holds strings rather than the order
+  itself, so nothing told it the numbers underneath had moved: the song went back and the rows on
+  the screen were the ones from before. Adding a pattern and removing a slot both had it, and it
+  is the kind of fault that reads as the feature not working rather than as the picture being
+  stale. The picked slot is held inside the order it now has, since an undo can leave a shorter
+  one than the slot that was picked
 - **Dragging a block out with the mouse was unusable, and the cause was the centred cursor
   rather than the pointer handling.** A press moves the cursor, the cursor is kept on the middle
   of the screen, so the pattern scrolls under a pointer that has not moved at all. In the grid's
