@@ -535,7 +535,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-907 of them, in about three seconds, with no window and no hardware. They run in CI on every push
+921 of them, in about three seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -924,6 +924,41 @@ whole exercise and is worth writing down rather than summarising:
   are the same hand, and the letter rows needed a key-up they had never had: a note typed into
   the pattern had no release at all, which was enough while a track held one note. It ends the
   chord and not the sound, since a note played by hand runs its own length here
+- **Clearing a track gives back the note columns it grew.** A track that widened to three while
+  a chord was played into it stayed three wide once the chord was deleted, and every column is
+  width on the screen, so emptying a track has to be allowed to give the room back. Clear track
+  and Clear pattern both do it. By what the whole song uses rather than what the pattern in
+  front does, since the count is the song's: `Song.ColumnsUsed` walks every pattern, because
+  narrowing on one pattern's emptiness would throw another pattern's chords away and a song may
+  not lose music because a track was cleared somewhere else
+- The cells first and the room after, which is the order the two steps have to be pushed in.
+  Undo then widens the track back before it puts the notes into it, and each press does
+  something you can see; the other way round, the first press would put notes into columns the
+  song no longer says are there
+- **A chord is written in pitch order, not in the order the fingers landed.** A chord is not
+  three simultaneous events: it is three events a few milliseconds apart in whatever order the
+  hand happened to arrive, so appending each note to the next free column recorded the same
+  shape differently every time it was played, E G B on one take and E B G on the next. Each
+  note goes where its pitch belongs and the ones above it are pushed along, which is
+  `IPatternEdit.EnterChordNote`. More than tidiness once the new note action is anything but
+  cut: a column is a voice and it carries across chords, so a column that is the bass in one and
+  the top of the next has a voice leaping about inside it, releasing and sustaining across the
+  leap. A chord with nowhere left to go drops its highest note, which is the one that falls off
+  the end when the rest are pushed along
+- **And the track widens itself to fit the chord**, which is `Song.RoomForChord` and is the
+  difference between the feature working and the feature being invisible. A track shows one note
+  column until somebody says otherwise, so without this a chord recorded into a fresh track puts
+  its second note on top of its first and keeps whichever finger was last down: what you hear is
+  three notes and what is written down is one. Somebody playing a chord has already said what
+  they want, and making them find a menu before they are allowed to record it is the wrong way
+  round. One column at a time, stopping at eight. No undo step of its own: the notes leave one,
+  so undo takes the chord off and leaves an empty column behind, and a step here would make a
+  three note chord cost three presses to undo, two of which appear to do nothing
+- The pattern's cells and the two arrays that say where they sit are one object, swapped as one.
+  They were three fields and the clock thread reads all three to place a cell, so a pass running
+  while somebody added a track or a note column could read the new running total against the old
+  array and walk off the end of it. Widening a track from inside note entry is exactly that case,
+  which is what made a pre-existing race worth closing rather than noting
 - A selection is still by track, so it covers all of a track's columns: copy, cut and transpose
   carry the whole chord and `PatternBlock` holds every column of it. Taking hold of one voice of
   a chord is the piece that was left, deliberately and written down in `docs/polyphony.md`: a
@@ -1367,19 +1402,46 @@ whole exercise and is worth writing down rather than summarising:
   you start from and a sound you own turned out to be the same object. A fresh library seeds
   itself with six starters, and from then on they are ordinary instruments
 - A note played by hand on the tracker's keyboard is that track playing. It goes on the track
-  the cursor is in, through its inserts and its fader, and moves that track's meter and the
-  master's, which is the whole point of auditioning: it tells you what the part will sound like.
+  the cursor is in, through its inserts, and moves that track's meter and the master's, which is
+  the whole point of auditioning: it tells you what the part will sound like. Through its fader,
+  its mute and its placement as well, and for a long time not: the level and the pan were applied
+  to a pattern note's voice when it started, in `WithMix`, and an audition went straight past it,
+  so a muted track still sounded under your hands and a fader anywhere but unity auditioned at a
+  level the part would never play at. Invisible on a fresh song, because a strip opens at unity,
+  which is how it sat there
+- Which needed the player to know which song is open, and it only ever learnt that when a pass
+  started. `Use` is that, called when the song changes rather than when it is played, and it
+  fixes a second thing quietly wrong for the same reason: `ApplyMix` reads the same field, so a
+  fader moved with the transport stopped reached nothing that was sounding
   Only the plugin path did that; everything else, synth, mono synth, sampler, kit and recording,
   went to the loose audition bus and moved no track meter at all. Every preview takes the track
   now and defaults to none. The rack's keyboard still names none, and rightly: the instrument it
   is playing may not be in any song, so it goes through nobody's fader
-- A note played by hand holds for a fixed moment on a generated sound, which would otherwise
-  never stop, and for its own length on a recording: a take cut off part way through is not the
-  sound the instrument makes. `SampleVoice.WindowSeconds` is that length, and the hold is passed
-  back up through `Audition` and `NotePlayed` so the key that lights and the cursor that runs
-  last exactly as long as the sound. Auditions pile up, as a keyboard does, unless the
-  instrument says `OneVoice`, which cuts what it was sounding first; in a pattern this changes
-  nothing, since a track is one voice already
+- A note played by hand holds for a fixed moment where nothing is going to let go of it, which
+  is a key that was clicked, and for its own length on a recording: a take cut off part way
+  through is not the sound the instrument makes. `SampleVoice.WindowSeconds` is that length, and
+  the hold is passed back up through `Audition` and `NotePlayed` so the key that lights and the
+  cursor that runs last exactly as long as the sound. Auditions pile up, as a keyboard does,
+  unless the instrument says `OneVoice`, which cuts what it was sounding first
+- **A key that is really held sounds while it is held**, and the moment is a safety net rather
+  than the length of the note. Four tenths of a second was the length of every note played on the
+  tracker's keyboard however long the key was down, which is the difference between what a chord
+  sounds like under your hands and what it sounds like coming back: three short stabs against
+  three notes ringing until the pattern plays something else. It is what a chord makes obvious
+  and a single note hides. Both of that page's keyboards let go now, the hardware because it
+  always sent the other half of the press and the letter rows because they were given a release
+  they never had, so ten seconds is only ever reached when something went wrong
+- **And nothing on that page could be let go of at all**, which is what made the fixed moment
+  the only thing ending a note. `LetAudition` and `CutAuditions` asked for a voice carrying no
+  track *and* the right audition id. Every preview takes the track now, so no voice on the
+  tracker's keyboard has ever answered that test since. The id is what says which panel is
+  holding a note, and the track was thrown away on top of it; matched on the id alone, a key
+  coming up reaches the note it started
+- A key already down arriving again is the letter row repeating, which is how a column is filled
+  quickly and stays that way. It is dropped while another key is down, because there it is a
+  hand resting on a chord rather than somebody filling a column, and every repeat sprayed a
+  single note down the pattern under the chord that had just been written. Hardware never
+  reaches it, since a key that is down cannot be pressed again
 - The audio engine runs whenever a track has a chain, not only while something is playing. A
   plugin has to be given blocks or it cannot work on the audio, cannot finish a delay's tail,
   and cannot tell the host what its own window did. `TrackMixer` therefore does not rest while

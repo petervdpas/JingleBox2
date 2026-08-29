@@ -44,6 +44,36 @@ public sealed class PatternEdit : IPatternEdit
     }
 
     /// <inheritdoc/>
+    public int EnterChordNote(Pattern pattern, PatternCursor from, int filled, Note note,
+                              int instrument, int volume)
+    {
+        Taking(pattern, "a chord");
+
+        if (!pattern.Contains(from.Line, from.Track, from.NoteColumn)) return from.NoteColumn;
+
+        int first = from.NoteColumn;
+        int last = Math.Min(first + Math.Max(0, filled), pattern.ColumnsOn(from.Track) - 1);
+
+        int at = last;
+
+        for (int column = first; column <= last; column++)
+        {
+            if (pattern[from.Line, from.Track, column].Note.Semitone <= note.Semitone) continue;
+
+            at = column;
+            break;
+        }
+
+        for (int column = last; column > at; column--)
+            pattern[from.Line, from.Track, column] = pattern[from.Line, from.Track, column - 1];
+
+        pattern[from.Line, from.Track, at] =
+            new TrackerCell(note, instrument, TrackerCell.ClampVolume(volume), TrackerEffect.None);
+
+        return at;
+    }
+
+    /// <inheritdoc/>
     public void EnterNoteOff(Pattern pattern, PatternCursor cursor)
     {
         Taking(pattern, "a note off");

@@ -308,6 +308,14 @@ public sealed class TrackerPlayer : ITrackerPlayer
     }
 
     /// <inheritdoc/>
+    public void Use(Song song)
+    {
+        if (song is null) return;
+
+        lock (_lock) _song = song;
+    }
+
+    /// <inheritdoc/>
     public void CutPreview(TrackerInstrument? instrument)
     {
         if (instrument == null) return;
@@ -351,7 +359,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// behaviour, and it is asked here rather than in the mixer because it is a fact about the
     /// instrument and the mixer is handed a track.
     /// </remarks>
-    public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
+    public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1,
+                          double holdSeconds = PreviewHoldSeconds)
     {
         if (!note.IsPlayable) return 0;
 
@@ -360,7 +369,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
         _audio.EnsureInitialized();
         _synth.EnsureStarted(_audio);
 
-        float level = gain * (float)instrument.Volume;
+        Song? song;
+        lock (_lock) song = _song;
+
+        var (level, placed) = WithMix(song, track, gain * (float)instrument.Volume, null);
+        float pan = placed ?? 0f;
 
         if (instrument.OneVoice) _synth.Mixer.CutAuditions(instrument.Id);
 
@@ -378,15 +391,15 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             if (playing >= 0)
             {
-                _synth.Mixer.PreviewOnTrack(playing, note, level, PreviewHoldSeconds, ending);
-                return PreviewHoldSeconds;
+                _synth.Mixer.PreviewOnTrack(playing, note, level, holdSeconds, ending, pan);
+                return holdSeconds;
             }
 
             var player = PreviewPlayerFor(instrument);
             if (player == null) return 0;
 
-            _synth.Mixer.PreviewPlugin(note, level, PreviewHoldSeconds, ending);
-            return PreviewHoldSeconds;
+            _synth.Mixer.PreviewPlugin(note, level, holdSeconds, ending);
+            return holdSeconds;
         }
 
         if (instrument.IsSampler)
@@ -398,7 +411,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             return _synth.Mixer.Preview(
                 zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, note,
-                (float)(level * zone.Volume), PreviewHoldSeconds, instrument.Id, track);
+                (float)(level * zone.Volume), holdSeconds, instrument.Id, track, pan);
         }
 
         if (instrument.IsKit)
@@ -410,26 +423,26 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
             return _synth.Mixer.Preview(
                 pad, instrument.Patch, padSample, note,
-                (float)(level * pad.Volume), PreviewHoldSeconds, instrument.Id, track);
+                (float)(level * pad.Volume), holdSeconds, instrument.Id, track, pan);
         }
 
         if (instrument.IsMonoSynth)
         {
             _synth.Mixer.Preview(instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
-                note, level, PreviewHoldSeconds, instrument.Id, track);
-            return PreviewHoldSeconds;
+                note, level, holdSeconds, instrument.Id, track, pan);
+            return holdSeconds;
         }
 
         if (instrument.IsSynth)
         {
-            _synth.Mixer.Preview(instrument.Patch, note, level, PreviewHoldSeconds, instrument.Id, track);
-            return PreviewHoldSeconds;
+            _synth.Mixer.Preview(instrument.Patch, note, level, holdSeconds, instrument.Id, track, pan);
+            return holdSeconds;
         }
 
         var sample = _samples.Load(instrument.FilePath);
         if (sample == null) return 0;
 
-        return _synth.Mixer.Preview(instrument, sample, note, level, PreviewHoldSeconds, instrument.Id, track);
+        return _synth.Mixer.Preview(instrument, sample, note, level, holdSeconds, instrument.Id, track, pan);
     }
 
     /// <inheritdoc/>
@@ -1444,8 +1457,22 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// Puts a note's own level through the track's strip. The cell's pan effect wins when it
     /// set one: an effect written into the pattern is a decision about that note.
     /// </summary>
-    private static (float Gain, float? Pan) WithMix(Song song, int track, float gain, float? pan)
+    /// <remarks>
+    /// A note belonging to no track, which is what a machine's own keyboard plays, goes through
+    /// nobody's strip: the instrument it is sounding may not be in any song. So does a note
+    /// played before the player has been told which song is open, which is a state nothing
+    /// should be in and is answered rather than thrown at.
+    ///
+    /// Auditions go through this too, and did not until a chord made it obvious: the fader and
+    /// the mute were applied to a pattern note and not to the same note played by hand, so a
+    /// muted track still sounded under your hands and a fader anywhere but unity auditioned at
+    /// a level the part would never play at. The whole point of auditioning is that it tells
+    /// you what the part will sound like.
+    /// </remarks>
+    private static (float Gain, float? Pan) WithMix(Song? song, int track, float gain, float? pan)
     {
+        if (song is null || track < 0) return (Math.Clamp(gain, 0f, MaxGain), pan);
+
         float mixed = Math.Clamp(gain * Levels.GainFor(song.Mix, track), 0f, MaxGain);
 
         return (mixed, pan ?? Levels.PanFor(song.Mix, track));

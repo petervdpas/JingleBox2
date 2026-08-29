@@ -57,6 +57,44 @@ public interface IPatternEdit
     /// </param>
     void EnterNote(Pattern pattern, PatternCursor cursor, Note note, int instrument, int volume);
 
+    /// <summary>
+    /// Puts another note into the chord already being played onto one line, in pitch order.
+    /// </summary>
+    /// <remarks>
+    /// A chord is not three simultaneous events. It is three events a few milliseconds apart in
+    /// whatever order the fingers landed, so appending each one to the next free column records
+    /// the same shape differently every time you play it: E G B on one take and E B G on the
+    /// next. This puts each note where its pitch belongs and pushes the ones above it along, so
+    /// the lowest voice is always the first column.
+    ///
+    /// That is more than tidiness once the new note action is anything but cut. A column is a
+    /// voice and it carries across chords, so a column that is the bass in one chord and the
+    /// top of the next has a voice leaping about inside it, releasing and sustaining across the
+    /// leap. In pitch order each column stays the voice it was.
+    ///
+    /// A chord with nowhere left to go drops its highest note, which is the one that falls off
+    /// the end when the rest are pushed along. Eight columns is as wide as a track goes, so this
+    /// is reached by a ninth finger.
+    ///
+    /// The cell is written clean rather than merged into whatever was there. Every column this
+    /// touches was either empty or holds a note this same chord put there a moment ago, so there
+    /// is nothing of anybody's to keep, and merging would have a shifted note's effect column
+    /// follow it into its new home.
+    /// </remarks>
+    /// <param name="pattern">The pattern being edited.</param>
+    /// <param name="from">
+    /// The line and track being played onto, with the note column the chord started in.
+    /// </param>
+    /// <param name="filled">How many of the chord's columns are already written.</param>
+    /// <param name="note">The note to write.</param>
+    /// <param name="instrument">Which instrument the note names.</param>
+    /// <param name="volume">
+    /// How hard it was played, or <see cref="TrackerCell.NoVolume"/> for no volume column.
+    /// </param>
+    /// <returns>Which note column it went into.</returns>
+    int EnterChordNote(Pattern pattern, PatternCursor from, int filled, Note note, int instrument,
+                       int volume);
+
     /// <summary>Writes a note-off, which stops the track without starting anything.</summary>
     /// <remarks>
     /// Written through the cell rather than over it. The note and the instrument are what a

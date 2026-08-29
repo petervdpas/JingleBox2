@@ -179,6 +179,77 @@ public class NewNoteActionTests
         return Math.Sqrt(sum / buffer.Length);
     }
 
+    /// <summary>
+    /// A note played by hand sounds for as long as it is asked to, not for a fixed moment.
+    /// </summary>
+    /// <remarks>
+    /// The fixed moment is what a clicked key wants, since nothing lets go of it. A key that is
+    /// really being held is let go of by the hand, and holding it to four tenths of a second
+    /// made a chord under your hands three short stabs where the same chord in the pattern rang
+    /// until something else played.
+    /// </remarks>
+    [Fact]
+    public void A_note_played_by_hand_sounds_for_as_long_as_it_is_asked_to()
+    {
+        var brief = new TrackMixer(Rate);
+        var held = new TrackMixer(Rate);
+
+        brief.Preview(Held(), new Note(60), 1f, 0.4, "id", 0);
+        held.Preview(Held(), new Note(60), 1f, 10, "id", 0);
+
+        Play(brief, 1000);
+        Play(held, 1000);
+
+        Assert.Equal(0, brief.VoiceCount);
+        Assert.Equal(1, held.VoiceCount);
+    }
+
+    /// <summary>And letting go of it starts its release there and then.</summary>
+    [Fact]
+    public void Letting_go_of_a_key_releases_the_note_it_started()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Held(), new Note(60), 1f, 10, "id", 0);
+        Play(mixer, 50);
+
+        mixer.LetAudition("id", 60);
+        Play(mixer, 600);
+
+        Assert.Equal(0, mixer.VoiceCount);
+    }
+
+    /// <summary>
+    /// A note played by hand takes a place in the field, so a panned track auditions panned.
+    /// </summary>
+    /// <remarks>
+    /// Measured off the buffer rather than read back off the voice: a placement the voice holds
+    /// and does not render is not a placement.
+    /// </remarks>
+    [Fact]
+    public void A_note_played_by_hand_sits_where_it_is_put()
+    {
+        var mixer = new TrackMixer(Rate);
+
+        mixer.Preview(Held(), new Note(60), Quiet, 10, "id", 0, -1f);
+
+        int frames = 2048;
+        var buffer = new float[frames * 2];
+
+        mixer.Render(buffer, frames);
+
+        double left = 0, right = 0;
+
+        for (int at = 0; at < buffer.Length; at += 2)
+        {
+            left += Math.Abs(buffer[at]);
+            right += Math.Abs(buffer[at + 1]);
+        }
+
+        Assert.True(left > 0);
+        Assert.True(right < left / 10);
+    }
+
     /// <summary>A note on another track is nobody's business but that track's.</summary>
     [Fact]
     public void A_note_on_another_track_ends_nothing_here()

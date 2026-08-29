@@ -286,6 +286,178 @@ public class NoteColumnTests
         Assert.Equal(0, next.Instrument);
     }
 
+    /// <summary>
+    /// A chord played into a track that shows one column widens it rather than landing on
+    /// itself.
+    /// </summary>
+    /// <remarks>
+    /// The whole feature is unreachable without this. A track shows one column until somebody
+    /// says otherwise, so a chord recorded into a fresh one used to put its second note on top
+    /// of its first and the only thing kept was whichever finger was last down, which reads as
+    /// polyphony not working at all.
+    /// </remarks>
+    [Fact]
+    public void A_chord_widens_the_track_it_is_played_into()
+    {
+        var song = Song.CreateDefault();
+
+        Assert.Equal(1, song.ColumnsOn(0));
+
+        Assert.Equal(1, song.RoomForChord(0, 0));
+        Assert.Equal(2, song.ColumnsOn(0));
+
+        Assert.Equal(2, song.RoomForChord(0, 1));
+        Assert.Equal(3, song.ColumnsOn(0));
+    }
+
+    /// <summary>It stops at the widest a track can be, and the note lands in the last column.</summary>
+    [Fact]
+    public void A_chord_stops_widening_at_the_last_column()
+    {
+        var song = Song.CreateDefault();
+        song.SetColumns(0, Song.MaxNoteColumns);
+
+        Assert.Equal(Song.MaxNoteColumns - 1, song.RoomForChord(0, Song.MaxNoteColumns - 1));
+        Assert.Equal(Song.MaxNoteColumns, song.ColumnsOn(0));
+    }
+
+    /// <summary>A track already wide enough is left alone.</summary>
+    [Fact]
+    public void A_chord_that_fits_widens_nothing()
+    {
+        var song = Song.CreateDefault();
+        song.SetColumns(0, 4);
+
+        Assert.Equal(1, song.RoomForChord(0, 0));
+        Assert.Equal(4, song.ColumnsOn(0));
+    }
+
+    /// <summary>A chord is kept in pitch order however the fingers landed.</summary>
+    /// <remarks>
+    /// The thing this exists for: playing E, then B, then G records the same shape as playing
+    /// E, then G, then B, so the same chord looks the same every time it is played.
+    /// </remarks>
+    [Fact]
+    public void A_chord_is_written_in_pitch_order()
+    {
+        var pattern = Chords();
+        var at = new PatternCursor(0, 0, CellColumn.Note);
+
+        Edits.EnterNote(pattern, at, new Note(64), 0);
+        Edits.EnterChordNote(pattern, at, 1, new Note(71), 0, TrackerCell.NoVolume);
+        Edits.EnterChordNote(pattern, at, 2, new Note(67), 0, TrackerCell.NoVolume);
+
+        Assert.Equal(new Note(64), pattern[0, 0, 0].Note);
+        Assert.Equal(new Note(67), pattern[0, 0, 1].Note);
+        Assert.Equal(new Note(71), pattern[0, 0, 2].Note);
+    }
+
+    /// <summary>A note below everything already down pushes the whole chord along.</summary>
+    [Fact]
+    public void A_note_under_the_chord_pushes_it_along()
+    {
+        var pattern = Chords();
+        var at = new PatternCursor(0, 0, CellColumn.Note);
+
+        Edits.EnterNote(pattern, at, new Note(67), 0);
+        Edits.EnterChordNote(pattern, at, 1, new Note(71), 0, TrackerCell.NoVolume);
+
+        Assert.Equal(0, Edits.EnterChordNote(pattern, at, 2, new Note(60), 0, TrackerCell.NoVolume));
+
+        Assert.Equal(new Note(60), pattern[0, 0, 0].Note);
+        Assert.Equal(new Note(67), pattern[0, 0, 1].Note);
+        Assert.Equal(new Note(71), pattern[0, 0, 2].Note);
+    }
+
+    /// <summary>What a note is played at travels with it when the chord shuffles along.</summary>
+    [Fact]
+    public void A_shifted_note_keeps_its_own_volume()
+    {
+        var pattern = Chords();
+        var at = new PatternCursor(0, 0, CellColumn.Note);
+
+        Edits.EnterNote(pattern, at, new Note(67), 0, 0x30);
+        Edits.EnterChordNote(pattern, at, 1, new Note(60), 0, 0x18);
+
+        Assert.Equal(0x18, pattern[0, 0, 0].Volume);
+        Assert.Equal(0x30, pattern[0, 0, 1].Volume);
+    }
+
+    /// <summary>A chord with nowhere left to go drops its highest note.</summary>
+    [Fact]
+    public void A_full_chord_drops_its_highest_note()
+    {
+        var pattern = Chords(columns: 2);
+        var at = new PatternCursor(0, 0, CellColumn.Note);
+
+        Edits.EnterNote(pattern, at, new Note(64), 0);
+        Edits.EnterChordNote(pattern, at, 1, new Note(71), 0, TrackerCell.NoVolume);
+        Edits.EnterChordNote(pattern, at, 2, new Note(60), 0, TrackerCell.NoVolume);
+
+        Assert.Equal(new Note(60), pattern[0, 0, 0].Note);
+        Assert.Equal(new Note(64), pattern[0, 0, 1].Note);
+    }
+
+    /// <summary>A chord begun in the second column stays there rather than sliding to the first.</summary>
+    [Fact]
+    public void A_chord_stays_where_the_cursor_started_it()
+    {
+        var pattern = Chords();
+        var at = new PatternCursor(0, 0, CellColumn.Note, 1);
+
+        Edits.EnterNote(pattern, at, new Note(67), 0);
+        Edits.EnterChordNote(pattern, at, 1, new Note(60), 0, TrackerCell.NoVolume);
+
+        Assert.True(pattern[0, 0, 0].IsEmpty);
+        Assert.Equal(new Note(60), pattern[0, 0, 1].Note);
+        Assert.Equal(new Note(67), pattern[0, 0, 2].Note);
+    }
+
+    /// <summary>A track with nothing in its extra columns does not need them.</summary>
+    /// <remarks>
+    /// What clearing a track asks: the room a chord took is given back once the chord is gone.
+    /// </remarks>
+    [Fact]
+    public void An_empty_track_needs_one_column()
+    {
+        var song = Song.CreateDefault();
+        song.SetColumns(0, 4);
+
+        Assert.Equal(1, song.ColumnsUsed(0));
+    }
+
+    /// <summary>It needs as far as the widest column anything is written in.</summary>
+    [Fact]
+    public void A_track_needs_as_far_as_its_widest_note()
+    {
+        var song = Song.CreateDefault();
+        song.SetColumns(0, 5);
+
+        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+
+        Assert.Equal(3, song.ColumnsUsed(0));
+    }
+
+    /// <summary>
+    /// And across every pattern, since the count is the song's and one pattern's emptiness is
+    /// not the song's.
+    /// </summary>
+    /// <remarks>
+    /// Narrowing by what the pattern in front happens to use would throw another pattern's
+    /// chords away, and a song may not lose music because a track was cleared somewhere else.
+    /// </remarks>
+    [Fact]
+    public void A_track_needs_what_every_pattern_uses()
+    {
+        var song = Song.CreateDefault();
+        song.AddPattern();
+        song.SetColumns(0, 4);
+
+        song.Patterns[1][0, 0, 3] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+
+        Assert.Equal(4, song.ColumnsUsed(0));
+    }
+
     /// <summary>Tab walks the fields of a column, then the columns of a track, then the tracks.</summary>
     [Fact]
     public void The_cursor_walks_the_columns_it_really_has()

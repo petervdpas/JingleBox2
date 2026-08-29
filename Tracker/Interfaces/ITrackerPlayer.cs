@@ -93,6 +93,18 @@ public interface ITrackerPlayer : IDisposable
     /// </remarks>
     void Play(Song song, TrackerPosition from, TrackerPlayMode mode = TrackerPlayMode.Song);
 
+    /// <summary>
+    /// The song being worked on, whether or not anything is playing.
+    /// </summary>
+    /// <remarks>
+    /// A pass hands its song in and the player keeps it, so everything that needs the mix has
+    /// had one since the first time somebody pressed play and nothing before then. Two things
+    /// want it while the transport is stopped, and both were quietly wrong without it: a note
+    /// played by hand goes through the strip of the track it is played on, and a fader moved
+    /// has to reach whatever is sounding.
+    /// </remarks>
+    void Use(Song song);
+
     /// <summary>Continues from where a pause left off. Does nothing when not paused.</summary>
     void Resume();
 
@@ -139,11 +151,20 @@ public interface ITrackerPlayer : IDisposable
     /// </returns>
     /// <remarks>
     /// Auditions pile up, as a keyboard does, unless the instrument says it is one voice, which
-    /// cuts what it was sounding first. A generated sound holds for a fixed moment, since no key
-    /// is being let go of; a recording holds for its own length, because a take cut off part way
-    /// through is not the sound the instrument makes.
+    /// cuts what it was sounding first. A recording holds for its own length whatever is asked
+    /// for, because a take cut off part way through is not the sound the instrument makes.
+    ///
+    /// A generated sound holds for as long as it is asked to, and the default is a fixed moment
+    /// because a key that was clicked has nothing to let go of it. A caller that really does
+    /// hold a key says so with a longer moment and lets go with <see cref="LetPreview"/>: what
+    /// it asks for is then a safety net for a release that never arrives rather than the length
+    /// of the note.
     /// </remarks>
-    double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1);
+    /// <param name="holdSeconds">
+    /// How long it sounds if nothing lets go of it. The default is what a click wants.
+    /// </param>
+    double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1,
+                   double holdSeconds = TrackerPlayer.PreviewHoldSeconds);
 
     /// <summary>
     /// How loud a strip is right now, both sides, for the mixer's meters. Zero for one that is

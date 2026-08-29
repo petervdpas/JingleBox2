@@ -44,9 +44,33 @@ public sealed class Pattern
     /// kilobytes, which is what the history is built on.
     ///
     /// Replaced rather than resized when the shape changes, since the index of a cell is worked
-    /// out from the track count and every one of them moves.
+    /// out from the counts beside it and every one of them moves. Read through
+    /// <see cref="_layout"/>, which is what makes that replacement one step rather than three.
     /// </remarks>
-    private TrackerCell[] _cells;
+    private TrackerCell[] _cells => _layout.Cells;
+
+    /// <summary>
+    /// The cells and the shape they are laid out in, held as one thing and swapped as one.
+    /// </summary>
+    /// <remarks>
+    /// The three used to be three fields, and changing the shape wrote them one after another.
+    /// The clock thread reads all three to work out where a cell is, so a pass running while
+    /// somebody added a track or a note column could read the new running total against the old
+    /// array and walk off the end of it. Swapping one reference cannot be caught half done: a
+    /// reader takes the object it finds and everything in it agrees with everything else.
+    ///
+    /// Writing a cell still writes into whichever array was current when the write began, so a
+    /// write racing a reshape is lost rather than misplaced. Every write comes from the drawing
+    /// thread and every reshape with it, so that race does not arise; the read is the one that
+    /// crosses threads.
+    /// </remarks>
+    private Layout _layout;
+
+    /// <summary>Everything about where a cell sits, so that it can be replaced in one go.</summary>
+    /// <param name="Cells">Every cell, line by line.</param>
+    /// <param name="Columns">How many note columns each track has.</param>
+    /// <param name="Starts">Where each track's columns begin in a line, with the stride on the end.</param>
+    private sealed record Layout(TrackerCell[] Cells, int[] Columns, int[] Starts);
 
     /// <summary>
     /// How many note columns each track has, one entry per track.
@@ -59,8 +83,11 @@ public sealed class Pattern
     /// Every pattern in a song has the same counts, because a part is played on so many voices
     /// whatever pattern it is in. Counts that varied per pattern would make copying a track
     /// between patterns a question with no good answer.
+    ///
+    /// Beside the cells in <see cref="_layout"/> rather than beside them as a field, so the two
+    /// cannot be read a shape apart.
     /// </remarks>
-    private int[] _columns;
+    private int[] _columns => _layout.Columns;
 
     /// <summary>
     /// Where each track's columns begin within one line, with the row's own total on the end.
@@ -70,7 +97,7 @@ public sealed class Pattern
     /// rather than a walk. One longer than there are tracks: the last entry is the stride, and
     /// having it there means the width of the last track needs no special case.
     /// </remarks>
-    private int[] _starts;
+    private int[] _starts => _layout.Starts;
 
     /// <summary>
     /// The parameters that move over this pattern, one lane apiece.
@@ -110,8 +137,12 @@ public sealed class Pattern
     public int TotalColumns => _starts[TrackCount];
 
     /// <summary>How many note columns a track has. Nought for a track that is not there.</summary>
-    public int ColumnsOn(int track) =>
-        track >= 0 && track < TrackCount ? _columns[track] : 0;
+    public int ColumnsOn(int track)
+    {
+        var columns = _layout.Columns;
+
+        return track >= 0 && track < columns.Length ? columns[track] : 0;
+    }
 
     /// <summary>
     /// The counts, to be kept: what a history step and a clone carry beside the cells.
@@ -151,14 +182,19 @@ public sealed class Pattern
         Lines = Math.Clamp(lines, MinLines, MaxLines);
         TrackCount = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
 
-        _columns = Widths(null, TrackCount);
-        _starts = Starts(_columns);
-        _cells = NewCells(Lines, _starts[TrackCount]);
+        var columns = Widths(null, TrackCount);
+        var starts = Starts(columns);
+
+        _layout = new Layout(NewCells(Lines, starts[TrackCount]), columns, starts);
     }
 
     /// <summary>Where a cell sits in the block. The one piece of arithmetic every read goes through.</summary>
-    private int Place(int line, int track, int column) =>
-        line * _starts[TrackCount] + _starts[track] + column;
+    /// <remarks>
+    /// Asked of a layout rather than of the pattern, so that a caller that has already taken one
+    /// cannot be handed a different shape half way through working out where its cell is.
+    /// </remarks>
+    private int Place(Layout layout, int line, int track, int column) =>
+        line * layout.Starts[TrackCount] + layout.Starts[track] + column;
 
     /// <summary>A count per track, held to its range, filled out or cut down to fit.</summary>
     /// <remarks>
@@ -216,17 +252,22 @@ public sealed class Pattern
     {
         get
         {
+            var layout = _layout;
+
             RequireInRange(line, track, column);
-            return _cells[Place(line, track, column)];
+
+            return layout.Cells[Place(layout, line, track, column)];
         }
         set
         {
+            var layout = _layout;
+
             RequireInRange(line, track, column);
 
-            int index = Place(line, track, column);
-            if (_cells[index] == value) return;
+            int index = Place(layout, line, track, column);
+            if (layout.Cells[index] == value) return;
 
-            _cells[index] = value;
+            layout.Cells[index] = value;
             Changed?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -235,10 +276,14 @@ public sealed class Pattern
     public bool Contains(int line, int track) => Contains(line, track, 0);
 
     /// <summary>The same, of one note column of a track.</summary>
-    public bool Contains(int line, int track, int column) =>
-        line >= 0 && line < Lines
-        && track >= 0 && track < TrackCount
-        && column >= 0 && column < _columns[track];
+    public bool Contains(int line, int track, int column)
+    {
+        var columns = _layout.Columns;
+
+        return line >= 0 && line < Lines
+               && track >= 0 && track < TrackCount
+               && column >= 0 && column < columns[track];
+    }
 
     /// <summary>Changes the step count, keeping whatever still fits.</summary>
     public void Resize(int lines) => Rebuild(lines, TrackCount, _columns);
@@ -358,13 +403,11 @@ public sealed class Pattern
             {
                 for (int column = 0; column < columns[track]; column++)
                     replacement[line * starts[TrackCount] + starts[track] + column] =
-                        _cells[Place(line, order[track], column)];
+                        _cells[Place(_layout, line, order[track], column)];
             }
         }
 
-        _cells = replacement;
-        _columns = columns;
-        _starts = starts;
+        _layout = new Layout(replacement, columns, starts);
 
         foreach (var lane in _lanes)
         {
@@ -381,9 +424,11 @@ public sealed class Pattern
     {
         RequireInRange(line, 0, 0);
 
+        var layout = _layout;
+
         for (int track = 0; track < TrackCount; track++)
-            for (int column = 0; column < _columns[track]; column++)
-                yield return _cells[Place(line, track, column)];
+            for (int column = 0; column < layout.Columns[track]; column++)
+                yield return layout.Cells[Place(layout, line, track, column)];
     }
 
     /// <summary>A pattern of its own holding the same music, with nothing shared.</summary>
@@ -395,11 +440,12 @@ public sealed class Pattern
     {
         var copy = new Pattern(Lines, TrackCount) { Name = Name };
 
-        copy._columns = ColumnCounts();
-        copy._starts = Starts(copy._columns);
-        copy._cells = new TrackerCell[_cells.Length];
+        var columns = ColumnCounts();
+        var cells = new TrackerCell[_cells.Length];
 
-        Array.Copy(_cells, copy._cells, _cells.Length);
+        Array.Copy(_cells, cells, cells.Length);
+
+        copy._layout = new Layout(cells, columns, Starts(columns));
         copy._lanes.AddRange(_lanes.Select(one => one.Clone()));
         return copy;
     }
@@ -482,11 +528,10 @@ public sealed class Pattern
 
         if (cells.Length != newLines * starts[newTracks]) return;
 
-        _cells = new TrackerCell[cells.Length];
-        Array.Copy(cells, _cells, cells.Length);
+        var kept = new TrackerCell[cells.Length];
+        Array.Copy(cells, kept, cells.Length);
 
-        _columns = widths;
-        _starts = starts;
+        _layout = new Layout(kept, widths, starts);
 
         _lanes.Clear();
         if (lanes is not null)
@@ -529,13 +574,11 @@ public sealed class Pattern
 
                 for (int column = 0; column < kept; column++)
                     replacement[line * starts[newTracks] + starts[track] + column] =
-                        _cells[Place(line, track, column)];
+                        _cells[Place(_layout, line, track, column)];
             }
         }
 
-        _cells = replacement;
-        _columns = widths;
-        _starts = starts;
+        _layout = new Layout(replacement, widths, starts);
         Lines = newLines;
         TrackCount = newTracks;
 

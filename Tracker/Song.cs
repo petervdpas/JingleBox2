@@ -316,6 +316,77 @@ public sealed class Song
         return true;
     }
 
+    /// <summary>
+    /// How many note columns a track really needs: as far as the widest one anything is
+    /// written in, across every pattern in the song.
+    /// </summary>
+    /// <remarks>
+    /// Every pattern, because the count is the song's. Narrowing a track by what one pattern
+    /// happens to use would throw away the chords another pattern has on it, and a song is not
+    /// allowed to lose music because somebody cleared a track somewhere else.
+    ///
+    /// Never less than one, since a track with nothing on it anywhere still has to have
+    /// somewhere to put a note.
+    /// </remarks>
+    public int ColumnsUsed(int track)
+    {
+        int used = MinNoteColumns;
+
+        foreach (var pattern in Patterns)
+        {
+            if (track < 0 || track >= pattern.TrackCount) continue;
+
+            for (int column = pattern.ColumnsOn(track) - 1; column >= used; column--)
+            {
+                if (!Written(pattern, track, column)) continue;
+
+                used = column + 1;
+                break;
+            }
+        }
+
+        return Math.Clamp(used, MinNoteColumns, MaxNoteColumns);
+    }
+
+    /// <summary>Whether anything at all is written in one note column of one track.</summary>
+    private static bool Written(Pattern pattern, int track, int column)
+    {
+        for (int line = 0; line < pattern.Lines; line++)
+            if (!pattern[line, track, column].IsEmpty) return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Makes room on a track for the next note of a chord, widening it if it has none, and
+    /// answers the note column that note goes into.
+    /// </summary>
+    /// <remarks>
+    /// A track shows one note column until somebody says otherwise, so without this a chord
+    /// played into a fresh track has nowhere to go: the second note lands on the first and the
+    /// only thing recorded is whichever finger was last down. Somebody playing a chord has
+    /// already said what they want, and making them find a menu before they are allowed to
+    /// record what they are playing is the wrong way round.
+    ///
+    /// One column at a time, stopping at <see cref="MaxNoteColumns"/>, where a further note
+    /// lands in the last column over the note that was there. Dropping it instead is the other
+    /// defensible answer and is what Renoise does; neither is obviously right, and landing it
+    /// at least leaves the note somewhere a hand can find it.
+    /// </remarks>
+    /// <param name="track">The track being played into.</param>
+    /// <param name="after">The note column the last note of this chord went into.</param>
+    /// <returns>Which note column to write into, which is always one the track really has.</returns>
+    public int RoomForChord(int track, int after)
+    {
+        if (track < 0 || track >= TrackCount) return 0;
+
+        int wanted = Math.Max(0, after + 1);
+
+        if (wanted >= ColumnsOn(track) && wanted < MaxNoteColumns) SetColumns(track, wanted + 1);
+
+        return Math.Min(wanted, Math.Max(0, ColumnsOn(track) - 1));
+    }
+
     /// <summary>Keeps the per-track list the same length as the track count, and in range.</summary>
     private void EnsureNoteColumns()
     {

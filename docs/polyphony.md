@@ -135,8 +135,16 @@ would eventually disagree, and the way that fails is a click landing on a cell o
 one under the pointer. `PatternMetrics.TrackWidth` is per track now and every horizontal
 question is a walk from the left.
 
-**Entry.** Renoise's rule: a note played while another key is still held goes to the next column
-of the same track, so a chord lands across 1, 2, 3 on one line and the cursor steps down once.
+**Entry.** Renoise's rule: a note played while another key is still held goes into the same
+track's columns on one line, and the cursor steps down once. Where in them is decided by pitch
+rather than by the order the fingers landed, which Renoise does not do and which this wants
+because a column is a voice that carries across chords: appended in arrival order, the same
+shape records as E G B on one take and E B G on the next, and column one is the bass in one
+chord and the top of the next.
+The track widens itself to fit, which is `Song.RoomForChord` and is not a nicety: a track shows
+one column until somebody says otherwise, so without it a chord recorded into a fresh track puts
+its second note on top of its first and keeps whichever finger was last down. That reads as
+polyphony not working at all, and it is how this was first shipped.
 The held-note counting is in the view model, since a hand on the hardware and a hand on the
 letter rows are the same hand. The letter rows needed a key-up they never had: a note typed into
 the pattern had no release at all, which was enough while a track held one note and is not
@@ -186,9 +194,14 @@ per-column selection                              half a day, and not done: see 
   monophonic part is not. Sustain makes this reachable today, before note columns exist at all.
 - Whether a track's ending should be readable from the pattern. A track left sustaining looks
   exactly like a track that is not, until you wonder why the mix is filling up.
-- What a chord does when it will not fit. A fourth note played on a three column track lands in
-  the third column, over the note that was there. Renoise drops it instead. Neither is obviously
-  right and nobody has hit it yet.
+- What a chord does when it will not fit. A ninth note pushes the rest along and the highest
+  falls off the end, since eight is as wide as a track goes. Dropping the ninth itself is the
+  other answer; this one at least keeps the chord in order and loses the note furthest from the
+  bass.
+- Whether the widening should be undoable on its own. It is not: the notes leave a step, so undo
+  takes the chord off and leaves the track wide, which is an empty column. A step of its own
+  would mean a three note chord costing three presses to undo, two of which appear to do
+  nothing.
 - Column mutes and column names, which Renoise has. Cheap now that the axis exists, and no use
   at all until somebody has written a chord with them.
 - Whether a track's insert chain and a future automation lane stay per track. They should:

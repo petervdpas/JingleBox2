@@ -144,6 +144,12 @@ public interface ITrackMixer
     /// release when a note is played by clicking on it, so it releases itself.
     /// </summary>
     /// <remarks>
+    /// Every audition takes a place in the field as well as a level, because a note played by
+    /// hand on a track is that track playing and a track that is panned is panned whoever is
+    /// playing it. Nought for one that belongs to no track, which is what a machine's own
+    /// keyboard plays.
+    /// </remarks>
+    /// <remarks>
     /// Notes played by hand pile up, as a keyboard does and as an audition on every other
     /// machine already did, each let go of at its own moment. An instrument set to one voice
     /// asks for <see cref="VoiceEnding.Cut"/> instead.
@@ -160,8 +166,12 @@ public interface ITrackMixer
     /// window is open and whose knobs have just been turned; a second copy would be a second
     /// sound, playing whatever the song was last saved with.
     /// </remarks>
+    /// <remarks>
+    /// It takes a place in the field as well as a level, because a note played by hand on a
+    /// track is that track playing, and a track that is panned is panned whoever is playing it.
+    /// </remarks>
     void PreviewOnTrack(int track, Note note, float gain, double holdSeconds,
-                        VoiceEnding ending = VoiceEnding.Sustain);
+                        VoiceEnding ending = VoiceEnding.Sustain, float pan = 0f);
 
     /// <summary>Lets go of one note a track's plugin was given by hand, for a key coming up.</summary>
     /// <remarks>
@@ -286,8 +296,12 @@ public interface ITrackMixer
     /// its level and its meter, which is what makes an audition tell you what the part will
     /// actually sound like.
     /// </param>
+    /// <param name="pan">
+    /// Where it sits, which is the strip's own placement for a note played on a track and the
+    /// middle for one that belongs to none.
+    /// </param>
     void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition,
-                 int track = SynthVoice.NoTrack);
+                 int track = SynthVoice.NoTrack, float pan = 0f);
 
     /// <summary>The same, on Ouroboros, for a note played while building the sound.</summary>
     /// <remarks>
@@ -307,8 +321,12 @@ public interface ITrackMixer
     /// its level and its meter, which is what makes an audition tell you what the part will
     /// actually sound like.
     /// </param>
+    /// <param name="pan">
+    /// Where it sits, which is the strip's own placement for a note played on a track and the
+    /// middle for one that belongs to none.
+    /// </param>
     void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition,
-                 int track = MonoSynthVoice.NoTrack);
+                 int track = MonoSynthVoice.NoTrack, float pan = 0f);
 
     /// <summary>The same, for a zone played on the panel rather than by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
@@ -327,8 +345,13 @@ public interface ITrackMixer
     /// its level and its meter, which is what makes an audition tell you what the part will
     /// actually sound like.
     /// </param>
+    /// <param name="pan">
+    /// Where it sits, which is the strip's own placement for a note played on a track and the
+    /// middle for one that belongs to none.
+    /// </param>
     double Preview(SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain,
-                   double holdSeconds, string audition, int track = SynthVoice.NoTrack);
+                   double holdSeconds, string audition, int track = SynthVoice.NoTrack,
+                   float pan = 0f);
 
     /// <summary>The same, for a pad tapped on the panel rather than played by a pattern.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
@@ -347,8 +370,13 @@ public interface ITrackMixer
     /// its level and its meter, which is what makes an audition tell you what the part will
     /// actually sound like.
     /// </param>
+    /// <param name="pan">
+    /// Where it sits, which is the strip's own placement for a note played on a track and the
+    /// middle for one that belongs to none.
+    /// </param>
     double Preview(DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
-                   double holdSeconds, string audition, int track = SynthVoice.NoTrack);
+                   double holdSeconds, string audition, int track = SynthVoice.NoTrack,
+                   float pan = 0f);
 
     /// <summary>A recording sounded once, for auditioning while editing.</summary>
     /// <returns>How long the note will sound, or zero if it did not start.</returns>
@@ -366,8 +394,13 @@ public interface ITrackMixer
     /// its level and its meter, which is what makes an audition tell you what the part will
     /// actually sound like.
     /// </param>
+    /// <param name="pan">
+    /// Where it sits, which is the strip's own placement for a note played on a track and the
+    /// middle for one that belongs to none.
+    /// </param>
     double Preview(TrackerInstrument instrument, SampleData sample, Note note, float gain,
-                   double holdSeconds, string audition, int track = SynthVoice.NoTrack);
+                   double holdSeconds, string audition, int track = SynthVoice.NoTrack,
+                   float pan = 0f);
 
     /// <summary>
     /// Stops what this instrument was sounding by hand, for one that plays one note at a time.
@@ -392,6 +425,11 @@ public interface ITrackMixer
     /// A one-shot is left alone entirely. It is a hit and it runs its own length: the mouse
     /// coming up is not a stop button on a recording with an end of its own, and a click lasts
     /// a few milliseconds, so following the key there would turn every drum into a tick.
+    ///
+    /// Matched on the audition and the note alone. A note played by hand carries the track it
+    /// was played on as well, so that it sounds through that track's inserts and moves its
+    /// meter, and asking for a track of none as well meant that a key coming up on the
+    /// tracker's own keyboard reached nothing at all.
     /// </remarks>
     void LetAudition(string audition, int semitone);
 

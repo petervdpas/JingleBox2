@@ -661,7 +661,7 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     public void PreviewOnTrack(int track, Note note, float gain, double holdSeconds,
-                               VoiceEnding ending = VoiceEnding.Sustain)
+                               VoiceEnding ending = VoiceEnding.Sustain, float pan = 0f)
     {
         if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
 
@@ -675,6 +675,7 @@ public sealed class TrackMixer : ITrackMixer
             instrument = _instruments[track];
 
             _instrumentGain[track] = gain;
+            _instrumentPan[track] = Math.Clamp(pan, -1f, 1f);
 
             everything = ending != VoiceEnding.Sustain && Silent(track);
 
@@ -914,11 +915,11 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     public void Preview(SynthPatch patch, Note note, float gain, double holdSeconds, string audition,
-                        int track = SynthVoice.NoTrack)
+                        int track = SynthVoice.NoTrack, float pan = 0f)
     {
         if (patch is null || !note.IsPlayable) return;
 
-        var voice = new SynthVoice(patch, note, track, gain, 0f, SampleRate, NextSeed())
+        var voice = new SynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed())
         {
             Audition = audition
         };
@@ -931,12 +932,12 @@ public sealed class TrackMixer : ITrackMixer
     /// <inheritdoc/>
     /// <remarks>Nothing is handed in for the note before, which is what switches the glide off.</remarks>
     public void Preview(MonoSynthPatch patch, Note note, float gain, double holdSeconds, string audition,
-                        int track = MonoSynthVoice.NoTrack)
+                        int track = MonoSynthVoice.NoTrack, float pan = 0f)
     {
         if (patch is null || !note.IsPlayable) return;
 
         var voice = new MonoSynthVoice(
-            patch, note, track, gain, 0f, SampleRate, NextSeed(), null)
+            patch, note, track, gain, pan, SampleRate, NextSeed(), null)
         {
             Audition = audition
         };
@@ -1027,13 +1028,13 @@ public sealed class TrackMixer : ITrackMixer
     public double Preview(
         SampleZone zone, SamplerPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
-        int track = SynthVoice.NoTrack)
+        int track = SynthVoice.NoTrack, float pan = 0f)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
-            track, gain, 0f, SampleRate, patch)
+            track, gain, pan, SampleRate, patch)
         {
             Audition = audition
         };
@@ -1052,13 +1053,13 @@ public sealed class TrackMixer : ITrackMixer
     public double Preview(
         DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
-        int track = SynthVoice.NoTrack)
+        int track = SynthVoice.NoTrack, float pan = 0f)
     {
         if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, patch, pad.Shape, note, note,
-            track, gain, 0f, SampleRate)
+            track, gain, pan, SampleRate)
         {
             Choke = pad.Choke,
             Audition = audition
@@ -1077,13 +1078,13 @@ public sealed class TrackMixer : ITrackMixer
     public double Preview(
         TrackerInstrument instrument, SampleData sample, Note note, float gain,
         double holdSeconds, string audition,
-        int track = SynthVoice.NoTrack)
+        int track = SynthVoice.NoTrack, float pan = 0f)
     {
         if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return 0;
 
         var voice = new SampleVoice(
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
-            track, gain, 0f, SampleRate)
+            track, gain, pan, SampleRate)
         {
             Audition = audition
         };
@@ -1109,6 +1110,13 @@ public sealed class TrackMixer : ITrackMixer
         voice.WindowSeconds > 0 ? Math.Max(asked, voice.WindowSeconds) : asked;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Matched on the audition alone. A note played by hand carries the track it was played on
+    /// as well, so that it goes through that track's inserts and moves its meter, and asking
+    /// for a track of none as well as an audition meant that every note played on the tracker's
+    /// own keyboard was unreachable: the id said which panel was holding it and the test threw
+    /// the answer away.
+    /// </remarks>
     public void CutAuditions(string audition)
     {
         if (string.IsNullOrEmpty(audition)) return;
@@ -1117,7 +1125,7 @@ public sealed class TrackMixer : ITrackMixer
         {
             foreach (var voice in _voices)
             {
-                if (voice.Track == SynthVoice.NoTrack && voice.Audition == audition) voice.Cut();
+                if (voice.Audition == audition) voice.Cut();
             }
         }
     }
@@ -1133,10 +1141,7 @@ public sealed class TrackMixer : ITrackMixer
             {
                 if (voice.OneShot) continue;
 
-                if (voice.Track == SynthVoice.NoTrack
-                    && voice.Audition == audition
-                    && voice.Note.Semitone == semitone)
-                    voice.NoteOff();
+                if (voice.Audition == audition && voice.Note.Semitone == semitone) voice.NoteOff();
             }
         }
     }

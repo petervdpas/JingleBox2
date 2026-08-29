@@ -878,6 +878,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _recordings = recordings;
 
         song = Song.CreateDefault();
+        _player.Use(song);
 
         CurrentPattern = song.Patterns[0];
 
@@ -1562,9 +1563,19 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Any edit to the pattern on screen is work that is not on disc.</summary>
     private void OnPatternEdited(object? sender, EventArgs e) => MarkDirty();
 
-    /// <summary>A different song is a different description, and different neighbours.</summary>
+    /// <summary>
+    /// A different song is a different description, different neighbours, and a different mix
+    /// for anything played by hand.
+    /// </summary>
+    /// <remarks>
+    /// The player is told first. It used to learn which song was open only when a pass started,
+    /// so until somebody pressed play a note played by hand went through no strip at all and a
+    /// fader moved reached nothing that was sounding.
+    /// </remarks>
     partial void OnSongChanged(Song value)
     {
+        _player.Use(value);
+
         OnPropertyChanged(nameof(SongDescription));
         NeighboursMoved();
     }
@@ -1788,21 +1799,42 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             : $"Quantized {SelectionLabel} to {lines}: {moved} note(s) moved";
     }
 
-    /// <summary>Empties the cursor's track across every line of the pattern.</summary>
+    /// <summary>
+    /// Empties the cursor's track across every line of the pattern, and gives back the note
+    /// columns that emptied it leaves nothing in.
+    /// </summary>
+    /// <remarks>
+    /// The cells first and the room after, which is the order the two steps have to be pushed
+    /// in: undo then widens the track back before it puts the notes into it, and each press
+    /// does something you can see.
+    /// </remarks>
     private void ClearTrack()
     {
         if (CurrentPattern == null) return;
 
         Edits.ClearTrack(CurrentPattern, Cursor.Track);
+        Narrow(Cursor.Track);
+
         Status = $"Cleared {CursorTrackLabel}";
     }
 
-    /// <summary>Empties every track of the pattern, which is one edit and one step.</summary>
+    /// <summary>
+    /// Empties every track of the pattern, and gives back every note column that leaves nothing
+    /// in.
+    /// </summary>
+    /// <remarks>
+    /// One edit and one step for the cells. The room is one more, however many tracks give some
+    /// back, because a song step is gathered by what it says it is about and these all say the
+    /// same thing.
+    /// </remarks>
     private void ClearPattern()
     {
         if (CurrentPattern == null) return;
 
         Edits.ClearPattern(CurrentPattern);
+
+        for (int track = 0; track < Song.TrackCount; track++) Narrow(track);
+
         Status = $"Cleared pattern '{CurrentPattern.Name}'";
     }
 
@@ -2223,9 +2255,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </summary>
     /// <remarks>
     /// Played on the track the cursor is in, which is the whole point: it goes through that
-    /// track's inserts and its fader, so a plugin instrument sounds through the copy the track
-    /// plays rather than through an audition copy of its own, and the strip's meter and the
-    /// master's move for it exactly as they do for a pass. Everything but the plugin path used
+    /// track's inserts, so a plugin instrument sounds through the copy the track plays rather
+    /// than through an audition copy of its own, and the strip's meter and the master's move
+    /// for it exactly as they do for a pass, and through its fader, its mute and its placement,
+    /// which is what makes an audition tell you what the part will actually sound like. Everything but the plugin path used
     /// to go to the loose audition bus instead and moved no track meter at all.
     ///
     /// The meters are started here rather than by the transport, since a note played by hand
@@ -2240,12 +2273,46 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var instrument = Song.InstrumentAt(InstrumentForTrack(Cursor.Track));
         if (instrument == null) return;
 
-        double held = _player.Preview(instrument, note, GainFor(volume), Cursor.Track);
+        _player.Preview(instrument, note, GainFor(volume), Cursor.Track, HeldNoteSeconds);
+
+        _sounding[note.Semitone] = instrument;
 
         Meters();
 
-        Played(Cursor.Track, note, held);
+        Played(Cursor.Track, note, 0d);
     }
+
+    /// <summary>
+    /// How long a note played here sounds if nothing ever lets go of it.
+    /// </summary>
+    /// <remarks>
+    /// Long, because both keyboards on this page do let go: the hardware sends the other half
+    /// of the press and the letter rows have a release of their own now. So this is a safety net
+    /// for a release that never arrives rather than the length of the note, and it wants to be
+    /// long enough that nobody ever hears it.
+    ///
+    /// It was the fixed moment a clicked key wants, four tenths of a second, and that was the
+    /// difference between what a chord sounded like under your hands and what it sounded like
+    /// coming back: three short stabs against three notes ringing until the pattern played
+    /// something else. A panel's own keys still hold for the fixed moment, because a click
+    /// really has nothing to let go of it.
+    ///
+    /// Ten seconds rather than a minute, because the net is only ever reached when something
+    /// went wrong, and a note left ringing for a minute after a lost release is worse than one
+    /// cut short after ten. Nobody holds a key that long while writing a part.
+    /// </remarks>
+    private const double HeldNoteSeconds = 10;
+
+    /// <summary>
+    /// Which instrument each held note was sounded on, so the release reaches the same one.
+    /// </summary>
+    /// <remarks>
+    /// Read back rather than worked out again from the cursor. The cursor can be moved between
+    /// a press and its release, and an audition is let go of by naming the instrument that is
+    /// holding it: a release that named the track's new instrument would reach nothing and
+    /// leave the note sounding until its safety net ran out.
+    /// </remarks>
+    private readonly Dictionary<int, TrackerInstrument> _sounding = new();
 
     /// <summary>Types a note at the instrument's own level, which is what a letter key sends.</summary>
     public void EnterNote(Note note) => EnterNote(note, TrackerCell.NoVolume);
@@ -2261,12 +2328,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     ///
     /// While the song is playing a note lands on the line you can hear rather than the line you
     /// left the cursor on, and the cursor is not stepped down: the music is already moving.
+    ///
+    /// A key already down arriving again is the letter row repeating, which is how a column is
+    /// filled quickly and stays. It is dropped while another key is down, because there it is
+    /// not somebody filling a column: it is a hand resting on a chord, and every repeat would
+    /// spray a single note down the pattern under the chord that was just written. Hardware
+    /// never reaches this, since a key that is down cannot be pressed again.
     /// </remarks>
     public void EnterNote(Note note, int volume)
     {
         if (IgnoreVelocity) volume = TrackerCell.NoVolume;
 
-        bool chord = _chordLine >= 0 && _holding.Count > 0 && !_holding.Contains(note.Semitone);
+        bool again = _holding.Contains(note.Semitone);
+
+        if (again && _holding.Count > 1) return;
+
+        bool chord = _chordLine >= 0 && _holding.Count > 0 && !again;
 
         PreviewNote(note, volume);
 
@@ -2274,22 +2351,58 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         if (CurrentPattern == null || !IsRecording) return;
 
-        var target = chord
-            ? Cursor with { Line = _chordLine, NoteColumn = _chordColumn }
-            : IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
-
         if (chord)
         {
-            int last = Math.Max(0, Song.ColumnsOn(target.Track) - 1);
-            target = target with { NoteColumn = Math.Min(_chordColumn + 1, last) };
+            MakeRoom(Cursor.Track, _chordStart + _chordFilled);
+
+            var into = Cursor with { Line = _chordLine, NoteColumn = _chordStart };
+
+            Edits.EnterChordNote(
+                CurrentPattern, into, _chordFilled, note, InstrumentForTrack(into.Track), volume);
+
+            _chordFilled++;
+
+            return;
         }
+
+        var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
 
         Edits.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
 
         _chordLine = target.Line;
-        _chordColumn = target.NoteColumn;
+        _chordStart = target.NoteColumn;
+        _chordFilled = 1;
 
-        if (!chord && !IsPlaying) StepDown();
+        if (!IsPlaying) StepDown();
+    }
+
+    /// <summary>
+    /// The note column the next note of a chord goes into, widening the track to fit it.
+    /// </summary>
+    /// <remarks>
+    /// The rule is <see cref="Song.RoomForChord"/>, which is where it can be put a question to
+    /// without a window. What is here is what a view model has to do about it: tell the page
+    /// that the track just got wider. Where the note then goes is not this: a chord is kept in
+    /// pitch order, so <see cref="IPatternEdit.EnterChordNote"/> decides that and this only
+    /// makes sure the column exists.
+    ///
+    /// Deliberately no undo step of its own. The notes leave one, so undo takes the chord back
+    /// off and leaves the track wide, which is an empty column and not worth a press. A step
+    /// here would mean a three note chord costing three presses to undo, two of which appear to
+    /// do nothing.
+    /// </remarks>
+    private void MakeRoom(int track, int column)
+    {
+        int was = Song.ColumnsOn(track);
+
+        Song.RoomForChord(track, column - 1);
+
+        if (Song.ColumnsOn(track) == was) return;
+
+        OnPropertyChanged(nameof(ColumnsHere));
+        OnPropertyChanged(nameof(CanAddColumn));
+        OnPropertyChanged(nameof(CanRemoveColumn));
+        OnPropertyChanged(nameof(Widths));
     }
 
     /// <summary>Which notes are still held, however they arrived, so a chord can be recognised.</summary>
@@ -2304,17 +2417,26 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>Which line the chord being played is being written on, or -1 when none is.</summary>
     private int _chordLine = -1;
 
-    /// <summary>And which note column the last of its notes went into.</summary>
-    private int _chordColumn;
+    /// <summary>Which note column it began in, which is the one the cursor was on.</summary>
+    private int _chordStart;
+
+    /// <summary>
+    /// And how many of its columns are written, which is how many notes it has so far.
+    /// </summary>
+    /// <remarks>
+    /// A count rather than the last column used, because the notes are kept in pitch order and
+    /// the one that just arrived may have gone anywhere among them.
+    /// </remarks>
+    private int _chordFilled;
 
     /// <summary>
     /// A key has come up, so the chord it was part of may be over.
     /// </summary>
     /// <remarks>
-    /// Only the grouping ends here. The note goes on sounding for its own length, which is what
-    /// a note played by hand has always done in this application: there is no key to let go of
-    /// when a note is played by clicking, so an audition releases itself and a key coming up is
-    /// not a stop button.
+    /// The note is let go of here, which is the whole of what a key coming up means: it starts
+    /// the sound's own release, the same as a pattern's OFF. A recording that is one shot is
+    /// left alone by <c>LetAudition</c>, since a take cut off part way through is not the sound
+    /// the instrument makes.
     ///
     /// Called for both kinds of keyboard. A letter key has no release of its own in the note
     /// path, so the view raises one, and without it the first chord anybody typed would go on
@@ -2327,6 +2449,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _holding.Remove(note.Semitone);
 
         if (_holding.Count == 0) _chordLine = -1;
+
+        if (_sounding.Remove(note.Semitone, out var instrument)) _player.LetPreview(instrument, note);
     }
 
     /// <summary>Forgets every held key, for the moment the keyboard goes somewhere else.</summary>
@@ -2339,6 +2463,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         _holding.Clear();
         _chordLine = -1;
+
+        foreach (var (semitone, instrument) in _sounding)
+            _player.LetPreview(instrument, new Note(semitone));
+
+        _sounding.Clear();
     }
 
     /// <inheritdoc/>
@@ -2551,11 +2680,47 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Selection = PatternSelection.None;
 
         MarkDirty();
+        ColumnsMoved();
+    }
 
+    /// <summary>A track is a different width, so everything measured in columns is stale.</summary>
+    private void ColumnsMoved()
+    {
         OnPropertyChanged(nameof(ColumnsHere));
         OnPropertyChanged(nameof(CanAddColumn));
         OnPropertyChanged(nameof(CanRemoveColumn));
         OnPropertyChanged(nameof(Widths));
+    }
+
+    /// <summary>
+    /// Takes back the note columns nothing is written in any more.
+    /// </summary>
+    /// <remarks>
+    /// What clearing asks for. A track that grew to three columns while a chord was played into
+    /// it stays three columns wide once the chord is deleted, and every one of them is width on
+    /// the screen, so emptying a track has to be allowed to give the room back.
+    ///
+    /// By what the whole song uses rather than what this pattern does, since the count is the
+    /// song's: narrowing on one pattern's emptiness would throw away another pattern's chords.
+    ///
+    /// It leaves a step of its own and is meant to. Clearing a track is two things that undo
+    /// separately, the notes and the room, and both of them are visible: the first press back
+    /// widens the track and the second puts the music in it.
+    /// </remarks>
+    private void Narrow(int track)
+    {
+        int used = Song.ColumnsUsed(track);
+        if (used == Song.ColumnsOn(track)) return;
+
+        Changing("a track's note columns");
+
+        if (!Song.SetColumns(track, used)) return;
+
+        Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount, Widths);
+        Selection = PatternSelection.None;
+
+        MarkDirty();
+        ColumnsMoved();
     }
 
     /// <summary>One more note column on the track the cursor is in.</summary>
