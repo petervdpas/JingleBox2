@@ -91,6 +91,32 @@ public interface IControllerProfiles
     string PortIs(string? device);
 
     /// <summary>
+    /// Which screen protocol writes to that port, or nothing for a port with no screen on it.
+    /// </summary>
+    /// <remarks>
+    /// The port and not the device, because a device is several ports and at most one of them is
+    /// the screen. Writing to the wrong one is silent, so this is the difference between a
+    /// greeting appearing and nobody being able to say why it did not.
+    ///
+    /// Nothing for a device with no file, which is the same answer the rest of this gives and is
+    /// the rule the whole idea rests on: a profile may add names and shape and may never add
+    /// capability. A controller nobody has written a file for had no screen before this existed
+    /// and has none now.
+    /// </remarks>
+    string ScreenOn(string? device);
+
+    /// <summary>
+    /// Whether that device's screen has to be switched on before it will take anything.
+    /// </summary>
+    /// <remarks>
+    /// False for a device with no file and for one that does not ask, since the message that does
+    /// the switching on is a write into a device's settings and the wrong device is worse off for
+    /// having had it.
+    /// </remarks>
+    bool ScreenWakes(string? device);
+
+
+    /// <summary>
     /// Whether a job belongs on this port, for a device that presents several.
     /// </summary>
     /// <remarks>

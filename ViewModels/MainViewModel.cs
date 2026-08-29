@@ -8,6 +8,7 @@ using JingleBox2.Tracker;
 using JingleBox2.Audio.Records;
 using JingleBox2.UI;
 using System;
+using Avalonia.Threading;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -1127,11 +1128,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 mackie.Handle(msg);
             });
 
-        var screen = new ArturiaDisplay(
-            midiService,
-            () => new MidiDeviceBindings().DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Controls));
+        var screen = new ControllerScreens(
+            () => new MidiDeviceBindings().DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.EveryRole),
+            new ArturiaDisplay(midiService, null, _profiles),
+            new MackieDisplay(midiService, _profiles, () => surface.Device));
 
         screen.Standing("JingleBox2", Tracker.SongName);
+
+        SayItAgain(screen);
 
         Tracker.PropertyChanged += (_, e) =>
         {
@@ -1147,9 +1151,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 mapping.Device,
                 mapping.Kind switch
                 {
-                    ControlKind.Action => ArturiaDisplay.Kind.Pad,
-                    ControlKind.Mix => ArturiaDisplay.Kind.Fader,
-                    _ => ArturiaDisplay.Kind.Knob
+                    ControlKind.Action => ScreenKind.Pad,
+                    ControlKind.Mix => ScreenKind.Fader,
+                    _ => ScreenKind.Knob
                 },
                 range > 0 ? (value - target.Min) / range : 0,
                 target.Name,
@@ -1166,7 +1170,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
             screen.Moved(
                 mapping.Device,
-                ArturiaDisplay.Kind.Knob,
+                ScreenKind.Knob,
                 range > 0 ? (target.Value - target.Min) / range : 0,
                 target.Name,
                 "pick up " + target.Reads(target.Value));
@@ -1977,4 +1981,36 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         cleaned = cleaned.Trim('-', '_');
         return cleaned.Length == 0 ? "" : cleaned;
     }
+
+    /// <summary>
+    /// Says the greeting a second and third time, a few seconds after the application starts.
+    /// </summary>
+    /// <remarks>
+    /// A controller is not ready the instant the operating system lists it. A KeyLab mkII powered
+    /// on a moment before this starts is on the bus, opens for writing, takes the message without
+    /// complaint and shows nothing, while the identical bytes sent by hand a minute later appear at
+    /// once. There is no message that asks a device whether it is ready, so the only answer is to
+    /// say it again.
+    ///
+    /// Two repeats and then it stops, because this is about a device settling rather than about
+    /// keeping a screen up to date: anything that changes afterwards says so itself. A timer rather
+    /// than a wait, so nothing about starting up is held back for it, and it disposes itself.
+    /// </remarks>
+    /// <param name="screen">The screens to greet again.</param>
+    private static void SayItAgain(IControllerScreen screen)
+    {
+        int said = 0;
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+
+        timer.Tick += (_, _) =>
+        {
+            screen.Again();
+
+            if (++said >= 2) timer.Stop();
+        };
+
+        timer.Start();
+    }
+
 }

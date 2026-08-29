@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
@@ -31,7 +33,7 @@ namespace JingleBox2.Midi;
 /// output will not open, is answered by <see cref="IMidiService.Send"/> with a quiet false, and
 /// writing to a screen that is not there costs a few bytes down a port nobody is reading.
 /// </remarks>
-public sealed class ArturiaDisplay
+public sealed class ArturiaDisplay : IControllerScreen
 {
     /// <summary>What every message to one of these begins with.</summary>
     private static readonly byte[] Head = { 0xF0, 0x00, 0x20, 0x6B, 0x7F, 0x42 };
@@ -49,28 +51,28 @@ public sealed class ArturiaDisplay
     /// </remarks>
     private static readonly byte[] Wake = { 0xF0, 0x00, 0x20, 0x6B, 0x7F, 0x42, 0x02, 0x02, 0x40, 0x6A, 0x21, 0xF7 };
 
-    /// <summary>What the value bar is drawn as.</summary>
+    /// <summary>
+    /// What this protocol draws each kind as.
+    /// </summary>
     /// <remarks>
-    /// The device's own picture of the control, so a knob's reading appears as a ring and a
-    /// fader's as a bar. It is about the thing on the screen and not about the thing under your
-    /// hand: a mixer level pointed at by an encoder is still drawn as a fader.
+    /// The numbers are Arturia's and stay in here. <see cref="ScreenKind"/> is what the
+    /// application asks for and carries none of them, or every other screen would be carrying
+    /// this one's.
     /// </remarks>
-    public enum Kind
+    private static byte Drawn(ScreenKind kind) => kind switch
     {
-        /// <summary>A ring, for a parameter on a machine.</summary>
-        Knob = 0x03,
-
-        /// <summary>A bar, for anything on a mixer strip.</summary>
-        Fader = 0x04,
-
-        /// <summary>A pad, for a button pointed at an action.</summary>
-        Pad = 0x05
-    }
+        ScreenKind.Fader => 0x04,
+        ScreenKind.Pad => 0x05,
+        _ => 0x03
+    };
 
     /// <summary>How many characters a line will take before it is cut.</summary>
     private const int Room = 16;
 
     private readonly IMidiService _midi;
+
+    /// <summary>Which devices have this kind of screen, which is a fact out of their files.</summary>
+    private readonly IControllerProfiles? _profiles;
 
     /// <summary>The controllers to greet, asked each time since what is plugged in changes.</summary>
     private readonly Func<IEnumerable<string>>? _devices;
@@ -96,10 +98,43 @@ public sealed class ArturiaDisplay
     /// exclusive message addressed to a manufacturer it is not, which it ignores. Both cost a
     /// few bytes down a port nobody is reading.
     /// </remarks>
-    public ArturiaDisplay(IMidiService midi, Func<IEnumerable<string>>? devices = null)
+    /// <param name="profiles">
+    /// Which devices have one of these screens. Nothing is written to a device whose file does
+    /// not say so, which is the difference between this and what was here before: the old
+    /// arrangement wrote Arturia's settings protocol to every controller on the desk on the
+    /// grounds that one which is not listening costs a few bytes. It costs a few bytes on a
+    /// controller that ignores it and it is a settings write on one that does not, and which of
+    /// those you have is not knowable from here.
+    /// </param>
+    public ArturiaDisplay(IMidiService midi, Func<IEnumerable<string>>? devices = null, IControllerProfiles? profiles = null)
     {
         _midi = midi;
         _devices = devices;
+        _profiles = profiles;
+    }
+
+    /// <summary>
+    /// Whether this device wants the switching-on message before anything else.
+    /// </summary>
+    /// <remarks>
+    /// Its own file answers, and a device that says nothing is not sent it. The message is a
+    /// write into a device's settings rather than anything about screens, and a KeyLab mkII that
+    /// receives it shows nothing afterwards while the identical text works without it. With no
+    /// profiles to ask this sends it, which is only the tests.
+    /// </remarks>
+    private bool Wakes(string device) => _profiles is null || _profiles.ScreenWakes(device);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// With no profiles to ask this claims every device, which is what the tests want and what
+    /// the application never does: <see cref="ControllerScreens"/> always hands one in.
+    /// </remarks>
+    public bool Writes(string? device)
+    {
+        if (string.IsNullOrWhiteSpace(device)) return false;
+        if (_profiles is null) return true;
+
+        return string.Equals(_profiles.ScreenOn(device), "arturia", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -149,6 +184,12 @@ public sealed class ArturiaDisplay
     }
 
     /// <summary>Two lines of words, and nothing else.</summary>
+    /// <remarks>
+    /// Both chunks, always, whatever the device does with them. A KeyLab mkII shows the first and
+    /// not the second, and sending it only the first is not a kindness: it renders nothing at all.
+    /// That cost most of an afternoon. The message is one thing and a screen takes it or does not,
+    /// so nothing here trims it to what somebody thinks a device will use.
+    /// </remarks>
     public void Say(string device, string first, string second)
     {
         var message = new List<byte>(Head);
@@ -177,13 +218,13 @@ public sealed class ArturiaDisplay
     /// True to have the screen go back to what it was showing after a moment, which is what a
     /// knob wants: the reading matters while your hand is on it and not afterwards.
     /// </param>
-    public void Moved(string device, Kind kind, double fraction, string what, string reads, bool hide = true)
+    public void Moved(string device, ScreenKind kind, double fraction, string what, string reads, bool hide = true)
     {
         byte value = (byte)Math.Clamp((int)Math.Round(fraction * 127), 0, 127);
 
         var message = new List<byte>(Head);
 
-        message.AddRange(new byte[] { 0x04, 0x02, 0x60, 0x1F, (byte)kind, (byte)(hide ? 0x02 : 0x00), value, 0x00, 0x00, 0x01 });
+        message.AddRange(new byte[] { 0x04, 0x02, 0x60, 0x1F, Drawn(kind), (byte)(hide ? 0x02 : 0x00), value, 0x00, 0x00, 0x01 });
         message.AddRange(Text(what));
         message.AddRange(new byte[] { 0x00, 0x02 });
         message.AddRange(Text(reads));
@@ -245,7 +286,7 @@ public sealed class ArturiaDisplay
     /// </remarks>
     private void Write(string device, byte[] message)
     {
-        if (string.IsNullOrWhiteSpace(device)) return;
+        if (!Writes(device)) return;
 
         lock (_shown)
         {
@@ -258,7 +299,7 @@ public sealed class ArturiaDisplay
 
         lock (_woken) first = _woken.Add(device);
 
-        if (first)
+        if (first && Wakes(device))
         {
             if (!_midi.Send(device, Wake))
             {
@@ -267,7 +308,7 @@ public sealed class ArturiaDisplay
                 return;
             }
 
-            Log.Write(LogArea.Midi, () => "screen: woke the display on '" + device + "'");
+            Log.Write(LogArea.Midi, () => "screen: switched the display on for '" + device + "'");
 
             if (_first.Length > 0 || _second.Length > 0) Say(device, _first, _second);
         }
@@ -278,6 +319,13 @@ public sealed class ArturiaDisplay
 
             lock (_shown) _shown.Remove(device);
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Nothing of its own: what a screen has to forget is per device, and
+    /// <see cref="ControllerScreens"/> forgets each one before saying the greeting again.</remarks>
+    public void Again()
+    {
     }
 
     /// <summary>Forgets that a device was woken, for one that has gone.</summary>

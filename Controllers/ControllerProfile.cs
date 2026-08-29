@@ -75,8 +75,69 @@ public sealed class ControllerProfile
     /// </remarks>
     public List<ControllerProgram> Programs { get; set; } = new();
 
+    /// <summary>
+    /// The screen it has, if it has one.
+    /// </summary>
+    /// <remarks>
+    /// A fact about the device in the same way its ports are, and it has to be written down for
+    /// the same reason: there is no way to ask. A controller cannot be sent "have you a screen",
+    /// and a screen that is not there swallows whatever is sent to it without a word, so a
+    /// program guessing gets no feedback whether it guessed right or wrong.
+    ///
+    /// Nothing here for a device with no screen, which is most of them, and nothing for a device
+    /// whose screen nobody has worked out how to write to yet. Both mean the same thing to the
+    /// application, which is that it writes nothing.
+    /// </remarks>
+    public ControllerScreen? Screen { get; set; }
+
     /// <summary>Anything a person opening the file should know. Read by nobody.</summary>
     public string Note { get; set; } = "";
+}
+
+/// <summary>What kind of screen a device has, and which of its ports it is on.</summary>
+/// <remarks>
+/// Two facts and not one, because the port is not guessable either. A MiniLab 3 has a port named
+/// for Analog Lab that looks like the obvious place and is not: its screen is written on the main
+/// port. A KeyLab mkII's screen is on neither of the two ports by name; it is on whichever one
+/// carries the DAW protocol, because the screen is part of that protocol rather than a thing of
+/// its own.
+/// </remarks>
+public sealed class ControllerScreen
+{
+    /// <summary>
+    /// Which protocol writes to it: <c>arturia</c> or <c>mackie</c>.
+    /// </summary>
+    /// <remarks>
+    /// A name rather than a number, so a file written today still names something the day a third
+    /// protocol arrives. A name nothing here implements is a device with no screen, which is the
+    /// same answer as saying nothing at all and is deliberately not an error: a file may describe
+    /// more of a device than this build knows what to do with.
+    /// </remarks>
+    public string Protocol { get; set; } = "";
+
+    /// <summary>The port it is written to, as a pattern, matched the way every other port is.</summary>
+    public string Port { get; set; } = "";
+
+    /// <summary>
+    /// Whether it has to be switched on before it will take anything.
+    /// </summary>
+    /// <remarks>
+    /// A MiniLab 3 does: nothing appears on it until it has been sent
+    /// <c>F0 00 20 6B 7F 42 02 02 40 6A 21 F7</c> once, which despite the name is not a wake at
+    /// all. It is Arturia's ordinary write-a-setting, preset 02, param 40, control 6A, value 21,
+    /// so it is switching something on rather than rousing anything.
+    ///
+    /// A KeyLab mkII is the exact opposite and that is why this is in the file. Sent it, the
+    /// screen takes nothing afterwards; not sent it, the same text appears at once. Which is what
+    /// you would expect of a setting written into a device it was never meant for, and it is the
+    /// second time this one message has been caught doing damage: our own remarks already
+    /// suspected it of being why a MiniLab stops speaking Mackie Control once it has had one.
+    ///
+    /// Off unless a file asks for it, because it is a write into somebody's hardware and the
+    /// device that needs it can say so.
+    /// </remarks>
+    public bool Wake { get; set; }
+
 }
 
 /// <summary>What a device says when it is asked who it is.</summary>

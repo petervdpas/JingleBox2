@@ -997,10 +997,58 @@ whole exercise and is worth writing down rather than summarising:
   note, where before it ended nothing, since there was no way to name one note and
   `LetPreview`'s plugin branch did not exist
 - A controller with a screen is written to: `ArturiaDisplay` puts the parameter's name, its
-  reading and a value bar on a MiniLab 3 while a knob is turned. Arturia's own system exclusive,
-  on the device's main port, and only while it is in a DAW mode. `MidiService.Send` opens an
-  output on demand and answers false for a device with none, so nothing has to know which
-  controllers have screens
+  reading and a value bar on it while a knob is turned, and the standing text is "JingleBox2"
+  over the open song's name. Arturia's own system exclusive
+- **Which controller has a screen is a fact in its file, and used to be a thing nobody asked.**
+  The old rule was that every device ticked as Controls got written to, on the reasoning that a
+  controller which is not listening costs a few bytes down a port nobody reads. That holds right
+  up until the device is listening and is not the one the message was written for: these bytes
+  are Arturia's write-a-setting, aimed at where a MiniLab keeps its screen, and what they do on
+  an MPD218 is not knowable from here. `IControllerScreen` is the contract, `ControllerScreens`
+  decides who hears what, and `IControllerProfiles.ScreenOn` is the question. A device whose file
+  says nothing has no screen, and a device with no file has none either, which is the same rule
+  the rest of a profile keeps
+- Two lines of words and a reading is the whole contract, because it is the least of what any of
+  them can do: a MiniLab draws a value as a ring and a Mackie display cannot draw at all, so
+  `MackieDisplay` says the name and the reading and drops the picture. `ScreenKind` carries no
+  numbers, since a value on it holding Arturia's 0x03 would make every other screen hold it too;
+  what a byte has to be is each protocol's own business
+- **A KeyLab mkII takes the same screen messages a MiniLab 3 does**, at the same address: write a
+  string to preset 02, param 60, control 01. Nobody could have known that from a document, and
+  it took writing to it, because reading that address answers 7F, nothing there. It is the
+  MiniLab's Selected Preset Name trap again: a field can be write-only, so a sweep finding
+  nothing proves nothing. The sweep is worth recording anyway, since it is what made the write
+  worth trying: every string id on the device answers, so the whole space can be walked in
+  seconds, and the only strings on a KeyLab are the control names
+- And it is on the **DAW port**, not the main one, which was settled by writing to each port on
+  its own with somebody watching the screen. The opposite of the MiniLab, whose screen is on the
+  main port and not the one named for Analog Lab. Neither is guessable, both were measured, and
+  that is why the port is in the file beside the protocol
+- **It shows the first line of the message and ignores the second, and it must still be sent the
+  second.** That is not a contradiction, it is the shape of the thing: the message is taken whole
+  or not at all, and one with the second chunk trimmed off renders nothing whatever. This cost an
+  afternoon, and the way it cost it is worth remembering because it will happen again. The screen
+  worked, somebody reported that only the top line appeared, and the obvious kindness was to stop
+  sending a device the half it cannot draw. That change broke it, and because the screen had by
+  then also been left holding rubbish from a hunt for the lower row, the two faults looked like
+  one fault and every attempt to get it back was made with the trimmed message. A power cycle did
+  not help, since the trimming was in the code by then. So: no per device trimming, nothing in any
+  file about how many rows a screen has, and one message for every screen. `Tests/ControllerScreenTests.cs`
+  holds both halves of that, and the MiniLab's exact bytes are pinned beside them
+- Two lessons under that, neither about screens. A protocol's message is a unit and a device is
+  entitled to refuse a truncated one, so a caller may not economise on the parts it thinks the
+  device will not use. And hunting for an undocumented address by writing guesses at it can leave
+  hardware in a state nobody can name: the write to param 60 control 02 put unreadable characters
+  on the screen and there is still no way to say what it set. Probing that far past a working
+  result cost more than the thing being hunted was worth
+- What the KeyLab's screen refuses is Mackie display text, and it refuses it while provably
+  speaking Mackie: in Standard MCU its faders arrive as pitch bend, its encoders as CC 16, Play
+  as note 94 and a finger on a fader as note 104, and four different model bytes of
+  `F0 00 00 66 <model> 12 ...` on both its ports changed nothing on the screen. It answers no
+  device query either. So it speaks the control half of Mackie Control and none of the display
+  half, and its screen is Arturia's alone
+- `MidiService.Send` opens an output on demand and answers false for a device with none, so a
+  controller with no output still costs nothing
 - `docs/hardware-integration.md` is mostly a plan, and the rule in it governs everything here:
   plain MIDI is the floor, not a fallback. A controller nobody has written anything about works
   today, taught by hovering a knob and touching the hardware, so a profile may add names, shape
@@ -1287,6 +1335,38 @@ whole exercise and is worth writing down rather than summarising:
   owner assigned. Two facts are in the file instead. The Looper strip sends CC 9 with its MIDI
   send off until a menu is visited, which reads as broken hardware. And its three transport
   buttons send MIDI Machine Control, which is why that is read here at all
+- `Controllers/Profiles/keylab-mkii.json` is the first file here filled in without anybody
+  touching the hardware. A KeyLab mkII 49 arrived on 2026-08-29 and answered Arturia's own
+  settings protocol for every field of every control, so the whole of User mode came back over
+  SysEx in one pass: ten presets, three banks apiece, nine encoders, nine faders, nine select
+  buttons, sixteen pads and ten DAW command buttons. `Controllers/Profiles/mpd218.json` had to
+  be measured knob by knob because Akai's equivalent protocol answers ETIMEDOUT, and that is
+  the whole difference between the two files
+- What it says, and every line of it is the device's answer rather than a reading of the manual.
+  All ten User presets carry the same numbers, so a preset is not a program here and the bank is:
+  bank 1 is Arturia's Analog Lab layout, encoders 74, 71, 76, 77, 93, 18, 19, 16, 17, which is a
+  MiniLab 3's Arturia program with a ninth on the end, and it counts notches. Banks 2 and 3 are
+  a plain absolute layout, encoders 35 to 43, and are identical to each other, which is written
+  as one program rather than two: two programs sharing every number would leave neither able to
+  be told from the other. Every control's channel reads User, meaning it follows the global User
+  MIDI channel rather than naming one, so the file claims no channel at all
+- The reading was checked against `sysex-controls` itself, page by page on screen, because a
+  reader written from somebody else's source is worth exactly one cross-check. Firmware, global
+  settings, the preset name and Column 1's knob down to its acceleration all agreed
+- Two ports, not the three that were guessed here while nobody owned one, and no MCU port: they
+  are `MIDI` and `DAW`, and the second carries whichever protocol Global Settings, DAW Map names.
+  That setting read Live, which is Ableton's and is not read here. Set it to Default MCU and this
+  application has the whole surface today, since `MidiMackieRouter` and `MackieSurface` are
+  already written. Its faders offer Pickup or Jump, which are this application's Takeover and
+  Jump under other names
+- What cannot be described that way is DAW mode, and that is a fact about the device rather than
+  a gap in the file. In DAW mode the front panel is hard mapped, the settings protocol says
+  nothing about it, and the numbers belong to whichever of the nine DAWs is chosen. The same
+  holds for Analog Lab. So this file describes User mode and says so
+- The pads are the one thing that differs between presets and the one thing the file cannot hold,
+  since a pad sends a note and `ControllerControl` is about controllers. Sixteen on channel 10,
+  gated: User 1 runs 36 to 51 straight up and User 2 to 10 have the rows the other way about,
+  48 to 51 along the top and 36 to 39 along the bottom. It is in the file's note instead
 - The transport is read in three dialects now, and a device speaks whichever its program or its
   menu chose. Mackie Control notes and the plain controllers a MiniLab sends were already there.
   Added: the realtime bytes 0xFA start, 0xFB continue and 0xFC stop, which are in the

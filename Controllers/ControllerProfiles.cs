@@ -267,6 +267,20 @@ public sealed class ControllerProfiles : IControllerProfiles
     }
 
     /// <inheritdoc/>
+    public string ScreenOn(string? device)
+    {
+        if (For(device) is not { } profile) return "";
+        if (profile.Screen is not { } screen) return "";
+        if (screen.Protocol.Length == 0) return "";
+
+        return _folder.Like(screen.Port, device!) ? screen.Protocol : "";
+    }
+
+    /// <inheritdoc/>
+    public bool ScreenWakes(string? device) =>
+        ScreenOn(device).Length > 0 && For(device) is { Screen.Wake: true };
+
+    /// <inheritdoc/>
     public bool PortTakes(string? device, MidiDeviceRole role)
     {
         if (For(device) is not { } profile) return true;

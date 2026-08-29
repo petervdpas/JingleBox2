@@ -1,5 +1,6 @@
 using System;
 using JingleBox2.Midi;
+using JingleBox2.Midi.Enums;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -38,7 +39,7 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.5, "Cutoff", "4.4 kHz");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.5, "Cutoff", "4.4 kHz");
 
         Assert.NotEmpty(midi.Sent);
 
@@ -63,7 +64,7 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.5, "Café — naïve", "± 3 dB");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.5, "Café — naïve", "± 3 dB");
 
         foreach (var (_, bytes) in midi.Sent)
             for (int at = 1; at < bytes.Length - 1; at++)
@@ -79,10 +80,10 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.5, "One", "1");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.5, "One", "1");
         int after = midi.Sent.Count;
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.6, "Two", "2");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.6, "Two", "2");
 
         Assert.Equal(after + 1, midi.Sent.Count);
     }
@@ -99,10 +100,10 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.5, "Cutoff", "4.4 kHz");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.5, "Cutoff", "4.4 kHz");
         int after = midi.Sent.Count;
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Knob, 0.5, "Cutoff", "4.4 kHz");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Knob, 0.5, "Cutoff", "4.4 kHz");
 
         Assert.Equal(after, midi.Sent.Count);
     }
@@ -121,7 +122,7 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Some other box", ArturiaDisplay.Kind.Knob, 0.5, "Cutoff", "4.4 kHz");
+        screen.Moved("Some other box", ScreenKind.Knob, 0.5, "Cutoff", "4.4 kHz");
 
         Assert.All(midi.Sent, sent => Assert.Equal("Some other box", sent.Device));
     }
@@ -166,7 +167,7 @@ public class ArturiaDisplayTests
     {
         var (screen, midi) = Wired();
 
-        screen.Moved("Minilab3 MIDI", ArturiaDisplay.Kind.Fader, 2.5, "Level", "loud");
+        screen.Moved("Minilab3 MIDI", ScreenKind.Fader, 2.5, "Level", "loud");
 
         foreach (var (_, bytes) in midi.Sent)
             Assert.All(bytes[1..^1], b => Assert.True(b < 0x80));

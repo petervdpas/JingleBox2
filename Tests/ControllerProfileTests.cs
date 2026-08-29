@@ -309,20 +309,25 @@ public class ControllerProfileTests
     /// <summary>The other files here name their devices as the MiniLab's does.</summary>
     [Theory]
     [InlineData("KeyLab mkII 49 MIDI", "KeyLab mkII")]
-    [InlineData("KeyLab mkII 88 MCU/HUI", "KeyLab mkII")]
+    [InlineData("KeyLab mkII 88 DAW", "KeyLab mkII")]
     [InlineData("MPD218 Port A", "MPD218")]
     public void The_other_controllers_with_a_file(string port, string called) =>
         Assert.Equal(called, _profiles.Called(port));
 
     /// <summary>
-    /// A KeyLab is several ports with nearly the same name too, and its file says which is which
-    /// even though it names not one of the device's controls.
+    /// A KeyLab is two ports with nearly the same name, and its file says which is which.
     /// </summary>
+    /// <remarks>
+    /// Two, and not the three that were written down here while nobody owned one. There is no
+    /// MCU port and no DIN port: the second is called DAW and carries whichever protocol the
+    /// device's own DAW Map setting names, which is Mackie Control only when that reads
+    /// Default MCU. Measured on the hardware on 2026-08-29.
+    /// </remarks>
     [Fact]
     public void A_keylabs_ports_say_what_they_are_for()
     {
         Assert.Contains("notes", _profiles.PortIs("KeyLab mkII 49 MIDI"));
-        Assert.Contains("Mackie", _profiles.PortIs("KeyLab mkII 49 MCU/HUI"));
+        Assert.Contains("Mackie", _profiles.PortIs("KeyLab mkII 49 DAW"));
     }
 
     /// <summary>
@@ -418,34 +423,52 @@ public class ControllerProfileTests
     }
 
     /// <summary>
-    /// A file that names a device and none of its controls claims nothing about any of them.
+    /// A KeyLab's User mode map, which the device was asked for rather than guessed at.
     /// </summary>
     /// <remarks>
-    /// The KeyLab file describes a device without naming a single controller, because
-    /// Arturia does not publish the numbers for it and nobody here owns one to measure.
-    /// Naming the device is the whole of what it does, and a profile is never allowed to
-    /// guess. The MPD218 was in the same state until somebody sat down with the hardware
-    /// and turned every knob, which is the only way that file could ever have been filled:
-    /// the MPD218 answers the universal identity request and refuses Akai's own settings
-    /// protocol, so sysex-controls asks and gets ETIMEDOUT.
+    /// This file named no control at all while nobody here owned the hardware, since Arturia
+    /// publishes none of it and a profile may never guess. It was read on 2026-08-29 through
+    /// Arturia's own settings protocol, the one sysex-controls speaks, so nobody had to turn
+    /// anything: every field of every control on all ten User presets came back over SysEx.
+    /// <para>Bank 1 is Arturia's Analog Lab layout and counts notches, so nothing is claimed
+    /// about how it should be picked up: which of the two counting conventions Relative 1 is
+    /// is not in the file and guessing wrong throws a parameter across its range. Banks 2 and
+    /// 3 report positions, and an endless encoder reporting a position is exactly what
+    /// <see cref="ControlPickup.Endless"/> exists for.</para>
     /// </remarks>
     [Fact]
-    public void A_file_with_no_control_map_claims_nothing_about_any_control()
+    public void A_keylabs_user_mode_map_was_read_off_the_device()
     {
-        Assert.Equal("", _profiles.Named("KeyLab mkII 49 MIDI", 1, 74));
-        Assert.Null(_profiles.Pickup("KeyLab mkII 49 MIDI", 1, 74));
+        const string port = "KeyLab mkII 49 MIDI";
+
+        _profiles.Saw(port, 1, 74);
+        Assert.Equal("User bank 1", _profiles.ProgramOn(port));
+        Assert.Equal("Encoder 1 (Cutoff)", _profiles.Named(port, 1, 74));
+        Assert.Null(_profiles.Pickup(port, 1, 74));
+        Assert.Equal("Fader 1", _profiles.Named(port, 1, 73));
+        Assert.Equal(ControlPickup.Takeover, _profiles.Pickup(port, 1, 73));
+
+        _profiles.Saw(port, 1, 35);
+        Assert.Equal("User bank 2 or 3", _profiles.ProgramOn(port));
+        Assert.Equal("Encoder 1", _profiles.Named(port, 1, 35));
+        Assert.Equal(ControlPickup.Endless, _profiles.Pickup(port, 1, 35));
+
+        Assert.Equal("Solo", _profiles.Named(port, 1, 52));
+        Assert.Equal(ControlPickup.Jump, _profiles.Pickup(port, 1, 52));
     }
 
     /// <summary>
-    /// Naming no controls does not stop a file putting each job on the port that does it.
+    /// Each job lands on the port that does it, and a port the file does not describe goes on
+    /// doing everything, since a profile may add names and shape and may never take capability
+    /// away.
     /// </summary>
     [Fact]
     public void And_the_transport_still_lands_on_the_right_port()
     {
         Assert.True(_profiles.PortTakes("KeyLab mkII 49 MIDI", MidiDeviceRole.Controls));
-        Assert.True(_profiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Transport));
-        Assert.False(_profiles.PortTakes("KeyLab mkII 49 MCU/HUI", MidiDeviceRole.Pads));
-        Assert.False(_profiles.PortTakes("KeyLab mkII 49 DIN THRU", MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiDeviceRole.Transport));
+        Assert.False(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiDeviceRole.Pads));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 Sync", MidiDeviceRole.Controls));
     }
 
     /// <summary>

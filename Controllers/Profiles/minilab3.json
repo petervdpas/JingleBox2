@@ -32,6 +32,9 @@
       "note": "the host out to the 5-pin socket. an output, so nothing ever arrives from it"
     }
   ],
+  "//screen": "Arturia's own, written on the main port rather than the one named for Analog Lab, which is the obvious guess and is wrong. Reverse engineered from what Arturia's software sends, and the same protocol turned out to drive a KeyLab mkII.",
+  "screen": { "protocol": "arturia", "port": "*MIDI*", "wake": true },
+
   "controls": [
     {
       "name": "Mod strip",
