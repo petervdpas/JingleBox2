@@ -88,6 +88,10 @@ public sealed record Machine(
     /// Answers for a machine that is not installed as well, since the caller is asking what a
     /// file on the shelf is rather than what is on the rack. What comes back is greyed and named
     /// for its engine, which is all anybody knows about a machine that is not here.
+    ///
+    /// A row to show, and not a thing that can be played. Whether an instrument may sound is a
+    /// separate question with its own answer, <see cref="Machines.Interfaces.IMachineProjects.Has"/>,
+    /// and it says no for exactly the machines this stands in for.
     /// </remarks>
     public static Machine? SlotFor(string? id) =>
         KindOf(id) is { } kind ? For(kind) : null;
@@ -138,7 +142,10 @@ public sealed record Machine(
     /// Not the machine's name: the machine is what is missing. This is the engine behind it,
     /// which is in the program and is what the song's own file says. A song written where
     /// Zampler was installed and opened where it was not shows a grey "Sampler", which is the
-    /// truth: the sound is there and the box it was programmed on is not.
+    /// truth: the engine is here and the box it was programmed on is not.
+    ///
+    /// The engine being here is not the same as the instrument being playable. It is silent
+    /// until the machine is back, and greyed for that reason as much as for the name.
     /// </remarks>
     private static string Engine(TrackerInstrumentKind kind) => kind switch
     {
@@ -223,8 +230,13 @@ public sealed record Machine(
     /// </summary>
     /// <remarks>
     /// A kind whose machine is not installed answers with the engine behind it, greyed. A song
-    /// still holds instruments of that kind, they still sound, and the list they are in still has
-    /// to write something beside them; what it must not do is name a machine that is not here.
+    /// still holds instruments of that kind and the list they are in still has to write something
+    /// beside them; what it must not do is name a machine that is not here.
+    ///
+    /// Nor may what comes back be taken as permission to play. This names a row; whether the
+    /// machine behind it is really installed is
+    /// <see cref="Machines.Interfaces.IMachineProjects.Has"/>, and an instrument it says no to is
+    /// silent.
     /// </remarks>
     public static Machine For(TrackerInstrumentKind kind) =>
         Registered.FirstOrDefault(one => one.Kind == kind)

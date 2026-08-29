@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using JingleBox2.Machines;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker.Machines.Interfaces;
@@ -48,4 +49,24 @@ public interface IMachineProjects
     /// </remarks>
     /// <param name="id">The machine's id, as a song writes it down.</param>
     MachinePanel? PanelFor(string? id);
+
+    /// <summary>
+    /// Whether the machine an instrument of that kind is on is installed here.
+    /// </summary>
+    /// <remarks>
+    /// Asked before anything sounds, and the reason it is asked at all is that an instrument
+    /// carries everything about itself except the machine. The settings travel with the song and
+    /// the engine is compiled in, so an instrument whose machine has been thrown out would
+    /// otherwise play, and play something that sounds finished, on a machine the song no longer
+    /// has. It names that machine and goes on naming it until the track is pointed at another
+    /// instrument, so what it needs is to be silent and to say why, not to be quietly stood in
+    /// for.
+    ///
+    /// By kind rather than by id because that is what an instrument holds. The kind names the
+    /// engine, the engine names the machine's own slot, and the slot is the id this was read
+    /// from disc under. A kind with no slot, which is a plugin, is never refused here: a plugin
+    /// is not a machine project and its absence is a different absence with its own answer.
+    /// </remarks>
+    /// <param name="kind">The engine an instrument is on, which is how it names its machine.</param>
+    bool Has(TrackerInstrumentKind kind);
 }

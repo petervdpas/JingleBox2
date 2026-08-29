@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using JingleBox2.ViewModels;
@@ -61,6 +62,12 @@ public partial class PluginStrip : UserControl
 
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
+        if (instrument.MachineMissing)
+        {
+            _ = Missing(instrument);
+            return;
+        }
+
         if (!instrument.IsPlugin)
         {
             var designer = instrument.Designer;
@@ -78,6 +85,48 @@ public partial class PluginStrip : UserControl
         instrument.IsOpen = true;
 
         PluginWindow.Show(instrument, panel, instrument.Title, owner, () => instrument.Close());
+    }
+
+    /// <summary>
+    /// Says why an instrument will not open, which is that its machine is not here.
+    /// </summary>
+    /// <remarks>
+    /// Said when it is asked for and nowhere else. An instrument whose machine is missing is a
+    /// row in a song like any other until somebody tries to use it, and that is the moment the
+    /// answer is wanted: told on the way in, while opening a song, it is a dialog about
+    /// something nobody had asked about yet and is gone by the time it matters.
+    ///
+    /// The window does not open behind it. There is no panel to draw, so what would open is an
+    /// empty frame with a keyboard that cannot sound a note, which reads as a machine that is
+    /// broken rather than one that is absent.
+    ///
+    /// The machine is labelled in the heading because an instrument takes its machine's name
+    /// unless somebody renames it, so the two are the same word more often than not and
+    /// "Ouroboros is not registered" leaves somebody wondering which of the two is meant. The
+    /// body then names the instrument and says "on it", which needs no second label.
+    ///
+    /// It points at the registry and stops there. It used to spell out what somebody would find
+    /// when they arrived, that the machine is either waiting to be added or not present at all
+    /// and needs its zip imported, which is a paragraph describing a page they have not opened.
+    /// That page says it better, and says it while they are looking at it.
+    ///
+    /// Register rather than install, and that is the whole instruction: registering is one page
+    /// to go and look at, where installing asks somebody to know which of those two cases they
+    /// are in before they have.
+    ///
+    /// Not awaited by the caller: it is an event handler, and the dialog owns itself once it is
+    /// up. What it is waiting on is somebody pressing OK.
+    /// </remarks>
+    /// <param name="instrument">The instrument whose machine has gone.</param>
+    private static async System.Threading.Tasks.Task Missing(PluginInstrumentViewModel instrument)
+    {
+        string machine = instrument.Missing?.Name ?? instrument.Instrument.Machine.Name;
+
+        await ConfirmDialog.ErrorAsync(
+            "Machine not registered",
+            machine + "(machine) is not registered",
+            "'" + instrument.Instrument.Name + "' is on it, so it has no panel and makes no "
+            + "sound. Check the machine registry under SETTINGS, System.");
     }
 
     /// <summary>

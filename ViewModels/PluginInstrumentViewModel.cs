@@ -36,6 +36,9 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// <summary>The machines this run has.</summary>
     private readonly IMachineProjects _machines;
 
+    /// <summary>How a machine that is not here is named, which its own kind cannot do.</summary>
+    private readonly Tracker.Machines.Interfaces.IMissingMachines _missing;
+
     /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
 
@@ -80,15 +83,21 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
     /// machine missing, without an error anywhere to say why.
     /// </param>
+    /// <param name="missing">
+    /// How a machine that is not installed is named, which is the one thing its own kind cannot
+    /// say. Left out, the ordinary one.
+    /// </param>
     public PluginInstrumentViewModel(
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
         IMachineProjects machines,
         Action? changed = null,
         Func<TrackInstrumentDesigner>? designer = null,
-        Action? remove = null)
+        Action? remove = null,
+        Tracker.Machines.Interfaces.IMissingMachines? missing = null)
     {
         _machines = machines;
+        _missing = missing ?? new Tracker.Machines.MissingMachines();
         _instrument = instrument;
         _live = live;
         _changed = changed;
@@ -150,6 +159,26 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
     /// <summary>The instrument this stands for, so the strip can tell one from another.</summary>
     public TrackerInstrument Instrument => _instrument;
+
+    /// <summary>
+    /// True when this instrument's machine is not installed, so there is nothing to open.
+    /// </summary>
+    /// <remarks>
+    /// A plugin is never this. It is not on a machine project at all, and a plugin that will not
+    /// load reports itself in its own words from its own process.
+    /// </remarks>
+    public bool MachineMissing => !_instrument.IsPlugin && !_machines.Has(_instrument.Kind);
+
+    /// <summary>
+    /// What the missing machine is called, or nothing when it is not missing.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the one thing that knows how to name a machine that is not here. Reading
+    /// <c>Machine.Name</c> instead gives the engine behind it, so an absent Ouroboros reports
+    /// itself as "Mono synth" and the message tells somebody to register a thing that is not on
+    /// the list under that name.
+    /// </remarks>
+    public Tracker.Machines.Records.MissingMachine? Missing => _missing.For(_instrument);
 
     /// <summary>The second line of its block: which machine it is, and how it is set.</summary>
     /// <remarks>

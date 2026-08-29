@@ -29,19 +29,53 @@ public sealed class MissingMachines(IMachineRegistry? registry = null) : IMissin
 
         foreach (var sound in instruments)
         {
-            if (sound is null || sound.IsPlugin) continue;
+            if (sound is null) continue;
 
-            string id = sound.Machine.SlotId;
+            if (Named(sound, offered) is not { } missing || !said.Add(missing.Id)) continue;
 
-            if (id.Length == 0 || !said.Add(id)) continue;
-
-            if (Machine.Installed.Any(one => one.SlotId == id)) continue;
-
-            bool ships = offered.TryGetValue(id, out string? called) && called.Length > 0;
-
-            wanted.Add(new MissingMachine(id, ships ? called! : sound.Machine.Name, ships));
+            wanted.Add(missing);
         }
 
         return wanted;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The shipped list is read for this one instrument, which is a folder walk for a question
+    /// asked once when somebody clicks. The alternative is keeping it, and a kept copy is a copy
+    /// that is wrong the moment a machine is added in the next tab.
+    /// </remarks>
+    public MissingMachine? For(TrackerInstrument? sound) =>
+        sound is null
+            ? null
+            : Named(sound, _registry.Available().ToDictionary(one => one.Id, one => one.Name));
+
+    /// <summary>
+    /// What that instrument is missing, or nothing when its machine is here.
+    /// </summary>
+    /// <remarks>
+    /// A plugin is never missing a machine: it is not on one. Nor is a kind with no slot, which
+    /// is the same thing said in the other direction.
+    ///
+    /// The name is looked for in the shipped copy first, because that is the only place left
+    /// that knows the machine is called Zampler rather than "Sampler", which is all the engine
+    /// behind it can say. Where the program ships no copy either, what the song remembered is
+    /// the best anything can do.
+    /// </remarks>
+    /// <param name="sound">The instrument being asked about.</param>
+    /// <param name="offered">The shipped machines that are not installed, by id.</param>
+    private static MissingMachine? Named(TrackerInstrument sound, Dictionary<string, string> offered)
+    {
+        if (sound.IsPlugin) return null;
+
+        string id = sound.Machine.SlotId;
+
+        if (id.Length == 0) return null;
+
+        if (Machine.Installed.Any(one => one.SlotId == id)) return null;
+
+        bool ships = offered.TryGetValue(id, out string? called) && called.Length > 0;
+
+        return new MissingMachine(id, ships ? called! : sound.Machine.Name, ships);
     }
 }

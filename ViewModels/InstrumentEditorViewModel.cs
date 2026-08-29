@@ -148,7 +148,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// <param name="play">
     /// How the panel plays a note: through it, a pad or a zone tapped here is the same note as
     /// one played on the keyboard, so the keyboard moves to it and lights it. Without one, a tap
-    /// still sounds, through the audition alone, and nothing on screen moves.
+    /// goes through the audition alone and nothing on screen moves.
+    ///
+    /// Either way it is the audition that decides whether anything is heard, and an instrument
+    /// whose machine is not installed is refused there: it is silent whichever route the tap
+    /// took.
     /// </param>
     /// <param name="keys">
     /// What is watching the notes going past, so a pad held down lights its own key on the

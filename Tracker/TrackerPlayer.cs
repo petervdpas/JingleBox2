@@ -16,6 +16,7 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker;
+using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -103,12 +104,23 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// writing a line of the log is a file opened and closed, and neither of those threads can
     /// afford to wait on a disc.
     /// </remarks>
-    public TrackerPlayer(IAudioEngine audio)
+    /// <param name="audio">The engine everything is rendered through and mixed into.</param>
+    /// <param name="machines">
+    /// Which machines this installation has, so an instrument whose machine is missing can be
+    /// refused rather than played on the engine underneath it. Left out, one that has nothing in
+    /// it, which answers that every machine is missing: a player built without being told what is
+    /// installed is a player that has not been wired up, and silence says so.
+    /// </param>
+    public TrackerPlayer(IAudioEngine audio, IMachineProjects? machines = null)
     {
         _audio = audio;
+        _machines = machines ?? new Machines.MachineProjects();
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }
+
+    /// <summary>Which machines this installation has, asked before anything is allowed to sound.</summary>
+    private readonly IMachineProjects _machines;
 
     /// <summary>How often the plugins are counted and their state written down.</summary>
     private const int WatchMilliseconds = 1000;
@@ -308,10 +320,18 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// Where the track named has no plugin loaded yet, it is loaded there rather than beside it:
     /// the caller worked this instrument out from that very track, and there is no song to check
     /// against anyway while the transport is stopped.
+    ///
+    /// An instrument whose machine is not installed here makes no sound at all, and answers with
+    /// no length, so nothing lights and nothing waits for it to finish. An instrument names its
+    /// machine and goes on naming it whether or not the machine is present; without it there is
+    /// nothing here to play, and the engine rendering the settings anyway would be the
+    /// application deciding a missing machine did not matter.
     /// </remarks>
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
         if (!note.IsPlayable) return 0;
+
+        if (!_machines.Has(instrument.Kind)) return 0;
 
         _audio.EnsureInitialized();
         _synth.EnsureStarted(_audio);
@@ -1125,6 +1145,13 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// as much a note this track played as one played on Ouroboros. With no length, since a note
     /// in a pattern lasts until whatever the track plays next and that has not happened yet.
     ///
+    /// An instrument whose machine is not installed here is one of those failures rather than a
+    /// note played on a stand-in. It goes on naming the machine it was made on and cannot be
+    /// played until that machine is back or the track is pointed at another instrument, so
+    /// nothing sounds and the line says why. The engine that would render it is compiled in and
+    /// the settings are all present, which is exactly what makes this worth refusing: it would
+    /// otherwise play something that sounds finished, on a machine the song no longer has.
+    ///
     /// Every way of failing writes a line saying which, because from outside they are all the
     /// same thing: a track that did not sound.
     /// </remarks>
@@ -1135,6 +1162,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (instrument == null)
         {
             Where(e.Track, e.Instrument, null, song, "there is no such instrument in the song");
+            return;
+        }
+
+        if (!_machines.Has(instrument.Kind))
+        {
+            Where(e.Track, e.Instrument, instrument, song, "its machine is not installed here");
             return;
         }
 

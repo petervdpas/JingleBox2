@@ -8,12 +8,17 @@ namespace JingleBox2.Tracker.Machines.Interfaces;
 /// </summary>
 /// <remarks>
 /// A song carries its instruments whole: every setting, every recording it points at, and the
-/// name of the machine each one came off. What it cannot carry is the machine, so a song written
-/// where Zampler was installed and opened where it was not still plays exactly as it did, and
-/// still saves, and simply has no panel to show for those instruments.
+/// name of the machine each one came off. What it cannot carry is the machine. So a song written
+/// where Zampler was installed and opened where it was not saves again unchanged and goes on
+/// naming Zampler, and the instruments on it are silent until it is back.
 ///
-/// That is worth saying out loud rather than leaving as an empty box, which is all this is for:
-/// look at what the song is asking for, and say which of it is not here.
+/// Silent rather than played on the engine underneath them, which they could be: the settings are
+/// all present and the engine is compiled in. That is exactly why it is refused. An instrument
+/// that plays on a machine the song no longer has sounds finished and is not, and nothing about
+/// hearing it would say so.
+///
+/// Which makes saying it out loud the whole of what this is for: look at what the song is asking
+/// for, and say which of it is not here, because the song itself has gone quiet about it.
 ///
 /// What counts as here is what the rack counts: a machine is installed or it is not, and there
 /// is one list that answers it.
@@ -40,4 +45,18 @@ public interface IMissingMachines
     /// </remarks>
     /// <param name="song">The song being opened, or nothing.</param>
     IReadOnlyList<MissingMachine> For(Song song);
+
+    /// <summary>
+    /// The same answer for one instrument: what it is missing, or nothing when it is fine.
+    /// </summary>
+    /// <remarks>
+    /// Asked where somebody has tried to open that one instrument, which is a different moment
+    /// from opening a song and wants a different sentence. The naming is the reason it is here
+    /// rather than worked out at the point of asking: an instrument whose machine is gone can
+    /// only say what its engine is called, so "Ouroboros" has to be fetched from the shipped
+    /// copy or from what the song remembered, and a second place doing that would eventually
+    /// say "Mono synth" to somebody.
+    /// </remarks>
+    /// <param name="sound">The instrument being opened, or nothing.</param>
+    MissingMachine? For(TrackerInstrument? sound);
 }

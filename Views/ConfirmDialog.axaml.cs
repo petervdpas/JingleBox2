@@ -60,6 +60,42 @@ public partial class ConfirmDialog : Window
     }
 
     /// <summary>
+    /// The same window saying something went wrong, rather than asking or merely telling.
+    /// </summary>
+    /// <remarks>
+    /// One button, and it keeps the red the question's confirm button has, because this is not a
+    /// choice: the application has already refused to do the thing and is saying why. The
+    /// heading is what separates it from <see cref="NoteAsync"/>, which is the same shape used
+    /// where nothing has gone wrong at all.
+    ///
+    /// A heading rather than an icon. The set of icons a desktop agrees on is small and none of
+    /// them survives a theme this dark without a second asset per theme, and a red line naming
+    /// the fault says the same thing in the words the fault is already in.
+    /// </remarks>
+    /// <param name="title">The window's own title, in the taskbar and on the frame.</param>
+    /// <param name="heading">The fault in a few words, in red above the explanation.</param>
+    /// <param name="message">What happened and what can be done about it.</param>
+    public static Task ErrorAsync(string title, string heading, string message)
+    {
+        var dialog = new ConfirmDialog { Title = title };
+
+        Fill(dialog, message, "OK");
+
+        var cancel = dialog.FindControl<Button>("CancelButton");
+        if (cancel != null) cancel.IsVisible = false;
+
+        var head = dialog.FindControl<TextBlock>("HeadingText");
+
+        if (head != null)
+        {
+            head.Text = heading;
+            head.IsVisible = true;
+        }
+
+        return Modal.ShowAsync(dialog, false);
+    }
+
+    /// <summary>
     /// Puts the question and the wording of the yes button into the window.
     /// </summary>
     /// <remarks>

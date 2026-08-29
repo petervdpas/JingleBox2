@@ -847,7 +847,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
-        _player = new TrackerPlayer(audio);
+        _player = new TrackerPlayer(audio, machines);
 
         Automation = new AutomationRecorder(
             () => Song,
@@ -2800,8 +2800,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>
     /// Gives the song a slot for a rack instrument, so its cells can name it. The slot holds
-    /// a copy: a song opened without the rack still plays, and the copy is brought back up
-    /// to date whenever the rack has the instrument.
+    /// a copy: a song opened without the rack of instruments still plays, and the copy is
+    /// brought back up to date whenever the rack has the instrument. The machine it is on is a
+    /// separate matter and does have to be installed, or the instrument is silent.
     /// </summary>
     /// <remarks>
     /// The copy is given an id of its own, because it is the song's from here on: name it what
@@ -2898,57 +2899,39 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Load();
 
-        await TellOfMissingMachines();
+        NoteMissingMachines();
     }
 
     /// <summary>
-    /// Says which machines the song that has just opened plays on and this installation has not
-    /// got.
+    /// Puts which machines this song needs and this installation has not got on the status line.
     /// </summary>
     /// <remarks>
-    /// The song is fine either way. Its instruments came with it, they sound exactly as they
-    /// were saved, and they save again untouched; what is missing is the panel to edit them
-    /// with, and the presets to start another one from. Worth saying, because an instrument
-    /// whose panel is blank looks broken and is not.
+    /// A line and not a dialog. It used to be a dialog on the way in, and that was the wrong
+    /// moment twice over: it interrupts the opening of a song to talk about instruments nobody
+    /// has looked at yet, and by the time somebody does look it has long been dismissed. What
+    /// answers at the moment it is wanted is the panel refusing to open, which says the same
+    /// thing about the one instrument being asked for.
+    ///
+    /// So this is the quiet half: a note that the song is not all here, where the song's other
+    /// notes go, for somebody who wants to know before they start rather than when they click.
+    ///
+    /// It points at the registry rather than describing it, as the dialog does, and for the same
+    /// reason: that page shows what is waiting to be added and what is not there at all, and it
+    /// shows it while somebody is looking at it.
     ///
     /// It tells and does not offer. Putting a machine on the rack is a thing you do to this
-    /// installation, not to a song, and doing it behind a dialog that came up while opening
-    /// something else is how an installation ends up in a state nobody chose. The two places
-    /// that add a machine are the two rows of buttons in SETTINGS, and they stay the only two.
-    ///
-    /// Said once, when the song arrives. Not on every glance at an instrument, and not as a bar
-    /// across the page.
-    ///
-    /// What it tells you to do depends on where the machine came from, and there are two
-    /// different fixes: one that ships with the program is added under SETTINGS, System, and one
-    /// that arrived in a zip has to be imported from that zip.
+    /// installation, not to a song, and doing it from a song being opened is how an installation
+    /// ends up in a state nobody chose. The two rows of buttons in SETTINGS stay the only two.
     /// </remarks>
-    public async Task TellOfMissingMachines()
+    public void NoteMissingMachines()
     {
         var wanted = Missing.For(Song);
 
         if (wanted.Count == 0) return;
 
-        bool one = wanted.Count == 1;
-
-        string names = Listed(wanted.Select(machine => machine.Name).ToList());
-
-        string how = wanted.All(machine => machine.Ships)
-            ? "Add " + (one ? "it" : "them") + " under SETTINGS, System."
-            : wanted.Any(machine => machine.Ships)
-                ? "Some ship with the program and can be added under SETTINGS, System. The rest "
-                  + "came in from a zip, so import that zip there."
-                : "They came in from a zip rather than with the program, so import that zip under "
-                  + "SETTINGS, System.";
-
-        await Views.ConfirmDialog.NoteAsync(
-            "Machines this song needs",
-            "'" + SongName + "' plays on " + names + ", which " + (one ? "is" : "are")
-            + " not installed here. It sounds as it was saved and saves again unchanged, but "
-            + "those instruments have no panel until the " + (one ? "machine is" : "machines are")
-            + " back. " + how);
-
-        Status = "Missing machine" + (one ? "" : "s") + ": " + names;
+        Status = "Silent, not registered: "
+                 + Listed(wanted.Select(machine => machine.Name).ToList())
+                 + ". Check the machine registry under SETTINGS, System.";
     }
 
     /// <summary>Names in a row, the way anybody would say them out loud.</summary>

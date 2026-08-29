@@ -259,9 +259,24 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - An **instrument** is a machine in use: your name, your settings, its own id, stored with the
     song. Two of them can come off one machine
 
-  So a song whose machine is not installed still plays, because the song carries the instrument
-  and the engine is in the program; what it has lost is the face, the presets and the name, and
-  it shows a grey "Sampler". A machine's own recordings do travel with it, inside the zip
+  So a song whose machine is not installed is silent on those tracks, and that is a decision
+  rather than a failure. The song carries the instrument and the engine is in the program, so it
+  could be rendered; playing it anyway would sound finished and would be an instrument on a
+  machine the song no longer has. It goes on naming that machine until the track is pointed at
+  another instrument, it saves unchanged, and it shows a grey "Sampler" named for its engine.
+  `IMachineProjects.Has` is the test, asked in `TrackerPlayer` before anything sounds. Nothing
+  about hearing silence explains it, so it is said twice and in two different moments. Opening
+  the song puts a line on the status bar naming what is not registered, which is a note for
+  somebody who wants to know before they start. Opening one of those instruments refuses and
+  says why, in a real error dialog headed `<Machine>(machine) is not registered`: the machine is
+  tagged because an instrument takes its machine's name unless it is renamed, so the two are
+  usually the same word. The window does not open behind it, since an empty frame with a
+  keyboard that cannot sound a note reads as a machine that is broken rather than absent.
+
+  It says **register**, not install, and points at SETTINGS, System without describing it. That
+  page shows the machine either waiting to be added or not there at all, which is itself the
+  answer about whether a zip has to be imported, and it shows it while somebody is looking at
+  it. A machine's own recordings do travel with it, inside the zip
 
 - A machine is a fixture on the rack: one of each, fixed name, always there. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
