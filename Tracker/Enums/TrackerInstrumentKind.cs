@@ -12,11 +12,9 @@ namespace JingleBox2.Tracker.Enums;
 /// <see cref="Machine"/>: an instrument of a kind whose machine is not installed here still has
 /// to be named, and what it is named is the engine rather than a machine that is not there.
 ///
-/// Named is not played. The engine is in the program and the instrument's own settings came with
-/// the song, so such an instrument could be rendered and deliberately is not: it names a machine
-/// this installation has not got, and playing it anyway would be the application deciding that
-/// did not matter. It is silent until the machine is back or the track is pointed at another
-/// instrument.
+/// Named is not played. An instrument is on a machine, and one whose machine is not registered
+/// here has nothing to play on: it is silent until the machine is back or the track is pointed at
+/// another instrument.
 /// </remarks>
 public enum TrackerInstrumentKind
 {

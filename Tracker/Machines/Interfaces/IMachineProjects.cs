@@ -54,13 +54,9 @@ public interface IMachineProjects
     /// Whether the machine an instrument of that kind is on is installed here.
     /// </summary>
     /// <remarks>
-    /// Asked before anything sounds, and the reason it is asked at all is that an instrument
-    /// carries everything about itself except the machine. The settings travel with the song and
-    /// the engine is compiled in, so an instrument whose machine has been thrown out would
-    /// otherwise play, and play something that sounds finished, on a machine the song no longer
-    /// has. It names that machine and goes on naming it until the track is pointed at another
-    /// instrument, so what it needs is to be silent and to say why, not to be quietly stood in
-    /// for.
+    /// Asked before anything sounds. An instrument is on a machine, so one whose machine is not
+    /// registered here has nothing to play on and is silent. It names that machine and goes on
+    /// naming it until the track is pointed at another instrument.
     ///
     /// By kind rather than by id because that is what an instrument holds. The kind names the
     /// engine, the engine names the machine's own slot, and the slot is the id this was read

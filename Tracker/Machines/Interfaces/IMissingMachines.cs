@@ -12,11 +12,6 @@ namespace JingleBox2.Tracker.Machines.Interfaces;
 /// where Zampler was installed and opened where it was not saves again unchanged and goes on
 /// naming Zampler, and the instruments on it are silent until it is back.
 ///
-/// Silent rather than played on the engine underneath them, which they could be: the settings are
-/// all present and the engine is compiled in. That is exactly why it is refused. An instrument
-/// that plays on a machine the song no longer has sounds finished and is not, and nothing about
-/// hearing it would say so.
-///
 /// Which makes saying it out loud the whole of what this is for: look at what the song is asking
 /// for, and say which of it is not here, because the song itself has gone quiet about it.
 ///

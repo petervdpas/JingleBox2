@@ -17,11 +17,8 @@ namespace JingleBox2.Tests;
 /// An instrument whose machine is not installed makes no sound at all.
 /// </summary>
 /// <remarks>
-/// The awkward part of this rule is that everything needed to play such an instrument is
-/// present. Its settings travel inside the song and the engine is compiled into the
-/// application, so it would play, and play something that sounds finished, on a machine the
-/// song no longer has. That is what makes it worth refusing rather than a case that fails on
-/// its own.
+/// An instrument is on a machine. Without that machine there is nothing to play, so nothing is
+/// heard and nothing is waited on.
 ///
 /// The engine handed in throws on every member, so these say more than that nothing was heard:
 /// they say the audio was never asked for anything. A guard that returned nought after starting

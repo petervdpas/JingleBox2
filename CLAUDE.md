@@ -259,11 +259,36 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - An **instrument** is a machine in use: your name, your settings, its own id, stored with the
     song. Two of them can come off one machine
 
-  So a song whose machine is not installed is silent on those tracks, and that is a decision
-  rather than a failure. The song carries the instrument and the engine is in the program, so it
-  could be rendered; playing it anyway would sound finished and would be an instrument on a
-  machine the song no longer has. It goes on naming that machine until the track is pointed at
-  another instrument, it saves unchanged, and it shows a grey "Sampler" named for its engine.
+- **The registry is what this installation has, and it is the only thing that answers that.**
+  Two folders and only one of them is yours. Beside the program is what ships: a source to take
+  a machine from, never written to, and never the answer to what is on the rack. Under the
+  application folder is what this installation actually has, and that one alone decides. The
+  point of the split is that removing a machine is not losing it, since the shipped copy stays
+  where it was and can be taken again.
+
+  Registering is a deliberate act and so is unregistering, which is why what has been *offered*
+  is recorded rather than what is present. `offered.txt` is that record: a shipped machine this
+  installation has never been offered goes on the rack, and one it has been offered is left
+  alone whether or not it is still there. So a machine written after the folder was made still
+  arrives, and a machine somebody threw out stays thrown out. Deciding by the folder's absence
+  meant neither: every new machine needed a trip to SETTINGS before it could be seen at all.
+
+  A machine that ships is kept up to date file by file against the shipped copy, by each file's
+  clock rather than by the version in its manifest, and **nothing is ever deleted**. What ships
+  is overwritten because that is the machine; anything else in the folder is yours, which is how
+  a preset you saved onto a machine survives the next version of it arriving.
+
+  Everything asks it. What the rack shows, what a panel is drawn from, what a song can sound,
+  and which machines a song is missing are all one question with one answer, and there is one
+  list that gives it: `IMachineRegistry` reads the folders and `IMachineProjects` holds what it
+  found for the run. A machine whose id this build has no engine for is read and passed over, so
+  a machines folder from a later version is harmless, and that gate is what has to move before a
+  machine written by somebody else can be registered at all.
+
+  So an instrument whose machine is not registered here makes no sound and has no panel: it is
+  on that machine, and the machine is not here. It goes on naming it until the track is pointed
+  at another instrument, it saves unchanged, and it shows a grey "Sampler" named for its
+  engine.
   `IMachineProjects.Has` is the test, asked in `TrackerPlayer` before anything sounds. Nothing
   about hearing silence explains it, so it is said twice and in two different moments. Opening
   the song puts a line on the status bar naming what is not registered, which is a note for

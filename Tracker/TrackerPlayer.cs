@@ -318,11 +318,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// the caller worked this instrument out from that very track, and there is no song to check
     /// against anyway while the transport is stopped.
     ///
-    /// An instrument whose machine is not installed here makes no sound at all, and answers with
-    /// no length, so nothing lights and nothing waits for it to finish. An instrument names its
-    /// machine and goes on naming it whether or not the machine is present; without it there is
-    /// nothing here to play, and the engine rendering the settings anyway would be the
-    /// application deciding a missing machine did not matter.
+    /// An instrument whose machine is not registered here makes no sound at all, and answers
+    /// with no length, so nothing lights and nothing waits for it to finish. It is on that
+    /// machine, and without it there is nothing here to play.
     /// </remarks>
     public double Preview(TrackerInstrument instrument, Note note, float gain = 1f, int track = -1)
     {
@@ -1142,12 +1140,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// as much a note this track played as one played on Ouroboros. With no length, since a note
     /// in a pattern lasts until whatever the track plays next and that has not happened yet.
     ///
-    /// An instrument whose machine is not installed here is one of those failures rather than a
-    /// note played on a stand-in. It goes on naming the machine it was made on and cannot be
-    /// played until that machine is back or the track is pointed at another instrument, so
-    /// nothing sounds and the line says why. The engine that would render it is compiled in and
-    /// the settings are all present, which is exactly what makes this worth refusing: it would
-    /// otherwise play something that sounds finished, on a machine the song no longer has.
+    /// An instrument whose machine is not registered here is one of those failures. It is on
+    /// that machine, and goes on naming it until the track is pointed at another instrument, so
+    /// nothing sounds and the line says why.
     ///
     /// Every way of failing writes a line saying which, because from outside they are all the
     /// same thing: a track that did not sound.
