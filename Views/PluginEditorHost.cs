@@ -4,7 +4,6 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using JingleBox2.Audio.Plugins;
 using System;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Views;

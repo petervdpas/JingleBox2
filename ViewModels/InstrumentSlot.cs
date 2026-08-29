@@ -2,9 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
 using System.Globalization;
-using JingleBox2.Machines;
 using JingleBox2.Machines.Records;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 

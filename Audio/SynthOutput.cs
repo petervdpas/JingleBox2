@@ -2,7 +2,6 @@ using System;
 using System.Runtime.InteropServices;
 using JingleBox2.Tracker.Synth;
 using ManagedBass;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.Audio;

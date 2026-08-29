@@ -1,10 +1,7 @@
-using System.Collections.Generic;
-using System.Linq;
 using JingleBox2.Machines;
 using JingleBox2.Midi;
 using Xunit;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Controllers;

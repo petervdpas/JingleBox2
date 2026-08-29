@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Audio;
 
 namespace JingleBox2.Audio;
 

@@ -1,7 +1,5 @@
-using JingleBox2.Tracker;
 using JingleBox2.Tracker.Synth;
 using Xunit;
-using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tests;

@@ -1,4 +1,3 @@
-using System;
 using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker.Synth.Records;

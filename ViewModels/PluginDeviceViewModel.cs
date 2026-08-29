@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
 using System.Collections.ObjectModel;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.ViewModels.Records;
 
 namespace JingleBox2.ViewModels;

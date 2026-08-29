@@ -1,15 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Tracker;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using JingleBox2.Machines;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 

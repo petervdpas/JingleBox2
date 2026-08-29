@@ -9,7 +9,6 @@ using System.Text;
 using System.Threading;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;
 
 namespace JingleBox2.Audio.Plugins.Bridge;

@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Audio.Plugins;
 using System;
 using System.Globalization;
 using JingleBox2.Audio.Plugins.Interfaces;

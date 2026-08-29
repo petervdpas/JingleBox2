@@ -10,13 +10,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using JingleBox2.ViewModels.Enums;
-using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Audio.Records;
 
 namespace JingleBox2.ViewModels;
 

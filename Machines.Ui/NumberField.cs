@@ -1,10 +1,8 @@
-using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using JingleBox2.Machines.Ui.Interfaces;
-using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 

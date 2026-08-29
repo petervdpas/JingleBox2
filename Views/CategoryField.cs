@@ -4,7 +4,6 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using JingleBox2.ViewModels;
 using System;
-using JingleBox2.Tracker.Synth.Enums;
 
 namespace JingleBox2.Views;
 

@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;

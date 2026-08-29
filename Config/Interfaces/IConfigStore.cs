@@ -1,4 +1,3 @@
-using JingleBox2.Config;
 
 namespace JingleBox2.Config.Interfaces;
 

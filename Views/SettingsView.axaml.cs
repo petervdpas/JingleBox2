@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Reactive;
-using System;
 using Avalonia.Platform.Storage;
 using JingleBox2.ViewModels;
 

@@ -1,4 +1,3 @@
-using JingleBox2.Tracker;
 using System;
 using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Interfaces;

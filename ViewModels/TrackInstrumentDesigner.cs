@@ -1,16 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Audio;
-using JingleBox2.Machines;
 using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Machines.Interfaces;
-using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
-using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 

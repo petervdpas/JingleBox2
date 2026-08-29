@@ -1,4 +1,3 @@
-using JingleBox2.Tracker;
 using System;
 using System.Collections.Generic;
 using JingleBox2.Midi.Interfaces;

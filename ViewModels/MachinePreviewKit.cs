@@ -1,4 +1,3 @@
-using JingleBox2.Machines;
 using JingleBox2.Tracker;
 using System;
 using System.Collections.Generic;

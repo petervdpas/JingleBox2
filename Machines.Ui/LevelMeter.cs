@@ -6,7 +6,6 @@ using System;
 using System.Diagnostics;
 using JingleBox2.Machines.Ui.Records;
 using JingleBox2.Machines.Ui.Interfaces;
-using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 

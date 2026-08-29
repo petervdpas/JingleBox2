@@ -1,7 +1,5 @@
 using Avalonia.Threading;
-using JingleBox2.Machines;
 using JingleBox2.Midi;
-using JingleBox2.Tracker;
 using System;
 using System.Collections;
 using System.Collections.ObjectModel;
@@ -11,7 +9,6 @@ using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 

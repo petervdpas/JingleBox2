@@ -1,9 +1,7 @@
 using JingleBox2.Tracker.Synth;
 using System;
 using System.Text.Json.Serialization;
-using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker;

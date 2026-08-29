@@ -3,17 +3,13 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using JingleBox2.Tracker;
 using System.IO;
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
-using JingleBox2.Shortcuts.Enums;
-using JingleBox2.Shortcuts.Interfaces;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 

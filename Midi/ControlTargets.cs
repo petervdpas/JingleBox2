@@ -13,8 +13,6 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
-using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Midi;

@@ -1,11 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using JingleBox2.Machines;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
 using JingleBox2.Machines.Records;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 

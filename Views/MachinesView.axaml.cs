@@ -1,12 +1,8 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
-using JingleBox2.Audio.Records;
-using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
-using JingleBox2.Audio.Plugins.Records;
 
 namespace JingleBox2.Views;
 

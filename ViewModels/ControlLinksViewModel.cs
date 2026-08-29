@@ -8,7 +8,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;

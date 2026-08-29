@@ -1,4 +1,3 @@
-using JingleBox2.Tracker.Synth;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker.Synth.Interfaces;

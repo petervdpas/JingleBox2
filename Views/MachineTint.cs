@@ -1,13 +1,7 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using System;
-using System.Linq;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Ui;
-using JingleBox2.Machines.Records;
-using JingleBox2.Machines.Ui.Records;
 using JingleBox2.Views.Records;
 using JingleBox2.Views.Interfaces;
 

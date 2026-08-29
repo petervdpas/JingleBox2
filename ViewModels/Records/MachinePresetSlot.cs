@@ -1,16 +1,3 @@
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
-using JingleBox2.Tracker;
-using JingleBox2.Tracker.Machines;
-using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace JingleBox2.ViewModels.Records;
 

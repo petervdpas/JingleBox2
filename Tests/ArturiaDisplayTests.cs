@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using JingleBox2.Midi;
 using Xunit;
 

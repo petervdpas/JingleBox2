@@ -1,4 +1,3 @@
-using JingleBox2.Tracker;
 using Xunit;
 using JingleBox2.Tracker.Records;
 using JingleBox2.UI;

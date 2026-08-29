@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
@@ -10,12 +9,9 @@ using JingleBox2.Midi;
 using JingleBox2.ViewModels;
 using System;
 using System.Reflection;
-using System.Threading.Tasks;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 

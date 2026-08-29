@@ -16,7 +16,6 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Ui.Records;
-using JingleBox2.Machines;
 
 namespace JingleBox2.Machines.Ui;
 

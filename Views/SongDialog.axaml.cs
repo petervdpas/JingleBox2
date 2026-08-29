@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Threading.Tasks;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;

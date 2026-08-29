@@ -1,7 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
 using JingleBox2.Midi;
-using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System.Collections.Generic;
 using System.Linq;

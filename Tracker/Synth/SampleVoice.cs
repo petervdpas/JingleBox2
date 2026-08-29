@@ -4,7 +4,6 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Synth.Records;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
-using JingleBox2.Tracker.Synth;
 
 namespace JingleBox2.Tracker.Synth;
 

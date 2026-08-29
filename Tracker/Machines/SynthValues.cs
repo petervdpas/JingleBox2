@@ -1,5 +1,4 @@
 using JingleBox2.Machines;
-using JingleBox2.Tracker.Synth;
 using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;

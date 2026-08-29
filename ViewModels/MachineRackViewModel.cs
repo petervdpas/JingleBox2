@@ -2,11 +2,8 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Diagnostics;
-using JingleBox2.Audio;
 using JingleBox2.Audio.Records;
-using JingleBox2.Machines;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Synth;
 using JingleBox2.Views;
 using System;
 using System.Collections.ObjectModel;
@@ -15,14 +12,11 @@ using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Machines.Interfaces;
-using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
-using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
-using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels;
 

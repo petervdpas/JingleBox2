@@ -2,8 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
-using Avalonia.Media;
-using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
 using System;

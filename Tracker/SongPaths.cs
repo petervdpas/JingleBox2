@@ -3,8 +3,6 @@ using System.IO;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Config;
-using JingleBox2.Config.Interfaces;
 
 namespace JingleBox2.Tracker;
 

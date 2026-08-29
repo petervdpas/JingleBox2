@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using JingleBox2.Machines;
 
 namespace JingleBox2.Machines.Interfaces;
 

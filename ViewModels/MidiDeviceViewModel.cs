@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Controllers;
-using JingleBox2.Midi;
 using System;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Controllers.Interfaces;

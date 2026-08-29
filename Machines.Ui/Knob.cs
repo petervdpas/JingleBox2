@@ -1,5 +1,4 @@
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -7,7 +6,6 @@ using System;
 using System.Globalization;
 using JingleBox2.Machines.Ui.Records;
 using JingleBox2.Machines.Ui.Interfaces;
-using JingleBox2.Machines.Ui;
 
 namespace JingleBox2.Machines.Ui;
 

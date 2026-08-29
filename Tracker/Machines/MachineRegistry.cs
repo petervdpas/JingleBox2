@@ -2,13 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
-using JingleBox2.Config.Interfaces;
-using JingleBox2.Config;
 
 namespace JingleBox2.Tracker.Machines;
 

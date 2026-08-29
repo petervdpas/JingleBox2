@@ -3,7 +3,6 @@ using JingleBox2.Midi;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels;
 using Xunit;
 

@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
-using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Audio.Plugins;
 

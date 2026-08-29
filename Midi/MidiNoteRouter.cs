@@ -1,9 +1,7 @@
 using JingleBox2.Diagnostics;
-using JingleBox2.Tracker;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
 

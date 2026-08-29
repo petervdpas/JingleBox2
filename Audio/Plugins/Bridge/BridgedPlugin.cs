@@ -1,7 +1,6 @@
 using JingleBox2.Audio.Plugins.Bridge.Enums;
 using System;
 using System.Collections.Generic;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Audio.Plugins.Bridge.Interfaces;

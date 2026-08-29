@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Media;
-using JingleBox2.Tracker.Machines.Records;
 using JingleBox2.Views.Records;
 
 namespace JingleBox2.Views.Interfaces;

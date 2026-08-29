@@ -1,6 +1,5 @@
 using System;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Midi;
 

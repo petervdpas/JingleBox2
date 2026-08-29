@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
-using JingleBox2.Tracker;
 using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker;

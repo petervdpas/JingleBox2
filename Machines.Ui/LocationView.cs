@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using JingleBox2.Machines;
 using System;
 using JingleBox2.Machines.Interfaces;
 

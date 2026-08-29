@@ -18,7 +18,6 @@ using JingleBox2.UI;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.UI.Interfaces;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Views;
 
 namespace JingleBox2.Views;
 

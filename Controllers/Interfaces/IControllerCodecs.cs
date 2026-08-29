@@ -1,6 +1,5 @@
 using System;
 using JingleBox2.Midi;
-using JingleBox2.Controllers;
 
 namespace JingleBox2.Controllers.Interfaces;
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using JingleBox2.Midi;
 
 namespace JingleBox2.Midi.Interfaces;
 

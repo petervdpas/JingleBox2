@@ -1,4 +1,3 @@
-using System;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Machines.Ui.Interfaces;
 using Xunit;

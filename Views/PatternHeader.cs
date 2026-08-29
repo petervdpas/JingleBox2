@@ -1,7 +1,6 @@
 using System;
 using System.Globalization;
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Tracker;

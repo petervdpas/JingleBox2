@@ -1,13 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Controllers;
-using JingleBox2.Midi;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Controllers.Interfaces;
 
 namespace JingleBox2.ViewModels;

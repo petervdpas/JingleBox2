@@ -4,9 +4,7 @@ using System.IO;
 using System.Text.Json;
 using JingleBox2.Audio.Plugins.Enums;
 using JingleBox2.Audio.Plugins.Records;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Audio.Plugins;
 
 namespace JingleBox2.Audio.Plugins;
 

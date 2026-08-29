@@ -1,8 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Machines;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Audio;
 using JingleBox2.Tracker;
 using System;
 using System.Collections.Generic;

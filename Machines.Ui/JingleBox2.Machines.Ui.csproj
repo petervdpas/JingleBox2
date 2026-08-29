@@ -20,6 +20,7 @@
          into a file, and what makes the compiler say which public thing is still undocumented.
          CS1591 is left switched on deliberately: it is the list of what is left to write. -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

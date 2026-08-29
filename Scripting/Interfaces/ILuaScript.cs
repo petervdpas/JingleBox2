@@ -1,6 +1,5 @@
 using System;
 using MoonSharp.Interpreter;
-using JingleBox2.Scripting;
 
 namespace JingleBox2.Scripting.Interfaces;
 

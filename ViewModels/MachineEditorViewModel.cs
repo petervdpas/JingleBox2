@@ -3,7 +3,6 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Machines;
-using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using System;
 using System.Collections.Generic;

@@ -5,9 +5,6 @@ using System.Linq;
 using JingleBox2.Tracker.Synth;
 using System.Text.Json;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker;
-using JingleBox2.Config.Interfaces;
-using JingleBox2.Config;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Files;
 

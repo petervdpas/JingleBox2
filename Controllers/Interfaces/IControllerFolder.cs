@@ -1,4 +1,3 @@
-using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Controllers.Interfaces;
 

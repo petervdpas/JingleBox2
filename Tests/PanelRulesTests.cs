@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using JingleBox2.Machines;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Ui;

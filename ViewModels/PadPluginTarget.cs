@@ -1,4 +1,3 @@
-using JingleBox2.Audio;
 using JingleBox2.Audio.Plugins;
 using System.Globalization;
 using JingleBox2.Audio.Interfaces;

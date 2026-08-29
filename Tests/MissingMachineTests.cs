@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Records;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Machines;

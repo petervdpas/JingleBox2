@@ -1,26 +1,19 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia;
 using JingleBox2.Audio;
-using JingleBox2.Audio.Records;
-using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using JingleBox2.Diagnostics.Enums;
-using JingleBox2.Midi.Enums;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Views;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines;
 

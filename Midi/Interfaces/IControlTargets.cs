@@ -1,4 +1,3 @@
-using JingleBox2.Midi;
 using JingleBox2.Midi.Records;
 
 namespace JingleBox2.Midi.Interfaces;

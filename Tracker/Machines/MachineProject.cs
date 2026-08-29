@@ -4,11 +4,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Machines.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
-using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;

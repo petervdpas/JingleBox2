@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using JingleBox2.Tracker;
 using Xunit;
-using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Interfaces;
 

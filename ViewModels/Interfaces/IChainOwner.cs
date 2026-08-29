@@ -1,5 +1,4 @@
 using JingleBox2.Audio.Plugins;
-using JingleBox2.ViewModels;
 
 namespace JingleBox2.ViewModels.Interfaces;
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-using JingleBox2.Diagnostics.Enums;
 
 namespace JingleBox2.Audio.Plugins;
 

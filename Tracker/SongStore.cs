@@ -5,16 +5,11 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
-using JingleBox2.Diagnostics.Enums;
-using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
-using JingleBox2.Tracker;
-using JingleBox2.Config.Interfaces;
-using JingleBox2.Config;
 
 namespace JingleBox2.Tracker;
 

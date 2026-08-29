@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Audio;
-using JingleBox2.Config;
 using JingleBox2.Audio.Records;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;

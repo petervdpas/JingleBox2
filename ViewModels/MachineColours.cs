@@ -1,6 +1,5 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Machines;
 using JingleBox2.Views;
 using System;
 using System.Runtime.CompilerServices;

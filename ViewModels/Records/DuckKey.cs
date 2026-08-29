@@ -1,9 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Tracker;
-using JingleBox2.UI;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
 
 namespace JingleBox2.ViewModels.Records;
 

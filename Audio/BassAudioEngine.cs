@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
-using JingleBox2.Config;
 using JingleBox2.Audio.Records;
 using ManagedBass;
 using JingleBox2.Audio.Enums;
 using JingleBox2.Config.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Audio;
 

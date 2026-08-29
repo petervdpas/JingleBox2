@@ -3,7 +3,6 @@ using Avalonia.Interactivity;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using JingleBox2.Machines;
 using System;
 using System.Collections.Generic;
 using JingleBox2.Machines.Interfaces;

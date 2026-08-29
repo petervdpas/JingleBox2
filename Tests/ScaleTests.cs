@@ -1,6 +1,5 @@
 using JingleBox2.UI;
 using JingleBox2.UI.Interfaces;
-using System;
 using Xunit;
 
 namespace JingleBox2.Tests;

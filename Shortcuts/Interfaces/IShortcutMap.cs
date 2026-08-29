@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Avalonia.Input;
 using JingleBox2.Shortcuts.Enums;
-using JingleBox2.Shortcuts;
 
 namespace JingleBox2.Shortcuts.Interfaces;
 

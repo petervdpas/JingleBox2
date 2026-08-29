@@ -4,7 +4,6 @@ using System.Linq;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Controllers;
 

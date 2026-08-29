@@ -4,18 +4,15 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using JingleBox2.Audio;
 using JingleBox2.Diagnostics;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Audio.Plugins.Bridge;
-using JingleBox2.Tracker.Synth;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker;

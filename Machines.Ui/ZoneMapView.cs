@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Input;
 using Avalonia.Media;
-using JingleBox2.Machines;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
