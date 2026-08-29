@@ -40,7 +40,7 @@ public class MixerIsolationTests
     {
         var mixer = new TrackMixer(Rate);
 
-        mixer.NoteOn(track, Loud(), new Note(60), 1f, 0f);
+        mixer.NoteOn(track, 0, Loud(), new Note(60), 1f, 0f);
         mixer.Render(new float[Frames * 2], Frames);
 
         return mixer;
@@ -85,8 +85,8 @@ public class MixerIsolationTests
     {
         var mixer = Playing(2);
 
-        mixer.SetLevels(0, 0f, null);
-        mixer.SetLevels(1, 0f, null);
+        mixer.SetLevels(0, 0, 0f, null);
+        mixer.SetLevels(1, 0, 0f, null);
         mixer.Render(new float[Frames * 2], Frames);
 
         Assert.True(mixer.LevelFor(2).Left > 0);
@@ -101,7 +101,7 @@ public class MixerIsolationTests
     {
         var mixer = Playing(2);
 
-        mixer.SetLevels(2, 0f, null);
+        mixer.SetLevels(2, 0, 0f, null);
 
         var buffer = new float[Frames * 2];
         mixer.Render(buffer, Frames);
@@ -220,7 +220,7 @@ public class MixerIsolationTests
     {
         var mixer = new TrackMixer(Rate);
 
-        mixer.NoteOn(0, Loud(), new Note(60), 1f, 0f);
+        mixer.NoteOn(0, 0, Loud(), new Note(60), 1f, 0f);
         mixer.Render(new float[Frames * 2], Frames);
 
         Assert.True(mixer.MasterLevel.Left > 0);

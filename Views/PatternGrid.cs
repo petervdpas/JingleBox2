@@ -187,8 +187,31 @@ public sealed class PatternGrid : ThemedControl
     private Typeface _typeface = new(FontFamily.Default);
 
     /// <summary>Layout for the pattern currently bound, shared with the header control.</summary>
+    /// <remarks>
+    /// The note column counts come off the pattern itself rather than off the song, so the
+    /// picture and the storage cannot disagree about how wide a track is: a click lands where
+    /// the cells really are.
+    /// </remarks>
     public PatternMetrics Metrics =>
-        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, Pad, Pad);
+        new(_charWidth, RowHeight, Pattern?.TrackCount ?? 0, Pad, Pad, Widths);
+
+    /// <summary>How many note columns each track of the bound pattern shows.</summary>
+    /// <remarks>
+    /// Made per read rather than kept, because a pattern is edited in place: a list cached here
+    /// would be the shape the pattern had when it was last bound.
+    /// </remarks>
+    private NoteColumns Widths
+    {
+        get
+        {
+            if (Pattern is not { } pattern) return default;
+
+            var counts = new int[pattern.TrackCount];
+            for (int track = 0; track < counts.Length; track++) counts[track] = pattern.ColumnsOn(track);
+
+            return new NoteColumns(counts);
+        }
+    }
 
     /// <summary>
     /// Half a screen, above the pattern and below it, whether or not there is anything to put
@@ -306,7 +329,7 @@ public sealed class PatternGrid : ThemedControl
         double visibleHeight = bounds.Height > 0 ? bounds.Height : contentHeight;
         double rowWidth = Math.Max(bounds.Width, metrics.ContentWidth);
 
-        var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount);
+        var cursor = EditCursor.Clamp(pattern.Lines, pattern.TrackCount, metrics.Columns);
         var barShade = palette.RowShade(0x1C);
         var beatShade = palette.RowShade(0x0E);
 
@@ -338,7 +361,7 @@ public sealed class PatternGrid : ThemedControl
         DrawCursor(context, metrics, palette, cursor);
     }
 
-    /// <summary>One line: its number in the gutter and one cell per track.</summary>
+    /// <summary>One line: its number in the gutter, then every note column of every track.</summary>
     private void DrawRow(DrawingContext context, PatternMetrics metrics, Pattern pattern,
         int line, double y, IBrush text, IBrush muted)
     {
@@ -346,21 +369,26 @@ public sealed class PatternGrid : ThemedControl
 
         for (int track = 0; track < pattern.TrackCount; track++)
         {
-            var cell = pattern[line, track];
+            for (int column = 0; column < pattern.ColumnsOn(track); column++)
+            {
+                var cell = pattern[line, track, column];
 
-            DrawText(context, cell.Note.ToString(),
-                metrics.ColumnX(track, CellColumn.Note), y, cell.Note.IsEmpty ? muted : text);
+                DrawText(context, cell.Note.ToString(),
+                    metrics.ColumnX(track, CellColumn.Note, column), y,
+                    cell.Note.IsEmpty ? muted : text);
 
-            DrawText(context, cell.InstrumentText,
-                metrics.ColumnX(track, CellColumn.Instrument), y,
-                cell.Instrument == TrackerCell.NoInstrument ? muted : text);
+                DrawText(context, cell.InstrumentText,
+                    metrics.ColumnX(track, CellColumn.Instrument, column), y,
+                    cell.Instrument == TrackerCell.NoInstrument ? muted : text);
 
-            DrawText(context, cell.VolumeText,
-                metrics.ColumnX(track, CellColumn.Volume), y,
-                cell.Volume == TrackerCell.NoVolume ? muted : text);
+                DrawText(context, cell.VolumeText,
+                    metrics.ColumnX(track, CellColumn.Volume, column), y,
+                    cell.Volume == TrackerCell.NoVolume ? muted : text);
 
-            DrawText(context, cell.Effect.ToString(),
-                metrics.ColumnX(track, CellColumn.Effect), y, cell.Effect.IsNone ? muted : text);
+                DrawText(context, cell.Effect.ToString(),
+                    metrics.ColumnX(track, CellColumn.Effect, column), y,
+                    cell.Effect.IsNone ? muted : text);
+            }
         }
     }
 
@@ -439,7 +467,7 @@ public sealed class PatternGrid : ThemedControl
         double height = block.LineCount * RowHeight;
 
         double left = metrics.TrackDividerX(block.FirstTrack);
-        double width = block.TrackCount * metrics.TrackWidth;
+        double width = metrics.TrackDividerX(block.LastTrack + 1) - left;
 
         var area = new Rect(left, top, width, height);
 
@@ -455,7 +483,7 @@ public sealed class PatternGrid : ThemedControl
         ThemePalette palette, int track, double height)
     {
         context.FillRectangle(palette.AccentTint(22),
-            new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height));
+            new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth(track), height));
     }
 
     /// <summary>
@@ -485,7 +513,7 @@ public sealed class PatternGrid : ThemedControl
         int track = DropTargetTrack;
         if (track < 0 || track >= (Pattern?.TrackCount ?? 0)) return;
 
-        var area = new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth, height);
+        var area = new Rect(metrics.TrackDividerX(track), 0, metrics.TrackWidth(track), height);
 
         context.FillRectangle(palette.AccentTint(40), area);
         context.DrawRectangle(new Pen(palette.AccentBrush, 2), area);
@@ -498,7 +526,7 @@ public sealed class PatternGrid : ThemedControl
     private void DrawCursor(DrawingContext context, PatternMetrics metrics,
         ThemePalette palette, PatternCursor cursor)
     {
-        double x = metrics.ColumnX(cursor.Track, cursor.Column);
+        double x = metrics.ColumnX(cursor.Track, cursor.Column, cursor.NoteColumn);
         double width = metrics.ColumnWidth(cursor.Column);
         double y = metrics.RowY(cursor.Line);
         var area = new Rect(x - 1, y, width + 2, RowHeight);

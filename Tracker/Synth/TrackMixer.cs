@@ -428,7 +428,7 @@ public sealed class TrackMixer : ITrackMixer
             Shift(_inserts, from, to);
             Shift(_instrumentGain, from, to);
             Shift(_instrumentPan, from, to);
-            Shift(_pluginHeld, from, to);
+            ShiftColumns(_pluginHeld, from, to);
             Shift(_ducking, from, to);
             Shift(_trackLevels, from, to);
 
@@ -461,6 +461,19 @@ public sealed class TrackMixer : ITrackMixer
         for (int track = from; track != to; track += step) values[track] = values[track + step];
 
         values[to] = moved;
+    }
+
+    /// <summary>The same, for state held as a block of note columns per track.</summary>
+    private static void ShiftColumns<T>(T[] values, int from, int to)
+    {
+        var moved = new T[Columns];
+        Array.Copy(values, from * Columns, moved, 0, Columns);
+
+        int step = from < to ? 1 : -1;
+        for (int track = from; track != to; track += step)
+            Array.Copy(values, (track + step) * Columns, values, track * Columns, Columns);
+
+        Array.Copy(moved, 0, values, to * Columns, Columns);
     }
 
     /// <inheritdoc/>
@@ -507,11 +520,14 @@ public sealed class TrackMixer : ITrackMixer
         IPluginInstrument? instrument;
         Span<int> letting = stackalloc int[HeldNotes.Most];
         int count;
+        bool everything;
 
         lock (_lock)
         {
             instrument = _preview;
             _previewGain = gain;
+
+            everything = ending != VoiceEnding.Sustain && _previewHeld.Count == 0;
 
             count = instrument == null
                 ? 0
@@ -520,17 +536,30 @@ public sealed class TrackMixer : ITrackMixer
 
         if (instrument == null) return;
 
-        Play(instrument, note.Semitone, letting, count, ending);
+        Play(instrument, note.Semitone, letting, count, everything);
     }
 
-    /// <summary>What each track's plugin has been told to play and has not been told to end.</summary>
+    /// <summary>
+    /// What each note column has told its track's plugin to play and has not told it to end.
+    /// </summary>
     /// <remarks>
+    /// One per column and not one per track, because a column is a voice: an OFF in the second
+    /// column of a chord has to end that column's note and leave the other two sounding, and
+    /// the only way to name one note of a plugin's chord is to have written down which column
+    /// started it.
+    ///
     /// One apiece and never null, so a note can be written down for a track whose plugin has
     /// not loaded yet without anything having to be made on the way past. They move with the
     /// track when the song moves it, since what a plugin is holding is the plugin's, not the
     /// position's.
     /// </remarks>
-    private readonly IHeldNotes[] _pluginHeld = PerTrack();
+    private readonly IHeldNotes[] _pluginHeld = PerColumn();
+
+    /// <summary>How many note columns each track has room for, which is as many as it can have.</summary>
+    private const int Columns = Song.MaxNoteColumns;
+
+    /// <summary>Where one note column's record sits.</summary>
+    private static int At(int track, int column) => track * Columns + column;
 
     /// <summary>The same, for the instrument being auditioned off a track.</summary>
     private readonly IHeldNotes _previewHeld = new HeldNotes();
@@ -538,12 +567,12 @@ public sealed class TrackMixer : ITrackMixer
     /// <summary>Reused, because this runs on the audio thread and must not make work for the collector.</summary>
     private readonly List<(IPluginInstrument Instrument, int Semitone)> _letting = new(MaxTracks);
 
-    /// <summary>A record per track, made once.</summary>
-    private static IHeldNotes[] PerTrack()
+    /// <summary>A record per note column of every track, made once.</summary>
+    private static IHeldNotes[] PerColumn()
     {
-        var held = new IHeldNotes[MaxTracks];
+        var held = new IHeldNotes[MaxTracks * Columns];
 
-        for (int track = 0; track < MaxTracks; track++) held[track] = new HeldNotes();
+        for (int at = 0; at < held.Length; at++) held[at] = new HeldNotes();
 
         return held;
     }
@@ -591,15 +620,20 @@ public sealed class TrackMixer : ITrackMixer
     /// Tells a plugin to let go of what it was holding and then to start the new note.
     /// </summary>
     /// <remarks>
-    /// Where there was nothing to let go of the whole plugin is asked to let go instead, which
-    /// is what this always did and is worth keeping: the record is what this side said, and a
-    /// plugin that has been sent a note by anything else is exactly the case a per-note off
+    /// Where nothing was remembered anywhere on the track the whole plugin is asked to let go
+    /// instead, which is what this always did and is worth keeping: the record is what this
+    /// side said, and a plugin sent a note by anything else is exactly the case a per-note off
     /// cannot reach. It costs one message on the first note after a stop.
+    ///
+    /// Anywhere on the track, and not in this column: the other columns are the rest of a
+    /// chord, and a sweep that fired whenever one column happened to be empty would take the
+    /// chord down every time a note landed in a column that had not played yet, which is every
+    /// first note of every chord.
     /// </remarks>
     private static void Play(IPluginInstrument instrument, int semitone, ReadOnlySpan<int> letting,
-                             int count, VoiceEnding ending)
+                             int count, bool everything)
     {
-        if (count == 0 && ending != VoiceEnding.Sustain) instrument.AllNotesOff();
+        if (everything) instrument.AllNotesOff();
 
         for (int i = 0; i < count; i++) instrument.NoteOff(letting[i]);
 
@@ -634,6 +668,7 @@ public sealed class TrackMixer : ITrackMixer
         IPluginInstrument? instrument;
         Span<int> letting = stackalloc int[HeldNotes.Most];
         int count;
+        bool everything;
 
         lock (_lock)
         {
@@ -641,14 +676,16 @@ public sealed class TrackMixer : ITrackMixer
 
             _instrumentGain[track] = gain;
 
+            everything = ending != VoiceEnding.Sustain && Silent(track);
+
             count = instrument == null
                 ? 0
-                : MakeWay(_pluginHeld[track], note.Semitone, Until(holdSeconds), ending, letting);
+                : MakeWay(_pluginHeld[At(track, 0)], note.Semitone, Until(holdSeconds), ending, letting);
         }
 
         if (instrument == null) return;
 
-        Play(instrument, note.Semitone, letting, count, ending);
+        Play(instrument, note.Semitone, letting, count, everything);
     }
 
     /// <inheritdoc/>
@@ -662,7 +699,7 @@ public sealed class TrackMixer : ITrackMixer
         lock (_lock)
         {
             instrument = _instruments[track];
-            held = _pluginHeld[track].Let(semitone);
+            held = _pluginHeld[At(track, 0)].Let(semitone);
         }
 
         if (held) instrument?.NoteOff(semitone);
@@ -693,14 +730,16 @@ public sealed class TrackMixer : ITrackMixer
     /// because a plugin's own velocity is part of its patch and turning a note down with it
     /// would change the sound rather than the level.
     /// </remarks>
-    public void PluginNoteOn(int track, Note note, float gain, float pan,
+    public void PluginNoteOn(int track, int column, Note note, float gain, float pan,
                              VoiceEnding ending = VoiceEnding.Cut)
     {
-        if (track < 0 || track >= MaxTracks || !note.IsPlayable) return;
+        if (track < 0 || track >= MaxTracks || column < 0 || column >= Columns) return;
+        if (!note.IsPlayable) return;
 
         IPluginInstrument? instrument;
         Span<int> letting = stackalloc int[HeldNotes.Most];
         int count;
+        bool everything;
 
         lock (_lock)
         {
@@ -708,37 +747,63 @@ public sealed class TrackMixer : ITrackMixer
             _instrumentGain[track] = gain;
             _instrumentPan[track] = Math.Clamp(pan, -1f, 1f);
 
+            everything = ending != VoiceEnding.Sustain && Silent(track);
+
             count = instrument == null
                 ? 0
-                : MakeWay(_pluginHeld[track], note.Semitone, 0, ending, letting);
+                : MakeWay(_pluginHeld[At(track, column)], note.Semitone, 0, ending, letting);
         }
 
         if (instrument == null) return;
 
-        Play(instrument, note.Semitone, letting, count, ending);
+        Play(instrument, note.Semitone, letting, count, everything);
     }
 
     /// <inheritdoc/>
     /// <remarks>
-    /// All notes off rather than one message per note, because an OFF ends everything the track
-    /// was holding and the plugin knows what that is better than this side does. The record is
-    /// emptied with it, or the next note would ask the plugin to let go of notes it has already
-    /// let go of.
+    /// One message per note, because an OFF belongs to one note column and the other columns of
+    /// the same track are the rest of a chord. All notes off would take the chord down to end
+    /// one note of it, which is the whole reason this side keeps a record at all.
+    ///
+    /// Where nothing is remembered anywhere on the track the plugin is asked to let go of
+    /// everything instead. That is what this always did, and it is the one case a per-note off
+    /// cannot reach: a plugin that has been sent a note by something other than this.
     /// </remarks>
-    public void PluginNoteOff(int track)
+    public void PluginNoteOff(int track, int column = 0)
     {
-        if (track < 0 || track >= MaxTracks) return;
+        if (track < 0 || track >= MaxTracks || column < 0 || column >= Columns) return;
 
         IPluginInstrument? instrument;
         Span<int> letting = stackalloc int[HeldNotes.Most];
+        int count;
+        bool nothing;
 
         lock (_lock)
         {
             instrument = _instruments[track];
-            _pluginHeld[track].LetAll(letting);
+            count = _pluginHeld[At(track, column)].LetAll(letting);
+            nothing = count == 0 && Silent(track);
         }
 
-        instrument?.AllNotesOff();
+        if (instrument == null) return;
+
+        if (nothing)
+        {
+            instrument.AllNotesOff();
+            return;
+        }
+
+        for (int i = 0; i < count; i++) instrument.NoteOff(letting[i]);
+    }
+
+    /// <summary>True when no note column of a track remembers holding anything.</summary>
+    /// <remarks>Held under the lock by its callers, since it reads the records.</remarks>
+    private bool Silent(int track)
+    {
+        for (int column = 0; column < Columns; column++)
+            if (_pluginHeld[At(track, column)].Count > 0) return false;
+
+        return true;
     }
 
     /// <inheritdoc/>
@@ -768,16 +833,19 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     /// <remarks>The voice is built outside the lock, since making one is the expensive half.</remarks>
-    public void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan,
+    public void NoteOn(int track, int column, SynthPatch patch, Note note, float gain, float pan,
                        VoiceEnding ending = VoiceEnding.Cut)
     {
         if (patch is null || !note.IsPlayable) return;
 
-        var voice = new SynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed());
+        var voice = new SynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed())
+        {
+            Column = column
+        };
 
         lock (_lock)
         {
-            MakeWay(track, note, ending);
+            MakeWay(track, column, note, ending);
             Add(voice);
         }
     }
@@ -787,7 +855,7 @@ public sealed class TrackMixer : ITrackMixer
     /// The one note-on built inside the lock rather than outside it, because what it slides
     /// from is read off the voice list and has to be read before that voice is cut.
     /// </remarks>
-    public void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan,
+    public void NoteOn(int track, int column, MonoSynthPatch patch, Note note, float gain, float pan,
                        VoiceEnding ending = VoiceEnding.Cut)
     {
         if (patch is null || !note.IsPlayable) return;
@@ -800,14 +868,18 @@ public sealed class TrackMixer : ITrackMixer
             {
                 foreach (var playing in _voices)
                 {
-                    if (playing.Track == track && !playing.IsFinished && playing is MonoSynthVoice last)
+                    if (playing.Track == track && playing.Column == column
+                        && !playing.IsFinished && playing is MonoSynthVoice last)
                         from = last.Hz;
                 }
             }
 
-            MakeWay(track, note, ending);
+            MakeWay(track, column, note, ending);
 
-            Add(new MonoSynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from));
+            Add(new MonoSynthVoice(patch, note, track, gain, pan, SampleRate, NextSeed(), from)
+            {
+                Column = column
+            });
         }
     }
 
@@ -818,18 +890,22 @@ public sealed class TrackMixer : ITrackMixer
     /// Held under the lock by its callers, since what it decides about has to still be true
     /// when the new voice is added.
     ///
+    /// Room is made in one note column and not across the track. A column is a voice, so the
+    /// other columns of the same track are other notes of the same chord and are none of this
+    /// note's business.
+    ///
     /// The same note arriving where it is already sounding is cut whichever ending was asked
     /// for. Two copies of one note are a retrigger, and letting them pile up is how a part left
     /// sustaining walks into <see cref="MaxVoices"/> and starts stealing notes somebody meant
     /// to hear.
     /// </remarks>
-    private void MakeWay(int track, Note note, VoiceEnding ending)
+    private void MakeWay(int track, int column, Note note, VoiceEnding ending)
     {
         if (track < 0) return;
 
         foreach (var playing in _voices)
         {
-            if (playing.Track != track) continue;
+            if (playing.Track != track || playing.Column != column) continue;
 
             if (ending == VoiceEnding.Cut || playing.Note.Semitone == note.Semitone) playing.Cut();
             else if (ending == VoiceEnding.Release) playing.NoteOff();
@@ -871,17 +947,21 @@ public sealed class TrackMixer : ITrackMixer
     }
 
     /// <inheritdoc/>
-    public void NoteOn(int track, TrackerInstrument instrument, SampleData sample, Note note, float gain, float pan)
+    public void NoteOn(int track, int column, TrackerInstrument instrument, SampleData sample,
+                       Note note, float gain, float pan)
     {
         if (instrument is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
         var voice = new SampleVoice(
             sample, instrument.Patch, instrument.Shape, note, instrument.BaseNote,
-            track, gain, pan, SampleRate);
+            track, gain, pan, SampleRate)
+        {
+            Column = column
+        };
 
         lock (_lock)
         {
-            MakeWay(track, note, instrument.NewNoteAction);
+            MakeWay(track, column, note, instrument.NewNoteAction);
             Add(voice);
         }
     }
@@ -890,7 +970,8 @@ public sealed class TrackMixer : ITrackMixer
     /// <remarks>
     /// A choke group of nought is no group at all, so nothing is walked and nothing is cut.
     /// </remarks>
-    public void NoteOn(int track, DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, float pan)
+    public void NoteOn(int track, int column, DrumPad pad, SynthPatch patch, SampleData sample,
+                       Note note, float gain, float pan)
     {
         if (pad is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
@@ -898,7 +979,8 @@ public sealed class TrackMixer : ITrackMixer
             sample, patch, pad.Shape, note, note,
             track, gain, pan, SampleRate)
         {
-            Choke = pad.Choke
+            Choke = pad.Choke,
+            Column = column
         };
 
         lock (_lock)
@@ -922,18 +1004,21 @@ public sealed class TrackMixer : ITrackMixer
     /// voice takes both: the plain path's shaping is left doing nothing and the four pole
     /// filters do the work instead.
     /// </remarks>
-    public void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note,
-                       float gain, float pan, VoiceEnding ending = VoiceEnding.Cut)
+    public void NoteOn(int track, int column, SampleZone zone, SamplerPatch patch, SampleData sample,
+                       Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut)
     {
         if (zone is null || patch is null || sample is null || sample.IsEmpty || !note.IsPlayable) return;
 
         var voice = new SampleVoice(
             sample, new SynthPatch(), zone.Shape, note, new Note(zone.Root),
-            track, gain, pan, SampleRate, patch);
+            track, gain, pan, SampleRate, patch)
+        {
+            Column = column
+        };
 
         lock (_lock)
         {
-            MakeWay(track, note, ending);
+            MakeWay(track, column, note, ending);
             Add(voice);
         }
     }
@@ -1057,7 +1142,7 @@ public sealed class TrackMixer : ITrackMixer
     }
 
     /// <inheritdoc/>
-    public void NoteOff(int track)
+    public void NoteOff(int track, int column = 0)
     {
         if (track < 0) return;
 
@@ -1065,17 +1150,17 @@ public sealed class TrackMixer : ITrackMixer
         {
             foreach (var voice in _voices)
             {
-                if (voice.Track == track) voice.NoteOff();
+                if (voice.Track == track && voice.Column == column) voice.NoteOff();
             }
         }
     }
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Every voice on the track, not the newest, because a kit can have several sounding at
-    /// once and the column is about the track rather than about one drum.
+    /// Every voice in that note column, not the newest, because a kit can have several sounding
+    /// at once and a volume column is about the column rather than about one drum.
     /// </remarks>
-    public void SetLevels(int track, float gain, float? pan)
+    public void SetLevels(int track, int column, float gain, float? pan)
     {
         if (track < 0) return;
 
@@ -1083,7 +1168,7 @@ public sealed class TrackMixer : ITrackMixer
         {
             foreach (var voice in _voices)
             {
-                if (voice.Track != track) continue;
+                if (voice.Track != track || voice.Column != column) continue;
 
                 voice.Gain = gain;
                 if (pan.HasValue) voice.Pan = pan.Value;
@@ -1181,8 +1266,10 @@ public sealed class TrackMixer : ITrackMixer
 
             for (int track = 0; track < MaxTracks; track++)
             {
-                if (_instruments[track] is IPluginInstrument plugin)
-                    Expired(_pluginHeld[track], plugin, now, expired, letting);
+                if (_instruments[track] is not IPluginInstrument plugin) continue;
+
+                for (int column = 0; column < Columns; column++)
+                    Expired(_pluginHeld[At(track, column)], plugin, now, expired, letting);
             }
 
             Array.Copy(_ducking, _ducked, MaxTracks);
@@ -1353,7 +1440,7 @@ public sealed class TrackMixer : ITrackMixer
 
             _previewHeld.LetAll(letting);
 
-            for (int track = 0; track < MaxTracks; track++) _pluginHeld[track].LetAll(letting);
+            foreach (var held in _pluginHeld) held.LetAll(letting);
         }
 
         foreach (var instrument in instruments) instrument?.AllNotesOff();

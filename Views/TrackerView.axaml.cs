@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -50,6 +51,16 @@ public partial class TrackerView : UserControl
     /// <summary>Which letter sounds which note.</summary>
     private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
 
+    /// <summary>
+    /// Which note each letter key is currently sounding, so its release names the same note.
+    /// </summary>
+    /// <remarks>
+    /// Read back rather than worked out again from the key: the octave can be changed between
+    /// a press and its release, and a release that named a different note would leave the first
+    /// one held for the rest of the session and every note after it read as part of a chord.
+    /// </remarks>
+    private readonly Dictionary<Key, Note> _typed = new();
+
     /// <summary>Where the pattern has to sit for the cursor to stay on the middle.</summary>
     private readonly IViewportScroller _scroll = new ViewportScroller();
 
@@ -98,6 +109,8 @@ public partial class TrackerView : UserControl
 
         Grid.CursorMoved += (_, cursor) => ViewModel?.SetCursor(cursor);
         AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnGridKeyUp, RoutingStrategies.Tunnel);
+        Grid.LostFocus += OnGridLostFocus;
 
         Header.TrackClicked += (_, track) => SelectTrack(track);
 
@@ -110,6 +123,7 @@ public partial class TrackerView : UserControl
             var metrics = Grid.Metrics;
             if (metrics.CharWidth > 0) Header.CharWidth = metrics.CharWidth;
             Header.RowHeight = Grid.RowHeight;
+            Header.Columns = metrics.Columns;
         };
 
         GridScroll.GetObservable(ScrollViewer.ViewportProperty)
@@ -596,6 +610,41 @@ public partial class TrackerView : UserControl
     /// The rules are in <see cref="KeyboardNoteMap"/>, so this only decides which of them to
     /// ask.
     /// </remarks>
+    /// <summary>
+    /// A letter key coming up, which is what tells the view model a chord is over.
+    /// </summary>
+    /// <remarks>
+    /// The note path has no release of its own: a letter typed into the pattern sounds a note
+    /// that lets itself go after a moment, and nothing ever said the key had come up. That was
+    /// enough while a track held one note. It is not enough now, because a note pressed while
+    /// another is held is a chord and goes into the next note column, and without a release the
+    /// first chord anybody typed would go on filling columns for ever.
+    ///
+    /// It does not stop the sound. A note played by hand runs its own length here, which is the
+    /// rule everywhere in this application that a key can be clicked rather than held.
+    /// </remarks>
+    /// <summary>
+    /// The keyboard has gone somewhere else, so every key it was holding is forgotten.
+    /// </summary>
+    /// <remarks>
+    /// The release will be delivered wherever the keys went instead and this will never hear
+    /// it. Without this the next note typed here would be read as part of a chord begun before
+    /// somebody clicked away, and would land in the second note column of whatever track the
+    /// cursor happened to be in.
+    /// </remarks>
+    private void OnGridLostFocus(object? sender, RoutedEventArgs e)
+    {
+        _typed.Clear();
+        ViewModel?.LetAllNotes();
+    }
+
+    private void OnGridKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (!_typed.Remove(e.Key, out var note)) return;
+
+        ViewModel?.LetNote(note);
+    }
+
     private void OnGridKeyDown(object? sender, KeyEventArgs e)
     {
         var vm = ViewModel;
@@ -657,6 +706,7 @@ public partial class TrackerView : UserControl
 
             if (_keys.NoteFor(key, vm.Octave) is Note note)
             {
+                _typed[e.Key] = note;
                 vm.EnterNote(note);
                 e.Handled = true;
             }

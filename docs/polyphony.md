@@ -1,7 +1,7 @@
 # Polyphony
 
-Half built. The new note action is in, note columns are not, and this is what was decided,
-what it cost and what is left.
+Built, both halves. This is what was decided, how it was done, and the one piece that was
+deliberately left.
 
 ## Two features share the word
 
@@ -16,7 +16,9 @@ release, a piano part in a single column overlaps by itself, because the previou
 decaying while the next one starts.
 
 They are orthogonal and they cost wildly different amounts here. One was a setting and two
-methods that already existed; the other is the pattern editor. They were taken in that order.
+methods that already existed; the other was the pattern editor. They were taken in that order,
+and doing the first one first was what paid: the per-note plugin bookkeeping it forced is the
+thing note columns could not have been built without.
 
 ## What a track is
 
@@ -88,66 +90,71 @@ amplifier group on the other three. It is a machine parameter like any other, so
 with a preset, pointable from a controller and automatable, and a machine written by somebody
 else can draw it or leave it out.
 
-## Note columns, which is the editor's work
+## Note columns, which were the editor's work
 
 What a Renoise note column carries is the whole cell again: note, instrument, volume, panning,
 delay and its own effect (`renoise/song/pattern/line.lua`). Here that means a column is another
-`TrackerCell`, unchanged. Nothing about the cell type has to move.
+`TrackerCell`, unchanged, and nothing about the cell type moved.
 
-How many, and where the count lives. Renoise: `max_note_columns` is 12, `visible_note_columns`
-is 1 to 12, and it sits on `renoise.Track`, which is the song, not the pattern. Take that as it
-stands. A part is played on so many voices whatever pattern it is in, and a count that varied
-per pattern would make copying a track between patterns a question with no good answer. One to
-eight here, default one, so nothing widens until it is asked for.
+How many, and where the count lives. Renoise: `max_note_columns` is 12, `min_note_columns` is 1,
+`visible_note_columns` is 1 to 12, and they sit on `renoise.Track`, which is the song, not the
+pattern. That was taken as it stands, with eight rather than twelve, because every column is
+width on the screen whether or not anything is written in it: a track with twelve is a pattern
+where you can see two tracks. `Song.NoteColumns` is the list, one entry per track, and every
+pattern is given the song's counts whenever they move.
 
-The pieces, in the order they stop being invisible.
+The pieces, in the order they stopped being invisible.
 
-**The pattern.** One flat array of value types is right and stays. The stride becomes the row's
-total column count rather than `TrackCount`, and it changes when a track's count does.
-`Pattern.Rebuild` already keeps whatever still fits when the shape changes, and this is the same
-operation with one more axis.
+**The pattern.** One flat array of value types, as before. The stride is the row's total column
+count rather than the track count, `_starts` is the running total so a cell's place is an
+addition rather than a walk, and `Rebuild` keeps whatever still fits across all three axes.
+`MoveTrack` rebuilds the block rather than shuffling it in place, because two tracks need not be
+the same width and a move is no longer a swap of equal pieces.
 
-**The file.** `SongStore.PatternDocument.Cells` is a list of `"line:track:cell"` strings, one
-per used cell. It becomes `"line:track:column:cell"`, and a three-part entry read back means
-column 0. Old songs load untouched, no migration and no version flag, which is what that format
-was chosen for. Worth a test of its own.
+**The file.** A cell entry past the first column is written `"line:track:column:cell"` and the
+first column keeps the three-part form it always had. Not for tidiness: a build that predates
+note columns splits the entry into three and reads the third field as a cell, so writing the
+column number into every entry would leave an older copy of the application finding every cell
+unreadable. This way it reads what it can play and leaves behind what it cannot, which is the
+bargain the rest of this format makes. Old songs load untouched, no migration and no version
+flag, which is what that format was chosen for.
 
-**The sequencer.** `EventsFor` walks tracks and gains an inner walk over columns. `TrackerEvent`
-names a track and must name a column too, or `Stop(track)` from one column's OFF kills the
-whole chord.
+**The sequencer.** `EventsFor` gained an inner walk, `TrackerEvent` names a column beside its
+track, and the two memories are per column: the volume must be, or one voice of a chord would
+set the level of the others, and the instrument is per column as well, which is Renoise's
+arrangement and the only one that holds up once a column is a voice. A song with one column a
+track cannot tell the two apart, which is every song written before this.
 
-**The mixer.** `Cut(track)` becomes cut by track and column, and `SynthVoice` carries the column
-beside its track. `SamplePosition(track)` returns the first voice it finds on a track and will
-have to say which one it means, since a panel's playhead cannot follow three at once.
+**The mixer.** `MakeWay` cuts by track and column, `SynthVoice` carries the column beside its
+track, and every plugin note is written down per column rather than per track. That last is
+what makes an OFF in one column of a chord end one note instead of all of them.
 
-**The cursor.** `PatternCursor.MoveColumn` flattens a track into a fixed four columns; it has to
-flatten a variable number. `PatternMetrics.TrackWidth` becomes per track, and `TrackAt` and
-`ColumnAt` stop being a division and become a walk. All of it is pure arithmetic with tests
-already sitting in `Tests/PatternTests.cs`, so it is checkable without a window. The grid is
-custom drawn, so a variable track width is arithmetic and not layout.
+**The cursor and the metrics.** `NoteColumns` is the walk all three places share: where a cell
+sits, where it is drawn, and where the next press of Tab lands. Written out three times those
+would eventually disagree, and the way that fails is a click landing on a cell other than the
+one under the pointer. `PatternMetrics.TrackWidth` is per track now and every horizontal
+question is a walk from the left.
 
-**The selection.** `PatternSelection` holds two corners in lines and tracks. Corners become
-lines and flat columns. Pasting a block into a track with fewer columns pastes what fits, the
-same rule `Rebuild` uses.
+**Entry.** Renoise's rule: a note played while another key is still held goes to the next column
+of the same track, so a chord lands across 1, 2, 3 on one line and the cursor steps down once.
+The held-note counting is in the view model, since a hand on the hardware and a hand on the
+letter rows are the same hand. The letter rows needed a key-up they never had: a note typed into
+the pattern had no release at all, which was enough while a track held one note and is not
+enough now. It ends the chord and not the sound, because a note played by hand runs its own
+length here.
 
-**Entry.** Renoise's rule is that a note typed while another key is held goes to the next column
-of the same track, so a chord played on a keyboard or typed on the letter rows lands across
-1, 2, 3. `MidiNoteInput` is pure and stays that way; held-note counting belongs in the view
-model.
-
-**History.** `Pattern.Cells`, `Holds` and `Restore` carry lines and track count and will carry
-the column counts. `TrackerHistory` compares shape before restoring, so if it is not taught the
-new axis an undo across a column count change does nothing and says nothing. This codebase has
-had that exact bug twice, in `currentPattern` and in `TakeFrom`, and both times it survived
-because doing nothing looks like working.
+**History.** `Pattern.Cells`, `Holds` and `Restore` carry the column counts, and a step that did
+not would hold cells of the wrong length, be refused, and say nothing. This codebase has had
+that exact bug twice and both times it survived because doing nothing looks like working.
 
 ## Effort
 
 ```
 new note action, three actions                    done
-per-note plugin offs, and the note bookkeeping    done, and note columns need it too
-column axis: pattern, file, sequencer, mixer      two days
-cursor, metrics, selection, entry, history        three to four days, all of it interface
+per-note plugin offs, and the note bookkeeping    done, and note columns needed it
+column axis: pattern, file, sequencer, mixer      done
+cursor, metrics, entry, history                   done
+per-column selection                              half a day, and not done: see below
 ```
 
 ## Decided already
@@ -158,22 +165,31 @@ cursor, metrics, selection, entry, history        three to four days, all of it 
   reason: fade needs a rate no patch here has.
 - The action belongs to the instrument, beside `OneVoice`, not to the track.
 - A note column is a whole `TrackerCell`. No new cell type.
-- The column count belongs to the song's track, not to the pattern.
-- The file grows a fourth field and old songs read as column 0.
+- The column count belongs to the song's track, not to the pattern. One to eight, default one.
+- The file grows a fourth field and old songs read as column 0. The first column keeps the
+  three-field form, so an older build still reads what it can play.
+- A selection covers whole tracks, columns included. Per-column corners are the piece that was
+  left; see below.
 
 ## Still open
 
-- Whether the instrument memory in `TrackerSequencer` is per track or per column. A blank
-  instrument column means the last one played, and the columns of a track are usually one part
-  on one instrument, which argues for per track. Renoise gives every column its own instrument
-  value, which argues the other way. The volume is not in doubt: gain has to be per column, or
-  one voice of a chord would set the level of the others.
+- **A selection is by track and not by column.** `PatternSelection` holds its corners as lines
+  and tracks, so selecting inside a track selects all of its columns: copy, cut, transpose and
+  the rest carry the whole chord. That is right for most of what anybody does with a block and
+  wrong for the one thing Renoise can do that this cannot, which is take hold of one voice of a
+  chord and move it. The corners become lines and flat note columns, `Contains` follows,
+  `PatternBlock` already carries the columns, and the grid draws and hit tests the block the way
+  it already draws and hit tests the cursor. Half a day, and it was left because a selection is
+  something people rely on and it is worth doing on its own rather than at the end of a week.
 - Whether `MaxVoices`, 48, still holds. Eight tracks of four-note chords in release is over it,
   and stealing the oldest during a sustained chord is audible in a way that stealing during a
   monophonic part is not. Sustain makes this reachable today, before note columns exist at all.
 - Whether a track's ending should be readable from the pattern. A track left sustaining looks
   exactly like a track that is not, until you wonder why the mix is filling up.
-- Column mutes and column names, which Renoise has. Cheap once the axis exists, and no use at
-  all until somebody has written a chord with them.
+- What a chord does when it will not fit. A fourth note played on a three column track lands in
+  the third column, over the note that was there. Renoise drops it instead. Neither is obviously
+  right and nobody has hit it yet.
+- Column mutes and column names, which Renoise has. Cheap now that the axis exists, and no use
+  at all until somebody has written a chord with them.
 - Whether a track's insert chain and a future automation lane stay per track. They should:
   columns share a bus, which is the whole point of them being one track.

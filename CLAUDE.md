@@ -535,7 +535,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-877 of them, in about three seconds, with no window and no hardware. They run in CI on every push
+907 of them, in about three seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -552,6 +552,12 @@ is public for exactly that. What was missing was somewhere to put the tests.
 `Tests/` is inside the application's folder, so `JingleBox2.csproj` has to remove it from its own
 globs the way it already does for the machine assemblies. Without that the app compiles the test
 sources into itself and every generated assembly attribute is defined twice.
+
+And the column axis, which is indexed arithmetic over a shape that is no longer a rectangle:
+where a cell sits, where it is drawn, where a click lands, what the file says, what the
+sequencer plays and what an undo puts back. `Tests/NoteColumnTests.cs` is that, and every test
+in it also says what a song with one column a track still does, which is every song written
+before now.
 
 What is covered, and it is the parts that can be got wrong quietly: the wire (running status,
 pitch bend, one-byte statuses), what kind of control is sending, pickup and endless knobs and
@@ -879,11 +885,49 @@ whole exercise and is worth writing down rather than summarising:
 - The typed view is not built: a parameter column in the pattern, which shares its whole
   foundation with note columns. The split is by the nature of the data, deliberate changes typed
   and recorded gestures drawn, because no column can display a hundred values a second
-- Polyphony is two features sharing a word, and one of them is built. `docs/polyphony.md` is
-  the plan and now also the record. Note columns, a track playing chords, are still a week and
-  all of it is the pattern and its editor: the audio side has nothing to learn, since auditions
-  are already polyphonic through the same mixer and a track already renders on its own bus. The
-  numbers came off the Renoise 3.5.4 install rather than from memory
+- Polyphony is two features sharing a word and both are built. `docs/polyphony.md` is the plan
+  and now the record. The numbers came off the Renoise 3.5.4 install rather than from memory
+- **A track is as many voices as it has note columns, and a note column is a whole cell again:
+  its own note, instrument, volume and effect.** One to eight, one by default, so every song
+  written before this is exactly what it was. Renoise allows twelve; eight because every column
+  is width on the screen whether or not anything is in it, and a track with twelve is a pattern
+  where you can see two tracks
+- The count belongs to the song's track rather than to the pattern, which is Renoise's
+  arrangement and right for the reason the track count is the song's: a part is played on so
+  many voices whatever pattern it is in, and counts that varied per pattern would make copying
+  a track between patterns a question with no good answer. `Song.NoteColumns` is the list and
+  every pattern is given it whenever it moves
+- The pattern is still one flat array of value types. What changed is the stride: it is the
+  row's total column count rather than the track count, and `_starts` is the running total so a
+  cell's place is an addition rather than a walk. `MoveTrack` rebuilds the block rather than
+  shuffling it in place, because two tracks need not be the same width any more and a move is
+  no longer a swap of equal pieces
+- **The file's first column keeps the three-field form it always had**, and only a column past
+  the first is written `line:track:column:cell`. Not tidiness: a build that predates note
+  columns splits an entry into three and reads the third field as a cell, so writing the column
+  number into every entry would leave an older copy of this application opening the song and
+  finding every cell unreadable. This way it reads what it can play and leaves behind what it
+  cannot. Old songs load untouched, no migration and no version flag
+- Both of the sequencer's memories are per column. The volume has to be, or one voice of a
+  chord would set the level of the others; the instrument is Renoise's arrangement and the only
+  one that holds up once a column is a voice, since a blank instrument column means the last
+  one *this voice* played. A song with one column a track cannot tell the two apart, which is
+  every song written before now
+- `NoteColumns` is one walk shared by three places that would otherwise each keep their own:
+  where a cell sits in the pattern, where it is drawn, and where the next press of Tab lands.
+  Written out three times those would eventually disagree, and the way that fails is a click
+  landing on a cell other than the one under the pointer. `PatternMetrics.TrackWidth` is per
+  track now and every horizontal question is a walk from the left rather than a multiplication
+- A note played while another key is still held goes to the next column of the same track, so a
+  chord lands across one line and the cursor steps down once. Renoise's rule. The held-note
+  counting is in the view model, because a hand on the hardware and a hand on the letter rows
+  are the same hand, and the letter rows needed a key-up they had never had: a note typed into
+  the pattern had no release at all, which was enough while a track held one note. It ends the
+  chord and not the sound, since a note played by hand runs its own length here
+- A selection is still by track, so it covers all of a track's columns: copy, cut and transpose
+  carry the whole chord and `PatternBlock` holds every column of it. Taking hold of one voice of
+  a chord is the piece that was left, deliberately and written down in `docs/polyphony.md`: a
+  selection is something people rely on and it is worth doing on its own
 - **What a new note does to the one still sounding is the instrument's to say.** `VoiceEnding`
   is cut, release or sustain, on `TrackerInstrument.NewNoteAction`, cut being what a tracker has
   always done and therefore the default: nothing anybody had already made sounds any different

@@ -62,10 +62,10 @@ public class NewNoteActionTests
     {
         var mixer = new TrackMixer(Rate);
 
-        mixer.NoteOn(0, Held(), new Note(60), 1f, 0f);
+        mixer.NoteOn(0, 0, Held(), new Note(60), 1f, 0f);
         Play(mixer, 20);
 
-        mixer.NoteOn(0, Held(), new Note(second), 1f, 0f, ending);
+        mixer.NoteOn(0, 0, Held(), new Note(second), 1f, 0f, ending);
 
         return mixer;
     }
@@ -162,10 +162,10 @@ public class NewNoteActionTests
         var mixer = new TrackMixer(Rate);
         var quiet = new SynthPatch { AttackMs = 0, DecayMs = 0, Sustain = 1, ReleaseMs = 400 };
 
-        mixer.NoteOn(0, quiet, new Note(60), Quiet, 0f);
+        mixer.NoteOn(0, 0, quiet, new Note(60), Quiet, 0f);
         Play(mixer, 20);
 
-        mixer.NoteOn(0, quiet, new Note(67), Quiet, 0f, ending);
+        mixer.NoteOn(0, 0, quiet, new Note(67), Quiet, 0f, ending);
         Play(mixer, 600);
 
         int frames = 4096;
@@ -185,8 +185,8 @@ public class NewNoteActionTests
     {
         var mixer = new TrackMixer(Rate);
 
-        mixer.NoteOn(0, Held(), new Note(60), 1f, 0f);
-        mixer.NoteOn(1, Held(), new Note(64), 1f, 0f);
+        mixer.NoteOn(0, 0, Held(), new Note(60), 1f, 0f);
+        mixer.NoteOn(1, 0, Held(), new Note(64), 1f, 0f);
 
         Play(mixer, 50);
 
@@ -304,10 +304,10 @@ public class NewNoteActionTests
     {
         var (mixer, ear) = Loaded();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f);
         ear.Said.Clear();
 
-        mixer.PluginNoteOn(0, new Note(64), 1f, 0f);
+        mixer.PluginNoteOn(0, 0, new Note(64), 1f, 0f);
 
         Assert.Equal(new[] { "off 60", "on 64" }, ear.Said);
     }
@@ -318,10 +318,10 @@ public class NewNoteActionTests
     {
         var (mixer, ear) = Loaded();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
         ear.Said.Clear();
 
-        mixer.PluginNoteOn(0, new Note(64), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(64), 1f, 0f, VoiceEnding.Sustain);
 
         Assert.Equal(new[] { "on 64" }, ear.Said);
     }
@@ -332,27 +332,86 @@ public class NewNoteActionTests
     {
         var (mixer, ear) = Loaded();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
         ear.Said.Clear();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
 
         Assert.Equal(new[] { "off 60", "on 60" }, ear.Said);
     }
 
-    /// <summary>A pattern's OFF ends everything the track's plugin is holding.</summary>
+    /// <summary>A pattern's OFF ends everything that note column was holding, by name.</summary>
     [Fact]
-    public void An_off_ends_the_whole_chord()
+    public void An_off_ends_what_its_own_column_was_holding()
     {
         var (mixer, ear) = Loaded();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
-        mixer.PluginNoteOn(0, new Note(64), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f, VoiceEnding.Sustain);
+        mixer.PluginNoteOn(0, 0, new Note(64), 1f, 0f, VoiceEnding.Sustain);
         ear.Said.Clear();
 
-        mixer.PluginNoteOff(0);
+        mixer.PluginNoteOff(0, 0);
 
-        Assert.Equal(new[] { "all off" }, ear.Said);
+        Assert.Equal(new[] { "off 60", "off 64" }, ear.Said);
+    }
+
+    /// <summary>
+    /// And leaves the other columns of the track sounding, which is the whole reason the host
+    /// keeps a record of what it said.
+    /// </summary>
+    /// <remarks>
+    /// All notes off would take a chord down to end one note of it. There is no other way to
+    /// name one note of a plugin's chord: the plugin cannot be asked what it is holding.
+    /// </remarks>
+    [Fact]
+    public void An_off_in_one_column_leaves_the_rest_of_the_chord()
+    {
+        var (mixer, ear) = Loaded();
+
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f);
+        mixer.PluginNoteOn(0, 1, new Note(64), 1f, 0f);
+        mixer.PluginNoteOn(0, 2, new Note(67), 1f, 0f);
+        ear.Said.Clear();
+
+        mixer.PluginNoteOff(0, 1);
+
+        Assert.Equal(new[] { "off 64" }, ear.Said);
+    }
+
+    /// <summary>
+    /// A chord landing column by column does not sweep the plugin on the way in.
+    /// </summary>
+    /// <remarks>
+    /// The sweep is the fallback for a plugin nothing here remembers having played, and a
+    /// column that has not played yet is not that: the other columns of the same track are the
+    /// notes of the chord being built. Read against the whole track, this was every first note
+    /// of every chord taking the chord before it down.
+    /// </remarks>
+    [Fact]
+    public void A_chord_across_columns_does_not_sweep_the_plugin()
+    {
+        var (mixer, ear) = Loaded();
+
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f);
+        mixer.PluginNoteOn(0, 1, new Note(64), 1f, 0f);
+        mixer.PluginNoteOn(0, 2, new Note(67), 1f, 0f);
+
+        Assert.Equal(new[] { "all off", "on 60", "on 64", "on 67" }, ear.Said);
+    }
+
+    /// <summary>A note in one column makes room in that column and nowhere else.</summary>
+    [Fact]
+    public void A_new_note_ends_only_its_own_column()
+    {
+        var (mixer, ear) = Loaded();
+
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f);
+        mixer.PluginNoteOn(0, 1, new Note(64), 1f, 0f);
+        ear.Said.Clear();
+
+        mixer.PluginNoteOn(0, 1, new Note(65), 1f, 0f);
+
+        Assert.Equal(new[] { "off 64", "on 65" }, ear.Said);
     }
 
     /// <summary>
@@ -364,11 +423,11 @@ public class NewNoteActionTests
     {
         var (mixer, ear) = Loaded();
 
-        mixer.PluginNoteOn(0, new Note(60), 1f, 0f);
-        mixer.PluginNoteOff(0);
+        mixer.PluginNoteOn(0, 0, new Note(60), 1f, 0f);
+        mixer.PluginNoteOff(0, 0);
         ear.Said.Clear();
 
-        mixer.PluginNoteOn(0, new Note(64), 1f, 0f);
+        mixer.PluginNoteOn(0, 0, new Note(64), 1f, 0f);
 
         Assert.Equal(new[] { "all off", "on 64" }, ear.Said);
     }

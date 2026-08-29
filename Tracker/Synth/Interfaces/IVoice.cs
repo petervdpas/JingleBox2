@@ -24,6 +24,19 @@ public interface IVoice
     int Track { get; }
 
     /// <summary>
+    /// Which of that track's note columns it is in, counting from zero.
+    /// </summary>
+    /// <remarks>
+    /// A column is a voice, so the track and the column together are what a new note makes room
+    /// against: three columns of one track are three notes sounding at once and ending one of
+    /// them may not touch the other two.
+    ///
+    /// Nought for a note played by hand, which has no column of its own and is cut by a note
+    /// landing in the track's first column exactly as it always was.
+    /// </remarks>
+    int Column { get; }
+
+    /// <summary>
     /// Which instrument played this by hand, or empty for a note from a pattern.
     /// </summary>
     /// <remarks>

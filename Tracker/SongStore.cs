@@ -618,6 +618,13 @@ public sealed class SongStore : ISongStore
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
         public int KeyboardOctave { get; set; } = 4;
         public int TrackCount { get; set; } = Song.DefaultTrackCount;
+
+        /// <summary>
+        /// How many note columns each track shows. Absent in a song written before they existed,
+        /// which reads back as one apiece and is exactly what that song played.
+        /// </summary>
+        public List<int> NoteColumns { get; set; } = new();
+
         public List<int> Order { get; set; } = new();
         public List<int> TrackInstruments { get; set; } = new();
         public List<TrackMix> Mix { get; set; } = new();
@@ -649,6 +656,7 @@ public sealed class SongStore : ISongStore
             LinesPerBeat = song.LinesPerBeat,
             KeyboardOctave = song.KeyboardOctave,
             TrackCount = song.TrackCount,
+            NoteColumns = new List<int>(song.NoteColumns),
             Order = new List<int>(song.Order),
             TrackInstruments = new List<int>(song.TrackInstruments),
             Mix = song.Mix.Select(m => m.Clone()).ToList(),
@@ -750,6 +758,7 @@ public sealed class SongStore : ISongStore
                 LinesPerBeat = LinesPerBeat,
                 KeyboardOctave = KeyboardOctave,
                 TrackCount = TrackCount,
+                NoteColumns = new List<int>(NoteColumns),
                 Order = new List<int>(Order),
                 TrackInstruments = new List<int>(TrackInstruments),
                 Mix = Mix.Select(m => m.Clone()).ToList(),
@@ -758,7 +767,7 @@ public sealed class SongStore : ISongStore
                 Instruments = Instruments.Select(Read).ToList()
             };
 
-            song.Patterns = Patterns.Select(p => p.ToPattern(TrackCount)).ToList();
+            song.Patterns = Patterns.Select(p => p.ToPattern(TrackCount, NoteColumns)).ToList();
             return song;
         }
     }
@@ -779,7 +788,21 @@ public sealed class SongStore : ISongStore
         /// <summary>How many steps it has, which is the one part of its shape it does own.</summary>
         public int Lines { get; set; } = Pattern.DefaultLines;
 
-        /// <summary>One entry per used cell, as "line:track:cell". Blank cells are not stored.</summary>
+        /// <summary>
+        /// One entry per used cell, as "line:track:cell". Blank cells are not stored.
+        /// </summary>
+        /// <remarks>
+        /// A note column past the first is written as "line:track:column:cell", and the first
+        /// column keeps the three-part form it always had. Not for tidiness: a build that
+        /// predates note columns splits this into three and reads whatever it finds in the
+        /// third field as a cell, so writing the column number into every entry would mean an
+        /// older copy of the application opening the song and finding every cell unreadable.
+        /// This way it reads what it can play and quietly leaves behind what it cannot, which
+        /// is the same bargain the rest of this format makes.
+        ///
+        /// The cell text is space separated and never holds a colon, so counting the fields is
+        /// enough to tell the two forms apart.
+        /// </remarks>
         public List<string> Cells { get; set; } = new();
 
         /// <summary>One entry per automated parameter. Empty for almost every pattern.</summary>
@@ -791,13 +814,20 @@ public sealed class SongStore : ISongStore
             var document = new PatternDocument { Name = pattern.Name, Lines = pattern.Lines };
 
             for (int line = 0; line < pattern.Lines; line++)
+            {
                 for (int track = 0; track < pattern.TrackCount; track++)
                 {
-                    var cell = pattern[line, track];
-                    if (cell.IsEmpty) continue;
+                    for (int column = 0; column < pattern.ColumnsOn(track); column++)
+                    {
+                        var cell = pattern[line, track, column];
+                        if (cell.IsEmpty) continue;
 
-                    document.Cells.Add($"{line}:{track}:{CellText.Write(cell)}");
+                        document.Cells.Add(column == 0
+                            ? $"{line}:{track}:{CellText.Write(cell)}"
+                            : $"{line}:{track}:{column}:{CellText.Write(cell)}");
+                    }
                 }
+            }
 
             foreach (var lane in pattern.Lanes)
                 document.Lanes.Add(LaneDocument.From(lane));
@@ -815,9 +845,11 @@ public sealed class SongStore : ISongStore
         /// that will not parse, or that names a cell outside the pattern, is passed over rather
         /// than costing the song.
         /// </remarks>
-        public Pattern ToPattern(int trackCount)
+        public Pattern ToPattern(int trackCount, IReadOnlyList<int>? columns = null)
         {
             var pattern = new Pattern(Lines, trackCount) { Name = Name };
+
+            pattern.SetColumns(columns);
 
             foreach (var lane in Lanes)
                 if (lane.ToLane() is { } made && (made.IsMaster || made.Track < trackCount))
@@ -825,14 +857,24 @@ public sealed class SongStore : ISongStore
 
             foreach (var entry in Cells)
             {
-                var parts = entry.Split(':', 3);
-                if (parts.Length != 3) continue;
+                var parts = entry.Split(':', 4);
+                if (parts.Length < 3) continue;
                 if (!int.TryParse(parts[0], out int line)) continue;
                 if (!int.TryParse(parts[1], out int track)) continue;
-                if (!pattern.Contains(line, track)) continue;
-                if (!CellText.TryRead(parts[2], out var cell)) continue;
 
-                pattern[line, track] = cell;
+                int column = 0;
+                string written = parts[2];
+
+                if (parts.Length == 4 && int.TryParse(parts[2], out int said))
+                {
+                    column = said;
+                    written = parts[3];
+                }
+
+                if (!pattern.Contains(line, track, column)) continue;
+                if (!CellText.TryRead(written, out var cell)) continue;
+
+                pattern[line, track, column] = cell;
             }
 
             return pattern;

@@ -34,11 +34,11 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "a note");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return;
 
-        var cell = pattern[cursor.Line, cursor.Track];
+        var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
 
-        pattern[cursor.Line, cursor.Track] = volume == TrackerCell.NoVolume
+        pattern[cursor.Line, cursor.Track, cursor.NoteColumn] = volume == TrackerCell.NoVolume
             ? cell with { Note = note, Instrument = instrument }
             : cell with { Note = note, Instrument = instrument, Volume = TrackerCell.ClampVolume(volume) };
     }
@@ -48,11 +48,11 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "a note off");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return;
 
-        var cell = pattern[cursor.Line, cursor.Track];
+        var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
 
-        pattern[cursor.Line, cursor.Track] = cell with
+        pattern[cursor.Line, cursor.Track, cursor.NoteColumn] = cell with
         {
             Note = Note.Off,
             Instrument = TrackerCell.NoInstrument
@@ -64,21 +64,21 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "a digit");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return false;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return false;
         if (!TryHexValue(digit, out int value)) return false;
 
-        var cell = pattern[cursor.Line, cursor.Track];
+        var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
 
         switch (cursor.Column)
         {
             case CellColumn.Instrument:
                 int instrument = cell.Instrument == TrackerCell.NoInstrument ? 0 : cell.Instrument;
-                pattern[cursor.Line, cursor.Track] = cell with { Instrument = ShiftIn(instrument, value) };
+                pattern[cursor.Line, cursor.Track, cursor.NoteColumn] = cell with { Instrument = ShiftIn(instrument, value) };
                 return true;
 
             case CellColumn.Volume:
                 int volume = cell.Volume == TrackerCell.NoVolume ? 0 : cell.Volume;
-                pattern[cursor.Line, cursor.Track] =
+                pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
                     cell with { Volume = TrackerCell.ClampVolume(ShiftIn(volume, value)) };
                 return true;
 
@@ -86,7 +86,7 @@ public sealed class PatternEdit : IPatternEdit
                 var effect = cell.Effect.IsNone
                     ? new TrackerEffect(TrackerEffect.SetVolume, 0)
                     : cell.Effect;
-                pattern[cursor.Line, cursor.Track] =
+                pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
                     cell with { Effect = effect with { Parameter = ShiftIn(effect.Parameter, value) } };
                 return true;
 
@@ -100,12 +100,12 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "an effect");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return false;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return false;
         if (cursor.Column != CellColumn.Effect) return false;
         if (!char.IsLetter(command)) return false;
 
-        var cell = pattern[cursor.Line, cursor.Track];
-        pattern[cursor.Line, cursor.Track] =
+        var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
+        pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
             cell with { Effect = cell.Effect with { Command = char.ToUpperInvariant(command) } };
         return true;
     }
@@ -115,11 +115,11 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "clearing a cell");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return;
 
-        var cell = pattern[cursor.Line, cursor.Track];
+        var cell = pattern[cursor.Line, cursor.Track, cursor.NoteColumn];
 
-        pattern[cursor.Line, cursor.Track] = cursor.Column switch
+        pattern[cursor.Line, cursor.Track, cursor.NoteColumn] = cursor.Column switch
         {
             CellColumn.Note => TrackerCell.Empty,
             CellColumn.Instrument => cell with { Instrument = TrackerCell.NoInstrument },
@@ -144,12 +144,15 @@ public sealed class PatternEdit : IPatternEdit
 
         for (int line = 0; line < pattern.Lines; line++)
         {
-            var cell = pattern[line, track];
+            for (int column = 0; column < pattern.ColumnsOn(track); column++)
+            {
+                var cell = pattern[line, track, column];
 
-            if (!cell.Note.IsPlayable || cell.Volume == wanted) continue;
+                if (!cell.Note.IsPlayable || cell.Volume == wanted) continue;
 
-            pattern[line, track] = cell with { Volume = wanted };
-            changed++;
+                pattern[line, track, column] = cell with { Volume = wanted };
+                changed++;
+            }
         }
 
         return changed;
@@ -164,10 +167,13 @@ public sealed class PatternEdit : IPatternEdit
 
         for (int line = 0; line < pattern.Lines; line++)
         {
-            var cell = pattern[line, track];
-            if (!cell.Note.IsPlayable) continue;
+            for (int column = 0; column < pattern.ColumnsOn(track); column++)
+            {
+                var cell = pattern[line, track, column];
+                if (!cell.Note.IsPlayable) continue;
 
-            pattern[line, track] = cell with { Note = cell.Note.Transpose(semitones) };
+                pattern[line, track, column] = cell with { Note = cell.Note.Transpose(semitones) };
+            }
         }
     }
 
@@ -218,13 +224,16 @@ public sealed class PatternEdit : IPatternEdit
         {
             for (int track = block.FirstTrack; track <= block.LastTrack; track++)
             {
-                var cell = pattern[line, track];
-                var edited = edit(cell);
+                for (int column = 0; column < pattern.ColumnsOn(track); column++)
+                {
+                    var cell = pattern[line, track, column];
+                    var edited = edit(cell);
 
-                if (edited == cell) continue;
+                    if (edited == cell) continue;
 
-                pattern[line, track] = edited;
-                changed++;
+                    pattern[line, track, column] = edited;
+                    changed++;
+                }
             }
         }
 
@@ -239,7 +248,8 @@ public sealed class PatternEdit : IPatternEdit
         if (track < 0 || track >= pattern.TrackCount) return;
 
         for (int line = 0; line < pattern.Lines; line++)
-            pattern[line, track] = TrackerCell.Empty;
+            for (int column = 0; column < pattern.ColumnsOn(track); column++)
+                pattern[line, track, column] = TrackerCell.Empty;
     }
 
     /// <inheritdoc/>
@@ -259,26 +269,31 @@ public sealed class PatternEdit : IPatternEdit
         if (track < 0 || track >= pattern.TrackCount || grid <= 1) return 0;
 
         var placed = new TrackerCell[pattern.Lines];
-        for (int line = 0; line < placed.Length; line++) placed[line] = TrackerCell.Empty;
-
         int moved = 0;
 
-        for (int line = 0; line < pattern.Lines; line++)
+        for (int column = 0; column < pattern.ColumnsOn(track); column++)
         {
-            var cell = pattern[line, track];
-            if (cell.IsEmpty) continue;
+            for (int line = 0; line < placed.Length; line++) placed[line] = TrackerCell.Empty;
 
-            int target = SnapLine(line, grid, pattern.Lines);
+            for (int line = 0; line < pattern.Lines; line++)
+            {
+                var cell = pattern[line, track, column];
+                if (cell.IsEmpty) continue;
 
-            if (!placed[target].IsEmpty) target = placed[line].IsEmpty ? line : NearestFree(placed, target);
-            if (target < 0) continue;
+                int target = SnapLine(line, grid, pattern.Lines);
 
-            placed[target] = cell;
-            if (target != line) moved++;
+                if (!placed[target].IsEmpty)
+                    target = placed[line].IsEmpty ? line : NearestFree(placed, target);
+
+                if (target < 0) continue;
+
+                placed[target] = cell;
+                if (target != line) moved++;
+            }
+
+            for (int line = 0; line < pattern.Lines; line++)
+                pattern[line, track, column] = placed[line];
         }
-
-        for (int line = 0; line < pattern.Lines; line++)
-            pattern[line, track] = placed[line];
 
         return moved;
     }
@@ -315,12 +330,15 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "inserting a line");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return;
 
-        for (int line = pattern.Lines - 1; line > cursor.Line; line--)
-            pattern[line, cursor.Track] = pattern[line - 1, cursor.Track];
+        for (int column = 0; column < pattern.ColumnsOn(cursor.Track); column++)
+        {
+            for (int line = pattern.Lines - 1; line > cursor.Line; line--)
+                pattern[line, cursor.Track, column] = pattern[line - 1, cursor.Track, column];
 
-        pattern[cursor.Line, cursor.Track] = TrackerCell.Empty;
+            pattern[cursor.Line, cursor.Track, column] = TrackerCell.Empty;
+        }
     }
 
     /// <inheritdoc/>
@@ -328,12 +346,15 @@ public sealed class PatternEdit : IPatternEdit
     {
         Taking(pattern, "deleting a line");
 
-        if (!pattern.Contains(cursor.Line, cursor.Track)) return;
+        if (!pattern.Contains(cursor.Line, cursor.Track, cursor.NoteColumn)) return;
 
-        for (int line = cursor.Line; line < pattern.Lines - 1; line++)
-            pattern[line, cursor.Track] = pattern[line + 1, cursor.Track];
+        for (int column = 0; column < pattern.ColumnsOn(cursor.Track); column++)
+        {
+            for (int line = cursor.Line; line < pattern.Lines - 1; line++)
+                pattern[line, cursor.Track, column] = pattern[line + 1, cursor.Track, column];
 
-        pattern[pattern.Lines - 1, cursor.Track] = TrackerCell.Empty;
+            pattern[pattern.Lines - 1, cursor.Track, column] = TrackerCell.Empty;
+        }
     }
 
     /// <summary>

@@ -174,11 +174,18 @@ public interface IPatternEdit
     /// Pushes every cell on a track down one line from the cursor, dropping the last one.
     /// The insert-line edit every tracker has.
     /// </summary>
+    /// <remarks>
+    /// Every note column of the track and not only the one the cursor is in. A chord is written
+    /// across the columns of one line, so opening a hole in one column of it would leave the
+    /// notes of that chord on different lines, which is not a thing anybody can have meant by
+    /// pressing insert.
+    /// </remarks>
     /// <param name="pattern">The pattern being edited.</param>
     /// <param name="cursor">Which track, and the line the hole opens at.</param>
     void InsertLine(Pattern pattern, PatternCursor cursor);
 
     /// <summary>Pulls every cell on a track up one line into the cursor, blanking the last.</summary>
+    /// <remarks>Every note column of it, for the reason the insert covers them all.</remarks>
     /// <param name="pattern">The pattern being edited.</param>
     /// <param name="cursor">Which track, and the line that is taken out.</param>
     void DeleteLine(Pattern pattern, PatternCursor cursor);

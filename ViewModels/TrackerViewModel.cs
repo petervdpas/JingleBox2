@@ -161,6 +161,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedTrack))]
     [NotifyPropertyChangedFor(nameof(CursorTrackLabel))]
+    [NotifyPropertyChangedFor(nameof(ColumnsHere))]
+    [NotifyPropertyChangedFor(nameof(CanAddColumn))]
+    [NotifyPropertyChangedFor(nameof(CanRemoveColumn))]
     private PatternCursor cursor = PatternCursor.Start;
 
     /// <summary>
@@ -2263,14 +2266,79 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         if (IgnoreVelocity) volume = TrackerCell.NoVolume;
 
+        bool chord = _chordLine >= 0 && _holding.Count > 0 && !_holding.Contains(note.Semitone);
+
         PreviewNote(note, volume);
+
+        _holding.Add(note.Semitone);
 
         if (CurrentPattern == null || !IsRecording) return;
 
-        var target = IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
+        var target = chord
+            ? Cursor with { Line = _chordLine, NoteColumn = _chordColumn }
+            : IsPlaying && PlayingLine >= 0 ? Cursor with { Line = PlayingLine } : Cursor;
+
+        if (chord)
+        {
+            int last = Math.Max(0, Song.ColumnsOn(target.Track) - 1);
+            target = target with { NoteColumn = Math.Min(_chordColumn + 1, last) };
+        }
 
         Edits.EnterNote(CurrentPattern, target, note, InstrumentForTrack(target.Track), volume);
-        if (!IsPlaying) StepDown();
+
+        _chordLine = target.Line;
+        _chordColumn = target.NoteColumn;
+
+        if (!chord && !IsPlaying) StepDown();
+    }
+
+    /// <summary>Which notes are still held, however they arrived, so a chord can be recognised.</summary>
+    /// <remarks>
+    /// A press while another key is still down is a chord and goes into the next note column;
+    /// the same key arriving again is the keyboard repeating and is an ordinary note. Both
+    /// sources are counted together, since a hand on the hardware and a hand on the letter rows
+    /// are the same hand.
+    /// </remarks>
+    private readonly HashSet<int> _holding = new();
+
+    /// <summary>Which line the chord being played is being written on, or -1 when none is.</summary>
+    private int _chordLine = -1;
+
+    /// <summary>And which note column the last of its notes went into.</summary>
+    private int _chordColumn;
+
+    /// <summary>
+    /// A key has come up, so the chord it was part of may be over.
+    /// </summary>
+    /// <remarks>
+    /// Only the grouping ends here. The note goes on sounding for its own length, which is what
+    /// a note played by hand has always done in this application: there is no key to let go of
+    /// when a note is played by clicking, so an audition releases itself and a key coming up is
+    /// not a stop button.
+    ///
+    /// Called for both kinds of keyboard. A letter key has no release of its own in the note
+    /// path, so the view raises one, and without it the first chord anybody typed would go on
+    /// filling columns for the rest of the session.
+    /// </remarks>
+    public void LetNote(Note note)
+    {
+        if (!note.IsPlayable) return;
+
+        _holding.Remove(note.Semitone);
+
+        if (_holding.Count == 0) _chordLine = -1;
+    }
+
+    /// <summary>Forgets every held key, for the moment the keyboard goes somewhere else.</summary>
+    /// <remarks>
+    /// The release will be delivered wherever the keys went instead and this will never hear
+    /// it, so without this the next note typed would be read as part of a chord begun before
+    /// somebody clicked away.
+    /// </remarks>
+    public void LetAllNotes()
+    {
+        _holding.Clear();
+        _chordLine = -1;
     }
 
     /// <inheritdoc/>
@@ -2292,6 +2360,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public void ReleaseMidiNote(Note note)
     {
+        Dispatcher.UIThread.Post(() => LetNote(note));
+
         if (!RecordNoteOffs) return;
 
         Dispatcher.UIThread.Post(EnterNoteOff);
@@ -2429,13 +2499,72 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         var moved = Cursor;
         if (lineDelta != 0) moved = moved.MoveLine(lineDelta, CurrentPattern.Lines);
         if (trackDelta != 0) moved = moved.MoveTrack(trackDelta, CurrentPattern.TrackCount);
-        if (columnDelta != 0) moved = moved.MoveColumn(columnDelta, CurrentPattern.TrackCount);
+        if (columnDelta != 0) moved = moved.MoveColumn(columnDelta, CurrentPattern.TrackCount, Widths);
 
         if (extend) Selection = Selection.IsEmpty ? PatternSelection.At(Cursor).ExtendTo(moved) : Selection.ExtendTo(moved);
         else Selection = PatternSelection.None;
 
         Cursor = moved;
     }
+
+    /// <summary>
+    /// How many note columns each track of this song shows, as the cursor and the metrics ask.
+    /// </summary>
+    /// <remarks>
+    /// The song's list rather than the pattern's copy of it, because this is what the cursor is
+    /// moved against and the cursor belongs to the song rather than to whichever pattern is
+    /// open. They cannot differ: every pattern is given the song's counts.
+    /// </remarks>
+    public NoteColumns Widths => new(Song.NoteColumns);
+
+    /// <summary>How many note columns the track the cursor is in shows.</summary>
+    public int ColumnsHere => Song.ColumnsOn(Cursor.Track);
+
+    /// <summary>Whether that track could show one more, and one fewer.</summary>
+    public bool CanAddColumn => ColumnsHere < Song.MaxNoteColumns;
+
+    /// <summary>And whether it could show one fewer.</summary>
+    public bool CanRemoveColumn => ColumnsHere > Song.MinNoteColumns;
+
+    /// <summary>
+    /// Gives the track the cursor is in one more note column, or takes its last one away.
+    /// </summary>
+    /// <remarks>
+    /// An edit like any other: it leaves an undo step, marks the song unsaved and is announced
+    /// as a song step rather than a pattern step, since the count belongs to the song and a
+    /// narrowing throws cells out of every pattern at once.
+    ///
+    /// The cursor is pulled back inside the track afterwards, or taking away the column it was
+    /// sitting in would leave it pointing at a cell that is no longer there.
+    /// </remarks>
+    public void SetColumns(int count)
+    {
+        int track = Cursor.Track;
+        if (track < 0 || track >= Song.TrackCount) return;
+        if (count == Song.ColumnsOn(track)) return;
+
+        Changing("a track's note columns");
+
+        if (!Song.SetColumns(track, count)) return;
+
+        Cursor = Cursor.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount, Widths);
+        Selection = PatternSelection.None;
+
+        MarkDirty();
+
+        OnPropertyChanged(nameof(ColumnsHere));
+        OnPropertyChanged(nameof(CanAddColumn));
+        OnPropertyChanged(nameof(CanRemoveColumn));
+        OnPropertyChanged(nameof(Widths));
+    }
+
+    /// <summary>One more note column on the track the cursor is in.</summary>
+    [RelayCommand]
+    private void AddColumn() => SetColumns(ColumnsHere + 1);
+
+    /// <summary>And one fewer, which throws away what was written in the one that goes.</summary>
+    [RelayCommand]
+    private void RemoveColumn() => SetColumns(ColumnsHere - 1);
 
     /// <summary>
     /// Puts the cursor exactly there, for a click on the grid.

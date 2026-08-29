@@ -38,6 +38,10 @@ public sealed class PatternHeader : ThemedControl
     public static readonly StyledProperty<double> ScrollOffsetProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(ScrollOffset));
 
+    /// <inheritdoc cref="Columns"/>
+    public static readonly StyledProperty<NoteColumns> ColumnsProperty =
+        AvaloniaProperty.Register<PatternHeader, NoteColumns>(nameof(Columns));
+
     /// <summary>The pattern's own row height, which the header's height and lettering follow.</summary>
     public static readonly StyledProperty<double> RowHeightProperty =
         AvaloniaProperty.Register<PatternHeader, double>(nameof(RowHeight), 18);
@@ -50,7 +54,8 @@ public sealed class PatternHeader : ThemedControl
     static PatternHeader()
     {
         AffectsRender<PatternHeader>(TrackCountProperty, SelectedTrackProperty,
-            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty, DropTargetTrackProperty);
+            CharWidthProperty, ScrollOffsetProperty, RowHeightProperty, DropTargetTrackProperty,
+            ColumnsProperty);
         AffectsMeasure<PatternHeader>(RowHeightProperty);
     }
 
@@ -80,6 +85,20 @@ public sealed class PatternHeader : ThemedControl
     {
         get => GetValue(ScrollOffsetProperty);
         set => SetValue(ScrollOffsetProperty, value);
+    }
+
+    /// <summary>
+    /// How many note columns each track shows, which is what makes them different widths.
+    /// </summary>
+    /// <remarks>
+    /// Told rather than worked out, and it has to be told: the header draws a box per track
+    /// across the same row the grid draws its cells in, and a header measuring tracks one way
+    /// while the grid draws them another puts every label over the wrong track.
+    /// </remarks>
+    public NoteColumns Columns
+    {
+        get => GetValue(ColumnsProperty);
+        set => SetValue(ColumnsProperty, value);
     }
 
     /// <inheritdoc cref="RowHeightProperty"/>
@@ -117,7 +136,7 @@ public sealed class PatternHeader : ThemedControl
     /// Without the pattern's padding, since the header has no lines above or below it: it is one
     /// row standing outside the scroll area.
     /// </remarks>
-    private PatternMetrics Metrics => new(CharWidth, RowHeight, TrackCount);
+    private PatternMetrics Metrics => new(CharWidth, RowHeight, TrackCount, 0, 0, Columns);
 
     /// <summary>
     /// One row tall, and no width of its own: the header is stretched to whatever the pattern
@@ -157,7 +176,7 @@ public sealed class PatternHeader : ThemedControl
         for (int track = 0; track < TrackCount; track++)
         {
             double x = metrics.TrackDividerX(track);
-            var area = new Rect(x + 1, 2, metrics.TrackWidth - 2, height - 4);
+            var area = new Rect(x + 1, 2, metrics.TrackWidth(track) - 2, height - 4);
             bool selected = track == SelectedTrack;
 
             bool dropTarget = track == DropTargetTrack;

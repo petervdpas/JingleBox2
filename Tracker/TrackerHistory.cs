@@ -77,6 +77,18 @@ public sealed class TrackerHistory : ITrackerHistory
         public int TrackCount;
 
         /// <summary>
+        /// And how many note columns each of them had.
+        /// </summary>
+        /// <remarks>
+        /// Part of the shape, so a step has to carry it for the same reason it carries the line
+        /// and track counts: without it an undo across a change of column count would find a
+        /// step whose cells are the wrong length, refuse to put it back and say nothing, which
+        /// is a bug this codebase has had twice and both times because doing nothing looks like
+        /// working.
+        /// </remarks>
+        public int[] Columns = Array.Empty<int>();
+
+        /// <summary>
         /// And the movement, which is part of the pattern and had to be part of the step.
         /// </summary>
         /// <remarks>
@@ -117,7 +129,7 @@ public sealed class TrackerHistory : ITrackerHistory
         /// <remarks>Always true: a pattern cannot refuse its own cells back.</remarks>
         public override bool Put()
         {
-            Pattern.Restore(Cells, Lines, TrackCount, Lanes);
+            Pattern.Restore(Cells, Lines, TrackCount, Columns, Lanes);
 
             return true;
         }
@@ -132,6 +144,7 @@ public sealed class TrackerHistory : ITrackerHistory
             Cells = pattern.Cells(),
             Lines = pattern.Lines,
             TrackCount = pattern.TrackCount,
+            Columns = pattern.ColumnCounts(),
             Lanes = pattern.LaneCopy(),
             What = what
         };
@@ -206,7 +219,7 @@ public sealed class TrackerHistory : ITrackerHistory
         if (_done.Count > 0
             && _done[^1] is PatternStep last
             && ReferenceEquals(last.Pattern, pattern)
-            && pattern.Holds(last.Cells, last.Lines, last.TrackCount, last.Lanes))
+            && pattern.Holds(last.Cells, last.Lines, last.TrackCount, last.Columns, last.Lanes))
         {
             last.What = what;
 

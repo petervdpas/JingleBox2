@@ -11,16 +11,30 @@ namespace JingleBox2.Tracker;
 /// </summary>
 public sealed class PatternBlock
 {
-    /// <summary>The cells themselves, line by track, copied out of the pattern.</summary>
-    private readonly TrackerCell[,] _cells;
+    /// <summary>The cells themselves, by line, track and note column, copied out of the pattern.</summary>
+    /// <remarks>
+    /// Room for the widest track in the block on every track of it, which wastes a few cells on
+    /// a block where one track plays chords and the others do not. A block is a handful of
+    /// kilobytes and lives until the next copy, so the shape being simple is worth more here
+    /// than the room being tight.
+    /// </remarks>
+    private readonly TrackerCell[,,] _cells;
+
+    /// <summary>How many note columns each track of the block was copied with.</summary>
+    private readonly int[] _columns;
 
     /// <summary>Private, so <see cref="Copy"/> is the only way one is made and it cannot be empty.</summary>
-    private PatternBlock(TrackerCell[,] cells, int lines, int tracks)
+    private PatternBlock(TrackerCell[,,] cells, int[] columns, int lines, int tracks)
     {
         _cells = cells;
+        _columns = columns;
         Lines = lines;
         Tracks = tracks;
     }
+
+    /// <summary>How many note columns the block holds for one of its tracks.</summary>
+    public int ColumnsOn(int track) =>
+        track >= 0 && track < _columns.Length ? _columns[track] : 0;
 
     /// <summary>How many lines deep it is.</summary>
     public int Lines { get; }
@@ -36,8 +50,14 @@ public sealed class PatternBlock
     /// Held rather than thrown, because a block is read by a paste that is already clipping
     /// itself against the pattern and an index past the edge is an ordinary state there.
     /// </remarks>
-    public TrackerCell At(int line, int track) =>
-        line >= 0 && line < Lines && track >= 0 && track < Tracks ? _cells[line, track] : TrackerCell.Empty;
+    public TrackerCell At(int line, int track) => At(line, track, 0);
+
+    /// <summary>One cell of one note column of the block, or an empty one for anything outside it.</summary>
+    public TrackerCell At(int line, int track, int column) =>
+        line >= 0 && line < Lines && track >= 0 && track < Tracks
+        && column >= 0 && column < ColumnsOn(track)
+            ? _cells[line, track, column]
+            : TrackerCell.Empty;
 
     /// <summary>How a menu or a status line names it.</summary>
     public string Describe() =>
@@ -51,15 +71,28 @@ public sealed class PatternBlock
         var block = selection.Clamp(pattern.Lines, pattern.TrackCount);
         if (block.IsEmpty) return null;
 
-        var cells = new TrackerCell[block.LineCount, block.TrackCount];
+        var columns = new int[block.TrackCount];
+        int widest = 1;
+
+        for (int track = 0; track < block.TrackCount; track++)
+        {
+            columns[track] = pattern.ColumnsOn(block.FirstTrack + track);
+            widest = Math.Max(widest, columns[track]);
+        }
+
+        var cells = new TrackerCell[block.LineCount, block.TrackCount, widest];
 
         for (int line = 0; line < block.LineCount; line++)
         {
             for (int track = 0; track < block.TrackCount; track++)
-                cells[line, track] = pattern[block.FirstLine + line, block.FirstTrack + track];
+            {
+                for (int column = 0; column < columns[track]; column++)
+                    cells[line, track, column] =
+                        pattern[block.FirstLine + line, block.FirstTrack + track, column];
+            }
         }
 
-        return new PatternBlock(cells, block.LineCount, block.TrackCount);
+        return new PatternBlock(cells, columns, block.LineCount, block.TrackCount);
     }
 
     /// <summary>
@@ -69,7 +102,9 @@ public sealed class PatternBlock
     /// <remarks>
     /// A block that hangs off the bottom or the right is clipped rather than refused: pasting
     /// four tracks into the last two puts two of them in, which is what a tracker does and
-    /// what anyone dragging a phrase to the end of a pattern expects.
+    /// what anyone dragging a phrase to the end of a pattern expects. A chord pasted onto a
+    /// track with fewer note columns is clipped the same way and for the same reason, and the
+    /// notes that do not fit are the last of the chord rather than the first.
     ///
     /// Cells are replaced, not merged. A paste is a decision about that region.
     ///
@@ -100,7 +135,12 @@ public sealed class PatternBlock
         for (int line = 0; line < lines; line++)
         {
             for (int track = 0; track < tracks; track++)
-                pattern[at.Line + line, at.Track + track] = _cells[line, track];
+            {
+                int columns = Math.Min(ColumnsOn(track), pattern.ColumnsOn(at.Track + track));
+
+                for (int column = 0; column < columns; column++)
+                    pattern[at.Line + line, at.Track + track, column] = _cells[line, track, column];
+            }
         }
 
         return new PatternSelection(at.Line, at.Track, at.Line + lines - 1, at.Track + tracks - 1);

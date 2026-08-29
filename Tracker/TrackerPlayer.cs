@@ -88,8 +88,22 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// </remarks>
     private float[] _noteGain = Array.Empty<float>();
 
-    /// <summary>Where each track's last note asked to be placed, or null for wherever the strip puts it.</summary>
+    /// <summary>Where each column's last note asked to be placed, or null for wherever the strip puts it.</summary>
     private float?[] _notePan = Array.Empty<float?>();
+
+    /// <summary>How many note columns the memory has room for on each track.</summary>
+    /// <remarks>
+    /// The widest a track can be rather than the widest it is, the same as the sequencer's
+    /// memory and for the same reason: a column added while the transport runs must not mean an
+    /// array rebuilt under the clock thread.
+    /// </remarks>
+    private const int Columns = Song.MaxNoteColumns;
+
+    /// <summary>How many tracks the memory is made for, which is the song's count.</summary>
+    private int Tracks => _noteGain.Length / Columns;
+
+    /// <summary>Where one note column's memory sits in the two arrays above.</summary>
+    private static int At(int track, int column) => track * Columns + column;
 
     /// <summary>
     /// Takes the engine the pads are already using, rather than opening a second one.
@@ -184,8 +198,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             _song = song;
             _sequencer = new TrackerSequencer(song.TrackCount);
-            _noteGain = new float[song.TrackCount];
-            _notePan = new float?[song.TrackCount];
+            _noteGain = new float[song.TrackCount * Columns];
+            _notePan = new float?[song.TrackCount * Columns];
             Mode = mode;
             Position = from;
         }
@@ -649,7 +663,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public void MoveTrack(int from, int to)
     {
         if (from == to) return;
-        if (from < 0 || from >= _noteGain.Length || to < 0 || to >= _noteGain.Length) return;
+        if (from < 0 || from >= Tracks || to < 0 || to >= Tracks) return;
 
         lock (_playerLock)
         {
@@ -662,8 +676,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
             foreach (var (track, loaded) in moved) _players[track] = loaded;
         }
 
-        Shift(_noteGain, from, to);
-        Shift(_notePan, from, to);
+        ShiftColumns(_noteGain, from, to);
+        ShiftColumns(_notePan, from, to);
 
         _synth.Mixer.MoveTrack(from, to);
 
@@ -680,6 +694,24 @@ public sealed class TrackerPlayer : ITrackerPlayer
         for (int track = from; track != to; track += step) values[track] = values[track + step];
 
         values[to] = moved;
+    }
+
+    /// <summary>The same, for the memory that holds a block of note columns per track.</summary>
+    /// <remarks>
+    /// A track's columns travel with it, so the block moves whole. Written out rather than
+    /// reusing the walk above, because that one moves single entries and a block move that
+    /// pretended to be one would silently interleave two tracks' columns.
+    /// </remarks>
+    private static void ShiftColumns<T>(T[] values, int from, int to)
+    {
+        var moved = new T[Columns];
+        Array.Copy(values, from * Columns, moved, 0, Columns);
+
+        int step = from < to ? 1 : -1;
+        for (int track = from; track != to; track += step)
+            Array.Copy(values, (track + step) * Columns, values, track * Columns, Columns);
+
+        Array.Copy(moved, 0, values, to * Columns, Columns);
     }
 
     /// <inheritdoc/>
@@ -1123,13 +1155,13 @@ public sealed class TrackerPlayer : ITrackerPlayer
     {
         foreach (var e in events)
         {
-            if (e.Track < 0 || e.Track >= _noteGain.Length) continue;
+            if (e.Track < 0 || e.Track >= Tracks || e.Column < 0 || e.Column >= Columns) continue;
 
             switch (e.Kind)
             {
                 case TrackerEventKind.Stop:
-                    _synth.Mixer.NoteOff(e.Track);
-                    _synth.Mixer.PluginNoteOff(e.Track);
+                    _synth.Mixer.NoteOff(e.Track, e.Column);
+                    _synth.Mixer.PluginNoteOff(e.Track, e.Column);
 
                     NotePlayed?.Invoke(this, (e.Track, Note.Off, 0d));
                     break;
@@ -1183,8 +1215,8 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         var (gain, pan) = LevelsFor(e, instrument);
 
-        _noteGain[e.Track] = gain;
-        _notePan[e.Track] = pan;
+        _noteGain[At(e.Track, e.Column)] = gain;
+        _notePan[At(e.Track, e.Column)] = pan;
 
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
 
@@ -1192,12 +1224,13 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
         if (instrument.IsPlugin)
         {
-            LetGo(instrument, e.Track);
+            LetGo(instrument, e.Track, e.Column);
 
             if (PlayerFor(e.Track, instrument) != null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "sent to its plugin");
-                _synth.Mixer.PluginNoteOn(e.Track, e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
+                _synth.Mixer.PluginNoteOn(e.Track, e.Column, e.Note, mixed, placed ?? 0f,
+                    instrument.NewNoteAction);
             }
             else
             {
@@ -1214,7 +1247,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (zone == null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "no zone on its map answers to that note");
-                LetGo(instrument, e.Track);
+                LetGo(instrument, e.Track, e.Column);
                 return;
             }
 
@@ -1223,15 +1256,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
             if (zoneSample == null)
             {
                 Where(e.Track, e.Instrument, instrument, song, "its zone's recording would not load");
-                LetGo(instrument, e.Track);
+                LetGo(instrument, e.Track, e.Column);
                 return;
             }
 
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
 
             _synth.Mixer.NoteOn(
-                e.Track, zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample, e.Note,
-                (float)(mixed * zone.Volume), Placed(placed, zone.Pan), instrument.NewNoteAction);
+                e.Track, e.Column, zone, instrument.Sampler ?? new Synth.SamplerPatch(), zoneSample,
+                e.Note, (float)(mixed * zone.Volume), Placed(placed, zone.Pan),
+                instrument.NewNoteAction);
 
             return;
         }
@@ -1257,7 +1291,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
 
             _synth.Mixer.NoteOn(
-                e.Track, pad, instrument.Patch, padSample, e.Note,
+                e.Track, e.Column, pad, instrument.Patch, padSample, e.Note,
                 (float)(mixed * pad.Volume), Placed(placed, pad.Pan));
 
             return;
@@ -1266,7 +1300,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (instrument.IsMonoSynth)
         {
             Where(e.Track, e.Instrument, instrument, song, "played on " + instrument.Machine.Name);
-            _synth.Mixer.NoteOn(e.Track, instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
+            _synth.Mixer.NoteOn(e.Track, e.Column, instrument.MonoSynth ?? new Synth.MonoSynthPatch(),
                 e.Note, mixed, placed ?? 0f, instrument.NewNoteAction);
             return;
         }
@@ -1274,7 +1308,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (instrument.IsSynth)
         {
             Where(e.Track, e.Instrument, instrument, song, "played as a synth voice");
-            _synth.Mixer.NoteOn(e.Track, instrument.Patch, e.Note, mixed, placed ?? 0f,
+            _synth.Mixer.NoteOn(e.Track, e.Column, instrument.Patch, e.Note, mixed, placed ?? 0f,
                 instrument.NewNoteAction);
             return;
         }
@@ -1283,12 +1317,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
         if (sample == null)
         {
             Where(e.Track, e.Instrument, instrument, song, "its recording would not load, so nothing was played");
-            LetGo(instrument, e.Track);
+            LetGo(instrument, e.Track, e.Column);
             return;
         }
 
         Where(e.Track, e.Instrument, instrument, song, "played as a recording");
-        _synth.Mixer.NoteOn(e.Track, instrument, sample, e.Note, mixed, placed ?? 0f);
+        _synth.Mixer.NoteOn(e.Track, e.Column, instrument, sample, e.Note, mixed, placed ?? 0f);
     }
 
     /// <summary>
@@ -1305,11 +1339,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// sustain asks for, and a note that could not be played is not a reason to end the ones
     /// that could.
     /// </remarks>
-    private void LetGo(TrackerInstrument instrument, int track)
+    private void LetGo(TrackerInstrument instrument, int track, int column)
     {
         if (instrument.NewNoteAction == VoiceEnding.Sustain) return;
 
-        _synth.Mixer.NoteOff(track);
+        _synth.Mixer.NoteOff(track, column);
     }
 
     /// <summary>What the last note on each track was addressed to, so it is said once a second.</summary>
@@ -1386,12 +1420,12 @@ public sealed class TrackerPlayer : ITrackerPlayer
         var instrument = song.InstrumentAt(e.Instrument);
         var (gain, pan) = LevelsFor(e, instrument);
 
-        _noteGain[e.Track] = gain;
-        _notePan[e.Track] = pan;
+        _noteGain[At(e.Track, e.Column)] = gain;
+        _notePan[At(e.Track, e.Column)] = pan;
 
         var (mixed, placed) = WithMix(song, e.Track, gain, pan);
 
-        _synth.Mixer.SetLevels(e.Track, mixed, placed);
+        _synth.Mixer.SetLevels(e.Track, e.Column, mixed, placed);
         _synth.Mixer.SetPluginLevels(e.Track, mixed, placed);
     }
 
@@ -1432,11 +1466,15 @@ public sealed class TrackerPlayer : ITrackerPlayer
         lock (_lock) song = _song;
         if (song == null) return;
 
-        for (int track = 0; track < _noteGain.Length; track++)
+        for (int track = 0; track < Tracks; track++)
         {
-            var (mixed, placed) = WithMix(song, track, _noteGain[track], _notePan[track]);
+            for (int column = 0; column < song.ColumnsOn(track); column++)
+            {
+                var (mixed, placed) = WithMix(
+                    song, track, _noteGain[At(track, column)], _notePan[At(track, column)]);
 
-            _synth.Mixer.SetLevels(track, mixed, placed);
+                _synth.Mixer.SetLevels(track, column, mixed, placed);
+            }
 
             _synth.Mixer.SetDucking(
                 track,

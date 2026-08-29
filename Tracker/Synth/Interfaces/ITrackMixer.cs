@@ -9,9 +9,10 @@ namespace JingleBox2.Tracker.Synth.Interfaces;
 /// and an instrument apiece.
 /// </summary>
 /// <remarks>
-/// Room is made on a track for each new note before it starts, and what that means is the
-/// instrument's to say: cut, which is what a tracker has always done and is still the default,
-/// release, or nothing at all. Auditions sit outside it, carry no track and simply pile up,
+/// Room is made in one note column for each new note before it starts, and what that means is
+/// the instrument's to say: cut, which is what a tracker has always done and is still the
+/// default, release, or nothing at all. A track is as many voices as it has note columns, and
+/// each of them is made room for on its own. Auditions sit outside it, carry no track and simply pile up,
 /// which is why a panel's keyboard cannot be heard on a strip or turned down by one. A kit
 /// answers the same question with its choke groups, since a crash has to go on ringing under
 /// the snare that follows it, so it is the one thing here that makes no room at all.
@@ -183,11 +184,15 @@ public interface ITrackMixer
     /// asked. Without that record the only thing a host can say is all notes off, which is
     /// right for one note a track and takes a whole chord down to end one note of it.
     /// </remarks>
-    void PluginNoteOn(int track, Note note, float gain, float pan,
+    void PluginNoteOn(int track, int column, Note note, float gain, float pan,
                       VoiceEnding ending = VoiceEnding.Cut);
 
-    /// <summary>Lets go of whatever a track's plugin is holding.</summary>
-    void PluginNoteOff(int track);
+    /// <summary>Lets go of what one of a track's note columns told its plugin to play.</summary>
+    /// <remarks>
+    /// One column, since the others are the rest of a chord. The column defaults to the first,
+    /// which is the only one a song written before note columns has.
+    /// </remarks>
+    void PluginNoteOff(int track, int column = 0);
 
     /// <summary>Follows the volume and pan columns while a plugin note holds.</summary>
     /// <remarks>
@@ -205,7 +210,7 @@ public interface ITrackMixer
     /// the default here rather than at the call sites, so a caller with no instrument in its
     /// hand, a test or an audition, plays what this engine has always played.
     /// </remarks>
-    void NoteOn(int track, SynthPatch patch, Note note, float gain, float pan,
+    void NoteOn(int track, int column, SynthPatch patch, Note note, float gain, float pan,
                 VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>
@@ -216,7 +221,7 @@ public interface ITrackMixer
     /// what it was. It is read before the old voice is cut, because cutting it is what makes it
     /// stop being the note before.
     /// </remarks>
-    void NoteOn(int track, MonoSynthPatch patch, Note note, float gain, float pan,
+    void NoteOn(int track, int column, MonoSynthPatch patch, Note note, float gain, float pan,
                 VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>
@@ -229,7 +234,8 @@ public interface ITrackMixer
     /// patch, its window and its base note off it, and a second way of saying the same thing
     /// is a second thing that can disagree.
     /// </remarks>
-    void NoteOn(int track, TrackerInstrument instrument, SampleData sample, Note note, float gain, float pan);
+    void NoteOn(int track, int column, TrackerInstrument instrument, SampleData sample, Note note,
+                float gain, float pan);
 
     /// <summary>
     /// Fires one pad of a kit: its own recording, at its own pitch, over whatever else is
@@ -245,7 +251,8 @@ public interface ITrackMixer
     /// nothing is resampled. That is the machine: a key chooses which recording sounds, not how
     /// fast to read one.
     /// </remarks>
-    void NoteOn(int track, DrumPad pad, SynthPatch patch, SampleData sample, Note note, float gain, float pan);
+    void NoteOn(int track, int column, DrumPad pad, SynthPatch patch, SampleData sample, Note note,
+                float gain, float pan);
 
     /// <summary>
     /// Plays one zone of a map: its recording, read at whatever speed the key asks for.
@@ -259,8 +266,8 @@ public interface ITrackMixer
     /// than a rack of them, and what a note does to the one before it is the instrument's to
     /// say.
     /// </remarks>
-    void NoteOn(int track, SampleZone zone, SamplerPatch patch, SampleData sample, Note note,
-                float gain, float pan, VoiceEnding ending = VoiceEnding.Cut);
+    void NoteOn(int track, int column, SampleZone zone, SamplerPatch patch, SampleData sample,
+                Note note, float gain, float pan, VoiceEnding ending = VoiceEnding.Cut);
 
     /// <summary>Sounds a note that releases on its own, for auditioning while editing.</summary>
     /// <param name="patch">The sound being built.</param>
@@ -388,11 +395,18 @@ public interface ITrackMixer
     /// </remarks>
     void LetAudition(string audition, int semitone);
 
-    /// <summary>Lets go of whatever a track was sounding, which is what a pattern's OFF does.</summary>
-    void NoteOff(int track);
+    /// <summary>
+    /// Lets go of what one note column was sounding, which is what a pattern's OFF does.
+    /// </summary>
+    /// <remarks>
+    /// One column, since the other columns of the same track are the other notes of a chord.
+    /// The column defaults to the first, which is the only one a song written before note
+    /// columns has and the one a note played by hand carries.
+    /// </remarks>
+    void NoteOff(int track, int column = 0);
 
     /// <summary>Follows the volume and pan columns while a note holds.</summary>
-    void SetLevels(int track, float gain, float? pan);
+    void SetLevels(int track, int column, float gain, float? pan);
 
     /// <summary>Silence, now. Used by the transport rather than by a note off.</summary>
     /// <remarks>

@@ -16,16 +16,38 @@ namespace JingleBox2.Tracker;
 public sealed class TrackerSequencer : ITrackerSequencer
 {
     /// <summary>
-    /// What each track last played, so a note with a blank instrument column knows what to
-    /// sound. <see cref="TrackerCell.NoInstrument"/> until that track has played anything.
+    /// What each note column last played, so a note with a blank instrument column knows what
+    /// to sound. <see cref="TrackerCell.NoInstrument"/> until it has played anything.
     /// </summary>
+    /// <remarks>
+    /// Per column and not per track, which is Renoise's arrangement and the only one that
+    /// holds up once a column is a voice: a blank instrument column means the last one this
+    /// voice played. Remembered per track, a chord written across three columns with a
+    /// different instrument in the third would leave the next note in the first playing the
+    /// third's. Typing a note fills its own instrument column, so a chord entered by hand or
+    /// by keyboard carries the instrument in every column of it and this is never asked.
+    ///
+    /// A song with one column a track cannot tell the two arrangements apart, which is every
+    /// song written before now.
+    /// </remarks>
     private readonly int[] _lastInstrument;
 
     /// <summary>
-    /// Where each track's volume column was last set. It stays there until something moves it,
+    /// Where each note column's volume was last set. It stays there until something moves it,
     /// which is what lets a level be typed once and hold down the page.
     /// </summary>
+    /// <remarks>
+    /// Per column for a harder reason than the instrument: a chord is several voices and the
+    /// volume column of one of them must not set the level of the others.
+    /// </remarks>
     private readonly float[] _trackGain;
+
+    /// <summary>How many note columns the memory has room for on each track.</summary>
+    /// <remarks>
+    /// The widest a track can be rather than the widest it is, so nothing has to be rebuilt
+    /// when somebody adds a column while the transport is running.
+    /// </remarks>
+    private const int Columns = Song.MaxNoteColumns;
 
     /// <summary>
     /// Memory for that many tracks, clamped to what a song can have.
@@ -38,13 +60,13 @@ public sealed class TrackerSequencer : ITrackerSequencer
     public TrackerSequencer(int trackCount)
     {
         int tracks = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
-        _lastInstrument = new int[tracks];
-        _trackGain = new float[tracks];
+        _lastInstrument = new int[tracks * Columns];
+        _trackGain = new float[tracks * Columns];
         Reset();
     }
 
     /// <inheritdoc/>
-    public int TrackCount => _lastInstrument.Length;
+    public int TrackCount => _lastInstrument.Length / Columns;
 
     /// <inheritdoc/>
     public void Reset()
@@ -71,32 +93,32 @@ public sealed class TrackerSequencer : ITrackerSequencer
         int tracks = Math.Min(pattern.TrackCount, TrackCount);
         for (int track = 0; track < tracks; track++)
         {
-            var cell = pattern[position.Line, track];
-            if (cell.IsEmpty) continue;
+            int columns = Math.Min(pattern.ColumnsOn(track), Columns);
 
-            if (cell.Note.IsOff)
+            for (int column = 0; column < columns; column++)
             {
-                events.Add(TrackerEvent.Stop(track));
-                continue;
-            }
+                var cell = pattern[position.Line, track, column];
+                if (cell.IsEmpty) continue;
 
-            if (cell.Instrument != TrackerCell.NoInstrument)
-                _lastInstrument[track] = cell.Instrument;
+                if (cell.Note.IsOff)
+                {
+                    events.Add(TrackerEvent.Stop(track, column));
+                    continue;
+                }
 
-            if (cell.Gain is float gain)
-                _trackGain[track] = gain;
+                int at = track * Columns + column;
 
-            if (cell.Note.IsPlayable)
-            {
+                if (cell.Instrument != TrackerCell.NoInstrument)
+                    _lastInstrument[at] = cell.Instrument;
+
+                if (cell.Gain is float gain)
+                    _trackGain[at] = gain;
+
                 events.Add(new TrackerEvent(
-                    track, TrackerEventKind.Trigger, cell.Note,
-                    _lastInstrument[track], _trackGain[track], cell.Effect));
-            }
-            else
-            {
-                events.Add(new TrackerEvent(
-                    track, TrackerEventKind.Adjust, Note.Empty,
-                    _lastInstrument[track], _trackGain[track], cell.Effect));
+                    track, column,
+                    cell.Note.IsPlayable ? TrackerEventKind.Trigger : TrackerEventKind.Adjust,
+                    cell.Note.IsPlayable ? cell.Note : Note.Empty,
+                    _lastInstrument[at], _trackGain[at], cell.Effect));
             }
         }
 

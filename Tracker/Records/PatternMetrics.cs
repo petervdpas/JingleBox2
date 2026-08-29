@@ -22,8 +22,18 @@ namespace JingleBox2.Tracker.Records;
 /// place.
 /// </param>
 /// <param name="BottomPad">The same underneath, for the pattern that comes next.</param>
+/// <param name="Columns">
+/// How many note columns each track shows, which is what makes tracks different widths.
+/// </param>
+/// <remarks>
+/// Nothing here is the same width as its neighbour any more. A track is as wide as the note
+/// columns it shows, so every horizontal question is a walk from the left rather than a
+/// multiplication, and a caller that says nothing about columns gets the one-apiece row every
+/// pattern had before chords existed.
+/// </remarks>
 public readonly record struct PatternMetrics(
-    double CharWidth, double RowHeight, int TrackCount, double TopPad = 0, double BottomPad = 0)
+    double CharWidth, double RowHeight, int TrackCount, double TopPad = 0, double BottomPad = 0,
+    NoteColumns Columns = default)
 {
     /// <summary>Digits in the line number gutter.</summary>
     public const int LineNumberChars = 3;
@@ -40,19 +50,38 @@ public readonly record struct PatternMetrics(
     /// <summary>The line number gutter, plus the blank character after it.</summary>
     public double GutterWidth => (LineNumberChars + 1) * CharWidth;
 
-    /// <summary>One track, divider padding and column gaps included. Every track is this wide.</summary>
-    public double TrackWidth
+    /// <summary>One note column: its four fields and the gap after each of them.</summary>
+    public double NoteColumnWidth
     {
         get
         {
-            double chars = TrackPadChars * 2;
+            double chars = 0;
             foreach (int width in ColumnWidths) chars += width + ColumnGapChars;
+
             return chars * CharWidth;
         }
     }
 
+    /// <summary>One track, divider padding and column gaps included.</summary>
+    /// <remarks>
+    /// No longer the same for every track: a track playing chords is as many note columns wide
+    /// as it has, and the one beside it need not have as many.
+    /// </remarks>
+    public double TrackWidth(int track) =>
+        TrackPadChars * 2 * CharWidth + Columns.On(track) * NoteColumnWidth;
+
     /// <summary>The gutter and every track, which is how wide the grid needs to be.</summary>
-    public double ContentWidth => GutterWidth + Math.Max(0, TrackCount) * TrackWidth;
+    public double ContentWidth
+    {
+        get
+        {
+            double width = GutterWidth;
+
+            for (int track = 0; track < Math.Max(0, TrackCount); track++) width += TrackWidth(track);
+
+            return width;
+        }
+    }
 
     /// <summary>The rows, and whatever neighbouring pattern is shown either side of them.</summary>
     /// <remarks>
@@ -64,15 +93,27 @@ public readonly record struct PatternMetrics(
         TopPad + Math.Max(0, lines) * RowHeight + BottomPad;
 
     /// <summary>Left edge of a track's divider.</summary>
-    public double TrackDividerX(int track) => GutterWidth + track * TrackWidth;
+    public double TrackDividerX(int track)
+    {
+        double x = GutterWidth;
+
+        for (int at = 0; at < track; at++) x += TrackWidth(at);
+
+        return x;
+    }
 
     /// <summary>Left edge of a track's first column, past its divider and padding.</summary>
     public double TrackX(int track) => TrackDividerX(track) + TrackPadChars * CharWidth;
 
-    /// <summary>Left edge of one column of one track.</summary>
-    public double ColumnX(int track, CellColumn column)
+    /// <summary>Left edge of one of a track's note columns.</summary>
+    public double NoteColumnX(int track, int noteColumn) =>
+        TrackX(track) + noteColumn * NoteColumnWidth;
+
+    /// <summary>Left edge of one field of one note column of one track.</summary>
+    public double ColumnX(int track, CellColumn column, int noteColumn = 0)
     {
-        double x = TrackX(track);
+        double x = NoteColumnX(track, noteColumn);
+
         for (int i = 0; i < (int)column; i++)
             x += (ColumnWidths[i] + ColumnGapChars) * CharWidth;
 
@@ -94,10 +135,40 @@ public readonly record struct PatternMetrics(
         lines <= 0 ? 0 : Math.Clamp((int)Math.Floor((y - TopPad) / RowHeight), 0, lines - 1);
 
     /// <summary>Which track a point falls on, held inside the song.</summary>
+    /// <remarks>
+    /// A walk rather than a division, because tracks are no longer the same width. Everything
+    /// left of the first track lands on it and everything right of the last lands on that, which
+    /// is what a click in the gutter or off the end of the row means.
+    /// </remarks>
     public int TrackAt(double x)
     {
-        if (TrackCount <= 0 || TrackWidth <= 0) return 0;
-        return Math.Clamp((int)((x - GutterWidth) / TrackWidth), 0, TrackCount - 1);
+        if (TrackCount <= 0) return 0;
+
+        double edge = GutterWidth;
+
+        for (int track = 0; track < TrackCount; track++)
+        {
+            edge += TrackWidth(track);
+            if (x < edge) return track;
+        }
+
+        return TrackCount - 1;
+    }
+
+    /// <summary>Which of that track's note columns the point falls on.</summary>
+    /// <remarks>
+    /// The track's left padding belongs to its first column and everything past its last column
+    /// lands on that one, for the reason a field's trailing gap belongs to the field before it:
+    /// a click in a gap should land on what it looks like it is beside.
+    /// </remarks>
+    public int NoteColumnAt(double x, int track)
+    {
+        int columns = Columns.On(track);
+        if (columns <= 1 || NoteColumnWidth <= 0) return 0;
+
+        double inside = x - TrackX(track);
+
+        return Math.Clamp((int)Math.Floor(inside / NoteColumnWidth), 0, columns - 1);
     }
 
     /// <summary>Which column of <paramref name="track"/> the point falls on.</summary>
@@ -108,7 +179,7 @@ public readonly record struct PatternMetrics(
     /// </remarks>
     public CellColumn ColumnAt(double x, int track)
     {
-        double inside = x - TrackX(track);
+        double inside = x - NoteColumnX(track, NoteColumnAt(x, track));
         double edge = 0;
 
         for (int i = 0; i < ColumnWidths.Length; i++)
@@ -124,6 +195,7 @@ public readonly record struct PatternMetrics(
     public PatternCursor CursorAt(double x, double y, int lines)
     {
         int track = TrackAt(x);
-        return new PatternCursor(LineAt(y, lines), track, ColumnAt(x, track));
+
+        return new PatternCursor(LineAt(y, lines), track, ColumnAt(x, track), NoteColumnAt(x, track));
     }
 }

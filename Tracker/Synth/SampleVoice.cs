@@ -235,6 +235,9 @@ public sealed class SampleVoice : IVoice
     public int Track { get; }
 
     /// <inheritdoc/>
+    public int Column { get; init; }
+
+    /// <inheritdoc/>
     public Note Note { get; }
 
     /// <inheritdoc/>

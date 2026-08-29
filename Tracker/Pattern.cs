@@ -49,6 +49,30 @@ public sealed class Pattern
     private TrackerCell[] _cells;
 
     /// <summary>
+    /// How many note columns each track has, one entry per track.
+    /// </summary>
+    /// <remarks>
+    /// A copy of what the song says, for the reason <see cref="TrackCount"/> is a copy: the
+    /// place of a cell is worked out from these on every read, and reaching to the song for
+    /// them would put a reference in the one place that has to stay a plain array lookup.
+    ///
+    /// Every pattern in a song has the same counts, because a part is played on so many voices
+    /// whatever pattern it is in. Counts that varied per pattern would make copying a track
+    /// between patterns a question with no good answer.
+    /// </remarks>
+    private int[] _columns;
+
+    /// <summary>
+    /// Where each track's columns begin within one line, with the row's own total on the end.
+    /// </summary>
+    /// <remarks>
+    /// A running total, made whenever the shape changes, so a cell's place is an addition
+    /// rather than a walk. One longer than there are tracks: the last entry is the stride, and
+    /// having it there means the width of the last track needs no special case.
+    /// </remarks>
+    private int[] _starts;
+
+    /// <summary>
     /// The parameters that move over this pattern, one lane apiece.
     /// </summary>
     /// <remarks>
@@ -82,12 +106,88 @@ public sealed class Pattern
     /// </remarks>
     public int TrackCount { get; private set; }
 
+    /// <summary>How many cells one line holds, which is every track's columns added up.</summary>
+    public int TotalColumns => _starts[TrackCount];
+
+    /// <summary>How many note columns a track has. Nought for a track that is not there.</summary>
+    public int ColumnsOn(int track) =>
+        track >= 0 && track < TrackCount ? _columns[track] : 0;
+
+    /// <summary>
+    /// The counts, to be kept: what a history step and a clone carry beside the cells.
+    /// </summary>
+    /// <remarks>
+    /// A copy rather than the array, since the shape is what a step is compared against and a
+    /// step holding the live counts would hold whatever they became.
+    /// </remarks>
+    public int[] ColumnCounts()
+    {
+        var kept = new int[TrackCount];
+        Array.Copy(_columns, kept, TrackCount);
+
+        return kept;
+    }
+
+    /// <summary>Gives a track that many note columns, keeping whatever still fits.</summary>
+    public void SetColumns(int track, int count)
+    {
+        if (track < 0 || track >= TrackCount) return;
+
+        int wanted = Math.Clamp(count, Song.MinNoteColumns, Song.MaxNoteColumns);
+        if (wanted == _columns[track]) return;
+
+        var columns = ColumnCounts();
+        columns[track] = wanted;
+
+        Rebuild(Lines, TrackCount, columns);
+    }
+
+    /// <summary>Sets every track's count at once, which is what a song pushes down.</summary>
+    public void SetColumns(IReadOnlyList<int>? counts) => Rebuild(Lines, TrackCount, counts);
+
     /// <summary>A pattern of that shape, every cell blank. Both numbers are held to their range.</summary>
     public Pattern(int lines = DefaultLines, int trackCount = Song.DefaultTrackCount)
     {
         Lines = Math.Clamp(lines, MinLines, MaxLines);
         TrackCount = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
-        _cells = NewCells(Lines, TrackCount);
+
+        _columns = Widths(null, TrackCount);
+        _starts = Starts(_columns);
+        _cells = NewCells(Lines, _starts[TrackCount]);
+    }
+
+    /// <summary>Where a cell sits in the block. The one piece of arithmetic every read goes through.</summary>
+    private int Place(int line, int track, int column) =>
+        line * _starts[TrackCount] + _starts[track] + column;
+
+    /// <summary>A count per track, held to its range, filled out or cut down to fit.</summary>
+    /// <remarks>
+    /// A track the caller said nothing about gets one column, which is what every track had
+    /// before there was more than one and is what a song written before this reads back as.
+    /// </remarks>
+    private static int[] Widths(IReadOnlyList<int>? counts, int trackCount)
+    {
+        var widths = new int[trackCount];
+
+        for (int track = 0; track < trackCount; track++)
+        {
+            int said = counts is not null && track < counts.Count ? counts[track] : Song.DefaultNoteColumns;
+
+            widths[track] = Math.Clamp(said, Song.MinNoteColumns, Song.MaxNoteColumns);
+        }
+
+        return widths;
+    }
+
+    /// <summary>The running total of those widths, with the stride on the end.</summary>
+    private static int[] Starts(int[] columns)
+    {
+        var starts = new int[columns.Length + 1];
+
+        for (int track = 0; track < columns.Length; track++)
+            starts[track + 1] = starts[track] + columns[track];
+
+        return starts;
     }
 
     /// <summary>
@@ -100,16 +200,30 @@ public sealed class Pattern
     /// </remarks>
     public TrackerCell this[int line, int track]
     {
+        get => this[line, track, 0];
+        set => this[line, track, 0] = value;
+    }
+
+    /// <summary>
+    /// One cell of one note column. The first column is the track itself, which is what every
+    /// caller that names only a track means.
+    /// </summary>
+    /// <remarks>
+    /// Reading or writing outside the pattern throws, because that is a mistake in the caller
+    /// rather than an ordinary state, and a write that would change nothing raises nothing.
+    /// </remarks>
+    public TrackerCell this[int line, int track, int column]
+    {
         get
         {
-            RequireInRange(line, track);
-            return _cells[line * TrackCount + track];
+            RequireInRange(line, track, column);
+            return _cells[Place(line, track, column)];
         }
         set
         {
-            RequireInRange(line, track);
+            RequireInRange(line, track, column);
 
-            int index = line * TrackCount + track;
+            int index = Place(line, track, column);
             if (_cells[index] == value) return;
 
             _cells[index] = value;
@@ -118,14 +232,19 @@ public sealed class Pattern
     }
 
     /// <summary>True when that cell is inside the pattern. The bounds check every edit uses.</summary>
-    public bool Contains(int line, int track) =>
-        line >= 0 && line < Lines && track >= 0 && track < TrackCount;
+    public bool Contains(int line, int track) => Contains(line, track, 0);
+
+    /// <summary>The same, of one note column of a track.</summary>
+    public bool Contains(int line, int track, int column) =>
+        line >= 0 && line < Lines
+        && track >= 0 && track < TrackCount
+        && column >= 0 && column < _columns[track];
 
     /// <summary>Changes the step count, keeping whatever still fits.</summary>
-    public void Resize(int lines) => Rebuild(lines, TrackCount);
+    public void Resize(int lines) => Rebuild(lines, TrackCount, _columns);
 
     /// <summary>Changes the track count, keeping whatever still fits.</summary>
-    public void SetTrackCount(int trackCount) => Rebuild(Lines, trackCount);
+    public void SetTrackCount(int trackCount) => Rebuild(Lines, trackCount, _columns);
 
     /// <summary>Empties it: every cell, and every lane. One change, not one per cell.</summary>
     public void Clear()
@@ -144,7 +263,8 @@ public sealed class Pattern
     public void ClearTrack(int track)
     {
         for (int line = 0; line < Lines; line++)
-            this[line, track] = TrackerCell.Empty;
+            for (int column = 0; column < ColumnsOn(track); column++)
+                this[line, track, column] = TrackerCell.Empty;
 
         if (_lanes.RemoveAll(one => one.Track == track) > 0)
             Changed?.Invoke(this, EventArgs.Empty);
@@ -207,24 +327,44 @@ public sealed class Pattern
     ///
     /// The lanes slide with the cells. A lane belongs to a track by number, so a track moved
     /// with its automation left behind would be somebody else's filter sweeping.
+    ///
+    /// The block is rebuilt rather than shuffled in place, because two tracks need not be the
+    /// same width any more: a track of three note columns moved in front of a track of one is
+    /// not a swap of equal pieces, and the row it lands in is a different length in every line.
+    /// The note columns travel with their track, which is the whole point of them belonging to
+    /// it.
     /// </remarks>
     public void MoveTrack(int from, int to)
     {
         if (from == to) return;
         if (from < 0 || from >= TrackCount || to < 0 || to >= TrackCount) return;
 
-        var column = new TrackerCell[Lines];
-        for (int line = 0; line < Lines; line++) column[line] = _cells[line * TrackCount + from];
+        var order = new int[TrackCount];
+        for (int track = 0; track < TrackCount; track++) order[track] = track;
 
         int step = from < to ? 1 : -1;
+        for (int track = from; track != to; track += step) order[track] = order[track + step];
+        order[to] = from;
 
-        for (int track = from; track != to; track += step)
+        var columns = new int[TrackCount];
+        for (int track = 0; track < TrackCount; track++) columns[track] = _columns[order[track]];
+
+        var starts = Starts(columns);
+        var replacement = NewCells(Lines, starts[TrackCount]);
+
+        for (int line = 0; line < Lines; line++)
         {
-            for (int line = 0; line < Lines; line++)
-                _cells[line * TrackCount + track] = _cells[line * TrackCount + track + step];
+            for (int track = 0; track < TrackCount; track++)
+            {
+                for (int column = 0; column < columns[track]; column++)
+                    replacement[line * starts[TrackCount] + starts[track] + column] =
+                        _cells[Place(line, order[track], column)];
+            }
         }
 
-        for (int line = 0; line < Lines; line++) _cells[line * TrackCount + to] = column[line];
+        _cells = replacement;
+        _columns = columns;
+        _starts = starts;
 
         foreach (var lane in _lanes)
         {
@@ -236,12 +376,14 @@ public sealed class Pattern
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>The cells of one step, left to right. Used by the player, one call per line.</summary>
+    /// <summary>Every cell of one step, left to right: each track's columns in turn.</summary>
     public IEnumerable<TrackerCell> Row(int line)
     {
-        RequireInRange(line, 0);
+        RequireInRange(line, 0, 0);
+
         for (int track = 0; track < TrackCount; track++)
-            yield return _cells[line * TrackCount + track];
+            for (int column = 0; column < _columns[track]; column++)
+                yield return _cells[Place(line, track, column)];
     }
 
     /// <summary>A pattern of its own holding the same music, with nothing shared.</summary>
@@ -252,6 +394,11 @@ public sealed class Pattern
     public Pattern Clone()
     {
         var copy = new Pattern(Lines, TrackCount) { Name = Name };
+
+        copy._columns = ColumnCounts();
+        copy._starts = Starts(copy._columns);
+        copy._cells = new TrackerCell[_cells.Length];
+
         Array.Copy(_cells, copy._cells, _cells.Length);
         copy._lanes.AddRange(_lanes.Select(one => one.Clone()));
         return copy;
@@ -287,10 +434,16 @@ public sealed class Pattern
     /// What the history asks to find out whether the last edit changed anything, so a keystroke
     /// that did nothing does not cost a step.
     /// </remarks>
-    public bool Holds(TrackerCell[]? cells, int lines, int trackCount, IReadOnlyList<AutomationLane>? lanes)
+    public bool Holds(TrackerCell[]? cells, int lines, int trackCount, IReadOnlyList<int>? columns,
+                      IReadOnlyList<AutomationLane>? lanes)
     {
         if (cells is null || lines != Lines || trackCount != TrackCount) return false;
         if (cells.Length != _cells.Length) return false;
+
+        if (columns is null || columns.Count != TrackCount) return false;
+
+        for (int track = 0; track < TrackCount; track++)
+            if (columns[track] != _columns[track]) return false;
 
         for (int at = 0; at < _cells.Length; at++)
             if (_cells[at] != cells[at]) return false;
@@ -316,7 +469,7 @@ public sealed class Pattern
     /// the way out: a step is kept and may be put back more than once, and handing over its own
     /// lanes would let the next edit reach into the history and change what it holds.
     /// </remarks>
-    public void Restore(TrackerCell[] cells, int lines, int trackCount,
+    public void Restore(TrackerCell[] cells, int lines, int trackCount, IReadOnlyList<int>? columns,
                         IReadOnlyList<AutomationLane>? lanes)
     {
         if (cells is null) return;
@@ -324,10 +477,16 @@ public sealed class Pattern
         int newLines = Math.Clamp(lines, MinLines, MaxLines);
         int newTracks = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
 
-        if (cells.Length != newLines * newTracks) return;
+        var widths = Widths(columns, newTracks);
+        var starts = Starts(widths);
+
+        if (cells.Length != newLines * starts[newTracks]) return;
 
         _cells = new TrackerCell[cells.Length];
         Array.Copy(cells, _cells, cells.Length);
+
+        _columns = widths;
+        _starts = starts;
 
         _lanes.Clear();
         if (lanes is not null)
@@ -347,21 +506,36 @@ public sealed class Pattern
     /// its end, and tracks taken off take their lanes with them. The master's lane stays: it is
     /// not one of the tracks and there is no count of them that reaches it.
     /// </remarks>
-    private void Rebuild(int lines, int trackCount)
+    private void Rebuild(int lines, int trackCount, IReadOnlyList<int>? columns)
     {
         int newLines = Math.Clamp(lines, MinLines, MaxLines);
         int newTracks = Math.Clamp(trackCount, Song.MinTrackCount, Song.MaxTrackCount);
-        if (newLines == Lines && newTracks == TrackCount) return;
 
-        var replacement = NewCells(newLines, newTracks);
+        var widths = Widths(columns, newTracks);
+        var starts = Starts(widths);
+
+        if (newLines == Lines && newTracks == TrackCount && Same(widths)) return;
+
+        var replacement = NewCells(newLines, starts[newTracks]);
 
         int keptLines = Math.Min(Lines, newLines);
         int keptTracks = Math.Min(TrackCount, newTracks);
+
         for (int line = 0; line < keptLines; line++)
+        {
             for (int track = 0; track < keptTracks; track++)
-                replacement[line * newTracks + track] = _cells[line * TrackCount + track];
+            {
+                int kept = Math.Min(_columns[track], widths[track]);
+
+                for (int column = 0; column < kept; column++)
+                    replacement[line * starts[newTracks] + starts[track] + column] =
+                        _cells[Place(line, track, column)];
+            }
+        }
 
         _cells = replacement;
+        _columns = widths;
+        _starts = starts;
         Lines = newLines;
         TrackCount = newTracks;
 
@@ -371,19 +545,31 @@ public sealed class Pattern
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>A block of blank cells of that shape.</summary>
-    private static TrackerCell[] NewCells(int lines, int trackCount)
+    /// <summary>True when the counts it has now are exactly those.</summary>
+    private bool Same(int[] widths)
     {
-        var cells = new TrackerCell[lines * trackCount];
+        if (widths.Length != _columns.Length) return false;
+
+        for (int track = 0; track < widths.Length; track++)
+            if (widths[track] != _columns[track]) return false;
+
+        return true;
+    }
+
+    /// <summary>A block of blank cells: that many lines of that many cells each.</summary>
+    private static TrackerCell[] NewCells(int lines, int stride)
+    {
+        var cells = new TrackerCell[lines * stride];
         Array.Fill(cells, TrackerCell.Empty);
         return cells;
     }
 
     /// <summary>Throws for a cell outside the pattern, naming the shape it was asked of.</summary>
-    private void RequireInRange(int line, int track)
+    private void RequireInRange(int line, int track, int column)
     {
-        if (!Contains(line, track))
+        if (!Contains(line, track, column))
             throw new ArgumentOutOfRangeException(
-                nameof(line), $"Cell {line},{track} is outside a {Lines}x{TrackCount} pattern.");
+                nameof(line),
+                $"Cell {line},{track},{column} is outside a {Lines}x{TrackCount} pattern.");
     }
 }

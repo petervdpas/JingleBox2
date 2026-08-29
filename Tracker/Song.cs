@@ -21,6 +21,22 @@ public sealed class Song
     /// <summary>What a new song opens with, which is enough to start and not a wall of empty columns.</summary>
     public const int DefaultTrackCount = 4;
 
+    /// <summary>A track has at least one note column, or it would have nowhere to put a note.</summary>
+    public const int MinNoteColumns = 1;
+
+    /// <summary>
+    /// Eight, which is as many notes as a track can play at once.
+    /// </summary>
+    /// <remarks>
+    /// Renoise allows twelve. Eight because nothing widens until it is asked for, and because
+    /// every column is width on the screen whether or not anything is written in it: a pattern
+    /// where one track has twelve is a pattern where you can see two tracks.
+    /// </remarks>
+    public const int MaxNoteColumns = 8;
+
+    /// <summary>One, so a song opens as every song before note columns existed played.</summary>
+    public const int DefaultNoteColumns = 1;
+
     /// <summary>What the song is called, which is also what its file is called.</summary>
     public string Name { get; set; } = "untitled";
 
@@ -88,6 +104,20 @@ public sealed class Song
 
     /// <summary>One strip per track: level, placement, mute and solo.</summary>
     public List<TrackMix> Mix { get; set; } = new();
+
+    /// <summary>
+    /// How many note columns each track shows, one entry per track.
+    /// </summary>
+    /// <remarks>
+    /// The song's and not the pattern's, which is Renoise's arrangement and right for the same
+    /// reason its track count is the song's: a part is played on so many voices whatever
+    /// pattern it is in, and counts that varied per pattern would make copying a track between
+    /// patterns a question with no good answer.
+    ///
+    /// A song written before note columns existed has nothing here and reads back as one
+    /// column a track, which is exactly what it played.
+    /// </remarks>
+    public List<int> NoteColumns { get; set; } = new();
 
     /// <summary>
     /// The whole mix, after every track: a level, a place and one effect the song goes through.
@@ -163,7 +193,9 @@ public sealed class Song
             if (at < Patterns.Count)
             {
                 Patterns[at].Name = wanted.Name;
-                Patterns[at].Restore(wanted.Cells(), wanted.Lines, wanted.TrackCount, wanted.LaneCopy());
+                Patterns[at].Restore(
+                    wanted.Cells(), wanted.Lines, wanted.TrackCount,
+                    wanted.ColumnCounts(), wanted.LaneCopy());
             }
             else
             {
@@ -247,6 +279,56 @@ public sealed class Song
         TrackInstruments[track] = value;
     }
 
+    /// <summary>How many note columns a track has. One for a track nothing has said anything about.</summary>
+    public int ColumnsOn(int track)
+    {
+        if (track < 0 || track >= TrackCount) return 0;
+
+        return track < NoteColumns.Count
+            ? Math.Clamp(NoteColumns[track], MinNoteColumns, MaxNoteColumns)
+            : DefaultNoteColumns;
+    }
+
+    /// <summary>
+    /// Gives a track that many note columns, here and in every pattern.
+    /// </summary>
+    /// <remarks>
+    /// Every pattern, because the count is the song's: a track two columns wide is two columns
+    /// wide throughout, and a pattern left behind would hold cells nothing could reach and
+    /// would refuse the next history step for being the wrong length.
+    ///
+    /// Narrowing throws away what was in the columns that go, which is what narrowing means and
+    /// is the same rule taking a track off follows. It leaves an undo step like any other edit,
+    /// because whoever asked for it went through the editor.
+    /// </remarks>
+    public bool SetColumns(int track, int count)
+    {
+        if (track < 0 || track >= TrackCount) return false;
+
+        int wanted = Math.Clamp(count, MinNoteColumns, MaxNoteColumns);
+        if (wanted == ColumnsOn(track)) return false;
+
+        EnsureNoteColumns();
+        NoteColumns[track] = wanted;
+
+        foreach (var pattern in Patterns) pattern.SetColumns(NoteColumns);
+
+        return true;
+    }
+
+    /// <summary>Keeps the per-track list the same length as the track count, and in range.</summary>
+    private void EnsureNoteColumns()
+    {
+        NoteColumns ??= new List<int>();
+
+        while (NoteColumns.Count < TrackCount) NoteColumns.Add(DefaultNoteColumns);
+        if (NoteColumns.Count > TrackCount)
+            NoteColumns.RemoveRange(TrackCount, NoteColumns.Count - TrackCount);
+
+        for (int track = 0; track < NoteColumns.Count; track++)
+            NoteColumns[track] = Math.Clamp(NoteColumns[track], MinNoteColumns, MaxNoteColumns);
+    }
+
     /// <summary>Takes an instrument off every track it is on, which is at most one of them.</summary>
     private void ClearInstrumentFromTracks(int instrument)
     {
@@ -288,6 +370,10 @@ public sealed class Song
         {
             Name = (Patterns.Count + 1).ToString("00")
         };
+
+        EnsureNoteColumns();
+        pattern.SetColumns(NoteColumns);
+
         Patterns.Add(pattern);
         return Patterns.Count - 1;
     }
@@ -420,11 +506,13 @@ public sealed class Song
 
         EnsureTrackInstruments();
         EnsureMix();
+        EnsureNoteColumns();
 
         foreach (var pattern in Patterns) pattern.MoveTrack(from, to);
 
         Shift(TrackInstruments, from, to);
         Shift(Mix, from, to);
+        Shift(NoteColumns, from, to);
 
         foreach (var strip in Mix)
         {
@@ -466,11 +554,16 @@ public sealed class Song
     public void SetTrackCount(int trackCount)
     {
         TrackCount = Math.Clamp(trackCount, MinTrackCount, MaxTrackCount);
-        foreach (var pattern in Patterns)
-            pattern.SetTrackCount(TrackCount);
 
         EnsureTrackInstruments();
         EnsureMix();
+        EnsureNoteColumns();
+
+        foreach (var pattern in Patterns)
+        {
+            pattern.SetTrackCount(TrackCount);
+            pattern.SetColumns(NoteColumns);
+        }
     }
 
     /// <summary>How long the whole song lasts, every slot of the order counted in turn.</summary>
@@ -502,8 +595,13 @@ public sealed class Song
         if (Patterns.Count == 0)
             Patterns.Add(new Pattern(Pattern.DefaultLines, TrackCount) { Name = "01" });
 
+        EnsureNoteColumns();
+
         foreach (var pattern in Patterns)
+        {
             pattern.SetTrackCount(TrackCount);
+            pattern.SetColumns(NoteColumns);
+        }
 
         Order.RemoveAll(index => index < 0 || index >= Patterns.Count);
         if (Order.Count == 0)

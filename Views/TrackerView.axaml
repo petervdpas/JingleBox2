@@ -237,6 +237,22 @@
 
                     <Separator />
 
+                    <!-- How many notes this track can play at once. A note column is a whole
+                         cell again with its own note, instrument, volume and effect, so the
+                         track grows wider with every one of them. -->
+                    <MenuItem Header="{Binding ColumnsHere, StringFormat='Note columns: {0}'}"
+                              ToolTip.Tip="How many notes this track plays at once. Each one is a voice of its own, with its own instrument and volume.">
+                      <MenuItem Header="Add one"
+                                IsEnabled="{Binding CanAddColumn}"
+                                Command="{Binding AddColumnCommand}" />
+                      <MenuItem Header="Take the last one away"
+                                IsEnabled="{Binding CanRemoveColumn}"
+                                Command="{Binding RemoveColumnCommand}"
+                                ToolTip.Tip="Whatever is written in it goes with it, in every pattern." />
+                    </MenuItem>
+
+                    <Separator />
+
                     <MenuItem Header="Quantize to">
                       <MenuItem Header="Every 2 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="2" />
                       <MenuItem Header="Every 3 lines" Command="{Binding QuantizeTrackCommand}" CommandParameter="3" />

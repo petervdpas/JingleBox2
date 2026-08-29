@@ -144,17 +144,18 @@ public class PatternTests
 
         var kept = pattern.Cells();
         var lanes = pattern.LaneCopy();
+        var columns = pattern.ColumnCounts();
         int lines = pattern.Lines, tracks = pattern.TrackCount;
 
-        Assert.True(pattern.Holds(kept, lines, tracks, lanes));
+        Assert.True(pattern.Holds(kept, lines, tracks, columns, lanes));
 
         Edits.ClearPattern(pattern);
-        Assert.False(pattern.Holds(kept, lines, tracks, lanes));
+        Assert.False(pattern.Holds(kept, lines, tracks, columns, lanes));
 
         int said = 0;
         pattern.Changed += (_, _) => said++;
 
-        pattern.Restore(kept, lines, tracks, lanes);
+        pattern.Restore(kept, lines, tracks, columns, lanes);
 
         Assert.True(pattern[0, 0].Note.IsPlayable);
 
@@ -170,7 +171,7 @@ public class PatternTests
     {
         var pattern = WithNotes();
 
-        pattern.Restore(new TrackerCell[3], 16, 4, null);
+        pattern.Restore(new TrackerCell[3], 16, 4, null, null);
 
         Assert.True(pattern[0, 0].Note.IsPlayable);
     }
