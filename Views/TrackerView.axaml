@@ -113,17 +113,19 @@
         </Grid>
 
         <Button Grid.Column="2" Content="Open..." Command="{Binding OpenSongCommand}" />
-        <!-- Warm rather than starred. A star is a character somebody has to know the meaning
-             of, and it moves the button's width as it comes and goes. -->
+        <!-- Coloured rather than starred. A star is a character somebody has to know the
+             meaning of, and it moves the button's width as it comes and goes. Green here and
+             warm on Cancel changes below, both on the same fact: see Button.save in App.axaml. -->
         <Button Grid.Column="3" Content="Save song" Command="{Binding SaveCommand}"
-                Classes.unsaved="{Binding NeedsSaving}"
-                ToolTip.Tip="Writes the song to disc. The button warms while there are changes that are not on disc yet." />
+                Classes.save="{Binding NeedsSaving}"
+                ToolTip.Tip="Writes the song to disc. The button goes green while there are changes that are not on disc yet." />
         <Button Grid.Column="4" Content="Save as..." Command="{Binding SaveAsCommand}" />
 
         <!-- The other half of saving, and the one nothing offered until now: putting it back.
              Dead unless there is both a saved copy to return to and something to return from. -->
         <Button Grid.Column="5" Content="Cancel changes"
                 IsEnabled="{Binding CanRevertSong}"
+                Classes.discard="{Binding CanRevertSong}"
                 Command="{Binding RevertSongCommand}"
                 ToolTip.Tip="Throws away everything done since the last save and reads the song back as it was. Asked first, because it cannot be undone." />
 

@@ -19,9 +19,12 @@
 
   <!-- Burnt, so Delete is not written in the same red as every heading around it. -->
   <Color x:Key="Color.Danger">#8F2F12</Color>
-  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
-       and not a fault, which is why it is not the danger colour. -->
-  <Color x:Key="Color.Unsaved">#E08A3C</Color>
+  <!-- The button that puts your work on disc, while there is work to put there. Green
+       because it is the safe half of the pair and reads as go without being decoded. -->
+  <Color x:Key="Color.Save">#43A047</Color>
+  <!-- And the button that throws that same work away. Warm rather than alarming: it is
+       a caution and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Discard">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#C2183C</Color>
   <Color x:Key="SystemAccentColorLight1">#E4506E</Color>

@@ -535,7 +535,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-961 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+969 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -1175,10 +1175,18 @@ whole exercise and is worth writing down rather than summarising:
   rather than replacing them, for the third time in this codebase and the same reason each time:
   the patch, the kit and the shape are held by reference by the panel's own view models
 - SETTINGS aside, the tracker's song bar has Cancel changes: read the song back off disc as it
-  was last saved, asked first, dead unless there is both a saved copy and something to lose. And
-  the Save button glows warm instead of wearing a star, because a star is a character somebody
-  has to know the meaning of and it moves the button's width as it comes and goes. `Color.Unsaved`
-  is per theme
+  was last saved, asked first, dead unless there is both a saved copy and something to lose
+- **Unsaved work is two buttons and therefore two colours.** Coloured rather than starred,
+  because a star is a character somebody has to know the meaning of and it moves the button's
+  width as it comes and goes, where a colour is read from across the room. `Color.Save` is
+  green on Save, `Color.Discard` is warm on Cancel changes, and both light on the same fact:
+  there is something on screen that is not on disc. That is the whole argument for two rather
+  than one. The moment the safe button starts asking to be pressed is the moment the other one
+  starts being able to cost you an afternoon, and green go against warm caution says which is
+  which without being decoded. Warm and not red on the second, since cancelling is a decision
+  taken on purpose and asked about first. One `Color.Unsaved` became the two, per theme as it
+  always was, and the same pair is on the machine editor's header, which has the identical two
+  buttons doing the identical job
 - Setting `currentPattern` rather than `CurrentPattern` in the tracker's constructor meant the
   song the application starts on never subscribed to its own pattern's changes: typing a note
   into it left the song looking saved. Every song opened afterwards went through the property and

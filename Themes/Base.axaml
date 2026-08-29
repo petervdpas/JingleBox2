@@ -19,6 +19,16 @@
   <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource Color.Accent}" />
   <SolidColorBrush x:Key="DangerBrush" Color="{DynamicResource Color.Danger}" />
 
+  <!-- Which page you are on, said in the accent colour. Three keys rather than one, because
+       Fluent has a colour for the selected tab, another for it under the pointer and a third
+       for it while the button is down, and it sets them inside the tab's own template where an
+       ordinary style on the TabItem cannot reach: setting only the first left the colour coming
+       off the page you are on the moment the mouse rested on it. There is nothing to feed back
+       about hovering somewhere you already are, so all three are the same. -->
+  <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="{DynamicResource Color.Accent}" />
+  <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOver" Color="{DynamicResource Color.Accent}" />
+  <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPressed" Color="{DynamicResource Color.Accent}" />
+
   <!-- ========= Make Fluent controls follow your theme ========= -->
   <!-- Backgrounds -->
   <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush"

@@ -14,11 +14,19 @@
   <Color x:Key="Color.TextPrimary">#0E0E0E</Color>
   <Color x:Key="Color.TextMuted">#4A5560</Color>
 
+  <!-- Blue, and Dark is the same blue lifted to where it reads on black. These two are the
+       plain pair, the ones somebody picks when they want no colour in particular, so they are
+       one theme in two lightnesses rather than two. They were blue against green for no reason
+       anybody wrote down, which the plain pair least of all can afford: the coloured themes
+       are each meant to be their own thing. -->
   <Color x:Key="Color.Accent">#0B6BFF</Color>
   <Color x:Key="Color.Danger">#B63E3E</Color>
-  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
-       and not a fault, which is why it is not the danger colour. -->
-  <Color x:Key="Color.Unsaved">#E08A3C</Color>
+  <!-- The button that puts your work on disc, while there is work to put there. Green
+       because it is the safe half of the pair and reads as go without being decoded. -->
+  <Color x:Key="Color.Save">#43A047</Color>
+  <!-- And the button that throws that same work away. Warm rather than alarming: it is
+       a caution and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Discard">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#0B6BFF</Color>
   <Color x:Key="SystemAccentColorLight1">#4A93FF</Color>

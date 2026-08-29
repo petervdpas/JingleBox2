@@ -21,9 +21,12 @@
        warning all the way up to the warning. -->
   <Color x:Key="Color.Accent">#A4E533</Color>
   <Color x:Key="Color.Danger">#E8563F</Color>
-  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
-       and not a fault, which is why it is not the danger colour. -->
-  <Color x:Key="Color.Unsaved">#E08A3C</Color>
+  <!-- The button that puts your work on disc, while there is work to put there. Green
+       because it is the safe half of the pair and reads as go without being decoded. -->
+  <Color x:Key="Color.Save">#43A047</Color>
+  <!-- And the button that throws that same work away. Warm rather than alarming: it is
+       a caution and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Discard">#E08A3C</Color>
 
   <Color x:Key="SystemAccentColor">#A4E533</Color>
   <Color x:Key="SystemAccentColorLight1">#C4F26A</Color>

@@ -490,17 +490,58 @@
             </Setter>
         </Style>
 
-        <!-- A button whose work is not on disc yet. It glows warm rather than wearing a star:
-             a star is a character somebody has to know the meaning of and it moves the button's
-             width as it comes and goes, where a colour is read without being decoded and from
-             across the room. Warm and not red, because unsaved work is a reminder rather than
-             a fault. -->
-        <Style Selector="Button.unsaved">
+        <!-- The two halves of having unsaved work, coloured rather than starred: a star is a
+             character somebody has to know the meaning of and it moves the button's width as it
+             comes and goes, where a colour is read without being decoded and from across the
+             room.
+
+             Green for the one that keeps the work and warm for the one that throws it away, so
+             the pair reads at a glance the way a light does. Both light up on the same fact,
+             that there is something on screen which is not on disc, and that is the whole
+             reason they are two colours and not one: the moment the safe button starts asking
+             to be pressed is the moment the other one starts being able to cost you an
+             afternoon. Warm and not red on the second, because cancelling is a decision
+             somebody takes on purpose and is asked about first, not a fault. -->
+        <!-- No underline under the page you are on. That is what Fluent draws and it reads as
+             a web page rather than as a piece of gear; the word itself carries the colour
+             instead, which is the three TabItemHeaderForegroundSelected keys in Base.axaml, so
+             nothing is lost and a line of pixels is not spent saying what a colour already
+             says.
+
+             The line stays on a strip that runs down the side, and that is not an
+             inconsistency: down a column the words are a list, the mark is at the head of the
+             row rather than under it, and it is what tells a selected row from a hovered one.
+             Which way a strip runs is the whole difference, so that is what this asks about
+             rather than a class somebody has to remember to put on. -->
+        <Style Selector="TabControl[TabStripPlacement=Top] > TabItem /template/ Border#PART_SelectedPipe">
+            <Setter Property="IsVisible" Value="False" />
+        </Style>
+
+        <!-- And in bold, because colour alone was not enough. On a light theme the accent and
+             the ordinary lettering are near enough in weight and darkness that the strip read
+             as six words with nothing chosen, which is worse than the underline was. Two
+             signals rather than one, and the second is the one that still works for somebody
+             who cannot tell the two colours apart. -->
+        <Style Selector="TabItem:selected">
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+
+        <Style Selector="Button.save">
             <Setter Property="Foreground">
-                <SolidColorBrush Color="{DynamicResource Color.Unsaved}" />
+                <SolidColorBrush Color="{DynamicResource Color.Save}" />
             </Setter>
             <Setter Property="BorderBrush">
-                <SolidColorBrush Color="{DynamicResource Color.Unsaved}" />
+                <SolidColorBrush Color="{DynamicResource Color.Save}" />
+            </Setter>
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <Style Selector="Button.discard">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Discard}" />
+            </Setter>
+            <Setter Property="BorderBrush">
+                <SolidColorBrush Color="{DynamicResource Color.Discard}" />
             </Setter>
             <Setter Property="BorderThickness" Value="1" />
         </Style>

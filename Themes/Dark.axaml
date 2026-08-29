@@ -14,14 +14,20 @@
   <Color x:Key="Color.TextPrimary">#FFFFFF</Color>
   <Color x:Key="Color.TextMuted">#A0A0A0</Color>
 
-  <Color x:Key="Color.Accent">#4CAF50</Color>
+  <!-- Light's blue, lifted to where it reads on black. See the note in Light.axaml: these two
+       are the plain pair and are one theme in two lightnesses, deeper on the light half and
+       brighter on the dark. -->
+  <Color x:Key="Color.Accent">#4A93FF</Color>
   <Color x:Key="Color.Danger">#B64A4A</Color>
-  <!-- Work that is not on disc yet. Warm rather than alarming: it is a reminder
-       and not a fault, which is why it is not the danger colour. -->
-  <Color x:Key="Color.Unsaved">#E08A3C</Color>
+  <!-- The button that puts your work on disc, while there is work to put there. Green
+       because it is the safe half of the pair and reads as go without being decoded. -->
+  <Color x:Key="Color.Save">#43A047</Color>
+  <!-- And the button that throws that same work away. Warm rather than alarming: it is
+       a caution and not a fault, which is why it is not the danger colour. -->
+  <Color x:Key="Color.Discard">#E08A3C</Color>
 
-  <Color x:Key="SystemAccentColor">#4CAF50</Color>
-  <Color x:Key="SystemAccentColorLight1">#6BDA70</Color>
-  <Color x:Key="SystemAccentColorDark1">#2E7D32</Color>
+  <Color x:Key="SystemAccentColor">#4A93FF</Color>
+  <Color x:Key="SystemAccentColorLight1">#7FB4FF</Color>
+  <Color x:Key="SystemAccentColorDark1">#0B6BFF</Color>
 
 </ResourceDictionary>
