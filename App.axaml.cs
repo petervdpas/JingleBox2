@@ -48,12 +48,104 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow
-            {
-                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://JingleBox2/Assets/icon.ico")))
-            };
+            var splash = new Views.SplashWindow();
+            splash.Show();
+
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+            var since = DateTime.UtcNow;
+
+            Dispatcher.UIThread.Post(() => Open(desktop, splash, since), DispatcherPriority.Background);
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Builds the one window, puts it up, and takes the splash down.
+    /// </summary>
+    /// <remarks>
+    /// Posted at <see cref="DispatcherPriority.Background"/> rather than called, and that is the
+    /// whole of what makes the splash worth having. Building the window is a long stretch of
+    /// work on the drawing thread, so called here it would run before the splash had been
+    /// painted once and the splash would appear as the window did: a flash, and a startup that
+    /// still looked like nothing was happening. Posted behind the frame that draws it, the
+    /// splash is up first and stays up for as long as the work takes.
+    ///
+    /// The splash is closed after the window is shown rather than before it is built. Closing
+    /// the last window is what ends the application, so the two overlap on purpose, and
+    /// <see cref="ShutdownMode.OnMainWindowClose"/> is set for the same reason: with it left on
+    /// the last window, a splash that closed a moment early would take the application with it.
+    ///
+    /// Anything thrown while the window is built takes the splash down before it goes up, so a
+    /// startup that fails is not a purple rectangle sitting there for ever. What it throws is
+    /// left alone: <c>Program.Main</c> writes it to startup.log, which is where a failure this
+    /// early is read.
+    /// </remarks>
+    /// <param name="desktop">The lifetime, which is told which window is the main one.</param>
+    /// <param name="splash">What is on screen until there is a window to replace it.</param>
+    /// <param name="since">When the splash went up, which is what the shortest stay is measured from.</param>
+    private static void Open(
+        IClassicDesktopStyleApplicationLifetime desktop, Views.SplashWindow splash, DateTime since)
+    {
+        MainWindow main;
+
+        try
+        {
+            splash.Doing("Reading your settings and machines");
+
+            main = new MainWindow
+            {
+                Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://JingleBox2/Assets/icon.ico")))
+            };
+
+            desktop.MainWindow = main;
+        }
+        catch (Exception)
+        {
+            splash.Close();
+            throw;
+        }
+
+        splash.Doing("Ready");
+
+        var left = SplashLeast - (DateTime.UtcNow - since);
+
+        if (left <= TimeSpan.Zero)
+        {
+            Swap(main, splash);
+            return;
+        }
+
+        DispatcherTimer.RunOnce(() => Swap(main, splash), left);
+    }
+
+    /// <summary>
+    /// The shortest the splash stays up, however quickly the application is ready.
+    /// </summary>
+    /// <remarks>
+    /// A floor and not a wait. The window is built while this runs, so on a machine that takes
+    /// longer than this the splash is gone the moment it is ready and nothing has been added to
+    /// the startup; it only costs anything on a machine fast enough that the splash would
+    /// otherwise be a flash.
+    ///
+    /// Which is the whole reason for it: a splash nobody can read is worse than none, since it
+    /// reads as the window having flickered. Long enough to be looked at rather than glimpsed.
+    /// </remarks>
+    private static readonly TimeSpan SplashLeast = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Puts the window up and takes the splash down, in that order.
+    /// </summary>
+    /// <remarks>
+    /// That order and not the other one. Closing the last window is what ends the application,
+    /// so the two are on screen together for an instant on purpose.
+    /// </remarks>
+    /// <param name="main">The window everything is in.</param>
+    /// <param name="splash">What has been standing in for it.</param>
+    private static void Swap(Window main, Window splash)
+    {
+        main.Show();
+        splash.Close();
     }
 }
