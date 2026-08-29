@@ -3,7 +3,7 @@
   "Name": "Zampler",
   "Summary": "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
   "Author": "Peter van de Pas",
-  "Version": "1.01",
+  "Version": "1.02",
   "Engine": "",
   "Theme": {
     "Accent": "#4E86D8",
@@ -678,7 +678,7 @@
                           "Properties": {
                             "span": "3",
                             "dial": "40",
-                            "tip": "How far the filter\u0027s own envelope moves the cutoff, up to six octaves."
+                            "tip": "How far the filter's own envelope moves the cutoff, up to six octaves."
                           },
                           "Children": []
                         }
@@ -826,6 +826,15 @@
               ]
             }
           ]
+        },
+        {
+          "Element": "Keys",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+          },
+          "Children": []
         }
       ]
     }

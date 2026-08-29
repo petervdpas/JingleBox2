@@ -3,7 +3,7 @@
   "Name": "OddSkilla",
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
-  "Version": "1.0",
+  "Version": "1.01",
   "Engine": "",
   "Theme": {
     "Accent": "#E2A03F",
@@ -547,6 +547,15 @@
               ]
             }
           ]
+        },
+        {
+          "Element": "Keys",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+          },
+          "Children": []
         }
       ]
     }
