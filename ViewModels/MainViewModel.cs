@@ -581,6 +581,63 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         }
     }
 
+    /// <summary>What this machine can be asked about scheduling, for the settings page.</summary>
+    private readonly Audio.Interfaces.IRealtimeThread _realtime = new Audio.RealtimeThread();
+
+    /// <summary>Whether this platform has an answer for real-time scheduling at all.</summary>
+    /// <remarks>
+    /// Windows has its own way of saying a thread is for audio and it is not written here yet, so
+    /// the switch is shown but cannot be moved there: a control that does nothing is worse than a
+    /// control that says why.
+    /// </remarks>
+    public bool RealtimeAvailable => _realtime.Possible;
+
+    /// <summary>
+    /// Whether the threads that must not be late are scheduled as audio threads.
+    /// </summary>
+    /// <remarks>
+    /// Written into the environment as well as the settings, because the other half that needs
+    /// the answer is in another process: a plugin host reads no settings of its own and inherits
+    /// this instead.
+    ///
+    /// The output is opened again, which is what makes it take effect on the mixing thread now.
+    /// A plugin already loaded keeps the scheduling it started with, since that is decided when
+    /// its process makes the thread; the next one loaded gets the new answer.
+    /// </remarks>
+    public bool RealtimeAudio
+    {
+        get => _cfg.RealtimeAudio;
+        set
+        {
+            if (_cfg.RealtimeAudio == value) return;
+
+            _cfg.RealtimeAudio = value;
+            _store.Save(_cfg);
+
+            Audio.RealtimeThread.Wants(value);
+
+            ApplyAudioSizes();
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(RealtimeHint));
+        }
+    }
+
+    /// <summary>What the switch means, said plainly enough to choose by.</summary>
+    public string RealtimeHint =>
+        !RealtimeAvailable
+            ? "Not on this system yet. Windows has its own way of saying a thread is for audio " +
+              "and this application does not use it, so there is nothing to switch on here."
+            : _cfg.RealtimeAudio
+                ? "The mixing thread and each plugin's own audio thread run ahead of everything " +
+                  "else on the machine, which is what every serious audio application here does. " +
+                  "The system may refuse it, in which case the log says so and nothing breaks. A " +
+                  "plugin already loaded keeps what it started with; the next one gets this."
+                : "The threads that must not be late take their turn like everything else, so a " +
+                  "browser laying out a page can delay the sound. Switch it on if plugins break " +
+                  "up, and listen: it is the one setting here that changes how the machine treats " +
+                  "this application rather than how much audio is held.";
+
     /// <summary>
     /// Puts the sizes on the running output, so a change is heard now rather than next time.
     /// </summary>

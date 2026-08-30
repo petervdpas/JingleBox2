@@ -714,7 +714,14 @@ public static class PluginHostProcess
     /// the plugin's own window needs. The whole block is measured rather than the first hundred
     /// samples: a block that starts quiet and ends loud is a note beginning, which is exactly
     /// the one worth seeing.
-    /// </remarks>
+    ///
+    /// **This thread asks for real-time scheduling too, and that is the whole point of it.** The
+    /// host sends a block and then waits for the answer before it can finish its own, so what is
+    /// really being waited on is a thread in another process getting its turn. Promoting only the
+    /// host's side buys nothing: the queue is here. Off unless <c>JB_REALTIME=1</c>, which the
+    /// host puts into the environment and this process inherits, since a plugin host reads no
+    /// settings of its own.
+    /// /// </remarks>
     /// <param name="audio">The socket the parent asks for blocks on.</param>
     /// <param name="asInstrument">
     /// Whether to ask the plugin to play something or to hand it the audio in the block. A
@@ -723,6 +730,12 @@ public static class PluginHostProcess
     /// <param name="maxFrames">The most frames one crossing carries, which sizes the buffer.</param>
     private static unsafe void Mix(Socket audio, bool asInstrument, int maxFrames)
     {
+        var scheduler = new JingleBox2.Audio.RealtimeThread();
+
+        scheduler.Take();
+
+        Say("the audio thread runs under " + scheduler.Said());
+
         var block = _block;
         var plugin = _plugin;
 

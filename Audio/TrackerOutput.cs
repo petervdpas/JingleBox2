@@ -386,9 +386,25 @@ public sealed class TrackerOutput : ITrackerOutput
     /// A full queue waits to be woken by whatever takes some, and looks anyway now and then in
     /// case a wake-up was missed. Each chunk goes into the ring in two runs rather than a sample
     /// at a time: the tail of it, then the head.
+    ///
+    /// **It asks for real-time scheduling from inside itself**, which is the only place it can:
+    /// what the operating system is being asked about is the calling thread. Asking anywhere the
+    /// sound library might be calling from is how the drawing thread once ended up under that
+    /// scheduler, with fourteen other threads inheriting it, since a new thread on this platform
+    /// takes the policy of the thread that made it. Off unless <c>JB_REALTIME=1</c>, and it may be
+    /// refused: a refusal is ordinary and is written down, because "the buffer has to be enormous
+    /// here" and "this machine will not grant real time" are the same fact and only one of them is
+    /// findable.
     /// </remarks>
     private void MixAhead()
     {
+        var scheduler = new RealtimeThread();
+
+        scheduler.Take();
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+            "the mixing thread runs under " + scheduler.Said());
+
         var mixer = Mixer;
 
         if (_aheadScratch.Length < AheadChunkFrames * Channels)

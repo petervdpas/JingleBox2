@@ -218,6 +218,17 @@
               </Grid>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OutputSizesHint}" />
+
+              <!-- The one setting here that changes how the machine treats this application
+                   rather than how much audio is held, so it stands apart from the three sizes
+                   above it. -->
+              <CheckBox Margin="0,6,0,0"
+                        Content="Real-time audio"
+                        IsChecked="{Binding RealtimeAudio}"
+                        IsEnabled="{Binding RealtimeAvailable}"
+                        ToolTip.Tip="Asks the system to schedule the mixing thread and each plugin's audio thread ahead of everything else." />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding RealtimeHint}" />
             </StackPanel>
           </Border>
 

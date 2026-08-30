@@ -152,6 +152,8 @@ public partial class MainWindow : Window
 
         var cfg = _store.LoadOrCreateDefault();
 
+        Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
+
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");

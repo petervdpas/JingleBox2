@@ -183,6 +183,24 @@ public sealed class AppConfig
     public string RecordInputDevice { get; set; } = "";
 
     /// <summary>
+    /// Whether the threads that must not be late are scheduled as audio threads.
+    /// </summary>
+    /// <remarks>
+    /// **Off, until it has been listened to on this machine.** It asks the operating system to
+    /// put a thread ahead of everything else running, which is what every serious audio
+    /// application on Linux does and is not a thing to switch on for somebody without their
+    /// hearing the difference.
+    ///
+    /// It reaches two threads: the one mixing ahead here, and the one inside each plugin's own
+    /// process. Both, because the mixer sends a plugin a block and then waits for the answer, so
+    /// promoting only this side leaves the wait exactly where it was.
+    ///
+    /// It needs permission the system gives per user and a machine not set up for audio will
+    /// refuse, which is ordinary and is written in the log rather than thrown.
+    /// </remarks>
+    public bool RealtimeAudio { get; set; }
+
+    /// <summary>
     /// How much audio the sound card holds ahead of what you hear, in frames.
     /// </summary>
     /// <remarks>
