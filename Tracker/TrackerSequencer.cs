@@ -152,7 +152,7 @@ public sealed class TrackerSequencer : ITrackerSequencer
         if (position.Line + 1 < pattern.Lines)
             return position with { Line = position.Line + 1 };
 
-        if (song.Loops(position.OrderIndex) && position.OrderIndex >= song.LoopLast)
+        if (song.InLoop(position.OrderIndex) && position.OrderIndex >= song.LoopLast)
             return new TrackerPosition(song.LoopFirst, 0);
 
         int nextOrder = position.OrderIndex + 1;

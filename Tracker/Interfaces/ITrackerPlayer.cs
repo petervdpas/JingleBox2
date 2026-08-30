@@ -229,6 +229,13 @@ public interface ITrackerPlayer : IDisposable
     void UseRenderAhead(int milliseconds);
 
     /// <summary>
+    /// How far ahead the output is buffered, in milliseconds. Say it before anything is played.
+    /// </summary>
+    /// <remarks>Passed straight through. See <see cref="Audio.Interfaces.ITrackerOutput.UseBuffer"/>.</remarks>
+    /// <param name="milliseconds">How much to hold. Clamped rather than refused.</param>
+    void UseBuffer(int milliseconds);
+
+    /// <summary>
     /// The chain of effects on a strip, made and put into the mix the first time it is asked
     /// for. A strip with nothing on it costs an empty chain, which does nothing per block.
     /// </summary>

@@ -107,7 +107,7 @@ public class VolumeScaleTests
 
         string said = SongStore.Copy(song);
 
-        Assert.Contains("\"Version\": 3", said);
+        Assert.Contains("\"Version\": 4", said);
 
         var back = SongStore.Uncopy(Aged(said));
 
@@ -152,5 +152,5 @@ public class VolumeScaleTests
     }
 
     /// <summary>The document as a build before the widening wrote it.</summary>
-    private static string Aged(string said) => said.Replace("\"Version\": 3", "\"Version\": 2");
+    private static string Aged(string said) => said.Replace("\"Version\": 4", "\"Version\": 2");
 }

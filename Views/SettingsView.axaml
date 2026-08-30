@@ -172,6 +172,27 @@
 
               <TextBlock Classes="cardHint" Text="{Binding EngineRateHint}" />
 
+              <!-- What the card keeps in hand, which is the latency. Under the rate because the
+                   two are read together: a buffer is milliseconds and a rate is what turns them
+                   into samples. Not the same question as the cushion below, which is about
+                   getting the mixing off the sound card's own thread. -->
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">
+                <TextBlock Grid.Column="0" Classes="label" Text="Output buffer:" />
+
+                <!-- A slider over the places on the list rather than over the sizes: the sizes
+                     double each step, so a slider over them would give the whole low half of
+                     the range a hair's width and the top two sizes most of the travel. -->
+                <Slider Grid.Column="1"
+                        Minimum="0" Maximum="{Binding OutputBufferSteps}"
+                        Value="{Binding OutputBufferStep}"
+                        TickFrequency="1" IsSnapToTickEnabled="True"
+                        TickPlacement="BottomRight"
+                        HorizontalAlignment="Left"
+                        MinWidth="260" />
+              </Grid>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OutputBufferHint}" />
+
               <!-- The trade is written under it rather than left to be discovered: tighter is
                    better until a plugin takes a moment longer than usual, and then it is worse. -->
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">

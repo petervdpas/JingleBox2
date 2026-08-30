@@ -1218,7 +1218,7 @@ public sealed class TrackMixer : ITrackMixer
     /// It was never meant to have two, and for almost all of a run it does not: either the sound
     /// card's own thread renders in step, or a thread of its own renders ahead into a queue, and
     /// which of those is happening is decided by one number. The window is the changeover.
-    /// <c>SynthOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread and
+    /// <c>TrackerOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread and
     /// then carries on regardless, which is right, since a plugin holding it up must not hang the
     /// application, but it leaves that thread still inside here while the sound card's own thread
     /// starts. Changing the output device, or the render-ahead setting, is exactly that moment.

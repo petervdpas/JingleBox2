@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker;
 
@@ -58,6 +59,25 @@ public sealed class Song
     public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
 
     /// <summary>
+    /// Whether this song plays the one pattern or works through the order.
+    /// </summary>
+    /// <remarks>
+    /// Part of the song rather than a preference, and it took being told twice to get right. It
+    /// looks like a thing about the desk, which is how it was first written; it is not. A song
+    /// that is finished plays as a song and a song being worked on loops the pattern in hand,
+    /// and which of those it is, is a fact about where the work has got to. Opening it tomorrow
+    /// should find it where it was left, and changing it should make the song want saving.
+    ///
+    /// Pattern by default, which is what a new song has always started as and what somebody
+    /// writing a first pattern wants.
+    ///
+    /// The loop switch beside it is the other way round and stays in the settings: whether the
+    /// thing you are listening to comes round again is about how you are working at this
+    /// moment, and a song handed to somebody else has no business setting it.
+    /// </remarks>
+    public TrackerPlayMode PlayMode { get; set; } = TrackerPlayMode.Pattern;
+
+    /// <summary>
     /// Which octave notes are typed and auditioned at, for this song.
     /// </summary>
     /// <remarks>
@@ -81,6 +101,23 @@ public sealed class Song
     /// <summary>The patterns themselves, which the order list points into by index.</summary>
     public List<Pattern> Patterns { get; set; } = new();
 
+    /// <summary>
+    /// What a pattern at that place in the song is called.
+    /// </summary>
+    /// <remarks>
+    /// Its own index, counted from nought, so a pattern's name and its place are the same
+    /// number. They were one apart: the order counts slots from 00 and patterns were named from
+    /// 01, so a fresh song read "slot 00 plays pattern 01" and the two columns of the order list
+    /// were permanently out of step for no reason anybody had chosen. Songs written on the old
+    /// naming are renumbered on the way in.
+    ///
+    /// It stays true because a pattern is never taken out of the list: removing a slot removes
+    /// the slot, and the patterns only ever grow, so no index ever shifts under a name.
+    /// </remarks>
+    /// <param name="index">Where the pattern sits in <see cref="Patterns"/>.</param>
+    public static string Named(int index) =>
+        Math.Max(0, index).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+
     /// <summary>Indexes into <see cref="Patterns"/>, in playing order.</summary>
     public List<int> Order { get; set; } = new();
 
@@ -102,6 +139,14 @@ public sealed class Song
     /// <summary>What either end of the loop range holds when there is no range at all.</summary>
     public const int NoLoop = -1;
 
+    /// <summary>The most slots one press of Play it again is allowed to add.</summary>
+    /// <remarks>
+    /// Sixteen, which is four four-bar phrases and past anything anybody chooses from a menu.
+    /// A bound rather than a policy: it is there so a number arriving from somewhere unexpected
+    /// cannot fill an order list with thousands of rows.
+    /// </remarks>
+    public const int MaxRepeats = 16;
+
     /// <summary>True when the order has a range marked on it.</summary>
     /// <remarks>
     /// Both ends have to be inside the order, so an order that has shrunk under a range leaves
@@ -120,8 +165,31 @@ public sealed class Song
     public int LoopLast => Math.Max(LoopFrom, LoopTo);
 
     /// <summary>Whether that slot is inside the range.</summary>
+    /// <remarks>
+    /// Named apart from <see cref="Looping"/> on purpose: one asks whether a particular slot is
+    /// marked, the other whether the song comes round at all, and two names a letter apart
+    /// would be read for each other for ever.
+    /// </remarks>
     /// <param name="slot">Where in the order.</param>
-    public bool Loops(int slot) => HasLoop && slot >= LoopFirst && slot <= LoopLast;
+    public bool InLoop(int slot) => HasLoop && slot >= LoopFirst && slot <= LoopLast;
+
+    /// <summary>
+    /// Whether the song comes round again when it reaches the end of what it is playing.
+    /// </summary>
+    /// <remarks>
+    /// What "the end" is depends on <see cref="PlayMode"/>: the end of the pattern when a
+    /// pattern is being looped, the end of the order when the song is playing. The two are one
+    /// question and belong in one place, which is why this is here rather than in the settings
+    /// where it started. A jingle that plays once and a part you go round while writing it are
+    /// different songs, not the same song on different days.
+    ///
+    /// True by default, and true in every song written before it was part of one: that is what
+    /// the transport did when nothing could set it.
+    ///
+    /// The loop range is a third thing again and answers before this does: marking a range is
+    /// saying "go round these" in as many words. See <see cref="SetLoop"/>.
+    /// </remarks>
+    public bool Looping { get; set; } = true;
 
     /// <summary>Marks a range over the order, or takes one off with <see cref="NoLoop"/>.</summary>
     /// <remarks>
@@ -276,7 +344,7 @@ public sealed class Song
     public static Song CreateDefault()
     {
         var song = new Song();
-        song.Patterns.Add(new Pattern(Pattern.DefaultLines, song.TrackCount) { Name = "01" });
+        song.Patterns.Add(new Pattern(Pattern.DefaultLines, song.TrackCount) { Name = Named(0) });
         song.Order.Add(0);
         return song;
     }
@@ -499,7 +567,7 @@ public sealed class Song
     {
         var pattern = new Pattern(lines, TrackCount)
         {
-            Name = (Patterns.Count + 1).ToString("00")
+            Name = Named(Patterns.Count)
         };
 
         EnsureNoteColumns();
@@ -529,7 +597,7 @@ public sealed class Song
         if (index < 0 || index >= Patterns.Count) return -1;
 
         var copy = Patterns[index].Clone();
-        copy.Name = (Patterns.Count + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+        copy.Name = Named(Patterns.Count);
 
         Patterns.Add(copy);
         return Patterns.Count - 1;

@@ -184,7 +184,39 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty] private int playingLine = -1;
 
     /// <summary>How many rows the pattern has, for a panel showing where its track is.</summary>
-    public int PatternLines => CurrentPattern?.Lines ?? 0;
+    /// <remarks>
+    /// This pattern's own, and settable. A song's patterns need not be the same length: the
+    /// model has always held the number per pattern and the sequencer has always read the
+    /// length of whichever one the slot plays, so a 32 line chorus after a 64 line verse worked
+    /// the day it was written. There was simply nowhere to type the number, and every pattern
+    /// was made at the default and stayed there.
+    ///
+    /// Shortening a pattern loses the lines off the end, which is an edit like any other and
+    /// undoes like one. The cursor is held inside what is left, or it would sit past the end of
+    /// the pattern it is in.
+    /// </remarks>
+    public int PatternLines
+    {
+        get => CurrentPattern?.Lines ?? 0;
+        set
+        {
+            if (CurrentPattern is not { } pattern) return;
+
+            int lines = Math.Clamp(value, Pattern.MinLines, Pattern.MaxLines);
+            if (lines == pattern.Lines) return;
+
+            Changing("a pattern's length");
+
+            pattern.Resize(lines);
+
+            Cursor = Cursor.Clamp(pattern.Lines, Song.TrackCount, new NoteColumns(pattern.ColumnCounts()));
+
+            OnPropertyChanged();
+            MarkDirty();
+
+            Status = $"Pattern {pattern.Name} is {lines} line(s) long";
+        }
+    }
 
     /// <summary>
     /// What is coming, and what has just been, shown dimmed above and below the pattern being
@@ -221,23 +253,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     {
         OnPropertyChanged(nameof(PatternBefore));
         OnPropertyChanged(nameof(PatternAfter));
-    }
-
-    /// <summary>In pattern mode nothing is coming but this pattern again, so both go blank.</summary>
-    /// <summary>
-    /// Tells the transport as well as the page, so a pass already running answers it.
-    /// </summary>
-    /// <remarks>
-    /// It only moved the ghosted neighbours before, which is the drawing half. The pass took its
-    /// mode when it started and kept it, so switching to Song while a pattern was looping did
-    /// nothing at all until the transport was stopped and started again. From the outside that
-    /// is a song that will not move on.
-    /// </remarks>
-    partial void OnPlayModeChanged(TrackerPlayMode value)
-    {
-        _player.Mode = value;
-
-        NeighboursMoved();
     }
 
     /// <summary>
@@ -654,7 +669,36 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     }
 
     /// <summary>Pattern by default: most editing is done against a single looping pattern.</summary>
-    [ObservableProperty] private TrackerPlayMode playMode = TrackerPlayMode.Pattern;
+    /// <summary>
+    /// Whether this song plays its order or loops the one pattern, which is the song's own.
+    /// </summary>
+    /// <remarks>
+    /// A song setting like the tempo, not a preference like the loop switch beside it, so
+    /// changing it is an edit: undoable, and it makes the song want saving. A song that is
+    /// finished plays as a song and one being worked on loops the pattern in hand, and which of
+    /// those it is, is a fact about where the work has got to rather than about the desk.
+    ///
+    /// The transport is told at once, so a pass already running answers it at the end of the
+    /// pattern rather than at the end of the pass.
+    /// </remarks>
+    public TrackerPlayMode PlayMode
+    {
+        get => Song.PlayMode;
+        set
+        {
+            if (Song.PlayMode == value) return;
+
+            Changing("the play mode");
+
+            Song.PlayMode = value;
+            _player.Mode = value;
+
+            OnPropertyChanged();
+            MarkDirty();
+
+            NeighboursMoved();
+        }
+    }
 
     /// <summary>
     /// The octave notes are typed and auditioned at, which is the song's and not the view's.
@@ -868,9 +912,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         ignoreVelocity = config?.IgnoreKeyVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
-        loopPlayback = config?.LoopPlayback ?? true;
 
-        _player = new TrackerPlayer(audio, machines) { Loop = loopPlayback };
+        _player = new TrackerPlayer(audio, machines);
 
         Automation = new AutomationRecorder(
             () => Song,
@@ -899,8 +942,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
 
-        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
+        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
         _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
+        _player.UseBuffer(config?.OutputBufferFrames ?? Audio.TrackerOutput.DefaultBufferFrames);
         _store = new SongStore();
         _rack = rack;
         _recordings = recordings;
@@ -1086,7 +1130,17 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     public IRelayCommand CopyPatternCommand => new RelayCommand(CopyPattern);
 
     /// <summary>Plays this slot's pattern again, in a slot of its own after it.</summary>
-    public IRelayCommand RepeatPatternCommand => new RelayCommand(RepeatPattern);
+    public IRelayCommand<int> RepeatPatternCommand => new RelayCommand<int>(RepeatPattern);
+
+    /// <summary>
+    /// How many more times the menu offers to play a pattern.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than a number to type, because repeating a part is a musical decision
+    /// with about four answers: again, a pair, a four bar phrase, eight. Anything else is a
+    /// second visit to the menu, which is cheaper than a dialog for the case nobody has.
+    /// </remarks>
+    public int[] RepeatCounts { get; } = { 1, 2, 4, 8, 16 };
 
     /// <summary>Points the picked slot at another pattern, named by its place in the song.</summary>
     public IRelayCommand<int> PlayPatternCommand => new RelayCommand<int>(PlayPattern);
@@ -1975,32 +2029,33 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <remarks>
     /// What "the end" is depends on the picker beside it: the end of the pattern in Pattern
     /// mode, the end of the order in Song mode. Off, playing a song is a play-through that stops
-    /// on its own, which is what you want when you are listening to the whole thing rather than
-    /// working on a part of it.
+    /// on its own, which is what you want for a jingle and what you never want while writing a
+    /// part.
+    ///
+    /// The song's own, like the mode, and for the same reason: the two are one question and
+    /// splitting them across a song and a settings file would be one question answered in two
+    /// places. It started in the settings and that was wrong. A song that plays once and a song
+    /// you go round are different songs, not the same song on different days.
     /// </remarks>
-    [ObservableProperty] private bool loopPlayback = true;
-
-    /// <summary>
-    /// Tells the transport at once, so a pass already running answers it.
-    /// </summary>
-    /// <remarks>
-    /// Live, the same as the mode beside it: the clock reads the flag when it works out where to
-    /// go next, so switching it while a pattern is looping is answered at the end of that
-    /// pattern rather than at the end of the pass. Being made to stop and start again to be
-    /// believed is what made the mode picker look broken.
-    /// </remarks>
-    partial void OnLoopPlaybackChanged(bool value)
+    public bool LoopPlayback
     {
-        _player.Loop = value;
+        get => Song.Looping;
+        set
+        {
+            if (Song.Looping == value) return;
 
-        Status = value
-            ? "Looping: it comes round again at the end"
-            : "Not looping: it plays to the end and stops";
+            Changing("looping");
 
-        if (_configStore == null || _config == null) return;
+            Song.Looping = value;
+            _player.Loop = value;
 
-        _config.LoopPlayback = value;
-        _configStore.Save(_config);
+            OnPropertyChanged();
+            MarkDirty();
+
+            Status = value
+                ? "Looping: it comes round again at the end"
+                : "Not looping: it plays to the end and stops";
+        }
     }
 
     /// <summary>
@@ -3092,23 +3147,37 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Renoise offers both from the same button, a copy on the left and a repeat on the right,
     /// which is a distinction nobody can see. Two commands here, since the difference between
     /// them is the whole question: one of them makes a pattern and one of them does not.
+    ///
+    /// And it takes a count, because repeating a part is almost never once: a phrase is four or
+    /// eight bars and asking for it one slot at a time is the same gesture four times. Real
+    /// slots rather than a number on one slot saying how often it goes round, so a run reads
+    /// down the list as a run, the loop range can be drawn across part of it, and the playhead
+    /// has somewhere to be while it is on the third time through.
     /// </remarks>
-    private void RepeatPattern()
+    /// <param name="times">How many more slots to add. One when the menu says nothing.</param>
+    private void RepeatPattern(int times)
     {
         if (Song.Order.Count == 0) return;
+
+        int more = Math.Clamp(times <= 0 ? 1 : times, 1, Song.MaxRepeats);
 
         Changing("repeating a pattern");
 
         int at = Math.Clamp(OrderIndex, 0, Song.Order.Count - 1);
+        int pattern = Song.Order[at];
 
-        Song.Order.Insert(at + 1, Song.Order[at]);
+        for (int i = 0; i < more; i++) Song.Order.Insert(at + 1 + i, pattern);
 
         RefreshOrder();
         MarkDirty();
 
-        OrderIndex = at + 1;
+        OrderIndex = at + more;
 
-        Status = $"Pattern {Song.PatternAt(at)?.Name} plays again at slot {OrderIndex:00}";
+        string name = Song.Patterns.Count > pattern ? Song.Patterns[pattern].Name : "--";
+
+        Status = more == 1
+            ? $"Pattern {name} plays again at slot {OrderIndex:00}"
+            : $"Pattern {name} plays {more + 1} times, slots {at:00} to {OrderIndex:00}";
     }
 
     /// <summary>What patterns a slot could be pointed at, for the menu that offers them.</summary>
@@ -3329,7 +3398,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         for (int i = 0; i < Song.Order.Count; i++)
         {
             var pattern = Song.PatternAt(i);
-            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.Loops(i)));
+            OrderEntries.Add(new OrderSlot(i, pattern?.Name ?? "--", Song.InLoop(i)));
         }
 
         OrderIndex = OrderEntries.Count == 0 ? -1 : Math.Clamp(wanted, 0, OrderEntries.Count - 1);
@@ -3807,8 +3876,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Drop();
 
+        _player.Mode = Song.PlayMode;
+        _player.Loop = Song.Looping;
+
         OnPropertyChanged(nameof(Bpm));
         OnPropertyChanged(nameof(LinesPerBeat));
+        OnPropertyChanged(nameof(LoopPlayback));
+        OnPropertyChanged(nameof(PlayMode));
         OnPropertyChanged(nameof(QuantizeChoices));
         OnPropertyChanged(nameof(TrackCount));
     }

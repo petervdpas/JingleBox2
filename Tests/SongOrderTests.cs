@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using JingleBox2.Tracker;
+using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
 using Xunit;
 
@@ -327,8 +328,8 @@ public class SongOrderTests
         Assert.True(song.HasLoop);
         Assert.Equal(1, song.LoopFirst);
         Assert.Equal(3, song.LoopLast);
-        Assert.True(song.Loops(2));
-        Assert.False(song.Loops(0));
+        Assert.True(song.InLoop(2));
+        Assert.False(song.InLoop(0));
     }
 
     /// <summary>A range drawn past the end is a range to the end, which is what the hand meant.</summary>
@@ -353,7 +354,7 @@ public class SongOrderTests
         song.SetLoop(Song.NoLoop, Song.NoLoop);
 
         Assert.False(song.HasLoop);
-        Assert.False(song.Loops(1));
+        Assert.False(song.InLoop(1));
 
         int last = song.Patterns[0].Lines - 1;
 
@@ -375,7 +376,7 @@ public class SongOrderTests
         song.Order.RemoveAt(2);
 
         Assert.False(song.HasLoop);
-        Assert.False(song.Loops(1));
+        Assert.False(song.InLoop(1));
     }
 
     /// <summary>The range travels in the song file, since it is about the music and not the desk.</summary>
@@ -406,6 +407,184 @@ public class SongOrderTests
         var back = SongStore.Uncopy(written)!;
 
         Assert.False(back.HasLoop);
+    }
+
+    /// <summary>
+    /// A pattern is named after its own place in the song, so the two columns of the order list
+    /// are the same number rather than one apart.
+    /// </summary>
+    [Fact]
+    public void A_pattern_is_named_after_its_own_place()
+    {
+        var song = Song.CreateDefault();
+
+        Assert.Equal("00", song.Patterns[0].Name);
+
+        int added = song.AddPattern();
+        Assert.Equal("01", song.Patterns[added].Name);
+
+        int copy = song.ClonePattern(0);
+        Assert.Equal("02", song.Patterns[copy].Name);
+
+        for (int at = 0; at < song.Patterns.Count; at++)
+            Assert.Equal(Song.Named(at), song.Patterns[at].Name);
+    }
+
+    /// <summary>
+    /// And a song written on the old naming is renumbered on the way in, every pattern of it,
+    /// including one that has fallen out of the order and could be pointed back at.
+    /// </summary>
+    [Fact]
+    public void An_old_song_is_renumbered_when_it_is_read()
+    {
+        var song = Four();
+
+        song.Order.RemoveAt(3);
+
+        string written = SongStore.Copy(song)
+            .Replace("\"Version\": 4", "\"Version\": 3")
+            .Replace("\"Name\": \"00\"", "\"Name\": \"01\"");
+
+        var back = SongStore.Uncopy(written)!;
+
+        for (int at = 0; at < back.Patterns.Count; at++)
+            Assert.Equal(Song.Named(at), back.Patterns[at].Name);
+    }
+
+    /// <summary>
+    /// Play it again with a count puts that many slots in, all on the one pattern, and leaves
+    /// the cursor on the last of them.
+    /// </summary>
+    [Fact]
+    public void Repeating_a_pattern_adds_real_slots()
+    {
+        var song = Four();
+
+        int pattern = song.Order[1];
+
+        for (int i = 0; i < 3; i++) song.Order.Insert(2 + i, pattern);
+
+        Assert.Equal(7, song.Order.Count);
+        Assert.All(new[] { 1, 2, 3, 4 }, slot => Assert.Equal(pattern, song.Order[slot]));
+        Assert.NotEqual(pattern, song.Order[5]);
+    }
+
+    /// <summary>
+    /// A song's patterns need not be the same length, and the walk reads whichever one the slot
+    /// it is on plays rather than one number for the song.
+    /// </summary>
+    [Fact]
+    public void Patterns_in_one_song_may_be_different_lengths()
+    {
+        var song = Four();
+
+        song.Patterns[song.Order[0]].Resize(4);
+        song.Patterns[song.Order[1]].Resize(2);
+
+        var walk = new System.Collections.Generic.List<string>();
+        var at = TrackerPosition.Start;
+
+        for (int step = 0; step < 8; step++)
+        {
+            walk.Add($"{at.OrderIndex}:{at.Line}");
+
+            var next = TrackerSequencer.Advance(song, at, loop: false);
+            if (next == null) break;
+
+            at = next.Value;
+        }
+
+        Assert.Equal(
+            new[] { "0:0", "0:1", "0:2", "0:3", "1:0", "1:1", "2:0", "2:1" },
+            walk.Take(8).ToArray());
+    }
+
+    /// <summary>And each length is written down and read back with its own pattern.</summary>
+    [Fact]
+    public void Each_length_travels_with_its_own_pattern()
+    {
+        var song = Four();
+
+        song.Patterns[0].Resize(16);
+        song.Patterns[1].Resize(48);
+
+        var back = SongStore.Uncopy(SongStore.Copy(song))!;
+
+        Assert.Equal(16, back.Patterns[0].Lines);
+        Assert.Equal(48, back.Patterns[1].Lines);
+    }
+
+    /// <summary>
+    /// Which way the song plays is the song's own, so it comes back with the song rather than
+    /// with whatever the desk was last set to.
+    /// </summary>
+    [Fact]
+    public void The_play_mode_travels_with_the_song()
+    {
+        var song = Four();
+
+        Assert.Equal(TrackerPlayMode.Pattern, song.PlayMode);
+
+        song.PlayMode = TrackerPlayMode.Song;
+
+        var back = SongStore.Uncopy(SongStore.Copy(song))!;
+
+        Assert.Equal(TrackerPlayMode.Song, back.PlayMode);
+    }
+
+    /// <summary>And a song written before it was part of one opens as Pattern, as it always did.</summary>
+    [Fact]
+    public void A_song_that_never_heard_of_the_mode_opens_on_pattern()
+    {
+        var song = Four();
+
+        song.PlayMode = TrackerPlayMode.Song;
+
+        string written = string.Join(
+            Environment.NewLine,
+            SongStore.Copy(song).Split('\n').Where(line => !line.Contains("PlayMode")));
+
+        var back = SongStore.Uncopy(written)!;
+
+        Assert.Equal(TrackerPlayMode.Pattern, back.PlayMode);
+    }
+
+    /// <summary>
+    /// Whether the song comes round is the song's own too, so the mode and the loop are one
+    /// question answered in one place.
+    /// </summary>
+    [Fact]
+    public void Looping_travels_with_the_song()
+    {
+        var song = Four();
+
+        Assert.True(song.Looping);
+
+        song.Looping = false;
+
+        var back = SongStore.Uncopy(SongStore.Copy(song))!;
+
+        Assert.False(back.Looping);
+    }
+
+    /// <summary>
+    /// And a song written before it was part of one comes round, which is what the transport
+    /// did when nothing could set it.
+    /// </summary>
+    [Fact]
+    public void A_song_that_never_heard_of_looping_comes_round()
+    {
+        var song = Four();
+
+        song.Looping = false;
+
+        string written = string.Join(
+            Environment.NewLine,
+            SongStore.Copy(song).Split('\n').Where(line => !line.Contains("Looping")));
+
+        var back = SongStore.Uncopy(written)!;
+
+        Assert.True(back.Looping);
     }
 
     /// <summary>Four slots, each on its own pattern, for the range tests to mark up.</summary>

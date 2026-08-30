@@ -33,7 +33,7 @@ namespace JingleBox2.Tests;
 ///
 /// Two threads is not a hypothetical. The sound card's own thread renders in step and a thread
 /// of its own renders ahead into a queue, never both, except while one is being swapped for the
-/// other: <c>SynthOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread
+/// other: <c>TrackerOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread
 /// and then carries on regardless, rightly, since a plugin holding it up must not hang the
 /// application. Changing the output device or the render-ahead setting is that moment.
 /// </remarks>

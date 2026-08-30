@@ -139,20 +139,35 @@ public sealed class AppConfig
     public bool IgnoreKeyVelocity { get; set; }
 
     /// <summary>
-    /// Whether the transport comes round again when it reaches the end of what it is playing.
+    /// How much the output stream holds, in frames.
     /// </summary>
     /// <remarks>
-    /// On, which is what it has always done: the flag existed on the player from the beginning
-    /// and nothing ever set it, so a song played round for ever and a pattern looped, and
-    /// neither was a decision anybody had made. What it decides is the end of a pattern in
-    /// Pattern mode and the end of the order in Song mode, so switched off, playing a song is a
-    /// play-through that stops on its own.
+    /// The latency knob, and the one that decides how long a key waits before it sounds: what
+    /// the sound card is playing is whatever was mixed this long ago.
     ///
-    /// A preference rather than part of the song, the same as the two above it. It is about how
-    /// you are working at this moment rather than about what the music is, and a song handed to
-    /// somebody else has no business telling their transport what to do.
+    /// In frames rather than milliseconds because that is what every other piece of music
+    /// software calls it and what anybody comparing this with their interface will look for.
+    /// The milliseconds follow from the rate and are shown beside it, since 512 frames is 11.6
+    /// ms at 44100 and 10.7 at 48000, and the wait is the part that matters.
+    ///
+    /// It is not the same question as the plugin cushion. The cushion moves the mixing off the
+    /// sound card's own thread and costs its own milliseconds on top of these; this is how much
+    /// finished audio the card keeps in hand. Shortening it tightens the feel of playing notes
+    /// in and gives everything less room to be late; lengthening it is the first thing to try
+    /// when the sound breaks up.
     /// </remarks>
-    public bool LoopPlayback { get; set; } = true;
+    public int OutputBufferFrames { get; set; } = DefaultOutputBufferFrames;
+
+    /// <summary>
+    /// What it holds when nobody has chosen: 2048 frames, about 46 ms at 44100.
+    /// </summary>
+    /// <remarks>
+    /// The safe end of the usual range rather than the tight end, since a default that breaks
+    /// up on somebody's machine is worse than one that is a few milliseconds slower than it
+    /// could be. It was sixty milliseconds as a constant nobody could reach, so this is a little
+    /// tighter than the program has always been rather than a lot.
+    /// </remarks>
+    public const int DefaultOutputBufferFrames = 2048;
 
     /// <summary>
     /// Whether letting a key go writes a note-off into the pattern.
@@ -206,7 +221,7 @@ public sealed class AppConfig
     /// not earn its cost. What made a cushion look necessary was timing the mixing against the
     /// length of a block, eleven and a half milliseconds, as though a block late by one were a
     /// hole in the output. It is not: the stream is buffered sixty milliseconds ahead
-    /// (<c>SynthOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
+    /// (<c>TrackerOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
     /// longer than its own length is absorbed. Measured on the real output with a thread
     /// allocating hard enough to pause the process for a quarter of its wall time, thirty-two
     /// voices of synths, of recordings and of both: the sound card went without nothing, with
@@ -218,7 +233,7 @@ public sealed class AppConfig
     /// another process, and that is the case worth turning it on for, which is what the words
     /// in SETTINGS say.
     ///
-    /// See <c>JingleBox2.Audio.SynthOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
+    /// See <c>JingleBox2.Audio.TrackerOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
     /// what the thread it starts is allowed to touch.
     /// </remarks>
     public int RenderAheadMs { get; set; }

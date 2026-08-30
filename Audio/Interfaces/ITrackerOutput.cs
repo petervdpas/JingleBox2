@@ -7,6 +7,16 @@ namespace JingleBox2.Audio.Interfaces;
 /// the mixer.
 /// </summary>
 /// <remarks>
+/// It was called SynthOutput, which was true when the tracker was synth voices and nothing else
+/// and said the wrong thing about the one stream the whole song leaves through. What crosses it
+/// is every voice there is: synth patches, recordings, kits, and plugins in processes of their
+/// own, summed by <see cref="Tracker.Synth.Interfaces.ITrackMixer"/> and through the master.
+/// The mixer had the same name and was renamed for the same reason.
+///
+/// The pads are the one thing that does not come through here: each of those is a stream of its
+/// own on the sound library, which is what lets one be started and stopped without the song
+/// noticing. Recordings written to disc do not either; that is RECORD's own path.
+///
 /// One stream for the whole song rather than a channel per note, because the voices are generated
 /// here and summing them in managed code is cheaper than handing the sound library dozens of
 /// channels to keep in step.
@@ -33,7 +43,7 @@ namespace JingleBox2.Audio.Interfaces;
 /// Everything else here is the drawing thread: opening a device, choosing how far ahead to run,
 /// and disposing.
 /// </remarks>
-public interface ISynthOutput : IDisposable
+public interface ITrackerOutput : IDisposable
 {
     /// <summary>What the engine is running at.</summary>
     int SampleRate { get; }
@@ -64,7 +74,7 @@ public interface ISynthOutput : IDisposable
     long Underruns { get; }
 
     /// <summary>
-    /// Asks for a rate, or for the device's own with <see cref="SynthOutput.FollowDevice"/>.
+    /// Asks for a rate, or for the device's own with <see cref="TrackerOutput.FollowDevice"/>.
     /// </summary>
     /// <remarks>
     /// Only heard before the mixer is built, which is why it comes from the settings at startup.
@@ -97,6 +107,22 @@ public interface ISynthOutput : IDisposable
     /// </remarks>
     /// <param name="audio">The engine that owns the device, opened first if it is not.</param>
     void EnsureStarted(IAudioEngine audio);
+
+    /// <summary>
+    /// How far ahead the stream is buffered, in milliseconds. Say it before it is opened.
+    /// </summary>
+    /// <remarks>
+    /// The latency: what the card is playing is what was mixed this long ago, so it is how long
+    /// a key waits before it sounds. Not the same question as the render-ahead cushion, which
+    /// moves the mixing off the sound card's thread and costs its own milliseconds on top of
+    /// these; this is how much finished audio the card keeps in hand.
+    ///
+    /// Held between what BASS can usefully keep and what stops being worth having. The rate at
+    /// which the buffer is topped up follows from it rather than being asked for separately: a
+    /// period that cannot keep up with the buffer is a dropout with no other explanation.
+    /// </remarks>
+    /// <param name="milliseconds">How much to hold. Clamped rather than refused.</param>
+    void UseBuffer(int milliseconds);
 
     /// <summary>Silences the voices. The stream stays open, ready for the next note.</summary>
     void Silence();

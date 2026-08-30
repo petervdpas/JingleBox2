@@ -166,8 +166,26 @@ public sealed class SongStore : ISongStore
     /// <inheritdoc/>
     public IReadOnlyList<SongFile> ListSongs() =>
         List()
-            .Select(path => new SongFile(Path.GetFileNameWithoutExtension(path), path, DescriptionIn(path)))
+            .Select(path => new SongFile(
+                Path.GetFileNameWithoutExtension(path), path, DescriptionIn(path), SavedAt(path)))
             .ToArray();
+
+    /// <summary>
+    /// When a song was last written, by the file's own clock.
+    /// </summary>
+    /// <remarks>
+    /// The file rather than anything inside it. A song does not record when it was saved and
+    /// should not have to: the thing that knows is the file system, it is right even for a song
+    /// copied in from somewhere, and it costs no reading of the file at all.
+    ///
+    /// A file that will not answer has no date rather than a made-up one, the same bargain the
+    /// description makes: this is a list to read, not the load that has to report a broken file.
+    /// </remarks>
+    private static DateTime SavedAt(string path)
+    {
+        try { return File.GetLastWriteTime(path); }
+        catch (Exception) { return default; }
+    }
 
     /// <summary>
     /// What one song says about itself, without loading the song.
@@ -615,13 +633,13 @@ public sealed class SongStore : ISongStore
     private sealed class SongDocument
     {
         /// <summary>
-        /// What this build writes: 3 since the volume column was widened to 0x80.
+        /// What this build writes: 4 since patterns were named from nought.
         /// </summary>
         /// <remarks>
-        /// 2 was the patches moving out of the document and into the container, and 1 is every
-        /// song written before either.
+        /// 3 was the volume column widening to 0x80, 2 was the patches moving out of the
+        /// document and into the container, and 1 is every song written before any of it.
         /// </remarks>
-        public const int Current = 3;
+        public const int Current = 4;
 
         /// <summary>
         /// What wrote the song being read, which decides what its numbers mean.
@@ -636,6 +654,24 @@ public sealed class SongStore : ISongStore
         public string Description { get; set; } = "";
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
+
+        /// <summary>
+        /// Whether the song plays its order or loops one pattern. See <see cref="Song.PlayMode"/>.
+        /// </summary>
+        /// <remarks>
+        /// Absent in a song written before it was part of one, which reads back as Pattern and
+        /// is what every one of those songs opened as.
+        /// </remarks>
+        public TrackerPlayMode PlayMode { get; set; } = TrackerPlayMode.Pattern;
+
+        /// <summary>
+        /// Whether the song comes round at the end. See <see cref="Song.Looping"/>.
+        /// </summary>
+        /// <remarks>
+        /// True when the file does not say, which is what the transport did before anything
+        /// could set it, so an older song plays exactly as it did.
+        /// </remarks>
+        public bool Looping { get; set; } = true;
         public int KeyboardOctave { get; set; } = 4;
         public int TrackCount { get; set; } = Song.DefaultTrackCount;
 
@@ -687,6 +723,8 @@ public sealed class SongStore : ISongStore
             Description = song.Description,
             Bpm = song.Bpm,
             LinesPerBeat = song.LinesPerBeat,
+            PlayMode = song.PlayMode,
+            Looping = song.Looping,
             KeyboardOctave = song.KeyboardOctave,
             TrackCount = song.TrackCount,
             NoteColumns = new List<int>(song.NoteColumns),
@@ -700,6 +738,25 @@ public sealed class SongStore : ISongStore
             Instruments = song.Instruments.Select(Written).ToList(),
             Patterns = song.Patterns.Select(PatternDocument.From).ToList()
         };
+
+        /// <summary>
+        /// Names every pattern after its own place in the song.
+        /// </summary>
+        /// <remarks>
+        /// They were named from one while the order counts slots from nought, so the two columns
+        /// of the order list were permanently one apart and a fresh song read "slot 00 plays
+        /// pattern 01". Nothing looks a pattern up by name, so renaming them all costs nothing
+        /// and cannot break a song: the order holds indexes and always did.
+        ///
+        /// Every pattern, not only the ones the order plays, since one that has fallen out of
+        /// the order can be pointed back at and would otherwise come back wearing the old
+        /// numbering.
+        /// </remarks>
+        private static void Renumber(Song song)
+        {
+            for (int at = 0; at < song.Patterns.Count; at++)
+                song.Patterns[at].Name = Song.Named(at);
+        }
 
         /// <summary>One instrument as the file should hold it: a copy, with portable paths.</summary>
         private static TrackerInstrument Written(TrackerInstrument instrument)
@@ -796,6 +853,8 @@ public sealed class SongStore : ISongStore
                 Description = Description,
                 Bpm = Bpm,
                 LinesPerBeat = LinesPerBeat,
+                PlayMode = PlayMode,
+                Looping = Looping,
                 KeyboardOctave = KeyboardOctave,
                 TrackCount = TrackCount,
                 NoteColumns = new List<int>(NoteColumns),
@@ -811,7 +870,9 @@ public sealed class SongStore : ISongStore
 
             song.Patterns = Patterns.Select(p => p.ToPattern(TrackCount, NoteColumns)).ToList();
 
-            if (Version < Current) Volumes.Widen(song);
+            if (Version < 3) Volumes.Widen(song);
+
+            if (Version < 4) Renumber(song);
 
             return song;
         }

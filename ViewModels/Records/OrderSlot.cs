@@ -11,8 +11,17 @@ namespace JingleBox2.ViewModels.Records;
 /// <param name="Loops">Whether this slot is inside the loop range.</param>
 public sealed record OrderSlot(int Slot, string Pattern, bool Loops)
 {
-    /// <summary>The slot and its pattern, as the list has always printed them.</summary>
-    public string Text => $"{Slot:00}   {Pattern}";
+    /// <summary>Where in the order, as two digits.</summary>
+    /// <remarks>
+    /// Its own property rather than formatted in the view, so the two numbers on a row are
+    /// written the same way in one place. They are two different things and are drawn as two
+    /// cells: where you are in the song, and which pattern is there.
+    /// </remarks>
+    public string Place => Slot.ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Both numbers, for anything that wants the row as one string.</summary>
+    /// <remarks>What the picture in the hand shows while a slot is being dragged.</remarks>
+    public string Text => Place + "   " + Pattern;
 
     /// <summary>The text, which is what a list with no template shows.</summary>
     public override string ToString() => Text;

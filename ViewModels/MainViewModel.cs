@@ -467,7 +467,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// </summary>
     public static (int Rate, string Label)[] EngineRates { get; } =
     {
-        (Audio.SynthOutput.FollowDevice, "Follow the output device"),
+        (Audio.TrackerOutput.FollowDevice, "Follow the output device"),
         (44100, "44100 Hz"),
         (48000, "48000 Hz"),
         (96000, "96000 Hz")
@@ -673,6 +673,70 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
               new Files.AppFolder().Path() + ".";
 
     /// <summary>What is actually running, as against what has been asked for.</summary>
+    /// <summary>
+    /// The buffer sizes offered, in frames, which is what every other piece of music software
+    /// calls this and what somebody comparing it with their interface will look for.
+    /// </summary>
+    /// <remarks>
+    /// Powers of two, because that is the set every driver and every other program offers and a
+    /// number between two of them buys nothing.
+    /// </remarks>
+    public static int[] BufferSizes { get; } = { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
+
+    /// <summary>Where the slider is, which is a place in the list rather than a size.</summary>
+    /// <remarks>
+    /// A slider over the places rather than over the sizes, so every step is one stop along:
+    /// over the sizes the low half of the range would be a hair's width and the top half most
+    /// of the travel. A setting holding something not on the list lands on the nearest.
+    /// </remarks>
+    public double OutputBufferStep
+    {
+        get
+        {
+            int best = 0;
+
+            for (int at = 1; at < BufferSizes.Length; at++)
+            {
+                if (Math.Abs(BufferSizes[at] - _cfg.OutputBufferFrames) <
+                    Math.Abs(BufferSizes[best] - _cfg.OutputBufferFrames)) best = at;
+            }
+
+            return best;
+        }
+        set
+        {
+            int at = Math.Clamp((int)Math.Round(value), 0, BufferSizes.Length - 1);
+
+            if (_cfg.OutputBufferFrames == BufferSizes[at]) return;
+
+            _cfg.OutputBufferFrames = BufferSizes[at];
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(OutputBufferHint));
+        }
+    }
+
+    /// <summary>The last place on the slider, so the view need not know how many there are.</summary>
+    public double OutputBufferSteps => BufferSizes.Length - 1;
+
+    /// <summary>
+    /// What the buffer comes to, in the two units that matter: frames chosen, milliseconds felt.
+    /// </summary>
+    /// <remarks>
+    /// The milliseconds at the rate the engine is actually running, not at the one asked for,
+    /// since following the device means the two can differ and the wait is a fact about what is
+    /// running.
+    /// </remarks>
+    public string OutputBufferHint =>
+        BufferSizes[(int)OutputBufferStep] + " frames, about "
+        + Audio.TrackerOutput.MillisecondsFor(BufferSizes[(int)OutputBufferStep], Tracker.EngineSampleRate)
+        + " ms at " + Tracker.EngineSampleRate + " Hz. That is how long a key you press waits "
+        + "before it is heard, and how long everything in the mix has to be late without a gap. "
+        + "Smaller is tighter to play; larger is the first thing to try if the sound breaks up. "
+        + "Takes effect when the app is started again.";
+
+    /// <summary>The hint about the rate, which is a different question.</summary>
     public string EngineRateHint =>
         $"Running at {Tracker.EngineSampleRate} Hz. A change takes effect when the app is started again.";
 

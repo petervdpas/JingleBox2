@@ -556,7 +556,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1014 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+1035 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -963,6 +963,71 @@ whole exercise and is worth writing down rather than summarising:
   past its first pattern, which is exactly what it was reported as. The clock reads
   `TrackerPlayer.Mode` on every line now, and the mode is volatile, since the clock thread reads
   it and the drawing thread writes it
+- The song picker says when each song was last saved, off to the right and quiet: it is what you
+  scan by rather than what you read. The file's own clock rather than anything inside the song,
+  which is right for a song copied in from elsewhere and costs no reading of the file.
+  `SongFile.SavedText` is the wording and it is said three ways, the time alone today, the day
+  and the time this week, the date for anything older: a full date on every row makes every row
+  the same width of digits and none of them worth looking at
+- **Pattern or Song is the song's own, and changing it is an edit.** It looks like a thing about
+  the desk, which is how it was first written and how I argued for it once; it is not. A song
+  that is finished plays as a song and one being worked on loops the pattern in hand, and which
+  of those it is, is a fact about where the work has got to. So it lives in `Song`, travels in
+  the file, is undoable and marks the song unsaved. An older song file has no mode in it and
+  opens on Pattern, which is what every one of them always did
+- **And the loop switch went the same way, for the reason that settles both**: what "the end" is
+  depends on the mode and what happens there is the loop, so they are one question and one
+  question does not get answered in two files. It started in the settings and that was wrong. A
+  jingle that plays once and a part you go round while writing it are different songs, not the
+  same song on different days. `Song.Looping`, true in a song written before it existed, which
+  is what the transport did when nothing could set it
+- The loop range is the third piece and answers before either: marking a range is saying "go
+  round these" in as many words. `Song.Loops(slot)` was renamed `Song.InLoop(slot)` when
+  `Looping` arrived beside it, since two names a letter apart asking different questions would
+  be read for each other for ever
+- **`SynthOutput` became `TrackerOutput`**, for the reason `SynthMixer` became `TrackMixer`: the
+  name was true when the tracker was synth voices and nothing else, and said the wrong thing
+  about the one stream the whole song leaves through. Everything crosses it, recordings and kits
+  and plugins in their own processes included. The pads do not: each of those is a stream of its
+  own on the sound library, which is what lets one start and stop without the song noticing
+- **The output buffer is a setting now**, in SETTINGS beside the rate. It was `BufferSeconds`,
+  sixty milliseconds as a constant nobody could reach, and it is the latency: what the card is
+  playing is what was mixed that long ago, so it is how long a key waits before it sounds. Not
+  the same question as the plugin cushion under it, which moves the mixing off the sound card's
+  thread and costs its own milliseconds on top
+- **In frames and on a slider, not milliseconds in a picker.** Frames because that is what every
+  other piece of music software calls it and what somebody comparing this with their interface
+  looks for; the milliseconds follow from the rate and are printed beside it, since 512 frames
+  is 12 ms at 44100 and 11 at 48000 and the wait is the part that is felt. Powers of two from 64
+  to 8192, and the slider runs over the places on that list rather than over the sizes: the
+  sizes double each step, so a slider over them would give the whole low half of the range a
+  hair's width and the top two sizes most of the travel. `TrackerOutput.MillisecondsFor` is the
+  one place frames become time, which is what lets the setting be in the units everybody uses
+  and the sound library have the seconds it wants
+- The rate at which that buffer is topped up follows from it rather than being a second setting:
+  a quarter of the buffer, held between five and ten milliseconds. It was a fixed ten, which is
+  fine for sixty and is most of twenty, and a period that cannot keep up with the buffer is a
+  dropout with no other explanation
+- **A pattern is named after its own place in the song, counted from nought.** They were named
+  from one while the order counts slots from nought, so a fresh song read "slot 00 plays pattern
+  01" and the two columns of the order list were permanently one apart for no reason anybody had
+  chosen. `Song.Named` is the one rule and `SongDocument` version 4 renumbers a song written on
+  the old naming, every pattern of it including one that has fallen out of the order. Nothing
+  ever looked a pattern up by name, so it cannot break a song: the order holds indexes and always
+  did. It stays true because a pattern is never taken out of the list, only a slot is
+- The row is the loop strip, the slot's place, and the pattern in a cell of its own, which is
+  Renoise's arrangement: two numbers that mean two different things, drawn as two things. The
+  place is a label and steps back; the pattern is the part worth reading and worth changing
+- **Play it again takes a count.** Repeating a part is almost never once: a phrase is four or
+  eight bars, and asking for it a slot at a time is the same gesture four times over. Real slots
+  rather than a number on one slot saying how often it goes round, so a run reads down the list
+  as a run, the loop range can be drawn across part of it, and the playhead has somewhere to be
+  while it is on the third time through
+- **A song's patterns need not be the same length, and never had to be.** The number is per
+  pattern in the model and in the file, and `Advance` has always read the length of whichever
+  pattern the slot plays, so a 32 line chorus after a 64 line verse worked the day it was
+  written. There was nowhere to type it: every pattern was made at the default and stayed there.
+  Lines is in the bar beside BPM now, about the pattern the cursor is in
 - **A loop range over the order is a strip down the left of the list, dragged.** Renoise's loop
   column, and the manual's own gesture for taking one off: "to remove a loop just click on a
   single slot twice". A column of its own rather than a mark on the row, because a range is

@@ -10,7 +10,7 @@ namespace JingleBox2.Audio;
 /// <remarks>
 /// Through BASS, as a stream BASS pulls from on its own thread.
 /// </remarks>
-public sealed class SynthOutput : ISynthOutput
+public sealed class TrackerOutput : ITrackerOutput
 {
     /// <summary>What the engine runs at when nothing better is known.</summary>
     public const int DefaultSampleRate = 44100;
@@ -22,13 +22,52 @@ public sealed class SynthOutput : ISynthOutput
     public const int Channels = 2;
 
     /// <summary>
-    /// How far ahead this stream is buffered. Short, because a note typed on a keyboard has to
-    /// sound now; BASS is told to update more often to keep a buffer this small fed.
+    /// How much this stream holds, in frames, and the least and most it may be asked to hold.
     /// </summary>
-    public const float BufferSeconds = 0.06f;
+    /// <remarks>
+    /// The latency: what the card is playing is what was mixed this long ago, so it is how long
+    /// a key waits before it sounds. Sixty milliseconds was a constant nobody could reach; it is
+    /// a setting now, because how tight it can go is a fact about somebody's machine and not
+    /// about this program.
+    ///
+    /// In frames because that is what every other piece of music software calls it. The
+    /// milliseconds follow from the rate, which is why this class works in frames and converts
+    /// once, where it hands the number to the sound library.
+    ///
+    /// 64 at the bottom, which is as tight as anything asks for, and 8192 at the top, past
+    /// which the delay is worse than whatever it was fixing.
+    /// </remarks>
+    public const int DefaultBufferFrames = 2048;
 
-    /// <summary>Milliseconds between BASS buffer updates. The default is far too slow for the above.</summary>
-    public const int UpdatePeriodMs = 10;
+    /// <inheritdoc cref="DefaultBufferFrames"/>
+    public const int LeastBufferFrames = 64;
+
+    /// <inheritdoc cref="DefaultBufferFrames"/>
+    public const int MostBufferFrames = 8192;
+
+    /// <summary>
+    /// Milliseconds between BASS buffer updates, worked out from the buffer it has to keep fed.
+    /// </summary>
+    /// <remarks>
+    /// A quarter of the buffer, so there are four chances to top it up before it runs out, held
+    /// between five and ten. It was a fixed ten, which is fine for a sixty millisecond buffer and
+    /// is most of a twenty millisecond one: a period that cannot keep up with the buffer is a
+    /// dropout with no other explanation, and the two numbers cannot be set independently by
+    /// anybody who does not already know that.
+    /// </remarks>
+    /// <param name="bufferMs">How much the stream is being asked to hold, in milliseconds.</param>
+    public static int UpdatePeriodFor(int bufferMs) => Math.Clamp(bufferMs / 4, 5, 10);
+
+    /// <summary>How long that many frames is at that rate, in milliseconds.</summary>
+    /// <remarks>
+    /// The one place frames become time, so the setting can be in the units everybody uses and
+    /// the sound library can have the seconds it wants. At least one millisecond, since nought
+    /// would be read as "no buffer at all" rather than as "a very short one".
+    /// </remarks>
+    /// <param name="frames">How much the stream holds.</param>
+    /// <param name="rate">What it is running at.</param>
+    public static int MillisecondsFor(int frames, int rate) =>
+        Math.Max(1, (int)Math.Round(Math.Max(1, frames) * 1000.0 / Math.Max(1, rate)));
 
     /// <summary>Held while the stream is opened or closed.</summary>
     private readonly object _lock = new();
@@ -137,6 +176,16 @@ public sealed class SynthOutput : ISynthOutput
     /// <remarks>Clamped to a fifth of a second, past which the delay is the fault it was fixing.</remarks>
     public void UseRenderAhead(int milliseconds) => _aheadMilliseconds = Math.Clamp(milliseconds, 0, MostAheadMs);
 
+    /// <inheritdoc/>
+    public void UseBuffer(int frames) =>
+        _bufferFramesWanted = Math.Clamp(frames, LeastBufferFrames, MostBufferFrames);
+
+    /// <summary>How much the stream is asked to hold, in frames.</summary>
+    private int _bufferFramesWanted = DefaultBufferFrames;
+
+    /// <summary>And what that comes to in milliseconds at the rate it is running.</summary>
+    private int BufferMs => MillisecondsFor(_bufferFramesWanted, SampleRate);
+
     /// <summary>The largest cushion that can be asked for, in milliseconds.</summary>
     private const int MostAheadMs = 200;
 
@@ -198,7 +247,7 @@ public sealed class SynthOutput : ISynthOutput
                 if (rate > 0) SampleRate = rate;
             }
 
-            Bass.Configure(Configuration.UpdatePeriod, UpdatePeriodMs);
+            Bass.Configure(Configuration.UpdatePeriod, UpdatePeriodFor(BufferMs));
 
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
@@ -206,7 +255,9 @@ public sealed class SynthOutput : ISynthOutput
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
                     ? "the synth stream would not open: " + Bass.LastError
-                    : "the synth stream is open at " + SampleRate + " Hz");
+                    : "the tracker stream is open at " + SampleRate + " Hz, buffered "
+                      + _bufferFramesWanted + " frames (" + BufferMs + " ms) and updated every "
+                      + UpdatePeriodFor(BufferMs) + " ms");
 
             if (_handle == 0)
             {
@@ -216,7 +267,7 @@ public sealed class SynthOutput : ISynthOutput
 
             StartMixingAhead();
 
-            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferSeconds);
+            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferMs / 1000f);
             Bass.ChannelPlay(_handle);
         }
     }
