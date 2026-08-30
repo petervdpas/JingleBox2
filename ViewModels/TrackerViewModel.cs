@@ -915,6 +915,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _player = new TrackerPlayer(audio, machines);
 
+        // Before anything else can touch the mixer. See the remarks on ITrackerOutput.UseSampleRate:
+        // the mixer is built at whatever rate is set the first time somebody asks for it, and a
+        // rate arriving after that is refused. Seventy lines further down, which is where these
+        // were, is already too late: the settings said 48000 and the stream opened at 44100.
+        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
+        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
+        _player.UseBuffer(config?.OutputBufferFrames ?? Audio.TrackerOutput.DefaultBufferFrames);
+
         Automation = new AutomationRecorder(
             () => Song,
             () => Transport == TrackerTransportState.Playing,
@@ -942,9 +950,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
 
-        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
-        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
-        _player.UseBuffer(config?.OutputBufferFrames ?? Audio.TrackerOutput.DefaultBufferFrames);
         _store = new SongStore();
         _rack = rack;
         _recordings = recordings;

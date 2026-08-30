@@ -166,7 +166,14 @@ public sealed class TrackerOutput : ITrackerOutput
     /// <inheritdoc/>
     public void UseSampleRate(int rate)
     {
-        if (_mixer != null) return;
+        if (_mixer != null)
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
+                "the rate cannot be moved to " + rate + " Hz: the mixer is already built at "
+                + SampleRate + " Hz. Whatever asked for it did so before the settings were read");
+
+            return;
+        }
 
         _wanted = rate;
         if (rate > 0) SampleRate = rate;
