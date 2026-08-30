@@ -82,6 +82,30 @@ public sealed class WaveformService : IWaveformService
 
     /// <inheritdoc/>
     /// <remarks>
+    /// Read whole, zeroed in place and written back through the same temporary file the trim
+    /// uses, so a failure part way leaves the take as it was.
+    /// </remarks>
+    public void SilenceFile(string filePath, long startFrame, long endFrame)
+    {
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException($"File not found: {filePath}");
+
+        var (samples, info) = _wav.Read(filePath);
+
+        startFrame = Math.Clamp(startFrame, 0, info.FrameCount);
+        endFrame = Math.Clamp(endFrame, startFrame, info.FrameCount);
+
+        long frames = endFrame - startFrame;
+        if (frames <= 0)
+            throw new InvalidOperationException("There is nothing selected to silence.");
+
+        Array.Clear(samples, (int)(startFrame * info.Channels), (int)(frames * info.Channels));
+
+        Write(filePath, samples, info, ".silence.tmp");
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
     /// A recording already on the target, or holding nothing but silence, is left where it is
     /// rather than rewritten to say the same thing.
     /// </remarks>

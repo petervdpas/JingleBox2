@@ -1,0 +1,313 @@
+{
+  "Id": "machine.bongabong",
+  "Name": "BongaBong",
+  "Kind": 4,
+  "Patch": {
+    "Wave": 1,
+    "Duty": 0.5,
+    "AttackMs": 2,
+    "DecayMs": 40,
+    "Sustain": 0.6,
+    "ReleaseMs": 80,
+    "TuneSemitones": 0,
+    "FineCents": 0,
+    "Drive": 1,
+    "VibratoRateHz": 0,
+    "VibratoDepthCents": 0,
+    "TremoloRateHz": 0,
+    "TremoloDepth": 0,
+    "PitchEnvSemitones": 0,
+    "PitchEnvMs": 60,
+    "FilterCutoffHz": 20000,
+    "FilterResonance": 0
+  },
+  "FilePath": "",
+  "BaseNoteSemitone": 48,
+  "Volume": 1,
+  "Loop": false,
+  "OneVoice": false,
+  "NewNoteAction": 0,
+  "Shape": null,
+  "PluginPath": "",
+  "PluginId": "",
+  "PluginFormat": 0,
+  "PluginName": "",
+  "PluginState": "",
+  "Kit": {
+    "Pads": [
+      {
+        "Semitone": 48,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 49,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 50,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 51,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 52,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 53,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 54,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 55,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 56,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 57,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 58,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 59,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 60,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 61,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 62,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      },
+      {
+        "Semitone": 63,
+        "Name": "",
+        "FilePath": "",
+        "Volume": 1,
+        "Pan": 0,
+        "Shape": {
+          "Start": 0,
+          "End": 1,
+          "LoopMode": 0,
+          "LoopStart": 0,
+          "LoopEnd": 1,
+          "Reverse": false,
+          "IsLooping": false
+        },
+        "Choke": 0
+      }
+    ],
+    "Sliced": false
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "KeyStep Pro",
+  "//": "From the manual only. The five encoders are deliberately absent: this device has no factory controller numbers for them.",
+  "matches": [
+    "KeyStep Pro*",
+    "*KeyStep Pro*",
+    "*KeyStepPro*",
+    "*KeyStep-Pro*"
+  ],
+  "identity": null,
+  "ports": [
+    {
+      "match": "*",
+      "role": "controls",
+      "note": "one port as far as the computer is concerned; the two MIDI outs, the MIDI in and the clock out are not on the USB side"
+    }
+  ],
+  "controls": [
+    {
+      "name": "Looper strip",
+      "cc": 9,
+      "channel": 0,
+      "kind": "strip"
+    }
+  ],
+  "programs": [],
+  "note": "A sequencer that is also a controller, and the second of those is the part with almost nothing in it that can be written down.\n\nIts five encoders have no factory controller number. The manual's Controller page gives each one CC [0-127] and marks no default, while every other parameter on that same page marks one: channel [1(d)-16], mode [Absolute(d), Relative1, Relative2, Relative3], min [0(d)-127], max [0-127(d)]. The omission is deliberate, so there is no map for this device even in principle, and measuring one would only report what its owner assigned. Each encoder is separately absolute or relative as well, so two of these need not agree even after both are set up. They are learned by touching them, which is what happens for a device with no file at all.\n\nWhat the manual does fix is the Looper touch strip, and it is worth knowing precisely because of how it fails: it sends CC 9, and its MIDI send is off until somebody turns it on in UTIL > Touch Strip > MIDI Send/Receive. A control that sends nothing until a menu is visited reads as broken hardware.\n\nThe transport is the thing to know about this device. Its three buttons send MIDI Machine Control, which is system exclusive, and this device is the reason that is read here at all. Both dialects work: MMC as it ships, and realtime start, continue and stop if it is switched over in UTIL (Transport send [OFF, MMC, Realtime, Both]). Either way the port needs the transport job ticked in SETTINGS, since on a port carrying the transport a message means the transport and not a note.\n\nThe ports have not been seen from this application, so the one port entry below matches anything. The device has a USB port, two MIDI outs, one MIDI in and a clock out, and MIDI Out 2 can be switched to Thru, none of which the computer sees.\n\nSource: docs/keystep-pro_Manual_2_5_2_EN.pdf, the Controller and Transport configuration pages. Nothing here was measured."
+}

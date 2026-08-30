@@ -6,14 +6,27 @@
         x:Class="JingleBox2.Views.RecordingEditDialog"
         x:DataType="vm:RecordViewModel"
         Title="Edit Recording"
-        SizeToContent="WidthAndHeight"
+        Width="900" Height="620"
+        MinWidth="620" MinHeight="440"
         WindowStartupLocation="CenterOwner">
 
-  <StackPanel Spacing="12" Margin="16">
+  <!--
+    A window somebody can pull out, because the picture is the work. A waveform three seconds
+    long in a fixed 760 pixels is one pixel to every four milliseconds, and finding the cough
+    you meant to silence means zooming rather than looking. It was sized to its content, which
+    makes a window that cannot be resized however hard you pull at the corner.
+
+    A dock rather than a stack, so the picture takes whatever height is left after the name and
+    the buttons have had theirs: in a stack every child asks for what it wants and the extra
+    room goes at the bottom, which is how a window grows and the thing you are looking at does
+    not.
+  -->
+  <DockPanel Margin="16" LastChildFill="True">
     <!-- A recording's name is its file name, so this box moves the file. Every instrument
          playing it is repointed at the same moment, on the shelf and in the song that is
          open, which is why it can be an ordinary box and not a warning. -->
-    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+    <Grid DockPanel.Dock="Top" Margin="0,0,0,12"
+          ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Name" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
 
       <TextBox Grid.Row="0" Grid.Column="1" Name="NameBox" FontSize="14"
@@ -36,13 +49,23 @@
                            ToolTip.Tip="Type a category to file this take under. Empty it to unfile it." />
     </Grid>
 
-    <TextBlock Text="{Binding RenameError}" Foreground="{DynamicResource DangerBrush}"
+    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,12"
+               Text="{Binding RenameError}" Foreground="{DynamicResource DangerBrush}"
                FontSize="12" IsVisible="{Binding RenameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <!-- Controls -->
+    <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+      <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" MinWidth="120" />
+      <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.75" FontSize="12"
+                 VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <Button Grid.Column="2" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" MinWidth="120" />
+    </Grid>
 
     <!-- Waveform Editor -->
     <Border Classes="card">
-      <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,auto,auto,auto,auto,auto,auto" ColumnSpacing="8">
+      <DockPanel LastChildFill="True">
+        <Grid DockPanel.Dock="Top" Margin="0,0,0,8"
+              ColumnDefinitions="*,auto,auto,auto,auto,auto,auto,auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Text="Trim Region" FontWeight="SemiBold" VerticalAlignment="Center" />
 
           <!-- Normalizing is about the level of the whole recording, so it sits apart from
@@ -55,27 +78,30 @@
           <Button Grid.Column="3" Name="NormalizeButton" Content="Normalize" Click="Normalize_Click"
                   ToolTip.Tip="Lifts the whole recording so its loudest moment sits on the peak above. Changes the file." />
 
-          <Button Grid.Column="4" Content="🔍-" Click="ZoomOut_Click" Width="40" />
-          <Button Grid.Column="5" Content="🔍+" Click="ZoomIn_Click" Width="40" />
-          <Button Grid.Column="6" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
+          <!-- The other half of what a region is for: trimming keeps it and throws the rest
+               away, this keeps the rest and empties it. Beside the region controls rather than
+               beside Normalize, which is about the whole file. -->
+          <Button Grid.Column="4" Name="SilenceButton" Content="Silence" Click="Silence_Click"
+                  ToolTip.Tip="Empties the region and leaves the length alone, for a cough in the middle of a good take. Changes the file." />
+
+          <Button Grid.Column="5" Content="🔍-" Click="ZoomOut_Click" Width="40" />
+          <Button Grid.Column="6" Content="🔍+" Click="ZoomIn_Click" Width="40" />
+          <Button Grid.Column="7" Name="PlayButton" Content="▶ Play" Click="Play_Click" />
         </Grid>
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                   Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}"
+                   Opacity="0.7" FontSize="12" />
+
         <Border Background="{DynamicResource BgBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1"
-                CornerRadius="4">
-          <Canvas Height="200" Width="760" Name="EditWaveformCanvas" />
+                CornerRadius="4"
+                MinHeight="160">
+          <Canvas Name="EditWaveformCanvas" ClipToBounds="True" />
         </Border>
-        <TextBlock Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}" Opacity="0.7" FontSize="12" />
-      </StackPanel>
+      </DockPanel>
     </Border>
 
-    <!-- Controls -->
-    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-      <Button Grid.Column="0" Content="Cancel" Click="Cancel_Click" MinWidth="120" />
-      <TextBlock Grid.Column="1" Text="{Binding Status}" Opacity="0.75" FontSize="12"
-                 VerticalAlignment="Center" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      <Button Grid.Column="2" Name="ApplyTrimButton" Content="Apply Trim" Click="ApplyTrim_Click" MinWidth="120" />
-    </Grid>
-  </StackPanel>
+  </DockPanel>
 
 </Window>

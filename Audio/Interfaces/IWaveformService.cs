@@ -44,6 +44,24 @@ public interface IWaveformService
     /// <exception cref="FileNotFoundException">There is no such file.</exception>
     /// <exception cref="InvalidOperationException">The region holds no frames.</exception>
     void TrimFile(string filePath, long startFrame, long endFrame);
+    /// <summary>
+    /// Silences part of a recording, leaving everything else and its length alone.
+    /// </summary>
+    /// <remarks>
+    /// The other half of what a region is for. Trimming keeps the region and throws the rest
+    /// away; this keeps the rest and empties the region, which is what somebody wants when a
+    /// cough or a stray word landed in the middle of a take that is otherwise good.
+    ///
+    /// The length does not change, deliberately: taking the frames out instead would move
+    /// everything after them, and a pad, an instrument or a slice pointing into this file by
+    /// position would quietly be pointing at something else. Silence is the edit that leaves
+    /// every other thing that knows this take still right about it.
+    /// </remarks>
+    /// <param name="filePath">The take.</param>
+    /// <param name="startFrame">Where the silence starts.</param>
+    /// <param name="endFrame">Where it ends, exclusive.</param>
+    void SilenceFile(string filePath, long startFrame, long endFrame);
+
 
     /// <summary>
     /// Lifts the whole file so its loudest moment sits on the target, in dBFS. Destructive,

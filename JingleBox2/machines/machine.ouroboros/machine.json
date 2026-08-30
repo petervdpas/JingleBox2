@@ -1,0 +1,757 @@
+{
+  "Id": "machine.ouroboros",
+  "Name": "Ouroboros",
+  "Summary": "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
+  "Author": "Peter van de Pas",
+  "Version": "1.02",
+  "Engine": "",
+  "Theme": {
+    "Accent": "#9B6DD6",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "StartsFrom": "presets",
+  "Parameters": [
+    {
+      "Key": "wave",
+      "Name": "Wave",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "pulse_width",
+      "Name": "Pulse width",
+      "Unit": "",
+      "Min": 0.02,
+      "Max": 0.98,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "tune",
+      "Name": "Frequency",
+      "Unit": "st",
+      "Min": -24,
+      "Max": 24,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "fine",
+      "Name": "Fine",
+      "Unit": "c",
+      "Min": -100,
+      "Max": 100,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "glide",
+      "Name": "Glide",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 2000,
+      "Default": 0,
+      "Step": 5
+    },
+    {
+      "Key": "noise_mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "filter_mode",
+      "Name": "Mode",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "cutoff",
+      "Name": "Cutoff",
+      "Unit": "",
+      "Min": 20,
+      "Max": 20000,
+      "Default": 12000,
+      "Step": 50
+    },
+    {
+      "Key": "resonance",
+      "Name": "Resonance",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.98,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "env_amp",
+      "Name": "Amp",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 1
+    },
+    {
+      "Key": "volume",
+      "Name": "Volume",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0.5,
+      "Step": 0.01
+    },
+    {
+      "Key": "new_note",
+      "Name": "New note",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
+    },
+    {
+      "Key": "attack",
+      "Name": "Attack",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 4000,
+      "Default": 2,
+      "Step": 1
+    },
+    {
+      "Key": "sustain",
+      "Name": "Sustain",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "decay",
+      "Name": "Decay",
+      "Unit": "ms",
+      "Min": 0,
+      "Max": 8000,
+      "Default": 300,
+      "Step": 5
+    },
+    {
+      "Key": "lfo_rate",
+      "Name": "Rate",
+      "Unit": "Hz",
+      "Min": 0.01,
+      "Max": 100,
+      "Default": 5,
+      "Step": 0.01
+    },
+    {
+      "Key": "lfo_wave",
+      "Name": "Wave",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "vco_source",
+      "Name": "Source",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 1
+    },
+    {
+      "Key": "vco_amount",
+      "Name": "Amount",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "vco_target",
+      "Name": "What",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "vcf_source",
+      "Name": "Source",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "vcf_amount",
+      "Name": "Amount",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "vcf_polarity",
+      "Name": "Polarity",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "12"
+          },
+          "Children": [
+            {
+              "Element": "Preset",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "source": "presets",
+                "caption": "Presets",
+                "width": "258"
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Oscillator"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 3 2 3 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "tune",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "fine",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "wave",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "Saw,Pulse"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "pulse_width",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "glide",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2",
+                        "tip": "How long a note takes to slide from the one before it. Zero is off."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Mixer"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "noise_mix",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2",
+                        "tip": "Nought is all oscillator, one is all noise, and between them is both."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Filter"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 3 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "cutoff",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2",
+                        "display": "cutoff_text"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "resonance",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "filter_mode",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "LowPass,HighPass"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Amplifier"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "2 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "env_amp",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "on": "Envelope",
+                        "off": "Open",
+                        "tip": "Open, a note is simply on at full and the envelope only moves what it is pointed at."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "volume",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "new_note",
+                      "Label": "",
+                      "Properties": {
+                        "options": "Cut,Release,Sustain",
+                        "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "gap": "10",
+            "heights": "own"
+          },
+          "Children": [
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Envelope"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 2 3"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "attack",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "sustain",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "on": "Hold",
+                        "off": "Decay",
+                        "tip": "Hold, the note stays until it is let go. Decay, it falls away and stays gone."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "decay",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "LFO"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "3 2 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Knob",
+                      "Parameter": "lfo_rate",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Led",
+                      "Parameter": "lfo_rate",
+                      "Label": "rate",
+                      "Properties": {
+                        "span": "2",
+                        "blink": "true",
+                        "align": "middle",
+                        "margin": "0,46,0,0",
+                        "tip": "Goes round at the rate beside it, so the number can be seen as well as read. It runs whether or not a note is playing, which is when the rate is being set."
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "lfo_wave",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "Triangle,Square"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Moves the oscillator"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "2 3 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vco_source",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "Envelope,Lfo"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vco_amount",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vco_target",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "Frequency,PulseWidth"
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Element": "Group",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "caption": "Moves the filter"
+              },
+              "Children": [
+                {
+                  "Element": "Strip",
+                  "Parameter": "",
+                  "Label": "",
+                  "Properties": {
+                    "cell": "26",
+                    "gap": "4",
+                    "columns": "2 3 2"
+                  },
+                  "Children": [
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vcf_source",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "options": "Envelope,Lfo"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Knob",
+                      "Parameter": "vcf_amount",
+                      "Label": "",
+                      "Properties": {
+                        "span": "3",
+                        "dial": "40",
+                        "headroom": "50",
+                        "lines": "2"
+                      },
+                      "Children": []
+                    },
+                    {
+                      "Element": "Switch",
+                      "Parameter": "vcf_polarity",
+                      "Label": "",
+                      "Properties": {
+                        "span": "2",
+                        "lines": "2",
+                        "on": "Close",
+                        "off": "Open",
+                        "tip": "Which way the modulation moves the filter."
+                      },
+                      "Children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "Element": "Keys",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "tip": "Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show."
+          },
+          "Children": []
+        }
+      ]
+    }
+  }
+}

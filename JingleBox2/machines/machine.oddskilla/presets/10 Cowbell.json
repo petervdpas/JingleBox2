@@ -1,0 +1,22 @@
+{
+  "Name": "Cowbell",
+  "Machine": "machine.oddskilla",
+  "wave": 4,
+  "duty": 0.3,
+  "tune": 12,
+  "fine": 0,
+  "pitch_env": 0,
+  "pitch_time": 60,
+  "attack": 0,
+  "decay": 90,
+  "sustain": 0,
+  "release": 25,
+  "drive": 1,
+  "level": 0,
+  "cutoff": 0.804991,
+  "resonance": 0,
+  "vib_rate": 0,
+  "vib_depth": 0,
+  "trem_rate": 0,
+  "trem_depth": 0
+}

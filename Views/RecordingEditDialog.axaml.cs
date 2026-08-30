@@ -543,6 +543,37 @@ public partial class RecordingEditDialog : Window
     /// Both destructive buttons are switched off while it runs, and the preview is stopped
     /// first, since a file that is open is one that will not be rewritten on Windows.
     /// </remarks>
+    /// <summary>
+    /// Empties the region, leaving the take its length.
+    /// </summary>
+    /// <remarks>
+    /// The region, the playhead and the zoom are left where they are, unlike a trim: nothing has
+    /// moved, so every stored position is still about the part of the file it was about. The
+    /// preview is stopped first, since a file that is open is one that will not be rewritten on
+    /// Windows, and both destructive buttons are switched off while it runs.
+    /// </remarks>
+    private async void Silence_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_vm == null || _applying) return;
+
+        _player.Stop();
+
+        _applying = true;
+        SetApplyEnabled(false);
+
+        try
+        {
+            if (!await _vm.SilenceAsync(_trim.Start, _trim.End)) return;
+
+            Redraw();
+        }
+        finally
+        {
+            _applying = false;
+            SetApplyEnabled(true);
+        }
+    }
+
     private async void ApplyTrim_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_vm == null || _applying) return;
@@ -605,5 +636,8 @@ public partial class RecordingEditDialog : Window
 
         var normalize = this.FindControl<Button>("NormalizeButton");
         if (normalize != null) normalize.IsEnabled = enabled;
+
+        var silence = this.FindControl<Button>("SilenceButton");
+        if (silence != null) silence.IsEnabled = enabled;
     }
 }

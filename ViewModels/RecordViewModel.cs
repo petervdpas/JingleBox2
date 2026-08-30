@@ -935,6 +935,56 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         }
     }
 
+    /// <summary>
+    /// Empties the region and leaves the rest of the take where it is.
+    /// </summary>
+    /// <remarks>
+    /// The same shape as <see cref="ApplyTrimAsync"/> and for the same reasons: the work is off
+    /// the drawing thread because a long take takes a moment, the file is rewritten so anything
+    /// playing it from memory has to read it again, and <see cref="RecordingChanged"/> carries
+    /// the path so it can.
+    ///
+    /// The length does not change, so unlike a trim the region, the playhead and the zoom are
+    /// still about the right part of the file afterwards and are left alone.
+    /// </remarks>
+    /// <param name="startFraction">Where the region starts, nought to one.</param>
+    /// <param name="endFraction">Where it ends.</param>
+    /// <returns>True when the file was rewritten.</returns>
+    public async Task<bool> SilenceAsync(double startFraction, double endFraction)
+    {
+        var recording = SelectedRecordingForEdit;
+        var waveform = CurrentWaveform;
+        if (recording == null || waveform == null) return false;
+
+        try
+        {
+            long totalFrames = waveform.TotalSamples;
+            long startFrame = (long)(Math.Clamp(startFraction, 0, 1) * totalFrames);
+            long endFrame = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames);
+
+            if (endFrame <= startFrame)
+            {
+                Status = "Select a part of the take first.";
+                return false;
+            }
+
+            Status = "Silencing...";
+            await Task.Run(() => _waveformService.SilenceFile(recording.FilePath, startFrame, endFrame));
+
+            CurrentWaveform = await Task.Run(() => _waveformService.AnalyzeFile(recording.FilePath));
+
+            RecordingChanged?.Invoke(this, recording.FilePath);
+
+            Status = $"Silenced {TimeSpan.FromMilliseconds((endFrame - startFrame) * 1000.0 / Math.Max(1, waveform.SampleRate)):mm\\:ss\\.fff} of '{recording.Name}'";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Status = $"Silence failed: {ex.Message}";
+            return false;
+        }
+    }
+
     /// <summary>Where a normalize puts the loudest moment, in dBFS.</summary>
     [ObservableProperty] private double normalizeTargetDb = Normalization.Target;
 
