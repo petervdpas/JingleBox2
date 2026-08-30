@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Enums;
 
 namespace JingleBox2.Tracker;
 
@@ -58,6 +59,25 @@ public sealed class Song
     public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
 
     /// <summary>
+    /// Whether this song plays the one pattern or works through the order.
+    /// </summary>
+    /// <remarks>
+    /// Part of the song rather than a preference, and it took being told twice to get right. It
+    /// looks like a thing about the desk, which is how it was first written; it is not. A song
+    /// that is finished plays as a song and a song being worked on loops the pattern in hand,
+    /// and which of those it is, is a fact about where the work has got to. Opening it tomorrow
+    /// should find it where it was left, and changing it should make the song want saving.
+    ///
+    /// Pattern by default, which is what a new song has always started as and what somebody
+    /// writing a first pattern wants.
+    ///
+    /// The loop switch beside it is the other way round and stays in the settings: whether the
+    /// thing you are listening to comes round again is about how you are working at this
+    /// moment, and a song handed to somebody else has no business setting it.
+    /// </remarks>
+    public TrackerPlayMode PlayMode { get; set; } = TrackerPlayMode.Pattern;
+
+    /// <summary>
     /// Which octave notes are typed and auditioned at, for this song.
     /// </summary>
     /// <remarks>
@@ -81,8 +101,116 @@ public sealed class Song
     /// <summary>The patterns themselves, which the order list points into by index.</summary>
     public List<Pattern> Patterns { get; set; } = new();
 
+    /// <summary>
+    /// What a pattern at that place in the song is called.
+    /// </summary>
+    /// <remarks>
+    /// Its own index, counted from nought, so a pattern's name and its place are the same
+    /// number. They were one apart: the order counts slots from 00 and patterns were named from
+    /// 01, so a fresh song read "slot 00 plays pattern 01" and the two columns of the order list
+    /// were permanently out of step for no reason anybody had chosen. Songs written on the old
+    /// naming are renumbered on the way in.
+    ///
+    /// It stays true because a pattern is never taken out of the list: removing a slot removes
+    /// the slot, and the patterns only ever grow, so no index ever shifts under a name.
+    /// </remarks>
+    /// <param name="index">Where the pattern sits in <see cref="Patterns"/>.</param>
+    public static string Named(int index) =>
+        Math.Max(0, index).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+
     /// <summary>Indexes into <see cref="Patterns"/>, in playing order.</summary>
     public List<int> Order { get; set; } = new();
+
+    /// <summary>The first slot of the loop range, or <see cref="NoLoop"/> for none.</summary>
+    /// <remarks>
+    /// A range over the order rather than over the patterns: it is slots that are looped, so a
+    /// pattern that appears twice can be inside the range once and outside it once.
+    ///
+    /// Part of the song rather than a preference, unlike the loop switch beside the mode picker.
+    /// The switch is about how you are working; a range is about a piece of the music, the eight
+    /// bars you are going round while you write the solo, and it is worth still being there when
+    /// the song is opened again. Renoise keeps it in the song for the same reason.
+    /// </remarks>
+    public int LoopFrom { get; set; } = NoLoop;
+
+    /// <summary>The last slot of the loop range, or <see cref="NoLoop"/> for none.</summary>
+    public int LoopTo { get; set; } = NoLoop;
+
+    /// <summary>What either end of the loop range holds when there is no range at all.</summary>
+    public const int NoLoop = -1;
+
+    /// <summary>The most slots one press of Play it again is allowed to add.</summary>
+    /// <remarks>
+    /// Sixteen, which is four four-bar phrases and past anything anybody chooses from a menu.
+    /// A bound rather than a policy: it is there so a number arriving from somewhere unexpected
+    /// cannot fill an order list with thousands of rows.
+    /// </remarks>
+    public const int MaxRepeats = 16;
+
+    /// <summary>True when the order has a range marked on it.</summary>
+    /// <remarks>
+    /// Both ends have to be inside the order, so an order that has shrunk under a range leaves
+    /// no range rather than one pointing at slots that are not there. Asked rather than repaired
+    /// on the way in, since a range is cheap to check and a repair would be a write from
+    /// whatever happened to look first.
+    /// </remarks>
+    public bool HasLoop =>
+        LoopFrom >= 0 && LoopTo >= 0 &&
+        LoopFrom < Order.Count && LoopTo < Order.Count;
+
+    /// <summary>The first slot of the range, whichever end it was drawn from.</summary>
+    public int LoopFirst => Math.Min(LoopFrom, LoopTo);
+
+    /// <summary>And the last, so nothing above has to know which way somebody dragged.</summary>
+    public int LoopLast => Math.Max(LoopFrom, LoopTo);
+
+    /// <summary>Whether that slot is inside the range.</summary>
+    /// <remarks>
+    /// Named apart from <see cref="Looping"/> on purpose: one asks whether a particular slot is
+    /// marked, the other whether the song comes round at all, and two names a letter apart
+    /// would be read for each other for ever.
+    /// </remarks>
+    /// <param name="slot">Where in the order.</param>
+    public bool InLoop(int slot) => HasLoop && slot >= LoopFirst && slot <= LoopLast;
+
+    /// <summary>
+    /// Whether the song comes round again when it reaches the end of what it is playing.
+    /// </summary>
+    /// <remarks>
+    /// What "the end" is depends on <see cref="PlayMode"/>: the end of the pattern when a
+    /// pattern is being looped, the end of the order when the song is playing. The two are one
+    /// question and belong in one place, which is why this is here rather than in the settings
+    /// where it started. A jingle that plays once and a part you go round while writing it are
+    /// different songs, not the same song on different days.
+    ///
+    /// True by default, and true in every song written before it was part of one: that is what
+    /// the transport did when nothing could set it.
+    ///
+    /// The loop range is a third thing again and answers before this does: marking a range is
+    /// saying "go round these" in as many words. See <see cref="SetLoop"/>.
+    /// </remarks>
+    public bool Looping { get; set; } = true;
+
+    /// <summary>Marks a range over the order, or takes one off with <see cref="NoLoop"/>.</summary>
+    /// <remarks>
+    /// Either end may be given first, since it is drawn by dragging and a drag goes both ways.
+    /// Held inside the order rather than refused, so a range drawn past the last row is a range
+    /// to the last row, which is what the hand doing it meant.
+    /// </remarks>
+    /// <param name="from">One end, or <see cref="NoLoop"/> to clear the range.</param>
+    /// <param name="to">The other end. Ignored when the first is <see cref="NoLoop"/>.</param>
+    public void SetLoop(int from, int to)
+    {
+        if (from < 0 || Order.Count == 0)
+        {
+            LoopFrom = NoLoop;
+            LoopTo = NoLoop;
+            return;
+        }
+
+        LoopFrom = Math.Clamp(from, 0, Order.Count - 1);
+        LoopTo = Math.Clamp(to < 0 ? from : to, 0, Order.Count - 1);
+    }
 
     /// <summary>
     /// The song's own instruments, which are its copies and not the rack's.
@@ -216,7 +344,7 @@ public sealed class Song
     public static Song CreateDefault()
     {
         var song = new Song();
-        song.Patterns.Add(new Pattern(Pattern.DefaultLines, song.TrackCount) { Name = "01" });
+        song.Patterns.Add(new Pattern(Pattern.DefaultLines, song.TrackCount) { Name = Named(0) });
         song.Order.Add(0);
         return song;
     }
@@ -439,7 +567,7 @@ public sealed class Song
     {
         var pattern = new Pattern(lines, TrackCount)
         {
-            Name = (Patterns.Count + 1).ToString("00")
+            Name = Named(Patterns.Count)
         };
 
         EnsureNoteColumns();
@@ -447,6 +575,63 @@ public sealed class Song
 
         Patterns.Add(pattern);
         return Patterns.Count - 1;
+    }
+
+    /// <summary>
+    /// Adds a pattern holding the same music as another, and hands back where it landed.
+    /// </summary>
+    /// <remarks>
+    /// A copy and not a second name for the same thing: <see cref="Pattern.Clone"/> takes the
+    /// cells and the automation lanes, so editing one afterwards leaves the other alone. That is
+    /// the whole point of copying a pattern rather than putting the one you have into the order
+    /// twice, which the order already allows and which is a different thing to want.
+    ///
+    /// Named the way a new one is, by how many there are, so the two ways of getting a pattern
+    /// cannot end up with two ways of naming one. The name is what the order list shows and is
+    /// not an identity: nothing looks a pattern up by it.
+    /// </remarks>
+    /// <param name="index">Which pattern to copy.</param>
+    /// <returns>Where the copy is in <see cref="Patterns"/>, or -1 for a pattern that is not there.</returns>
+    public int ClonePattern(int index)
+    {
+        if (index < 0 || index >= Patterns.Count) return -1;
+
+        var copy = Patterns[index].Clone();
+        copy.Name = Named(Patterns.Count);
+
+        Patterns.Add(copy);
+        return Patterns.Count - 1;
+    }
+
+    /// <summary>
+    /// Moves one slot of the order to another place in it, taking its pattern with it.
+    /// </summary>
+    /// <remarks>
+    /// The slot moves, not the pattern: a pattern that is in the order three times has three
+    /// slots and only the one being dragged is touched.
+    ///
+    /// The destination is read as where the slot should end up once it has been taken out, which
+    /// is what dragging a row down a list means to the hand doing it. Out of range at either end
+    /// is held to the ends rather than refused, since a drop below the last row is a drop on the
+    /// last row as far as anybody dragging is concerned.
+    /// </remarks>
+    /// <param name="from">The slot being moved.</param>
+    /// <param name="to">Where it should sit afterwards.</param>
+    /// <returns>False when nothing moved, which is a slot dropped where it already was.</returns>
+    public bool MoveOrder(int from, int to)
+    {
+        if (Order.Count < 2) return false;
+        if (from < 0 || from >= Order.Count) return false;
+
+        to = Math.Clamp(to, 0, Order.Count - 1);
+        if (to == from) return false;
+
+        int slot = Order[from];
+
+        Order.RemoveAt(from);
+        Order.Insert(to, slot);
+
+        return true;
     }
 
     /// <summary>

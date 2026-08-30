@@ -72,6 +72,7 @@ public sealed class ConfigStore : IConfigStore
             {
                 var json = File.ReadAllText(ConfigPath);
                 var cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? new AppConfig();
+                Brought(cfg);
                 Normalize(cfg);
                 return cfg;
             }
@@ -89,9 +90,34 @@ public sealed class ConfigStore : IConfigStore
     /// <inheritdoc/>
     public void Save(AppConfig cfg)
     {
+        cfg.Version = AppConfig.CurrentVersion;
+
         Normalize(cfg);
         var json = JsonSerializer.Serialize(cfg, JsonOptions);
         _files.Write(ConfigPath, json);
+    }
+
+    /// <summary>
+    /// Moves a setting whose default was wrong rather than merely different, once.
+    /// </summary>
+    /// <remarks>
+    /// Not the same job as <see cref="Normalize"/>, which repairs a file every time it is read
+    /// and must therefore be something that can be run twice. This runs on the way in only, and
+    /// it is allowed to change a value somebody could have chosen, which is exactly why it has
+    /// to know whether it has run before: <see cref="AppConfig.Version"/> is that record.
+    ///
+    /// Nothing to move yet, and the empty body is the point rather than an oversight: the
+    /// machinery is here because a default that turns out to be wrong cannot otherwise be
+    /// corrected for anybody who has already run the program once, and finding that out is
+    /// exactly what happened to the mixing cushion. It was going to be changed from none to
+    /// twenty milliseconds until the real output was measured and the cushion turned out to buy
+    /// nothing; see <see cref="AppConfig.RenderAheadMs"/>.
+    /// </remarks>
+    private static void Brought(AppConfig cfg)
+    {
+        if (cfg.Version >= AppConfig.CurrentVersion) return;
+
+        cfg.Version = AppConfig.CurrentVersion;
     }
 
     /// <summary>

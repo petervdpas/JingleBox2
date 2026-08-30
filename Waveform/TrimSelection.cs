@@ -55,6 +55,34 @@ public sealed class TrimSelection
         else if (handle == TrimHandle.End) MoveEnd(fraction, minGap);
     }
 
+    /// <summary>
+    /// Drags a region out from nothing: two fractions in either order become the two ends.
+    /// </summary>
+    /// <remarks>
+    /// The gesture every audio editor has, and the one this was missing: the handles could be
+    /// moved but a region could not be drawn, so selecting the middle of a take meant dragging
+    /// one end all the way in and then the other, past everything you were trying to look at.
+    ///
+    /// Either order, because a hand dragging leftwards is drawing the same region as a hand
+    /// dragging rightwards and only one of them starts at the lower number. Held apart by the
+    /// same minimum gap the handles keep, so a drag that goes nowhere leaves something that can
+    /// still be taken hold of.
+    /// </remarks>
+    /// <param name="from">Where the drag started, nought to one.</param>
+    /// <param name="to">Where it is now.</param>
+    /// <param name="minGap">The narrowest the region may be.</param>
+    public void Select(double from, double to, double minGap)
+    {
+        double low = Math.Clamp(Math.Min(from, to), 0, 1);
+        double high = Math.Clamp(Math.Max(from, to), 0, 1);
+
+        if (high - low < minGap) high = Math.Min(1, low + minGap);
+        if (high - low < minGap) low = Math.Max(0, high - minGap);
+
+        Start = low;
+        End = high;
+    }
+
     /// <summary>Pulls a position inside the region.</summary>
     /// <param name="fraction">A place in the file, 0 to 1.</param>
     public double Clamp(double fraction) => Math.Clamp(fraction, Start, End);

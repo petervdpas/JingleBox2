@@ -133,6 +133,16 @@ public sealed class TrackerSequencer : ITrackerSequencer
     /// By the order entry rather than by the pattern, since the same pattern can be in a song
     /// twice and what follows it is a different answer each time. An order entry pointing at no
     /// pattern ends the pass rather than being skipped, which is what an empty song does.
+    ///
+    /// A loop range over the order is answered before the end of the order is, and it loops
+    /// whatever the <paramref name="loop"/> flag says. Marking a range is somebody saying "go
+    /// round these" in as many words, where the flag is a standing preference about what happens
+    /// when there is nothing else to play; a range that did nothing while the switch was off
+    /// would be a mark on the screen with no effect and nothing to explain it.
+    ///
+    /// It is answered only at the last slot of the range, so playing from before it runs into it
+    /// and then goes round, and playing from after it is not dragged backwards. Somebody who
+    /// starts the transport past the range meant to hear what is past the range.
     /// </remarks>
     public static TrackerPosition? Advance(Song song, TrackerPosition position, bool loop)
     {
@@ -141,6 +151,9 @@ public sealed class TrackerSequencer : ITrackerSequencer
 
         if (position.Line + 1 < pattern.Lines)
             return position with { Line = position.Line + 1 };
+
+        if (song.InLoop(position.OrderIndex) && position.OrderIndex >= song.LoopLast)
+            return new TrackerPosition(song.LoopFirst, 0);
 
         int nextOrder = position.OrderIndex + 1;
         if (nextOrder < song.Order.Count)

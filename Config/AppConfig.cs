@@ -232,10 +232,43 @@ public sealed class AppConfig
     /// How far ahead of the sound card the tracker mixes, in milliseconds.
     /// </summary>
     /// <remarks>
-    /// Zero mixes in step, which is tightest and has no slack at all for a plugin that takes a
-    /// moment longer than usual. See <c>JingleBox2.Audio.SynthOutput.UseRenderAhead</c>.
+    /// Zero mixes in step, and that is the default because it was measured and a cushion did
+    /// not earn its cost. What made a cushion look necessary was timing the mixing against the
+    /// length of a block, eleven and a half milliseconds, as though a block late by one were a
+    /// hole in the output. It is not: the stream is buffered sixty milliseconds ahead
+    /// (<c>SynthOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
+    /// longer than its own length is absorbed. Measured on the real output with a thread
+    /// allocating hard enough to pause the process for a quarter of its wall time, thirty-two
+    /// voices of synths, of recordings and of both: the sound card went without nothing, with
+    /// the cushion and without it.
+    ///
+    /// So a cushion buys nothing here and costs the one thing this application cannot spare,
+    /// which is how long a key waits before it sounds, on top of the sixty already in the
+    /// stream. What it is still for is a plugin: every block one plays is a round trip to
+    /// another process, and that is the case worth turning it on for, which is what the words
+    /// in SETTINGS say.
+    ///
+    /// See <c>JingleBox2.Audio.SynthOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
+    /// what the thread it starts is allowed to touch.
     /// </remarks>
     public int RenderAheadMs { get; set; }
+
+    /// <summary>
+    /// What wrote this file, so a setting whose default has changed can be moved once.
+    /// </summary>
+    /// <remarks>
+    /// 1 is every settings file written before this field existed, which is the default for
+    /// exactly that reason: a file that does not say is older than the field, and reading it as
+    /// current would skip the conversion silently. The song file learned this the same way.
+    ///
+    /// It is only for defaults that were wrong rather than merely different. A setting somebody
+    /// chose is theirs; this exists for the ones nobody ever chose because there was no reason
+    /// to look.
+    /// </remarks>
+    public int Version { get; set; } = 1;
+
+    /// <summary>What this build writes.</summary>
+    public const int CurrentVersion = 2;
 
     /// <summary>
     /// Whether the tracker puts its plugins down when you go and work somewhere else.

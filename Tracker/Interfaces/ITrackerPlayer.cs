@@ -85,9 +85,26 @@ public interface ITrackerPlayer : IDisposable
     TrackerPosition Position { get; }
 
     /// <summary>Whether it is walking the order list or staying on one pattern.</summary>
-    TrackerPlayMode Mode { get; }
+    /// <remarks>
+    /// Settable while a pass is running, and answered on the next line rather than on the next
+    /// pass. It is a transport setting and not something a pass is started with: somebody who
+    /// switches from looping a pattern to playing the song means now, the way pressing loop on
+    /// any other machine does, and being made to stop and start again to be believed is the
+    /// behaviour of a setting that has not been wired up. It read as the song simply refusing
+    /// to move on.
+    /// </remarks>
+    TrackerPlayMode Mode { get; set; }
 
     /// <summary>Start again from the top instead of stopping at the end.</summary>
+    /// <remarks>
+    /// What "the end" is depends on <see cref="Mode"/>: the end of the pattern when a pattern is
+    /// being looped, the end of the order when the song is playing. The two are one question and
+    /// are offered side by side.
+    ///
+    /// Settable while a pass is running and answered when the end is reached, the same as the
+    /// mode. It was true and nothing ever set it, so everything played round for ever and that
+    /// was a default nobody had chosen rather than a decision.
+    /// </remarks>
     bool Loop { get; set; }
 
     /// <summary>Instrument files that could not be loaded, for reporting after a take.</summary>

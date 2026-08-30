@@ -135,7 +135,25 @@ public partial class RecordingEditDialog : Window
     private bool _renaming;
 
     /// <summary>How wide the picture is, which is what every fraction is converted through.</summary>
-    private double CanvasWidth => _canvas?.Width ?? 0;
+    /// <remarks>
+    /// What it was given rather than what it was told to be. The canvas had a width written on
+    /// it and the window could not be resized, so the two were the same number; now the picture
+    /// takes whatever the window has left and only its bounds know how much that is.
+    /// </remarks>
+    private double CanvasWidth => _canvas?.Bounds.Width ?? 0;
+
+    /// <summary>Where a drag that is drawing a region began, as a fraction of the take.</summary>
+    private double _selectFrom;
+
+    /// <summary>
+    /// True once a press that landed on neither handle has moved far enough to be a selection.
+    /// </summary>
+    /// <remarks>
+    /// Not set on the press itself, deliberately: a press that never moves is a click, and a
+    /// click puts the play cursor down and must leave the region alone. Waiting for the hand to
+    /// travel is what lets one gesture be both.
+    /// </remarks>
+    private bool _selecting;
 
     /// <summary>
     /// Builds the window and wires the picture up: the player's reports in, the pointer
@@ -172,6 +190,8 @@ public partial class RecordingEditDialog : Window
             _canvas = this.FindControl<Canvas>("EditWaveformCanvas");
 
             if (_canvas == null) return;
+
+            _canvas.SizeChanged += (_, _) => Redraw();
 
             _canvas.PointerPressed += Canvas_PointerPressed;
             _canvas.PointerMoved += Canvas_PointerMoved;
@@ -229,7 +249,7 @@ public partial class RecordingEditDialog : Window
 
         var waveform = _vm?.CurrentWaveform;
         double width = CanvasWidth;
-        double height = _canvas.Height;
+        double height = _canvas.Bounds.Height;
 
         if (waveform == null || waveform.PeakData.Length == 0 || width <= 0 || height <= 0) return;
 
@@ -355,28 +375,44 @@ public partial class RecordingEditDialog : Window
         _pressX = point.X;
 
         _dragging = _trim.HitTest(point.X, _viewport, CanvasWidth, TrimGrabTolerance);
+        _selecting = false;
 
-        if (_dragging == TrimHandle.None && _viewport.CanPan)
+        if (_dragging == TrimHandle.None)
         {
-            _panning = true;
-            _panStartScroll = _viewport.Scroll;
+            bool middle = e.GetCurrentPoint(_canvas).Properties.IsMiddleButtonPressed;
+
+            if (middle && _viewport.CanPan)
+            {
+                _panning = true;
+                _panStartScroll = _viewport.Scroll;
+            }
+            else
+            {
+                _selectFrom = _viewport.XToFraction(point.X, CanvasWidth);
+            }
         }
 
-        if (_dragging != TrimHandle.None || _panning)
-            e.Pointer.Capture(_canvas);
+        e.Pointer.Capture(_canvas);
     }
 
     /// <summary>
-    /// Moves whichever of the two the hand has hold of, and draws the picture again.
+    /// Moves a handle, draws a new region, or pans, depending on what the press landed on.
     /// </summary>
     /// <remarks>
-    /// A pan to the right moves the window earlier, so the audio tracks the cursor rather than
-    /// running away from it: the hand is dragging the recording, not the viewport.
+    /// **A drag on the picture draws a region**, which is the gesture every audio editor has and
+    /// the one this was missing: only the two handles could be moved, so selecting the middle of
+    /// a take meant dragging one end all the way in and then the other, past everything you were
+    /// trying to look at. It waits for the hand to travel past <see cref="ClickSlop"/> first, so
+    /// a press that never moves is still a click and still only puts the play cursor down.
+    ///
+    /// Panning moved to the middle button when the left one took up selecting. A pan to the
+    /// right moves the window earlier, so the audio tracks the cursor rather than running away
+    /// from it: the hand is dragging the recording, not the viewport.
     /// </remarks>
     private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
     {
         if (_canvas == null) return;
-        if (_dragging == TrimHandle.None && !_panning) return;
+        if (!e.GetCurrentPoint(_canvas).Properties.IsLeftButtonPressed && !_panning) return;
 
         var point = e.GetPosition(_canvas);
 
@@ -384,9 +420,20 @@ public partial class RecordingEditDialog : Window
         {
             _viewport.ScrollTo(_panStartScroll - _viewport.PanDistance(point.X - _pressX, CanvasWidth));
         }
-        else
+        else if (_dragging != TrimHandle.None)
         {
             _trim.Move(_dragging, _viewport.XToFraction(point.X, CanvasWidth), TrimSelection.MinGapFor(_viewport));
+        }
+        else
+        {
+            if (!_selecting && Math.Abs(point.X - _pressX) <= ClickSlop) return;
+
+            _selecting = true;
+
+            _trim.Select(
+                _selectFrom,
+                _viewport.XToFraction(point.X, CanvasWidth),
+                TrimSelection.MinGapFor(_viewport));
         }
 
         Redraw();
@@ -396,13 +443,14 @@ public partial class RecordingEditDialog : Window
     /// Lets go, and drops the play cursor if the press turned out to be a click.
     /// </summary>
     /// <remarks>
-    /// A press that never moved a handle and travelled less than <see cref="ClickSlop"/> is a
-    /// click, whether or not it was also panning: a pan of nothing has done nothing, and asking
-    /// the hand to hold still to within a pixel would make the play cursor unusable.
+    /// A press that never moved a handle, never drew a region and travelled less than
+    /// <see cref="ClickSlop"/> is a click, whether or not it was also panning: a pan of nothing
+    /// has done nothing, and asking the hand to hold still to within a pixel would make the play
+    /// cursor unusable.
     /// </remarks>
     private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (_canvas != null && _dragging == TrimHandle.None)
+        if (_canvas != null && _dragging == TrimHandle.None && !_selecting)
         {
             var point = e.GetPosition(_canvas);
             if (Math.Abs(point.X - _pressX) <= ClickSlop)
@@ -410,6 +458,7 @@ public partial class RecordingEditDialog : Window
         }
 
         _dragging = TrimHandle.None;
+        _selecting = false;
         _panning = false;
         e.Pointer.Capture(null);
     }
