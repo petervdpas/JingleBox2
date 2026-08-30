@@ -556,7 +556,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1035 of them, in about five seconds, with no window and no hardware. They run in CI on every push
+1043 of them, in about five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -995,6 +995,18 @@ whole exercise and is worth writing down rather than summarising:
   playing is what was mixed that long ago, so it is how long a key waits before it sounds. Not
   the same question as the plugin cushion under it, which moves the mixing off the sound card's
   thread and costs its own milliseconds on top
+- **`Views/RangeField.cs` is a slider with its reading printed after it, and it is a control
+  because the arrangement is the whole difficulty.** A slider in a row takes the slack, and
+  whatever else is in that row then either floats away from it or is squeezed off the edge: it
+  went wrong three times as a grid, once each way. A reading belongs against the control it is
+  the reading of at every window width, and that is a property of the pair rather than of the
+  page they sit on. So the pair is sized in one place, nothing stretches, and the control asks
+  for exactly the two of them. The reading is a string handed in rather than a number formatted
+  there, since what a number means is the caller's business: 2048 is frames and 46 ms and
+  neither is something a slider could work out. An empty reading is no reading, and it is then a
+  slider. A `Panel` around Avalonia's own `Slider` rather than a control drawn from nothing,
+  because dragging, the keyboard, the ticks and the theme are already right and none of them is
+  what it is about
 - **In frames and on a slider, not milliseconds in a picker.** Frames because that is what every
   other piece of music software calls it and what somebody comparing this with their interface
   looks for; the milliseconds follow from the rate and are printed beside it, since 512 frames
@@ -1287,6 +1299,15 @@ whole exercise and is worth writing down rather than summarising:
   the guard inside `Log.Write` is checked after the caller has already allocated it. Everywhere
   else still writes without asking, because a line written when something is decided costs
   nothing worth counting
+- **The log is kept between runs and is cleared on purpose, in SETTINGS.** Never on start: the
+  run you most often want is the one that already ended badly, and a log cleared on start has
+  thrown away the crash you restarted because of. It rolls over at four megabytes keeping one
+  `.old`, so two files is the bounded cost, and each run writes one boundary line naming the
+  areas and the build, which is what to search for to find where a run begins. Clear the log
+  takes both files and says the boundary line again at once, so the fresh file starts the way any
+  other run does rather than mid-sentence: it is why `Announce` is allowed to run twice in one
+  process. Not asked about first, unlike deleting a recording, because a log is not somebody's
+  work
 - `LogArea.Machines` is the sixth area, and everything under `Tracker/Machines/` writes to it
   rather than to the app's. It is a whole half of this program and it says almost nothing while
   nothing is wrong; the day a machine draws an empty panel or comes back from a zip missing a

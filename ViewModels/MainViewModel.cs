@@ -601,6 +601,24 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     }
 
     /// <summary>
+    /// Throws away the log and the one before it, and starts a new one.
+    /// </summary>
+    /// <remarks>
+    /// Not asked about first, unlike deleting a recording or throwing away a song's changes: a
+    /// log is not somebody's work, it is what the program has been muttering about itself, and a
+    /// question before every clear would be in the way of the one case this exists for, which is
+    /// emptying it before doing the thing you want to read about.
+    /// </remarks>
+    public IRelayCommand ClearLogCommand => new RelayCommand(() =>
+    {
+        bool went = Diagnostics.Log.Clear();
+
+        OnPropertyChanged(nameof(LogHint));
+
+        Bus.Say(went ? "The log was cleared" : "There was no log to clear");
+    });
+
+    /// <summary>
     /// Which parts of the app write to the log, one switch each.
     /// </summary>
     /// <remarks>
@@ -713,7 +731,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             _store.Save(_cfg);
 
             OnPropertyChanged();
-            OnPropertyChanged(nameof(OutputBufferHint));
+            OnPropertyChanged(nameof(OutputBufferReading));
         }
     }
 
@@ -721,20 +739,27 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public double OutputBufferSteps => BufferSizes.Length - 1;
 
     /// <summary>
-    /// What the buffer comes to, in the two units that matter: frames chosen, milliseconds felt.
+    /// What the slider is on, in the two units that matter: frames chosen, milliseconds felt.
     /// </summary>
     /// <remarks>
+    /// Beside the slider rather than only in the paragraph under it, because it is the reading
+    /// of the control and a control whose value is three lines away is a control you set by
+    /// guessing. The paragraph says what it means; this says what it is.
+    ///
     /// The milliseconds at the rate the engine is actually running, not at the one asked for,
     /// since following the device means the two can differ and the wait is a fact about what is
     /// running.
     /// </remarks>
-    public string OutputBufferHint =>
-        BufferSizes[(int)OutputBufferStep] + " frames, about "
+    public string OutputBufferReading =>
+        BufferSizes[(int)OutputBufferStep] + " frames  ·  "
         + Audio.TrackerOutput.MillisecondsFor(BufferSizes[(int)OutputBufferStep], Tracker.EngineSampleRate)
-        + " ms at " + Tracker.EngineSampleRate + " Hz. That is how long a key you press waits "
-        + "before it is heard, and how long everything in the mix has to be late without a gap. "
-        + "Smaller is tighter to play; larger is the first thing to try if the sound breaks up. "
-        + "Takes effect when the app is started again.";
+        + " ms";
+
+    /// <summary>What that reading means, which is the same for every position of the slider.</summary>
+    public string OutputBufferHint =>
+        "How long a key you press waits before it is heard, and how long everything in the mix "
+        + "has to be late without a gap. Smaller is tighter to play; larger is the first thing "
+        + "to try if the sound breaks up. Takes effect when the app is started again.";
 
     /// <summary>The hint about the rate, which is a different question.</summary>
     public string EngineRateHint =>

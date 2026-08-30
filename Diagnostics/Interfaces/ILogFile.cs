@@ -28,4 +28,18 @@ public interface ILogFile
     /// <param name="mostBytes">How big it is allowed to get before it is rolled over.</param>
     /// <returns>Whether it was rolled over just now.</returns>
     bool Roll(string path, long mostBytes);
+
+    /// <summary>
+    /// Deletes the log and the one before it, so what is left is what happens next.
+    /// </summary>
+    /// <remarks>
+    /// Both, because leaving the old one would clear a log and leave four megabytes of the same
+    /// thing beside it, which is not what anybody pressing this means.
+    ///
+    /// Fails in silence like everything else here: a file the system will not let go of is a
+    /// log that carries on, not an error in the middle of somebody's session.
+    /// </remarks>
+    /// <param name="path">The current file. The old one is the same name with .old on it.</param>
+    /// <returns>Whether anything was actually deleted.</returns>
+    bool Clear(string path);
 }

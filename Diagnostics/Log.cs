@@ -185,6 +185,37 @@ public static class Log
         Announce();
     }
 
+    /// <summary>
+    /// Throws away the log and the one before it, and starts a new one on this run.
+    /// </summary>
+    /// <remarks>
+    /// What is waiting is written and dropped first, or the lines already in the queue would be
+    /// appended to the file a moment after it was deleted and the log would look uncleared.
+    ///
+    /// The boundary line is said again afterwards, so the fresh file names the build and the
+    /// areas the way any other run does rather than starting mid-sentence. That is why
+    /// <see cref="Announce"/> is allowed to run twice in one process: this is the one thing
+    /// that makes a second one right.
+    /// </remarks>
+    /// <returns>Whether there was anything to throw away.</returns>
+    public static bool Clear()
+    {
+        Flush();
+
+        string path = Path;
+        if (path.Length == 0) return false;
+
+        bool went = Store.Clear(path);
+
+        if (IsOn)
+        {
+            _started = false;
+            Announce();
+        }
+
+        return went;
+    }
+
     /// <summary>Turns it off without forgetting where it was, and writes what is waiting.</summary>
     public static void Close()
     {
