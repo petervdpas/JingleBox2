@@ -573,11 +573,27 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             _cfg.OutputBufferSize = frames;
             _store.Save(_cfg);
 
+            ApplyAudioSizes();
+
             OnPropertyChanged(nameof(BufferStep));
             OnPropertyChanged(nameof(BufferReading));
             OnPropertyChanged(nameof(OutputSizesHint));
         }
     }
+
+    /// <summary>
+    /// Puts the sizes on the running output, so a change is heard now rather than next time.
+    /// </summary>
+    /// <remarks>
+    /// **A setting that needs a restart is a setting nobody tunes**, and finding a buffer that
+    /// suits a machine means trying several: every one of those used to be a restart and a fresh
+    /// listen. One place, called by all four setters, because they are one decision and four
+    /// copies of this line would be four chances for one of them to forget.
+    ///
+    /// Not the sample rate, which is the one that still waits: the mixer, every voice in it and
+    /// every plugin that has been told what it is fed at are all built from it.
+    /// </remarks>
+    private void ApplyAudioSizes() => Tracker.ApplyAudioSizes(Sizes, _cfg.RenderAheadMs);
 
     /// <summary>
     /// What the slider is on: the size, and the latency it comes to.
@@ -628,6 +644,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         set => Take(UpdatePeriods, value, _cfg.OutputUpdatePeriodMs, ms =>
         {
             _cfg.OutputUpdatePeriodMs = ms;
+            ApplyAudioSizes();
             OnPropertyChanged(nameof(SelectedUpdatePeriod));
             OnPropertyChanged(nameof(OutputSizesHint));
         });
@@ -661,6 +678,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         set => Take(UpdateThreads, value, _cfg.OutputUpdateThreads, count =>
         {
             _cfg.OutputUpdateThreads = count;
+            ApplyAudioSizes();
             OnPropertyChanged(nameof(SelectedUpdateThreads));
             OnPropertyChanged(nameof(OutputSizesHint));
         });
@@ -712,8 +730,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         ". The buffer is the latency: what you hear was mixed that long ago, and it is what a key " +
         "waits before it sounds. Too small for the machine and the mixing cannot keep up, which is " +
         "a stutter with no other explanation. These are per platform, since Linux is buffering " +
-        "underneath us already and Windows is not the same. All three take effect when the app is " +
-        "started again.";
+        "underneath us already and Windows is not the same. All three take effect at once, so the " +
+        "right one can be found by listening. If the sound goes strange afterwards, restart: " +
+        "reopening the output is not the same as starting clean, and the setting is remembered.";
 
     /// <summary>
     /// How far ahead of the sound card the tracker mixes, offered as words rather than numbers.
@@ -739,8 +758,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// </summary>
     /// <remarks>
     /// Read back off the settings by matching the number, so a cushion the settings hold that
-    /// nobody offers falls back to the tightest. Takes effect when the app is started again,
-    /// since the thread that does the mixing ahead is made once.
+    /// nobody offers falls back to the tightest. Takes effect at once: the output is opened again
+    /// with the new cushion, which starts or stops the mixing-ahead thread with it.
     /// </remarks>
     public string SelectedRenderAhead
     {
@@ -762,6 +781,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 _cfg.RenderAheadMs = milliseconds;
                 _store.Save(_cfg);
 
+                ApplyAudioSizes();
+
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(RenderAheadHint));
                 return;
@@ -775,11 +796,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             ? "Each block is mixed inside the call that asks for it, which is as tight as this gets. " +
               "A plugin that takes a moment longer than usual has nowhere to take it from, and what " +
               "comes out is a gap. Give it a cushion if the sound breaks up while plugins are playing. " +
-              "Takes effect when the app is started again."
+              "Takes effect at once."
             : "The mixer works " + _cfg.RenderAheadMs + " ms ahead on a thread of its own, so a plugin " +
               "being late eats into that instead of into the output. It also means what you hear was " +
               "mixed " + _cfg.RenderAheadMs + " ms ago, which is what a key you press waits before it " +
-              "sounds. Takes effect when the app is started again.";
+              "sounds. Takes effect at once.";
 
     /// <summary>
     /// Whether the app and its plugin processes write down what they are doing.
