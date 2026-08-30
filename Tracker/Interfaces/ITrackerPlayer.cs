@@ -211,6 +211,9 @@ public interface ITrackerPlayer : IDisposable
     /// </summary>
     void UseRenderAhead(int milliseconds);
 
+    /// <inheritdoc cref="Audio.Interfaces.ISynthOutput.UseSizes"/>
+    void UseSizes(Audio.Records.AudioSizes sizes);
+
     /// <summary>
     /// The chain of effects on a strip, made and put into the mix the first time it is asked
     /// for. A strip with nothing on it costs an empty chain, which does nothing per block.

@@ -843,6 +843,14 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio, machines);
+        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
+
+        _player.UseSizes(new Audio.AudioDefaults().Chosen(new Audio.Records.AudioSizes(
+            config?.OutputBufferMs ?? 0,
+            config?.OutputUpdatePeriodMs ?? 0,
+            config?.OutputUpdateThreads ?? 0)));
+
+        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
 
         Automation = new AutomationRecorder(
             () => Song,
@@ -871,8 +879,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         MasterEffect.Target = new TrackPluginTarget(_player, TrackerPlayer.MasterStrip);
 
-        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
-        _player.UseRenderAhead(config?.RenderAheadMs ?? 0);
         _store = new SongStore();
         _rack = rack;
         _recordings = recordings;

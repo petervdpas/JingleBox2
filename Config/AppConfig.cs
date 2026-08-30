@@ -183,6 +183,46 @@ public sealed class AppConfig
     public string RecordInputDevice { get; set; } = "";
 
     /// <summary>
+    /// How much audio the sound card holds ahead of what you hear, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// **Nought means whatever suits this machine**, which is <see cref="Audio.AudioDefaults"/>,
+    /// and not nought milliseconds. That is what lets a settings file written before this existed
+    /// sound exactly as it did, and what lets the same file be carried between a Linux machine and
+    /// a Windows one without carrying a number that suited neither.
+    ///
+    /// It is the latency: what the card is playing is what was mixed this long ago, so it is how
+    /// long a key waits before it sounds. Too small and the mixing thread cannot keep it fed and
+    /// what comes out has holes in it. This was a constant of sixty milliseconds, which is what
+    /// nought still gets you.
+    /// </remarks>
+    public int OutputBufferMs { get; set; }
+
+    /// <summary>
+    /// How often the sound library tops that buffer up, in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// Nought means whatever suits this machine, the same as the buffer above. A period that
+    /// cannot keep up with the buffer is a dropout with no other explanation, so the two are
+    /// chosen together: this was a constant of ten milliseconds against a buffer of sixty.
+    ///
+    /// It is a setting of the whole sound library rather than of one stream, so it reaches the
+    /// pads as well as the tracker.
+    /// </remarks>
+    public int OutputUpdatePeriodMs { get; set; }
+
+    /// <summary>
+    /// How many threads the sound library uses to top up the buffers.
+    /// </summary>
+    /// <remarks>
+    /// Nought leaves the library on its own default, which is one thread for every stream in the
+    /// application: a pad decoding a file then delays the tracker, and the tracker rendering a
+    /// block with a plugin in it delays every pad back. More than one lets a slow stream stop
+    /// holding up the others, and past four they wake to look at buffers that are already full.
+    /// </remarks>
+    public int OutputUpdateThreads { get; set; }
+
+    /// <summary>
     /// How far ahead of the sound card the tracker mixes, in milliseconds.
     /// </summary>
     /// <remarks>

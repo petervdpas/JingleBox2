@@ -486,6 +486,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// <inheritdoc/>
     public void UseRenderAhead(int milliseconds) => _synth.UseRenderAhead(milliseconds);
 
+    /// <inheritdoc/>
+    public void UseSizes(Audio.Records.AudioSizes sizes) => _synth.UseSizes(sizes);
+
     /// <summary>
     /// The strip that is not a track: the whole mix, after all of them.
     /// </summary>

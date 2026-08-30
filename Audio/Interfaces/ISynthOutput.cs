@@ -87,6 +87,26 @@ public interface ISynthOutput : IDisposable
     void UseRenderAhead(int milliseconds);
 
     /// <summary>
+    /// Says how the audio is to be sized: the buffer, how often it is topped up, and by how many
+    /// threads.
+    /// </summary>
+    /// <remarks>
+    /// All three together, because they are one decision: a buffer is only as good as how often it
+    /// is filled. They were three constants here, sixty milliseconds topped up every ten, and the
+    /// two that were invisible are the two that decide whether the sound comes out whole.
+    ///
+    /// The period and the thread count are settings of the whole sound library rather than of this
+    /// stream, so they reach the pads as well. This is where they are said because the tracker
+    /// holds the shortest buffer on the device, and the shortest buffer is the one that runs out
+    /// first.
+    ///
+    /// Takes effect when the stream is next opened, like the rate: the buffer is an attribute of a
+    /// stream that already exists and the period is read by the library when it starts updating.
+    /// </remarks>
+    /// <param name="sizes">What to use.</param>
+    void UseSizes(Records.AudioSizes sizes);
+
+    /// <summary>
     /// Opens the stream on first use, and opens it again if it has gone. Safe to call before
     /// every note.
     /// </summary>

@@ -30,6 +30,19 @@ public sealed class SynthOutput : ISynthOutput
     /// <summary>Milliseconds between BASS buffer updates. The default is far too slow for the above.</summary>
     public const int UpdatePeriodMs = 10;
 
+    /// <summary>
+    /// What the audio is sized at, which is the two constants above until somebody says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Held rather than read from the settings here, because this class knows about a sound card
+    /// and nothing about a settings file. Whoever has both hands it over.
+    /// </remarks>
+    private Records.AudioSizes _sizes =
+        new((int)(BufferSeconds * 1000), UpdatePeriodMs, 0);
+
+    /// <inheritdoc/>
+    public void UseSizes(Records.AudioSizes sizes) => _sizes = sizes;
+
     /// <summary>Held while the stream is opened or closed.</summary>
     private readonly object _lock = new();
 
@@ -198,7 +211,10 @@ public sealed class SynthOutput : ISynthOutput
                 if (rate > 0) SampleRate = rate;
             }
 
-            Bass.Configure(Configuration.UpdatePeriod, UpdatePeriodMs);
+            Bass.Configure(Configuration.UpdatePeriod, _sizes.UpdatePeriodMs);
+
+            if (_sizes.UpdateThreads > 0)
+                Bass.Configure(Configuration.UpdateThreads, _sizes.UpdateThreads);
 
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
@@ -206,7 +222,9 @@ public sealed class SynthOutput : ISynthOutput
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
                     ? "the synth stream would not open: " + Bass.LastError
-                    : "the synth stream is open at " + SampleRate + " Hz");
+                    : "the synth stream is open at " + SampleRate + " Hz, buffered "
+                      + _sizes.BufferMs + " ms, updated every " + _sizes.UpdatePeriodMs + " ms by "
+                      + (_sizes.UpdateThreads > 0 ? _sizes.UpdateThreads + " threads" : "the library's own thread"));
 
             if (_handle == 0)
             {
@@ -216,7 +234,7 @@ public sealed class SynthOutput : ISynthOutput
 
             StartMixingAhead();
 
-            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferSeconds);
+            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, _sizes.BufferMs / 1000f);
             Bass.ChannelPlay(_handle);
         }
     }

@@ -184,6 +184,38 @@
               </Grid>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding RenderAheadHint}" />
+
+              <!-- The three that decide whether the sound comes out whole, and two of them used
+                   to be constants nobody could reach. Together under one hint, because they are
+                   one decision: a buffer is only as good as how often it is topped up. -->
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">
+                <TextBlock Grid.Column="0" Classes="label" Text="Output buffer:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding OutputBufferLabels}"
+                          SelectedItem="{Binding SelectedOutputBuffer}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
+
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Topped up:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding UpdatePeriodLabels}"
+                          SelectedItem="{Binding SelectedUpdatePeriod}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
+
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                <TextBlock Grid.Column="0" Classes="label" Text="Filling threads:" />
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding UpdateThreadLabels}"
+                          SelectedItem="{Binding SelectedUpdateThreads}"
+                          HorizontalAlignment="Left"
+                          MinWidth="220" />
+              </Grid>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OutputSizesHint}" />
             </StackPanel>
           </Border>
 

@@ -509,6 +509,166 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     }
 
     /// <summary>
+    /// What the audio is sized at where nothing has been chosen, per platform.
+    /// </summary>
+    /// <remarks>
+    /// Held rather than made per read, since every one of the three settings below asks it what
+    /// nought means.
+    /// </remarks>
+    private readonly Audio.Interfaces.IAudioDefaults _audioDefaults = new Audio.AudioDefaults();
+
+    /// <summary>The three sizes as they stand, with nought resolved to this machine's default.</summary>
+    private Audio.Records.AudioSizes Sizes => _audioDefaults.Chosen(new Audio.Records.AudioSizes(
+        _cfg.OutputBufferMs, _cfg.OutputUpdatePeriodMs, _cfg.OutputUpdateThreads));
+
+    /// <summary>
+    /// How much audio the card holds ahead of what you hear, offered in milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// **Milliseconds and not frames.** Frames are what the sound library takes and what other
+    /// music software prints, and they are also a number that means something different at every
+    /// rate: 512 frames is 12 ms at 44100 and 11 at 48000. What is felt is the time, and what
+    /// decides whether the sound holds together is the time, so the time is what is chosen.
+    ///
+    /// The list starts above what anybody should need to go below. This was a constant of sixty
+    /// milliseconds for months and it was never the thing that made the sound bad.
+    /// </remarks>
+    private static readonly (int Milliseconds, string Label)[] OutputBuffers =
+    {
+        (0, "Default for this machine"),
+        (20, "20 ms (tight)"),
+        (40, "40 ms"),
+        (60, "60 ms"),
+        (100, "100 ms"),
+        (200, "200 ms (safe)")
+    };
+
+    /// <summary>The sizes on offer, for the picker to show.</summary>
+    public string[] OutputBufferLabels { get; } = OutputBuffers.Select(b => b.Label).ToArray();
+
+    /// <summary>Which one is in force, read back off the settings by its number.</summary>
+    public string SelectedOutputBuffer
+    {
+        get => Chosen(OutputBuffers, _cfg.OutputBufferMs);
+        set => Take(OutputBuffers, value, _cfg.OutputBufferMs, ms =>
+        {
+            _cfg.OutputBufferMs = ms;
+            OnPropertyChanged(nameof(SelectedOutputBuffer));
+            OnPropertyChanged(nameof(OutputSizesHint));
+        });
+    }
+
+    /// <summary>
+    /// How often the sound library tops the buffer up.
+    /// </summary>
+    /// <remarks>
+    /// Chosen beside the buffer because it is half of the same decision: a period that cannot keep
+    /// up with the buffer is a dropout with no other explanation.
+    /// </remarks>
+    private static readonly (int Milliseconds, string Label)[] UpdatePeriods =
+    {
+        (0, "Default for this machine"),
+        (5, "every 5 ms"),
+        (10, "every 10 ms"),
+        (20, "every 20 ms")
+    };
+
+    /// <inheritdoc cref="OutputBufferLabels"/>
+    public string[] UpdatePeriodLabels { get; } = UpdatePeriods.Select(u => u.Label).ToArray();
+
+    /// <inheritdoc cref="SelectedOutputBuffer"/>
+    public string SelectedUpdatePeriod
+    {
+        get => Chosen(UpdatePeriods, _cfg.OutputUpdatePeriodMs);
+        set => Take(UpdatePeriods, value, _cfg.OutputUpdatePeriodMs, ms =>
+        {
+            _cfg.OutputUpdatePeriodMs = ms;
+            OnPropertyChanged(nameof(SelectedUpdatePeriod));
+            OnPropertyChanged(nameof(OutputSizesHint));
+        });
+    }
+
+    /// <summary>
+    /// How many threads do the topping up.
+    /// </summary>
+    /// <remarks>
+    /// One is the sound library's own default and means one thread fills every stream in the
+    /// application in turn: a pad decoding a file delays the tracker, and the tracker rendering a
+    /// block with a plugin in it delays every pad back. More lets a slow stream stop holding up
+    /// the others. Past four they wake to look at buffers that are already full.
+    /// </remarks>
+    private static readonly (int Milliseconds, string Label)[] UpdateThreads =
+    {
+        (0, "Default for this machine"),
+        (1, "1 thread"),
+        (2, "2 threads"),
+        (3, "3 threads"),
+        (4, "4 threads")
+    };
+
+    /// <inheritdoc cref="OutputBufferLabels"/>
+    public string[] UpdateThreadLabels { get; } = UpdateThreads.Select(u => u.Label).ToArray();
+
+    /// <inheritdoc cref="SelectedOutputBuffer"/>
+    public string SelectedUpdateThreads
+    {
+        get => Chosen(UpdateThreads, _cfg.OutputUpdateThreads);
+        set => Take(UpdateThreads, value, _cfg.OutputUpdateThreads, count =>
+        {
+            _cfg.OutputUpdateThreads = count;
+            OnPropertyChanged(nameof(SelectedUpdateThreads));
+            OnPropertyChanged(nameof(OutputSizesHint));
+        });
+    }
+
+    /// <summary>The label whose number matches, or the first, which is always the default.</summary>
+    private static string Chosen((int Milliseconds, string Label)[] offered, int held)
+    {
+        foreach (var (number, label) in offered)
+        {
+            if (number == held) return label;
+        }
+
+        return offered[0].Label;
+    }
+
+    /// <summary>Takes a label back to its number, stores it, and says so.</summary>
+    /// <remarks>
+    /// Shared by the three above, which differ only in which field they write: three copies of
+    /// this loop would be three chances for one of them to forget to save.
+    /// </remarks>
+    private void Take(
+        (int Milliseconds, string Label)[] offered, string label, int held, Action<int> put)
+    {
+        foreach (var (number, name) in offered)
+        {
+            if (name != label || held == number) continue;
+
+            put(number);
+            _store.Save(_cfg);
+
+            return;
+        }
+    }
+
+    /// <summary>What the three add up to, in the numbers actually in force.</summary>
+    /// <remarks>
+    /// The resolved numbers rather than what is stored, since "Default for this machine" tells
+    /// nobody what their machine is doing. Said once under the three, because they are one
+    /// decision and reading them apart is how somebody sets a buffer of twenty and leaves it
+    /// topped up every twenty.
+    /// </remarks>
+    public string OutputSizesHint =>
+        "Running with " + Sizes.BufferMs + " ms of buffer, topped up every " +
+        Sizes.UpdatePeriodMs + " ms by " +
+        (Sizes.UpdateThreads > 0 ? Sizes.UpdateThreads + " threads" : "the sound library's own one thread") +
+        ". The buffer is the latency: what you hear was mixed that long ago, and it is what a key " +
+        "waits before it sounds. Too small for the machine and the mixing cannot keep up, which is " +
+        "a stutter with no other explanation. These are per platform, since Linux is buffering " +
+        "underneath us already and Windows is not the same. All three take effect when the app is " +
+        "started again.";
+
+    /// <summary>
     /// How far ahead of the sound card the tracker mixes, offered as words rather than numbers.
     /// </summary>
     /// <remarks>
