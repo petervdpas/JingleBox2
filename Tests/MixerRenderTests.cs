@@ -33,7 +33,7 @@ namespace JingleBox2.Tests;
 ///
 /// Two threads is not a hypothetical. The sound card's own thread renders in step and a thread
 /// of its own renders ahead into a queue, never both, except while one is being swapped for the
-/// other: <c>SynthOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread
+/// other: <c>TrackerOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread
 /// and then carries on regardless, rightly, since a plugin holding it up must not hang the
 /// application. Changing the output device or the render-ahead setting is that moment.
 /// </remarks>
@@ -629,5 +629,46 @@ public class MixerRenderTests
     {
         /// <inheritdoc/>
         public void Process(float[] buffer, int frames) { }
+    }
+
+    /// <summary>
+    /// A block of a different length does not rebuild the buffers.
+    /// </summary>
+    /// <remarks>
+    /// The sound card asks for what it asks for, and a real session's log reads "the tracker stream
+    /// is asking for between 8 and 529 frames at a time": with the buffers sized to the last block
+    /// rather than the largest, that reallocated the loose bus and one bus per sounding track on
+    /// very nearly every callback, which is a collection running inside the mix and a stutter you
+    /// can hear on a song with three notes in it.
+    ///
+    /// Counted rather than reasoned about: the thread's own allocation total over a run of blocks
+    /// whose lengths keep changing. A warm-up pass first, since the first block at any size builds
+    /// what it needs and is allowed to. Four voices, because a mixer with nothing sounding rests
+    /// before it reaches the buffers and would have passed this while the fault was still there.
+    ///
+    /// Checked by putting the fault back: twelve blocks allocate **0** bytes with the buffers
+    /// grown, and **300,544** with them sized to the last block.
+    /// </remarks>
+    [Fact]
+    public void A_different_block_size_does_not_rebuild_the_buffers()
+    {
+        var mixer = new TrackMixer(Rate);
+        var buffer = new float[1024 * 2];
+
+        int[] sizes = { 1024, 8, 64, 449, 529, 256 };
+
+        for (int track = 0; track < 4; track++)
+            mixer.NoteOn(track, 0, Loud(), new Note(48 + track), 1f, 0f);
+
+        foreach (var frames in sizes) mixer.Render(buffer, frames);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+
+        foreach (var frames in sizes) mixer.Render(buffer, frames);
+        foreach (var frames in sizes) mixer.Render(buffer, frames);
+
+        long taken = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.True(taken < 8192, "twelve blocks of shifting size allocated " + taken + " bytes");
     }
 }

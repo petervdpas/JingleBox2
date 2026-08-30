@@ -55,7 +55,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private readonly ISampleStore _samples = new SampleStore();
 
     /// <summary>The one stream everything sounds through, and the mixer behind it.</summary>
-    private readonly Audio.Interfaces.ISynthOutput _synth = new Audio.SynthOutput();
+    private readonly Audio.Interfaces.ITrackerOutput _synth = new Audio.TrackerOutput();
 
     /// <summary>Guards the song and its sequencer, which are replaced whole when a pass starts.</summary>
     private readonly object _lock = new();
@@ -511,6 +511,9 @@ public sealed class TrackerPlayer : ITrackerPlayer
 
     /// <inheritdoc/>
     public void UseSizes(Audio.Records.AudioSizes sizes) => _synth.UseSizes(sizes);
+
+    /// <inheritdoc/>
+    public void RestartOutput() => _synth.Restart(_audio);
 
     /// <summary>
     /// The strip that is not a track: the whole mix, after all of them.

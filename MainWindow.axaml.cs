@@ -168,7 +168,9 @@ public partial class MainWindow : Window
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
 
-        _audio = new BassAudioEngine(padCount: cfg.Rows * cfg.Columns);
+        _audio = new BassAudioEngine(
+            padCount: cfg.Rows * cfg.Columns,
+            deviceRate: cfg.EngineSampleRate);
 
         var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects);
         DataContext = vm;

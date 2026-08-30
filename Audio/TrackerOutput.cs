@@ -10,7 +10,7 @@ namespace JingleBox2.Audio;
 /// <remarks>
 /// Through BASS, as a stream BASS pulls from on its own thread.
 /// </remarks>
-public sealed class SynthOutput : ISynthOutput
+public sealed class TrackerOutput : ITrackerOutput
 {
     /// <summary>What the engine runs at when nothing better is known.</summary>
     public const int DefaultSampleRate = 44100;
@@ -198,7 +198,7 @@ public sealed class SynthOutput : ISynthOutput
             {
                 if (Bass.ChannelIsActive(_handle) == PlaybackState.Playing) return;
 
-                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, "the synth stream had gone; opening another");
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, "the tracker stream had gone; opening another");
 
                 StopMixingAhead();
 
@@ -224,8 +224,8 @@ public sealed class SynthOutput : ISynthOutput
 
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
-                    ? "the synth stream would not open: " + Bass.LastError
-                    : "the synth stream is open at " + SampleRate + " Hz, buffered "
+                    ? "the tracker stream would not open: " + Bass.LastError
+                    : "the tracker stream is open at " + SampleRate + " Hz, buffered "
                       + _sizes.BufferFrames + " frames (" + BufferMs + " ms), updated every " + _sizes.UpdatePeriodMs + " ms by "
                       + (_sizes.UpdateThreads > 0 ? _sizes.UpdateThreads + " threads" : "the library's own thread"));
 
@@ -240,6 +240,27 @@ public sealed class SynthOutput : ISynthOutput
             Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferMs / 1000f);
             Bass.ChannelPlay(_handle);
         }
+    }
+
+    /// <inheritdoc/>
+    public void Restart(IAudioEngine audio)
+    {
+        lock (_lock)
+        {
+            if (_disposed) return;
+
+            if (_handle != 0)
+            {
+                StopMixingAhead();
+
+                Bass.StreamFree(_handle);
+
+                _handle = 0;
+                _procedure = null;
+            }
+        }
+
+        EnsureStarted(audio);
     }
 
     /// <summary>What the output device is running at, or zero when it will not say.</summary>
@@ -487,8 +508,8 @@ public sealed class SynthOutput : ISynthOutput
 
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 low == high
-                    ? "the synth stream is asking for " + low + " frames at a time"
-                    : "the synth stream is asking for between " + low + " and " + high + " frames at a time");
+                    ? "the tracker stream is asking for " + low + " frames at a time"
+                    : "the tracker stream is asking for between " + low + " and " + high + " frames at a time");
         }
 
         if (_scratch.Length < samples) _scratch = new float[samples];

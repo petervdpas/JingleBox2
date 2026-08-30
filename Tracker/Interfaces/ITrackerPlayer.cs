@@ -228,8 +228,14 @@ public interface ITrackerPlayer : IDisposable
     /// </summary>
     void UseRenderAhead(int milliseconds);
 
-    /// <inheritdoc cref="Audio.Interfaces.ISynthOutput.UseSizes"/>
+    /// <inheritdoc cref="Audio.Interfaces.ITrackerOutput.UseSizes"/>
     void UseSizes(Audio.Records.AudioSizes sizes);
+
+    /// <summary>
+    /// Opens the output again so a size that was just changed is in force now.
+    /// </summary>
+    /// <remarks>Passed straight through. See <see cref="Audio.Interfaces.ITrackerOutput.Restart"/>.</remarks>
+    void RestartOutput();
 
     /// <summary>
     /// The chain of effects on a strip, made and put into the mix the first time it is asked

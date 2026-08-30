@@ -467,7 +467,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// </summary>
     public static (int Rate, string Label)[] EngineRates { get; } =
     {
-        (Audio.SynthOutput.FollowDevice, "Follow the output device"),
+        (Audio.TrackerOutput.FollowDevice, "Follow the output device"),
         (44100, "44100 Hz"),
         (48000, "48000 Hz"),
         (96000, "96000 Hz")
@@ -597,7 +597,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// </remarks>
     private int Rate => _cfg.EngineSampleRate > 0
         ? _cfg.EngineSampleRate
-        : Audio.SynthOutput.DefaultSampleRate;
+        : Audio.TrackerOutput.DefaultSampleRate;
 
     /// <summary>What a number of frames comes to in milliseconds, at the engine's rate.</summary>
     private int MillisecondsFor(int frames) =>

@@ -236,7 +236,7 @@ public sealed class AppConfig
     /// not earn its cost. What made a cushion look necessary was timing the mixing against the
     /// length of a block, eleven and a half milliseconds, as though a block late by one were a
     /// hole in the output. It is not: the stream is buffered sixty milliseconds ahead
-    /// (<c>SynthOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
+    /// (<c>TrackerOutput.BufferSeconds</c>) and BASS tops that up every ten, so a block that took
     /// longer than its own length is absorbed. Measured on the real output with a thread
     /// allocating hard enough to pause the process for a quarter of its wall time, thirty-two
     /// voices of synths, of recordings and of both: the sound card went without nothing, with
@@ -248,7 +248,7 @@ public sealed class AppConfig
     /// another process, and that is the case worth turning it on for, which is what the words
     /// in SETTINGS say.
     ///
-    /// See <c>JingleBox2.Audio.SynthOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
+    /// See <c>JingleBox2.Audio.TrackerOutput.UseRenderAhead</c>, and <c>docs/threads.md</c> for
     /// what the thread it starts is allowed to touch.
     /// </remarks>
     public int RenderAheadMs { get; set; }

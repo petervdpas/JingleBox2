@@ -147,7 +147,6 @@ public sealed class TrackMixer : ITrackMixer
     private float _previewGain = 1f;
 
     /// <summary>How long the last block was, so the busses are only rebuilt when it changes.</summary>
-    private int _bufferFrames;
 
     /// <summary>What one strip's side chain is set to.</summary>
     /// <param name="Depth">How far down the strip goes when the key is at full scale, 0 to 1.</param>
@@ -1218,7 +1217,7 @@ public sealed class TrackMixer : ITrackMixer
     /// It was never meant to have two, and for almost all of a run it does not: either the sound
     /// card's own thread renders in step, or a thread of its own renders ahead into a queue, and
     /// which of those is happening is decided by one number. The window is the changeover.
-    /// <c>SynthOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread and
+    /// <c>TrackerOutput.StopMixingAhead</c> waits two tenths of a second for the ahead thread and
     /// then carries on regardless, which is right, since a plugin holding it up must not hang the
     /// application, but it leaves that thread still inside here while the sound card's own thread
     /// starts. Changing the output device, or the render-ahead setting, is exactly that moment.
@@ -1619,7 +1618,7 @@ public sealed class TrackMixer : ITrackMixer
         {
             if (!_sounding[track]) continue;
 
-            _busses[track] ??= new float[samples];
+            _busses[track] ??= new float[_room];
             Array.Clear(_busses[track]!, 0, samples);
         }
 
@@ -1791,9 +1790,10 @@ public sealed class TrackMixer : ITrackMixer
     private void EnsureBusses(int frames)
     {
         int samples = frames * 2;
-        if (_bufferFrames == frames && _loose.Length >= samples) return;
 
-        _bufferFrames = frames;
+        if (samples <= _room) return;
+
+        _room = samples;
         _loose = new float[samples];
 
         for (int track = 0; track < MaxTracks; track++)
@@ -1801,6 +1801,30 @@ public sealed class TrackMixer : ITrackMixer
             if (_busses[track] != null) _busses[track] = new float[samples];
         }
     }
+
+    /// <summary>
+    /// The longest block these buffers have been asked for, which is the size they are all kept
+    /// at.
+    /// </summary>
+    /// <remarks>
+    /// **Grow only.** It held the last block's frame count and rebuilt every buffer here whenever
+    /// the next block was a different length. That is not a rare event, and this machine's own log
+    /// says so in as many words: <c>the tracker stream is asking for between 8 and 529 frames at a
+    /// time</c>. So the loose bus and one bus per sounding track were thrown away and allocated
+    /// again on very nearly every callback, tens of kilobytes at a time, thousands of times a
+    /// second, on the one thread with a deadline. The collector then runs during the mix, and a
+    /// collection stops every managed thread in the process including that one.
+    ///
+    /// Measured rather than argued: twelve blocks of shifting size allocate nought bytes grown,
+    /// and three hundred thousand sized to the last block. See
+    /// <c>Tests/MixerRenderTests.A_different_block_size_does_not_rebuild_the_buffers</c>.
+    ///
+    /// Nothing else has to change, because nothing in here is bounded by a buffer's own length:
+    /// every loop works to the <c>samples</c> or <c>frames</c> it was handed, and a buffer longer
+    /// than the block simply has room left at the end. <see cref="_previewScratch"/> has always
+    /// been grown this way, which is the rule this file already kept everywhere but here.
+    /// </remarks>
+    private int _room;
 
     /// <summary>Below this the bus is a wire; above it, it bends. Roughly -3 dB.</summary>
     public const float Knee = 0.7f;
@@ -1828,6 +1852,18 @@ public sealed class TrackMixer : ITrackMixer
 
     /// <inheritdoc/>
     /// <remarks>
+    /// **A meter may not take the mixer's lock.** This walked the whole voice list under
+    /// <c>_lock</c>, and what asks it is a timer twenty times a second, once per strip: a drawing
+    /// thread taking the lock the mixing thread needs, dozens of times a second, for a number
+    /// nobody can hear. That is the shape <c>docs/threads.md</c> warns about, written into the one
+    /// class the whole mix goes through.
+    ///
+    /// It reads the peak the render already measured off the track's own bus, which is a plain
+    /// float written by one thread and read by another. It is also the truer answer: what the
+    /// track sent, rather than the sum of what its voices thought they were worth. The two sides
+    /// read the same, since the measurement is of the bus rather than of a voice's pan, and a
+    /// meter is a loudness rather than a picture of the stereo field.
+    ///
     /// Bounded by how many tracks a song can have, deliberately. It once asked whether the
     /// track number was inside the volume column's own memory, which is made when a pass
     /// starts, so before one there were no tracks to report on at all and every track meter
@@ -1837,31 +1873,9 @@ public sealed class TrackMixer : ITrackMixer
     {
         if (track < 0 || track >= MaxTracks) return (0, 0);
 
-        float left = 0;
-        float right = 0;
+        float level = Math.Clamp(_trackLevels[track] * MasterGain, 0f, 1f);
 
-        lock (_lock)
-        {
-            foreach (var voice in _voices)
-            {
-                if (voice.Track != track || voice.IsFinished) continue;
-
-                float level = voice.Level * MasterGain * DuckGainFor(track);
-                float pan = voice.Pan;
-
-                left = Math.Max(left, level * (pan <= 0 ? 1f : 1f - pan));
-                right = Math.Max(right, level * (pan >= 0 ? 1f : 1f + pan));
-            }
-
-            if (_instruments[track] != null && _trackLevels[track] > 0)
-            {
-                float level = _trackLevels[track] * MasterGain * DuckGainFor(track);
-                left = Math.Max(left, level);
-                right = Math.Max(right, level);
-            }
-        }
-
-        return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
+        return (level, level);
     }
 
     /// <summary>

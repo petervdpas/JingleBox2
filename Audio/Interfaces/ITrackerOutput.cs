@@ -11,6 +11,11 @@ namespace JingleBox2.Audio.Interfaces;
 /// here and summing them in managed code is cheaper than handing the sound library dozens of
 /// channels to keep in step.
 ///
+/// **The tracker's rather than the synth's**, which is what it was called. That was true when
+/// this carried synth voices and nothing else, and it says the wrong thing about the one stream
+/// the whole song leaves through: recordings, kits and plugins in their own processes all cross
+/// it. The pads do not, since each of those is a channel of its own on the sound library.
+///
 /// The rate is fixed for the life of the mixer. Voices, filters and plugins all work their
 /// timings out from it, so it cannot move under them: it is asked for once, when the device is
 /// opened, and everything is built for it after that.
@@ -33,7 +38,7 @@ namespace JingleBox2.Audio.Interfaces;
 /// Everything else here is the drawing thread: opening a device, choosing how far ahead to run,
 /// and disposing.
 /// </remarks>
-public interface ISynthOutput : IDisposable
+public interface ITrackerOutput : IDisposable
 {
     /// <summary>What the engine is running at.</summary>
     int SampleRate { get; }
@@ -64,7 +69,7 @@ public interface ISynthOutput : IDisposable
     long Underruns { get; }
 
     /// <summary>
-    /// Asks for a rate, or for the device's own with <see cref="SynthOutput.FollowDevice"/>.
+    /// Asks for a rate, or for the device's own with <see cref="TrackerOutput.FollowDevice"/>.
     /// </summary>
     /// <remarks>
     /// Only heard before the mixer is built, which is why it comes from the settings at startup.
@@ -117,6 +122,27 @@ public interface ISynthOutput : IDisposable
     /// </remarks>
     /// <param name="audio">The engine that owns the device, opened first if it is not.</param>
     void EnsureStarted(IAudioEngine audio);
+
+    /// <summary>
+    /// Closes the stream and opens it again, so a size that was changed is in force now rather
+    /// than next time the application starts.
+    /// </summary>
+    /// <remarks>
+    /// **A setting that needs a restart is a setting nobody tunes.** The buffer, how often it is
+    /// topped up and how many threads do the topping are all read when the stream is opened, so
+    /// changing one used to mean closing the application, and finding a value that suits a machine
+    /// means trying several. Every one of those was a restart and a fresh listen.
+    ///
+    /// The mixing-ahead thread is stopped before the stream is freed and started again after, the
+    /// same order <see cref="EnsureStarted"/> uses when it finds a stream that has gone.
+    ///
+    /// Not the sample rate. Everything is built at that: the mixer, every voice in it and every
+    /// plugin that has been told what it is being fed at, so changing it live would mean building
+    /// all of them again and losing what is loaded. That one still says it waits for a restart,
+    /// and it is the only one that does.
+    /// </remarks>
+    /// <param name="audio">The engine, since opening a stream needs the device open first.</param>
+    void Restart(IAudioEngine audio);
 
     /// <summary>Silences the voices. The stream stays open, ready for the next note.</summary>
     void Silence();

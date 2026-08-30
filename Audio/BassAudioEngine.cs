@@ -80,8 +80,12 @@ public sealed class BassAudioEngine : IAudioEngine
     /// sound card can still start the application and look at it.
     /// </remarks>
     /// <param name="padCount">How many pads there are, which <see cref="Resize"/> can change.</param>
-    public BassAudioEngine(int padCount = 8)
+    /// <param name="deviceRate">What to open the card at, or nought for the default.</param>
+    /// <param name="rate">The rule that decides, handed in so it can be asked without a card.</param>
+    public BassAudioEngine(int padCount = 8, int deviceRate = 0, Interfaces.IOutputRate? rate = null)
     {
+        _deviceRate = (rate ?? new OutputRate()).Chosen(deviceRate);
+
         _padStreams = new int[padCount];
         _padKinds = new PadSourceKind[padCount];
         _padSources = new string?[padCount];
@@ -237,7 +241,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
             _currentDeviceId = deviceId;
 
-            if (!Bass.Init(deviceId, 44100))
+            if (!Bass.Init(deviceId, _deviceRate))
                 throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
 
             LoadPlugins();
@@ -573,12 +577,23 @@ public sealed class BassAudioEngine : IAudioEngine
         lock (_lock) EnsureInitLocked();
     }
 
+    /// <summary>
+    /// What the card is opened at, decided once on the way up.
+    /// </summary>
+    /// <remarks>
+    /// It was a literal 44100 in both places that open a device, while the tracker's mixer read
+    /// the rate from the settings. They agree at 44100 and nowhere else, and where they disagree
+    /// nothing says so: the sound is quietly resampled down to the card and back up by the system
+    /// mixer. See <see cref="Interfaces.IOutputRate"/>.
+    /// </remarks>
+    private readonly int _deviceRate;
+
     /// <summary>Opens BASS on the default output if nothing has. Called holding the lock.</summary>
     private void EnsureInitLocked()
     {
         if (_currentDeviceId >= 0) return;
 
-        if (!Bass.Init(0, 44100))
+        if (!Bass.Init(0, _deviceRate))
             throw new InvalidOperationException($"Bass.Init default device failed: {Bass.LastError}");
         _currentDeviceId = 0;
 

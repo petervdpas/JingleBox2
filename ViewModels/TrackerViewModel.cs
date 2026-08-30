@@ -914,7 +914,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
         _player = new TrackerPlayer(audio, machines);
-        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
+        _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
 
         _player.UseSizes(new Audio.AudioDefaults().Chosen(new Audio.Records.AudioSizes(
             config?.OutputBufferSize ?? 0,
@@ -2334,6 +2334,36 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         try
         {
             _player.EnsureEngine();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Puts new audio sizes on the output and opens it again, so they are in force now.
+    /// </summary>
+    /// <remarks>
+    /// **A setting that needs a restart is a setting nobody tunes**, and finding a buffer that
+    /// suits a machine means trying several. The cushion goes with them because it is the same
+    /// question asked at the other end and is read at the same moment.
+    ///
+    /// The sample rate is not here on purpose: the mixer, every voice and every plugin is built
+    /// at that rate, so it is the one that still waits for a restart.
+    ///
+    /// A failure is swallowed the way <see cref="ReopenAudio"/> swallows one: a sound card that
+    /// will not reopen is not something the settings page can do anything about, and it has
+    /// already said so in the log.
+    /// </remarks>
+    /// <param name="sizes">The buffer, the update period and the thread count.</param>
+    /// <param name="cushionMs">How far ahead to mix.</param>
+    public void ApplyAudioSizes(Audio.Records.AudioSizes sizes, int cushionMs)
+    {
+        try
+        {
+            _player.UseSizes(sizes);
+            _player.UseRenderAhead(cushionMs);
+            _player.RestartOutput();
         }
         catch (Exception)
         {
