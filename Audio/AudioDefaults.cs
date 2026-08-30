@@ -17,11 +17,17 @@ namespace JingleBox2.Audio;
 /// </remarks>
 public sealed class AudioDefaults : IAudioDefaults
 {
-    /// <summary>What Linux is given.</summary>
-    private static readonly AudioSizes Linux = new(60, 10, 0);
+    /// <summary>
+    /// What Linux is given: 2048 frames, which is 46 ms at 44100.
+    /// </summary>
+    /// <remarks>
+    /// The nearest stop on the slider to the sixty milliseconds this application ran as a
+    /// constant for weeks and which is the only figure anybody has actually listened to.
+    /// </remarks>
+    private static readonly AudioSizes Linux = new(2048, 10, 0);
 
     /// <summary>What Windows is given, until it has been measured there.</summary>
-    private static readonly AudioSizes Windows = new(60, 10, 0);
+    private static readonly AudioSizes Windows = new(2048, 10, 0);
 
     /// <inheritdoc/>
     public AudioSizes For(bool windows) => windows ? Windows : Linux;
@@ -35,7 +41,7 @@ public sealed class AudioDefaults : IAudioDefaults
         var fallback = Here;
 
         return new AudioSizes(
-            stored.BufferMs > 0 ? stored.BufferMs : fallback.BufferMs,
+            stored.BufferFrames > 0 ? stored.BufferFrames : fallback.BufferFrames,
             stored.UpdatePeriodMs > 0 ? stored.UpdatePeriodMs : fallback.UpdatePeriodMs,
             stored.UpdateThreads > 0 ? stored.UpdateThreads : fallback.UpdateThreads);
     }

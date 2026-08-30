@@ -17,13 +17,13 @@ public class AudioDefaultsTests
 {
     private readonly IAudioDefaults _defaults = new AudioDefaults();
 
-    /// <summary>The default is what this application played for months before it was a setting.</summary>
+    /// <summary>The default is the nearest size to the sixty milliseconds it ran as a constant.</summary>
     [Fact]
-    public void Linux_gets_what_the_constants_were()
+    public void Linux_gets_the_size_nearest_what_the_constant_was()
     {
         var sizes = _defaults.For(windows: false);
 
-        Assert.Equal(60, sizes.BufferMs);
+        Assert.Equal(2048, sizes.BufferFrames);
         Assert.Equal(10, sizes.UpdatePeriodMs);
     }
 
@@ -33,7 +33,7 @@ public class AudioDefaultsTests
     {
         var sizes = _defaults.For(windows: true);
 
-        Assert.True(sizes.BufferMs > 0);
+        Assert.True(sizes.BufferFrames > 0);
         Assert.True(sizes.UpdatePeriodMs > 0);
     }
 
@@ -57,7 +57,7 @@ public class AudioDefaultsTests
     {
         var chosen = _defaults.Chosen(new AudioSizes(0, 0, 0));
 
-        Assert.Equal(_defaults.Here.BufferMs, chosen.BufferMs);
+        Assert.Equal(_defaults.Here.BufferFrames, chosen.BufferFrames);
         Assert.Equal(_defaults.Here.UpdatePeriodMs, chosen.UpdatePeriodMs);
     }
 
@@ -65,9 +65,9 @@ public class AudioDefaultsTests
     [Fact]
     public void What_was_chosen_is_kept()
     {
-        var chosen = _defaults.Chosen(new AudioSizes(200, 20, 3));
+        var chosen = _defaults.Chosen(new AudioSizes(512, 20, 3));
 
-        Assert.Equal(200, chosen.BufferMs);
+        Assert.Equal(512, chosen.BufferFrames);
         Assert.Equal(20, chosen.UpdatePeriodMs);
         Assert.Equal(3, chosen.UpdateThreads);
     }
@@ -78,7 +78,7 @@ public class AudioDefaultsTests
     {
         var chosen = _defaults.Chosen(new AudioSizes(0, 20, 0));
 
-        Assert.Equal(_defaults.Here.BufferMs, chosen.BufferMs);
+        Assert.Equal(_defaults.Here.BufferFrames, chosen.BufferFrames);
         Assert.Equal(20, chosen.UpdatePeriodMs);
         Assert.Equal(_defaults.Here.UpdateThreads, chosen.UpdateThreads);
     }

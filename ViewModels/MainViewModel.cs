@@ -519,44 +519,89 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
     /// <summary>The three sizes as they stand, with nought resolved to this machine's default.</summary>
     private Audio.Records.AudioSizes Sizes => _audioDefaults.Chosen(new Audio.Records.AudioSizes(
-        _cfg.OutputBufferMs, _cfg.OutputUpdatePeriodMs, _cfg.OutputUpdateThreads));
+        _cfg.OutputBufferSize, _cfg.OutputUpdatePeriodMs, _cfg.OutputUpdateThreads));
 
     /// <summary>
-    /// How much audio the card holds ahead of what you hear, offered in milliseconds.
+    /// The buffer sizes on offer, in frames.
     /// </summary>
     /// <remarks>
-    /// **Milliseconds and not frames.** Frames are what the sound library takes and what other
-    /// music software prints, and they are also a number that means something different at every
-    /// rate: 512 frames is 12 ms at 44100 and 11 at 48000. What is felt is the time, and what
-    /// decides whether the sound holds together is the time, so the time is what is chosen.
+    /// **Frames on the slider and the latency printed beside it**, which is what every other
+    /// audio application does: LMMS, Ardour and Reaper all read "Buffer size 512" with the
+    /// milliseconds next to it. Frames are what the sound library takes and what somebody
+    /// comparing this with their interface looks for; the milliseconds are what is actually felt,
+    /// and they follow from the rate, so 512 frames is 12 ms at 44100 and 11 at 48000.
     ///
-    /// The list starts above what anybody should need to go below. This was a constant of sixty
-    /// milliseconds for months and it was never the thing that made the sound bad.
+    /// The slider runs over the **places** in this list rather than over the sizes, because the
+    /// sizes double at each step: a slider over the numbers themselves would give the whole low
+    /// half of the range a hair's width and hand the top two sizes most of the travel.
     /// </remarks>
-    private static readonly (int Milliseconds, string Label)[] OutputBuffers =
-    {
-        (0, "Default for this machine"),
-        (20, "20 ms (tight)"),
-        (40, "40 ms"),
-        (60, "60 ms"),
-        (100, "100 ms"),
-        (200, "200 ms (safe)")
-    };
+    private static readonly int[] BufferChoices =
+        { 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
 
-    /// <summary>The sizes on offer, for the picker to show.</summary>
-    public string[] OutputBufferLabels { get; } = OutputBuffers.Select(b => b.Label).ToArray();
+    /// <summary>How far along that list the slider may go.</summary>
+    public double BufferSteps => BufferChoices.Length - 1;
 
-    /// <summary>Which one is in force, read back off the settings by its number.</summary>
-    public string SelectedOutputBuffer
+    /// <summary>
+    /// Which place on the list is chosen, which is what the slider moves.
+    /// </summary>
+    /// <remarks>
+    /// Nothing stored reads as this machine's own default, so the slider opens where the sound
+    /// actually is rather than at one end. Storing it is what makes it stop being the default.
+    /// </remarks>
+    public double BufferStep
     {
-        get => Chosen(OutputBuffers, _cfg.OutputBufferMs);
-        set => Take(OutputBuffers, value, _cfg.OutputBufferMs, ms =>
+        get
         {
-            _cfg.OutputBufferMs = ms;
-            OnPropertyChanged(nameof(SelectedOutputBuffer));
+            int wanted = Sizes.BufferFrames;
+            int nearest = 0;
+
+            for (int at = 1; at < BufferChoices.Length; at++)
+            {
+                if (Math.Abs(BufferChoices[at] - wanted) < Math.Abs(BufferChoices[nearest] - wanted))
+                    nearest = at;
+            }
+
+            return nearest;
+        }
+        set
+        {
+            int at = Math.Clamp((int)Math.Round(value), 0, BufferChoices.Length - 1);
+            int frames = BufferChoices[at];
+
+            if (_cfg.OutputBufferSize == frames) return;
+
+            _cfg.OutputBufferSize = frames;
+            _store.Save(_cfg);
+
+            OnPropertyChanged(nameof(BufferStep));
+            OnPropertyChanged(nameof(BufferReading));
             OnPropertyChanged(nameof(OutputSizesHint));
-        });
+        }
     }
+
+    /// <summary>
+    /// What the slider is on: the size, and the latency it comes to.
+    /// </summary>
+    /// <remarks>
+    /// Short, because it stands beside the slider and the pair has to fit a narrow window. What
+    /// it means, and whether it is this machine's default, is said once underneath rather than
+    /// twice.
+    /// </remarks>
+    public string BufferReading =>
+        Sizes.BufferFrames + " · " + MillisecondsFor(Sizes.BufferFrames) + " ms";
+
+    /// <summary>What rate the arithmetic between frames and milliseconds is done at.</summary>
+    /// <remarks>
+    /// The setting rather than what the device came up at, since the slider has to answer before
+    /// anything is open. They are the same number in every case anybody has run.
+    /// </remarks>
+    private int Rate => _cfg.EngineSampleRate > 0
+        ? _cfg.EngineSampleRate
+        : Audio.SynthOutput.DefaultSampleRate;
+
+    /// <summary>What a number of frames comes to in milliseconds, at the engine's rate.</summary>
+    private int MillisecondsFor(int frames) =>
+        Math.Max(1, (int)Math.Round(frames * 1000.0 / Rate));
 
     /// <summary>
     /// How often the sound library tops the buffer up.
@@ -573,10 +618,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         (20, "every 20 ms")
     };
 
-    /// <inheritdoc cref="OutputBufferLabels"/>
+    /// <summary>The choices, for the picker to show.</summary>
     public string[] UpdatePeriodLabels { get; } = UpdatePeriods.Select(u => u.Label).ToArray();
 
-    /// <inheritdoc cref="SelectedOutputBuffer"/>
+    /// <summary>Which one is in force, read back off the settings by its number.</summary>
     public string SelectedUpdatePeriod
     {
         get => Chosen(UpdatePeriods, _cfg.OutputUpdatePeriodMs);
@@ -606,10 +651,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         (4, "4 threads")
     };
 
-    /// <inheritdoc cref="OutputBufferLabels"/>
+    /// <summary>The choices, for the picker to show.</summary>
     public string[] UpdateThreadLabels { get; } = UpdateThreads.Select(u => u.Label).ToArray();
 
-    /// <inheritdoc cref="SelectedOutputBuffer"/>
+    /// <summary>Which one is in force, read back off the settings by its number.</summary>
     public string SelectedUpdateThreads
     {
         get => Chosen(UpdateThreads, _cfg.OutputUpdateThreads);
@@ -659,7 +704,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// topped up every twenty.
     /// </remarks>
     public string OutputSizesHint =>
-        "Running with " + Sizes.BufferMs + " ms of buffer, topped up every " +
+        "Running with " + Sizes.BufferFrames + " frames of buffer" +
+        (_cfg.OutputBufferSize <= 0 ? " (this machine's default)" : "") + ", " +
+        MillisecondsFor(Sizes.BufferFrames) + " ms, topped up every " +
         Sizes.UpdatePeriodMs + " ms by " +
         (Sizes.UpdateThreads > 0 ? Sizes.UpdateThreads + " threads" : "the sound library's own one thread") +
         ". The buffer is the latency: what you hear was mixed that long ago, and it is what a key " +

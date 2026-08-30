@@ -190,11 +190,13 @@
                    one decision: a buffer is only as good as how often it is topped up. -->
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,6,0,0">
                 <TextBlock Grid.Column="0" Classes="label" Text="Output buffer:" />
-                <ComboBox Grid.Column="1"
-                          ItemsSource="{Binding OutputBufferLabels}"
-                          SelectedItem="{Binding SelectedOutputBuffer}"
-                          HorizontalAlignment="Left"
-                          MinWidth="220" />
+                <views:RangeField Grid.Column="1"
+                                  HorizontalAlignment="Left"
+                                  Minimum="0"
+                                  Maximum="{Binding BufferSteps}"
+                                  Value="{Binding BufferStep, Mode=TwoWay}"
+                                  Reading="{Binding BufferReading}"
+                                  SliderWidth="200" />
               </Grid>
 
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">

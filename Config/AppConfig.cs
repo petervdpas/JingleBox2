@@ -183,20 +183,26 @@ public sealed class AppConfig
     public string RecordInputDevice { get; set; } = "";
 
     /// <summary>
-    /// How much audio the sound card holds ahead of what you hear, in milliseconds.
+    /// How much audio the sound card holds ahead of what you hear, in frames.
     /// </summary>
     /// <remarks>
     /// **Nought means whatever suits this machine**, which is <see cref="Audio.AudioDefaults"/>,
-    /// and not nought milliseconds. That is what lets a settings file written before this existed
-    /// sound exactly as it did, and what lets the same file be carried between a Linux machine and
-    /// a Windows one without carrying a number that suited neither.
+    /// and not nought frames. That is what lets a settings file written before this existed sound
+    /// exactly as it did, and what lets the same file be carried between a Linux machine and a
+    /// Windows one without carrying a number that suited neither.
     ///
-    /// It is the latency: what the card is playing is what was mixed this long ago, so it is how
-    /// long a key waits before it sounds. Too small and the mixing thread cannot keep it fed and
-    /// what comes out has holes in it. This was a constant of sixty milliseconds, which is what
-    /// nought still gets you.
+    /// **Frames rather than milliseconds**, because that is what every other audio application
+    /// asks for and what the sound library takes. The milliseconds are printed beside it and are
+    /// the thing actually felt: it is the latency, so what the card is playing is what was mixed
+    /// that long ago, and it is how long a key waits before it sounds. Too small and the mixing
+    /// cannot keep it fed and what comes out has holes in it.
+    ///
+    /// Its own name rather than the one the newer work used, deliberately: a settings file that
+    /// has been through that work holds a frame count chosen by a measurement that was made with
+    /// nothing playing, and reading it here would put that number back into a build it was never
+    /// measured for.
     /// </remarks>
-    public int OutputBufferMs { get; set; }
+    public int OutputBufferSize { get; set; }
 
     /// <summary>
     /// How often the sound library tops that buffer up, in milliseconds.

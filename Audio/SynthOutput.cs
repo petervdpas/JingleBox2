@@ -37,8 +37,11 @@ public sealed class SynthOutput : ISynthOutput
     /// Held rather than read from the settings here, because this class knows about a sound card
     /// and nothing about a settings file. Whoever has both hands it over.
     /// </remarks>
-    private Records.AudioSizes _sizes =
-        new((int)(BufferSeconds * 1000), UpdatePeriodMs, 0);
+    private Records.AudioSizes _sizes = new(2048, UpdatePeriodMs, 0);
+
+    /// <summary>What the buffer comes to in milliseconds at the rate in force.</summary>
+    private int BufferMs =>
+        Math.Max(1, (int)Math.Round(_sizes.BufferFrames * 1000.0 / Math.Max(1, SampleRate)));
 
     /// <inheritdoc/>
     public void UseSizes(Records.AudioSizes sizes) => _sizes = sizes;
@@ -223,7 +226,7 @@ public sealed class SynthOutput : ISynthOutput
                 _handle == 0
                     ? "the synth stream would not open: " + Bass.LastError
                     : "the synth stream is open at " + SampleRate + " Hz, buffered "
-                      + _sizes.BufferMs + " ms, updated every " + _sizes.UpdatePeriodMs + " ms by "
+                      + _sizes.BufferFrames + " frames (" + BufferMs + " ms), updated every " + _sizes.UpdatePeriodMs + " ms by "
                       + (_sizes.UpdateThreads > 0 ? _sizes.UpdateThreads + " threads" : "the library's own thread"));
 
             if (_handle == 0)
@@ -234,7 +237,7 @@ public sealed class SynthOutput : ISynthOutput
 
             StartMixingAhead();
 
-            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, _sizes.BufferMs / 1000f);
+            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferMs / 1000f);
             Bass.ChannelPlay(_handle);
         }
     }

@@ -846,7 +846,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.SynthOutput.FollowDevice);
 
         _player.UseSizes(new Audio.AudioDefaults().Chosen(new Audio.Records.AudioSizes(
-            config?.OutputBufferMs ?? 0,
+            config?.OutputBufferSize ?? 0,
             config?.OutputUpdatePeriodMs ?? 0,
             config?.OutputUpdateThreads ?? 0)));
 
