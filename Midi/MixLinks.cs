@@ -51,8 +51,17 @@ public static class MixLinks
         Scope = ControlScope.Fixed,
         Track = track,
         Mix = what,
+        Owner = Strip(track),
         Name = Said(what, track)
     };
+
+    /// <summary>Which strip, as a heading over everything pointed at it.</summary>
+    /// <remarks>
+    /// The master is not a track and is not counted among them, so it is named rather than
+    /// numbered. See <see cref="Tracker.TrackerPlayer.MasterStrip"/>.
+    /// </remarks>
+    private static string Strip(int track) =>
+        track == Tracker.TrackerPlayer.MasterStrip ? "Master" : "Track " + (track + 1);
 
     /// <summary>What to call it in a list of links, which is where eight of them sit together.</summary>
     /// <remarks>

@@ -346,73 +346,10 @@
             </StackPanel>
           </Border>
 
-          <Border Classes="card">
-            <StackPanel Classes="cardBody">
-              <TextBlock Classes="cardTitle" Text="Knobs and faders" />
-
-              <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="What your controller does whatever you open. Press Ctrl+Shift+M with a machine's panel open on the rack, rest the pointer on a knob until it glows, and touch the control on your desk. What you point at on an instrument in a song belongs to that song instead, and is listed in the tracker under MIDI CC." />
-
-              <Border Classes="inset" IsVisible="{Binding Links.HasLinks}">
-                <!-- Under the controller each was learned on. Flat, the list runs on: one knob
-                     can hold a job per machine, and two controllers interleave by number into
-                     something nobody can read. -->
-                <ItemsControl ItemsSource="{Binding Links.Controllers}">
-                  <ItemsControl.ItemTemplate>
-                   <DataTemplate>
-                    <StackPanel Margin="0,0,0,10">
-                      <TextBlock Classes="cardHint" FontWeight="SemiBold" Margin="0,0,0,4"
-                                 Text="{Binding Said}" />
-
-                      <ItemsControl ItemsSource="{Binding Links}" Margin="10,0,0,0">
-                       <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
-                        <TextBlock Grid.Column="0" VerticalAlignment="Center"
-                                   FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
-                                   Text="{Binding Control}" />
-
-                        <!-- Which controller, said once on the heading above rather than on
-                             every row under it. -->
-                        <TextBlock Grid.Column="1" VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis" Text="{Binding What}" />
-
-                        <!-- Only when it is pinned to a track. Almost every link follows
-                             you, and a column saying so on every row says nothing. -->
-                        <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
-                                   IsVisible="{Binding IsPinned}"
-                                   Text="{Binding Where}" />
-
-                        <!-- Pressed when the guess was wrong. A button that repeats while it
-                             is held sends what an encoder sends, so this cannot be right every
-                             time, and past the end of the list it goes back to listening. -->
-                        <Button Grid.Column="3" Classes="page"
-                                Content="{Binding How}"
-                                Command="{Binding NextCommand}"
-                                ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
-
-                        <Button Grid.Column="5" Content="Forget" Classes="danger"
-                                Command="{Binding ForgetCommand}" />
-                      </Grid>
-                        </DataTemplate>
-                       </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </StackPanel>
-                   </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </Border>
-
-              <TextBlock Classes="cardHint"
-                         IsVisible="{Binding !Links.HasLinks}"
-                         Text="Nothing is pointed at anything yet." />
-
-              <Button Content="Forget them all" Classes="danger"
-                      HorizontalAlignment="Left"
-                      IsVisible="{Binding Links.HasLinks}"
-                      Command="{Binding Links.ForgetAllCommand}" />
-            </StackPanel>
-          </Border>
+          <!-- The desk's links, and the same list the tracker's MIDI CC page draws under the
+               song's own. Here because this is where the hardware is looked after; there
+               because that is where the pointing gesture is made. One list, two places. -->
+          <views:ControlLinksView DataContext="{Binding Links}" />
 
           </StackPanel>
         </ScrollViewer>

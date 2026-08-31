@@ -307,6 +307,62 @@ public sealed class ControlLink
     }
 
     /// <summary>
+    /// Lays several links down at once, as one act.
+    /// </summary>
+    /// <remarks>
+    /// What an import is. The rules are the ones a link made by hand keeps, and they have to be:
+    /// one control does one job, so an arriving link displaces whatever held its control and
+    /// whatever else was pointed at its target, in both layers. A template that half applied
+    /// because it was laid down some other way would be worse than one that was refused.
+    ///
+    /// One act rather than a run of them. The song's undo is told once, so taking an import back
+    /// is one press rather than one per knob; the lists are said to have changed once, so the
+    /// page is not rebuilt forty times; and the settings are written once. That is also why this
+    /// is here rather than a loop at the caller: a caller looping over <see cref="Handle"/> would
+    /// be right about every link and wrong about the whole.
+    /// </remarks>
+    /// <param name="arriving">The links to lay down. Each is taken as it is, hardware and all.</param>
+    /// <param name="intoSong">
+    /// True to put them in the open song's own layout rather than on the desk. Ignored when
+    /// there is no song, since a link has to live somewhere.
+    /// </param>
+    public int Take(IEnumerable<ControlMapping>? arriving, bool intoSong = false)
+    {
+        var all = arriving?.Where(one => one is not null).ToList() ?? new List<ControlMapping>();
+
+        if (all.Count == 0) return 0;
+
+        var song = intoSong ? Song?.Invoke() : null;
+
+        Changing();
+
+        foreach (var one in all)
+        {
+            Displace(Song?.Invoke(), one);
+            lock (_lock) Displace(_mappings, one);
+
+            if (song is not null) song.Add(one);
+            else lock (_lock) _mappings.Add(one);
+        }
+
+        if (song is not null) SongChanged?.Invoke();
+
+        _changed();
+
+        Log.Write(LogArea.Midi, () =>
+            "link: took " + all.Count + " links on to " + (song is not null ? "this song" : "the desk"));
+
+        Say(() =>
+        {
+            foreach (var one in all) Linked?.Invoke(one);
+
+            Changed?.Invoke();
+        });
+
+        return all.Count;
+    }
+
+    /// <summary>
     /// Everything pointed at anything: the song's layout first, then the desk's.
     /// </summary>
     /// <remarks>

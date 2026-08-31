@@ -56,6 +56,7 @@ public static class TransportLinks
         Kind = ControlKind.Transport,
         Scope = ControlScope.Fixed,
         Transport = key,
+        Owner = "Transport",
         Name = said
     };
 }

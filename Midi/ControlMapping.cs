@@ -124,6 +124,26 @@ public sealed class ControlMapping
     /// <summary>What to call it in a list of mappings. Filled in when it is learned.</summary>
     public string Name { get; set; } = "";
 
+    /// <summary>
+    /// What it is pointed at, by the name a person reads: a machine, an effect, a mixer strip
+    /// or the transport.
+    /// </summary>
+    /// <remarks>
+    /// The ids above say which thing this is about and are the only ones that decide anything;
+    /// this is the same fact in the words on the front of it, and it is here because a list of
+    /// links is read rather than resolved. Grouping by <see cref="Machine"/> would head a card
+    /// "oddskilla", which is a folder name, and a plugin's id is a hash.
+    ///
+    /// <see cref="Name"/> is this and the control's own words run together, which is how it was
+    /// written at every place a link is made and is why the two are not one field: a card
+    /// headed with the machine wants the rest of the sentence on the row under it, and there is
+    /// no way back to the two halves once they are one string.
+    ///
+    /// Empty on a link made before this existed. Such a link is grouped by its ids exactly as
+    /// any other, and only its heading is plainer.
+    /// </remarks>
+    public string Owner { get; set; } = "";
+
     /// <summary>One of its own, for a song keeping a copy of what it was handed.</summary>
     public static ControlMapping Copy(ControlMapping one) => new()
     {
@@ -143,7 +163,8 @@ public sealed class ControlMapping
         Transport = one.Transport,
         Pickup = one.Pickup,
         Turn = one.Turn,
-        Name = one.Name
+        Name = one.Name,
+        Owner = one.Owner
     };
 
     /// <summary>True when this mapping and that message are about each other.</summary>

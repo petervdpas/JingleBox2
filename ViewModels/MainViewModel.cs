@@ -9,6 +9,7 @@ using JingleBox2.Audio.Records;
 using JingleBox2.UI;
 using System;
 using Avalonia.Threading;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -138,6 +139,18 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
     /// <summary>What the controller is pointed at, for the list in SETTINGS.</summary>
     public ControlLinksViewModel Links { get; private set; } = null!;
+
+    /// <summary>
+    /// Which MIDI ports this computer has, asked rather than held.
+    /// </summary>
+    /// <remarks>
+    /// A template names its controller as a profile calls it, since a port is spelled
+    /// differently on every system, so opening one means looking through what is actually
+    /// plugged in. Asked each time because a controller can be connected while the page is
+    /// open, and a list read when the page was built would refuse the device somebody has just
+    /// put on the desk.
+    /// </remarks>
+    private IEnumerable<string> Ports() => Midi.Devices.Select(one => one.Name).ToList();
 
     /// <summary>RECORD: taking a recording, and the shelf everything else fetches takes off.</summary>
     public RecordViewModel Record { get; }
@@ -1397,9 +1410,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink.SongChanging = () => Tracker.ControlsChanging();
 
-        Links = new ControlLinksViewModel(ControlLink, profiles: _profiles);
+        Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
 
-        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true, profiles: _profiles);
+        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true, profiles: _profiles, ports: Ports);
+
+        Tracker.DeskControls = Links;
 
         var transport = new MidiTransportRouter(new TransportAdapter(Transport), _profiles);
 

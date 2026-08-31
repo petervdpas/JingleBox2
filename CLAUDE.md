@@ -865,6 +865,68 @@ whole exercise and is worth writing down rather than summarising:
   one list showing both with a word beside each row reads as a leak whatever the word says.
   Moving a link between the layers was built and taken out again: what anybody actually wants
   is a new song that starts with a layout already on it, which is a song template
+- **The two link layers are drawn as cards, one per thing the hardware is pointed at, and the
+  tracker's MIDI CC page shows both.** The song's own above and the desk's below, headed This
+  song and Templates, and a card per target with a section per controller inside it. That pair,
+  one controller against one target, is the unit the whole thing is for: it means the same on
+  anybody's installation, so it is what can be handed to somebody else. `docs/control-templates.md`
+  is what is built and what is next
+- The word for a machine, an effect or a mixer strip, taken together, is **target**, which is
+  what `IControlTarget` has meant since the beginning rather than something invented for the
+  page. It is deliberately not called a device, although that is what Renoise, Bitwig and
+  Ableton all call it: this is a page about MIDI, where device already means the box on the
+  desk, and the two ends of the wire may not share a name. `ControlDeviceLinks` became
+  `ControllerLinks` for the same reason. The umbrella is not shown at all in the interface,
+  where a card is headed with the thing itself and the sort of thing is a quiet word beside it,
+  so nobody has to learn the word to read the page
+- The desk's list is now in two places and is one list rather than a copy: SETTINGS because that
+  is where the hardware is looked after, the tracker because that is where the pointing gesture
+  is made, one button along from the rack. `Views/ControlLinksView.axaml` is that one drawing,
+  bound to a layer rather than to whoever holds one. It had been written out twice and the two
+  had already drifted apart by a column
+- `ControlMapping.Owner` is what a link is pointed at in the words on the front of it, beside
+  the ids that decide. Separate from `Name`, which is the owner and the control run together:
+  under a card headed OddSkilla the rows want the rest of the sentence, and there is no way back
+  to the two halves once they are one string. A link made before it existed has the name read
+  back out of it instead, since every one of those was written as the owner and the parameter
+  key run together, and removing the key leaves the owner. Machines only: a plugin's parameter
+  is named by the plugin and was never written down here, so an old effect link keeps its id as
+  a heading, which is plain and is still the right card
+- One list is one layer, and that is not the same rule as one page is one layer, which is what
+  the code used to lean on. The two poured into one with a word beside each row was the thing
+  that could not work, and it is still true; two lists side by side, each headed with how far
+  its links reach, are two lists
+- **A template is a file, `*.jbtl`, and it is written and read where the cards are drawn.** JSON,
+  written whole, in `templates/` under the application folder by default and openable from
+  anywhere, since the point of one is that it travels. Every value in it is a word rather than a
+  number out of an enum, so it can be read, corrected and sent on by somebody who has never seen
+  this code, and `parameter` is one field for all four kinds because to a knob a machine's key,
+  a plugin's number, one of the mixer's six words and one of the transport's five are one
+  question in four vocabularies. Export is on the controller's line inside a card rather than on
+  the card, since a card can hold two controllers and a file holding both would land on somebody
+  who has one of them
+- The port is the only thing in a link that cannot travel, and settling it is the only conversion
+  an import does. The same nanoKONTROL2 is `nanoKONTROL2 _ CTRL` to the ALSA sequencer and
+  `nanoKONTROL2 _ SLIDER/KNOB` to rawmidi, and Windows spells it a third way, so a file names the
+  controller as its profile calls it and the ports are looked through on arrival. A controller
+  that is not plugged in keeps the name the file carried and its links wait for it, which is the
+  rule a link already kept: a controller left in the other room is not a decision to unwire it.
+  Said out loud, because a template that applies perfectly and moves nothing until the device
+  arrives reads exactly like a file that failed to open
+- Conflicts needed no new rule. `ControlLink.Take` lays a batch down by the rules a link made by
+  hand keeps, so an arriving link displaces whatever held its control and whatever else was
+  pointed at its target, and importing the same template twice leaves what once did. One act
+  rather than a run of them: the song's undo is told once, so taking an import back is one press
+  rather than one per knob, the lists are said to have changed once, and the settings are written
+  once. A caller looping over `Handle` would be right about every link and wrong about the whole
+- What cannot be read is left out and counted rather than failing the lot, which is what a
+  template from a newer version looks like: mostly this version's, and the useful answer is the
+  part that works plus a line saying how much did not
+- `ILinkTargets` is what a link points at, said in words and read back out of them, and it is one
+  rule because the page cuts its cards by it and the file is written by it. Two spellings would
+  eventually disagree, and the way that fails is a template that means one thing to whoever
+  exported it and another to whoever opened it. Not to be confused with `IControlTargets`, which
+  reaches the live thing so a value can be written into it; this one only ever deals in words
 - Automation is lanes rather than more effect commands, one per parameter per track per pattern,
   values normalised 0 to 1 and converted through `IControlTarget`, which is the same interface
   remote control writes through: the clock arriving at line 32 and a knob writing from CC 74 are

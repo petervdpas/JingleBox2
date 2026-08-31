@@ -2287,6 +2287,29 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private ControlLinksViewModel? _songControls;
 
     /// <summary>
+    /// What the desk is pointed at whatever song is open, shown under the song's own.
+    /// </summary>
+    /// <remarks>
+    /// The very same list SETTINGS draws, handed in rather than built here, because two of them
+    /// would be two answers to one question and taking a link off one would leave the other
+    /// showing it. It is here at all because this is where a desk link is made: the gesture is
+    /// Ctrl+Shift+M over a machine on the rack, which is the button next along, and reading
+    /// what it did meant leaving the tracker for a settings page.
+    /// </remarks>
+    public ControlLinksViewModel? DeskControls
+    {
+        get => _deskControls;
+        set
+        {
+            _deskControls = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Behind <see cref="DeskControls"/>, which is set from outside once.</summary>
+    private ControlLinksViewModel? _deskControls;
+
+    /// <summary>
     /// Shows a page, or goes back to the pattern when the page asked for is already up.
     /// </summary>
     /// <remarks>

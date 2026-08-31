@@ -583,7 +583,25 @@
 
     <views:MixerView IsVisible="{Binding ShowsMixer}" />
 
-    <views:SongControlsView IsVisible="{Binding ShowsControls}" />
+    <!-- Both layers of links, one under the other, each headed with how far its own reach.
+         The song's is here because a song holds its own layout the way it holds its patterns.
+         The desk's is here because this is where you make one: pointing at a machine on the
+         rack is one button away, and until now the only place to read the result was SETTINGS,
+         which is a different page in a different part of the application from the gesture that
+         wrote it. It is still in SETTINGS, since that is where the hardware is looked after,
+         and it is the same list rather than a copy of it: forgetting a link on either page is
+         the same act and both pages show it at once. -->
+    <!-- Each card as tall as what it holds, and the page scrolls when the two together are
+         taller than the window. Halves were tried first and are wrong: a song with nothing
+         pointed at it took half the screen to say so while the desk's fourteen links scrolled
+         inside the other half, which is the emptier list given the larger share. A list wants
+         the room its contents want. -->
+    <ScrollViewer IsVisible="{Binding ShowsControls}" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="10">
+        <views:ControlLinksView DataContext="{Binding SongControls}" />
+        <views:ControlLinksView DataContext="{Binding DeskControls}" />
+      </StackPanel>
+    </ScrollViewer>
 
     </Grid>
   </DockPanel>

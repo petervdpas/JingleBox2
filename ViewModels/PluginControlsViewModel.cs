@@ -175,6 +175,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
             Scope = Midi.Enums.ControlScope.Focused,
             Plugin = Plugin.Info.Id,
             Parameter = id,
+            Owner = Plugin.Info.Name,
             Name = Plugin.Info.Name + " " + (parameter?.Name ?? id.ToString())
         }, keep: true);
     }

@@ -105,6 +105,7 @@ public partial class PluginParameters : UserControl
             Scope = Midi.Enums.ControlScope.Focused,
             Plugin = controls.Plugin.Info.Id,
             Parameter = parameter.Id,
+            Owner = controls.Plugin.Info.Name,
             Name = controls.Plugin.Info.Name + " " + parameter.Name
         }, keep: true);
     }

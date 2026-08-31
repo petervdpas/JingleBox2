@@ -239,6 +239,7 @@ public partial class InstrumentPanel : UserControl
             Scope = Midi.Enums.ControlScope.Focused,
             Machine = editor.MachineId,
             Key = key,
+            Owner = editor.MachineName,
             Name = editor.MachineName + " " + key
         }, InSong);
     }
@@ -278,6 +279,7 @@ public partial class InstrumentPanel : UserControl
             Machine = editor.MachineId,
             Key = action,
             Pickup = Midi.Enums.ControlPickup.Jump,
+            Owner = editor.MachineName,
             Name = editor.MachineName + " " + action.Replace('_', ' ')
         }, InSong);
     }

@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             x:Class="JingleBox2.Views.ControlLinksView"
+             x:DataType="vm:ControlLinksViewModel">
+
+  <!-- One layer of links: a heading, and a card for each thing the hardware is pointed at.
+       Bound to the layer itself rather than to whoever holds one, which is what lets the same
+       drawing serve all three places a list of links is wanted: the song's and the desk's under
+       the tracker's MIDI CC, and the desk's again in SETTINGS. It was written out twice before
+       and the two had already drifted: one had a column the other did not. -->
+  <!-- A card per target and the controllers inside it, rather than the other way round. The
+       question somebody opens this with is what their hardware does to OddSkilla, and the pair
+       of headings is also the unit this is all for: one controller against one target is a
+       template, and it means the same thing on anybody's installation. -->
+  <StackPanel Spacing="8">
+    <TextBlock Classes="cardTitle" Text="{Binding Title}" />
+
+    <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding Hint}" />
+
+    <TextBlock Classes="cardHint" TextWrapping="Wrap"
+               IsVisible="{Binding !HasLinks}"
+               Text="{Binding Nothing}" />
+
+    <ItemsControl ItemsSource="{Binding Targets}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Border Classes="card" Margin="0,0,0,8">
+            <StackPanel>
+              <!-- What it is, and what sort of thing that is. The sort is said quietly and
+                   beside the name rather than as a heading of its own, because it is the same
+                   word on every card of a run and the name is what you are looking for. -->
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="{Binding Title}" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Kind}" />
+              </StackPanel>
+
+              <ItemsControl ItemsSource="{Binding Controllers}" Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Margin="0,0,0,6">
+                      <!-- The controller and its links on this target are one template, so
+                           the button that writes one out belongs on this line rather than on
+                           the card: a card can hold two controllers, and a file holding both
+                           would land on somebody who has one of them. -->
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <TextBlock Grid.Column="0" Classes="cardHint" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" Text="{Binding Said}" />
+
+                        <Button Grid.Column="1" Content="Export..." Classes="page"
+                                Click="Export_Click"
+                                ToolTip.Tip="Write what this controller does to this one thing out as a template, to keep or to send to somebody else." />
+                      </Grid>
+
+                      <ItemsControl ItemsSource="{Binding Links}" Margin="10,0,0,0">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12" Margin="0,2">
+                              <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                                         FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"
+                                         Text="{Binding Control}" />
+
+                              <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                         TextTrimming="CharacterEllipsis" Text="{Binding Said}" />
+
+                              <!-- Only when it is pinned to a track, which a mixer link is
+                                   not: there the card is the strip and this would repeat it. -->
+                              <TextBlock Grid.Column="2" Classes="cardHint" VerticalAlignment="Center"
+                                         IsVisible="{Binding IsPinned}"
+                                         Text="{Binding Where}" />
+
+                              <!-- Pressed when the guess was wrong. A button that repeats while
+                                   it is held sends what an encoder sends, so working it out from
+                                   the values cannot be right every time. -->
+                              <Button Grid.Column="3" Classes="page"
+                                      Content="{Binding How}"
+                                      Command="{Binding NextCommand}"
+                                      ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />
+
+                              <Button Grid.Column="4" Content="Forget" Classes="danger"
+                                      Command="{Binding ForgetCommand}" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <TextBlock Classes="cardHint" TextWrapping="Wrap"
+               IsVisible="{Binding HasStatus}"
+               Text="{Binding Status}" />
+
+    <!-- Both the desk's only. A template is what one controller does to one thing wherever it
+         is met, which is the desk in as many words; and a song's layout is part of the song and
+         is taken back with the song's own undo. -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Import a template..." Classes="page"
+              IsVisible="{Binding Imports}"
+              Click="Import_Click"
+              ToolTip.Tip="Read a template somebody made, here or elsewhere. What it points at is named by id, so it means the same thing on any installation that has the machine." />
+
+      <Button Content="Forget them all" Classes="danger"
+              IsVisible="{Binding Clears}"
+              IsEnabled="{Binding HasLinks}"
+              Command="{Binding ForgetAllCommand}" />
+    </StackPanel>
+  </StackPanel>
+
+</UserControl>
