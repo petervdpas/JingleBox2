@@ -18,5 +18,15 @@ public enum ControlKind
     /// <remarks>
     /// Last, so a mapping saved before this existed still reads as the kind it was given.
     /// </remarks>
-    Action
+    Action,
+
+    /// <summary>
+    /// One of the transport's four keys: play, pause, stop or record.
+    /// </summary>
+    /// <remarks>
+    /// Last for the same reason <see cref="Action"/> is, and it is the one kind that names
+    /// neither a track nor a machine. There is one transport and it is the same one from every
+    /// page, so a button pointed at play means play.
+    /// </remarks>
+    Transport
 }

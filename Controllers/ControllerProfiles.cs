@@ -281,6 +281,49 @@ public sealed class ControllerProfiles : IControllerProfiles
         ScreenOn(device).Length > 0 && For(device) is { Screen.Wake: true };
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// True for a device nobody has written a file for, which is the promise the protocol is
+    /// read on at all, and true for one whose file names Mackie on this port. False only when
+    /// there is a file and it says something other than Mackie about this device.
+    /// </remarks>
+    public bool SurfaceOn(string? device)
+    {
+        if (For(device) is not { } profile) return true;
+        if (profile.Surface is not { } surface) return false;
+        if (!string.Equals(surface.Protocol, Mackie, StringComparison.OrdinalIgnoreCase)) return false;
+
+        return surface.Port.Length == 0 || _folder.Like(surface.Port, device!);
+    }
+
+    /// <summary>The one surface protocol read here.</summary>
+    private const string Mackie = "mackie";
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Spelled out rather than parsed, so the words a file may use are visible here and a word
+    /// nobody implements reads as no transport key rather than as an error.
+    /// </remarks>
+    public TransportKey? TransportOn(string? device, int channel, int cc)
+    {
+        if (Control(device, channel, cc) is not { } control) return null;
+
+        return control.Transport.ToLowerInvariant() switch
+        {
+            "play" => TransportKey.Play,
+            "stop" => TransportKey.Stop,
+            "record" => TransportKey.Record,
+            "pause" => TransportKey.Pause,
+            "cycle" or "loop" => TransportKey.Loop,
+            _ => null
+        };
+    }
+
+    /// <inheritdoc/>
+    public bool Momentary(string? device, int channel, int cc) =>
+        Control(device, channel, cc) is { } control
+        && string.Equals(control.Press, "momentary", StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc/>
     public bool PortTakes(string? device, MidiDeviceRole role)
     {
         if (For(device) is not { } profile) return true;

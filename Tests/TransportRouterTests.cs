@@ -34,6 +34,9 @@ public class TransportRouterTests
 
         /// <inheritdoc/>
         public void Record() => Did.Add("record");
+
+        /// <inheritdoc/>
+        public void Loop() => Did.Add("cycle");
     }
 
     /// <summary>A router and the deck under it, so a test can play a message and read what happened.</summary>
@@ -111,20 +114,30 @@ public class TransportRouterTests
     }
 
     /// <summary>
-    /// Loop on CC 105 and tap tempo on CC 109 are read and deliberately do nothing.
+    /// Cycle on CC 105 turns looping on or off, and tap tempo on CC 109 still does nothing.
     /// </summary>
     /// <remarks>
-    /// Named so the log says what arrived rather than reporting a number nobody recognises.
+    /// Cycle was read and deliberately dropped for a long time, which was the right thing to do
+    /// while there was nowhere for it to go. There is: the Loop switch sits in the tracker's bar
+    /// beside the Pattern or Song picker, because what the end is and what happens when you
+    /// reach it are one question, and a control surface puts its cycle key in the transport row
+    /// for exactly the same reason.
+    ///
+    /// Tap tempo is still named and left alone. It is the last one here with somewhere obvious
+    /// to go that it has not been given yet.
     /// </remarks>
     [Fact]
-    public void Loop_and_tap_tempo_are_recognised_and_do_nothing_yet()
+    public void Cycle_turns_looping_on_and_tap_tempo_still_does_nothing()
     {
         var (router, deck) = Wired();
 
         router.Handle(Cc(105));
+
+        Assert.Equal(new[] { "cycle" }, deck.Did);
+
         router.Handle(Cc(109));
 
-        Assert.Empty(deck.Did);
+        Assert.Equal(new[] { "cycle" }, deck.Did);
     }
 
     /// <summary>

@@ -106,6 +106,51 @@ public interface IControllerProfiles
     string ScreenOn(string? device);
 
     /// <summary>
+    /// Whether that port is read as a Mackie Control surface.
+    /// </summary>
+    /// <remarks>
+    /// The one question here whose default is yes, and it has to be. Mackie Control needs no
+    /// file: the protocol says what every control on it is, so a surface nobody has written
+    /// anything about works the moment it is plugged in, and gating that on a profile would
+    /// take a working device away to fix one that never worked.
+    ///
+    /// So a device with no file is a Mackie surface if it is ticked for the transport, exactly
+    /// as it always was. A device with a file that names no surface is not, because a file lists
+    /// what a device sends and one that lists fifty one plain controllers is saying there is no
+    /// protocol underneath them. That is the opposite direction from the rest of this interface
+    /// and it is still the same rule: what the file says beats what the numbers suggest.
+    ///
+    /// Which matters because the numbers suggest wrongly. Mackie's eight V-pots are continuous
+    /// controllers 16 to 23 and a nanoKONTROL2's eight knobs are continuous controllers 16 to 23,
+    /// and there is nothing in a message to tell the two apart.
+    /// </remarks>
+    bool SurfaceOn(string? device);
+
+    /// <summary>
+    /// Whether that control is a momentary button: one that reports a finger, not a state.
+    /// </summary>
+    /// <remarks>
+    /// False for everything a file says nothing about, which is every controller that has none
+    /// and every button whose file does not mention it, so nothing already working changes.
+    ///
+    /// It decides one thing: what a button does to a switch. Followed, a momentary button mutes
+    /// a track while it is held and unmutes it on the way up; flipped, it does what the button
+    /// on the screen does. See <c>IControlTarget.Switch</c> for the other half.
+    /// </remarks>
+    bool Momentary(string? device, int channel, int cc);
+
+    /// <summary>
+    /// Which transport key that control is, or nothing for a control that is not one.
+    /// </summary>
+    /// <remarks>
+    /// Read by <c>MidiTransportRouter</c> after its three protocols have all declined, so a
+    /// device speaking one of them is unaffected and a device speaking none of them gets its
+    /// transport buttons from its file. Nothing for a device with no file, which is the rule the
+    /// whole idea rests on.
+    /// </remarks>
+    TransportKey? TransportOn(string? device, int channel, int cc);
+
+    /// <summary>
     /// Whether that device's screen has to be switched on before it will take anything.
     /// </summary>
     /// <remarks>

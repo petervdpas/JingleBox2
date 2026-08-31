@@ -86,14 +86,14 @@
               <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
                           Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                           HorizontalAlignment="Center"
-                          views:Pointable.Offers="{x:Static midi:MixLinks.MasterPan}"
+                          views:Pointable.Offers="{Binding PanLink}"
                           views:Pointable.InSong="True"
                           Value="{Binding Pan}" />
 
               <!-- Mute and no solo. Soloing the master would mean soloing everything, which is
                    what it is already doing. -->
               <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                            views:Pointable.Offers="{x:Static midi:MixLinks.MasterMute}"
+                            views:Pointable.Offers="{Binding MuteLink}"
                             views:Pointable.InSong="True"
                             ToolTip.Tip="Silence the whole mix" />
             </StackPanel>
@@ -104,7 +104,7 @@
                            Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                            TrackLength="0"
                            Ticks="6,0,-6,-12,-24,-40,-60"
-                           views:Pointable.Offers="{x:Static midi:MixLinks.MasterLevel}"
+                           views:Pointable.Offers="{Binding LevelLink}"
                            views:Pointable.InSong="True"
                            ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
                            Value="{Binding VolumeDecibels}" />
@@ -156,18 +156,18 @@
                       <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
                                   Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                                   HorizontalAlignment="Center"
-                                  views:Pointable.Offers="{x:Static midi:MixLinks.Pan}"
+                                  views:Pointable.Offers="{Binding PanLink}"
                                   views:Pointable.InSong="True"
                                   Value="{Binding Pan}" />
 
                       <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
                         <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                                      views:Pointable.Offers="{x:Static midi:MixLinks.Mute}"
+                                      views:Pointable.Offers="{Binding MuteLink}"
                                       views:Pointable.InSong="True"
                                       ToolTip.Tip="Mute this track" />
 
                         <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
-                                      views:Pointable.Offers="{x:Static midi:MixLinks.Solo}"
+                                      views:Pointable.Offers="{Binding SoloLink}"
                                       views:Pointable.InSong="True"
                                       ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
                       </StackPanel>
@@ -189,13 +189,13 @@
                         <ui:Knob Label="Duck" Format="0.00" DefaultValue="0"
                                     Minimum="0" Maximum="1" SmallStep="0.02" LargeStep="0.1"
                                     DialSize="30"
-                                    views:Pointable.Offers="{x:Static midi:MixLinks.Duck}"
+                                    views:Pointable.Offers="{Binding DuckLink}"
                                     views:Pointable.InSong="True"
                                     ToolTip.Tip="How far down this track goes while the key track is at full scale."
                                     Value="{Binding Duck}" />
 
                         <ui:Knob Label="Rel" Unit="ms" Format="0" DefaultValue="150"
-                                    views:Pointable.Offers="{x:Static midi:MixLinks.Release}"
+                                    views:Pointable.Offers="{Binding ReleaseLink}"
                                     views:Pointable.InSong="True"
                                     Minimum="20" Maximum="1000" SmallStep="5" LargeStep="50"
                                     DialSize="30"
@@ -210,7 +210,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8"
                                 HorizontalAlignment="Center" Margin="0,2,0,0">
                       <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
-                                   views:Pointable.Offers="{x:Static midi:MixLinks.Level}"
+                                   views:Pointable.Offers="{Binding LevelLink}"
                                    views:Pointable.InSong="True"
                                    Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                    TrackLength="0"

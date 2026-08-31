@@ -61,4 +61,23 @@ public sealed class LogFile : ILogFile
             return false;
         }
     }
+
+    /// <inheritdoc/>
+    public bool Clear(string path)
+    {
+        bool went = false;
+
+        try
+        {
+            if (File.Exists(path)) { File.Delete(path); went = true; }
+
+            string old = path + ".old";
+            if (File.Exists(old)) { File.Delete(old); went = true; }
+        }
+        catch (Exception)
+        {
+        }
+
+        return went;
+    }
 }

@@ -1,5 +1,6 @@
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Midi.Interfaces;
 
@@ -73,8 +74,20 @@ public sealed class MidiTransportRouter
 
     private readonly ITransportKeys _transport;
 
+    /// <summary>What is known about the devices, for the dialect that is written down.</summary>
+    private readonly IControllerProfiles? _profiles;
+
     /// <param name="transport">Where a press comes out. Not a view model, so this can be tested.</param>
-    public MidiTransportRouter(ITransportKeys transport) => _transport = transport;
+    /// <param name="profiles">
+    /// What is known about the devices, so a controller whose file names its transport buttons
+    /// works from the tick in SETTINGS like every other controller does. Optional, and left out
+    /// only the three protocols are read, which is what this did before the question was asked.
+    /// </param>
+    public MidiTransportRouter(ITransportKeys transport, IControllerProfiles? profiles = null)
+    {
+        _transport = transport;
+        _profiles = profiles;
+    }
 
     /// <summary>The three realtime bytes, which are the transport as MIDI has always had it.</summary>
     /// <remarks>
@@ -141,10 +154,11 @@ public sealed class MidiTransportRouter
                 case PlayCc: Say(message, "play"); _transport.Play(); return;
                 case StopCc: Say(message, "stop"); _transport.Stop(); return;
                 case RecordCc: Say(message, "record"); _transport.Record(); return;
-                case CycleCc: Say(message, "loop, which this does nothing with yet"); return;
+                case CycleCc: Say(message, "cycle, which turns looping on or off"); _transport.Loop(); return;
                 case TapCc: Say(message, "tap tempo, which this does nothing with yet"); return;
             }
 
+            Filed(message);
             return;
         }
 
@@ -158,12 +172,43 @@ public sealed class MidiTransportRouter
 
             case Rewind: Say(message, "rewind, which this does nothing with yet"); return;
             case Forward: Say(message, "forward, which this does nothing with yet"); return;
-            case Cycle: Say(message, "cycle, which this does nothing with yet"); return;
+            case Cycle: Say(message, "cycle, which turns looping on or off"); _transport.Loop(); return;
         }
 
         Log.Write(LogArea.Midi, () =>
             "transport: '" + message.Device + "' sent note " + message.Value
             + ", which is not one of Mackie Control's transport buttons");
+    }
+
+    /// <summary>
+    /// The fourth dialect: a controller whose file says which of its buttons the transport's are.
+    /// </summary>
+    /// <remarks>
+    /// Asked last, after the three protocols have all declined, so a device speaking one of them
+    /// never reaches here and nothing that worked can change. It exists because the tick in
+    /// SETTINGS meant two different things depending on the device. A MiniLab 3 and a KeyLab
+    /// mkII speak Mackie Control, plain controllers or machine control, so ticking Transport
+    /// made their buttons work with nothing pointed anywhere; a nanoKONTROL2's play button is a
+    /// plain controller 41 like its mute buttons, which no dialect covers, so the same tick did
+    /// nothing whatever and the transport could only be reached by pointing a button at it by
+    /// hand. That is not a rule anybody could have worked out from the outside.
+    ///
+    /// Nothing for a device with no file, which is what such a device had before, and nothing
+    /// for a control its file does not call a transport button. Pause is read as stop, the same
+    /// as machine control's, because there is nowhere here to pause to.
+    /// </remarks>
+    private void Filed(MidiMessage message)
+    {
+        if (_profiles?.TransportOn(message.Device, message.Channel, message.Value) is not { } key)
+            return;
+
+        switch (key)
+        {
+            case TransportKey.Play: Say(message, "play, which its file says that button is"); _transport.Play(); return;
+            case TransportKey.Record: Say(message, "record, which its file says that button is"); _transport.Record(); return;
+            case TransportKey.Loop: Say(message, "cycle, which its file says that button is"); _transport.Loop(); return;
+            default: Say(message, "stop, which its file says that button is"); _transport.Stop(); return;
+        }
     }
 
     /// <summary>Start, continue or stop, straight off the wire.</summary>

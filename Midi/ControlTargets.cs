@@ -54,12 +54,21 @@ public sealed class ControlTargets : IControlTargets
     /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
     /// machine missing, without an error anywhere to say why.
     /// </param>
-    public ControlTargets(TrackerViewModel tracker, IMachineProjects machines, MachineRackViewModel? rack = null)
+    /// <param name="presses">
+    /// The transport, for a button pointed at one of its four keys. Optional, and without one a
+    /// transport link finds nothing and says so, which is what a test with no window wants.
+    /// </param>
+    public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
+                          MachineRackViewModel? rack = null, ITransportPresses? presses = null)
     {
         _tracker = tracker;
         _machines = machines;
         _rack = rack;
+        _presses = presses;
     }
+
+    /// <summary>The transport, where there is one.</summary>
+    private readonly ITransportPresses? _presses;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -96,6 +105,7 @@ public sealed class ControlTargets : IControlTargets
             ControlKind.Insert => OnPlugin(mapping, track),
             ControlKind.Mix => OnStrip(mapping, track),
             ControlKind.Action => OnButton(mapping),
+            ControlKind.Transport => OnTransport(mapping),
             _ => null
         };
 
@@ -450,7 +460,9 @@ public sealed class ControlTargets : IControlTargets
 
         if (name.Length == 0) return null;
 
-        return new Target(name + " on " + Named(track), min, max, read, write, this, mapping);
+        bool flips = mapping.Mix is MixControl.Mute or MixControl.Solo;
+
+        return new Target(name + " on " + Named(track), min, max, read, write, this, mapping, flips: flips);
     }
 
     /// <summary>
@@ -462,6 +474,38 @@ public sealed class ControlTargets : IControlTargets
     /// picked up from. Where the press comes out is <see cref="ControlActions"/>, and why it
     /// has to go there rather than be done here is written up on it.
     /// </remarks>
+    /// <summary>
+    /// One of the transport's four keys, which is a press rather than a value.
+    /// </summary>
+    /// <remarks>
+    /// Shaped exactly as a machine's button is and for the same reason: the router already has a
+    /// path for a target that is pressed rather than moved, so this needs no second one. It
+    /// reads nought always, since none of the four is a value and a control picking one up would
+    /// be picking up from nothing.
+    /// </remarks>
+    private IControlTarget? OnTransport(ControlMapping mapping)
+    {
+        if (_presses is null) return null;
+
+        var key = mapping.Transport;
+
+        return new Target(
+            Said(key), 0, 1, () => 0, _ => _presses.Press(key), this, mapping);
+    }
+
+    /// <summary>What to call a transport key on a status line and in a list of links.</summary>
+    /// <remarks>
+    /// Written out rather than taken off the enum, so the word a person reads is decided here
+    /// rather than by how the value happened to be spelled in code.
+    /// </remarks>
+    private static string Said(TransportKey key) => key switch
+    {
+        TransportKey.Pause => "Pause",
+        TransportKey.Stop => "Stop",
+        TransportKey.Record => "Record",
+        _ => "Play"
+    };
+
     private IControlTarget? OnButton(ControlMapping mapping)
     {
         if (mapping.Key.Length == 0) return null;
@@ -501,8 +545,11 @@ public sealed class ControlTargets : IControlTargets
         /// What the number is measured in, where the thing that owns it said. Empty otherwise,
         /// and then a reading is the number on its own.
         /// </param>
+        /// <param name="flips">
+        /// True for a two-state target, so a momentary button flips it rather than holding it.
+        /// </param>
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
-                      ControlTargets desk, ControlMapping mapping, string unit = "")
+                      ControlTargets desk, ControlMapping mapping, string unit = "", bool flips = false)
         {
             Name = name;
             Min = min;
@@ -512,7 +559,11 @@ public sealed class ControlTargets : IControlTargets
             _desk = desk;
             _mapping = mapping;
             _unit = unit;
+            Switch = flips;
         }
+
+        /// <inheritdoc/>
+        public bool Switch { get; }
 
         /// <summary>What it is measured in, when the thing that owns it said. Empty otherwise.</summary>
         private readonly string _unit;

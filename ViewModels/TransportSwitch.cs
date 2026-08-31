@@ -145,6 +145,16 @@ public sealed class TransportSwitch : ObservableObject
     public void Moved() => Recheck();
 
     /// <summary>
+    /// Turns looping on or off on the deck in front, for a cycle key on a control surface.
+    /// </summary>
+    /// <remarks>
+    /// No command beside the other four, deliberately: those are the caps drawn on the bar and
+    /// looping is a switch elsewhere on the page. This is the way in for hardware, which has a
+    /// cycle key in its transport row whether or not this application draws one there.
+    /// </remarks>
+    public void Loop() => Wired.Loop();
+
+    /// <summary>
     /// Everything the caps draw from, as one value, so two of them can be compared at once.
     /// </summary>
     private (bool, bool, bool, bool, bool, bool) Snapshot() =>

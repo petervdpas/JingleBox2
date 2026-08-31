@@ -46,6 +46,18 @@ public sealed class TransportAdapter : ITransportKeys
         _transport.RecordCommand.Execute(null);
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Straight to the deck the transport is patched to, since there is no command for it: Play,
+    /// Stop and Record are buttons on the screen and looping is a switch, so there is nothing
+    /// here to press on somebody's behalf.
+    /// </remarks>
+    public void Loop()
+    {
+        Said("loop", true);
+        _transport.Loop();
+    }
+
     /// <summary>
     /// Says whether that press had anywhere to go, since the command itself will not.
     /// </summary>

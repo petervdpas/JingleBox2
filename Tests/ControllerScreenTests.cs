@@ -195,6 +195,16 @@ public class ControllerScreenTests
         public bool ScreenWakes(string? device) => false;
 
         /// <inheritdoc/>
+        public bool SurfaceOn(string? device) => _real.SurfaceOn(device);
+
+        /// <inheritdoc/>
+        public bool Momentary(string? device, int channel, int cc) => _real.Momentary(device, channel, cc);
+
+        /// <inheritdoc/>
+        public TransportKey? TransportOn(string? device, int channel, int cc) =>
+            _real.TransportOn(device, channel, cc);
+
+        /// <inheritdoc/>
         public void Reload() => _real.Reload();
 
         /// <inheritdoc/>

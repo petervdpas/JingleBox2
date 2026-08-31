@@ -99,6 +99,14 @@ public sealed class ControlMapping
     /// <summary>Which strip control, for <see cref="ControlKind.Mix"/>.</summary>
     public MixControl Mix { get; set; } = MixControl.Volume;
 
+    /// <summary>Which of the transport's four keys, for a mapping that names the transport.</summary>
+    /// <remarks>
+    /// Meaningless for every other kind, in the way <see cref="Mix"/> is, and left at its first
+    /// value there rather than made nullable: a mapping is read by kind and nothing looks at
+    /// this unless the kind says to.
+    /// </remarks>
+    public TransportKey Transport { get; set; } = TransportKey.Play;
+
     /// <summary>
     /// How the hardware and the software are reconciled when they disagree.
     /// </summary>
@@ -132,6 +140,7 @@ public sealed class ControlMapping
         Slot = one.Slot,
         Parameter = one.Parameter,
         Mix = one.Mix,
+        Transport = one.Transport,
         Pickup = one.Pickup,
         Turn = one.Turn,
         Name = one.Name
@@ -174,6 +183,8 @@ public sealed class ControlMapping
 
             ControlKind.Mix => other.Mix == Mix && other.Scope == Scope
                                && (Scope != ControlScope.Fixed || other.Track == Track),
+
+            ControlKind.Transport => other.Transport == Transport,
 
             _ => false
         };

@@ -756,6 +756,13 @@
               </WrapPanel>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding LogHint}" />
+
+              <!-- Beside the switch that fills it, since emptying it before doing the thing you
+                   want to read about is the one case this exists for. Not asked about first: a
+                   log is not somebody's work. -->
+              <Button Content="Clear the log" HorizontalAlignment="Left"
+                      Command="{Binding ClearLogCommand}"
+                      ToolTip.Tip="Throws away the log and the one before it, and starts a new one. The log is kept between runs and rolls over at four megabytes, so this is how it is emptied on purpose." />
             </StackPanel>
           </Border>
 

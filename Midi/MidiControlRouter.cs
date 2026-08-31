@@ -240,7 +240,39 @@ public sealed class MidiControlRouter
     ///
     /// A button is the edge and not the position. A hardware button held down sends the same
     /// value over and over, so only the change counts, and there is nothing to sense and nothing
-    /// to pick up: a press is a press.
+    /// to pick up: a press is a press. The transport's four keys go the same way, since play is
+    /// something done rather than a value moved, and it means a momentary button works there
+    /// without its file having to say anything: the release is a change that is not a press and
+    /// falls out on its own.
+    ///
+    /// A button pointed at a switch is the edge as well, but only when its file says the button
+    /// is momentary, and then it flips what it finds rather than writing what it was sent. The
+    /// two kinds of button are indistinguishable on the wire and mean opposite things: a
+    /// latching one reports its own state, so following the value is right, and a momentary one
+    /// reports a finger, so following the value mutes a track for exactly as long as a thumb is
+    /// on it. Nothing said in a file means followed, which is what this always did.
+    ///
+    /// Nothing that is a press parks, which is why the two press branches are asked before
+    /// parking rather than after it. Parking is a rule about a control that reports a position
+    /// driving a value into an end: it stops a fader held against the top writing the top over
+    /// and over, and the way out of it is a message going the other way. A button has no
+    /// position and the thing it points at has no in between, so every one of parking's terms is
+    /// meaningless there and its answer is arbitrary. Left below it, a button pointed at the
+    /// transport worked on the press that made the link and then swallowed most of what came
+    /// after: `Put` had left the target at its maximum, so the hand was parked upward, and a
+    /// release read through the wrap unwinding is a step upward too, which is the same direction
+    /// and therefore still parked. It fired about one press in three, which is worse than never
+    /// working, because it looks like a loose cable.
+    ///
+    /// A switch does not park at all, and that is a fault this found rather than a rule it
+    /// needed. Parking is about positions: a fader held against the top must stop writing the
+    /// top over and over, and the way out of it is a message going the other way. A switch is
+    /// only ever at one of its two ends, so a press that flips it lands on an end and parks, and
+    /// then the press that would flip it back is a jump from 127 to nought, which the wrap
+    /// unwinding reads as one step upwards rather than a hundred and twenty seven downwards.
+    /// Same direction, still parked, thrown away. So a button pointed at a mute muted the track
+    /// once and did nothing ever again, whether it was momentary or not, and that is most of what
+    /// "linking the M and the S works very strange" was.
     ///
     /// Nothing at all is done with a control until it is known what kind of control it is. Three
     /// messages, about thirty milliseconds, and holding them back is the point rather than a
@@ -258,6 +290,9 @@ public sealed class MidiControlRouter
     /// is now is written down either way, since it is what the next message is measured against,
     /// both for the crossing and for the wrap.
     /// </remarks>
+    /// <summary>Halfway up a target's range, which is where a switch changes its mind.</summary>
+    private static double Middle(IControlTarget target) => (target.Min + target.Max) / 2;
+
     private void Apply(ControlMapping mapping, IControlTarget target, int data)
     {
         var hand = _hands.GetValue(mapping, _ => new Hand());
@@ -275,13 +310,7 @@ public sealed class MidiControlRouter
             mapping.Pickup = pickup;
         }
 
-        if (Parked(hand, mapping, data))
-        {
-            hand.Was = data;
-            return;
-        }
-
-        if (mapping.Kind == ControlKind.Action)
+        if (mapping.Kind is ControlKind.Action or ControlKind.Transport)
         {
             bool down = data >= Still;
 
@@ -291,6 +320,27 @@ public sealed class MidiControlRouter
 
             if (down) Put(hand, mapping, data, target, 1);
 
+            return;
+        }
+
+        if (target.Switch && _profiles.Momentary(mapping.Device, mapping.Channel, mapping.Cc))
+        {
+            hand.Was = data;
+
+            bool held = data >= Still;
+
+            if (held == hand.Down) return;
+
+            hand.Down = held;
+
+            if (held) Put(hand, mapping, data, target, target.Value >= Middle(target) ? target.Min : target.Max);
+
+            return;
+        }
+
+        if (!target.Switch && Parked(hand, mapping, data))
+        {
+            hand.Was = data;
             return;
         }
 

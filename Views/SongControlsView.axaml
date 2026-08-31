@@ -7,17 +7,26 @@
   <!-- What this song has its controller pointed at. The song's own and not the desk's: the
        desk is looked after in SETTINGS, where it belongs, because it is the same in every song
        and this is not. -->
+  <!-- Docked rather than stacked, so the list gets the page rather than a fixed 420 pixels
+       with the rest of the window empty under it. A stack panel gives each child the height it
+       asks for and a list asks for what it holds, so sixteen links scrolled inside a short box
+       on a tall screen. The two lines above it are the only things here with a height of their
+       own; everything left over is the list, which is what somebody looking at a list wants. -->
   <Border Classes="card">
-    <StackPanel Classes="cardBody">
-      <StackPanel Orientation="Horizontal" Spacing="8">
+    <DockPanel LastChildFill="True">
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
         <TextBlock Classes="cardTitle" Text="This song's controls" />
       </StackPanel>
 
-      <TextBlock Classes="cardHint" TextWrapping="Wrap"
+      <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap" Margin="0,8,0,8"
                  Text="Press Ctrl+Shift+M with an instrument's panel open, rest the pointer on a knob until it glows, and touch the control on your desk. What you point at here is this song's and travels in its file. The same gesture on a machine on the rack makes a link that works in every song, and those are listed in SETTINGS." />
 
+      <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
+                 IsVisible="{Binding !SongControls.HasLinks}"
+                 Text="{Binding SongControls.Nothing}" />
+
       <Border Classes="inset" IsVisible="{Binding SongControls.HasLinks}">
-        <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
           <ItemsControl ItemsSource="{Binding SongControls.Controllers}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -62,11 +71,7 @@
           </ItemsControl>
         </ScrollViewer>
       </Border>
-
-      <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                 IsVisible="{Binding !SongControls.HasLinks}"
-                 Text="{Binding SongControls.Nothing}" />
-    </StackPanel>
+    </DockPanel>
   </Border>
 
 </UserControl>

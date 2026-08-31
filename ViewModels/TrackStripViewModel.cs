@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using JingleBox2.Midi;
+using JingleBox2.Midi.Enums;
 using JingleBox2.Tracker;
 using JingleBox2.UI;
 using System;
@@ -48,6 +50,13 @@ public sealed class TrackStripViewModel : ObservableObject
         _changed = changed;
 
         DuckKeys = track < 0 ? Array.Empty<DuckKey>() : BuildKeys(track, trackCount);
+
+        LevelLink = MixLinks.On(MixControl.Volume, track);
+        PanLink = MixLinks.On(MixControl.Pan, track);
+        MuteLink = MixLinks.On(MixControl.Mute, track);
+        SoloLink = MixLinks.On(MixControl.Solo, track);
+        DuckLink = MixLinks.On(MixControl.Duck, track);
+        ReleaseLink = MixLinks.On(MixControl.Release, track);
     }
 
     /// <summary>
@@ -76,6 +85,37 @@ public sealed class TrackStripViewModel : ObservableObject
 
     /// <summary>Which track this strip is, or -1 for the master, which is not a track.</summary>
     public int Track { get; }
+
+    /// <summary>
+    /// What each of this strip's controls offers a hardware control resting on it.
+    /// </summary>
+    /// <remarks>
+    /// Per strip rather than one set shared by all of them, which is the whole of the fix: a
+    /// shared set meant every link on the mixer said "the track I am on", so eight faders pointed
+    /// at eight strips were eight links with one target, and each one replaced the last. Point at
+    /// TR-02's fader and it is TR-02's fader. See <see cref="MixLinks"/> for why it was the other
+    /// way round first.
+    ///
+    /// Made once with the strip and kept, since a strip is rebuilt whenever the song is and its
+    /// track number cannot change under it. <see cref="Views.Pointable"/> copies one before
+    /// offering it, so handing out the same instance twice is safe.
+    /// </remarks>
+    public ControlMapping LevelLink { get; }
+
+    /// <inheritdoc cref="LevelLink"/>
+    public ControlMapping PanLink { get; }
+
+    /// <inheritdoc cref="LevelLink"/>
+    public ControlMapping MuteLink { get; }
+
+    /// <inheritdoc cref="LevelLink"/>
+    public ControlMapping SoloLink { get; }
+
+    /// <inheritdoc cref="LevelLink"/>
+    public ControlMapping DuckLink { get; }
+
+    /// <inheritdoc cref="LevelLink"/>
+    public ControlMapping ReleaseLink { get; }
 
     /// <summary>Backing field for <see cref="IsSelected"/>.</summary>
     private bool selected;

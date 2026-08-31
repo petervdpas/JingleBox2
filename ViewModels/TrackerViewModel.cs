@@ -2027,6 +2027,15 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         Status = $"Transposed {SelectionLabel} by {steps:+0;-0} semitone(s)";
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The tracker is the one deck this means anything on, so it is the one that implements it.
+    /// Straight through <see cref="LoopPlayback"/> rather than at the player, so a cycle key on
+    /// the desk and the switch in the bar are the same act: the song is marked changed, the
+    /// status line says which way it went, and the switch on the screen follows.
+    /// </remarks>
+    public void Loop() => LoopPlayback = !LoopPlayback;
+
     /// <summary>
     /// Whether the transport comes round again at the end of what it is playing. On, and
     /// remembered between runs.

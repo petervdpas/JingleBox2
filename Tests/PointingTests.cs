@@ -72,27 +72,57 @@ public class PointingTests
         Assert.True(LinkKey.Answers(true, TimeSpan.FromMilliseconds(LinkKey.AgainMs)));
     }
 
-    /// <summary>A strip's level is offered for whichever track you last touched.</summary>
+    /// <summary>A strip's level names that strip, so eight faders are eight tracks.</summary>
     /// <remarks>
-    /// Focused rather than a track number, so one knob pointed at Level is the level of the
-    /// strip in hand rather than one link per track.
+    /// It followed the cursor first, one shared template for every strip, and that could not be
+    /// used on a desk with more than one fader: two links following the cursor have the same
+    /// target, so the second replaced the first and pointing fader two at TR-02 unlinked fader
+    /// one. Fixed, and named for its own track, which is also what the default layout does.
     /// </remarks>
     [Fact]
-    public void A_strip_offers_the_track_you_are_on_rather_than_a_numbered_one()
+    public void A_strip_offers_its_own_track_rather_than_the_one_in_hand()
     {
-        Assert.Equal(ControlScope.Focused, MixLinks.Level.Scope);
-        Assert.Equal(ControlKind.Mix, MixLinks.Level.Kind);
-        Assert.Equal(MixControl.Volume, MixLinks.Level.Mix);
+        var second = MixLinks.On(MixControl.Volume, 1);
+
+        Assert.Equal(ControlScope.Fixed, second.Scope);
+        Assert.Equal(ControlKind.Mix, second.Kind);
+        Assert.Equal(MixControl.Volume, second.Mix);
+        Assert.Equal(1, second.Track);
+    }
+
+    /// <summary>
+    /// And two strips' levels are two different targets, which is what makes eight links possible.
+    /// </summary>
+    /// <remarks>
+    /// The fault itself, stated. A link displaces one that names the same target, which is right
+    /// and is what stops a pile of links growing on one control. When every strip said "the track
+    /// I am on", every level on the mixer was one target.
+    /// </remarks>
+    [Fact]
+    public void Two_strips_levels_are_not_the_same_target()
+    {
+        Assert.False(MixLinks.On(MixControl.Volume, 0).SameTarget(MixLinks.On(MixControl.Volume, 1)));
+        Assert.True(MixLinks.On(MixControl.Volume, 0).SameTarget(MixLinks.On(MixControl.Volume, 0)));
+    }
+
+    /// <summary>The master is strip -1 here as it is everywhere else.</summary>
+    [Fact]
+    public void The_master_is_the_strip_that_is_not_a_track()
+    {
+        var master = MixLinks.On(MixControl.Volume, JingleBox2.Tracker.TrackerPlayer.MasterStrip);
+
+        Assert.Equal(ControlScope.Fixed, master.Scope);
+        Assert.Equal(JingleBox2.Tracker.TrackerPlayer.MasterStrip, master.Track);
     }
 
     /// <summary>Pan, mute, solo and duck each name their own value rather than sharing one.</summary>
     [Fact]
     public void Every_control_on_a_strip_names_its_own_thing()
     {
-        Assert.Equal(MixControl.Pan, MixLinks.Pan.Mix);
-        Assert.Equal(MixControl.Mute, MixLinks.Mute.Mix);
-        Assert.Equal(MixControl.Solo, MixLinks.Solo.Mix);
-        Assert.Equal(MixControl.Duck, MixLinks.Duck.Mix);
+        Assert.Equal(MixControl.Pan, MixLinks.On(MixControl.Pan, 0).Mix);
+        Assert.Equal(MixControl.Mute, MixLinks.On(MixControl.Mute, 0).Mix);
+        Assert.Equal(MixControl.Solo, MixLinks.On(MixControl.Solo, 0).Mix);
+        Assert.Equal(MixControl.Duck, MixLinks.On(MixControl.Duck, 0).Mix);
     }
 
     /// <summary>The ducking release has a name for a link to use.</summary>
@@ -103,8 +133,8 @@ public class PointingTests
     [Fact]
     public void The_release_time_can_be_pointed_at_too()
     {
-        Assert.Equal(MixControl.Release, MixLinks.Release.Mix);
-        Assert.Equal(ControlScope.Focused, MixLinks.Release.Scope);
+        Assert.Equal(MixControl.Release, MixLinks.On(MixControl.Release, 0).Mix);
+        Assert.Equal(ControlScope.Fixed, MixLinks.On(MixControl.Release, 0).Scope);
     }
 
     /// <summary>A shelf of presets is a list, so the picker offers two actions and no value.</summary>
@@ -163,13 +193,15 @@ public class PointingTests
     [Fact]
     public void What_is_offered_is_a_copy_and_the_template_is_left_alone()
     {
-        var offered = ControlMapping.Copy(MixLinks.Level);
+        var template = MixLinks.On(MixControl.Volume, 0);
+
+        var offered = ControlMapping.Copy(template);
 
         offered.Device = "Some Controller";
         offered.Cc = 74;
 
-        Assert.Equal("", MixLinks.Level.Device);
-        Assert.Equal(0, MixLinks.Level.Cc);
+        Assert.Equal("", template.Device);
+        Assert.Equal(0, template.Cc);
         Assert.Equal(MixControl.Volume, offered.Mix);
     }
 }

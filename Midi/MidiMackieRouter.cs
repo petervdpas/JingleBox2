@@ -2,6 +2,7 @@ using System;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
+using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
@@ -82,6 +83,7 @@ public sealed class MidiMackieRouter
     private readonly IControlTargets _targets;
     private readonly Func<int> _tracks;
     private readonly MackieSurface? _surface;
+    private readonly IControllerProfiles? _profiles;
 
     /// <param name="targets">
     /// Where a fader, a knob or a button lands: the mixer, through the same door a link written
@@ -96,11 +98,21 @@ public sealed class MidiMackieRouter
     /// The half that writes back, where there is one. Optional because the reading half is
     /// worth having on its own and because every test of this would otherwise need a port.
     /// </param>
-    public MidiMackieRouter(IControlTargets targets, Func<int> tracks, MackieSurface? surface = null)
+    /// <param name="profiles">
+    /// What is known about the devices, so a controller whose file says it speaks plain
+    /// controllers is not read as a surface. Optional, and left out everything is read as one,
+    /// which is what this did before the question was asked.
+    /// </param>
+    public MidiMackieRouter(
+        IControlTargets targets,
+        Func<int> tracks,
+        MackieSurface? surface = null,
+        IControllerProfiles? profiles = null)
     {
         _targets = targets;
         _tracks = tracks;
         _surface = surface;
+        _profiles = profiles;
     }
 
     /// <summary>Which track the leftmost strip is on.</summary>
@@ -118,6 +130,8 @@ public sealed class MidiMackieRouter
     {
         if (message is null) return;
 
+        if (!Speaks(message.Device)) return;
+
         if (_surface is not null && !string.Equals(_surface.Device, message.Device, StringComparison.Ordinal))
         {
             _surface.Device = message.Device;
@@ -133,6 +147,45 @@ public sealed class MidiMackieRouter
             case MidiMessageType.Note: Pressed(message); return;
         }
     }
+
+    /// <summary>
+    /// Whether that port is a surface at all, asked before a byte of it is read.
+    /// </summary>
+    /// <remarks>
+    /// Yes for a device nobody has written a file for, which is the promise this protocol is
+    /// read on: a surface works on arrival and needs nothing. No for a device whose file
+    /// describes it and never mentions Mackie, because there is nothing here to tell a V-pot
+    /// from a knob that happens to send the same number, and a nanoKONTROL2's eight knobs send
+    /// exactly the numbers Mackie's eight V-pots do. Read both ways at once, a knob turned
+    /// slowly moves a pan in jumps to either end, which is what a person sees and cannot
+    /// explain.
+    ///
+    /// Said once per device rather than once per message: this is on the MIDI thread and a hand
+    /// on a fader is a hundred messages a second.
+    /// </remarks>
+    private bool Speaks(string? device)
+    {
+        if (_profiles is null) return true;
+
+        string port = device ?? "";
+
+        if (string.Equals(port, _asked, StringComparison.Ordinal)) return _speaks;
+
+        _asked = port;
+        _speaks = _profiles.SurfaceOn(device);
+
+        if (!_speaks)
+            Log.Write(LogArea.Midi, () =>
+                "mackie: '" + port + "' is not read as a surface, since its file describes it and names no protocol");
+
+        return _speaks;
+    }
+
+    /// <summary>The last port asked about, so the answer is worked out once rather than per message.</summary>
+    private string? _asked;
+
+    /// <summary>And what it answered.</summary>
+    private bool _speaks = true;
 
     /// <summary>
     /// A fader, which is a position and lands on it.

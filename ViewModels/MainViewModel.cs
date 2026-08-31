@@ -886,6 +886,24 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     }
 
     /// <summary>
+    /// Throws away the log and the one before it, and starts a new one.
+    /// </summary>
+    /// <remarks>
+    /// Not asked about first, unlike deleting a recording or throwing away a song's changes: a
+    /// log is not somebody's work, it is what the program has been muttering about itself, and a
+    /// question before every clear would be in the way of the one case this exists for, which is
+    /// emptying it before doing the thing you want to read about.
+    /// </remarks>
+    public IRelayCommand ClearLogCommand => new RelayCommand(() =>
+    {
+        bool went = Diagnostics.Log.Clear();
+
+        OnPropertyChanged(nameof(LogHint));
+
+        Bus.Say(went ? "The log was cleared" : "There was no log to clear");
+    });
+
+    /// <summary>
     /// Which parts of the app write to the log, one switch each.
     /// </summary>
     /// <remarks>
@@ -1360,7 +1378,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
-        var targets = new ControlTargets(Tracker, _machines, Machines);
+        var targets = new ControlTargets(Tracker, _machines, Machines, new TransportPresses(Transport));
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
@@ -1383,7 +1401,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true, profiles: _profiles);
 
-        var transport = new MidiTransportRouter(new TransportAdapter(Transport));
+        var transport = new MidiTransportRouter(new TransportAdapter(Transport), _profiles);
 
         var surface = new MackieSurface(
             midiService, targets, () => Tracker.TrackCount,
@@ -1392,7 +1410,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                      ? named
                      : "TR-" + (track + 1).ToString("00", System.Globalization.CultureInfo.InvariantCulture));
 
-        var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount, surface);
+        var mackie = new MidiMackieRouter(targets, () => Tracker.TrackCount, surface, _profiles);
 
         Tracker.MixShown = surface.Draw;
 

@@ -90,8 +90,56 @@ public sealed class ControllerProfile
     /// </remarks>
     public ControllerScreen? Screen { get; set; }
 
+    /// <summary>
+    /// The control surface protocol it speaks, if it speaks one.
+    /// </summary>
+    /// <remarks>
+    /// Mackie Control needs no file, which is the whole reason it is worth reading: the protocol
+    /// says what every control on it is, so a surface nobody has written anything about works on
+    /// arrival. This is not that promise being withdrawn. It is the other half of it.
+    ///
+    /// A device with no file is still read as a Mackie surface when it is ticked for the
+    /// transport, exactly as before. A device with a file that never mentions Mackie is not, and
+    /// that is a statement rather than an omission: a file lists what the device sends, and one
+    /// that lists fifty one plain controllers and no protocol is saying there is no protocol.
+    ///
+    /// The case it exists for cost an evening. Mackie's eight V-pots are continuous controllers
+    /// 0x10 to 0x17, which is 16 to 23, and a nanoKONTROL2's eight knobs are 16 to 23 as well.
+    /// Ticking Transport for it, which is the only way to reach its transport buttons, turned on
+    /// the Mackie reading of the very same numbers, so every knob was decoded twice: once as the
+    /// position it is and once as a count of notches it is not. The second reading won often
+    /// enough to be unusable, and from a hand on the desk it reads as a knob that is far too
+    /// sensitive rather than as two things answering one message. An MPD218 has the same
+    /// collision on 16 to 21 and would have had the same evening.
+    /// </remarks>
+    public ControllerSurface? Surface { get; set; }
+
     /// <summary>Anything a person opening the file should know. Read by nobody.</summary>
     public string Note { get; set; } = "";
+}
+
+/// <summary>What control surface protocol a device speaks, and on which of its ports.</summary>
+/// <remarks>
+/// Two facts and not one, for the reason a screen's are two: a device that speaks Mackie rarely
+/// speaks it on the port its knobs are on. A MiniLab 3 keeps it on a port named MCU beside three
+/// others, and a KeyLab mkII on the one named DAW, and only while Global Settings, DAW Map says
+/// Standard MCU. Naming the port is what stops the protocol being read off the port that carries
+/// the plain notes.
+/// </remarks>
+public sealed class ControllerSurface
+{
+    /// <summary>
+    /// Which protocol: <c>mackie</c>, and nothing else is read here yet.
+    /// </summary>
+    /// <remarks>
+    /// A name rather than a flag, the same as a screen's, so the day a second surface protocol
+    /// arrives a file written today still names something. A name nothing here implements reads
+    /// as a device with no surface, which is deliberately not an error.
+    /// </remarks>
+    public string Protocol { get; set; } = "";
+
+    /// <summary>The port it is spoken on, as a pattern, matched the way every other port is.</summary>
+    public string Port { get; set; } = "";
 }
 
 /// <summary>What kind of screen a device has, and which of its ports it is on.</summary>
@@ -206,6 +254,48 @@ public sealed class ControllerControl
 
     /// <summary>encoder, fader, pad, button, strip. What it is, not what it does.</summary>
     public string Kind { get; set; } = "";
+
+    /// <summary>
+    /// Which of the transport's keys this button is: <c>play</c>, <c>stop</c>, <c>record</c>,
+    /// or nothing for a button that is not one of them.
+    /// </summary>
+    /// <remarks>
+    /// The legend printed on the button, which is a fact about the hardware in the way its
+    /// controller number is, and it is here because otherwise one device in five is worse off
+    /// than the rest for no reason anybody could explain.
+    ///
+    /// A MiniLab 3 and a KeyLab mkII need none of this: their transport buttons speak Mackie
+    /// Control, plain controllers or machine control, so ticking Transport in SETTINGS makes
+    /// them work and nothing has to be pointed anywhere. A nanoKONTROL2's play button is a plain
+    /// controller 41 like its mute buttons, which no dialect covers, so the same tick did
+    /// nothing at all and the only way to reach the transport was to point the button at it by
+    /// hand. Same tick, same expectation, different answer.
+    ///
+    /// So this is a fourth dialect and the file is where it is written down, because the number
+    /// is what differs between devices and the meaning is not. It adds no capability the
+    /// hardware lacks: the device really does have a play button, and this says which one it is.
+    /// A device with no file has no transport buttons here, which is what it had before.
+    /// </remarks>
+    public string Transport { get; set; } = "";
+
+    /// <summary>
+    /// What a press does to the value: <c>momentary</c>, <c>latching</c>, or nothing said.
+    /// </summary>
+    /// <remarks>
+    /// The one fact about a button that its numbers cannot carry. Both kinds send nought and a
+    /// hundred and twenty seven and nothing else, so no amount of watching separates them, and
+    /// they mean opposite things. A latching button reports its own state and reports it once a
+    /// press: following the value is exactly right. A momentary button reports a finger, full
+    /// while it is held and nought when it is let go, so following the value mutes a track for
+    /// as long as somebody keeps a thumb on the button.
+    ///
+    /// Every one of a nanoKONTROL2's thirty five buttons reads Momentary, which is in its scene
+    /// and in no mapping list anywhere, and it is why mute and solo behaved the way they did.
+    ///
+    /// Nothing said means the value is followed, which is what everything did before this
+    /// existed, so no controller anybody has already pointed at anything changes.
+    /// </remarks>
+    public string Press { get; set; } = "";
 
     /// <summary>
     /// True when nothing is sent unless a modifier is held.

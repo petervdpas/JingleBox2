@@ -25,4 +25,21 @@ public interface ITransportKeys
 
     /// <summary>Record.</summary>
     void Record();
+
+    /// <summary>
+    /// Cycle: turns looping on or off on whichever page the transport is patched to.
+    /// </summary>
+    /// <remarks>
+    /// The fourth word, and it was the one every dialect already carried and nothing read.
+    /// Mackie Control has it as note 0x56, a MiniLab sends controller 105, a nanoKONTROL2's
+    /// CYCLE is controller 46, and all three were named here and answered with a log line saying
+    /// this does nothing with it yet. It has somewhere obvious to go: the Loop switch sits in the
+    /// tracker's bar beside the Pattern or Song picker, because what the end is and what happens
+    /// when you reach it are one question, and a control surface puts its cycle key in the
+    /// transport row for the same reason.
+    ///
+    /// Nothing on a page with nothing to go round, which is where <c>ITransportDeck.Loop</c>
+    /// being defaulted to nothing earns its keep.
+    /// </remarks>
+    void Loop();
 }

@@ -32,6 +32,20 @@ public interface IControlTarget
     void Set(double value);
 
     /// <summary>
+    /// Whether this is a switch: two states, rather than a range with values in between.
+    /// </summary>
+    /// <remarks>
+    /// It changes what a button does to it and nothing else. A hardware button that stays where
+    /// it is put reports its state, so following the value is right and this need never be
+    /// asked. A momentary button reports a finger: full while it is held and nought when it is
+    /// let go. Followed, that mutes a track for as long as somebody keeps their thumb down and
+    /// unmutes it when they take it off, which is a mute nobody can use.
+    ///
+    /// False by default, so a target that has not thought about it behaves exactly as it did.
+    /// </remarks>
+    bool Switch => false;
+
+    /// <summary>
     /// How the value reads, for a controller with a screen to show.
     /// </summary>
     /// <remarks>

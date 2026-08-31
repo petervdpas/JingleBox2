@@ -76,4 +76,18 @@ public interface ITransportDeck : INotifyPropertyChanged
     /// page is doing, there is always an answer to being asked to stop.
     /// </remarks>
     void Stop();
+
+    /// <summary>
+    /// Turns looping on or off, for a deck that has such a thing.
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to nothing, which is not laziness: a take on RECORD and a bank of pads have
+    /// nothing to go round, so a cycle button pressed on those pages should do nothing rather
+    /// than something invented. The tracker is the one deck it means anything on.
+    ///
+    /// A toggle rather than a setting, because that is what the button on a control surface is:
+    /// there is one Cycle key and pressing it is the whole gesture. Every protocol that carries
+    /// it carries only the press.
+    /// </remarks>
+    void Loop() { }
 }

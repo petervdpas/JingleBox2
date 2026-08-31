@@ -124,211 +124,250 @@
           "name": "Solo 1",
           "cc": 32,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 2",
           "cc": 33,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 3",
           "cc": 34,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 4",
           "cc": 35,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 5",
           "cc": 36,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 6",
           "cc": 37,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 7",
           "cc": 38,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Solo 8",
           "cc": 39,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 1",
           "cc": 48,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 2",
           "cc": 49,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 3",
           "cc": 50,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 4",
           "cc": 51,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 5",
           "cc": 52,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 6",
           "cc": 53,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 7",
           "cc": 54,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Mute 8",
           "cc": 55,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 1",
           "cc": 64,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 2",
           "cc": 65,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 3",
           "cc": 66,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 4",
           "cc": 67,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 5",
           "cc": 68,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 6",
           "cc": 69,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 7",
           "cc": 70,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rec 8",
           "cc": 71,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Track left",
           "cc": 58,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Track right",
           "cc": 59,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Cycle",
           "cc": 46,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary",
+          "transport": "cycle"
         },
         {
           "name": "Set marker",
           "cc": 60,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Marker left",
           "cc": 61,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Marker right",
           "cc": 62,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Rewind",
           "cc": 43,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Fast forward",
           "cc": 44,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary"
         },
         {
           "name": "Stop",
           "cc": 42,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary",
+          "transport": "stop"
         },
         {
           "name": "Play",
           "cc": 41,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary",
+          "transport": "play"
         },
         {
           "name": "Record",
           "cc": 45,
           "channel": 1,
-          "kind": "button"
+          "kind": "button",
+          "press": "momentary",
+          "transport": "record"
         }
       ]
     }

@@ -5,6 +5,8 @@ using System;
 using System.Windows.Input;
 using JingleBox2.Machines.Ui;
 using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Midi;
+using JingleBox2.Midi.Enums;
 
 namespace JingleBox2.Views;
 
@@ -256,12 +258,25 @@ public class Transport : ThemedControl
     protected override Size MeasureOverride(Size availableSize) =>
         new(Order.Length * CapWidth + (Order.Length - 1) * Gap, CapHeight);
 
+    /// <summary>
+    /// Joins the tally of things worth entering the pointing mode for.
+    /// </summary>
+    /// <remarks>
+    /// The transport is on every page that has anything to play, so this is what makes
+    /// Ctrl+Shift+M mean something outside the mixer and the machine panels. Counted the same
+    /// way they are, and by visibility as well as attachment, since the bar is hidden rather
+    /// than removed on a page with no transport.
+    /// </remarks>
+    public Transport() => LinkKey.Watch(this);
+
     /// <summary>The four caps, in the order they are always in.</summary>
     public override void Render(DrawingContext context)
     {
         var palette = ThemePalette.From(this);
 
         foreach (var key in Order) DrawCap(context, palette, key);
+
+        if (_offering != Key.None) LinkGlow.Paint(context, Seat(_offering));
     }
 
     /// <summary>
@@ -461,21 +476,78 @@ public class Transport : ThemedControl
 
         var over = At(e.GetPosition(this));
 
-        if (over == _over) return;
+        if (over == _over) { Offer(over); return; }
 
         _over = over;
 
+        Offer(over);
+
         InvalidateVisual();
     }
+
+    /// <summary>
+    /// Offers the cap under the pointer to whatever is being linked, and glows it.
+    /// </summary>
+    /// <remarks>
+    /// Its own rather than <see cref="Pointable"/>'s, and for the reason the machine panel keeps
+    /// its own: that hangs one mapping on one control, and this is four keys drawn inside one
+    /// control, so only the control knows which of them the pointer is on.
+    ///
+    /// A fresh copy every time, because <see cref="ControlLink.Handle"/> fills the controller's
+    /// half into the object it was handed and then keeps it: offering the template itself would
+    /// have every link on the transport overwriting the last.
+    ///
+    /// Offered once per cap rather than once per movement, and offered again when the link has
+    /// taken the last one, which is what a hand that has just pointed one button and reaches for
+    /// the next expects.
+    /// </remarks>
+    private void Offer(Key over)
+    {
+        if (ControlLink.Current is not { IsLinking: true } link || over == Key.None)
+        {
+            if (_offering == Key.None) return;
+
+            _offering = Key.None;
+
+            InvalidateVisual();
+            return;
+        }
+
+        if (_offering == over && link.Offered is not null) return;
+
+        _offering = over;
+
+        link.Offer(ControlMapping.Copy(TransportLinks.For(Named(over))), keep: false);
+
+        InvalidateVisual();
+    }
+
+    /// <summary>Which of the four a drawn cap is, for a link that names one.</summary>
+    /// <remarks>
+    /// Two enumerations for four keys, deliberately. The drawn one has a None, because a pointer
+    /// is very often on no cap at all, and a link has no use for that.
+    /// </remarks>
+    private static TransportKey Named(Key key) => key switch
+    {
+        Key.Pause => TransportKey.Pause,
+        Key.Stop => TransportKey.Stop,
+        Key.Record => TransportKey.Record,
+        _ => TransportKey.Play
+    };
+
+    /// <summary>Which cap is being offered to a link, or none.</summary>
+    private Key _offering = Key.None;
 
     /// <summary>Puts every cap back down when the pointer leaves the bar.</summary>
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
 
-        if (_over == Key.None) return;
+        if (_over == Key.None) { Offer(Key.None); return; }
 
         _over = Key.None;
+
+        Offer(Key.None);
 
         InvalidateVisual();
     }

@@ -810,16 +810,29 @@ whole exercise and is worth writing down rather than summarising:
   asked without a window: which side, and where a step lands. It stops at the ends rather than
   coming round, since a button held down that wrapped would carry you past the one you were
   looking for
-- `Midi/MixLinks.cs` is what a mixer strip offers: Level, Pan, Mute, Solo, Duck and the ducking
-  release, which was missing until the strip was gone over control by control: every other value
-  had a name for a link to use and that one had none. Not the Duck from picker, which names a
-  track rather than a value, for the same reason a take picker cannot be pointed at. A mixer link
-  is the song's rather than the desk's, because a track only exists in a song. Every one is
-  `ControlScope.Focused`, so one knob pointed at Level is the level of whichever strip you last
-  touched rather than a link per track. Touching a strip anywhere picks its track, tunnelled so
-  grabbing a fader picks the strip on the way past rather than instead of moving it, and it goes
-  through the pattern cursor rather than a second answer beside it: the mixer, the pattern, the
-  chain and the automation then agree without being told about each other
+- **`Midi/MixLinks.cs` is what a mixer strip offers, and a link names the strip it was made on.**
+  Level, Pan, Mute, Solo, Duck and the ducking release, which was missing until the strip was
+  gone over control by control: every other value had a name for a link to use and that one had
+  none. Not the Duck from picker, which names a track rather than a value, for the same reason a
+  take picker cannot be pointed at. A mixer link is the song's rather than the desk's, because a
+  track only exists in a song. Touching a strip anywhere picks its track, tunnelled so grabbing a
+  fader picks the strip on the way past rather than instead of moving it, and it goes through the
+  pattern cursor rather than a second answer beside it: the mixer, the pattern, the chain and the
+  automation then agree without being told about each other
+- **It was `ControlScope.Focused` first and that could not be used.** One shared set of templates
+  for every strip, all of them meaning "the track I am on", on the reasoning that a link per
+  strip would be eight links to make and eight to remember for a desk that has one fader. That
+  reasoning names its own hardware assumption, and a nanoKONTROL2 breaks it: eight faders, eight
+  knobs and twenty four strip buttons, where the whole point of the desk is that fader three is
+  track three. And it was not merely unhelpful, it was impossible: two links following the cursor
+  have the same target, so `SameTarget` read the second as a replacement for the first, and
+  pointing fader two at TR-02 quietly unlinked fader one. Reported as "controller strip 2 also
+  points to track 1 and I cant really control link that way", which is exactly what it did
+- Worse, it disagreed with the layout a device already gets before anybody points at anything,
+  which pins fader three to track three. **Two ways of doing one thing that answer differently is
+  the fault underneath the fault**: whichever was right, they could not both be. `MixLinks.On`
+  is the one maker now, `TrackStripViewModel` holds its own six, and the master needs no special
+  case because it is strip -1 there as it is everywhere else
 - What a track plays is the track's own instrument and never the one picked out in the list
   beside the pattern. Those are two questions and the tracker answered the first with the second
   whenever a track had none of its own: the keyboard sounded an instrument the track had not
@@ -1222,6 +1235,15 @@ whole exercise and is worth writing down rather than summarising:
   the guard inside `Log.Write` is checked after the caller has already allocated it. Everywhere
   else still writes without asking, because a line written when something is decided costs
   nothing worth counting
+- **The log is kept between runs and is cleared on purpose, in SETTINGS.** Never on start: the
+  run you most often want is the one that already ended badly, and a log cleared on start has
+  thrown away the crash you restarted because of. It rolls over at four megabytes keeping one
+  `.old`, so two files is the bounded cost, and each run writes one boundary line naming the
+  areas and the build, which is what to search for to find where a run begins. Clear the log
+  takes both files and says the boundary line again at once, so the fresh file starts the way any
+  other run does rather than mid-sentence: it is why `Announce` is allowed to run twice in one
+  process. Not asked about first, unlike deleting a recording, because a log is not somebody's
+  work
 - `LogArea.Machines` is the sixth area, and everything under `Tracker/Machines/` writes to it
   rather than to the app's. It is a whole half of this program and it says almost nothing while
   nothing is wrong; the day a machine draws an empty panel or comes back from a zip missing a
@@ -1507,6 +1529,87 @@ whole exercise and is worth writing down rather than summarising:
   here: the copy in the application folder is whatever was first put there. Machines are kept up
   to date file by file against the shipped copy and controllers are not, which is a difference
   nobody decided
+- **Ticking a controller for Transport used to read it as a Mackie surface whether or not it
+  spoke Mackie, and the numbers collide.** Mackie's eight V-pots are continuous controllers 0x10
+  to 0x17, which is 16 to 23, and a nanoKONTROL2's eight knobs are 16 to 23. So one knob turned
+  was decoded twice, once as the position it is and once as a count of notches it is not, and the
+  second reading threw a pan to either end. From a hand on the desk that is a knob far too
+  sensitive to use, which is exactly how it was reported, and 2519 lines of the log say
+  `mackie: 'nanoKONTROL2 _ CTRL' moved Pan on TR-01` beside the same number of lines saying the
+  link did the right thing. An MPD218 collides on 16 to 21 and had the same fault waiting
+- The gate is `IControllerProfiles.SurfaceOn`, and it is the one question here whose default is
+  yes. Mackie Control is read precisely because it needs no file, so a device nobody has
+  described is still read as a surface exactly as before; a device whose file describes it and
+  names no protocol is not, because a file lists what a device sends and one listing fifty one
+  plain controllers is saying there is nothing underneath them. The port is named as well as the
+  protocol, in a `surface` block beside `screen` and for the same reason: a MiniLab 3 speaks it
+  on the port named MCU and a KeyLab mkII on the one named DAW, and reading it off the port the
+  knobs are on is the fault again in a different place
+- **A button pointed at a switch is momentary or latching and nothing on the wire says which.**
+  Both send nought and a hundred and twenty seven and they mean opposite things: a latching
+  button reports its own state, so following the value is right, and a momentary one reports a
+  finger, so following the value mutes a track for exactly as long as a thumb is on the button.
+  Every one of a nanoKONTROL2's thirty five buttons is Momentary, which is in the device's scene
+  and in no mapping list anywhere. `ControllerControl.Press` is that fact and
+  `IControllerProfiles.Momentary` the question; nothing said means followed, so no controller
+  anybody has already pointed at anything changes
+- **And nothing that is a press may park, which took two goes to see.** Parking is a rule about a
+  control that reports a position driving a value into an end: it stops a fader held against the
+  top writing the top over and over, and the way out is a message going the other way. A button
+  has no position and a switch has no in between, so every one of parking's terms is meaningless
+  there and its answer is arbitrary. The transport showed it worst: a press writes the target's
+  maximum, so the hand parked upward, and a release read through the wrap unwinding is a step
+  upward too, same direction, still parked. It fired about one press in three, which is worse
+  than never working because it reads as a loose cable. The two press branches are asked before
+  parking now, and `Tests/ControlSurfaceTests.cs` counts three presses and their releases,
+  because the releases contributing nothing is half of what has to be true
+- **And under that, a switch was parking.** Parking is a rule about positions: a fader held
+  against the top must stop writing the top over and over, and the way out is a message going
+  the other way. A switch is only ever at one of its two ends, so the press that flips it lands
+  on an end and parks, and the press that would flip it back is a jump from 127 to nought, which
+  the wrap unwinding reads as one step upwards rather than a hundred and twenty seven downwards:
+  same direction, still parked, thrown away. So a button pointed at a mute muted the track once
+  and did nothing ever again, momentary or not. `IControlTarget.Switch` is the test and a switch
+  does not park. This one was found by a test rather than reported, and it is most of what
+  "linking the M and the S works very strange" actually was
+- **Ticking Transport meant two different things depending on the device, and that was the
+  real fault.** A MiniLab 3 and a KeyLab mkII speak Mackie Control, plain controllers or machine
+  control, so the tick made their transport buttons work with nothing pointed anywhere. A
+  nanoKONTROL2's play button is plain controller 41 like its mute buttons, which no dialect
+  covers, so the identical tick did nothing whatever and the transport could only be reached by
+  pointing a button at it by hand. Nobody could have worked that rule out from the outside, and
+  it was reported in exactly those words: that is not how the transport works for the minilab3
+  or the mk2
+- So there is a fourth dialect and it is the file. `ControllerControl.Transport` is the legend
+  printed on the button, `IControllerProfiles.TransportOn` the question, and
+  `MidiTransportRouter` asks it only after its three protocols have all declined, so a device
+  speaking one of them is untouched. It adds no capability the hardware lacks: the device really
+  does have a play button and this says which one it is. A device with no file has no transport
+  buttons, which is what it had before
+- **And cycle turns looping on, which every dialect already carried and none of them read.**
+  Mackie Control has it as note 0x56, a MiniLab sends controller 105, a nanoKONTROL2's CYCLE is
+  controller 46, and all three were named in the router and answered with a line saying this does
+  nothing with it yet. It has somewhere obvious to go: Loop sits in the tracker's bar beside the
+  Pattern or Song picker, because what the end is and what happens when you reach it are one
+  question, and a control surface puts its cycle key in the transport row for the same reason.
+  `ITransportKeys.Loop` is the fourth word and `ITransportDeck.Loop` is defaulted to nothing,
+  which is not laziness: a take on RECORD and a bank of pads have nothing to go round, so a cycle
+  key pressed on those pages should do nothing rather than something invented. Tap tempo is the
+  last one named and left alone
+- **The transport had nothing on it to point at.** `Pointable.Offers` appeared in exactly one
+  view, the mixer's, so the pointing gesture found nothing on the bar and no hardware button
+  could be linked to play. Ticking the device for Transport looks like the answer and is not:
+  that switch reads the three protocols, and a nanoKONTROL2's play button is a plain controller
+  41, where the plain dialect read here is a MiniLab's 105 to 109. `Midi/TransportLinks.cs` is
+  the four keys, `ControlKind.Transport` the kind and `ITransportPresses` the seam, which is
+  four keys where `ITransportKeys` is three: a protocol folds pause into stop because it cannot
+  send one, and a person pointing at the pause on the screen means the pause on the screen
+- The bar offers its own, the way a machine panel does and for the same reason: it is one
+  control drawing four caps, so only it knows which is under the pointer, where `Pointable` hangs
+  one mapping on one control. It calls `LinkKey.Watch` too, which is what makes Ctrl+Shift+M mean
+  something on a page that is not the mixer. A transport key is `ControlScope.Fixed` and belongs
+  to the desk rather than to a song: there is one transport, and a link that travelled in a file
+  would arrive on somebody else's machine telling their hardware what to do
 - `Controllers/Profiles/keystep-pro.json` is the one that says a device cannot be described, and why.
   Its five encoders have no factory controller number: the manual's Controller page marks a
   default for channel, mode, min and max and marks none for CC, so the omission is deliberate

@@ -239,6 +239,11 @@ public sealed class ControlLink
     ///
     /// The offer is held rather than made again afterwards: wiggling the same knob twice is one
     /// link, and the second wiggle must not make a second mapping out of the same offer.
+    ///
+    /// The line it writes names the layer the link went into and counts that layer. It counted
+    /// the desk whichever list the link landed in, so sixteen mixer links in a row each reported
+    /// the same four, and a log that reports a number which never moves is worse than one that
+    /// reports none: it reads as the links not being kept.
     /// </remarks>
     public ControlMapping? Handle(MidiMessage message)
     {
@@ -259,15 +264,28 @@ public sealed class ControlLink
         Displace(Song?.Invoke(), wanted);
         lock (_lock) Displace(_mappings, wanted);
 
+        int held;
+        string layer;
+
         if (_offeredToSong && Song?.Invoke() is { } keeping)
         {
             keeping.Add(wanted);
+
+            held = keeping.Count;
+            layer = "this song";
 
             SongChanged?.Invoke();
         }
         else
         {
-            lock (_lock) _mappings.Add(wanted);
+            lock (_lock)
+            {
+                _mappings.Add(wanted);
+
+                held = _mappings.Count;
+            }
+
+            layer = "the desk";
         }
 
         _offered = null;
@@ -276,7 +294,8 @@ public sealed class ControlLink
 
         Log.Write(LogArea.Midi, () =>
             "link: CC " + wanted.Cc + " ch" + wanted.Channel + " now moves "
-            + (wanted.Name.Length > 0 ? wanted.Name : wanted.Key) + ", " + _mappings.Count + " in all");
+            + (wanted.Name.Length > 0 ? wanted.Name : wanted.Key)
+            + ", " + held + " on " + layer);
 
         Say(() =>
         {
