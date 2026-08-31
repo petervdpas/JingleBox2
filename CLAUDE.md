@@ -1484,15 +1484,29 @@ whole exercise and is worth writing down rather than summarising:
   architecture; the tables are facts about hardware and are what nobody should reinvent. Mackie
   themselves never published any of it: the same hardware shipped as Emagic's Logic Control and
   Emagic did
-- `Controllers/Profiles/nanokontrol2.json` is the first file here written from somebody else's reading of
-  a device rather than from the wire, and it says so at the top. Korg's parameter guide has a
-  page per control type explaining what CC Number means and never prints one; the numbers come
-  from Mixxx's mapping for the device as shipped, agreeing with every community list. Fifty one
-  controls, all fixed: sliders 0-7, knobs 16-23, solo 32-39, mute 48-55, rec 64-71, transport
-  41-46 and 58-62. They hold in CC mode, which is the factory mode, and mean nothing in the five
-  DAW modes where the same controls speak that DAW's protocol. It buys the most of any file here
-  because the device is the plainest surface anybody makes: eight faders on eight track levels
-  and eight knobs on the panel in front of you, working before it is unwrapped
+- `Controllers/Profiles/nanokontrol2.json` was the one file here written from somebody else's
+  reading of a device rather than from the wire, and on 2026-08-31 the device arrived and it was
+  read. Korg's parameter guide has a page per control type explaining what CC Number means and
+  never prints one, so the numbers had come from Mixxx's mapping for the device as shipped. All
+  fifty one agreed. Sliders 0-7, knobs 16-23, solo 32-39, mute 48-55, rec 64-71, transport 41-46
+  and 58-62, and identity Korg `42` family `0113` member `0000` on firmware 1.3. They hold in CC
+  mode, which is the factory mode, and mean nothing in the five DAW modes where the same controls
+  speak that DAW's protocol. It buys the most of any file here because the device is the plainest
+  surface anybody makes: eight faders on eight track levels and eight knobs on the panel in front
+  of you, working before it is unwrapped
+- **What the scene added that no community list carries is the shape of a press.** Every one of
+  the thirty five buttons reads mode CC, behaviour Momentary, off 0 and on 127, so a button is a
+  key with two halves rather than a switch that stays where it is put, and the LED mode is
+  Internal, which means a light follows the host rather than the press. Every knob and slider is
+  enabled over the full 0 to 127 and every controller group takes the global channel rather than
+  naming one. None of that is a number a mapping file would ever list, and all of it decides how
+  the thing feels
+- **And a shipped profile that is corrected does not reach anybody.** `ControllerFolder.FirstRun`
+  copies with `overwrite: false` and records what has been offered, deliberately, so a file
+  somebody has edited is theirs. The cost is that a file this repository fixes stays fixed only
+  here: the copy in the application folder is whatever was first put there. Machines are kept up
+  to date file by file against the shipped copy and controllers are not, which is a difference
+  nobody decided
 - `Controllers/Profiles/keystep-pro.json` is the one that says a device cannot be described, and why.
   Its five encoders have no factory controller number: the manual's Controller page marks a
   default for channel, mode, min and max and marks none for CC, so the omission is deliberate
