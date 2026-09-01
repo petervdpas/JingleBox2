@@ -104,14 +104,11 @@ public partial class MachinesView : UserControl
         if (current != null) current.IsEditing = _onScreen;
     }
 
-    /// <summary>
-    /// Opens the plugin's own interface for the instrument being edited, in a window of its
-    /// own. It closes itself when the instrument is left.
-    /// </summary>
-    private void NewFromPlugin_Click(object? sender, RoutedEventArgs e)
+    /// <summary>Puts another box on the machine picked, under a name nothing else has.</summary>
+    private void NewFromMachine_Click(object? sender, RoutedEventArgs e)
     {
-        if (ViewModel != null && PluginPicker.SelectedItem is JingleBox2.Audio.Plugins.Records.PluginInfo plugin)
-            ViewModel.NewFromPluginCommand.Execute(plugin);
+        if (ViewModel != null && MachinePicker.SelectedItem is JingleBox2.Tracker.Records.Machine machine)
+            ViewModel.NewFromMachineCommand.Execute(machine);
     }
 
 }

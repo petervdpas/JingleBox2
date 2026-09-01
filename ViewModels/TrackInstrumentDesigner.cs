@@ -81,7 +81,8 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
         }
 
         Editor = new InstrumentEditorViewModel(
-            track, instrument, changed, machines, waveforms, audition, recordings, note => Play(note), keys);
+            track, instrument, changed, machines, waveforms, audition, recordings, note => Play(note), keys,
+            inSong: true);
 
         Location = new TrackLocationViewModel(tracker);
 

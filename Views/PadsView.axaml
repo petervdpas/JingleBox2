@@ -31,7 +31,7 @@
   </UserControl.Styles>
 
   <Border Background="{DynamicResource BgBrush}">
-    <DockPanel Margin="0,6">
+    <DockPanel Classes="tabRoot">
 
       <!-- The profile and the pads it holds, side by side: picking a profile and picking a
            pad out of it are one glance apart, and neither is worth the whole width. Narrow the

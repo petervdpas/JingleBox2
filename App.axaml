@@ -39,8 +39,22 @@
         <!-- One set of tab metrics, so every tab breathes the same. -->
         <!-- Top and foot only. Left and right are the window's, so every page lines up with
              the tab names above it and the status bar below it. -->
+        <!-- It said the same thing before and reached nothing: the selector named StackPanel and
+             no page is one, so all six set their own and drifted, 12 above the takes and 6 above
+             the pattern, with the settings rail adding more of its own. Any control now, and the
+             six say which they are rather than each saying how much. -->
+        <Style Selector=":is(Control).tabRoot">
+            <Setter Property="Margin" Value="0,1,0,6" />
+        </Style>
+
+        <!-- A page that paints its own background leaves the room inside the paint rather than
+             outside it, or the strip above shows through the gap in another colour. -->
+        <Style Selector="Border.tabRoot">
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Padding" Value="0,1,0,6" />
+        </Style>
+
         <Style Selector="StackPanel.tabRoot">
-            <Setter Property="Margin" Value="0,12" />
             <Setter Property="Spacing" Value="12" />
         </Style>
         <!-- A list whose rows are things rather than lines of text: a take, a song, anything

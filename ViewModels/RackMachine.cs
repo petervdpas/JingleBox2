@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Enums;
 using JingleBox2.Machines.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
@@ -76,28 +75,13 @@ public sealed partial class RackMachine : ObservableObject
     /// The second line: which machine this instrument is on, and one word about how it is set.
     /// </summary>
     /// <remarks>
-    /// The machine comes first because the machine is the organising idea. "Bass" on its own
-    /// says nothing about what you would be editing if you opened it; "OddSkilla, square" says
-    /// which panel you will get and roughly what it is doing. A plugin names itself instead,
-    /// since which plugin it is matters more than the fact that it is one.
+    /// The instrument's own answer, not a second one written here. It was written out twice
+    /// before, once on the instrument and once on this row, and the two had already drifted: an
+    /// effect said the same thing a plugin instrument did, since only one of the two copies had
+    /// been told that effects exist. Two lists printing one instrument have to agree, and the
+    /// only way they can be made to is by there being one sentence.
     /// </remarks>
-    public string DetailText
-    {
-        get
-        {
-            if (Instrument.IsPlugin)
-                return Instrument.PluginName is { Length: > 0 } plugin ? plugin : "Plugin";
-
-            string machine = Instrument.Machine.Name;
-
-            return Instrument.Kind switch
-            {
-                TrackerInstrumentKind.Synth => machine + ", " + Instrument.Patch.Wave.ToString().ToLowerInvariant(),
-                TrackerInstrumentKind.MonoSynth => machine + ", " + (Instrument.MonoSynth?.Wave.ToString().ToLowerInvariant() ?? "saw"),
-                _ => machine + ", " + Instrument.BaseNote
-            };
-        }
-    }
+    public string DetailText => Instrument.Detail;
 
     /// <summary>Redraws the row after the editor changed the instrument behind it.</summary>
     public void Refresh()

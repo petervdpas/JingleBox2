@@ -195,7 +195,7 @@ public sealed class TrackerInstrument
     {
         get
         {
-            if (IsPlugin) return PluginName is { Length: > 0 } plugin ? plugin : "Plugin";
+            if (IsPlugin) return PluginName is { Length: > 0 } named ? named : "Plugin";
 
             string machine = Machine.Name;
 
@@ -224,6 +224,8 @@ public sealed class TrackerInstrument
             : new Audio.Plugins.Records.PluginInfo(PluginId, PluginName, "", "", PluginPath, PluginFormat, IsInstrument: true);
 
     /// <summary>An instrument that is a plugin, at whatever the plugin opens with.</summary>
+    /// <param name="name">What to call it.</param>
+    /// <param name="plugin">Which plugin.</param>
     public static TrackerInstrument CreatePlugin(string name, Audio.Plugins.Records.PluginInfo plugin)
     {
         return new TrackerInstrument

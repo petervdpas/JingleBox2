@@ -326,7 +326,16 @@ public class ControlLinksPageTests
             ports: () => new[] { "nanoKONTROL2 _ CTRL" });
     }
 
-    /// <summary>Out of the card it is drawn from, and back into an empty layer.</summary>
+    /// <summary>
+    /// Out of the card it is drawn from, and back into an empty layer.
+    /// </summary>
+    /// <remarks>
+    /// The list is read again by hand between the acts and the checks. In the application it
+    /// reads itself, because <see cref="ControlLink.Say"/> raises Changed on the drawing thread;
+    /// here there is no drawing thread pumping, so whether the rebuild has happened by the next
+    /// line depends on what ran before this test in the assembly. Asking for it is the same
+    /// rebuild, taken at a moment this test decides rather than one it hopes for.
+    /// </remarks>
     [Fact]
     public void A_card_is_written_out_and_read_back_in()
     {
@@ -342,10 +351,13 @@ public class ControlLinksPageTests
         Assert.True(File.Exists(path));
 
         page.ForgetAllCommand.Execute(null);
+        page.Reread();
+
         Assert.Empty(desk);
         Assert.Empty(page.Targets);
 
         page.Import(path);
+        page.Reread();
 
         Assert.Equal(2, desk.Count);
         Assert.Equal("OddSkilla", Assert.Single(page.Targets).Title);

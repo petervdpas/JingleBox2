@@ -43,13 +43,19 @@ public interface IInstrumentAudition
     double SamplePosition(int track);
 
     /// <summary>
-    /// The live plugin behind a plugin instrument, loaded if it is not already open. Null for
-    /// any other kind, and for a plugin this host cannot play.
+    /// The live plugin behind a plugin on the rack or on a track, loaded if it is not already
+    /// open. Null for any other kind, and for a plugin this host cannot open.
     /// </summary>
     /// <remarks>
-    /// The editor needs the running plugin, not a description of one: the knobs it shows are
-    /// the plugin's own, and the patch it saves has to be read out of the thing that is
-    /// making the sound.
+    /// The editor needs the running plugin, not a description of one: the knobs it shows are the
+    /// plugin's own, and the patch it saves has to be read out of the thing that is making the
+    /// sound. A plugin's parameters cannot be listed without it, either; there is no manifest to
+    /// read and Serum answers with 2622 of them.
+    ///
+    /// <see cref="IPluginParameters"/> rather than <see cref="IPluginInstrument"/>, because an
+    /// effect is on the rack too and everything above this wants the same two things of both:
+    /// the knobs and the patch. Playing notes into one is a question only an instrument answers
+    /// and is asked elsewhere.
     /// </remarks>
-    IPluginInstrument? PluginFor(TrackerInstrument instrument);
+    IPluginParameters? PluginFor(TrackerInstrument instrument);
 }

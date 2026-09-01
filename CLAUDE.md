@@ -325,10 +325,31 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   answer about whether a zip has to be imported, and it shows it while somebody is looking at
   it. A machine's own recordings do travel with it, inside the zip
 
-- A machine is a fixture on the rack: one of each, fixed name, always there. `TrackerInstrument`
+- A machine is a fixture on the rack while it is registered: one of each, fixed name, and gone
+  from the rack when it is unregistered in SETTINGS, System. It used to say always there, which
+  was written before the registry existed and had been quietly untrue ever since: the registry is
+  what this installation has and is the only thing that answers that. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
   (`MachineRack`, `MachineRackViewModel`, `RackMachine`, `MachinesView`) and the tracker's say
   instrument (`Song.Instruments`, `InstrumentSlot`, `AddInstrumentCommand`)
+- **The rack is what this installation has registered, in two tabs: Machines and Effects.** A
+  plugin is on neither and never should have been on the rack at all: a CLAP or a VST3 is
+  somebody else's program, used by a song rather than owned by this installation, and shelving
+  one only put Serum in a list beside OddSkilla as though the two were the same kind of thing.
+  Anything that is not a registered machine is moved to `instruments/retired` on the next open,
+  which now includes the plugins that were shelved before this
+- Each tab's picker offers what this installation has of that kind: the machines for the second
+  box on one, and the effects, of which there are none because there are no effect engines for
+  one to be on. An effect will be registered exactly as a machine is, through the same folder,
+  the same id-decides-engine gate, and the same zip
+- **A song picks its instrument from one list: the rack's machines and the instrument plugins on
+  this computer.** `MachineRackViewModel.Offered`, drawn as a coloured dot and a name, since to a
+  track those are one question with one answer: what plays this part. Instruments only, because
+  an effect goes on a track's chain under the pattern, which is where it belongs and where it
+  already worked. A plugin says its format only where the same name is installed twice, which
+  happens whenever a plugin ships as both a CLAP and a VST3: those are two plugins here, two ids
+  and two sets of parameter numbers, so neither can be dropped and a list saying one word twice
+  is one nobody can pick from
 - `SampleSlicer` (Tracker/): Where a recording gets cut into pieces. Finds the attacks off the
   peak data by beating a decaying peak-hold, walks each cut back to where its sound began, and
   falls back to an even division when there is nothing to find. Knows nothing about what takes
@@ -922,6 +943,11 @@ whole exercise and is worth writing down rather than summarising:
 - What cannot be read is left out and counted rather than failing the lot, which is what a
   template from a newer version looks like: mostly this version's, and the useful answer is the
   part that works plus a line saying how much did not
+- `RackMachine.DetailText` was a second copy of `TrackerInstrument.Detail` and is the instrument's
+  own answer again. The two had already drifted, which is what that duplication always does: only
+  one of them had been told that effects exist, so the row called an effect a plugin. This file
+  already recorded the same lesson once, when the sentence was briefly written out on both of the
+  two things that print it
 - `ILinkTargets` is what a link points at, said in words and read back out of them, and it is one
   rule because the page cuts its cards by it and the file is written by it. Two spellings would
   eventually disagree, and the way that fails is a template that means one thing to whoever
@@ -1359,6 +1385,15 @@ whole exercise and is worth writing down rather than summarising:
   taken on purpose and asked about first. One `Color.Unsaved` became the two, per theme as it
   always was, and the same pair is on the machine editor's header, which has the identical two
   buttons doing the identical job
+- **Every page starts the same distance under the tab strip, and `tabRoot` is that distance.**
+  The rule was already written in `App.axaml` and reached nothing: its selector named
+  `StackPanel` and no page is one, so all six set their own and drifted, twelve above the takes,
+  six above the pattern, and the settings rail adding more of its own. Any control now, and each
+  page says which it is rather than how much. A page that paints its own background leaves the
+  room inside the paint rather than outside it, or the strip above shows through the gap in
+  another colour, which is the one reason `Border.tabRoot` is a second rule and not a special
+  case. Measured off the screen rather than judged: the card's top edge is on the same pixel on
+  all six pages, where it used to vary by twelve
 - **Which page you are on is said in the accent colour and in bold, never with an underline.**
   Fluent draws a line under the selected tab and that reads as a web page rather than as a piece
   of gear, so the pipe is hidden on any strip that runs across

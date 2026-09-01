@@ -14,7 +14,7 @@
        eight hundred thousand pixels tall: the scrollbar is a hairline, the top cards scroll
        away as you look through the list, and the list cannot be scrolled on its own at all.
        Given a row of its own it stays the size of the window whatever the shelf holds. -->
-  <Grid RowDefinitions="Auto,Auto,*" Margin="0,12">
+  <Grid RowDefinitions="Auto,Auto,*" Classes="tabRoot">
 
     <!-- Recording Controls -->
       <Border Grid.Row="0" Classes="card" Margin="0,0,0,12">

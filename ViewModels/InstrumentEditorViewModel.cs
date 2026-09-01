@@ -161,6 +161,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// defaulted: a fresh one is empty, so a default would draw blank panels and report every
     /// machine missing, without an error anywhere to say why.
     /// </param>
+    /// <param name="inSong">
+    /// True when this is an instrument on a track, false when it is the thing itself on the
+    /// rack. It decides which layer a knob pointed at this lands in, and the rack is the default
+    /// because the rack is what this editor was written for.
+    /// </param>
     public InstrumentEditorViewModel(
         int index,
         TrackerInstrument instrument,
@@ -170,8 +175,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         IInstrumentAudition? audition = null,
         ObservableCollection<Recording>? recordings = null,
         Action<Note>? play = null,
-        Midi.Interfaces.IMidiMonitor? keys = null)
+        Midi.Interfaces.IMidiMonitor? keys = null,
+        bool inSong = false)
     {
+        _inSong = inSong;
         _keys = keys;
         _machines = machines;
         Index = index;
@@ -779,11 +786,18 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         _plugin = plugin;
 
-        PluginPanel = new PluginControlsViewModel(plugin, KeepPatch);
+        PluginPanel = new PluginControlsViewModel(plugin, KeepPatch, _inSong);
     }
 
     /// <summary>The plugin this editor is showing, when it is showing one.</summary>
-    private Audio.Plugins.Interfaces.IPluginInstrument? _plugin;
+    /// <remarks>
+    /// The parameters rather than the instrument, since an effect on the rack is a plugin here
+    /// too and the two things this holds it for, the knobs and the patch, are on both.
+    /// </remarks>
+    private Audio.Plugins.Interfaces.IPluginParameters? _plugin;
+
+    /// <summary>Whether this is an instrument on a track or the thing itself on the rack.</summary>
+    private readonly bool _inSong;
 
     /// <summary>Set when a knob has moved and the patch has not been read back yet.</summary>
     private bool _patchStale;

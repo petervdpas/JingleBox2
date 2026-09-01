@@ -96,8 +96,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         {
             plugins.Plugins.CollectionChanged += (_, _) =>
             {
-                OnPropertyChanged(nameof(AvailablePlugins));
-                OnPropertyChanged(nameof(HasAvailablePlugins));
+                OfferedChanged();
             };
         }
 
@@ -237,14 +236,27 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             if (slot != null) Machines.Add(new RackMachine(slot));
         }
 
-        foreach (var plugin in held.Where(i => i.IsPlugin).OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase))
-            Machines.Add(new RackMachine(plugin));
-
         Selected = Machines.FirstOrDefault(i => i.Id == keep) ?? Machines.FirstOrDefault();
+
+        OfferedChanged();
     }
 
     /// <summary>
-    /// Brings the shelf to what a rack is: the machines, then the plugins, and nothing else.
+    /// The effects this installation has, which is none yet.
+    /// </summary>
+    /// <remarks>
+    /// Its own tab beside the machines, and its own list, because an effect is registered the
+    /// way a machine is: a folder with an id, a face and presets, designed here and travelling
+    /// as a zip. There are none because there are no effect engines yet, and an id with no
+    /// engine behind it is refused rather than shown as a box that cannot sound, which is the
+    /// same gate a machine passes.
+    ///
+    /// Empty rather than absent, so the tab is there and says what it is for.
+    /// </remarks>
+    public ObservableCollection<RackMachine> Effects { get; } = new();
+
+    /// <summary>
+    /// Brings the shelf to what a rack is: the machines this installation has, and nothing else.
     /// </summary>
     /// <remarks>
     /// Every machine installed here gets its slot on the shelf. Written once, the first time the
@@ -272,7 +284,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         foreach (var instrument in _rack.List())
         {
-            if (instrument.IsPlugin || Machine.IsSlot(instrument.Id)) continue;
+            if (Machine.IsSlot(instrument.Id)) continue;
 
             string name = instrument.Name;
 
@@ -297,7 +309,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         if (retired > 0)
         {
             Status = retired + (retired == 1 ? " instrument" : " instruments") +
-                     " moved to instruments/retired. The rack holds the machines and your plugins.";
+                     " moved to instruments/retired. The rack holds this installation's machines and effects; a plugin belongs to a song.";
         }
     }
 
@@ -544,42 +556,133 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     }
 
     /// <summary>
-    /// The plugins that can be an instrument here: the ones that take notes, in a format this
-    /// host knows how to play. An effect is not offered, and neither is an instrument in a
-    /// format that would load and then be silent.
+    /// Everything a song can take an instrument from: this rack's boxes and the plugins on
+    /// this computer.
     /// </summary>
-    public System.Collections.Generic.IReadOnlyList<Audio.Plugins.Records.PluginInfo> AvailablePlugins =>
-        _plugins == null
-            ? System.Array.Empty<Audio.Plugins.Records.PluginInfo>()
-            : _plugins.Plugins.Where(_host.CanPlay).ToList();
-
-    /// <summary>True when there is any plugin worth offering, so the menu can be hidden.</summary>
-    public bool HasAvailablePlugins => AvailablePlugins.Count > 0;
-
-    /// <summary>Puts a plugin on the rack as an instrument of its own.</summary>
     /// <remarks>
-    /// Always enabled. A plugin that cannot be played here is refused with a reason in the status
-    /// line, which is more use than a greyed row nobody can ask about.
+    /// One list, because to a track they are one question: what plays this part. The rack's are
+    /// this installation's own; the plugins are somebody else's programs, offered here because a
+    /// song is where one is used and shelving one only put it in a list beside OddSkilla as
+    /// though the two were the same kind of thing.
+    ///
+    /// Instruments only. An effect is added to a track's chain, under the pattern, which is
+    /// where it belongs and where it already works.
+    ///
+    /// A plugin says its format where the same name is installed twice, and only then. A great
+    /// many ship as a CLAP and a VST3 of the same thing, and those are two plugins here, so
+    /// neither can be dropped and a list saying the same word twice is one nobody can pick from.
+    /// Printed on every row it would say nothing on almost all of them.
     /// </remarks>
-    public IRelayCommand<Audio.Plugins.Records.PluginInfo> NewFromPluginCommand =>
-        new RelayCommand<Audio.Plugins.Records.PluginInfo>(NewFromPlugin);
-
-    /// <summary>Makes an instrument on that plugin, or says why it cannot be one.</summary>
-    private void NewFromPlugin(Audio.Plugins.Records.PluginInfo? plugin)
+    public System.Collections.Generic.IReadOnlyList<Records.InstrumentChoice> Offered
     {
-        if (plugin == null)
+        get
         {
-            Status = "Pick a plugin first.";
+            var offered = Machines
+                .Select(one => new Records.InstrumentChoice(one, null, one.Name, one.Colour))
+                .ToList();
+
+            if (_plugins == null) return offered;
+
+            var plugins = _plugins.Plugins.Where(_host.CanPlay).ToList();
+
+            var twice = plugins
+                .GroupBy(one => one.Name, System.StringComparer.OrdinalIgnoreCase)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToHashSet(System.StringComparer.OrdinalIgnoreCase);
+
+            offered.AddRange(plugins
+                .OrderBy(one => one.Name, System.StringComparer.OrdinalIgnoreCase)
+                .Select(one => new Records.InstrumentChoice(
+                    null,
+                    one,
+                    twice.Contains(one.Name) ? one.Name + "  " + one.Format.ToString().ToUpperInvariant() : one.Name,
+                    Machine.For(Tracker.Enums.TrackerInstrumentKind.Plugin).Theme.Accent)));
+
+            return offered;
+        }
+    }
+
+    /// <summary>
+    /// The machines this installation has, for the picker that adds another box on one.
+    /// </summary>
+    /// <remarks>
+    /// Registered machines and nothing else. A plugin is not offered here and never was worth
+    /// offering: a CLAP or a VST3 is somebody else's program, it is used by a song rather than
+    /// owned by this installation, and it is picked where a song picks its instruments and where
+    /// a track adds an effect. Shelving one only put it in a list beside OddSkilla as though the
+    /// two were the same kind of thing.
+    ///
+    /// Which machines there are is the registry's answer and nobody else's, so a machine thrown
+    /// out in SETTINGS is not offered here either.
+    ///
+    /// Only what is not on the rack already. Every registered machine is given its box when the
+    /// rack is read, so this is usually empty and the picker is not drawn at all, which is the
+    /// truth: there is nothing to add. Offering the five that are sitting in the list above it
+    /// was offering to do nothing, five times.
+    /// </remarks>
+    public System.Collections.Generic.IReadOnlyList<Machine> AvailableMachines =>
+        Machine.Installed
+            .Where(one => Machines.All(row => row.Id != one.SlotId))
+            .ToList();
+
+    /// <summary>True when there is a machine to add, so the picker can be hidden.</summary>
+    public bool HasAvailableMachines => AvailableMachines.Count > 0;
+
+    /// <summary>
+    /// The effects this installation has, for the picker on the effects tab.
+    /// </summary>
+    /// <remarks>
+    /// None yet, and it says so rather than showing a picker with nothing in it. Effects are
+    /// registered the way machines are, and there are none because there are no effect engines
+    /// for one to be on.
+    /// </remarks>
+    public System.Collections.Generic.IReadOnlyList<Machine> AvailableEffects =>
+        System.Array.Empty<Machine>();
+
+    /// <summary>The rack's own boxes are written when it is read, so this list moves with them.</summary>
+    private void OfferedChanged()
+    {
+        OnPropertyChanged(nameof(AvailableMachines));
+        OnPropertyChanged(nameof(HasAvailableMachines));
+        OnPropertyChanged(nameof(Offered));
+    }
+
+    /// <summary>True when there is an effect to add.</summary>
+    public bool HasAvailableEffects => AvailableEffects.Count > 0;
+
+    /// <summary>Puts another box on a machine this installation has.</summary>
+    /// <remarks>
+    /// Always enabled. A machine that is not registered here is refused with a reason in the
+    /// status line, which is more use than a greyed row nobody can ask about.
+    /// </remarks>
+    public IRelayCommand<Machine> NewFromMachineCommand =>
+        new RelayCommand<Machine>(NewFromMachine);
+
+    /// <summary>
+    /// Makes another instrument on that machine, under a name nothing else on the rack has.
+    /// </summary>
+    /// <remarks>
+    /// The machine's own box is written when the rack is read and is always there while the
+    /// machine is registered. This is for the second one: a Zampler set up differently, kept
+    /// beside the first rather than instead of it.
+    /// </remarks>
+    /// <param name="machine">Which machine to make it on.</param>
+    private void NewFromMachine(Machine? machine)
+    {
+        if (machine == null)
+        {
+            Status = "Pick a machine first.";
             return;
         }
 
-        if (!_host.CanPlay(plugin))
+        if (!Machine.Installed.Any(one => one.Kind == machine.Kind))
         {
-            Status = $"'{plugin.Name}' cannot be played as an instrument here.";
+            Status = $"'{machine.Name}' is not registered here.";
             return;
         }
 
-        Add(TrackerInstrument.CreatePlugin(UniqueName(plugin.Name), plugin));
+        Add(TrackerInstrument.CreateOn(machine, UniqueName(machine.Name)));
     }
 
     /// <summary>
@@ -619,6 +722,8 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             var row = new RackMachine(instrument);
             Machines.Add(row);
             Selected = row;
+
+            OfferedChanged();
 
             RackChanged?.Invoke(this, EventArgs.Empty);
             Status = $"Added '{instrument.Name}'";

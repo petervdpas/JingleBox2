@@ -149,6 +149,20 @@ lines being counted, a damaged file, and an import repeated. `ControlLinksPageTe
 file is the page's own half, since the file picker is the window's and everything either button
 does once a path is known is the layer's.
 
+## Where a plugin is met
+
+A plugin is not on the rack. It is somebody else's program, and it is used by a song: picked as a
+track's instrument from the one list that merges the rack's machines with the instrument plugins
+on this computer, or added to a track's chain as an effect. The rack is what this installation
+has registered, in two tabs, Machines and Effects, and both are things designed here that travel
+as zips.
+
+That leaves the question of where a plugin's links live, and the answer is not the rack.
+`PluginControlsViewModel.InSong` carries it, because a plugin window is opened from three places
+and only whoever opened it knows which. A link on a plugin names the plugin's own id and
+parameter number and never a track, so it is a fact about Serum wherever you were standing when
+you made it, and it belongs on the template layer.
+
 ## Still open
 
 **Templates are not read on startup.** The folder is where they gather and where the picker

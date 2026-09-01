@@ -785,10 +785,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// comes from.
     /// </summary>
     /// <remarks>
-    /// A machine and not an instrument: what goes into the song is a copy with an id of its
-    /// own. See <see cref="AddInstrumentCommand"/>.
+    /// A machine on the rack or a plugin on this computer, since to a track those are one
+    /// question. What goes into the song is a copy of its own either way. See
+    /// <see cref="AddInstrumentCommand"/>.
     /// </remarks>
-    [ObservableProperty] private RackMachine? pickedMachine;
+    [ObservableProperty] private Records.InstrumentChoice? pickedMachine;
 
     /// <summary>The order, as rows: which pattern is played at each slot, in words.</summary>
     public ObservableCollection<OrderSlot> OrderEntries { get; } = new();
@@ -2771,11 +2772,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The engine is brought up first, so the first note played is not the one that waits for
     /// the plugin to open.
     /// </remarks>
-    public Audio.Plugins.Interfaces.IPluginInstrument? PluginFor(TrackerInstrument instrument)
+    public Audio.Plugins.Interfaces.IPluginParameters? PluginFor(TrackerInstrument instrument)
     {
         if (instrument == null || !instrument.IsPlugin) return null;
 
         _player.EnsureEngine();
+
         return _player.PreviewPlayerFor(instrument);
     }
 
@@ -3486,9 +3488,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     public void RefreshRack()
     {
-        if (PickedMachine == null) return;
+        if (PickedMachine?.Machine is not { } machine) return;
 
-        if (_rack.Load(PickedMachine.Id) == null) PickedMachine = null;
+        if (_rack.Load(machine.Id) == null) PickedMachine = null;
     }
 
     /// <summary>
@@ -3505,18 +3507,32 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </remarks>
     private void AddInstrument()
     {
-        var chosen = PickedMachine?.Instrument;
-        if (chosen == null)
+        if (PickedMachine is not { } picked)
         {
-            Status = "Pick an instrument from the rack first.";
+            Status = "Pick an instrument first.";
             return;
         }
 
         Changing("adding an instrument");
 
-        var taken = chosen.Clone();
+        TrackerInstrument taken;
 
-        taken.Id = "";
+        if (picked.Machine is { } box)
+        {
+            taken = box.Instrument.Clone();
+
+            taken.Id = "";
+        }
+        else if (picked.Plugin is { } plugin)
+        {
+            taken = TrackerInstrument.CreatePlugin(plugin.Name, plugin);
+        }
+        else
+        {
+            Status = "Pick an instrument first.";
+            return;
+        }
+
         taken.EnsureId();
 
         Song.Instruments.Add(taken);
@@ -3524,7 +3540,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         MarkDirty();
 
         SelectedInstrument = Song.Instruments.Count - 1;
-        Status = $"Added '{chosen.Name}' to the song as instrument {SelectedInstrument:00}";
+        Status = $"Added '{taken.Name}' to the song as instrument {SelectedInstrument:00}";
     }
 
 

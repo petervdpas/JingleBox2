@@ -194,7 +194,7 @@ public static class PanelPreview
 
         /// <inheritdoc/>
         /// <remarks>No plugin is ever loaded here, so a panel that asks gets nothing.</remarks>
-        public IPluginInstrument? PluginFor(TrackerInstrument instrument) => null;
+        public IPluginParameters? PluginFor(TrackerInstrument instrument) => null;
     }
 
     /// <summary>

@@ -86,7 +86,7 @@
 
   <!-- One part at a time. Everything here used to be one column of cards taller than the
        window, which is a page you scroll rather than a page you read. -->
-  <TabControl x:Name="Sections" Classes="rail" TabStripPlacement="Left" Margin="0,6" Padding="0">
+  <TabControl x:Name="Sections" Classes="rail tabRoot" TabStripPlacement="Left" Padding="0">
 
     <!-- A shape of its own, so the line between the sections and their settings can be
          dragged. A docked tab strip has nowhere to put a handle: it is as wide as it is and
