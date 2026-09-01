@@ -53,6 +53,17 @@ public sealed class MachineProjects : IMachineProjects
     {
         string slot = JingleBox2.Tracker.Records.Machine.For(kind).SlotId;
 
-        return slot.Length == 0 || For(slot) != null;
+        if (slot.Length == 0) return true;
+
+        if (For(slot) is null) return false;
+
+        return _rack is null || _rack.Contains(slot);
     }
+
+    /// <summary>Which machines are on the rack, or nothing while nobody has said.</summary>
+    private HashSet<string>? _rack;
+
+    /// <inheritdoc/>
+    public void OnRack(IEnumerable<string> slots) =>
+        _rack = slots is null ? null : new HashSet<string>(slots, StringComparer.OrdinalIgnoreCase);
 }

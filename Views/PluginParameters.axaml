@@ -47,15 +47,21 @@
       </StackPanel>
     </Border>
 
-    <!-- The plugin's own interface, where it has one. Everything inside it is the plugin's
-         doing; the host only lends it the window. -->
-    <views:PluginEditorHost IsVisible="{Binding HasOwnWindow}"
+    <!-- The plugin's own interface, where it has one and it is what is on show. Everything
+         inside it is the plugin's doing; the host only lends it the window. Hidden, the native
+         child goes and the plugin is detached, which the host does in that order because a
+         plugin still drawing into a window that has gone is a crash inside its own toolkit. -->
+    <views:PluginEditorHost IsVisible="{Binding ShowsFace}"
                             Editor="{Binding Editor}"
                             HorizontalAlignment="Left"
                             VerticalAlignment="Top" />
 
-    <!-- Knobs are the fallback, for a plugin that draws nothing of its own. -->
-    <StackPanel Spacing="10" IsVisible="{Binding !HasOwnWindow}">
+    <!-- The host's own knobs. All there is for a plugin that draws nothing of its own, and for
+         one that does, what the Knobs button in the window's header switches to. They are the
+         only controls here the host drew, so they are the only ones a pointer can be rested on
+         to point a hardware knob at: with a plugin's own face on show there is nothing to
+         point at, which is why no plugin could be linked to at all before this. -->
+    <StackPanel Spacing="10" IsVisible="{Binding ShowsKnobs}">
 
     <!-- A plugin that took the application down while opening its window does not get another
          go at it without being asked for by name. -->

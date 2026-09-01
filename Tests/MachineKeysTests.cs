@@ -378,6 +378,16 @@ public class MachineKeysTests
         /// <summary>Takes a monitor to share, or keeps one of its own.</summary>
         public Designer(MidiMonitor? monitor = null) => Monitor = monitor ?? new MidiMonitor();
 
+        /// <summary>
+        /// What is sounding, read straight away rather than through the dispatcher.
+        /// </summary>
+        /// <remarks>
+        /// The same reason the keyboard is: there is no drawing thread being pumped here, and
+        /// whether the dispatcher would run the work inline or queue it for ever depends on
+        /// which thread first touched it, which in a suite is whatever ran before this test.
+        /// </remarks>
+        public SoundingNotes Sounding { get; } = new(read => read());
+
         /// <summary>The notes going past, which is where a keyboard's lights come from.</summary>
         public MidiMonitor Monitor { get; }
 
@@ -395,11 +405,14 @@ public class MachineKeysTests
 
         public IRelayCommand TestCommand { get; } = new RelayCommand(() => { });
 
-        /// <summary>What is ringing, which is a different question from what is held down.</summary>
-        public SoundingNotes Sounding { get; } = new();
-
         /// <summary>The keyboard under test, built once and kept.</summary>
-        public IMachineKeys MachineKeys => _keys ??= new DesignerKeys(this);
+        /// <remarks>
+        /// Told to read straight away rather than through the dispatcher. There is no drawing
+        /// thread being pumped here, and whether the dispatcher would run the work inline or
+        /// queue it for ever depends on which thread first touched it, which in a suite is
+        /// whatever ran before this test.
+        /// </remarks>
+        public IMachineKeys MachineKeys => _keys ??= new DesignerKeys(this, read => read());
 
         public InstrumentPresets? Presets => null;
 

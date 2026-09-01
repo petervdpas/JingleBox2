@@ -65,4 +65,23 @@ public interface IMachineProjects
     /// </remarks>
     /// <param name="kind">The engine an instrument is on, which is how it names its machine.</param>
     bool Has(TrackerInstrumentKind kind);
+
+    /// <summary>
+    /// Takes which machines are on the rack, by slot id, replacing whatever was known before.
+    /// </summary>
+    /// <remarks>
+    /// Held here rather than asked for, because <see cref="Has"/> is asked on the audio thread
+    /// before every note and the rack is files on a disc.
+    ///
+    /// The rack decides which machines a song can be given, so a machine taken off it is one
+    /// this installation is not offering, and an instrument on it is in exactly the position of
+    /// an instrument whose machine was never registered: silent, no panel, and named as missing.
+    /// Anything else would be a machine you cannot pick but can still hear, which is a state
+    /// nobody chose and nothing on the screen explains.
+    ///
+    /// Told nothing, everything registered counts, which is what a caller with no rack wants:
+    /// a test, a preview, or the machine designer.
+    /// </remarks>
+    /// <param name="slots">The slot ids of the machines on the rack.</param>
+    void OnRack(IEnumerable<string> slots);
 }

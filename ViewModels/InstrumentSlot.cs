@@ -21,12 +21,20 @@ public sealed partial class InstrumentSlot : ObservableObject
     /// <param name="index">The number a pattern cell writes to reach this instrument.</param>
     /// <param name="instrument">The instrument itself, held rather than copied.</param>
     /// <param name="track">The track playing it, or -1 when no track does.</param>
-    public InstrumentSlot(int index, TrackerInstrument instrument, int track)
+    /// <param name="offered">
+    /// Whether this installation is offering the machine it is on, which is registered and on
+    /// the rack. Left out, yes, which is what a caller with no rack wants.
+    /// </param>
+    public InstrumentSlot(int index, TrackerInstrument instrument, int track, bool offered = true)
     {
         Index = index;
         Instrument = instrument;
         Track = track;
+        _offered = offered;
     }
+
+    /// <summary>Whether this installation is offering the machine this instrument is on.</summary>
+    private readonly bool _offered;
 
     /// <summary>Its place in the song's list, which is what a cell's instrument column holds.</summary>
     public int Index { get; }
@@ -47,7 +55,13 @@ public sealed partial class InstrumentSlot : ObservableObject
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
-    public MachineTheme Theme => Instrument.Machine.Theme;
+    /// <remarks>
+    /// Grey where the machine is not being offered, whether it was never registered or has been
+    /// taken off the rack: both mean the instrument is silent and has no panel, so both read as
+    /// absent rather than as an ordinary instrument that happens not to sound.
+    /// </remarks>
+    public MachineTheme Theme =>
+        _offered ? Instrument.Machine.Theme : JingleBox2.Tracker.Records.Machine.Absent;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;

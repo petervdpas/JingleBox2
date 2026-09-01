@@ -70,15 +70,27 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// Read once on the way in, since a window opened while a chord is held has to show the chord
     /// rather than wait for the next key.
     /// </remarks>
-    public DesignerKeys(IInstrumentDesigner designer)
+    /// <param name="designer">Whose panel this keyboard is on.</param>
+    /// <param name="onDrawn">
+    /// How to get onto the thread this keyboard is drawn on. Left out, the dispatcher, which is
+    /// right in the application and unanswerable outside one: whether
+    /// <c>Dispatcher.UIThread.CheckAccess</c> says yes depends on which thread first touched the
+    /// dispatcher, so in a test suite the answer changes with what ran before and a keyboard
+    /// lights or does not by luck.
+    /// </param>
+    public DesignerKeys(IInstrumentDesigner designer, Action<Action>? onDrawn = null)
     {
         _designer = designer;
         _keys = designer.MidiKeys ?? new MidiMonitor();
+        _onDrawn = onDrawn;
 
         Read();
 
         _keys.Changed += Moved;
     }
+
+    /// <summary>How to get onto the drawing thread, or nothing for the dispatcher.</summary>
+    private readonly Action<Action>? _onDrawn;
 
     /// <summary>
     /// The keys with a hand on them: what the keyboard lights.
@@ -198,6 +210,12 @@ public sealed class DesignerKeys : IMachineKeys, IDisposable
     /// </remarks>
     private void Moved(object? sender, EventArgs e)
     {
+        if (_onDrawn is { } onto)
+        {
+            onto(Read);
+            return;
+        }
+
         if (Dispatcher.UIThread.CheckAccess()) Read();
         else Dispatcher.UIThread.Post(Read);
     }

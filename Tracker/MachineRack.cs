@@ -188,4 +188,50 @@ public sealed class MachineRack : IMachineRack
             return null;
         }
     }
+
+    /// <summary>What the record of shelved machines is called, beside the instruments it is about.</summary>
+    private const string ShelvedFile = "shelved.txt";
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A plain list of ids, one to a line, so it can be read and corrected by hand the way the
+    /// registry's own record can. A missing file reads as nothing shelved, which is what a rack
+    /// that has never been opened has.
+    /// </remarks>
+    public IReadOnlyCollection<string> Shelved
+    {
+        get
+        {
+            string path = Path.Combine(Folder, ShelvedFile);
+
+            try
+            {
+                return File.Exists(path)
+                    ? new HashSet<string>(
+                        File.ReadAllLines(path).Select(one => one.Trim()).Where(one => one.Length > 0),
+                        StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+            catch (Exception)
+            {
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Appended rather than rewritten, and a machine already on the list is left alone.</remarks>
+    public void Shelve(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || Shelved.Contains(id)) return;
+
+        try
+        {
+            Directory.CreateDirectory(Folder);
+            File.AppendAllText(Path.Combine(Folder, ShelvedFile), id + Environment.NewLine);
+        }
+        catch (Exception)
+        {
+        }
+    }
 }

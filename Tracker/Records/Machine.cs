@@ -225,6 +225,21 @@ public sealed record Machine(
     private static readonly MachineTheme Bare = new("#7B838C");
 
     /// <summary>
+    /// The grey a machine wears when this installation is not offering it.
+    /// </summary>
+    /// <remarks>
+    /// The same grey a machine that was never registered has always worn, because to a song they
+    /// are the same situation: one taken off the rack is one this installation is not offering,
+    /// so an instrument on it is silent, has no panel, and reads as absent rather than as an
+    /// ordinary instrument that happens not to sound.
+    ///
+    /// Here rather than in the list that paints the row, so the grey and the reason for it stay
+    /// in one place: the row asks whether the machine is being offered and takes this, rather
+    /// than knowing what colour absent looks like.
+    /// </remarks>
+    public static MachineTheme Absent => Bare;
+
+    /// <summary>
     /// Which machine a kind is on. Never null: every kind has one.
     /// </summary>
     /// <remarks>

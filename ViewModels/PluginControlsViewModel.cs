@@ -282,6 +282,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         StoppedNote = "";
 
         _prepared = false;
+        _knobs = false;
         Prepare();
 
         _changed?.Invoke();
@@ -290,11 +291,81 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// <summary>The plugin's own interface, when it has one and it has been opened.</summary>
     public IPluginEditor? Editor { get; private set; }
 
-    /// <summary>True when the plugin draws itself and the host's knobs are not needed.</summary>
+    /// <summary>True when the plugin draws itself, whether or not that is what is on show.</summary>
     public bool HasOwnWindow => Editor != null;
 
+    /// <summary>
+    /// Whether the host's own knobs are shown instead of the plugin's face.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole of what makes a plugin linkable. A knob is pointed at by resting the
+    /// pointer on a control the host drew, and the host drew nothing for a plugin with a face of
+    /// its own: <see cref="Prepare"/> stopped as soon as it had opened the editor, so the knobs
+    /// were never built and there was no dial to rest a pointer on. Every plugin worth having
+    /// has a face, so pointing at one was impossible rather than merely awkward, and it was
+    /// impossible for instruments as much as for effects.
+    ///
+    /// Off for a plugin that draws itself, since its own face is what you opened it for, and on
+    /// for one that does not, where the knobs are all there is. Switched by hand in the window's
+    /// header, which is also the only place the two can be told apart.
+    /// </remarks>
+    public bool ShowsKnobs
+    {
+        get => _showsKnobs;
+        set
+        {
+            if (_showsKnobs == value) return;
+
+            _showsKnobs = value;
+
+            if (value) BuildKnobsOnce();
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowsFace));
+            OnPropertyChanged(nameof(HasKnobs));
+        }
+    }
+
+    /// <summary>Behind <see cref="ShowsKnobs"/>.</summary>
+    private bool _showsKnobs;
+
+    /// <summary>True when the plugin's own face is what is on show.</summary>
+    public bool ShowsFace => Editor != null && !ShowsKnobs;
+
+    /// <summary>True when there is a choice to make, so the window can offer it.</summary>
+    /// <remarks>
+    /// Only where the plugin draws itself. Without a face there is nothing to switch to and a
+    /// button offering to show the knobs that are already showing says nothing.
+    /// </remarks>
+    public bool CanShowKnobs => Editor != null;
+
     /// <summary>True when there is nothing but the host's knobs to show.</summary>
-    public bool HasKnobs => Editor == null && HasParameters;
+    public bool HasKnobs => ShowsKnobs && HasParameters;
+
+    /// <summary>
+    /// Builds the host's knobs the first time somebody asks to see them, and not before.
+    /// </summary>
+    /// <remarks>
+    /// Reading two thousand parameters into two thousand controls costs a visible pause, and
+    /// Serum answers with 2622 of them. A plugin drawing its own face is opened for that face,
+    /// so the knobs are built when they are wanted and never for the plugin nobody switches.
+    /// </remarks>
+    private void BuildKnobsOnce()
+    {
+        if (_knobs) return;
+        _knobs = true;
+
+        BuildKnobs();
+
+        OnPropertyChanged(nameof(HasParameters));
+        OnPropertyChanged(nameof(HasSwitches));
+        OnPropertyChanged(nameof(HasReadouts));
+        OnPropertyChanged(nameof(IsTruncated));
+        OnPropertyChanged(nameof(TruncationNote));
+    }
+
+    /// <summary>Whether the host's knobs have been built yet.</summary>
+    private bool _knobs;
 
     /// <summary>
     /// Gets the panel ready to be shown: the plugin's own interface if it has one, and the
@@ -341,20 +412,21 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(Editor));
             OnPropertyChanged(nameof(HasOwnWindow));
+            OnPropertyChanged(nameof(CanShowKnobs));
+            OnPropertyChanged(nameof(ShowsFace));
             OnPropertyChanged(nameof(HasKnobs));
             return;
         }
 
         OnPropertyChanged(nameof(BlockedNote));
 
-        BuildKnobs();
+        _showsKnobs = true;
 
+        BuildKnobsOnce();
+
+        OnPropertyChanged(nameof(ShowsKnobs));
+        OnPropertyChanged(nameof(ShowsFace));
         OnPropertyChanged(nameof(HasKnobs));
-        OnPropertyChanged(nameof(HasParameters));
-        OnPropertyChanged(nameof(HasSwitches));
-        OnPropertyChanged(nameof(HasReadouts));
-        OnPropertyChanged(nameof(IsTruncated));
-        OnPropertyChanged(nameof(TruncationNote));
     }
 
     /// <summary>
@@ -424,6 +496,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
         _settle = null;
 
         _prepared = false;
+        _knobs = false;
 
         var editor = Editor;
         Editor = null;

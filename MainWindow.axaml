@@ -33,7 +33,7 @@
       <views:Transport HorizontalAlignment="Right"
                        VerticalAlignment="Top"
                        IsVisible="{Binding ShowsTransport}"
-                       Margin="0,5,25,0"
+                       Margin="0,1,25,0"
                        ZIndex="1"
                        CapWidth="34" CapHeight="26" Gap="4" Quiet="True"
                        IsRecording="{Binding Transport.IsRecording}"

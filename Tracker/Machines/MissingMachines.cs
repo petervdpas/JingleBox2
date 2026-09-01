@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Tracker.Machines.Records;
 using JingleBox2.Tracker.Records;
@@ -11,10 +12,17 @@ namespace JingleBox2.Tracker.Machines;
 /// Who says which machines ship and which are installed. Left out, the ordinary one, which
 /// reads this installation's own folders.
 /// </param>
-public sealed class MissingMachines(IMachineRegistry? registry = null) : IMissingMachines
+/// <param name="rack">
+/// The shelf, which decides which machines a song can be given. Left out, the registry alone
+/// answers, which is what a caller with no rack wants: a test, a preview, or the designer.
+/// </param>
+public sealed class MissingMachines(IMachineRegistry? registry = null, IMachineRack? rack = null) : IMissingMachines
 {
     /// <summary>Who says what ships, which is the only place a missing machine's name survives.</summary>
     private readonly IMachineRegistry _registry = registry ?? new MachineRegistry();
+
+    /// <summary>The shelf, or nothing when only the registry is being asked.</summary>
+    private readonly IMachineRack? _rack = rack;
 
     /// <inheritdoc/>
     public IReadOnlyList<MissingMachine> For(Song song)
@@ -64,7 +72,7 @@ public sealed class MissingMachines(IMachineRegistry? registry = null) : IMissin
     /// </remarks>
     /// <param name="sound">The instrument being asked about.</param>
     /// <param name="offered">The shipped machines that are not installed, by id.</param>
-    private static MissingMachine? Named(TrackerInstrument sound, Dictionary<string, string> offered)
+    private MissingMachine? Named(TrackerInstrument sound, Dictionary<string, string> offered)
     {
         if (sound.IsPlugin) return null;
 
@@ -72,10 +80,16 @@ public sealed class MissingMachines(IMachineRegistry? registry = null) : IMissin
 
         if (id.Length == 0) return null;
 
-        if (Machine.Installed.Any(one => one.SlotId == id)) return null;
+        bool registered = Machine.Installed.Any(one => one.SlotId == id);
+
+        if (registered && (_rack is null || _rack.Load(id) is not null)) return null;
 
         bool ships = offered.TryGetValue(id, out string? called) && called.Length > 0;
 
-        return new MissingMachine(id, ships ? called! : sound.Machine.Name, ships);
+        return new MissingMachine(
+            id,
+            registered || !ships ? sound.Machine.Name : called!,
+            ships || registered,
+            registered);
     }
 }

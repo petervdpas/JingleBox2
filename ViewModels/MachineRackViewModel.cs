@@ -122,8 +122,17 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     [NotifyPropertyChangedFor(nameof(HasMachines))]
     private RackMachine? selected;
 
-    /// <summary>False while a machine's own slot is picked, which cannot be deleted.</summary>
-    public bool CanDelete => Selected is { IsYours: true };
+    /// <summary>
+    /// True whenever a row is picked, since anything on the rack can be taken off it.
+    /// </summary>
+    /// <remarks>
+    /// A machine's own box could not be, on the reasoning that a machine is not something you
+    /// can be without. That was the wrong shape: the rack is which machines a song can be given,
+    /// so a machine you never reach for is one you should be able to take off it. The machine
+    /// itself stays registered and the picker offers it back, which is what makes taking it off
+    /// safe rather than final. Losing a machine is unregistering it, in SETTINGS, System.
+    /// </remarks>
+    public bool CanDelete => Selected != null;
 
     /// <summary>False for a machine and for a plugin, both of which are named elsewhere.</summary>
     public bool CanRename => Selected is { CanRename: true };
@@ -238,6 +247,8 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Selected = Machines.FirstOrDefault(i => i.Id == keep) ?? Machines.FirstOrDefault();
 
+        _machines.OnRack(Machines.Select(one => one.Id).ToList());
+
         OfferedChanged();
     }
 
@@ -254,6 +265,17 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// Empty rather than absent, so the tab is there and says what it is for.
     /// </remarks>
     public ObservableCollection<RackMachine> Effects { get; } = new();
+
+    /// <summary>A machine's own box, under the id that says whose it is.</summary>
+    /// <param name="machine">The machine to make a box for.</param>
+    private static TrackerInstrument Boxed(Machine machine)
+    {
+        var made = TrackerInstrument.CreateOn(machine, machine.Name);
+
+        made.Id = machine.SlotId;
+
+        return made;
+    }
 
     /// <summary>
     /// Brings the shelf to what a rack is: the machines this installation has, and nothing else.
@@ -295,15 +317,14 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             Log.Write(LogArea.Machines, () => "retired '" + name + "' from the rack");
         }
 
+        var shelved = _rack.Shelved;
+
         foreach (var machine in Machine.Installed)
         {
-            if (_rack.Load(machine.SlotId) != null) continue;
+            if (shelved.Contains(machine.SlotId)) continue;
 
-            var made = TrackerInstrument.CreateOn(machine, machine.Name);
-
-            made.Id = machine.SlotId;
-
-            _rack.Save(made);
+            _rack.Save(Boxed(machine));
+            _rack.Shelve(machine.SlotId);
         }
 
         if (retired > 0)
@@ -660,14 +681,15 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         new RelayCommand<Machine>(NewFromMachine);
 
     /// <summary>
-    /// Makes another instrument on that machine, under a name nothing else on the rack has.
+    /// Puts that machine's box back on the rack.
     /// </summary>
     /// <remarks>
-    /// The machine's own box is written when the rack is read and is always there while the
-    /// machine is registered. This is for the second one: a Zampler set up differently, kept
-    /// beside the first rather than instead of it.
+    /// Under the machine's own id, because it is that machine's box and not a second one: a song
+    /// picks its instruments off the rack, so what this is for is having Zampler available again
+    /// after taking it off. A variant of a machine set up differently is a Duplicate of the box,
+    /// which is a different act with a different button.
     /// </remarks>
-    /// <param name="machine">Which machine to make it on.</param>
+    /// <param name="machine">Which machine to put back.</param>
     private void NewFromMachine(Machine? machine)
     {
         if (machine == null)
@@ -682,7 +704,13 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             return;
         }
 
-        Add(TrackerInstrument.CreateOn(machine, UniqueName(machine.Name)));
+        if (Machines.Any(one => one.Id == machine.SlotId))
+        {
+            Status = $"'{machine.Name}' is already on the rack.";
+            return;
+        }
+
+        Add(Boxed(machine));
     }
 
     /// <summary>
@@ -723,6 +751,10 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             Machines.Add(row);
             Selected = row;
 
+            _machines.OnRack(Machines.Select(one => one.Id).ToList());
+
+            _machines.OnRack(Machines.Select(one => one.Id).ToList());
+
             OfferedChanged();
 
             RackChanged?.Invoke(this, EventArgs.Empty);
@@ -749,17 +781,15 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         var row = Selected;
         if (row == null) return;
 
-        if (row.IsSlot)
-        {
-            Status = row.Name + " is a machine, not an instrument you made. It cannot be deleted.";
-            return;
-        }
-
         bool confirmed = await ConfirmDialog.AskAsync(
-            "Delete instrument",
-            $"Delete '{row.Name}' from the rack? Songs that already use it keep their own copy, "
-                + "but it will no longer be available to new songs. This cannot be undone.",
-            "Delete");
+            row.IsSlot ? "Take off the rack" : "Delete instrument",
+            row.IsSlot
+                ? $"Take '{row.Name}' off the rack? Songs that already use it keep their own copy, "
+                    + "and it can be put back from the picker underneath, since the machine itself "
+                    + "stays registered. Whatever you had set on this box is lost."
+                : $"Delete '{row.Name}' from the rack? Songs that already use it keep their own copy, "
+                    + "but it will no longer be available to new songs. This cannot be undone.",
+            row.IsSlot ? "Take off" : "Delete");
 
         if (!confirmed) return;
 
@@ -774,8 +804,13 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
             Machines.Remove(row);
             Selected = Machines.ElementAtOrDefault(Math.Min(index, Machines.Count - 1));
 
+            OfferedChanged();
+
             RackChanged?.Invoke(this, EventArgs.Empty);
-            Status = $"Deleted '{row.Name}'. Songs that already use it keep their copy.";
+
+            Status = row.IsSlot
+                ? $"Took '{row.Name}' off the rack. Put it back from the picker underneath."
+                : $"Deleted '{row.Name}'. Songs that already use it keep their copy.";
         }
         catch (Exception ex)
         {

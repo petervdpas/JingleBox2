@@ -395,9 +395,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     ///
     /// There is room under it as well. The transport is taller than the names beside it, so a
     /// strip only as tall as the words leaves it hanging over whatever the page starts with.
+    /// Measured rather than judged: the caps ended six pixels above the first card once the
+    /// pages were tightened, which is close enough to read as a mistake.
+    ///
+    /// The same on both branches, because the strip has to be one height whether or not the
+    /// transport is standing in it: a page that started higher for having no transport would be
+    /// the drift that was just taken out of the six pages.
     /// </remarks>
     public Avalonia.Thickness TabStripRoom =>
-        ShowsTransport ? new Avalonia.Thickness(0, 0, 160, 12) : new Avalonia.Thickness(0, 0, 0, 12);
+        ShowsTransport ? new Avalonia.Thickness(0, 0, 160, 15) : new Avalonia.Thickness(0, 0, 0, 15);
 
     /// <summary>
     /// The pages, in the order the tab strip has them. Written out, because the context the bar

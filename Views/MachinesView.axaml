@@ -97,7 +97,7 @@
                         Margin="0,6,0,0"
                         IsEnabled="{Binding CanDelete}"
                         Command="{Binding DeleteCommand}"
-                        ToolTip.Tip="Takes a box off the rack. A machine's own box cannot be taken out." />
+                        ToolTip.Tip="Takes it off the rack, so songs are no longer offered it. A machine can be put back from the picker above; the machine itself is only lost by unregistering it in SETTINGS." />
               </StackPanel>
 
               <ListBox ItemsSource="{Binding Machines}"

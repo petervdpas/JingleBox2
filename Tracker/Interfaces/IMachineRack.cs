@@ -77,4 +77,23 @@ public interface IMachineRack : ISampleUsage
 
     /// <summary>Removes an instrument for good. False when there was nothing to remove.</summary>
     bool Delete(string id);
+
+    /// <summary>
+    /// Which machines have ever been put on the rack, whether or not they are on it now.
+    /// </summary>
+    /// <remarks>
+    /// What has been offered rather than what is present, which is the rule the registry keeps
+    /// for the same reason. Putting a machine on the rack is a deliberate act and so is taking
+    /// it off: deciding by absence would put a machine you threw out back on the next time the
+    /// rack was read, and there would be no way to be without one.
+    ///
+    /// So a machine this rack has never been offered gets its box, and one it has been offered
+    /// is left alone whether or not the box is still there. A machine registered after the rack
+    /// was built still arrives, and one you took off stays off.
+    /// </remarks>
+    IReadOnlyCollection<string> Shelved { get; }
+
+    /// <summary>Writes down that a machine has been put on the rack.</summary>
+    /// <param name="id">The machine's slot id.</param>
+    void Shelve(string id);
 }

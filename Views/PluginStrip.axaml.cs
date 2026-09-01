@@ -104,29 +104,17 @@ public partial class PluginStrip : UserControl
     /// "Ouroboros is not registered" leaves somebody wondering which of the two is meant. The
     /// body then names the instrument and says "on it", which needs no second label.
     ///
-    /// It points at the registry and stops there. It used to spell out what somebody would find
-    /// when they arrived, that the machine is either waiting to be added or not present at all
-    /// and needs its zip imported, which is a paragraph describing a page they have not opened.
-    /// That page says it better, and says it while they are looking at it.
-    ///
-    /// Register rather than install, and that is the whole instruction: registering is one page
-    /// to go and look at, where installing asks somebody to know which of those two cases they
-    /// are in before they have.
+    /// It names the machine and what that costs, and stops. Where to go and put it right used to
+    /// be on the end of it and is not: somebody with a song full of machines knows this
+    /// application, and a sentence sending them to a page they already know is a sentence they
+    /// read every time to learn nothing.
     ///
     /// Not awaited by the caller: it is an event handler, and the dialog owns itself once it is
     /// up. What it is waiting on is somebody pressing OK.
     /// </remarks>
     /// <param name="instrument">The instrument whose machine has gone.</param>
-    private static async System.Threading.Tasks.Task Missing(PluginInstrumentViewModel instrument)
-    {
-        string machine = instrument.Missing?.Name ?? instrument.Instrument.Machine.Name;
-
-        await ConfirmDialog.ErrorAsync(
-            "Machine not registered",
-            machine + "(machine) is not registered",
-            "'" + instrument.Instrument.Name + "' is on it, so it has no panel and makes no "
-            + "sound. Check the machine registry under SETTINGS, System.");
-    }
+    private static System.Threading.Tasks.Task Missing(PluginInstrumentViewModel instrument) =>
+        MissingMachineDialog.ShowAsync(instrument.Missing, instrument.Instrument.Name);
 
     /// <summary>
     /// Opens the effect whose block was pressed.

@@ -163,6 +163,18 @@ and only whoever opened it knows which. A link on a plugin names the plugin's ow
 parameter number and never a track, so it is a fact about Serum wherever you were standing when
 you made it, and it belongs on the template layer.
 
+## Pointing at a plugin
+
+A knob is pointed at by resting the pointer on a control the host drew, and until now the host
+drew none for a plugin that has a face of its own: `Prepare` stopped as soon as it had opened
+the editor. Every plugin worth having has a face, so no plugin could be linked to at all, and
+the log never said so because a gesture nobody can make writes no line.
+
+The Knobs button in the plugin window's header switches between the plugin's face and the host's
+own controls, and only appears where there is a face to switch away from. The knobs are built
+the first time they are asked for, since Serum answers with 2622 parameters and building them
+is a visible pause a plugin opened for its own face should not pay.
+
 ## Still open
 
 **Templates are not read on startup.** The folder is where they gather and where the picker

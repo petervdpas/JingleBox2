@@ -59,7 +59,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>The machines a song wants that this installation has not got.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMissingMachines Missing = new MissingMachines();
+    private readonly IMissingMachines Missing;
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     /// <remarks>
@@ -953,6 +953,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _store = new SongStore();
         _rack = rack;
+        Missing = new MissingMachines(rack: _rack);
         _recordings = recordings;
 
         song = Song.CreateDefault();
@@ -3608,39 +3609,46 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Load();
 
-        NoteMissingMachines();
+        await NoteMissingMachines();
     }
 
     /// <summary>
-    /// Puts which machines this song needs and this installation has not got on the status line.
+    /// Says which machines this song needs and this installation has not got, or has not on the
+    /// rack.
     /// </summary>
     /// <remarks>
-    /// A line and not a dialog. It used to be a dialog on the way in, and that was the wrong
-    /// moment twice over: it interrupts the opening of a song to talk about instruments nobody
-    /// has looked at yet, and by the time somebody does look it has long been dismissed. What
-    /// answers at the moment it is wanted is the panel refusing to open, which says the same
-    /// thing about the one instrument being asked for.
+    /// A dialog and a line, and it was briefly only the line. The argument for the line alone
+    /// was that a dialog interrupts the opening of a song to talk about instruments nobody has
+    /// looked at yet, and that the panel refusing to open says the same thing at the moment it
+    /// is wanted. Both halves of that are true and neither is the point: a song that will not
+    /// play part of itself is not a detail to be discovered later, and a line on the status bar
+    /// stands for a few seconds and is then replaced by the context. Somebody who looked away
+    /// while the song loaded is told nothing at all.
     ///
-    /// So this is the quiet half: a note that the song is not all here, where the song's other
-    /// notes go, for somebody who wants to know before they start rather than when they click.
+    /// So the dialog is back, and the line stays: the line for somebody watching, the dialog for
+    /// somebody who was not. The panel's own refusal stays too, since that is the answer at the
+    /// moment an instrument is actually asked for.
     ///
-    /// It points at the registry rather than describing it, as the dialog does, and for the same
-    /// reason: that page shows what is waiting to be added and what is not there at all, and it
-    /// shows it while somebody is looking at it.
+    /// Two different situations and they are not equally bad, so they are said separately.
+    /// A machine that is not registered means the instruments on it make no sound at all, which
+    /// is the one worth interrupting for. A machine that is registered but not on the rack plays
+    /// perfectly, since a song owns its own copy of every instrument; what it cannot do is be
+    /// picked for another track, which is worth knowing and is not a fault.
     ///
-    /// It tells and does not offer. Putting a machine on the rack is a thing you do to this
-    /// installation, not to a song, and doing it from a song being opened is how an installation
-    /// ends up in a state nobody chose. The two rows of buttons in SETTINGS stay the only two.
+    /// It names the machines and what that costs, and stops. Where to go and put it right is
+    /// not said, here or in the panel's refusal or on the status line: somebody who has a song
+    /// with machines in it knows this application, and a sentence sending them to a page they
+    /// already know is a sentence they read every time to learn nothing.
     /// </remarks>
-    public void NoteMissingMachines()
+    public async System.Threading.Tasks.Task NoteMissingMachines()
     {
-        var wanted = Missing.For(Song);
+        var all = Missing.For(Song);
 
-        if (wanted.Count == 0) return;
+        if (all.Count == 0) return;
 
-        Status = "Silent, not registered: "
-                 + Listed(wanted.Select(machine => machine.Name).ToList())
-                 + ". Check the machine registry under SETTINGS, System.";
+        Status = "Silent: " + Listed(all.Select(machine => machine.Name).ToList());
+
+        await Views.MissingMachineDialog.ShowAsync(all);
     }
 
     /// <summary>Names in a row, the way anybody would say them out loud.</summary>
@@ -4039,7 +4047,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Instruments.Clear();
         for (int i = 0; i < Song.Instruments.Count; i++)
-            Instruments.Add(new InstrumentSlot(i, Song.Instruments[i], Song.GetInstrumentTrack(i)));
+            Instruments.Add(new InstrumentSlot(
+                i,
+                Song.Instruments[i],
+                Song.GetInstrumentTrack(i),
+                _machines.Has(Song.Instruments[i].Kind)));
 
         SelectedInstrument = Math.Clamp(selected, 0, Math.Max(0, Instruments.Count - 1));
 

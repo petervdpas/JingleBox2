@@ -338,10 +338,22 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   one only put Serum in a list beside OddSkilla as though the two were the same kind of thing.
   Anything that is not a registered machine is moved to `instruments/retired` on the next open,
   which now includes the plugins that were shelved before this
-- Each tab's picker offers what this installation has of that kind: the machines for the second
-  box on one, and the effects, of which there are none because there are no effect engines for
-  one to be on. An effect will be registered exactly as a machine is, through the same folder,
-  the same id-decides-engine gate, and the same zip
+- **The rack decides which machines a song can be given, so a machine can be taken off it.** It
+  could not be, on the reasoning that a machine is not something you can be without, and that was
+  the wrong shape: a machine you never reach for is one that should not be in the list a song
+  picks from. Taking it off is not losing it. The machine stays registered, the picker underneath
+  offers it back, and losing one is unregistering it in SETTINGS, System
+- Which means the rack cannot be rebuilt from the registry on every open, or a machine taken off
+  would be back the next morning with nothing to say why. `IMachineRack.Shelved` is the record,
+  `instruments/shelved.txt`, one id to a line: a machine this rack has never been offered gets
+  its box, and one it has been offered is left alone whether or not the box is still there. The
+  registry's own `offered.txt` is the same rule for the same reason, and this is that rule one
+  layer in
+- Each tab's picker offers what is registered and not already on the rack, which is empty in the
+  ordinary case and is the truth: there is nothing to add. What it puts back is the machine's own
+  box, under the machine's own slot id, because it is that machine's box and not a second one. A
+  variant set up differently is a Duplicate, which is a different act with a different button.
+  The effects tab offers nothing yet, since there are no effect engines for one to be on
 - **A song picks its instrument from one list: the rack's machines and the instrument plugins on
   this computer.** `MachineRackViewModel.Offered`, drawn as a coloured dot and a name, since to a
   track those are one question with one answer: what plays this part. Instruments only, because
@@ -948,6 +960,25 @@ whole exercise and is worth writing down rather than summarising:
   one of them had been told that effects exist, so the row called an effect a plugin. This file
   already recorded the same lesson once, when the sentence was briefly written out on both of the
   two things that print it
+- **No plugin could be pointed at, and that was the whole of the link remote's remaining hole.**
+  A knob is pointed at by resting the pointer on a control the host drew, and the host drew none
+  for a plugin with a face of its own: `PluginControlsViewModel.Prepare` stopped the moment it
+  had opened the editor, so the knobs were never built. Every plugin worth having has a face, so
+  this was impossible rather than awkward, and it was impossible for instruments as much as for
+  effects. Nothing in the log ever said so, because a gesture nobody can make writes no line
+- `ShowsKnobs` is the switch and the Knobs button in the plugin window's header is where it is
+  thrown, beside Bypass and offered only where there is a face to switch away from. The knobs
+  are built the first time somebody asks and never otherwise, since reading two thousand
+  parameters into two thousand controls is a visible pause and Serum answers with 2622: a plugin
+  opened for its own face pays nothing
+- Hiding the face takes the native child window with it, which is the one order that matters:
+  `PluginEditorHost` detaches the plugin before the window goes, because a plugin still drawing
+  into a window that has gone is a crash inside its own toolkit. Create and destroy are
+  symmetric, so switching back puts it in again
+- Proved on the wire rather than by reading: `link: offering Insert ZamComp Attack` is the first
+  Insert offer that has ever appeared in this application's log. ZamAutoSat is worth knowing
+  about as a witness that is not one: it reports no parameters at all, so the host draws nothing
+  for it however it is asked, and its chain block prints no readings either
 - `ILinkTargets` is what a link points at, said in words and read back out of them, and it is one
   rule because the page cuts its cards by it and the file is written by it. Two spellings would
   eventually disagree, and the way that fails is a template that means one thing to whoever

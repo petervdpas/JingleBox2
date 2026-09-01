@@ -54,10 +54,44 @@ public sealed class SoundingNotes
     private int _alone = -1;
 
     /// <summary>Sets the clock up and leaves it stopped, since nothing is lit yet.</summary>
-    public SoundingNotes()
+    /// <param name="onDrawn">
+    /// How to get onto the thread this is read on. Left out, the dispatcher, which is right in
+    /// the application and unanswerable outside one: whether
+    /// <c>Dispatcher.UIThread.CheckAccess</c> says yes depends on which thread first touched the
+    /// dispatcher, so in a test suite the answer changes with what ran before and a note lights
+    /// or does not by luck.
+    /// </param>
+    public SoundingNotes(Action<Action>? onDrawn = null)
     {
+        _onDrawn = onDrawn;
+
         _clock = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TickMs) };
         _clock.Tick += (_, _) => Tick();
+    }
+
+    /// <summary>How to get onto the drawing thread, or nothing for the dispatcher.</summary>
+    private readonly Action<Action>? _onDrawn;
+
+    /// <summary>
+    /// Whether this call had to be sent to the thread this is read on rather than run here.
+    /// </summary>
+    /// <remarks>
+    /// True means the work has been handed on and the caller must stop; false means carry on
+    /// where you are. Told how to get onto that thread, the answer is always carry on, because
+    /// whoever handed the delegate in is saying this is already the right thread. Running the
+    /// work through it instead would call the caller again, which calls this again: it did, and
+    /// the suite went down with a stack overflow nineteen thousand frames deep.
+    /// </remarks>
+    /// <param name="work">What to run if it has to be sent.</param>
+    private bool Sent(Action work)
+    {
+        if (_onDrawn is not null) return false;
+
+        if (Dispatcher.UIThread.CheckAccess()) return false;
+
+        Dispatcher.UIThread.Post(work);
+
+        return true;
     }
 
     /// <summary>The semitones lit now. The keyboard follows this as it changes.</summary>
@@ -109,11 +143,7 @@ public sealed class SoundingNotes
     /// </remarks>
     public void Struck(Note note, double seconds, bool alone = false)
     {
-        if (!Dispatcher.UIThread.CheckAccess())
-        {
-            Dispatcher.UIThread.Post(() => Struck(note, seconds, alone));
-            return;
-        }
+        if (Sent(() => Struck(note, seconds, alone))) return;
 
         if (alone && _alone >= 0)
         {
@@ -142,11 +172,7 @@ public sealed class SoundingNotes
     /// <summary>Everything goes dark, for a transport that has stopped.</summary>
     public void Silence()
     {
-        if (!Dispatcher.UIThread.CheckAccess())
-        {
-            Dispatcher.UIThread.Post(Silence);
-            return;
-        }
+        if (Sent(Silence)) return;
 
         _left.Clear();
         Lit.Clear();

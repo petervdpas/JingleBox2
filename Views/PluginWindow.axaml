@@ -23,6 +23,16 @@
                       IsVisible="{Binding HasBypass}"
                       IsChecked="{Binding IsBypassed}"
                       ToolTip.Tip="Switch it off without taking it out of the chain" />
+
+        <!-- The plugin's face or the host's knobs. Only offered where the plugin has a face,
+             since without one the knobs are all there is. It is not a preference about looks:
+             the host's knobs are the only controls here the host drew, so they are the only
+             ones a pointer can rest on to point a hardware knob at one. -->
+        <ToggleButton Content="Knobs"
+                      MinWidth="0" Padding="10,2" FontSize="12"
+                      IsVisible="{Binding Panel.CanShowKnobs}"
+                      IsChecked="{Binding Panel.ShowsKnobs}"
+                      ToolTip.Tip="Show this plugin's controls as the host draws them, which is what Ctrl+Shift+M points a hardware knob at." />
       </StackPanel>
     </Border>
 
