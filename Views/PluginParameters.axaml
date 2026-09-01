@@ -57,10 +57,11 @@
                             VerticalAlignment="Top" />
 
     <!-- The host's own knobs. All there is for a plugin that draws nothing of its own, and for
-         one that does, what the Knobs button in the window's header switches to. They are the
-         only controls here the host drew, so they are the only ones a pointer can be rested on
-         to point a hardware knob at: with a plugin's own face on show there is nothing to
-         point at, which is why no plugin could be linked to at all before this. -->
+         one that does, what the Knobs button in the window's header switches to: every
+         parameter in one list, which a face laid out for the ear is not always the quickest way
+         to read. A hardware control cannot be pointed at any of them, deliberately: a plugin
+         brings its own MIDI learn, and a mapping made here would be a second one beside it
+         with no way for the two to agree. -->
     <StackPanel Spacing="10" IsVisible="{Binding ShowsKnobs}">
 
     <!-- A plugin that took the application down while opening its window does not get another
@@ -86,8 +87,7 @@
                IsVisible="{Binding IsTruncated}"
                Text="{Binding TruncationNote}" />
 
-    <!-- The knobs, with the ring the pointer leaves on one lying over the top of them. Over
-         and never in, or the row would move when a knob was pointed at. -->
+    <!-- The knobs. -->
     <Panel>
     <ItemsControl x:Name="Dials" ItemsSource="{Binding Controls}">
       <ItemsControl.ItemsPanel>
@@ -112,7 +112,6 @@
       </ItemsControl.ItemTemplate>
     </ItemsControl>
 
-    <ui:LinkGlow x:Name="Glow" IsHitTestVisible="False" />
     </Panel>
 
     <!-- The on and off ones. A dial with two positions is a tick box wearing a hat. -->

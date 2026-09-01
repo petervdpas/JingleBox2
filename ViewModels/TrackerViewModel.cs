@@ -1352,6 +1352,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             ? _player.ChainFor(track)
             : null;
 
+
     /// <summary>
     /// Throws away the song that is open, as it stands on disc. What is on the screen stays
     /// there, unsaved, so a delete by mistake costs a save rather than the work.

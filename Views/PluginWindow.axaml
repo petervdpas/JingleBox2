@@ -25,14 +25,15 @@
                       ToolTip.Tip="Switch it off without taking it out of the chain" />
 
         <!-- The plugin's face or the host's knobs. Only offered where the plugin has a face,
-             since without one the knobs are all there is. It is not a preference about looks:
-             the host's knobs are the only controls here the host drew, so they are the only
-             ones a pointer can rest on to point a hardware knob at one. -->
+             since without one the knobs are all there is. What the knobs are for is reading
+             every parameter at once and setting one exactly, which a face laid out for the ear
+             is not always the quickest way to do. Nothing here can be pointed a hardware knob
+             at: a plugin brings its own MIDI learn. -->
         <ToggleButton Content="Knobs"
                       MinWidth="0" Padding="10,2" FontSize="12"
                       IsVisible="{Binding Panel.CanShowKnobs}"
                       IsChecked="{Binding Panel.ShowsKnobs}"
-                      ToolTip.Tip="Show this plugin's controls as the host draws them, which is what Ctrl+Shift+M points a hardware knob at." />
+                      ToolTip.Tip="Show this plugin's controls as the host draws them, every parameter in one list." />
       </StackPanel>
     </Border>
 

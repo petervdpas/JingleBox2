@@ -889,10 +889,50 @@ whole exercise and is worth writing down rather than summarising:
   physical control being pointed somewhere else, or something else being pointed at the same
   target; a controller that is simply not plugged in keeps its links untouched, since leaving
   one in the other room is not a decision to unwire it
+- **Where a link is kept changed and what decides whether it fires did not.** A link answers
+  only while the thing it names is the thing in front of you, which is the point of the whole
+  design and is untouched by the layers going: `ControlTargets.Find` reads the focused track,
+  `OnMachine` refuses unless that track's machine id is the mapping's, `OnRack` refuses unless
+  the machine open on the rack is, and `OnPlugin` refuses unless the track really has that
+  plugin. Knob one is not the first knob on this track, it is OddSkilla's cutoff, so a track
+  playing a drum machine is not driven by it at all
+- **A plugin cannot be pointed at, and that is a decision rather than a gap.** A VST3 or a CLAP
+  is somebody else's program and brings its own MIDI learn, which it keeps itself: a link made
+  here would be a second mapping beside the plugin's own with no way to make the two agree. So
+  remote control is for machines, our own effects and the mixer, which are the things this
+  installation is the only owner of. `PluginParameters` offers nothing, `PluginControlsViewModel`
+  no longer offers the parameter you last touched, `ControlLink` drops a plugin link as it reads
+  the settings, and `LinkTargets.Point` refuses the `effect` word so a template carrying one is
+  counted and left out rather than failing the whole file
+- It was built first and taken out with a session's work behind it, so the reasoning is worth
+  keeping. Pointing at a plugin really did work: the host draws a knob per parameter behind the
+  **Knobs** button, and for a plugin with a face of its own both standards say which parameter
+  you just touched, VST3 at once and CLAP at the end of the block, so turning Vital's own Level
+  knob offered `Insert Vital Oscillator 1 Level` with no host knob involved. What could never
+  work is the other half. There is no way to draw inside another program's window, VST3 has no
+  call asking a plugin to highlight a control, and the CLAP one that does, `param-indication`, is
+  no use to a VST3. So the gesture had no confirmation where it mattered, and a knob learned that
+  way sat beside whatever the plugin had learned for itself
+- Ctrl+Shift+M on a plugin's window says so rather than doing nothing. `PluginWindow` answers the
+  keystroke itself instead of calling `LinkKey.Listen`, and swallows it, which is the opposite of
+  what `LinkKey` does with a keystroke it will not answer: there it is left alone because it may
+  mean something to whatever is in front of you, here it is being answered with a sentence. It
+  cannot be caught while the plugin's own interface has the keyboard, since those keys never
+  reach this process
+- Automation is the one thing that still points at a plugin, and it is untouched. A lane names an
+  insert on a track's chain through the same `ControlKind.Insert` and the same
+  `ControlTargets.OnPlugin`, which is why neither was removed: a lane is this song saying what a
+  parameter does over these lines, which is not a fact about your hardware and does not want to
+  be a template
 - **There is one layer, and everything pointed at anything lands on it.** A knob pointed at a
   machine's filter is a fact about your hardware and that machine, true of every song that plays
   it, and so is a knob on a mixer strip, since a strip is a number and strip three is strip three
   everywhere. Kept in the settings, listed in SETTINGS and in the tracker under MIDI CC
+- Which also means a link made inside a song fills the template for that same pair. Point the
+  nanoKONTROL2 at OddSkilla's cutoff on track three and it lands on the card headed OddSkilla,
+  nanoKONTROL2, the same card pointing at OddSkilla on the rack fills, because the link writes
+  the machine's id and the parameter key and never the track or the instrument's own id. A strip
+  writes the strip number and goes the same way. `Tests/ControlCardTests.cs` says so
 - It was two layers, the desk's and the song's, decided by where you pointed: an instrument on a
   track or a strip on the mixer put the link in the song's own `.jibx`, and the song's won where
   both named the same control. Templates are what that was reaching for and could not be. A copy

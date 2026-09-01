@@ -13,7 +13,18 @@ public sealed class LinkTargets : ILinkTargets
     /// <summary>A machine on the rack, or an instrument on a track, which is one in use.</summary>
     public const string Machine = "machine";
 
-    /// <summary>A plugin on a track's insert chain.</summary>
+    /// <summary>
+    /// A plugin on a track's insert chain, which no link may point at.
+    /// </summary>
+    /// <remarks>
+    /// Kept as a word because a template written before this may carry it, and one that does is
+    /// read far enough to be counted and left out rather than failing the whole file.
+    ///
+    /// A hardware control cannot be pointed at a plugin. A plugin is somebody else's program and
+    /// brings its own MIDI learn, so a link made here would be a second mapping beside the one
+    /// the plugin already keeps, and nothing could make the two agree. Remote control is for
+    /// machines, our own effects and the mixer.
+    /// </remarks>
     public const string Effect = "effect";
 
     /// <summary>One strip of the mixer, the master included.</summary>
@@ -177,11 +188,11 @@ public sealed class LinkTargets : ILinkTargets
     /// The link those three words describe, without its wording or its hardware.
     /// </summary>
     /// <remarks>
-    /// Every branch refuses rather than guessing. A machine with no key, a plugin parameter that
-    /// is not a number, a strip that is neither the master nor a track number, and a word that
-    /// is not one of the mixer's six or the transport's five all come back as nothing, and the
-    /// caller counts what it could not read. That count is the whole of what a person can be
-    /// told about a file written by a newer version.
+    /// Every branch refuses rather than guessing. A machine with no key, a strip that is neither
+    /// the master nor a track number, and a word that is not one of the mixer's six or the
+    /// transport's five all come back as nothing, and the caller counts what it could not read.
+    /// So does a plugin, always: see <see cref="Effect"/>. That count is the whole of what a
+    /// person can be told about a file this version will not take.
     /// </remarks>
     /// <param name="kind">One of the four words.</param>
     /// <param name="id">Which one.</param>
@@ -199,16 +210,7 @@ public sealed class LinkTargets : ILinkTargets
                     Key = parameter
                 };
 
-        if (Same(kind, Effect))
-            return id.Length == 0 || !uint.TryParse(parameter, NumberStyles.Integer, CultureInfo.InvariantCulture, out uint number)
-                ? null
-                : new ControlMapping
-                {
-                    Kind = ControlKind.Insert,
-                    Scope = ControlScope.Focused,
-                    Plugin = id,
-                    Parameter = number
-                };
+        if (Same(kind, Effect)) return null;
 
         if (Same(kind, Mixer))
         {

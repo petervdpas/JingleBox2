@@ -65,10 +65,11 @@ Every part of a link that decides anything is the same on every installation.
 
 A **machine** is named by an id, and the id is what decides its engine, so it is the same id in
 everybody's `instruments/` folder; a parameter is named by the key the machine stores it under,
-which is the machine's own and travels in its zip. A **plugin** is named by the id the scanner
-took from the plugin itself, which is the VST3 class id or the CLAP id, and its parameters are
-numbered by the plugin. A **mixer** link names a strip and one of `MixControl`'s six values, and
-strip three is strip three anywhere. The **transport** is four keys and a cycle.
+which is the machine's own and travels in its zip. A **mixer** link names a strip and one of
+`MixControl`'s six values, and strip three is strip three anywhere. The **transport** is four
+keys and a cycle. There is no fourth: a plugin cannot be pointed at, for the reason under "A
+plugin cannot be pointed at" below, and the `effect` word survives only so an older file
+carrying one can be counted and left out.
 
 Two things are not portable and both have an answer already.
 
@@ -104,9 +105,11 @@ from anywhere, since the point of one is that it travels.
 
 Every value is a word rather than a number out of an enum, so a template can be read, corrected
 and sent on by somebody who has never seen this code. `parameter` is one field for all four
-kinds because to a knob they are one question in four vocabularies: a machine's own key, a
-plugin's parameter number, one of the mixer's six words, or one of the transport's five. A field
-per kind would leave three empty on every line.
+kinds because to a knob they are one question in several vocabularies: a machine's own key, one
+of the mixer's six words, or one of the transport's five. A field per kind would leave the rest
+empty on every line. The fourth vocabulary, a plugin's parameter number, is still described here
+because a file written before plugins were refused may carry it and is read far enough to say
+how much was left out.
 
 `control` is the legend on the front of the device and nothing is resolved from it. A device in
 another of its programs sends different numbers under the same legends, so resolving by name
@@ -150,42 +153,73 @@ the two halves once they are one string. Every place a link is made fills it in.
 
 A link made before it existed carries no owner, and rather than heading its card `machine.oddskilla`
 the name is read back out of it: every one of those names was written as the owner and the
-parameter key run together, so removing the key leaves the owner. That works for machines and
-not for plugins, whose parameter names are the plugin's and are not written down here, so an old
-effect link keeps its id as a heading.
+parameter key run together, so removing the key leaves the owner.
 
 `Tests/ControlCardTests.cs` is the cutting: what shares a card, what may not, the order they
-come in, and both fallbacks. `Tests/ControlTemplateTests.cs` is the file: the round trip, the
+come in, both fallbacks, and a template naming a plugin being refused. `Tests/ControlTemplateTests.cs` is the file: the round trip, the
 port being found by its profile's name and not by the port, a controller that is not here, the
 mixer's strips, the transport's keys, links on two targets being refused, a newer version's
 lines being counted, a damaged file, and an import repeated. `ControlLinksPageTests` in the same
 file is the page's own half, since the file picker is the window's and everything either button
 does once a path is known is the layer's.
 
-## Where a plugin is met
+## A plugin cannot be pointed at
 
-A plugin is not on the rack. It is somebody else's program, and it is used by a song: picked as a
-track's instrument from the one list that merges the rack's machines with the instrument plugins
-on this computer, or added to a track's chain as an effect. The rack is what this installation
-has registered, in two tabs, Machines and Effects, and both are things designed here that travel
-as zips.
+A VST3 or a CLAP is somebody else's program, used by a song rather than owned by this
+installation: picked as a track's instrument from the one list that merges the rack's machines
+with the instrument plugins on this computer, or added to a track's chain as an effect. It is on
+neither tab of the rack, and it cannot be pointed a hardware control at.
 
-That leaves the question of where a plugin's links live, and the answer is not the rack. A link
-on a plugin names the plugin's own id and parameter number and never a track, so it is a fact
-about Serum wherever you were standing when you made it, and it is a template like any other.
-`PluginControlsViewModel.InSong` used to carry the layer decision and is gone with it.
+That is a decision, not a gap. **A plugin brings its own MIDI learn and keeps the result
+itself.** A link made here would be a second mapping beside the plugin's own, in a different
+place, with different rules about takeover and endless encoders, and nothing able to make the
+two agree. So remote control is for machines, our own effects and the mixer, which are the
+things this installation is the only owner of.
 
-## Pointing at a plugin
+Ctrl+Shift+M on a plugin's window says so rather than doing nothing. `PluginWindow` answers the
+keystroke itself instead of calling `LinkKey.Listen`, and swallows it, which is the opposite of
+what `LinkKey` does with a keystroke it will not answer: there it is left alone because it may
+mean something to whatever is in front of you, here it is being answered with a sentence. It
+cannot be caught while the plugin's own interface has the keyboard, since those keys are
+delivered to another program's window and never reach this one.
 
-A knob is pointed at by resting the pointer on a control the host drew, and until now the host
-drew none for a plugin that has a face of its own: `Prepare` stopped as soon as it had opened
-the editor. Every plugin worth having has a face, so no plugin could be linked to at all, and
-the log never said so because a gesture nobody can make writes no line.
+`LinkTargets.Point` refuses the `effect` word, so a template written before this carrying plugin
+entries is counted and left out rather than failing the whole file, and `ControlLink` drops a
+plugin link as it reads the settings.
 
-The Knobs button in the plugin window's header switches between the plugin's face and the host's
-own controls, and only appears where there is a face to switch away from. The knobs are built
-the first time they are asked for, since Serum answers with 2622 parameters and building them
-is a visible pause a plugin opened for its own face should not pay.
+### What was built, and why it went
+
+It is worth writing down, because pointing at a plugin really did work and somebody will
+otherwise build it again.
+
+The host draws a knob per parameter behind the **Knobs** button in the plugin window's header,
+and those are our controls, so a pointer can rest on one. For a plugin with a face of its own
+that grid is not the answer, and it does not have to be: both standards report which parameter
+you just touched, VST3 the moment you touch it through `IComponentHandler::performEdit`, CLAP at
+the end of the block. So turning Vital's own Level knob, inside Vital's own window, offered
+`Insert Vital Oscillator 1 Level`. Measured on the wire, not reasoned about.
+
+What could never work is the other half: showing you it landed. There is no way to draw inside
+another program's window. VST3 has no call asking a plugin to highlight a control. CLAP has one,
+`param-indication`, which is no use to a VST3 and is the mirror of what a host would want anyway.
+So the gesture had no confirmation at the place it was made.
+
+The two readable things the formats do offer were never built, and are the ones to look at if
+this is ever reopened. **CLAP `clap.remote-controls`**: the plugin declares named pages of eight
+parameters, which is exactly a nanoKONTROL2 laid out on a plugin nobody has written a mapping
+for. **VST3 `IMidiMapping`**: `getMidiControllerAssignment(bus, channel, cc, out ParamID)`, the
+plugin's own declared MIDI remote, queryable and storable. Neither is in `Vst3Abi` or the CLAP
+side here.
+
+## Automation still points at a plugin
+
+A lane names an insert on a track's chain, through the same `ControlKind.Insert` and the same
+`ControlTargets.OnPlugin`, which is why neither was removed with the rest. It is a different
+thing from a link and wants different answers: a lane is this song saying what a parameter does
+over these lines, so it belongs to the song, it is not a fact about your hardware, and it has no
+business being a template. A track's own instrument is deliberately not searched there, although
+it may well be a plugin, because a lane names something on the chain and a plugin playing the
+track is not on its chain.
 
 ## Still open
 
@@ -201,8 +235,7 @@ machine is read, passed over, and said once rather than left silent, and this sh
 same thing in the same words.
 
 **Recording.** Learning a link is still a gesture spread across the panels that offer one:
-`Views/Pointable.cs`, the machine panel, the plugin window and the transport bar each call
-`ControlLink.Offer`. It wants to be a subsystem of its own rather than a habit four views share,
+`Views/Pointable.cs`, the machine panel and the transport bar each call `ControlLink.Offer`. It wants to be a subsystem of its own rather than a habit four views share,
 and the reason is the same reason the templates wanted a file: recording a whole template in one
 pass, control by control, is a thing the page should be able to drive rather than something that
 only happens as a side effect of resting a pointer somewhere.

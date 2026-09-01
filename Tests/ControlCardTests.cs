@@ -55,6 +55,47 @@ public class ControlCardTests
         Assert.Equal(Targets.KeyOf(knob), Targets.KeyOf(button));
     }
 
+    /// <summary>
+    /// A link made on a track and one made on the rack are the same card.
+    /// </summary>
+    /// <remarks>
+    /// The whole of what makes a template rather than a per-song layout. A knob pointed at
+    /// OddSkilla's cutoff on track three and one pointed at the same knob on the rack are the
+    /// same sentence, because the link writes the machine's id and the parameter key and never
+    /// the track or the instrument's own id. So both gestures fill one card, and either of them
+    /// displaces the other.
+    /// </remarks>
+    [Fact]
+    public void The_same_knob_on_a_track_and_on_the_rack_are_one_card()
+    {
+        var rack = OnMachine("machine.oddskilla", "OddSkilla", "cutoff");
+
+        var track = new ControlMapping
+        {
+            Kind = ControlKind.Instrument,
+            Scope = ControlScope.Focused,
+            Machine = "machine.oddskilla",
+            Key = "cutoff",
+            Owner = "OddSkilla",
+            Name = "OddSkilla cutoff"
+        };
+
+        Assert.Equal(Targets.KeyOf(rack), Targets.KeyOf(track));
+    }
+
+    /// <summary>A plugin cannot be pointed at, so a template naming one is refused.</summary>
+    /// <remarks>
+    /// Counted and left out rather than failing the file, since a template written before this
+    /// may carry plugin entries beside machine ones and the machine ones are still good.
+    /// </remarks>
+    [Fact]
+    public void A_template_naming_a_plugin_is_refused()
+    {
+        Assert.Null(Targets.Point(LinkTargets.Effect, "vst3:serum", "12", "Serum", "Serum Cutoff"));
+
+        Assert.NotNull(Targets.Point(LinkTargets.Machine, "machine.oddskilla", "cutoff", "OddSkilla", "OddSkilla cutoff"));
+    }
+
     /// <summary>By the id rather than the name, so two machines never share a card.</summary>
     [Fact]
     public void Two_machines_are_two_cards()

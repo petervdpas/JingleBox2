@@ -51,6 +51,8 @@ public sealed class ControlLink
     {
         _mappings = mappings;
         _changed = changed;
+
+        _mappings.RemoveAll(one => one.Kind == ControlKind.Insert);
     }
 
     /// <summary>
@@ -566,43 +568,6 @@ public sealed class ControlLink
         }
 
         return doing;
-    }
-
-    /// <summary>Which of a plugin's parameters already have something pointed at them.</summary>
-    public IReadOnlyCollection<uint> ParametersOn(string plugin)
-    {
-        var taken = new HashSet<uint>();
-
-        foreach (var one in Mappings)
-        {
-            if (one.Kind != ControlKind.Insert) continue;
-            if (!string.Equals(one.Plugin, plugin, StringComparison.Ordinal)) continue;
-
-            taken.Add(one.Parameter);
-        }
-
-        return taken;
-    }
-
-    /// <summary>Takes off whatever is pointed at that parameter of that plugin.</summary>
-    public void UnlinkPlugin(string plugin, uint parameter)
-    {
-        Changing();
-
-        int gone = Song?.Invoke()?.RemoveAll(one =>
-            one.Kind == ControlKind.Insert
-            && string.Equals(one.Plugin, plugin, StringComparison.Ordinal)
-            && one.Parameter == parameter) ?? 0;
-
-        lock (_lock) gone += _mappings.RemoveAll(one =>
-            one.Kind == ControlKind.Insert
-            && string.Equals(one.Plugin, plugin, StringComparison.Ordinal)
-            && one.Parameter == parameter);
-
-        if (gone == 0) return;
-
-        _changed();
-        Say(() => Changed?.Invoke());
     }
 
     /// <summary>

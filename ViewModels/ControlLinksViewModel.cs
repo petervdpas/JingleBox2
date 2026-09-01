@@ -397,7 +397,7 @@ public sealed class ControlLinksViewModel : ObservableObject
         if (reading.Skipped > 0)
             said += ". " + reading.Skipped
                     + (reading.Skipped == 1 ? " control was" : " controls were")
-                    + " written for a newer version and left out";
+                    + " left out, being for a plugin or for a newer version";
 
         Status = said + ".";
     }

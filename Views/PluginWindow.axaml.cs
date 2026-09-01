@@ -1,5 +1,10 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using JingleBox2.Audio.Plugins;
+using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -31,17 +36,112 @@ public partial class PluginWindow : Window
     /// that it is not active: it carries on drawing from its own timers and ignores everything
     /// clicked on it.
     ///
-    /// <see cref="LinkKey"/>.Listen is the other one: the pointer goes where the windows are,
-    /// so the other mouse mode has to be reachable from all of them.
+    /// Ctrl+Shift+M is the other one, and here it is answered by refusing rather than by
+    /// <see cref="LinkKey"/>.Listen: a plugin is the one thing in this application a hardware
+    /// control cannot be pointed at, and a keystroke that silently did nothing on the one window
+    /// where it does nothing would read as the gesture having broken.
+    ///
+    /// It is answered twice because there are two ways it can arrive. The toolkit's handler gets
+    /// it while the window's own chrome has the keyboard; while the plugin's interface has it the
+    /// key is delivered to that program and this process never sees it, so
+    /// <see cref="IWindowShortcut"/> asks the window system for that one combination instead. The
+    /// two cannot both fire for one press, and if they did the clock below would drop the second.
     /// </remarks>
     public PluginWindow()
     {
         InitializeComponent();
 
-        LinkKey.Listen(this);
+        AddHandler(InputElement.KeyDownEvent, Pressed, RoutingStrategies.Tunnel);
+
+        Opened += (_, _) => Catch();
+        Closed += (_, _) => Uncatch();
 
         Activated += (_, _) => TellPlugin(true);
         Deactivated += (_, _) => TellPlugin(false);
+    }
+
+    /// <summary>How a keystroke is asked for on a window somebody else is drawing in.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly WindowShortcuts Shortcuts = new();
+
+    /// <summary>The standing request, let go of when the window closes.</summary>
+    private IDisposable? _caught;
+
+    /// <summary>
+    /// Asks the window system for Ctrl+Shift+M on this window, once there is one to ask about.
+    /// </summary>
+    /// <remarks>
+    /// On Opened rather than in the constructor, because the handle is what the window system
+    /// gave the window and there is none until it exists. Nothing where the platform cannot do
+    /// it, which leaves the toolkit's handler covering the window's own chrome, exactly as
+    /// before.
+    /// </remarks>
+    private void Catch()
+    {
+        if (TryGetPlatformHandle() is not { } handle) return;
+
+        _caught = Shortcuts.On(
+            handle.HandleDescriptor ?? "",
+            handle.Handle,
+            () => Dispatcher.UIThread.Post(Refuse));
+    }
+
+    /// <summary>Gives the keystroke back, so nothing outlives the window it was asked for.</summary>
+    private void Uncatch()
+    {
+        _caught?.Dispose();
+        _caught = null;
+    }
+
+    /// <summary>When the refusal was last said, so leaning on the key does not stack dialogs.</summary>
+    /// <remarks>
+    /// A clock rather than a flag, and the same clock <see cref="LinkKey"/> keeps, for the
+    /// reason written there: a flag has to be cleared by the key coming up and the key can come
+    /// up in another window.
+    /// </remarks>
+    private DateTime _refused;
+
+    /// <summary>
+    /// Answers Ctrl+Shift+M by saying why it does nothing here.
+    /// </summary>
+    /// <remarks>
+    /// Swallowed rather than passed on, which is the opposite of what <see cref="LinkKey"/> does
+    /// with a keystroke it will not answer. There it is left alone because it may mean something
+    /// to whatever is in front of you; here it is being answered, with a sentence.
+    ///
+    /// It cannot be caught while the plugin's own interface has the keyboard, since that is
+    /// another program's window and its keys never reach this one. Pressed anywhere on the
+    /// window's own chrome, or with the host's knobs showing, it is ours and it is said.
+    /// </remarks>
+    private void Pressed(object? sender, KeyEventArgs e)
+    {
+        if (e.Handled || e.Key != Key.M) return;
+        if (e.KeyModifiers != (KeyModifiers.Control | KeyModifiers.Shift)) return;
+
+        e.Handled = true;
+
+        Refuse();
+    }
+
+    /// <summary>Says why the keystroke does nothing here, once however it arrived.</summary>
+    /// <remarks>
+    /// The clock is what makes it once. A key leant on repeats, and the two ways a press can
+    /// reach this window could in principle both answer one press, where a dialog apiece would
+    /// be a stack of them to dismiss.
+    /// </remarks>
+    private async void Refuse()
+    {
+        var now = DateTime.UtcNow;
+        var since = now - _refused;
+
+        _refused = now;
+
+        if (since.TotalMilliseconds < LinkKey.AgainMs) return;
+
+        await ConfirmDialog.ErrorAsync(
+            "MIDI CC",
+            "A plugin does its own MIDI learning",
+            "Ctrl+Shift+M points a hardware control at a machine, at one of our own effects or at a mixer strip, and it does not work on a VST3 or a CLAP. Those bring their own MIDI learn and keep the result themselves, so pointing at one here would be a second mapping beside the plugin's own with no way to make the two agree.\n\nUse the plugin's own way of doing it, usually a right click on the control you want.");
     }
 
     /// <summary>Passes this window's activation to the plugin drawing inside it, if there is one.</summary>

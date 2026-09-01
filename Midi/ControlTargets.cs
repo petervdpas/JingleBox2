@@ -369,7 +369,18 @@ public sealed class ControlTargets : IControlTargets
             + "' AND IT READS BACK " + back.ToString("0.####"));
     }
 
-    /// <summary>A knob on a plugin in a track's chain, when that is the plugin it is about.</summary>
+    /// <summary>
+    /// A knob on a plugin in a track's chain, when that is the plugin it is about.
+    /// </summary>
+    /// <remarks>
+    /// Only an automation lane reaches this now. A hardware control cannot be pointed at a
+    /// plugin at all: a plugin brings its own MIDI learn, so a mapping made here would be a
+    /// second one beside the plugin's own with no way for the two to agree.
+    ///
+    /// The track's own instrument is deliberately not searched, although it may well be a
+    /// plugin. A lane names something on the track's chain, and a plugin playing the track is
+    /// not on its chain.
+    /// </remarks>
     private IControlTarget? OnPlugin(ControlMapping mapping, int track)
     {
         var chain = _tracker.InsertsOn(track);
