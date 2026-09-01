@@ -3485,10 +3485,22 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// The picker is filled straight from the rack now rather than from a second reading of the
     /// folder, so there is no list here to rebuild. There was, and it was read before the rack
     /// had been brought into shape, which is how the picker came to be offering four machines
-    /// twice each. All that is left to do is let go of a choice that is no longer on it.
+    /// twice each. What is left is letting go of a choice that is no longer on it.
+    ///
+    /// And reading the shelf, then the song's own instruments, because whether this installation
+    /// is offering a machine is what greys their rows: a machine put back on the rack or
+    /// registered again has to take its colour back. The shelf is read here rather than trusted
+    /// from whoever last changed it, since the answer is cached for the audio thread and a cache
+    /// nobody refreshed is exactly what leaves a row grey after the machine came back. Called
+    /// when the rack changes and when the tracker is opened, since a machine is registered on
+    /// the settings page and the way back from there is to this one.
     /// </remarks>
     public void RefreshRack()
     {
+        _machines.OnRack(_rack.List().Select(one => one.Id).ToList());
+
+        SyncInstruments();
+
         if (PickedMachine?.Machine is not { } machine) return;
 
         if (_rack.Load(machine.Id) == null) PickedMachine = null;

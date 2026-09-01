@@ -369,6 +369,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Transport?.Moved();
 
+        if (value == TrackerTab) Tracker.RefreshRack();
+
         OnPropertyChanged(nameof(ShowsTransport));
         OnPropertyChanged(nameof(TabStripRoom));
     }
@@ -1302,6 +1304,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             Tracker.RefreshRack();
             Record.RefreshUsage();
         };
+
+        Machines.Machines.CollectionChanged += (_, _) => Tracker.RefreshRack();
 
         Record.SampleUsage = new JingleBox2.Tracker.SampleUsers(rack, Tracker.Songs);
 
