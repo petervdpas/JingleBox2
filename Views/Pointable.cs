@@ -33,17 +33,6 @@ public static class Pointable
     public static readonly AttachedProperty<ControlMapping?> OffersProperty =
         AvaloniaProperty.RegisterAttached<Control, Control, ControlMapping?>("Offers");
 
-    /// <summary>
-    /// Whether the link belongs to the song being worked on rather than to the desk.
-    /// </summary>
-    /// <remarks>
-    /// The same distinction the panels make. An instrument on a track is this song's, so what is
-    /// pointed at it travels in the file; a machine on the rack is the machine, and belongs to
-    /// the desk. A mixer strip is a track, which only a song has, and so is the song's.
-    /// </remarks>
-    public static readonly AttachedProperty<bool> InSongProperty =
-        AvaloniaProperty.RegisterAttached<Control, Control, bool>("InSong");
-
     /// <summary>Hanging a mapping is what wires the control up, so the change is what is watched.</summary>
     static Pointable()
     {
@@ -56,13 +45,6 @@ public static class Pointable
     /// <inheritdoc cref="OffersProperty"/>
     public static void SetOffers(Control control, ControlMapping? value) =>
         control.SetValue(OffersProperty, value);
-
-    /// <inheritdoc cref="InSongProperty"/>
-    public static bool GetInSong(Control control) => control.GetValue(InSongProperty);
-
-    /// <inheritdoc cref="InSongProperty"/>
-    public static void SetInSong(Control control, bool value) =>
-        control.SetValue(InSongProperty, value);
 
     /// <summary>
     /// Takes the pointer handlers on or off as a mapping is hung on the control or taken away.
@@ -180,7 +162,7 @@ public static class Pointable
 
         Watch(link);
 
-        link.Offer(ControlMapping.Copy(template), control.GetValue(InSongProperty));
+        link.Offer(ControlMapping.Copy(template));
 
         Light(control);
     }

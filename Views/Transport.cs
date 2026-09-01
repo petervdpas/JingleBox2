@@ -517,7 +517,7 @@ public class Transport : ThemedControl
 
         _offering = over;
 
-        link.Offer(ControlMapping.Copy(TransportLinks.For(Named(over))), keep: false);
+        link.Offer(ControlMapping.Copy(TransportLinks.For(Named(over))));
 
         InvalidateVisual();
     }

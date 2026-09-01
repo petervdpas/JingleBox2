@@ -847,8 +847,8 @@ whole exercise and is worth writing down rather than summarising:
   Level, Pan, Mute, Solo, Duck and the ducking release, which was missing until the strip was
   gone over control by control: every other value had a name for a link to use and that one had
   none. Not the Duck from picker, which names a track rather than a value, for the same reason a
-  take picker cannot be pointed at. A mixer link is the song's rather than the desk's, because a
-  track only exists in a song. Touching a strip anywhere picks its track, tunnelled so grabbing a
+  take picker cannot be pointed at. A mixer link is the desk's, like every other link: it names a
+  strip number, and strip three is strip three in every song. Touching a strip anywhere picks its track, tunnelled so grabbing a
   fader picks the strip on the way past rather than instead of moving it, and it goes through the
   pattern cursor rather than a second answer beside it: the mixer, the pattern, the chain and the
   automation then agree without being told about each other
@@ -889,34 +889,44 @@ whole exercise and is worth writing down rather than summarising:
   physical control being pointed somewhere else, or something else being pointed at the same
   target; a controller that is simply not plugged in keeps its links untouched, since leaving
   one in the other room is not a decision to unwire it
-- Linking lives in two layers, and which one a link lands in is decided by where you pointed.
-  A machine on the rack is the machine: a knob pointed at its filter there is true of every song
-  you will ever open, so it goes on the desk, which is kept in the settings and listed in
-  SETTINGS. An instrument on a track is this song's, and so is anything pointed at it, plugins
-  on a track's chain included: that goes in the song's own `.jibx` and is listed in the tracker
-  under MIDI CC. The song's wins where both name the same control. One list per layer, because
-  one list showing both with a word beside each row reads as a leak whatever the word says.
-  Moving a link between the layers was built and taken out again: what anybody actually wants
-  is a new song that starts with a layout already on it, which is a song template
-- **The two link layers are drawn as cards, one per thing the hardware is pointed at, and the
-  tracker's MIDI CC page shows both.** The song's own above and the desk's below, headed This
-  song and Templates, and a card per target with a section per controller inside it. That pair,
-  one controller against one target, is the unit the whole thing is for: it means the same on
-  anybody's installation, so it is what can be handed to somebody else. `docs/control-templates.md`
-  is what is built and what is next
+- **There is one layer, and everything pointed at anything lands on it.** A knob pointed at a
+  machine's filter is a fact about your hardware and that machine, true of every song that plays
+  it, and so is a knob on a mixer strip, since a strip is a number and strip three is strip three
+  everywhere. Kept in the settings, listed in SETTINGS and in the tracker under MIDI CC
+- It was two layers, the desk's and the song's, decided by where you pointed: an instrument on a
+  track or a strip on the mixer put the link in the song's own `.jibx`, and the song's won where
+  both named the same control. Templates are what that was reaching for and could not be. A copy
+  of the same layout per song is the same work done again for every song, it cannot be handed to
+  anybody, and the layer it lands in depended on which of two identical-looking panels the
+  pointer happened to be over. `ControlLink.Handle` writes to the desk and nothing else does,
+  `Pointable.InSong` and `InstrumentPanel.InSong` are gone with the decision they carried, and
+  what an older song is still holding is still read and is still displaced by an arriving link,
+  so nothing laid down before this starts fighting what is laid down now
+- **A card is one controller against one target, which is a template.** `Views/ControlLinksView.axaml`
+  draws one for each pair, headed with the thing pointed at, the sort of thing it is and the
+  controller, and opened by the same chevron the machine editor's cards use. **Folded away to
+  begin with, and one open at a time**, which is what the shape of the thing asks for: a card is
+  ten or twenty rows, so a desk pointed at six machines is a page nobody can hold in their eye,
+  and folded the list is a heading apiece, which is the shelf of templates and is what somebody
+  opens the page to see. Which one is open is the list's own answer and not a flag per card,
+  since there is only ever one, and it is held by key so the list being thrown away and built
+  again does not fold up the card you are working in. It was a card per target with a section per
+  controller nested inside, which drew the same templates one level down and made the card a
+  thing no file could be written from. `docs/control-templates.md` is what is built and what is
+  next
 - The word for a machine, an effect or a mixer strip, taken together, is **target**, which is
   what `IControlTarget` has meant since the beginning rather than something invented for the
   page. It is deliberately not called a device, although that is what Renoise, Bitwig and
   Ableton all call it: this is a page about MIDI, where device already means the box on the
   desk, and the two ends of the wire may not share a name. `ControlDeviceLinks` became
-  `ControllerLinks` for the same reason. The umbrella is not shown at all in the interface,
+  `ControllerLinks` and then `ControlTemplateLinks` for the same reason. The umbrella is not shown at all in the interface,
   where a card is headed with the thing itself and the sort of thing is a quiet word beside it,
   so nobody has to learn the word to read the page
-- The desk's list is now in two places and is one list rather than a copy: SETTINGS because that
-  is where the hardware is looked after, the tracker because that is where the pointing gesture
-  is made, one button along from the rack. `Views/ControlLinksView.axaml` is that one drawing,
-  bound to a layer rather than to whoever holds one. It had been written out twice and the two
-  had already drifted apart by a column
+- The list is in two places and is one list rather than a copy: SETTINGS because that is where
+  the hardware is looked after, the tracker because that is where the pointing gesture is made,
+  one button along from the rack. `Views/ControlLinksView.axaml` is that one drawing, bound to
+  the list rather than to whoever holds one. It had been written out twice and the two had
+  already drifted apart by a column
 - `ControlMapping.Owner` is what a link is pointed at in the words on the front of it, beside
   the ids that decide. Separate from `Name`, which is the owner and the control run together:
   under a card headed OddSkilla the rows want the rest of the sentence, and there is no way back
@@ -925,19 +935,15 @@ whole exercise and is worth writing down rather than summarising:
   key run together, and removing the key leaves the owner. Machines only: a plugin's parameter
   is named by the plugin and was never written down here, so an old effect link keeps its id as
   a heading, which is plain and is still the right card
-- One list is one layer, and that is not the same rule as one page is one layer, which is what
-  the code used to lean on. The two poured into one with a word beside each row was the thing
-  that could not work, and it is still true; two lists side by side, each headed with how far
-  its links reach, are two lists
 - **A template is a file, `*.jbtl`, and it is written and read where the cards are drawn.** JSON,
   written whole, in `templates/` under the application folder by default and openable from
   anywhere, since the point of one is that it travels. Every value in it is a word rather than a
   number out of an enum, so it can be read, corrected and sent on by somebody who has never seen
   this code, and `parameter` is one field for all four kinds because to a knob a machine's key,
   a plugin's number, one of the mixer's six words and one of the transport's five are one
-  question in four vocabularies. Export is on the controller's line inside a card rather than on
-  the card, since a card can hold two controllers and a file holding both would land on somebody
-  who has one of them
+  question in four vocabularies. Export is on the card, because the card is the template: it was
+  on a line inside the card while a card could hold two controllers, and a file holding both
+  would have landed on somebody who has one of them
 - The port is the only thing in a link that cannot travel, and settling it is the only conversion
   an import does. The same nanoKONTROL2 is `nanoKONTROL2 _ CTRL` to the ALSA sequencer and
   `nanoKONTROL2 _ SLIDER/KNOB` to rawmidi, and Windows spells it a third way, so a file names the
@@ -949,9 +955,9 @@ whole exercise and is worth writing down rather than summarising:
 - Conflicts needed no new rule. `ControlLink.Take` lays a batch down by the rules a link made by
   hand keeps, so an arriving link displaces whatever held its control and whatever else was
   pointed at its target, and importing the same template twice leaves what once did. One act
-  rather than a run of them: the song's undo is told once, so taking an import back is one press
-  rather than one per knob, the lists are said to have changed once, and the settings are written
-  once. A caller looping over `Handle` would be right about every link and wrong about the whole
+  rather than a run of them: the list is said to have changed once, so the page is not rebuilt
+  forty times, and the settings are written once. A caller looping over `Handle` would be right
+  about every link and wrong about the whole
 - What cannot be read is left out and counted rather than failing the lot, which is what a
   template from a newer version looks like: mostly this version's, and the useful answer is the
   part that works plus a line saying how much did not

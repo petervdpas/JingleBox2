@@ -341,12 +341,11 @@ public class ControlLinksPageTests
     {
         var page = Page(out var desk);
 
-        var card = Assert.Single(page.Targets);
-        var section = Assert.Single(card.Controllers);
+        var card = Assert.Single(page.Cards);
 
-        string path = Path.Combine(new ControlTemplates().Folder(), page.Suggest(section) + ".jbtl");
+        string path = Path.Combine(new ControlTemplates().Folder(), page.Suggest(card) + ".jbtl");
 
-        page.Export(section, path);
+        page.Export(card, path);
 
         Assert.True(File.Exists(path));
 
@@ -354,13 +353,13 @@ public class ControlLinksPageTests
         page.Reread();
 
         Assert.Empty(desk);
-        Assert.Empty(page.Targets);
+        Assert.Empty(page.Cards);
 
         page.Import(path);
         page.Reread();
 
         Assert.Equal(2, desk.Count);
-        Assert.Equal("OddSkilla", Assert.Single(page.Targets).Title);
+        Assert.Equal("OddSkilla", Assert.Single(page.Cards).Title);
         Assert.Contains("2 controls for OddSkilla", page.Status);
     }
 
@@ -379,12 +378,70 @@ public class ControlLinksPageTests
         Assert.Contains("is not a control template", page.Status);
     }
 
-    /// <summary>A song's layer takes no template, since a template is what the desk does.</summary>
+    /// <summary>Cards arrive folded away, and the one that is opened stays open.</summary>
+    /// <remarks>
+    /// The list is thrown away and made afresh whenever anything moves, so without the open
+    /// card being remembered by its key, laying one link down would fold up the card somebody
+    /// is working in.
+    /// </remarks>
     [Fact]
-    public void Only_the_desk_takes_a_template()
+    public void The_open_card_survives_the_list_being_rebuilt()
     {
-        Assert.True(Page(out _).Imports);
+        var page = Page(out _);
 
-        Assert.False(new ControlLinksViewModel(new ControlLink(new List<ControlMapping>(), () => { }), songOnly: true).Imports);
+        var card = Assert.Single(page.Cards);
+
+        Assert.False(card.Open);
+
+        card.Open = true;
+
+        page.Reread();
+
+        Assert.True(Assert.Single(page.Cards).Open);
+    }
+
+    /// <summary>Opening one card folds the others away.</summary>
+    /// <remarks>
+    /// Two machines and one controller is two cards. Opening the second must fold the first,
+    /// and the folding must not clear the key of the card that has just been opened, which is
+    /// what the guard in <c>Folded</c> is there for.
+    /// </remarks>
+    [Fact]
+    public void Only_one_card_is_open_at_a_time()
+    {
+        var desk = new List<ControlMapping>
+        {
+            OnMachine("attack", 0),
+            new()
+            {
+                Kind = ControlKind.Instrument,
+                Machine = "machine.ouroboros",
+                Key = "tune",
+                Owner = "Ouroboros",
+                Name = "Ouroboros tune",
+                Device = "nanoKONTROL2 _ CTRL",
+                Channel = 1,
+                Cc = 16
+            }
+        };
+
+        var page = new ControlLinksViewModel(new ControlLink(desk, () => { }));
+
+        Assert.Equal(2, page.Cards.Count);
+
+        page.Cards[0].Open = true;
+
+        Assert.True(page.Cards[0].Open);
+        Assert.False(page.Cards[1].Open);
+
+        page.Cards[1].Open = true;
+
+        Assert.False(page.Cards[0].Open);
+        Assert.True(page.Cards[1].Open);
+
+        page.Reread();
+
+        Assert.False(page.Cards[0].Open);
+        Assert.True(page.Cards[1].Open);
     }
 }

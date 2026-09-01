@@ -7,15 +7,17 @@ using JingleBox2.ViewModels;
 
 namespace JingleBox2.Views;
 
-/// <summary>One layer of controller links, as a heading and a card for each thing.</summary>
+/// <summary>
+/// The templates, as a card for each controller against each thing it is pointed at.
+/// </summary>
 /// <remarks>
 /// Bound to a <see cref="ControlLinksViewModel"/> itself rather than to something holding one,
-/// so the three places that want a list of links all point one of these at the layer they are
-/// about and nothing here has to know which layer it is drawing.
+/// so both places that want the list point one of these at it and nothing here has to know
+/// where it is being drawn.
 ///
 /// The two buttons are here rather than commands on the view model because both of them are a
-/// file picker, which is the window's and not the layer's. Everything either one does once a
-/// path is known is the layer's, which is where it is done.
+/// file picker, which is the window's and not the list's. Everything either one does once a
+/// path is known is the list's, which is where it is done.
 /// </remarks>
 public partial class ControlLinksView : UserControl
 {
@@ -25,7 +27,7 @@ public partial class ControlLinksView : UserControl
         InitializeComponent();
     }
 
-    /// <summary>The layer this is showing, or nothing before it has been given one.</summary>
+    /// <summary>The list this is showing, or nothing before it has been given one.</summary>
     private ControlLinksViewModel? Layer => DataContext as ControlLinksViewModel;
 
     /// <summary>
@@ -41,7 +43,7 @@ public partial class ControlLinksView : UserControl
     private async void Export_Click(object? sender, RoutedEventArgs e)
     {
         if (Layer is not { } layer) return;
-        if (sender is not Control { DataContext: ControllerLinks which }) return;
+        if (sender is not Control { DataContext: ControlTemplateLinks which }) return;
 
         var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
         if (storage == null) return;
@@ -58,7 +60,7 @@ public partial class ControlLinksView : UserControl
         if (file?.TryGetLocalPath() is { } path) layer.Export(which, path);
     }
 
-    /// <summary>Reads a template and lays its links down in this layer.</summary>
+    /// <summary>Reads a template and lays its links down.</summary>
     /// <param name="sender">Unused.</param>
     /// <param name="e">Unused.</param>
     private async void Import_Click(object? sender, RoutedEventArgs e)
@@ -88,7 +90,7 @@ public partial class ControlLinksView : UserControl
     /// the folder cannot be made, which leaves the picker wherever it would have opened.
     /// </remarks>
     /// <param name="storage">The window's own file access.</param>
-    /// <param name="layer">The layer, which knows where templates are kept.</param>
+    /// <param name="layer">The list, which knows where templates are kept.</param>
     private static async System.Threading.Tasks.Task<IStorageFolder?> Folder(IStorageProvider storage, ControlLinksViewModel layer)
     {
         try

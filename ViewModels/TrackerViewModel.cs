@@ -2269,34 +2269,18 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>And how tall the automation stands, which is its own answer and not a share.</summary>
     [ObservableProperty] private double lanesHeight = 120;
 
-    /// <summary>What this song has its controller pointed at, for the page that shows it.</summary>
-    /// <remarks>
-    /// Handed in rather than built here, because the same list narrowed differently is what
-    /// SETTINGS shows, and both are views of the one registry. It says when it arrives, so the
-    /// page is not left bound to nothing if it happens to be built first.
-    /// </remarks>
-    public ControlLinksViewModel? SongControls
-    {
-        get => _songControls;
-        set
-        {
-            _songControls = value;
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>Behind <see cref="SongControls"/>, which is set from outside once.</summary>
-    private ControlLinksViewModel? _songControls;
-
     /// <summary>
-    /// What the desk is pointed at whatever song is open, shown under the song's own.
+    /// The templates: what the hardware is pointed at, whatever song is open.
     /// </summary>
     /// <remarks>
     /// The very same list SETTINGS draws, handed in rather than built here, because two of them
     /// would be two answers to one question and taking a link off one would leave the other
-    /// showing it. It is here at all because this is where a desk link is made: the gesture is
+    /// showing it. It is here at all because this is where a link is made: the gesture is
     /// Ctrl+Shift+M over a machine on the rack, which is the button next along, and reading
     /// what it did meant leaving the tracker for a settings page.
+    ///
+    /// There was a second list beside it, the song's own. A song no longer holds links of its
+    /// own: what a knob does to a machine is true of every song that plays that machine.
     /// </remarks>
     public ControlLinksViewModel? DeskControls
     {
@@ -3972,8 +3956,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         CurrentPattern = Song.PatternAt(0);
         Cursor = PatternCursor.Start.Clamp(CurrentPattern?.Lines ?? 0, Song.TrackCount);
         PlayingLine = -1;
-
-        SongControls?.Reread();
 
         IsDirty = false;
 

@@ -241,20 +241,8 @@ public partial class InstrumentPanel : UserControl
             Key = key,
             Owner = editor.MachineName,
             Name = editor.MachineName + " " + key
-        }, InSong);
+        });
     }
-
-    /// <summary>
-    /// Whether this panel is a song's instrument or the machine itself on the rack.
-    /// </summary>
-    /// <remarks>
-    /// The same control stands in two places and they mean different things. On the rack it is
-    /// the machine: pointing a knob at its filter is a fact about your hardware and that
-    /// machine, true in every song you open, so it belongs on the desk. On a track it is this
-    /// song's instrument, and pointing a knob at its filter is about this piece of music, so it
-    /// travels in the file.
-    /// </remarks>
-    private bool InSong => Designer is TrackInstrumentDesigner;
 
     /// <summary>
     /// Offers a button on the panel, which is a press rather than a value.
@@ -281,7 +269,7 @@ public partial class InstrumentPanel : UserControl
             Pickup = Midi.Enums.ControlPickup.Jump,
             Owner = editor.MachineName,
             Name = editor.MachineName + " " + action.Replace('_', ' ')
-        }, InSong);
+        });
     }
 
     /// <summary>Does what a mapped hardware button asked for, if it asked this machine.</summary>
@@ -369,10 +357,7 @@ public partial class InstrumentPanel : UserControl
     /// <summary>The instrument being worked on, or nothing when the designer has none.</summary>
     private InstrumentEditorViewModel? Editor => (DataContext as IInstrumentDesigner)?.Editor;
 
-    /// <summary>
-    /// What this panel is standing in: the rack, or a track's own window. See
-    /// <see cref="InSong"/> for why the difference matters.
-    /// </summary>
+    /// <summary>What this panel is standing in: the rack, or a track's own window.</summary>
     private IInstrumentDesigner? Designer => DataContext as IInstrumentDesigner;
 
     /// <summary>Whatever window this panel is in, since that is where the keys arrive.</summary>

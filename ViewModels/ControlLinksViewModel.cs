@@ -60,26 +60,8 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </remarks>
     private readonly Func<IEnumerable<string>>? _ports;
 
-    /// <summary>
-    /// Which of the two layers this list is about.
-    /// </summary>
-    /// <remarks>
-    /// One each, and never both. The desk is what your controller does whatever you open; a
-    /// song's own comes and goes with the song like its patterns do.
-    ///
-    /// They were one list showing everything with a word beside each row saying which layer it
-    /// belonged to, and that word was not enough: a link made in a song turned up in the
-    /// settings, where nothing about the surroundings suggested a song had anything to do with
-    /// it. One list is one layer, and that is the rule. It is not the same rule as one page is
-    /// one layer, which is what this used to lean on and is now wrong: the tracker's MIDI CC
-    /// page draws both, one under the other, each headed with how far its links reach. Two
-    /// lists side by side are two lists; what could not work was the two poured into one.
-    /// </remarks>
-    private readonly bool _songOnly;
-
-    /// <summary>Reads one layer's links and follows them for as long as this list is on screen.</summary>
+    /// <summary>Reads the links and follows them for as long as this list is on screen.</summary>
     /// <param name="link">Where the links live.</param>
-    /// <param name="songOnly">True for the song's own layer, false for the desk.</param>
     /// <param name="profiles">
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
@@ -92,7 +74,6 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// <param name="naming">What a target is called, shared with the file so the two agree.</param>
     public ControlLinksViewModel(
         ControlLink link,
-        bool songOnly = false,
         IControllerProfiles? profiles = null,
         Func<IEnumerable<string>>? ports = null,
         IControlTemplates? templates = null,
@@ -100,7 +81,6 @@ public sealed class ControlLinksViewModel : ObservableObject
     {
         _profiles = profiles ?? new ControllerProfiles();
         _link = link;
-        _songOnly = songOnly;
         _naming = naming ?? new LinkTargets();
         _templates = templates ?? new ControlTemplates(_naming);
         _ports = ports;
@@ -111,58 +91,27 @@ public sealed class ControlLinksViewModel : ObservableObject
     }
 
     /// <summary>
-    /// What this list is, in the two or three words that head it.
+    /// What this list is, in the one word that heads it.
     /// </summary>
     /// <remarks>
-    /// Named for how far the links reach rather than for where they are kept, because that is
-    /// the whole of the difference and it is what somebody looking at two lists on one page is
-    /// trying to tell apart. Where they are kept is a fact about files and is of no use while
-    /// you are looking at a knob wondering what it will do.
-    ///
     /// Templates, plural, because the cards under it are the templates and the heading is the
-    /// shelf they sit on. A link that works in every song, on a machine that is the same
-    /// machine on everybody's installation, is a thing you could hand to somebody else, and
-    /// that is what the whole of this layer is for.
+    /// shelf they sit on. There is one list here now and there were two: a song used to keep
+    /// links of its own, made by pointing at an instrument on a track, and they are templates
+    /// instead. A link on a machine is true of every song that plays that machine, so a copy of
+    /// it per song was work done again for nothing and could not be handed to anybody.
     /// </remarks>
-    public string Title => _songOnly ? "This song" : "Templates";
+    public string Title => "Templates";
 
     /// <summary>
     /// How a link is made, said above the list rather than left to be discovered.
     /// </summary>
     /// <remarks>
-    /// The gesture is the same for both layers and only what it is pointed at decides which
-    /// list the link lands in, so each half says that in its own words: point at an instrument
-    /// on a track and it is the song's, point at a machine on the rack and it is every song's.
-    ///
-    /// Neither says where the other one is drawn. The same list is shown in two places now,
-    /// and a sentence saying "listed below" is true on one page and a wild goose chase on the
-    /// other.
+    /// It does not say where else the list is drawn. The same list is in two places, SETTINGS
+    /// and here, and a sentence saying "listed below" would be true on one page and a wild
+    /// goose chase on the other.
     /// </remarks>
-    public string Hint => _songOnly
-        ? "Press Ctrl+Shift+M with an instrument's panel open, rest the pointer on a knob until it glows, and touch the control on your desk. What you point at here is this song's and travels in its file."
-        : "What your controller does whatever you open, one card for each thing it is pointed at. Press Ctrl+Shift+M with a machine's panel open on the rack, rest the pointer on a knob until it glows, and touch the control on your desk. What you point at on an instrument in a song belongs to that song instead.";
-
-    /// <summary>
-    /// Whether this list offers to take every link off at once.
-    /// </summary>
-    /// <remarks>
-    /// The desk's does and a song's does not. Clearing the desk is starting a controller again
-    /// from nothing, which is a thing people really do and the reason that button exists. A
-    /// song's layout is part of the song: it is taken back with the song's own undo, it travels
-    /// in the file, and it has no more business behind a button that empties it in one press
-    /// than the song's patterns have.
-    /// </remarks>
-    public bool Clears => !_songOnly;
-
-    /// <summary>
-    /// Whether this layer takes a template from outside.
-    /// </summary>
-    /// <remarks>
-    /// The desk's does. A template is what one controller does to one machine wherever it is
-    /// met, which is the desk in as many words, and it is the layer somebody else's file is
-    /// about. A song's layout is about this piece of music and is not a thing you receive.
-    /// </remarks>
-    public bool Imports => !_songOnly;
+    public string Hint =>
+        "One card for each controller against each thing it is pointed at, which is what a template is. Press Ctrl+Shift+M, rest the pointer on a knob until it glows, and touch the control on your desk. It works in every song, and it can be written out and handed to somebody else.";
 
     /// <summary>
     /// What just happened, in a line, or nothing.
@@ -189,32 +138,29 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// <summary>True when there is something to say, so the line is not an empty gap.</summary>
     public bool HasStatus => Status.Length > 0;
 
-    /// <summary>What to say when there is nothing to show, which differs between the two.</summary>
-    public string Nothing => _songOnly
-        ? "This song has no controls of its own. Point a knob at an instrument on a track and it will be kept here, and travel in the song's file."
-        : "Nothing is pointed at anything yet. Point a knob at a machine on the rack and it will be kept here, and work in every song.";
+    /// <summary>What to say when there is nothing to show.</summary>
+    public string Nothing =>
+        "Nothing is pointed at anything yet. Point a knob at a machine on the rack or at a strip on the mixer and it will be kept here, and work in every song.";
 
-    /// <summary>Every link in this layer, flat, in the order the headings put them.</summary>
+    /// <summary>Every link, flat, in the order the headings put them.</summary>
     public ObservableCollection<ControlLinkRow> Links { get; } = new();
 
     /// <summary>
-    /// The same links, gathered under the thing each is pointed at, and under the controller
-    /// within that.
+    /// The same links as cards: one card for each controller against each thing it is pointed
+    /// at.
     /// </summary>
     /// <remarks>
-    /// Two levels, and each one is a question somebody actually asks. What does my hardware do
-    /// to OddSkilla is the first; which of my controllers is the second. Flat, neither can be
-    /// answered: one knob can hold a job per machine, so a single encoder taking the filter on
-    /// four machines is four rows scattered through the list, and two controllers interleave by
-    /// number into something nobody can read.
+    /// That pair is the unit the whole of this is for. What your nanoKONTROL2 does to OddSkilla
+    /// is the same sentence on anybody's installation, since a machine's id decides its engine
+    /// and a plugin's parameters are numbered by the plugin, so it is exactly the thing that
+    /// can be written out and handed to somebody else. A card is a template.
     ///
-    /// The pair is also the unit the whole of this is for. One controller against one target is
-    /// a template: it is the same on every installation, since a machine's id decides its
-    /// engine and a plugin's parameters are numbered by the plugin, so it is the thing that can
-    /// be handed to somebody else. Drawing it as one card per target with the controllers
-    /// inside is drawing the templates.
+    /// It was a card per target with the controllers nested inside it, which drew the same
+    /// templates one level down and made the card a thing no file could be written from: a card
+    /// holding two controllers would land on somebody who has one of them. One card, one file,
+    /// one Export button.
     /// </remarks>
-    public ObservableCollection<ControlTargetLinks> Targets { get; } = new();
+    public ObservableCollection<ControlTemplateLinks> Cards { get; } = new();
 
     /// <summary>True when there is anything to show, so the page can say <see cref="Nothing"/>.</summary>
     public bool HasLinks => Links.Count > 0;
@@ -252,9 +198,10 @@ public sealed class ControlLinksViewModel : ObservableObject
     private void Restock()
     {
         Links.Clear();
-        Targets.Clear();
 
-        var order = (_songOnly ? _link.Kept : _link.Desk)
+        Cards.Clear();
+
+        var order = _link.Desk
             .OrderBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
             .ThenBy(one => one.Channel)
             .ThenBy(one => one.Cc)
@@ -267,42 +214,105 @@ public sealed class ControlLinksViewModel : ObservableObject
                      .GroupBy(_naming.KeyOf, StringComparer.Ordinal)
                      .OrderBy(one => _naming.RankOf(one.First()))
                      .ThenBy(one => _naming.TitleOf(one), StringComparer.OrdinalIgnoreCase))
-            Targets.Add(Card(target));
+            foreach (var card in Made(target))
+            {
+                card.Open = card.Key == _open;
+
+                Cards.Add(card);
+            }
 
         OnPropertyChanged(nameof(HasLinks));
     }
 
     /// <summary>
-    /// One card: the thing pointed at, and its links under the controller each was learned on.
+    /// The cards for one thing pointed at: one for each controller pointed at it.
     /// </summary>
     /// <remarks>
     /// The heading is worked out once and handed down to every row under it, so the rows can
     /// leave it off. Worked out rather than read, because a link made before the name was kept
     /// has only its ids, and a card headed with a folder name is a card nobody recognises.
+    ///
+    /// Almost always one card, since almost nobody points two desks at the same machine. Where
+    /// somebody does, they are two templates and are two cards, which is the same answer the
+    /// file gives.
     /// </remarks>
     /// <param name="target">Every link pointed at one thing.</param>
-    private ControlTargetLinks Card(IEnumerable<ControlMapping> target)
+    private IEnumerable<ControlTemplateLinks> Made(IEnumerable<ControlMapping> target)
     {
         var all = target.ToList();
         string owner = _naming.TitleOf(all);
+        string kind = _naming.KindOf(all[0]);
+        string key = _naming.KeyOf(all[0]);
 
-        return new ControlTargetLinks(
-            owner,
-            _naming.KindOf(all[0]),
-            all.GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
-                .Select(controller => new ControllerLinks(
-                    controller.Key,
-                    controller.Select(one => new ControlLinkRow(one, _link, _profiles, owner)),
-                    controller.ToList(),
-                    _profiles)));
+        return all.GroupBy(one => one.Device, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(controller => new ControlTemplateLinks(
+                owner,
+                kind,
+                key,
+                controller.Key,
+                controller.Select(one => new ControlLinkRow(one, _link, _profiles, owner)),
+                controller.ToList(),
+                _profiles,
+                Folded));
     }
+
+    /// <summary>
+    /// Which card is showing its rows, by its key, or nothing when they are all folded away.
+    /// </summary>
+    /// <remarks>
+    /// Held here rather than on the cards, because it is a fact about the list: one open at a
+    /// time, so the answer is a single key and not a flag apiece. It also survives the list
+    /// being thrown away and built again, which happens whenever anything moves, so laying a
+    /// link down does not fold up the card you are looking at.
+    /// </remarks>
+    private string _open = "";
+
+    /// <summary>
+    /// A card was opened or folded away, so the rest of the list follows it.
+    /// </summary>
+    /// <remarks>
+    /// One open at a time. A card is the whole of what a controller does to one machine, ten or
+    /// twenty rows, and several of them open at once is the page this arrangement was made to
+    /// get away from: what you want to see is what you are working on, and the headings of
+    /// everything else.
+    ///
+    /// The guard is not tidiness. Folding the others away calls this again once per card, and
+    /// each of those calls says a card has closed, which would clear the key of the one that
+    /// has just been opened.
+    /// </remarks>
+    /// <param name="card">The card whose <see cref="ControlTemplateLinks.Open"/> just moved.</param>
+    private void Folded(ControlTemplateLinks card)
+    {
+        if (_folding) return;
+
+        _folding = true;
+
+        try
+        {
+            _open = card.Open ? card.Key : "";
+
+            if (!card.Open) return;
+
+            foreach (var one in Cards)
+                if (!ReferenceEquals(one, card))
+                    one.Open = false;
+        }
+        finally
+        {
+            _folding = false;
+        }
+    }
+
+    /// <summary>Set while the list is folding the other cards away, so it does not hear itself.</summary>
+    private bool _folding;
 
     /// <summary>Where a template is written by default, and where the picker opens.</summary>
     public string Folder() => _templates.Folder();
 
     /// <summary>What to call the file this section would be written to.</summary>
     /// <param name="which">The controller's links on one target.</param>
-    public string Suggest(ControllerLinks? which) =>
+    public string Suggest(ControlTemplateLinks? which) =>
         which is null || Written(which) is not { } template
             ? "template"
             : _templates.FileName(template);
@@ -317,7 +327,7 @@ public sealed class ControlLinksViewModel : ObservableObject
     /// </remarks>
     /// <param name="which">The controller's links on one target.</param>
     /// <param name="path">Where to write it.</param>
-    public void Export(ControllerLinks? which, string path)
+    public void Export(ControlTemplateLinks? which, string path)
     {
         if (which is null || path is not { Length: > 0 }) return;
 
@@ -376,7 +386,7 @@ public sealed class ControlLinksViewModel : ObservableObject
             return;
         }
 
-        int took = _link.Take(reading.Links, _songOnly);
+        int took = _link.Take(reading.Links);
 
         string said = "Took " + took + (took == 1 ? " control for " : " controls for ")
                       + (template.Target.Name.Length > 0 ? template.Target.Name : template.Target.Kind);
@@ -394,7 +404,7 @@ public sealed class ControlLinksViewModel : ObservableObject
 
     /// <summary>This section as a template, or nothing when there is nothing to write.</summary>
     /// <param name="which">The controller's links on one target.</param>
-    private ControlTemplate? Written(ControllerLinks which) =>
+    private ControlTemplate? Written(ControlTemplateLinks which) =>
         _templates.Describe(
             _profiles.Called(which.Device),
             which.Mappings,
@@ -402,72 +412,77 @@ public sealed class ControlLinksViewModel : ObservableObject
 }
 
 /// <summary>
-/// One thing a controller is pointed at, and every link on it.
+/// One controller against one thing it is pointed at, which is a template.
 /// </summary>
 /// <remarks>
-/// A machine, an effect, a mixer strip or the transport. They are one type here because to a
-/// knob they are the same thing: something with parameters that can be written into, which is
-/// what <see cref="Midi.Interfaces.IControlTarget"/> has meant since the beginning.
+/// What your nanoKONTROL2 does to OddSkilla, which is the same sentence on anybody's
+/// installation: a machine's id decides its engine and a plugin's parameters are numbered by
+/// the plugin, so nothing in it means one thing here and another somewhere else. That is why
+/// this is the unit a file is written from and the unit a card draws.
 ///
-/// What it is not called is a device. On a page about MIDI that word already means the box on
-/// the desk, and this is the other end of the wire.
+/// The thing pointed at is a machine, an effect, a mixer strip or the transport, and they are
+/// one type here because to a knob they are the same thing: something with parameters that can
+/// be written into, which is what <see cref="Midi.Interfaces.IControlTarget"/> has meant since
+/// the beginning. What it is not called is a device. On a page about MIDI that word already
+/// means the box on the desk, and this is the other end of the wire.
 /// </remarks>
-public sealed class ControlTargetLinks
-{
-    /// <summary>Gathers everything pointed at one target under a heading naming it.</summary>
-    /// <param name="title">What it is called, worked out once for the card and its rows alike.</param>
-    /// <param name="kind">Which sort of thing it is, in the one word a person would use.</param>
-    /// <param name="controllers">Its links, gathered under the controller each was learned on.</param>
-    public ControlTargetLinks(string title, string kind, IEnumerable<ControllerLinks> controllers)
-    {
-        Title = title;
-        Kind = kind;
-
-        foreach (var one in controllers) Controllers.Add(one);
-    }
-
-    /// <summary>What it is called, which is the heading over the card.</summary>
-    public string Title { get; }
-
-    /// <summary>Which sort of thing it is, in the one word a person would use for it.</summary>
-    public string Kind { get; }
-
-    /// <summary>Its links, gathered under the controller each was learned on.</summary>
-    public ObservableCollection<ControllerLinks> Controllers { get; } = new();
-
-}
-
-/// <summary>
-/// One controller, and everything learned on it against one target.
-/// </summary>
-/// <remarks>
-/// This pair, the controller and the target above it, is a template: what your nanoKONTROL2
-/// does to OddSkilla, which is the same sentence on anybody's installation. So it is the thing
-/// that is written out and read back, and not the card, which can hold two controllers and
-/// would land on somebody who has one of them.
-/// </remarks>
-public sealed class ControllerLinks
+public sealed class ControlTemplateLinks : ObservableObject
 {
     /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
     private readonly IControllerProfiles _profiles;
 
-    /// <summary>Gathers one controller's rows under its own heading.</summary>
+    /// <summary>The list this card is one of, told when it opens so it can fold the others.</summary>
+    private readonly Action<ControlTemplateLinks>? _folded;
+
+    /// <summary>Gathers one controller's rows on one target under a heading naming both.</summary>
+    /// <param name="title">What the target is called, worked out once for the card and its rows alike.</param>
+    /// <param name="kind">Which sort of thing the target is, in the one word a person would use.</param>
+    /// <param name="key">What the target is to the rules, so a card can be told from the next.</param>
     /// <param name="device">What the controller is called, or nothing for links that name none.</param>
-    /// <param name="links">Everything learned on it, as rows to read.</param>
+    /// <param name="links">Everything learned on it against this target, as rows to read.</param>
     /// <param name="mappings">The same links as they are stored, for writing a template out.</param>
     /// <param name="profiles">What is known about the controllers, handed down rather than made again.</param>
-    public ControllerLinks(
+    /// <param name="folded">
+    /// Told when this card is opened or folded away, so the list can fold the others. Left out
+    /// where a card stands on its own and there is nothing for it to be one of.
+    /// </param>
+    public ControlTemplateLinks(
+        string title,
+        string kind,
+        string key,
         string device,
         IEnumerable<ControlLinkRow> links,
         IReadOnlyList<ControlMapping> mappings,
-        IControllerProfiles profiles)
+        IControllerProfiles profiles,
+        Action<ControlTemplateLinks>? folded = null)
     {
         _profiles = profiles;
+        _folded = folded;
+        Title = title;
+        Kind = kind;
+        Key = key + " / " + device;
         Device = device;
         Mappings = mappings;
 
         foreach (var one in links) Links.Add(one);
     }
+
+    /// <summary>What the target is called, which is the heading over the card.</summary>
+    public string Title { get; }
+
+    /// <summary>Which sort of thing the target is, in the one word a person would use for it.</summary>
+    public string Kind { get; }
+
+    /// <summary>
+    /// What this card is about, in the words the rules use rather than the ones on the front.
+    /// </summary>
+    /// <remarks>
+    /// The list is thrown away and built again whenever anything moves, so a card folded away
+    /// would come back open unless the fold is remembered against something that survives the
+    /// rebuild. Two people's names for one machine are the same key, which is what makes this
+    /// the thing to remember it against rather than the heading.
+    /// </remarks>
+    public string Key { get; }
 
     /// <summary>What the controller is called, or nothing for links that name none.</summary>
     public string Device { get; }
@@ -485,14 +500,41 @@ public sealed class ControllerLinks
     /// </remarks>
     public IReadOnlyList<ControlMapping> Mappings { get; }
 
-    /// <summary>The heading: the controller, and how much of it is spoken for.</summary>
+    /// <summary>
+    /// Whether the card is showing its rows.
+    /// </summary>
+    /// <remarks>
+    /// Folded away to begin with, and one open at a time: a card is ten or twenty rows, and a
+    /// desk pointed at six machines is a page nobody can hold in their eye. Folded, the list is
+    /// a heading apiece, which is the shelf of templates and is what somebody opens this page
+    /// to see.
+    /// </remarks>
+    public bool Open
+    {
+        get => _open;
+        set
+        {
+            if (_open == value) return;
+
+            _open = value;
+
+            OnPropertyChanged();
+
+            _folded?.Invoke(this);
+        }
+    }
+
+    /// <summary>Behind <see cref="Open"/>.</summary>
+    private bool _open;
+
+    /// <summary>The controller, and how much of it is spoken for.</summary>
     /// <remarks>
     /// A mapping made before controllers were recorded names none, and says so rather than
     /// sitting under a blank heading as if the name had gone missing.
     /// </remarks>
     public string Said =>
         (Device.Length > 0 ? _profiles.Called(Device) : "Learned before controllers were recorded")
-        + "  ·  " + Links.Count + (Links.Count == 1 ? " control" : " controls");
+        + "  \u00B7  " + Links.Count + (Links.Count == 1 ? " control" : " controls");
 }
 
 /// <summary>One line of it: which control, what it moves, and how it picks it up.</summary>

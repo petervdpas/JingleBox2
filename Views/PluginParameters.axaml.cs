@@ -107,7 +107,7 @@ public partial class PluginParameters : UserControl
             Parameter = parameter.Id,
             Owner = controls.Plugin.Info.Name,
             Name = controls.Plugin.Info.Name + " " + parameter.Name
-        }, controls.InSong);
+        });
     }
 
     /// <summary>

@@ -1422,8 +1422,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
 
-        Tracker.SongControls = new ControlLinksViewModel(ControlLink, songOnly: true, profiles: _profiles, ports: Ports);
-
         Tracker.DeskControls = Links;
 
         var transport = new MidiTransportRouter(new TransportAdapter(Transport), _profiles);

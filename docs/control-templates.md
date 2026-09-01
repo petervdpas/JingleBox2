@@ -26,23 +26,38 @@ words that are shown are the three words a person already uses.
 
 ## A template is one controller against one target
 
-That pair is the unit, and it is what the page now draws: a card per target, and inside it a
-section per controller.
+That pair is the unit, and it is what the page draws: one card each, headed with the thing
+pointed at, the sort of thing it is, and the controller.
 
 ```
 Templates
-  OddSkilla   machine
-    nanoKONTROL2 · 10 controls
+  OddSkilla   machine   nanoKONTROL2 · 10 controls        [Export...]
       Slider 1   attack
       Knob 1     duty
-  Ouroboros   machine
-    MiniLab 3 · 4 controls
+  Ouroboros   machine   MiniLab 3 · 4 controls            [Export...]
       Encoder 1  tune
 ```
 
-Above the templates sits the song's own layer, which is the same drawing pointed at the other
-list. What you point at on a machine on the rack works in every song and is a template; what you
-point at on an instrument on a track is that song's and travels in its `.jibx`.
+Each card opens and folds away by its heading, the same chevron the machine editor's cards use.
+They arrive folded, and one is open at a time: a card is ten or twenty rows, so a desk pointed at
+six machines is a page nobody can hold in their eye, and folded the list is a heading apiece,
+which is the shelf of templates and is what somebody opens this page to see.
+
+Which card is open is the list's own answer rather than a flag on each card, since there is only
+ever one, and it is held by the card's key. The list is thrown away and made afresh whenever
+anything moves, so without that, laying a link down would fold up the card you are working in.
+
+It was a card per target with a section per controller nested inside it. That drew the same
+templates one level down and made the card a thing no file could be written from, since a card
+holding two controllers would land on somebody who has one of them.
+
+There was a second list above this one, the song's own: what you pointed at on an instrument on a
+track or on a strip on the mixer went into that song's `.jibx`. Templates are what that was
+reaching for and could not be. A copy of the same layout per song is the same work done again for
+every song and can be handed to nobody, and which layer a link landed in depended on which of two
+identical-looking panels the pointer happened to be over. Everything lands on the templates now.
+What an older song is still holding is still read, and is still displaced by an arriving link, so
+nothing laid down before this fights what is laid down today.
 
 ## Why it can be handed to somebody else
 
@@ -104,13 +119,11 @@ file is written by it, so the two cannot drift into meaning different things by 
 
 ## Export and import
 
-**Export** is on the controller's line inside a card rather than on the card, because that pair
-is the template. A card can hold two controllers and a file holding both would land on somebody
+**Export** is on the card, because the card is the template. It was on a line inside the card
+while a card could hold two controllers, and a file holding both would have landed on somebody
 who has one of them.
 
-**Import** is one button under the Templates heading, and only there: a template is what one
-controller does to one thing wherever it is met, which is the desk in as many words. A song's
-layout is about this piece of music and is not a thing you receive.
+**Import** is one button at the foot of the list.
 
 The port is settled on the way in, which is the only conversion an import does. A controller
 that is not plugged in keeps the name the file carried and its links wait for it, which is the
@@ -121,8 +134,8 @@ until the device arrives reads exactly like a file that failed to open.
 Conflicts needed no new rule. `ControlLink.Take` lays a batch down by the rules a link made by
 hand keeps: one control does one job, so an arriving link displaces whatever held its control
 and whatever else was pointed at its target. Importing the same template twice therefore leaves
-what once did. One act rather than a run of them, so the song's undo is told once, the lists are
-said to have changed once, and the settings are written once.
+what once did. One act rather than a run of them, so the list is said to have changed once
+rather than forty times and the settings are written once.
 
 What cannot be read is left out and counted rather than failing the lot. A template from a
 newer version is mostly this version's, and the useful answer is the part that works plus a line
@@ -157,11 +170,10 @@ on this computer, or added to a track's chain as an effect. The rack is what thi
 has registered, in two tabs, Machines and Effects, and both are things designed here that travel
 as zips.
 
-That leaves the question of where a plugin's links live, and the answer is not the rack.
-`PluginControlsViewModel.InSong` carries it, because a plugin window is opened from three places
-and only whoever opened it knows which. A link on a plugin names the plugin's own id and
-parameter number and never a track, so it is a fact about Serum wherever you were standing when
-you made it, and it belongs on the template layer.
+That leaves the question of where a plugin's links live, and the answer is not the rack. A link
+on a plugin names the plugin's own id and parameter number and never a track, so it is a fact
+about Serum wherever you were standing when you made it, and it is a template like any other.
+`PluginControlsViewModel.InSong` used to carry the layer decision and is gone with it.
 
 ## Pointing at a plugin
 

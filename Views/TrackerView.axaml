@@ -583,24 +583,21 @@
 
     <views:MixerView IsVisible="{Binding ShowsMixer}" />
 
-    <!-- Both layers of links, one under the other, each headed with how far its own reach.
-         The song's is here because a song holds its own layout the way it holds its patterns.
-         The desk's is here because this is where you make one: pointing at a machine on the
-         rack is one button away, and until now the only place to read the result was SETTINGS,
-         which is a different page in a different part of the application from the gesture that
-         wrote it. It is still in SETTINGS, since that is where the hardware is looked after,
-         and it is the same list rather than a copy of it: forgetting a link on either page is
-         the same act and both pages show it at once. -->
-    <!-- Each card as tall as what it holds, and the page scrolls when the two together are
-         taller than the window. Halves were tried first and are wrong: a song with nothing
-         pointed at it took half the screen to say so while the desk's fourteen links scrolled
-         inside the other half, which is the emptier list given the larger share. A list wants
-         the room its contents want. -->
+    <!-- The templates, one card for each controller against each thing it is pointed at. Here
+         because this is where you make one: pointing at a machine on the rack is one button
+         away, and until now the only place to read the result was SETTINGS, which is a
+         different page in a different part of the application from the gesture that wrote it.
+         It is still in SETTINGS, since that is where the hardware is looked after, and it is
+         the same list rather than a copy of it: forgetting a link on either page is the same
+         act and both pages show it at once.
+
+         There were two lists here, this one and the song's own. A song no longer holds links:
+         what a knob does to a machine is true of every song that plays it, so a copy per song
+         was the same work done again and could be handed to nobody. -->
+    <!-- Each card as tall as what it holds, and the page scrolls when they are together taller
+         than the window. A list wants the room its contents want. -->
     <ScrollViewer IsVisible="{Binding ShowsControls}" VerticalScrollBarVisibility="Auto">
-      <StackPanel Spacing="10">
-        <views:ControlLinksView DataContext="{Binding SongControls}" />
-        <views:ControlLinksView DataContext="{Binding DeskControls}" />
-      </StackPanel>
+      <views:ControlLinksView DataContext="{Binding DeskControls}" />
     </ScrollViewer>
 
     </Grid>

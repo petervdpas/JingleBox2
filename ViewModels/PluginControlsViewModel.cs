@@ -66,17 +66,10 @@ public sealed partial class PluginControlsViewModel : ObservableObject
     /// </remarks>
     /// <param name="plugin">The running plugin, which is the only thing that knows its own knobs.</param>
     /// <param name="changed">Told when a value moves, so whoever holds the patch can write it down.</param>
-    /// <param name="inSong">
-    /// True when this plugin belongs to the song being worked on, which is a plugin on a track:
-    /// its instrument, or an insert on its chain. False for one open on the rack, which is the
-    /// plugin itself rather than any use of it, and where a knob pointed at it is a fact about
-    /// that plugin in every song.
-    /// </param>
-    public PluginControlsViewModel(IPluginParameters plugin, Action? changed = null, bool inSong = true)
+    public PluginControlsViewModel(IPluginParameters plugin, Action? changed = null)
     {
         Plugin = plugin;
         _changed = changed;
-        InSong = inSong;
 
         if (plugin is BridgedPlugin bridged) bridged.Stopped += () => Dispatcher.UIThread.Post(Fell);
 
@@ -84,17 +77,6 @@ public sealed partial class PluginControlsViewModel : ObservableObject
 
         plugin.Reloaded += () => Dispatcher.UIThread.Post(Reloaded);
     }
-
-    /// <summary>
-    /// Whether a link made on this panel belongs to the song or to the desk.
-    /// </summary>
-    /// <remarks>
-    /// The same question <c>InstrumentPanel.InSong</c> answers for a machine, and the same
-    /// answer: the thing itself is the desk's and a use of it is the song's. It is here rather
-    /// than worked out in the view because a plugin window is opened from three places and only
-    /// whoever opened it knows which of them it was.
-    /// </remarks>
-    public bool InSong { get; }
 
     /// <summary>The plugin loaded a whole new sound.</summary>
     /// <remarks>
@@ -197,7 +179,7 @@ public sealed partial class PluginControlsViewModel : ObservableObject
             Parameter = id,
             Owner = Plugin.Info.Name,
             Name = Plugin.Info.Name + " " + (parameter?.Name ?? id.ToString())
-        }, keep: true);
+        });
     }
 
     /// <summary>Which parameters the plugin is reporting rather than being set to.</summary>

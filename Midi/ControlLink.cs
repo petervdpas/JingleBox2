@@ -115,20 +115,6 @@ public sealed class ControlLink
     /// <summary>What the pointer is resting on, or nothing.</summary>
     private ControlMapping? _offered;
 
-    /// <summary>
-    /// Whether what is being offered belongs to the song or to the desk.
-    /// </summary>
-    /// <remarks>
-    /// Decided by where you pointed, not by whether a song happens to be open. A machine on the
-    /// rack is the machine itself, and a knob pointed at it there is a fact about your hardware
-    /// and that machine: true in every song you ever open. An instrument on a track is this
-    /// song's, and a knob pointed at it there is about this piece of music.
-    ///
-    /// Laying out a controller on the rack with a song open used to put the whole layout in
-    /// that song, which is the opposite of what anybody means by it.
-    /// </remarks>
-    private bool _offeredToSong;
-
     /// <summary>What is being offered to the controller, for a panel that wants to light it.</summary>
     public ControlMapping? Offered => _offered;
 
@@ -187,17 +173,12 @@ public sealed class ControlLink
     /// What the pointer is resting on, as a mapping with its controller half still empty, or
     /// null when the pointer has left and there is nothing on offer.
     /// </param>
-    /// <param name="keep">
-    /// True when this belongs to the song being worked on: an instrument on a track. False for
-    /// the machine itself on the rack, which is about the machine and not about any song.
-    /// </param>
-    public void Offer(ControlMapping? what, bool keep = false)
+    public void Offer(ControlMapping? what)
     {
         if (!_linking) return;
         if (ReferenceEquals(_offered, what)) return;
 
         _offered = what;
-        _offeredToSong = keep;
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
             what == null
@@ -240,10 +221,12 @@ public sealed class ControlLink
     /// The offer is held rather than made again afterwards: wiggling the same knob twice is one
     /// link, and the second wiggle must not make a second mapping out of the same offer.
     ///
-    /// The line it writes names the layer the link went into and counts that layer. It counted
-    /// the desk whichever list the link landed in, so sixteen mixer links in a row each reported
-    /// the same four, and a log that reports a number which never moves is worse than one that
-    /// reports none: it reads as the links not being kept.
+    /// Every link goes on the desk. A song used to be able to hold links of its own, made by
+    /// pointing at an instrument on a track or at a strip on the mixer, and they are templates
+    /// now: what a knob does to a machine is true of every song that plays that machine, so a
+    /// copy per song was the same work done again and could be handed to nobody. What an older
+    /// song is still holding is read and is still displaced by an arriving link, so nothing that
+    /// was already laid down starts fighting what is laid down now.
     /// </remarks>
     public ControlMapping? Handle(MidiMessage message)
     {
@@ -262,30 +245,16 @@ public sealed class ControlLink
         Changing();
 
         Displace(Song?.Invoke(), wanted);
-        lock (_lock) Displace(_mappings, wanted);
 
         int held;
-        string layer;
 
-        if (_offeredToSong && Song?.Invoke() is { } keeping)
+        lock (_lock)
         {
-            keeping.Add(wanted);
+            Displace(_mappings, wanted);
 
-            held = keeping.Count;
-            layer = "this song";
+            _mappings.Add(wanted);
 
-            SongChanged?.Invoke();
-        }
-        else
-        {
-            lock (_lock)
-            {
-                _mappings.Add(wanted);
-
-                held = _mappings.Count;
-            }
-
-            layer = "the desk";
+            held = _mappings.Count;
         }
 
         _offered = null;
@@ -295,7 +264,7 @@ public sealed class ControlLink
         Log.Write(LogArea.Midi, () =>
             "link: CC " + wanted.Cc + " ch" + wanted.Channel + " now moves "
             + (wanted.Name.Length > 0 ? wanted.Name : wanted.Key)
-            + ", " + held + " on " + layer);
+            + ", " + held + " on the desk");
 
         Say(() =>
         {
@@ -312,45 +281,39 @@ public sealed class ControlLink
     /// <remarks>
     /// What an import is. The rules are the ones a link made by hand keeps, and they have to be:
     /// one control does one job, so an arriving link displaces whatever held its control and
-    /// whatever else was pointed at its target, in both layers. A template that half applied
-    /// because it was laid down some other way would be worse than one that was refused.
+    /// whatever else was pointed at its target, including anything an older song is still
+    /// holding. A template that half applied because it was laid down some other way would be
+    /// worse than one that was refused.
     ///
-    /// One act rather than a run of them. The song's undo is told once, so taking an import back
-    /// is one press rather than one per knob; the lists are said to have changed once, so the
-    /// page is not rebuilt forty times; and the settings are written once. That is also why this
-    /// is here rather than a loop at the caller: a caller looping over <see cref="Handle"/> would
-    /// be right about every link and wrong about the whole.
+    /// One act rather than a run of them. The list is said to have changed once, so the page is
+    /// not rebuilt forty times, and the settings are written once. That is also why this is here
+    /// rather than a loop at the caller: a caller looping over <see cref="Handle"/> would be
+    /// right about every link and wrong about the whole.
     /// </remarks>
     /// <param name="arriving">The links to lay down. Each is taken as it is, hardware and all.</param>
-    /// <param name="intoSong">
-    /// True to put them in the open song's own layout rather than on the desk. Ignored when
-    /// there is no song, since a link has to live somewhere.
-    /// </param>
-    public int Take(IEnumerable<ControlMapping>? arriving, bool intoSong = false)
+    public int Take(IEnumerable<ControlMapping>? arriving)
     {
         var all = arriving?.Where(one => one is not null).ToList() ?? new List<ControlMapping>();
 
         if (all.Count == 0) return 0;
-
-        var song = intoSong ? Song?.Invoke() : null;
 
         Changing();
 
         foreach (var one in all)
         {
             Displace(Song?.Invoke(), one);
-            lock (_lock) Displace(_mappings, one);
 
-            if (song is not null) song.Add(one);
-            else lock (_lock) _mappings.Add(one);
+            lock (_lock)
+            {
+                Displace(_mappings, one);
+
+                _mappings.Add(one);
+            }
         }
-
-        if (song is not null) SongChanged?.Invoke();
 
         _changed();
 
-        Log.Write(LogArea.Midi, () =>
-            "link: took " + all.Count + " links on to " + (song is not null ? "this song" : "the desk"));
+        Log.Write(LogArea.Midi, () => "link: took " + all.Count + " links on to the desk");
 
         Say(() =>
         {

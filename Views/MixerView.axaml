@@ -87,14 +87,12 @@
                           Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                           HorizontalAlignment="Center"
                           views:Pointable.Offers="{Binding PanLink}"
-                          views:Pointable.InSong="True"
                           Value="{Binding Pan}" />
 
               <!-- Mute and no solo. Soloing the master would mean soloing everything, which is
                    what it is already doing. -->
               <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
                             views:Pointable.Offers="{Binding MuteLink}"
-                            views:Pointable.InSong="True"
                             ToolTip.Tip="Silence the whole mix" />
             </StackPanel>
 
@@ -105,7 +103,6 @@
                            TrackLength="0"
                            Ticks="6,0,-6,-12,-24,-40,-60"
                            views:Pointable.Offers="{Binding LevelLink}"
-                           views:Pointable.InSong="True"
                            ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
                            Value="{Binding VolumeDecibels}" />
 
@@ -157,18 +154,15 @@
                                   Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
                                   HorizontalAlignment="Center"
                                   views:Pointable.Offers="{Binding PanLink}"
-                                  views:Pointable.InSong="True"
                                   Value="{Binding Pan}" />
 
                       <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
                         <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
                                       views:Pointable.Offers="{Binding MuteLink}"
-                                      views:Pointable.InSong="True"
                                       ToolTip.Tip="Mute this track" />
 
                         <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
                                       views:Pointable.Offers="{Binding SoloLink}"
-                                      views:Pointable.InSong="True"
                                       ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
                       </StackPanel>
                     </StackPanel>
@@ -190,13 +184,11 @@
                                     Minimum="0" Maximum="1" SmallStep="0.02" LargeStep="0.1"
                                     DialSize="30"
                                     views:Pointable.Offers="{Binding DuckLink}"
-                                    views:Pointable.InSong="True"
                                     ToolTip.Tip="How far down this track goes while the key track is at full scale."
                                     Value="{Binding Duck}" />
 
                         <ui:Knob Label="Rel" Unit="ms" Format="0" DefaultValue="150"
                                     views:Pointable.Offers="{Binding ReleaseLink}"
-                                    views:Pointable.InSong="True"
                                     Minimum="20" Maximum="1000" SmallStep="5" LargeStep="50"
                                     DialSize="30"
                                     ToolTip.Tip="How long this track takes to come back up once the key stops. The attack is always fast."
@@ -211,7 +203,6 @@
                                 HorizontalAlignment="Center" Margin="0,2,0,0">
                       <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
                                    views:Pointable.Offers="{Binding LevelLink}"
-                                   views:Pointable.InSong="True"
                                    Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                    TrackLength="0"
                                    Ticks="6,0,-6,-12,-24,-40,-60"
