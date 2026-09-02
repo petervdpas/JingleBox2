@@ -399,6 +399,25 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   it is made rather than known by the class, because a face is a face over an engine and one
   engine may one day be behind several faces. The keys are the engine's own, so a song can be
   written down without the face: what a chain holds is an id and a handful of numbers
+- **Which box a link on one of ours reaches is the one whose face is in front, and it used to be
+  the chain of the track you are on.** That is right while you are working in the pattern and
+  wrong in three separate ways the moment a face is open in a window, which is exactly when a hand
+  is reaching for a knob. A track's chain follows the cursor, so a face left open while an
+  instrument window claims another track resolved against that other track. The master's chain is
+  on the mixer and follows nothing, so it never matched the cursor at all. And a pad's chain is
+  not on a track in the first place, so no answer phrased as a track number could ever have
+  reached it: a knob pointed at an effect on a pad moved nothing, ever. `IEffectInFront` is the
+  one answer, `IEffectShown` is the three things a link needs about a box (which effect, where it
+  is standing, and what its knobs stand at), and `EffectWindow` says both halves, on opening as
+  well as on being brought forward, since whether a window hears that it was activated is the
+  window manager's business
+- **And it was written into the engine rather than through the values, so the picture never
+  moved.** A machine's parameter goes through the panel's own `IPanelValues`, which is what
+  raises `Said` and redraws the face; an effect on a chain wrote straight into the engine. The
+  sound changed, every knob on the screen stayed where it was, and from a chair that reads as a
+  link that was never made rather than as a picture that is stale. `ControlTargets.Reaching` is
+  the one builder both ways of arriving at a box go through, so there is one answer to what a
+  write does
 - **A knob is pointed at one of ours on a chain, and the link names the effect and the key.**
   Not the slot and not the track: the same two words a machine link uses, for the same reason,
   which is that both travel. So one link drives whichever EchoBox is on the track you are working
@@ -1142,6 +1161,29 @@ whole exercise and is worth writing down rather than summarising:
   physical control being pointed somewhere else, or something else being pointed at the same
   target; a controller that is simply not plugged in keeps its links untouched, since leaving
   one in the other room is not a decision to unwire it
+- **Both of those are about one controller, and the second one had lost it.** The same physical
+  control pointed somewhere else is obviously one box; something else pointed at the same target
+  had no controller in the test at all, so a second desk pointed at a machine deleted the first
+  desk's links on it as they were learned. Which is the opposite of what is written a page down
+  and what the whole design rests on: a link answers only its own controller's messages, so two
+  desks pointed at one machine can never both fire and are not competing, and hardware A and B
+  against machines 1 and 2 is four templates rather than a fight. `ControlLink.SameDesk` is that
+  half of the rule, and a link naming no controller is the wildcard it reads as everywhere else,
+  displaced by any of them since it really would answer beside one
+- It cost twice over, because a template here is the links themselves rather than a file: the
+  surfaces line on a face lists what survived, so somebody with two boxes on the desk lost half
+  a template and then found the repair was made out of the damage. Reported as both halves of
+  one sentence, the CCs not being saved per hardware and the hamburger restoring only half the
+  knobs, and it was one fault. `Tests/ControlDeskTests.cs` is the rule; four knobs learned on one
+  box and two of them learned again on another is the shape of it
+- **And two threads writing one file were writing through one half-written file.** The settings
+  are saved from the drawing thread whenever anything on a page moves and from the MIDI thread
+  when a knob is learned or a control's own behaviour is worked out, and `SafeFile` named the
+  half-written file after the path and nothing else. The second writer could not create it,
+  deleted it on the way out, and left the first with nothing to move into place; the fallback
+  then opened the real file and could leave that broken too. From outside it is a settings file
+  that occasionally loses whatever was last put in it. Each write has its own now, the process in
+  the name as well as the count, since this executable runs again as a plugin's host
 - **Where a link is kept changed and what decides whether it fires did not.** A link answers
   only while the thing it names is the thing in front of you, which is the point of the whole
   design and is untouched by the layers going: `ControlTargets.Find` reads the focused track,

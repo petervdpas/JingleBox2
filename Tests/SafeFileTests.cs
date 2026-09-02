@@ -159,6 +159,58 @@ public class SafeFileTests : IDisposable
     }
 
     /// <summary>
+    /// Two threads writing one file at once leave one whole file and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The settings are written from the drawing thread whenever anything on a page moves, and
+    /// from the MIDI thread when a knob is learned or a control's own behaviour is worked out.
+    /// Those are two threads at one path, and the half-written file was named after the path
+    /// alone, so both were writing through the same temporary file: the second one to arrive
+    /// could not create it, deleted it on its way out, and the first then had nothing left to
+    /// move into place. What that looks like from outside is a settings file that occasionally
+    /// loses whatever was last put in it, with nothing anywhere saying so.
+    ///
+    /// Which of the two contents wins is not the question and cannot be: they are two saves of
+    /// the same object a moment apart. What has to be true is that the file holds one of them
+    /// whole rather than a mixture or a crater.
+    /// </remarks>
+    [Fact]
+    public void Two_writers_at_one_path_leave_one_whole_file()
+    {
+        string path = At("config.json");
+
+        string one = new string('a', 20000);
+        string two = new string('b', 20000);
+
+        var faults = new System.Collections.Concurrent.ConcurrentBag<Exception>();
+
+        void Write(string what)
+        {
+            for (int again = 0; again < 40; again++)
+            {
+                try { _files.Write(path, what); }
+                catch (Exception thrown) { faults.Add(thrown); }
+            }
+        }
+
+        var first = new System.Threading.Thread(() => Write(one));
+        var second = new System.Threading.Thread(() => Write(two));
+
+        first.Start();
+        second.Start();
+        first.Join();
+        second.Join();
+
+        Assert.Empty(faults);
+
+        Assert.Equal(new[] { path }, Directory.GetFiles(_home));
+
+        string landed = File.ReadAllText(path);
+
+        Assert.True(landed == one || landed == two, "the file holds neither write whole");
+    }
+
+    /// <summary>
     /// A writer that throws part way leaves the old file exactly as it was.
     /// </summary>
     /// <remarks>

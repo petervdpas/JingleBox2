@@ -283,7 +283,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </summary>
     /// <remarks>
     /// Two things have to be true. The machine has to be installed with a panel laid out, which
-    /// is what <see cref="Tracker.Machines.MachineProjects.PanelFor"/> answers; and this build has to know how to
+    /// is what <see cref="Tracker.Interfaces.IRackDevices{T}.PanelFor"/> answers; and this build has to know how to
     /// turn that machine's parameters into an instrument's settings, which is what the values
     /// are. A machine with a face and nobody to read it draws knobs that turn nothing, so the
     /// panel written by hand is shown instead and nothing is lost.

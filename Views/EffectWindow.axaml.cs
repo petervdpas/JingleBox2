@@ -36,6 +36,17 @@ public partial class EffectWindow : Window
     /// every window with something pointable on it. What is offered is the effect and the
     /// control under the pointer, which is a fact about your hardware and this effect rather
     /// than about the track it is standing on.
+    ///
+    /// And the window says its chain is the one in front, which is the other half of the same
+    /// gesture: the link says which effect and never which chain, so without this a knob pointed
+    /// at a box on the master or on a pad reached nothing at all, and one on a track reached
+    /// whichever track an instrument window had last claimed. The same thing the instrument
+    /// window says about its track, said about a chain, since a chain is not always on a track.
+    ///
+    /// Said when it opens as well as when it is brought forward, because opening a window is
+    /// coming to the front and there is no guarantee anything else will say so: whether a window
+    /// is told it was activated is the window manager's business, and under a bare X server there
+    /// is nobody to tell it. Saying it twice costs one assignment.
     /// </remarks>
     public EffectWindow()
     {
@@ -49,9 +60,21 @@ public partial class EffectWindow : Window
 
         LinkKey.Watch(Face);
 
-        Opened += (_, _) => _remote.Watch();
+        Opened += (_, _) =>
+        {
+            _remote.Watch();
 
-        Closed += (_, _) => _remote.Stop();
+            Device?.InFront();
+        };
+
+        Activated += (_, _) => Device?.InFront();
+
+        Closed += (_, _) =>
+        {
+            _remote.Stop();
+
+            Device?.NotInFront();
+        };
     }
 
 

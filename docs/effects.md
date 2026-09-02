@@ -192,6 +192,31 @@ what and which parameter, `Slot` for where. Automation goes the same way through
 The Menu part then means something on an effect's face on the day the face exists, which is what
 it was built generic for.
 
+**Which box the link reaches is the one whose face is in front.** A link names the effect and the
+key and never where the box is standing, which is what makes it travel, so something else has to
+answer "which EchoBox". That answer was the chain of the track you are working on, and it is right
+while you are working in the pattern and wrong in three ways once a face is open in a window,
+which is exactly when a hand is reaching for a knob:
+
+- a track's chain follows the cursor, so a face left open while an instrument window claims a
+  different track resolved against that other track
+- the master's chain is on the mixer and follows nothing, so it never matched the cursor at all
+- a pad's chain is not on a track, so no answer phrased as a track number could reach it. A knob
+  pointed at an effect on a pad moved nothing, ever
+
+`IEffectInFront` is the one answer, asked before anything else, and `IEffectShown` is the three
+things a link needs about a box: which effect it is, where it is standing (for the sentence on the
+status line, since a chain is not always on a track), and what its knobs stand at. The window says
+it on opening as well as on being brought forward, because whether a window hears that it was
+activated is the window manager's business and under a bare X server there is nobody to tell it.
+With no face open the chain of the track you are on answers as it always did, and then the rack.
+
+**And the write goes through the values, not into the engine.** A machine's parameter is written
+through the panel's own `IPanelValues`, which raises `Said` and redraws the face; an effect on a
+chain wrote straight into the engine, so the sound changed and every knob on the screen stayed
+where it was. From a chair that reads as a link that was never made rather than as a picture that
+is stale. `ControlTargets.Reaching` is the one builder both ways of arriving at a box go through.
+
 ## The six
 
 Delay, filter, drive, reverb, EQ and compressor. Each is an engine and a face, and each engine is

@@ -72,9 +72,20 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// <summary>Gives this pad its effect chain, pointed at itself.</summary>
     /// <param name="plugins">Everything installed, as scanned in SETTINGS.</param>
     /// <param name="effects">What effects of ours this installation has, which the plus offers first.</param>
-    public void UsePlugins(PluginLibraryViewModel plugins, Tracker.Effects.Interfaces.IEffectProjects? effects = null)
+    /// <param name="front">
+    /// Where a face opened off this pad's chain says it is in front. It is the only answer there
+    /// can be here: a pad is not a track, so nothing phrased as a track number ever reached an
+    /// effect standing on one.
+    /// </param>
+    public void UsePlugins(
+        PluginLibraryViewModel plugins,
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+        Interfaces.IEffectInFront? front = null)
     {
-        Effect = new PluginChainViewModel(plugins, effects) { Target = new PadPluginTarget(_audio, Index) };
+        Effect = new PluginChainViewModel(plugins, effects, front: front)
+        {
+            Target = new PadPluginTarget(_audio, Index)
+        };
         Effect.Changed += OnEffectChanged;
 
         OnPropertyChanged(nameof(Effect));

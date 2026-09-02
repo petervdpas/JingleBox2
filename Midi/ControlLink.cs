@@ -453,9 +453,39 @@ public sealed class ControlLink
     public bool IsSong(ControlMapping mapping) => Song?.Invoke()?.Contains(mapping) == true;
 
     /// <summary>Takes off whatever the new link is replacing: its control, and its target.</summary>
+    /// <remarks>
+    /// Both halves are about one controller. The same physical control pointed somewhere else is
+    /// obviously so; the same target pointed at by something else has to be, or a second box on
+    /// the desk deletes the first box's layout as it is learned.
+    ///
+    /// That is what it did. A link records the controller it was learned on and answers only its
+    /// own messages, so two desks pointed at one machine can never both fire and are not
+    /// competing for it: A and B both drive machine 1 and neither displaces the other, which is
+    /// the whole of what makes hardware A and B against machines 1 and 2 four templates rather
+    /// than a fight. Without the controller in the test it was one template, silently, and the
+    /// half of it that had been learned again elsewhere was gone.
+    ///
+    /// It cost twice, because a template here is the links themselves rather than a file: what
+    /// the surfaces line on a machine's face lists is what survived, so the repair somebody
+    /// reaches for was itself made out of the damage.
+    /// </remarks>
     private static void Displace(List<ControlMapping>? from, ControlMapping wanted) =>
-        from?.RemoveAll(one => one.SameTarget(wanted)
-                               || (one.SameControl(wanted) && !Apart(one, wanted)));
+        from?.RemoveAll(one => SameDesk(one, wanted)
+                               && (one.SameTarget(wanted)
+                                   || (one.SameControl(wanted) && !Apart(one, wanted))));
+
+    /// <summary>True when those two links could ever answer the same controller.</summary>
+    /// <remarks>
+    /// A link naming no controller is the wildcard a link made before controllers were recorded
+    /// reads as: <see cref="ControlMapping.Answers"/> lets it answer every device, so it really
+    /// would fire beside an arriving link and it is displaced by any of them.
+    /// </remarks>
+    /// <param name="one">A link already on the desk.</param>
+    /// <param name="wanted">The link arriving.</param>
+    private static bool SameDesk(ControlMapping one, ControlMapping wanted) =>
+        one.Device.Length == 0
+        || wanted.Device.Length == 0
+        || MidiService.SameName(one.Device, wanted.Device);
 
     /// <summary>
     /// True when two links share a control but can never answer the same message.

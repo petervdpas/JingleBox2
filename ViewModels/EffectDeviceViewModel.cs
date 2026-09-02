@@ -24,7 +24,7 @@ namespace JingleBox2.ViewModels;
 /// A row rather than a thing, the same as a plugin's. The engine and its place in the chain both
 /// belong to somebody else and this holds neither.
 /// </remarks>
-public sealed partial class EffectDeviceViewModel : ObservableObject, IChainDevice
+public sealed partial class EffectDeviceViewModel : ObservableObject, IChainDevice, IEffectShown
 {
     /// <summary>How many of its controls the block prints, which is what a block has room for.</summary>
     private const int Readings = 3;
@@ -52,7 +52,39 @@ public sealed partial class EffectDeviceViewModel : ObservableObject, IChainDevi
         Effect = effect;
         Engine = engine;
         Device = device;
+
+        _owner = chain.Target;
     }
+
+    /// <summary>
+    /// Where this box's chain lives, taken once when the row was built.
+    /// </summary>
+    /// <remarks>
+    /// Taken rather than asked for, because the chain view under the pattern is pointed at
+    /// whichever track the cursor is on and a row outlives that: asking it later would answer for
+    /// wherever the cursor has since gone rather than for the chain this box is really on.
+    /// </remarks>
+    private readonly IChainOwner? _owner;
+
+    /// <inheritdoc/>
+    public string Id => Effect.Id;
+
+    /// <inheritdoc/>
+    public string Where => _owner?.Label ?? "";
+
+    /// <summary>
+    /// This box's face came to the front, so it is the one being worked on.
+    /// </summary>
+    /// <remarks>
+    /// Which is what a link pointed at one of ours resolves against. A link names the effect and
+    /// the key and never where it is standing, so something has to say which EchoBox, and the one
+    /// whose face you are looking at is the only answer that is right on a track, on the master
+    /// and on a pad alike. Nothing is applied by saying it.
+    /// </remarks>
+    public void InFront() => _chain.Front?.InFront(this);
+
+    /// <summary>And has gone, so the track you are on answers again.</summary>
+    public void NotInFront() => _chain.Front?.Gone(this);
 
     /// <summary>What the effect is, which is the face, the parameters and the name.</summary>
     public EffectProject Effect { get; }

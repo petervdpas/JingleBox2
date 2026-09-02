@@ -886,6 +886,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="config">The settings as they stand. Null in a test.</param>
     /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
     /// <param name="effects">What effects of ours this installation has, for the chains.</param>
+    /// <param name="front">
+    /// Where a face opened off one of these chains says it is in front, so a knob pointed at one
+    /// of ours reaches the box you are looking at. Nothing in a test, and then a link on one of
+    /// ours is looked for on the track you are working on, as it always was.
+    /// </param>
     /// <param name="waveforms">What draws a recording's shape. Null draws a flat line.</param>
     /// <param name="machines">
     /// The machines this run has, the one instance everything shares. Required rather than
@@ -901,7 +906,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+        IEffectInFront? front = null)
     {
         _machines = machines;
         Ours = effects;
@@ -912,10 +918,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _configStore = configStore;
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
-        TrackEffect = new PluginChainViewModel(Plugins, Ours);
+        TrackEffect = new PluginChainViewModel(Plugins, Ours, front: front);
         TrackEffect.Changed += MarkDirty;
 
-        MasterEffect = new PluginChainViewModel(Plugins, Ours)
+        MasterEffect = new PluginChainViewModel(Plugins, Ours, front: front)
         {
             Nothing = "No effect across the mix yet."
         };

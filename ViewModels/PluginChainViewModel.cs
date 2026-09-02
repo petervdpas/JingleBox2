@@ -45,14 +45,21 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// </param>
     /// <param name="effects">What effects of ours this installation has, or nothing.</param>
     /// <param name="engines">Which of them this build can make. Left out, the real list.</param>
+    /// <param name="front">
+    /// Where a face opened off this chain says it is in front, so a knob pointed at one of ours
+    /// reaches the one you are looking at. Nothing where there is nobody to tell, which is every
+    /// chain view built without a link layer behind it.
+    /// </param>
     public PluginChainViewModel(
         PluginLibraryViewModel plugins,
         Tracker.Effects.Interfaces.IEffectProjects? effects = null,
-        Tracker.Effects.Interfaces.IEffectEngines? engines = null)
+        Tracker.Effects.Interfaces.IEffectEngines? engines = null,
+        IEffectInFront? front = null)
     {
         Plugins = plugins;
         _effects = effects;
         _engines = engines ?? new Tracker.Effects.EffectEngines();
+        Front = front;
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };
         _poll.Tick += (_, _) => Poll();
@@ -117,6 +124,16 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
     /// <summary>The boxes in this chain, in the order the audio goes through them.</summary>
     public ObservableCollection<IChainDevice> Devices { get; } = new();
+
+    /// <summary>
+    /// Where a face opened off this chain says it is in front, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Held rather than reached for, and handed down to each box, because the box is what a
+    /// window is opened on and the box is what the window can tell. This view knows nothing
+    /// about links and does not want to.
+    /// </remarks>
+    public IEffectInFront? Front { get; }
 
     /// <summary>
     /// What this view is pointed at, which is where the chain really lives.

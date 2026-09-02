@@ -44,6 +44,9 @@ public sealed class ControlTargets : IControlTargets
     private readonly TrackerViewModel _tracker;
     private readonly RackViewModel? _rack;
 
+    /// <summary>Which chain has a face of ours open in front, or nothing.</summary>
+    private readonly ViewModels.Interfaces.IEffectInFront? _front;
+
     /// <param name="tracker">
     /// The song and everything in it: the tracks, their mixer strips, their instruments and the
     /// plugins on their chains. Almost every mapping is answered out of this.
@@ -66,15 +69,22 @@ public sealed class ControlTargets : IControlTargets
     /// against the chain in front of you. Nothing when there are none, and then only plugins are
     /// found on a chain, which is what this did before effects existed.
     /// </param>
+    /// <param name="front">
+    /// Which chain has a face of ours open in front. Optional, and without one a link on one of
+    /// ours is looked for on the track you are working on and on the rack, which is what this did
+    /// before a face could be opened off a chain at all.
+    /// </param>
     public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
-                          Tracker.Effects.Interfaces.IEffectProjects? effects = null)
+                          Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+                          ViewModels.Interfaces.IEffectInFront? front = null)
     {
         _tracker = tracker;
         _machines = machines;
         _effects = effects;
         _rack = rack;
         _presses = presses;
+        _front = front;
     }
 
     /// <summary>The transport, where there is one.</summary>
@@ -96,6 +106,8 @@ public sealed class ControlTargets : IControlTargets
     public IControlTarget? Find(ControlMapping mapping)
     {
         if (mapping is null) return null;
+
+        if (mapping.Kind == ControlKind.Device && OnFront(mapping) is { } ahead) return ahead;
 
         int track = mapping.Scope == ControlScope.Fixed ? mapping.Track : _tracker.FocusedTrack;
 
@@ -274,7 +286,54 @@ public sealed class ControlTargets : IControlTargets
     /// a song with a Zampler on a track is a song you are working in, and the rack is where you
     /// go when you are not.
     /// </remarks>
-    private IControlTarget? OnRack(ControlMapping mapping)
+    private IControlTarget? OnRack(ControlMapping mapping) =>
+        OnRackMachine(mapping) ?? OnRackEffect(mapping);
+
+    /// <summary>
+    /// The effect picked on the rack, which answers a knob exactly as a machine there does.
+    /// </summary>
+    /// <remarks>
+    /// The same reasoning, and it has to be the same or the two are not one thing: what is on the
+    /// rack is what you are working on, so a knob pointed at it moves it whether or not any track
+    /// happens to be playing through one. What it writes into is the bench the face is drawn on,
+    /// which is kept nowhere, since an effect in use is a slot on some track's chain and this is
+    /// the effect itself.
+    ///
+    /// A link names an id, so only one of the two branches can ever match: a machine's id is not
+    /// an effect's.
+    /// </remarks>
+    /// <param name="mapping">What the control was pointed at.</param>
+    private IControlTarget? OnRackEffect(ControlMapping mapping)
+    {
+        if (mapping.Key.Length == 0) return null;
+
+        if (_rack?.SelectedEffect is not { } picked) return null;
+
+        if (mapping.Machine.Length > 0
+            && !string.Equals(mapping.Machine, picked.Id, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (picked.Effect.Parameters.FirstOrDefault(one => one.Key == mapping.Key) is not { } parameter)
+            return null;
+
+        var values = picked.Values;
+
+        string said = parameter.Name.Length > 0 ? parameter.Name : parameter.Key;
+
+        return new Target(
+            picked.Name + " " + said + " on the rack",
+            parameter.Min,
+            parameter.Max,
+            () => values.Get(mapping.Key),
+            value => Written(values, mapping.Key, value),
+            this,
+            mapping,
+            parameter.Unit);
+    }
+
+    /// <summary>The machine open on the rack, which is the other half of the same question.</summary>
+    /// <param name="mapping">What the control was pointed at.</param>
+    private IControlTarget? OnRackMachine(ControlMapping mapping)
     {
         if (mapping.Key.Length == 0) return null;
         if (_rack?.Editor is not { } editor) return null;
@@ -433,18 +492,47 @@ public sealed class ControlTargets : IControlTargets
     /// <param name="track">The track it resolves against, which is the one in front of you.</param>
     private IControlTarget? OnDevice(ControlMapping mapping, int track) =>
         OnMachine(mapping, track)
-        ?? OnEffect(mapping, track, _tracker.InsertsOn(track))
+        ?? OnEffect(mapping, _tracker.InsertsOn(track), Named(track))
         ?? OnRack(mapping);
 
     /// <summary>
-    /// One of our effects on that track's chain, when that is what the mapping names.
+    /// One of ours on whichever chain has its face open in front, which beats everything.
+    /// </summary>
+    /// <remarks>
+    /// A link on one of ours names the effect and the key and never where it is standing, so
+    /// something has to say which EchoBox. The track you are working on is the answer while you
+    /// are working in the pattern and is the wrong answer the moment a face is open in a window,
+    /// which is exactly when a hand is reaching for a knob: a chain on the master follows no
+    /// cursor, a pad's chain is not on a track at all, and a track's own chain resolved against
+    /// whichever track an instrument window had last claimed.
+    ///
+    /// First, and it costs nothing to put it there: a machine's id is not an effect's, so the
+    /// machine branch and this one can never both match and the order between them decides
+    /// nothing.
+    /// </remarks>
+    /// <param name="mapping">What the control was pointed at.</param>
+    private IControlTarget? OnFront(ControlMapping mapping)
+    {
+        if (_front?.Shown is not { } shown) return null;
+
+        if (!string.Equals(shown.Id, mapping.Machine, StringComparison.OrdinalIgnoreCase)) return null;
+
+        return Reaching(mapping, shown.Id, shown.Where, shown.Values);
+    }
+
+    /// <summary>
+    /// One of our effects on a chain, when that is what the mapping names.
     /// </summary>
     /// <remarks>
     /// A link on one of ours names the effect's id and the parameter's key, the same two words a
     /// link on a machine names, because that is what travels: an id is the same id on everybody's
-    /// disc and a key is the effect's own. It says nothing about which track or which slot, so
-    /// the same link drives whichever EchoBox is on the track you are working on, which is the
-    /// rule every other link here keeps.
+    /// disc and a key is the effect's own. It says nothing about which chain or which slot, so
+    /// the same link drives whichever EchoBox is in front of you, which is the rule every other
+    /// link here keeps.
+    ///
+    /// Which chain that is has two answers and they are asked in this order: the one with a face
+    /// open in front, and then the chain of the track you are working on. See
+    /// <see cref="OnFront"/> for why the second alone was not enough.
     ///
     /// The first one of that effect on the chain, where somebody has put two on: what a knob was
     /// pointed at is the effect, and choosing between two of the same by counting would be a link
@@ -454,9 +542,13 @@ public sealed class ControlTargets : IControlTargets
     /// here, so the plugin path below is untouched.
     /// </remarks>
     /// <param name="mapping">What the control was pointed at.</param>
-    /// <param name="track">The track it resolves against, which is the one in front of you.</param>
-    /// <param name="chain">That track's chain.</param>
-    private IControlTarget? OnEffect(ControlMapping mapping, int track, PluginChain? chain)
+    /// <param name="chain">The chain to look through.</param>
+    /// <param name="where">
+    /// What that chain is called, for the sentence a status line prints: the track's name, the
+    /// master, or a pad. Taken rather than worked out here, since a chain is not always on a
+    /// track and only its owner knows what to call it.
+    /// </param>
+    private IControlTarget? OnEffect(ControlMapping mapping, PluginChain? chain, string where)
     {
         if (chain is null || mapping.Machine.Length == 0 || mapping.Key.Length == 0) return null;
 
@@ -466,24 +558,47 @@ public sealed class ControlTargets : IControlTargets
 
             if (!string.Equals(engine.Id, mapping.Machine, StringComparison.OrdinalIgnoreCase)) continue;
 
-            if (_effects?.For(engine.Id) is not { } effect) continue;
-
-            if (effect.Parameters.FirstOrDefault(one => one.Key == mapping.Key) is not { } parameter) continue;
-
-            string said = parameter.Name.Length > 0 ? parameter.Name : parameter.Key;
-
-            return new Target(
-                effect.Name + " " + said + " on " + Named(track),
-                parameter.Min,
-                parameter.Max,
-                () => engine.ValueOf(mapping.Key),
-                value => engine.SetValue(mapping.Key, value),
-                this,
-                mapping,
-                parameter.Unit);
+            return Reaching(mapping, engine.Id, where, new Tracker.Effects.EffectValues(engine));
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The knob itself, once which effect and which of its knobs have both been settled.
+    /// </summary>
+    /// <remarks>
+    /// One builder for both ways of arriving at a box, the face in front and the chain of the
+    /// track you are on, because everything after "which box" is the same question: does this
+    /// effect really have that parameter, what is it called, and what are its ends.
+    ///
+    /// Written through the values rather than into the engine, and that is not a detail. The
+    /// values are the object the face is reading, so a write that goes past them moves the sound
+    /// and leaves every knob on the screen where it was, which from a chair reads as a link that
+    /// was never made. It is the same door a machine's parameter is written through, and it is
+    /// the reason <see cref="Rack.Faces.Interfaces.IPanelValues.Said"/> exists.
+    /// </remarks>
+    /// <param name="mapping">What the control was pointed at.</param>
+    /// <param name="id">Which effect, by the id its manifest carries.</param>
+    /// <param name="where">What its chain is called, for the sentence a status line prints.</param>
+    /// <param name="values">What its knobs stand at, which the face is reading.</param>
+    private IControlTarget? Reaching(ControlMapping mapping, string id, string where, IPanelValues values)
+    {
+        if (_effects?.For(id) is not { } effect) return null;
+
+        if (effect.Parameters.FirstOrDefault(one => one.Key == mapping.Key) is not { } parameter) return null;
+
+        string said = parameter.Name.Length > 0 ? parameter.Name : parameter.Key;
+
+        return new Target(
+            effect.Name + " " + said + " on " + where,
+            parameter.Min,
+            parameter.Max,
+            () => values.Get(mapping.Key),
+            value => Written(values, mapping.Key, value),
+            this,
+            mapping,
+            parameter.Unit);
     }
 
     /// <summary>

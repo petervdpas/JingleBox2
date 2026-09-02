@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 using JingleBox2.Files.Interfaces;
 
 namespace JingleBox2.Files;
@@ -15,6 +17,21 @@ public sealed class SafeFile : ISafeFile
     /// which is the very thing being avoided.
     /// </remarks>
     private const string Suffix = ".writing";
+
+    /// <summary>Tells one write from another, so no two ever share a half-written file.</summary>
+    /// <remarks>
+    /// The name used to be the path and nothing else, which is one name for every writer. Two
+    /// threads at one path is not a corner: the settings are written from the drawing thread
+    /// whenever anything on a page moves and from the MIDI thread when a knob is learned or a
+    /// control's own behaviour is worked out. Sharing the name, the second writer could not
+    /// create the file, deleted it on its way out, and left the first with nothing to move into
+    /// place; the fallback then opened the real file and could leave that broken too. From
+    /// outside it is a settings file that occasionally loses whatever was last put in it.
+    ///
+    /// The process is in it as well as the count, since this same executable runs again as a
+    /// plugin's host and two processes counting from nought would agree.
+    /// </remarks>
+    private static int _writes;
 
     /// <summary>
     /// UTF-8 without the byte order mark.
@@ -73,7 +90,10 @@ public sealed class SafeFile : ISafeFile
 
         if (folder.Length > 0) Directory.CreateDirectory(folder);
 
-        return path + Suffix;
+        return path + Suffix
+               + Environment.ProcessId.ToString(CultureInfo.InvariantCulture)
+               + "-"
+               + Interlocked.Increment(ref _writes).ToString(CultureInfo.InvariantCulture);
     }
 
     /// <summary>Takes the half-written file away, in silence.</summary>

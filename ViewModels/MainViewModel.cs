@@ -74,6 +74,18 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     private readonly ControllerCodecs _codecs;
 
     /// <summary>
+    /// Which chain has a face of ours open in front, shared by everything that makes a chain
+    /// view and by the thing that resolves a link.
+    /// </summary>
+    /// <remarks>
+    /// One screen, one thing on the front of it. A link on one of our effects names the effect
+    /// and the key and never where it is standing, so this is what says which EchoBox: the
+    /// tracks' chain follows the cursor, the master's follows nothing, and a pad's is not on a
+    /// track at all, which is three ways for a track number to be the wrong answer.
+    /// </remarks>
+    private readonly Interfaces.IEffectInFront _effectInFront = new EffectInFront();
+
+    /// <summary>
     /// What a controller does before anybody has pointed it at anything.
     /// </summary>
     /// <remarks>
@@ -1313,7 +1325,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         var rack = new MachineRack();
 
         Tracker = new TrackerViewModel(
-            audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService, _effects);
+            audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService, _effects,
+            _effectInFront);
         Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
         MachineShelf = new MachineShelfViewModel(_machines);
@@ -1436,7 +1449,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
-        var targets = new ControlTargets(Tracker, _machines, Machines, new TransportPresses(Transport), _effects);
+        var targets = new ControlTargets(
+            Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront);
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
@@ -2045,7 +2059,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 PadColor = padCfg.Color
             };
 
-            pad.UsePlugins(Plugins, _effects);
+            pad.UsePlugins(Plugins, _effects, _effectInFront);
             pad.RestoreEffects(padCfg.Plugins);
 
             pad.PropertyChanged += OnPadChanged;

@@ -246,6 +246,20 @@ them: a link records the controller it was learned on, so A and B both drive mac
 neither displaces the other. That is also why picking a surface is usually a no-op, and why it is
 worth having anyway: it is the repair when a knob has been moved.
 
+**That paragraph was true of the design and false of the code.** A link is displaced by the same
+physical control being pointed somewhere else, or by something else being pointed at the same
+target, and the second test had no controller in it: pointing B at machine 1 deleted A's link on
+whatever it landed on, as it was learned, with nothing said. Both halves of the rule are about
+one controller now, which is `ControlLink.SameDesk`, and a link naming no controller is the
+wildcard it reads as everywhere else and is displaced by any of them.
+
+It cost twice, because a template here is the links themselves. The surfaces line lists what
+survived, so somebody with two boxes on the desk lost half a template and then found the repair
+was made out of the damage: four knobs learned on the Korg, two of them learned again on the
+Arturia, and the Korg's card came back saying two controls. Reported as both halves of one
+sentence, the CCs not being saved per hardware and the hamburger restoring only half the knobs.
+`Tests/ControlDeskTests.cs` is the rule.
+
 **The learn line is the keystroke and not a second way of doing it.** It turns over the same
 `ControlLink.IsLinking` and says which way it is about to turn it, since the menu is read again
 every time it opens and there is no other sign of the mode on a machine's face.

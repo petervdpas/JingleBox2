@@ -1,3 +1,4 @@
+using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Devices.Interfaces;
 
 namespace JingleBox2.Tracker.Interfaces;
@@ -24,6 +25,16 @@ public interface IRackProject : IDevice
 
     /// <summary>Bumped by whoever makes it, and shown beside the name wherever it is listed.</summary>
     string Version { get; }
+
+    /// <summary>
+    /// How its face is put together, which is what the library draws it from.
+    /// </summary>
+    /// <remarks>
+    /// Every device has one, laid out in the designer and carried in its manifest. A device whose
+    /// face has never been laid out has an empty one, which is a panel with nothing on it rather
+    /// than no panel at all: what to draw instead is the caller's decision and not the device's.
+    /// </remarks>
+    Panel Panel { get; }
 
     /// <summary>The folder it was read from, or empty for one that has never been saved.</summary>
     string Folder { get; }
