@@ -149,6 +149,17 @@
            behind that is a second frame around the first. -->
       <views:InstrumentPanel Grid.Column="2" IsVisible="{Binding ShowsMachine}" />
 
+      <!-- A tab with nothing on it says so, in the middle of the room the panel would have had.
+           Left to itself the page went on showing whatever was last drawn, so taking the last
+           effect out of the registry left a machine standing beside an empty effects list. -->
+      <TextBlock Grid.Column="2" Classes="cardHint"
+                 IsVisible="{Binding ShowsNothing}"
+                 Text="{Binding NothingSaid}"
+                 TextAlignment="Center"
+                 TextWrapping="Wrap"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center" />
+
       <!-- And the same room again for an effect, which is not an instrument and has no editor
            behind it: what is drawn is the effect's own face, and what its knobs are standing at
            here is a demonstration kept nowhere. It is worth drawing all the same, because this is

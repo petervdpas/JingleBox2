@@ -305,10 +305,35 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// Both, and not either: an effect picked on a tab nobody is looking at is not what is in
     /// front of you, and an effects tab with nothing picked has nothing to draw.
     /// </remarks>
-    public bool ShowsEffect => RackTab == 1 && SelectedEffect is not null;
+    public bool ShowsEffect => RackTab == EffectsTab && SelectedEffect is not null;
 
     /// <summary>And true when it is a machine's own panel, which is what it always was.</summary>
-    public bool ShowsMachine => !ShowsEffect;
+    public bool ShowsMachine => RackTab == MachinesTab && Selected is not null;
+
+    /// <summary>
+    /// True when the tab in front has nothing on it, which is a thing to say rather than a hole.
+    /// </summary>
+    /// <remarks>
+    /// It used to fall back to whatever was last drawn, so taking the last effect out of the
+    /// registry left a machine's panel standing beside an empty effects list, which reads as the
+    /// list being broken rather than as the list being empty.
+    /// </remarks>
+    public bool ShowsNothing => !ShowsEffect && !ShowsMachine;
+
+    /// <summary>What to say when there is nothing to draw, in the words of the tab in front.</summary>
+    /// <remarks>
+    /// Two sentences: what is not there, and where it is added. SETTINGS, System is the answer to
+    /// both, since a box on the rack is a box this installation has registered.
+    /// </remarks>
+    public string NothingSaid => RackTab == EffectsTab
+        ? "No effects registered.\nSETTINGS, System is where effects are added."
+        : "No machines registered.\nSETTINGS, System is where machines are added.";
+
+    /// <summary>Which tab is which, written out rather than counted at each use.</summary>
+    private const int MachinesTab = 0;
+
+    /// <inheritdoc cref="MachinesTab"/>
+    private const int EffectsTab = 1;
 
     /// <summary>Told when the tab moved, so the page draws the other world.</summary>
     /// <param name="value">Which tab is now in front.</param>
@@ -323,6 +348,8 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     {
         OnPropertyChanged(nameof(ShowsEffect));
         OnPropertyChanged(nameof(ShowsMachine));
+        OnPropertyChanged(nameof(ShowsNothing));
+        OnPropertyChanged(nameof(NothingSaid));
     }
 
     /// <summary>A machine's own box, under the id that says whose it is.</summary>
@@ -542,6 +569,8 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     {
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanRename));
+
+        Shown();
 
         Flush();
 

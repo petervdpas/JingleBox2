@@ -364,6 +364,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   a machine. What kept its name is what only the instrument world has: `MachineWindow`,
   `MachineShelfViewModel`, `MachinePresetDesk`, `MissingMachineDialog`, `MachineRack`,
   `MachineProject`, and the preview parts for a kit, a keyboard, zones and slices
+- **A rack tab with nothing on it says so, in the middle of the room the panel would have had.**
+  It used to fall back to whatever was drawn last, so taking the last effect out of the registry
+  left a machine's panel standing beside an empty effects list, which reads as the list being
+  broken rather than as the list being empty. Two sentences: what is not there, and that SETTINGS,
+  System is where it is added
 - **An effect is picked on the rack and its face is drawn beside the list**, in its own colours,
   with its own Menu in the corner. It is not an instrument and has no editor behind it: what its
   knobs stand at there is a bench kept nowhere, since an effect in use is a slot on some track's
