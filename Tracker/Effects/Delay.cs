@@ -134,14 +134,24 @@ public sealed class Delay : IEffectEngine
     /// hundred kilobytes.
     /// </remarks>
     /// <param name="sampleRate">What the mix is running at, since a time is in milliseconds.</param>
-    public Delay(int sampleRate)
+    /// <param name="id">Which effect this one is standing for, or nothing outside the application.</param>
+    public Delay(int sampleRate, string? id = null)
     {
+        Id = id ?? "";
+
         _rate = sampleRate > 0 ? sampleRate : 48000;
         _room = (int)(MostMs * 0.001 * _rate) + 2;
         _line = new float[_room * 2];
         _now = Frames(TimeThen);
         _glide = 1.0 / Math.Max(1, GlideMs * 0.001 * _rate);
     }
+
+    /// <inheritdoc/>
+    public string Id { get; }
+
+    /// <inheritdoc/>
+    public System.Collections.Generic.IReadOnlyList<string> Keys { get; } =
+        new[] { Time, Feedback, Damp, Mix };
 
     /// <summary>That many milliseconds as frames, held inside the line.</summary>
     /// <param name="ms">The time in milliseconds.</param>

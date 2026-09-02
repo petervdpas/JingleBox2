@@ -14,6 +14,9 @@ public sealed class EffectWorld : IDesignWorld
     /// <summary>Who unpacks and copies effects, since an effect's folder travels.</summary>
     private readonly IRackArchive<EffectProject> _crates;
 
+    /// <summary>The effects folder on disc, which is where a browse starts.</summary>
+    private readonly IRackRegistry<EffectProject> _registry = new EffectRegistry();
+
     /// <summary>Takes the archive, or the ordinary one.</summary>
     /// <param name="crates">Who carries and zips an effect's folder.</param>
     public EffectWorld(IRackArchive<EffectProject>? crates = null) => _crates = crates ?? new EffectArchive();
@@ -23,6 +26,9 @@ public sealed class EffectWorld : IDesignWorld
 
     /// <inheritdoc/>
     public string ManifestName => EffectProject.ManifestName;
+
+    /// <inheritdoc/>
+    public string Installed => _registry.Installed;
 
     /// <inheritdoc/>
     public IDesignProject New() => new EffectProject

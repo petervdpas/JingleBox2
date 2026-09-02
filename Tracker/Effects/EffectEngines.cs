@@ -21,10 +21,10 @@ public sealed class EffectEngines : IEffectEngines
     /// make is worth being able to read, and an engine that arrives by being discovered is one
     /// nobody can find by looking.
     /// </remarks>
-    private static readonly Dictionary<string, Func<int, int, IEffectEngine>> Built =
+    private static readonly Dictionary<string, Func<string, int, int, IEffectEngine>> Built =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            [EchoBox] = (rate, _) => new Delay(rate),
+            [EchoBox] = (id, rate, _) => new Delay(rate, id),
         };
 
     /// <summary>
@@ -42,5 +42,5 @@ public sealed class EffectEngines : IEffectEngines
 
     /// <inheritdoc/>
     public IEffectEngine? Make(string? id, int sampleRate, int maxFrames) =>
-        id is { Length: > 0 } && Built.TryGetValue(id, out var make) ? make(sampleRate, maxFrames) : null;
+        id is { Length: > 0 } && Built.TryGetValue(id, out var make) ? make(id, sampleRate, maxFrames) : null;
 }

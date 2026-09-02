@@ -43,9 +43,16 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// What SETTINGS scanned, which is what the plus button offers. Shared rather than scanned
     /// again here: a scan opens every plugin library it finds and is not a thing to do twice.
     /// </param>
-    public PluginChainViewModel(PluginLibraryViewModel plugins)
+    /// <param name="effects">What effects of ours this installation has, or nothing.</param>
+    /// <param name="engines">Which of them this build can make. Left out, the real list.</param>
+    public PluginChainViewModel(
+        PluginLibraryViewModel plugins,
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+        Tracker.Effects.Interfaces.IEffectEngines? engines = null)
     {
         Plugins = plugins;
+        _effects = effects;
+        _engines = engines ?? new Tracker.Effects.EffectEngines();
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };
         _poll.Tick += (_, _) => Poll();
@@ -80,15 +87,36 @@ public sealed partial class PluginChainViewModel : ObservableObject
         {
             if (!device.IsOpen) continue;
 
-            foreach (var parameter in device.Readouts) parameter.Refresh();
+            if (device is PluginDeviceViewModel plugin)
+            {
+                foreach (var parameter in plugin.Readouts) parameter.Refresh();
+            }
         }
     }
 
     /// <summary>Everything installed, as scanned in SETTINGS.</summary>
     public PluginLibraryViewModel Plugins { get; }
 
+    /// <summary>What effects of ours this installation has, which the plus offers first.</summary>
+    /// <remarks>
+    /// Ours before somebody else's, deliberately: this list is short and known, and a plugin
+    /// list can run to hundreds. Nothing at all when there are none, which is what the tab in
+    /// SETTINGS is for.
+    /// </remarks>
+    public System.Collections.Generic.IReadOnlyList<Tracker.Effects.EffectProject> Ours =>
+        _effects?.All ?? System.Array.Empty<Tracker.Effects.EffectProject>();
+
+    /// <summary>True when there is one of ours to offer, so the list can be left out.</summary>
+    public bool HasOurs => Ours.Count > 0;
+
+    /// <summary>What effects of ours this installation has, or nothing when none were read.</summary>
+    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+
+    /// <summary>Which of them this build can actually make.</summary>
+    private readonly Tracker.Effects.Interfaces.IEffectEngines _engines;
+
     /// <summary>The boxes in this chain, in the order the audio goes through them.</summary>
-    public ObservableCollection<PluginDeviceViewModel> Devices { get; } = new();
+    public ObservableCollection<IChainDevice> Devices { get; } = new();
 
     /// <summary>
     /// What this view is pointed at, which is where the chain really lives.
@@ -124,11 +152,51 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// Adds a plugin to the end of the chain, which is what the plus button does.
     /// </summary>
     /// <remarks>
-    /// Always enabled: whether the plugin can actually go on is decided in <see cref="Add"/>,
+    /// Always enabled: whether the plugin can actually go on is decided in <see cref="Add(PluginInfo)"/>,
     /// which can say why on the strip. A greyed-out plus with no reason beside it would be
     /// worse.
     /// </remarks>
     public IRelayCommand<PluginInfo> AddCommand => new RelayCommand<PluginInfo>(Add);
+
+    /// <summary>Adds one of ours to the end of the chain, which is the other half of the plus.</summary>
+    public IRelayCommand<Tracker.Effects.EffectProject> AddOursCommand =>
+        new RelayCommand<Tracker.Effects.EffectProject>(Add);
+
+    /// <summary>
+    /// Puts one of our effects on the end of the chain.
+    /// </summary>
+    /// <remarks>
+    /// The same act as adding a plugin and a good deal less to go wrong: the engine is in this
+    /// process, it cannot fail to load, it has no window of its own to crash in, and it is built
+    /// for the host's own rate because that is the rate of the audio it is about to be handed.
+    ///
+    /// An id this build has no engine for is refused with a reason rather than added as a box
+    /// that passes the audio through, which is the same gate the rack keeps.
+    /// </remarks>
+    /// <param name="effect">Which effect, as the registry read it off the disc.</param>
+    public void Add(Tracker.Effects.EffectProject? effect)
+    {
+        if (effect == null || Target == null) return;
+
+        if (_engines.Make(effect.Id, Target.SampleRate, MaxFrames) is not { } engine)
+        {
+            Status = $"'{effect.Name}' has no engine in this version";
+            return;
+        }
+
+        foreach (var parameter in effect.Parameters) engine.SetValue(parameter.Key, parameter.Default);
+
+        AboutTo();
+
+        var device = Target.Chain.Add(engine);
+
+        Devices.Add(new EffectDeviceViewModel(this, effect, engine, device));
+
+        NotifyChanged();
+
+        Status = "";
+        OnPropertyChanged(nameof(IsEmpty));
+    }
 
     /// <summary>Shows the new host's chain, without touching either host's audio.</summary>
     partial void OnTargetChanged(IChainOwner? value)
@@ -196,7 +264,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// apart. Then its own interface goes, before the plugin does: a plugin drawing into a
     /// window that has already been disposed is a crash inside its own toolkit.
     /// </remarks>
-    public void Remove(PluginDeviceViewModel device)
+    public void Remove(IChainDevice device)
     {
         if (Target == null) return;
 
@@ -207,8 +275,11 @@ public sealed partial class PluginChainViewModel : ObservableObject
         Target.Chain.Remove(device.Device);
         Devices.Remove(device);
 
-        device.Panel.Close();
-        device.Effect.Dispose();
+        if (device is PluginDeviceViewModel plugin)
+        {
+            plugin.Panel.Close();
+            plugin.Effect.Dispose();
+        }
 
         if (Devices.Count == 0) _poll.Stop();
 
@@ -226,7 +297,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// </remarks>
     /// <param name="device">The row being moved, which carries the chain entry the audio order is kept in.</param>
     /// <param name="offset">Minus one for earlier in the chain, plus one for later.</param>
-    public void Move(PluginDeviceViewModel device, int offset)
+    public void Move(IChainDevice device, int offset)
     {
         if (Target == null) return;
         if (!Target.Chain.Move(device.Device, offset)) return;
@@ -258,7 +329,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// removed, because a window belonging to the track you have just left is a window over
     /// somebody else's plugin.
     /// </remarks>
-    public event System.Action<PluginDeviceViewModel>? DeviceClosing;
+    public event System.Action<IChainDevice>? DeviceClosing;
 
     /// <summary>
     /// Raised before the chain is about to gain or lose a plugin.
@@ -355,9 +426,18 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         foreach (var device in Target.Chain.Devices)
         {
-            if (device.Insert is not IPluginEffect effect) continue;
+            if (device.Insert is IPluginEffect effect)
+            {
+                Devices.Add(new PluginDeviceViewModel(this, effect, device));
 
-            Devices.Add(new PluginDeviceViewModel(this, effect, device));
+                continue;
+            }
+
+            if (device.Insert is not Tracker.Effects.Interfaces.IEffectEngine engine) continue;
+
+            if (_effects?.For(engine.Id) is not { } ours) continue;
+
+            Devices.Add(new EffectDeviceViewModel(this, ours, engine, device));
         }
 
         if (Devices.Count > 0) _poll.Start();

@@ -37,6 +37,8 @@ public partial class MachineWindow : Window
         InitializeComponent();
 
         LinkKey.Listen(this);
+
+        DeckKeys.Listen(this);
     }
 
     /// <summary>

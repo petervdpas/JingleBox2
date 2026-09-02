@@ -15,6 +15,9 @@ public sealed class MachineWorld : IDesignWorld
     /// <summary>Who unpacks and copies machines, since a machine's folder travels.</summary>
     private readonly IRackArchive<MachineProject> _crates;
 
+    /// <summary>The machines folder on disc, which is where a browse starts.</summary>
+    private readonly IRackRegistry<MachineProject> _registry = new MachineRegistry();
+
     /// <summary>Takes the archive, or the ordinary one.</summary>
     /// <param name="crates">Who carries and zips a machine's folder.</param>
     public MachineWorld(IRackArchive<MachineProject>? crates = null) => _crates = crates ?? new MachineArchive();
@@ -24,6 +27,9 @@ public sealed class MachineWorld : IDesignWorld
 
     /// <inheritdoc/>
     public string ManifestName => MachineProject.ManifestName;
+
+    /// <inheritdoc/>
+    public string Installed => _registry.Installed;
 
     /// <inheritdoc/>
     public IDesignProject New() => new MachineProject

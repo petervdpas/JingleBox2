@@ -70,9 +70,11 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     public PluginChainViewModel? Effect { get; private set; }
 
     /// <summary>Gives this pad its effect chain, pointed at itself.</summary>
-    public void UsePlugins(PluginLibraryViewModel plugins)
+    /// <param name="plugins">Everything installed, as scanned in SETTINGS.</param>
+    /// <param name="effects">What effects of ours this installation has, which the plus offers first.</param>
+    public void UsePlugins(PluginLibraryViewModel plugins, Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
-        Effect = new PluginChainViewModel(plugins) { Target = new PadPluginTarget(_audio, Index) };
+        Effect = new PluginChainViewModel(plugins, effects) { Target = new PadPluginTarget(_audio, Index) };
         Effect.Changed += OnEffectChanged;
 
         OnPropertyChanged(nameof(Effect));

@@ -115,6 +115,9 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// <summary>Whether this world has a presets page at all.</summary>
     public bool ShowsPresets => _world.HasPresets;
 
+    /// <summary>Where this world keeps what this installation has, which is where a browse starts.</summary>
+    public string Home => _world.Installed;
+
     /// <summary>Whether this world can be written out as a zip for somebody else.</summary>
     public bool ShowsExport => _world.Exports;
 

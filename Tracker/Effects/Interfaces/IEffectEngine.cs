@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using JingleBox2.Audio.Plugins.Interfaces;
 
 namespace JingleBox2.Tracker.Effects.Interfaces;
@@ -23,6 +24,30 @@ namespace JingleBox2.Tracker.Effects.Interfaces;
 /// </remarks>
 public interface IEffectEngine : IAudioInsert
 {
+    /// <summary>
+    /// Which effect this is one of, by the id its manifest carries.
+    /// </summary>
+    /// <remarks>
+    /// The engine is not the effect: a face is a face over an engine, and one engine may one day
+    /// be behind several faces, so what an instance is standing for is told to it when it is
+    /// made rather than known by the class. It is what a chain writes down and what says whose
+    /// face to draw over it.
+    ///
+    /// Empty for one built by hand, which is a test and nothing else.
+    /// </remarks>
+    string Id { get; }
+
+    /// <summary>
+    /// Every parameter this engine has, by key.
+    /// </summary>
+    /// <remarks>
+    /// So a chain can be written down without the face: what is saved is the effect's id and
+    /// what its knobs were at, and the knobs are the engine's own business. A face names the
+    /// same keys, since that is how a control on it says what it turns, but a song saved with an
+    /// effect whose folder has since gone still holds what it was set to.
+    /// </remarks>
+    IReadOnlyList<string> Keys { get; }
+
     /// <summary>Where that parameter is standing, or nought for one this effect has not got.</summary>
     /// <param name="key">The parameter's own word, as its manifest names it.</param>
     double ValueOf(string? key);

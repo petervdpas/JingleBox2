@@ -22,6 +22,17 @@ public interface IDesignWorld
     /// <summary>What the file at the top of one of these folders is called.</summary>
     string ManifestName { get; }
 
+    /// <summary>
+    /// Where this installation keeps the ones it has, which is where a browse starts.
+    /// </summary>
+    /// <remarks>
+    /// Opening one is not opening a file: the system offers wherever you last were, which after
+    /// an afternoon of anything else is a folder with none of these in it. It starts here
+    /// instead, and here is not the same folder for the two worlds, which is what this exists to
+    /// say.
+    /// </remarks>
+    string Installed { get; }
+
     /// <summary>A fresh one, with an id of its own and a name saying it is new.</summary>
     /// <remarks>
     /// The id is made here and never typed, and it is not one this build has an engine for: a

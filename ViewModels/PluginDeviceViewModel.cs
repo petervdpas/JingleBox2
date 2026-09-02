@@ -15,7 +15,7 @@ namespace JingleBox2.ViewModels;
 /// else, and this holds neither. What it does own is the panel, which is built here so that
 /// closing a window and opening it again shows the same one.
 /// </remarks>
-public sealed partial class PluginDeviceViewModel : ObservableObject
+public sealed partial class PluginDeviceViewModel : ObservableObject, Interfaces.IChainDevice
 {
     /// <summary>The chain this box is in, which is what a bypass or a move has to be told.</summary>
     private readonly PluginChainViewModel _chain;

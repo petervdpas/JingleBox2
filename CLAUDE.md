@@ -364,6 +364,51 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   a machine. What kept its name is what only the instrument world has: `MachineWindow`,
   `MachineShelfViewModel`, `MachinePresetDesk`, `MissingMachineDialog`, `MachineRack`,
   `MachineProject`, and the preview parts for a kit, a keyboard, zones and slices
+- **The transport answers its two keys on every window, not only on the main one.** Space and
+  Ctrl+R were handled by the main window's own key handler, so opening anything else stopped them
+  working: a machine's panel, an effect off a chain, a plugin's window. A transport that stops
+  because you opened a knob is a transport nobody can trust. `Views/DeckKeys.cs` is that door, one
+  deck for the application the way `LinkKey` is one gesture and the log is one file, hung on every
+  window that opens. The rule is `DeckKeys.Wants`, which has no window in it: which key, what was
+  held with it, and whether the keyboard is somewhere a key means something else, since a space in
+  a name is a space. Named for the deck because `ITransportKeys` is already the four words a
+  control surface sends, and two things with nearly the same name is how two things come to be
+  mistaken for each other
+- **The pointing gesture works on an effect's face, and had to be told twice to.** The window
+  answers Ctrl+Shift+M like every other window, and the face says it is there through
+  `LinkKey.Watch`, since the gate counts views that allow pointing and a face nobody counted left
+  the gesture dead. Then the face has to be told the mode is on, or the mode is on and nothing on
+  the screen says so: `ShowLinks` is the same three lines a machine's panel has, hung on the
+  window's own opening rather than on the visual tree, which a window is the root of. What is
+  offered reads `link: offering Insert EchoBox time (machine 'effect.echobox' key 'time')`
+- **An effect of ours goes on a track's chain and on a pad's, beside the plugins.** The plus
+  offers ours first, since that list is short and known and a plugin list runs to hundreds. What
+  it puts on is the engine itself: in this process, nothing to load, no window of somebody else's
+  to embed, and built for the host's own rate because that is the rate of the audio it is about to
+  be handed. `IChainDevice` is the block both kinds draw as, named in XAML for the reason
+  `IRackRow` is: a compiled binding needs a type and a block drawn twice would be two templates
+  drifting apart
+- **A chain entry says which world its box came out of, and absent means plugin.**
+  `PluginDeviceConfig.Effect` is the effect's own id and nothing else is written: no path, since
+  it is not a file on this computer, and no state lump, since everything it holds is in its
+  parameters. Every chain already on somebody's disc has no such field and is read as what it was.
+  An effect this build has no engine for is named rather than passed over, the same as a missing
+  plugin, and the rest of the chain still loads
+- **`IEffectEngine` answers three questions a chain asks of anything on it**: which effect it is
+  standing for, what it can be set to, and where each of those stands. The id is told to it when
+  it is made rather than known by the class, because a face is a face over an engine and one
+  engine may one day be behind several faces. The keys are the engine's own, so a song can be
+  written down without the face: what a chain holds is an id and a handful of numbers
+- **A knob is pointed at one of ours on a chain, and the link names the effect and the key.**
+  Not the slot and not the track: the same two words a machine link uses, for the same reason,
+  which is that both travel. So one link drives whichever EchoBox is on the track you are working
+  on, and a template made on one installation means the same thing on another. The face is offered
+  from three places now, all of them the same panel: the rack, the effect's own window off the
+  chain, and the designer's preview
+- **A value written and read back is not the same number**, which cost a test. An engine keeps its
+  knobs in single words, so a double set twice reads back a hair different and the panel announced
+  every write as a change. `EffectValues` narrows both sides before comparing, which says exactly
+  what it means: whether this would move anything at all
 - **A rack tab with nothing on it says so, in the middle of the room the panel would have had.**
   It used to fall back to whatever was drawn last, so taking the last effect out of the registry
   left a machine's panel standing beside an empty effects list, which reads as the list being

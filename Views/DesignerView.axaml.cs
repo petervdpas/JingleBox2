@@ -7,9 +7,7 @@ using System.IO;
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
-using JingleBox2.Tracker.Machines;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -28,10 +26,6 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
-
-    /// <summary>The machines folder on disc.</summary>
-    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
 
     /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;
@@ -231,7 +225,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     {
         if (Editor is not { } editor) return;
 
-        string? folder = await PickFolder("Open a machine");
+        string? folder = await PickFolder("Open a " + editor.Word);
 
         if (folder != null) editor.Open(folder);
     }
@@ -336,7 +330,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
             return;
         }
 
-        string? folder = await PickFolder("Where to keep this machine");
+        string? folder = await PickFolder("Where to keep this " + editor.Word);
 
         if (folder != null) editor.Save(folder);
     }
@@ -362,7 +356,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     {
         if (Editor is not { CanExport: true } editor || editor.Project == null) return;
 
-        string? folder = await PickFolder("Where to keep this machine from now on");
+        string? folder = await PickFolder("Where to keep this " + editor.Word + " from now on");
 
         if (folder == null) return;
 
@@ -852,10 +846,11 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// Asks for a folder, starting where the machines are rather than where the system was last.
     /// </summary>
     /// <remarks>
-    /// Opening a machine is not opening a file. The system offers wherever you last were, which
-    /// after an afternoon of anything else is a folder with no machines in it and three levels
-    /// to climb out of. So it starts beside the machine already open, which is the folder the
-    /// others are in, and at the installed machines when there is none.
+    /// Opening one is not opening a file. The system offers wherever you last were, which after
+    /// an afternoon of anything else is a folder with none of these in it and three levels to
+    /// climb out of. So it starts beside the one already open, which is the folder its
+    /// neighbours are in, and at this world's own installed folder when there is none: the
+    /// effects tab starts in the effects, which is what the world is asked for.
     ///
     /// Where the machine landed is remembered, so a second machine opened out of somebody else's
     /// folder does not send you back to this one.
@@ -888,7 +883,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// </remarks>
     private async System.Threading.Tasks.Task<IStorageFolder?> Among(IStorageProvider storage)
     {
-        foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Registry.Installed })
+        foreach (string? home in new[] { Beside(Editor?.Folder), _lastHome, Editor?.Home })
         {
             if (home is not { Length: > 0 } || !Directory.Exists(home)) continue;
 

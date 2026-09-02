@@ -33,11 +33,11 @@ public partial class PluginStrip : UserControl
 
         DataContextChanged += (_, _) =>
         {
-            if (_chain != null) _chain.DeviceClosing -= PluginWindow.CloseFor;
+            if (_chain != null) _chain.DeviceClosing -= Closing;
 
             _chain = DataContext as PluginChainViewModel;
 
-            if (_chain != null) _chain.DeviceClosing += PluginWindow.CloseFor;
+            if (_chain != null) _chain.DeviceClosing += Closing;
         };
     }
 
@@ -126,9 +126,30 @@ public partial class PluginStrip : UserControl
     private void OnOpenDevice(object? sender, RoutedEventArgs e)
     {
         if (sender is not Control control) return;
-        if (control.DataContext is not PluginDeviceViewModel device) return;
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
-        PluginWindow.Show(device, owner);
+        if (control.DataContext is PluginDeviceViewModel plugin)
+        {
+            PluginWindow.Show(plugin, owner);
+
+            return;
+        }
+
+        if (control.DataContext is EffectDeviceViewModel ours) EffectWindow.Show(ours, owner);
+    }
+
+    /// <summary>
+    /// Shuts whatever window a box has, for the box going out of the chain.
+    /// </summary>
+    /// <remarks>
+    /// Either kind: a plugin's window is somebody else's interface embedded in ours and one of
+    /// ours is a panel, and both have to go before the thing behind them does.
+    /// </remarks>
+    /// <param name="device">The box on its way out.</param>
+    private static void Closing(ViewModels.Interfaces.IChainDevice device)
+    {
+        PluginWindow.CloseFor(device);
+
+        EffectWindow.CloseFor(device);
     }
 }

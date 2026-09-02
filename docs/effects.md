@@ -242,9 +242,11 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
    Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
    thrown out exactly as a machine is, through the same archive and the same page. What is left of
-   this step is the chain: putting one on a track, writing it into the song and reading it back,
-   bypass through the new part, and pointing a controller or a lane at it. The rack showing an
-   effect's face waits on that too, since a knob pointed at one has to have somewhere to land.
+   this step is **done** as well: the plus on a track's chain and on a pad's offers ours first,
+   the block reads like any other, its own window draws the face, the song writes down the
+   effect's id and what its knobs were at, and a knob pointed at one resolves against the chain
+   in front of you. What is left of the step is the footswitch, which is bypass as a part on the
+   face rather than the power button on the block, and a lane over the pattern.
 5. **The other five engines.**
 
 ## Still open

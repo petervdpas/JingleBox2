@@ -35,11 +35,41 @@ public partial class RackView : UserControl
 
         EffectFace.LinkWanted += Offer;
 
+        LinkKey.Watch(EffectFace);
+
+        AttachedToVisualTree += (_, _) =>
+        {
+            if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
+
+            ShowLinks();
+        };
+
+        DetachedFromVisualTree += (_, _) =>
+        {
+            if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
+        };
+
         DataContextChanged += (_, _) => Watch();
     }
 
     /// <summary>The rack this page is showing, or nothing before it has one.</summary>
     private RackViewModel? Rack => DataContext as RackViewModel;
+
+
+    /// <summary>Tells the face what mode the pointer is in and what is already pointed at.</summary>
+    /// <remarks>
+    /// The same three things a machine's panel is told, and told the same way: the glow over a
+    /// control is how somebody knows the gesture is live and which controls already have
+    /// something on them. Without it the mode is on and nothing on the screen says so.
+    /// </remarks>
+    private void ShowLinks()
+    {
+        var link = Midi.ControlLink.Current;
+
+        EffectFace.Linking = link?.IsLinking ?? false;
+
+        EffectFace.Linked = link is null || Rack?.SelectedEffect is not { } effect ? null : link.KeysOn(effect.Id);
+    }
 
     /// <summary>Follows the picked effect, so the face is painted in that effect's colours.</summary>
     private void Watch()
@@ -48,7 +78,11 @@ public partial class RackView : UserControl
 
         rack.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(RackViewModel.SelectedEffect)) Retint();
+            if (e.PropertyName is not nameof(RackViewModel.SelectedEffect)) return;
+
+            Retint();
+
+            ShowLinks();
         };
 
         Retint();

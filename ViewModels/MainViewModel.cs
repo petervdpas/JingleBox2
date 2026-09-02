@@ -1312,7 +1312,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         var rack = new MachineRack();
 
-        Tracker = new TrackerViewModel(audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService);
+        Tracker = new TrackerViewModel(
+            audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService, _effects);
         Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
         MachineShelf = new MachineShelfViewModel(_machines);
@@ -1435,7 +1436,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
-        var targets = new ControlTargets(Tracker, _machines, Machines, new TransportPresses(Transport));
+        var targets = new ControlTargets(Tracker, _machines, Machines, new TransportPresses(Transport), _effects);
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
@@ -2044,7 +2045,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 PadColor = padCfg.Color
             };
 
-            pad.UsePlugins(Plugins);
+            pad.UsePlugins(Plugins, _effects);
             pad.RestoreEffects(padCfg.Plugins);
 
             pad.PropertyChanged += OnPadChanged;

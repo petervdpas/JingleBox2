@@ -42,6 +42,14 @@ namespace JingleBox2.ViewModels;
 /// </remarks>
 public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudition, ITrackerPanel, ITransportDeck, Midi.Interfaces.IPlaysNotes, Shortcuts.Interfaces.IShortcutContext
 {
+    /// <summary>What effects of ours this installation has, for the chains under the pattern.</summary>
+    /// <remarks>
+    /// Handed down rather than read here: the rack's Effects tab, the shelf in SETTINGS and every
+    /// chain in the song are views of one list, and an effect added in SETTINGS has to show on
+    /// the plus without anybody restarting.
+    /// </remarks>
+    private Tracker.Effects.Interfaces.IEffectProjects? Ours { get; }
+
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
@@ -877,6 +885,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <param name="configStore">Where a preference is written down. Null in a test.</param>
     /// <param name="config">The settings as they stand. Null in a test.</param>
     /// <param name="plugins">The plugin library, shared with the pads. One is made if none is given.</param>
+    /// <param name="effects">What effects of ours this installation has, for the chains.</param>
     /// <param name="waveforms">What draws a recording's shape. Null draws a flat line.</param>
     /// <param name="machines">
     /// The machines this run has, the one instance everything shares. Required rather than
@@ -891,9 +900,11 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         ConfigStore? configStore = null,
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
-        IWaveformService? waveforms = null)
+        IWaveformService? waveforms = null,
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
+        Ours = effects;
         _waveforms = waveforms;
 
         Edits.Watching = History.Taking;
@@ -901,10 +912,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         _configStore = configStore;
         _config = config;
         Plugins = plugins ?? new PluginLibraryViewModel();
-        TrackEffect = new PluginChainViewModel(Plugins);
+        TrackEffect = new PluginChainViewModel(Plugins, Ours);
         TrackEffect.Changed += MarkDirty;
 
-        MasterEffect = new PluginChainViewModel(Plugins)
+        MasterEffect = new PluginChainViewModel(Plugins, Ours)
         {
             Nothing = "No effect across the mix yet."
         };

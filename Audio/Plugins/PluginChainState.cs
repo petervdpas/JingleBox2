@@ -10,6 +10,20 @@ namespace JingleBox2.Audio.Plugins;
 /// <summary>One saved effect: which plugin, whether it was switched off, and its settings.</summary>
 public sealed class PluginDeviceConfig
 {
+    /// <summary>
+    /// Which effect of ours this is, or empty for somebody else's plugin.
+    /// </summary>
+    /// <remarks>
+    /// The one field that says which of the two worlds a box on the chain came out of, and it is
+    /// the id off the effect's own manifest: the same id the rack registers, the same one a
+    /// template names, and the only name that is the same on everybody's disc.
+    ///
+    /// Absent from every chain saved before effects existed, which reads back as a plugin, and
+    /// that is what those were.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Effect { get; set; } = "";
+
     /// <summary>The file it came from. Found again by id first, since a path moves.</summary>
     public string Path { get; set; } = "";
 
@@ -78,6 +92,7 @@ public sealed class PluginChainConfig
         {
             copy.Devices.Add(new PluginDeviceConfig
             {
+                Effect = device.Effect,
                 Path = device.Path,
                 Id = device.Id,
                 Format = device.Format,
@@ -114,6 +129,9 @@ public sealed class PluginChainState : IPluginChainState
     /// <summary>The one place that knows both plugin standards. Holds nothing, so one is enough.</summary>
     private readonly IPluginHost _plugins = new PluginHost();
 
+    /// <summary>Which effects of ours this build can make, for the boxes that are not plugins.</summary>
+    private readonly Tracker.Effects.Interfaces.IEffectEngines _engines = new Tracker.Effects.EffectEngines();
+
     /// <inheritdoc/>
     public PluginChainConfig Capture(PluginChain? chain, bool patches = false)
     {
@@ -122,6 +140,13 @@ public sealed class PluginChainState : IPluginChainState
 
         foreach (var device in chain.Devices)
         {
+            if (device.Insert is Tracker.Effects.Interfaces.IEffectEngine ours)
+            {
+                config.Devices.Add(Written(ours, device));
+
+                continue;
+            }
+
             if (device.Insert is not IPluginEffect effect) continue;
 
             var saved = new PluginDeviceConfig
@@ -145,6 +170,31 @@ public sealed class PluginChainState : IPluginChainState
         }
 
         return config;
+    }
+
+    /// <summary>
+    /// One of ours written down: which effect it is, and what its knobs were at.
+    /// </summary>
+    /// <remarks>
+    /// No path and no state lump. An effect of ours is not a file somewhere on this computer, it
+    /// is a box this installation has registered, and everything it holds is in its parameters.
+    /// </remarks>
+    /// <param name="engine">The effect that is running.</param>
+    /// <param name="device">Its place in the chain, which is what carries the bypass.</param>
+    private static PluginDeviceConfig Written(
+        Tracker.Effects.Interfaces.IEffectEngine engine,
+        PluginChain.Device device)
+    {
+        var saved = new PluginDeviceConfig
+        {
+            Effect = engine.Id,
+            Name = engine.Id,
+            Bypassed = device.Bypassed
+        };
+
+        foreach (string key in engine.Keys) saved.Parameters[key] = engine.ValueOf(key);
+
+        return saved;
     }
 
     /// <inheritdoc/>
@@ -180,6 +230,22 @@ public sealed class PluginChainState : IPluginChainState
 
         foreach (var saved in config.Devices)
         {
+            if (saved.Effect is { Length: > 0 })
+            {
+                if (_engines.Make(saved.Effect, sampleRate, maxFrames) is not { } engine)
+                {
+                    missing.Add(saved.Effect);
+
+                    continue;
+                }
+
+                foreach (var (key, value) in saved.Parameters) engine.SetValue(key, value);
+
+                chain.Add(engine).Bypassed = saved.Bypassed;
+
+                continue;
+            }
+
             var described = new PluginInfo(saved.Id, saved.Name, "", "", saved.Path, saved.Format);
             var effect = _plugins.Load(described, sampleRate, maxFrames);
 

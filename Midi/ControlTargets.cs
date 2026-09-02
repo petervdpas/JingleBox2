@@ -38,6 +38,9 @@ public sealed class ControlTargets : IControlTargets
     /// <summary>The machines this run has.</summary>
     private readonly IMachineProjects _machines;
 
+    /// <summary>The effects this run has, for a knob pointed at one of ours on a chain.</summary>
+    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+
     private readonly TrackerViewModel _tracker;
     private readonly RackViewModel? _rack;
 
@@ -58,11 +61,18 @@ public sealed class ControlTargets : IControlTargets
     /// The transport, for a button pointed at one of its four keys. Optional, and without one a
     /// transport link finds nothing and says so, which is what a test with no window wants.
     /// </param>
+    /// <param name="effects">
+    /// The effects this installation has, so a knob pointed at one of ours can be resolved
+    /// against the chain in front of you. Nothing when there are none, and then only plugins are
+    /// found on a chain, which is what this did before effects existed.
+    /// </param>
     public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
-                          RackViewModel? rack = null, ITransportPresses? presses = null)
+                          RackViewModel? rack = null, ITransportPresses? presses = null,
+                          Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
         _tracker = tracker;
         _machines = machines;
+        _effects = effects;
         _rack = rack;
         _presses = presses;
     }
@@ -386,6 +396,8 @@ public sealed class ControlTargets : IControlTargets
         var chain = _tracker.InsertsOn(track);
         if (chain is null) return null;
 
+        if (OnOurs(mapping, track, chain) is { } ours) return ours;
+
         var wanted = Insert(chain, mapping);
         if (wanted is null) return null;
 
@@ -404,6 +416,56 @@ public sealed class ControlTargets : IControlTargets
             this,
             mapping,
             parameter.Units);
+    }
+
+    /// <summary>
+    /// One of our effects on that track's chain, when that is what the mapping names.
+    /// </summary>
+    /// <remarks>
+    /// A link on one of ours names the effect's id and the parameter's key, the same two words a
+    /// link on a machine names, because that is what travels: an id is the same id on everybody's
+    /// disc and a key is the effect's own. It says nothing about which track or which slot, so
+    /// the same link drives whichever EchoBox is on the track you are working on, which is the
+    /// rule every other link here keeps.
+    ///
+    /// The first one of that effect on the chain, where somebody has put two on: what a knob was
+    /// pointed at is the effect, and choosing between two of the same by counting would be a link
+    /// that moved when they were reordered.
+    ///
+    /// Nothing when the mapping names a plugin instead, which is what an empty machine id means
+    /// here, so the plugin path below is untouched.
+    /// </remarks>
+    /// <param name="mapping">What the control was pointed at.</param>
+    /// <param name="track">The track it resolves against, which is the one in front of you.</param>
+    /// <param name="chain">That track's chain.</param>
+    private IControlTarget? OnOurs(ControlMapping mapping, int track, PluginChain chain)
+    {
+        if (mapping.Machine.Length == 0 || mapping.Key.Length == 0) return null;
+
+        foreach (var device in chain.Devices)
+        {
+            if (device.Insert is not Tracker.Effects.Interfaces.IEffectEngine engine) continue;
+
+            if (!string.Equals(engine.Id, mapping.Machine, StringComparison.OrdinalIgnoreCase)) continue;
+
+            if (_effects?.For(engine.Id) is not { } effect) continue;
+
+            if (effect.Parameters.FirstOrDefault(one => one.Key == mapping.Key) is not { } parameter) continue;
+
+            string said = parameter.Name.Length > 0 ? parameter.Name : parameter.Key;
+
+            return new Target(
+                effect.Name + " " + said + " on " + Named(track),
+                parameter.Min,
+                parameter.Max,
+                () => engine.ValueOf(mapping.Key),
+                value => engine.SetValue(mapping.Key, value),
+                this,
+                mapping,
+                parameter.Unit);
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -1,6 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Threading;
 using JingleBox2.Audio;
 using JingleBox2.Audio.Routing;
@@ -84,19 +82,6 @@ public partial class MainWindow : Window
 
     /// <summary>Set once the startup size has been applied, so layout does not trigger saves.</summary>
     private bool _windowRestored;
-
-    /// <summary>What is being held down, so a held key is one press. See <see cref="UI.HeldKeys"/>.</summary>
-    private readonly UI.HeldKeys _held = new();
-
-    /// <summary>
-    /// Set while the transport has the space bar, so the key coming up again is swallowed too.
-    /// </summary>
-    /// <remarks>
-    /// A button clicks on the space key coming up, and does not check that it ever saw the key
-    /// go down. Taking only the key-down therefore stops the button pressing and still lets it
-    /// click: open a song, press space, and the song plays and the picker opens behind it.
-    /// </remarks>
-    private bool _tookSpace;
 
     /// <summary>How much of the window is spent above the pads: the theme, the device and the tabs.</summary>
     private const double HeaderHeight = 140;
@@ -207,15 +192,13 @@ public partial class MainWindow : Window
             Title = $"JingleBox2 v{version}";
         }
 
-        AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
-
         Views.LinkKey.Listen(this);
 
         Shortcuts.ShortcutKeys.Map.Take(cfg.Shortcuts);
         Shortcuts.ShortcutKeys.Listen(this);
-        AddHandler(KeyUpEvent, OnWindowKeyUp, RoutingStrategies.Tunnel);
 
-        Deactivated += (_, _) => _held.Forget();
+        Views.DeckKeys.Deck = vm.Transport;
+        Views.DeckKeys.Listen(this);
 
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
@@ -235,96 +218,6 @@ public partial class MainWindow : Window
     /// </summary>
     private static Diagnostics.Enums.LogArea Areas(Config.AppConfig cfg) =>
         cfg.LogAreas == 0 ? Diagnostics.Enums.LogArea.Everything : (Diagnostics.Enums.LogArea)cfg.LogAreas;
-
-    /// <summary>
-    /// The two keys the window answers itself: space works the transport, Ctrl+R records.
-    /// </summary>
-    /// <remarks>
-    /// Space starts the transport when it is stopped and stops it when it is running, which is
-    /// where every tracker and every desk puts it, and is the reason the transport is on the
-    /// window rather than on a page: it is worth starting from wherever you happen to be.
-    ///
-    /// It is taken on the way down, before the focused control sees it, because otherwise the
-    /// last button you pressed keeps the key: click Open and space opens the song again instead
-    /// of playing it, which is exactly what a space bar must never do. Enter still works every
-    /// button, so nothing reachable by keyboard becomes unreachable. Two things are left alone:
-    /// a text box, where a space is a space, and a combo box with its list open, where space
-    /// takes the row that is lit. A space held down is swallowed rather than passed on, so a
-    /// leant-on key does nothing at all rather than something else.
-    ///
-    /// Ctrl+R records, and what that means is whatever the page you are on says it means: the
-    /// transport is patched to the page's own deck. On RECORD it takes a take, on TRACKER it
-    /// arms the pattern for typing, and on the pages that record nothing the deck says it
-    /// cannot and the keystroke passes through. The cap at the top of the window is this same
-    /// thing pressed with a mouse. Pressing it again is the other half of the same key: on
-    /// RECORD that ends the take, and on TRACKER, where recording is an armed state rather than
-    /// a running one, the deck reads it as disarming. Not while somebody is typing a name into
-    /// something.
-    ///
-    /// Every key goes through <see cref="_held"/>, not only these two, so the record of what is
-    /// down is the whole keyboard and the next shortcut added here is one press too.
-    /// </remarks>
-    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
-    {
-        bool first = _held.Pressed(e.Key);
-
-        if (e.Handled) return;
-
-        if (first && e.Key == Key.R && e.KeyModifiers == KeyModifiers.Control)
-        {
-            if (FocusManager?.GetFocusedElement() is TextBox) return;
-
-            if (DataContext is not MainViewModel deck || deck.Transport is not { } transport) return;
-
-            if (transport.IsRecording) transport.StopCommand.Execute(null);
-            else if (transport.CanRecord) transport.RecordCommand.Execute(null);
-            else return;
-
-            e.Handled = true;
-            return;
-        }
-
-        if (e.Key != Key.Space || e.KeyModifiers != KeyModifiers.None) return;
-
-        switch (FocusManager?.GetFocusedElement())
-        {
-            case TextBox: return;
-
-            case ComboBox { IsDropDownOpen: true }: return;
-        }
-
-        _tookSpace = true;
-
-        if (!first)
-        {
-            e.Handled = true;
-            return;
-        }
-
-        if (DataContext is not MainViewModel vm) return;
-
-        vm.Transport.Toggle();
-
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// The key is up, so the next time it goes down is a press again.
-    /// </summary>
-    /// <remarks>
-    /// A space the transport took is swallowed on the way up as well. Buttons click on the
-    /// key coming up rather than going down, and do it whether or not they saw the press, so
-    /// half a space bar is enough to work the last button you clicked.
-    /// </remarks>
-    private void OnWindowKeyUp(object? sender, KeyEventArgs e)
-    {
-        _held.Released(e.Key);
-
-        if (e.Key != Key.Space || !_tookSpace) return;
-
-        _tookSpace = false;
-        e.Handled = true;
-    }
 
     /// <summary>
     /// Uses the size the window was last left at, falling back to the pad matrix on first run.
