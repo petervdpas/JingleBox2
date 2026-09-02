@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Synth;
 using System;
 using JingleBox2.Tracker.Enums;
@@ -39,7 +39,7 @@ namespace JingleBox2.Tracker.Machines;
 /// Where the recordings are, for the line that says how long the take is. Without one that line
 /// is empty, which is what a panel being designed against no shelf should show.
 /// </param>
-public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : MachineValues
+public sealed class RecordingValues(TrackerInstrument instrument, TakeLibrary? shelf = null) : PanelValues
 {
     /// <summary>The fader scale, so a level in decibels can be checked without a window.</summary>
     private readonly IGainScale _gain = new GainScale();

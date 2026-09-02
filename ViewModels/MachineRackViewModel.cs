@@ -11,7 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
@@ -216,11 +216,11 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
-    public Machines.Interfaces.IMachineLocation? MachineLocation =>
+    public Rack.Machines.Interfaces.IMachineLocation? MachineLocation =>
         _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
 
     /// <inheritdoc cref="MachineLocation"/>
-    private Machines.Interfaces.IMachineLocation? _place;
+    private Rack.Machines.Interfaces.IMachineLocation? _place;
 
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     /// <remarks>

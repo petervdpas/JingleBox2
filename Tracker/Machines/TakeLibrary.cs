@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 

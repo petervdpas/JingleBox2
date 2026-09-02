@@ -3,8 +3,8 @@ using Avalonia.Input;
 using Avalonia.Media;
 using System;
 using System.Windows.Input;
-using JingleBox2.Machines.Ui;
-using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Rack.Ui;
+using JingleBox2.Rack.Ui.Records;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
 

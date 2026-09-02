@@ -15,7 +15,7 @@ permission, which is part of the licence under which JingleBox2 is offered.
   The plugin interfaces are:
 
     * the public types of the JingleBox2 machine interface, being the
-      assembly named JingleBox2.Machines.Abstractions and any assembly that
+      assembly named JingleBox2.Rack.Abstractions and any assembly that
       replaces it in that role; and
 
     * the protocols by which JingleBox2 talks to a program running in a

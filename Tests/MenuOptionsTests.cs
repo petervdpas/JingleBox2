@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Faces.Records;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -31,7 +31,7 @@ public class MenuOptionsTests
     [Fact]
     public void A_menu_that_says_nothing_carries_everything()
     {
-        Assert.Equal(MachineMenuOptions.All, Options.Named(null));
+        Assert.Equal(MenuOptionWords.All, Options.Named(null));
     }
 
     /// <summary>
@@ -63,8 +63,8 @@ public class MenuOptionsTests
     {
         var named = Options.Named(said);
 
-        Assert.True(Options.Carries(named, MachineMenuOptions.Surfaces));
-        Assert.True(Options.Carries(named, MachineMenuOptions.Learn));
+        Assert.True(Options.Carries(named, MenuOptionWords.Surfaces));
+        Assert.True(Options.Carries(named, MenuOptionWords.Learn));
     }
 
     /// <summary>The same word twice is one option and not two.</summary>
@@ -86,8 +86,8 @@ public class MenuOptionsTests
     {
         var named = Options.Named("surfaces,somethingelse");
 
-        Assert.True(Options.Carries(named, MachineMenuOptions.Surfaces));
-        Assert.False(Options.Carries(named, MachineMenuOptions.Learn));
+        Assert.True(Options.Carries(named, MenuOptionWords.Surfaces));
+        Assert.False(Options.Carries(named, MenuOptionWords.Learn));
         Assert.True(Options.Carries(named, "somethingelse"));
     }
 
@@ -95,10 +95,10 @@ public class MenuOptionsTests
     [Fact]
     public void Naming_one_option_leaves_the_others_off()
     {
-        var named = Options.Named(MachineMenuOptions.Learn);
+        var named = Options.Named(MenuOptionWords.Learn);
 
-        Assert.False(Options.Carries(named, MachineMenuOptions.Surfaces));
-        Assert.True(Options.Carries(named, MachineMenuOptions.Learn));
+        Assert.False(Options.Carries(named, MenuOptionWords.Surfaces));
+        Assert.True(Options.Carries(named, MenuOptionWords.Learn));
     }
 
     /// <summary>
@@ -124,10 +124,10 @@ public class MenuOptionsTests
     [Fact]
     public void Every_option_has_a_word_of_its_own()
     {
-        Assert.NotEmpty(MachineMenuOptions.All);
-        Assert.All(MachineMenuOptions.All, one => Assert.False(string.IsNullOrWhiteSpace(one)));
-        Assert.Equal(MachineMenuOptions.All.Count,
-            MachineMenuOptions.All.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.NotEmpty(MenuOptionWords.All);
+        Assert.All(MenuOptionWords.All, one => Assert.False(string.IsNullOrWhiteSpace(one)));
+        Assert.Equal(MenuOptionWords.All.Count,
+            MenuOptionWords.All.Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     /// <summary>A line says nothing about which option it is on unless it is told.</summary>
@@ -139,7 +139,7 @@ public class MenuOptionsTests
     [Fact]
     public void A_line_belongs_to_no_option_until_it_is_told()
     {
-        var line = new MachineMenuItem("Something");
+        var line = new PanelMenuItem("Something");
 
         Assert.Equal("", line.Option);
         Assert.True(line.Live);
@@ -151,12 +151,12 @@ public class MenuOptionsTests
     [Fact]
     public void The_designer_offers_a_tick_for_every_option_there_is()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
         Assert.True(picked.IsMenu);
-        Assert.Equal(MachineMenuOptions.All.Count, picked.Options.Count);
+        Assert.Equal(MenuOptionWords.All.Count, picked.Options.Count);
         Assert.All(picked.Options, one => Assert.True(one.On));
     }
 
@@ -170,29 +170,29 @@ public class MenuOptionsTests
     [Fact]
     public void Taking_an_option_off_writes_the_rest_down()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
-        Assert.False(element.Properties.ContainsKey(MachineMenuOptions.Property));
+        Assert.False(element.Properties.ContainsKey(MenuOptionWords.Property));
 
         picked.Options.First(one => one.Said.Contains("Learn", StringComparison.Ordinal)).On = false;
 
-        Assert.Equal(MachineMenuOptions.Surfaces, element.Properties[MachineMenuOptions.Property]);
+        Assert.Equal(MenuOptionWords.Surfaces, element.Properties[MenuOptionWords.Property]);
 
         foreach (var one in picked.Options) one.On = false;
 
-        Assert.Equal("", element.Properties[MachineMenuOptions.Property]);
-        Assert.Empty(Options.Named(element.Properties[MachineMenuOptions.Property]));
+        Assert.Equal("", element.Properties[MenuOptionWords.Property]);
+        Assert.Empty(Options.Named(element.Properties[MenuOptionWords.Property]));
     }
 
     /// <summary>And putting one back on says so again.</summary>
     [Fact]
     public void Putting_an_option_back_on_says_so_again()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuOptions.Property] = "";
+        element.Properties[MenuOptionWords.Property] = "";
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
@@ -202,8 +202,8 @@ public class MenuOptionsTests
 
         Assert.True(picked.Options[0].On);
         Assert.True(Options.Carries(
-            Options.Named(element.Properties[MachineMenuOptions.Property]),
-            MachineMenuOptions.All[0]));
+            Options.Named(element.Properties[MenuOptionWords.Property]),
+            MenuOptionWords.All[0]));
     }
 
     /// <summary>An option a machine names that this build has no word for is still shown as itself.</summary>
@@ -214,9 +214,9 @@ public class MenuOptionsTests
     [Fact]
     public void An_option_with_no_wording_here_is_shown_as_the_file_spells_it()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuOptions.Property] = "surfaces,somethingelse";
+        element.Properties[MenuOptionWords.Property] = "surfaces,somethingelse";
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
@@ -232,30 +232,30 @@ public class MenuOptionsTests
     [Fact]
     public void A_menu_sits_in_the_upper_right_until_it_is_told_otherwise()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
-        Assert.Equal(MachineMenuCorners.All.Count, picked.Corners.Count);
+        Assert.Equal(MenuCorners.All.Count, picked.Corners.Count);
         Assert.Equal(picked.Corners[0], picked.Corner);
-        Assert.False(element.Properties.ContainsKey(MachineMenuCorners.Property));
+        Assert.False(element.Properties.ContainsKey(MenuCorners.Property));
     }
 
     /// <summary>Choosing the other one writes the word the file uses.</summary>
     [Fact]
     public void Choosing_the_other_corner_writes_the_word_the_file_uses()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
         picked.Corner = picked.Corners[1];
 
-        Assert.Equal(MachineMenuCorners.TopLeft, element.Properties[MachineMenuCorners.Property]);
+        Assert.Equal(MenuCorners.TopLeft, element.Properties[MenuCorners.Property]);
 
         picked.Corner = picked.Corners[0];
 
-        Assert.Equal(MachineMenuCorners.TopRight, element.Properties[MachineMenuCorners.Property]);
+        Assert.Equal(MenuCorners.TopRight, element.Properties[MenuCorners.Property]);
     }
 
     /// <summary>
@@ -277,9 +277,9 @@ public class MenuOptionsTests
     [InlineData("")]
     public void A_corner_this_build_does_not_know_reads_as_the_upper_right(string said)
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuCorners.Property] = said;
+        element.Properties[MenuCorners.Property] = said;
 
         Assert.Equal(new ViewModels.MachineElementViewModel(element).Corners[0],
             new ViewModels.MachineElementViewModel(element).Corner);
@@ -289,9 +289,9 @@ public class MenuOptionsTests
     [Fact]
     public void The_corner_is_read_however_it_is_spelled()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuCorners.Property] = "  TOPLEFT ";
+        element.Properties[MenuCorners.Property] = "  TOPLEFT ";
 
         Assert.Equal(new ViewModels.MachineElementViewModel(element).Corners[1],
             new ViewModels.MachineElementViewModel(element).Corner);
@@ -308,10 +308,10 @@ public class MenuOptionsTests
     [Fact]
     public void A_menus_own_settings_are_not_offered_as_properties_to_type()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuCorners.Property] = MachineMenuCorners.TopLeft;
-        element.Properties[MachineMenuOptions.Property] = MachineMenuOptions.Learn;
+        element.Properties[MenuCorners.Property] = MenuCorners.TopLeft;
+        element.Properties[MenuOptionWords.Property] = MenuOptionWords.Learn;
         element.Properties["margin"] = "4";
 
         var picked = new ViewModels.MachineElementViewModel(element);
@@ -323,9 +323,9 @@ public class MenuOptionsTests
     [Fact]
     public void Every_corner_is_offered_and_each_has_a_word_of_its_own()
     {
-        var picked = new ViewModels.MachineElementViewModel(new MachineElement { Element = MachineElementKinds.Menu });
+        var picked = new ViewModels.MachineElementViewModel(new PanelElement { Element = ElementKinds.Menu });
 
-        Assert.Equal(MachineMenuCorners.All.Count, picked.Corners.Count);
+        Assert.Equal(MenuCorners.All.Count, picked.Corners.Count);
         Assert.Equal(picked.Corners.Count, picked.Corners.Distinct(StringComparer.Ordinal).Count());
 
         foreach (string corner in picked.Corners)
@@ -347,7 +347,7 @@ public class MenuOptionsTests
     [Fact]
     public void Every_corner_writes_a_word_the_file_allows()
     {
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element);
 
@@ -355,12 +355,12 @@ public class MenuOptionsTests
         {
             picked.Corner = corner;
 
-            Assert.Contains(element.Properties[MachineMenuCorners.Property], MachineMenuCorners.All);
+            Assert.Contains(element.Properties[MenuCorners.Property], MenuCorners.All);
         }
 
         picked.Corner = picked.Corners[0];
 
-        Assert.Equal(MachineMenuCorners.TopRight, element.Properties[MachineMenuCorners.Property]);
+        Assert.Equal(MenuCorners.TopRight, element.Properties[MenuCorners.Property]);
     }
 
     /// <summary>
@@ -374,18 +374,18 @@ public class MenuOptionsTests
     [Fact]
     public void A_machine_may_have_one_menu()
     {
-        var root = new MachineElement { Element = MachineElementKinds.Column };
+        var root = new PanelElement { Element = ElementKinds.Column };
 
-        root.Children.Add(new MachineElement { Element = MachineElementKinds.Menu });
-        root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+        root.Children.Add(new PanelElement { Element = ElementKinds.Menu });
+        root.Children.Add(new PanelElement { Element = ElementKinds.Knob });
 
         var picked = new ViewModels.MachineElementViewModel(root);
 
         var knob = picked.Children[1];
 
-        knob.Kind = MachineElementKinds.Menu;
+        knob.Kind = ElementKinds.Menu;
 
-        Assert.Equal(MachineElementKinds.Knob, knob.Kind);
+        Assert.Equal(ElementKinds.Knob, knob.Kind);
     }
 
     /// <summary>And the one that is there may still be turned into something else and back.</summary>
@@ -397,19 +397,19 @@ public class MenuOptionsTests
     [Fact]
     public void The_only_menu_may_still_be_turned_into_something_else_and_back()
     {
-        var root = new MachineElement { Element = MachineElementKinds.Column };
+        var root = new PanelElement { Element = ElementKinds.Column };
 
-        root.Children.Add(new MachineElement { Element = MachineElementKinds.Menu });
+        root.Children.Add(new PanelElement { Element = ElementKinds.Menu });
 
         var only = new ViewModels.MachineElementViewModel(root).Children[0];
 
-        only.Kind = MachineElementKinds.Knob;
+        only.Kind = ElementKinds.Knob;
 
-        Assert.Equal(MachineElementKinds.Knob, only.Kind);
+        Assert.Equal(ElementKinds.Knob, only.Kind);
 
-        only.Kind = MachineElementKinds.Menu;
+        only.Kind = ElementKinds.Menu;
 
-        Assert.Equal(MachineElementKinds.Menu, only.Kind);
+        Assert.Equal(ElementKinds.Menu, only.Kind);
     }
 
     /// <summary>
@@ -427,13 +427,13 @@ public class MenuOptionsTests
     {
         int edits = 0;
 
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element, edited: () => edits++);
 
         picked.Corner = picked.Corner;
 
-        Assert.False(element.Properties.ContainsKey(MachineMenuCorners.Property));
+        Assert.False(element.Properties.ContainsKey(MenuCorners.Property));
         Assert.Equal(0, edits);
     }
 
@@ -443,15 +443,15 @@ public class MenuOptionsTests
     {
         int edits = 0;
 
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
-        element.Properties[MachineMenuCorners.Property] = MachineMenuCorners.TopLeft;
+        element.Properties[MenuCorners.Property] = MenuCorners.TopLeft;
 
         var picked = new ViewModels.MachineElementViewModel(element, edited: () => edits++);
 
         picked.Corner = picked.Corner;
 
-        Assert.Equal(MachineMenuCorners.TopLeft, element.Properties[MachineMenuCorners.Property]);
+        Assert.Equal(MenuCorners.TopLeft, element.Properties[MenuCorners.Property]);
         Assert.Equal(0, edits);
     }
 
@@ -469,7 +469,7 @@ public class MenuOptionsTests
     {
         int edits = 0;
 
-        var element = new MachineElement { Element = MachineElementKinds.Menu };
+        var element = new PanelElement { Element = ElementKinds.Menu };
 
         var picked = new ViewModels.MachineElementViewModel(element, edited: () => edits++);
 
@@ -485,7 +485,7 @@ public class MenuOptionsTests
         picked.Parameter = "cutoff";
         Assert.Equal(4, edits);
 
-        picked.Kind = MachineElementKinds.Knob;
+        picked.Kind = ElementKinds.Knob;
         Assert.Equal(5, edits);
     }
 
@@ -499,11 +499,11 @@ public class MenuOptionsTests
     {
         int edits = 0;
 
-        var root = new MachineElement { Element = MachineElementKinds.Column };
+        var root = new PanelElement { Element = ElementKinds.Column };
 
         var picked = new ViewModels.MachineElementViewModel(root, edited: () => edits++);
 
-        var added = picked.Add(new MachineElement { Element = MachineElementKinds.Knob });
+        var added = picked.Add(new PanelElement { Element = ElementKinds.Knob });
 
         added.Label = "Cutoff";
 
@@ -514,7 +514,7 @@ public class MenuOptionsTests
     [Fact]
     public void A_wrapper_with_no_hook_writes_without_complaining()
     {
-        var picked = new ViewModels.MachineElementViewModel(new MachineElement { Element = MachineElementKinds.Menu });
+        var picked = new ViewModels.MachineElementViewModel(new PanelElement { Element = ElementKinds.Menu });
 
         picked.Corner = picked.Corners[1];
 
@@ -526,6 +526,6 @@ public class MenuOptionsTests
     public void Anything_that_is_not_a_menu_is_not_asked_about_options()
     {
         Assert.False(new ViewModels.MachineElementViewModel(
-            new MachineElement { Element = MachineElementKinds.Knob }).IsMenu);
+            new PanelElement { Element = ElementKinds.Knob }).IsMenu);
     }
 }

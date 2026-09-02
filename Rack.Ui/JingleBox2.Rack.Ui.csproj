@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The parts a machine's front panel is made of.
+
+    The second half of the contract: the first says what a machine is, this says what it is
+    drawn with. A knob, a fader, a switch, a group frame, a keyboard, a recording's picture, and
+    the palette they all read their colours from. A machine written by somebody else builds its
+    panel out of these, which is why they live here rather than in the application.
+
+    Avalonia, and nothing else. No BASS, no view models, no tracker: a panel is a picture of a
+    machine's settings and has no business knowing what a song is. That is where the line was
+    drawn through the waveform: the viewport maths and the outline building came here because a
+    panel has to draw a recording, and the player that sounds one stayed behind because it is
+    BASS.
+  -->
+  <PropertyGroup>
+    <!-- The documentation is an artefact of the build, not a comment nobody reads. Every seam
+         in this application is an interface and the prose lives on it; this is what turns that
+         into a file, and what makes the compiler say which public thing is still undocumented.
+         CS1591 is left switched on deliberately: it is the list of what is left to write. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>JingleBox2.Rack.Ui</RootNamespace>
+    <AssemblyName>JingleBox2.Rack.Ui</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.1" />
+    <!--
+      A drawing reader, for the one element that shows a file: a machine's badge. Avalonia knows
+      how to decode a png and a jpg and nothing about an svg, and a logo is exactly the picture
+      that wants to be drawn rather than sampled, since a panel is laid out at whatever size the
+      person laying it out says. It belongs here and not in the abstractions: the abstractions
+      say a picture is a file with a name, and which of them can be read is a question about
+      whoever is doing the drawing.
+    -->
+    <PackageReference Include="Svg.Controls.Avalonia" Version="12.0.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rack.Abstractions\JingleBox2.Rack.Abstractions.csproj" />
+  </ItemGroup>
+
+  <!--
+    The tests can see what is internal here, and only the tests.
+
+    This assembly is published: an outside machine links against it, and the licence exception
+    names its companion. So what is public is a promise, and the rule for what earns one is
+    whether an outside machine would write it down. The parts every range control shares are
+    public because a machine drawing a control of its own should feel like the ones we ship; how
+    our own knob sweeps its 270 degrees and how our own fader reads its track are not, and a
+    contract carrying them would be a promise about our drawing rather than about their machine.
+
+    Internal is not untested. A rule nobody can reach is exactly what this whole pass was
+    against, and the answer is this line rather than a wider contract.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>JingleBox2.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.ViewModels;
@@ -135,7 +135,7 @@ public class MachineValuesTests
     {
         var shown = new ObservableCollection<MachineParameterViewModel>
         {
-            new(new MachineParameter { Key = "duty", Min = 0, Max = 1 })
+            new(new Parameter { Key = "duty", Min = 0, Max = 1 })
         };
 
         var values = new MachinePreviewValues(shown);

@@ -1,4 +1,4 @@
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker;

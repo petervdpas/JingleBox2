@@ -1,7 +1,7 @@
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;

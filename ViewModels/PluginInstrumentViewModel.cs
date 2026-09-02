@@ -5,8 +5,8 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Faces;
 
 namespace JingleBox2.ViewModels;
 
@@ -204,7 +204,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// <remarks>
     /// The same thing the effects after it print, and for the same reason: a row of boxes with
     /// names on them tells you the order of the chain and nothing at all about the sound. Which
-    /// few is <see cref="Machines.PanelOrder"/>, the order the panel reads, so it is the first
+    /// few is <see cref="JingleBox2.Rack.Faces.PanelOrder"/>, the order the panel reads, so it is the first
     /// three controls your eye lands on when you open the machine rather than the first three
     /// lines of a file.
     ///

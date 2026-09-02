@@ -1,6 +1,6 @@
 using Avalonia.Threading;
 using JingleBox2.Audio.Plugins;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System;
@@ -10,7 +10,7 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
@@ -356,7 +356,7 @@ public sealed class ControlTargets : IControlTargets
     /// show that: the wire was innocent. So the disagreement is caught here, where both halves
     /// are in one place, and named.
     /// </remarks>
-    private static void Written(IMachineValues values, string key, double value)
+    private static void Written(IPanelValues values, string key, double value)
     {
         values.Set(key, value);
 

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Records;
 
 namespace JingleBox2.Tracker.Records;
 
@@ -34,7 +34,7 @@ public sealed record Machine(
     string Name,
     string Summary,
     bool IsOurs,
-    MachineTheme Theme) : IMachine
+    PanelTheme Theme) : IMachine
 {
     /// <summary>The machine's own colour, which is where everything it is painted with starts.</summary>
     public string Colour => Theme.Accent;
@@ -111,7 +111,7 @@ public sealed record Machine(
         "Plugin",
         "A VST3 or CLAP instrument, playing in a process of its own.",
         false,
-        new MachineTheme("#7B838C"));
+        new PanelTheme("#7B838C"));
 
     /// <summary>
     /// The order machines stand in, which is the app's and not any machine's.
@@ -197,7 +197,7 @@ public sealed record Machine(
     /// An id this build has no engine for is refused rather than added as a box that cannot
     /// sound, which is what makes a machines folder from a later version harmless.
     /// </remarks>
-    public static bool Register(string id, string name, string summary, MachineTheme theme)
+    public static bool Register(string id, string name, string summary, PanelTheme theme)
     {
         var kind = KindOf(id);
 
@@ -210,7 +210,7 @@ public sealed record Machine(
             string.IsNullOrWhiteSpace(name) ? Engine(engine) : name,
             summary ?? "",
             true,
-            theme ?? new MachineTheme("#7B838C")));
+            theme ?? new PanelTheme("#7B838C")));
 
         return true;
     }
@@ -222,7 +222,7 @@ public sealed record Machine(
             .FirstOrDefault();
 
     /// <summary>The colour of a machine that is not here to say what colour it is.</summary>
-    private static readonly MachineTheme Bare = new("#7B838C");
+    private static readonly PanelTheme Bare = new("#7B838C");
 
     /// <summary>
     /// The grey a machine wears when this installation is not offering it.
@@ -237,7 +237,7 @@ public sealed record Machine(
     /// in one place: the row asks whether the machine is being offered and takes this, rather
     /// than knowing what colour absent looks like.
     /// </remarks>
-    public static MachineTheme Absent => Bare;
+    public static PanelTheme Absent => Bare;
 
     /// <summary>
     /// Which machine a kind is on. Never null: every kind has one.

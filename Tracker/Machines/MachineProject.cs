@@ -1,10 +1,10 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
@@ -133,10 +133,10 @@ public sealed class MachineProject
     public string Engine { get; set; } = "";
 
     /// <summary>Its colours, which are its own and not the application's.</summary>
-    public MachineTheme Theme { get; set; } = new("#7B838C");
+    public PanelTheme Theme { get; set; } = new("#7B838C");
 
     /// <summary>
-    /// Where the picker at the top of its panel gets its list. See <see cref="MachineStarts"/>.
+    /// Where the picker at the top of its panel gets its list. See <see cref="PanelStarts"/>.
     /// </summary>
     /// <remarks>
     /// Empty when the machine does not say, which is not the same as saying presets: a machine
@@ -154,7 +154,7 @@ public sealed class MachineProject
     /// The machine itself, more than anything else here: the panel is these drawn, the patch is
     /// these stored, and a song's instrument is these with values in them.
     /// </remarks>
-    public List<MachineParameter> Parameters { get; set; } = new();
+    public List<Parameter> Parameters { get; set; } = new();
 
     /// <summary>
     /// How those parameters are arranged on the machine's face.
@@ -164,7 +164,7 @@ public sealed class MachineProject
     /// set to, this is only how it is shown. A project that has not been arranged yet has an
     /// empty panel, which is the state a machine is in the moment its parameters are made.
     /// </remarks>
-    public MachinePanel Panel { get; set; } = new();
+    public Panel Panel { get; set; } = new();
 
     /// <summary>Whether this project has a folder yet.</summary>
     /// <remarks>
@@ -242,9 +242,9 @@ public sealed class MachineProject
     /// The first one found walking the face. A machine with two pickers on it is a machine
     /// nobody has finished, and there is no sensible second answer to give.
     /// </remarks>
-    private static MachineElement? Picker(MachineElement element)
+    private static PanelElement? Picker(PanelElement element)
     {
-        if (element.Element == MachineElementKinds.Preset) return element;
+        if (element.Element == ElementKinds.Preset) return element;
 
         foreach (var child in element.Children)
             if (Picker(child) is { } found) return found;
@@ -280,7 +280,7 @@ public sealed class MachineProject
         if (Picker(Panel.Root) is { } picker
             && picker.Properties.TryGetValue(SourceProperty, out string? said)
             && said.Trim().Length > 0)
-            return string.Equals(said.Trim(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase);
+            return string.Equals(said.Trim(), PanelStarts.Takes, StringComparison.OrdinalIgnoreCase);
 
         if (_asked) return _browses;
 
@@ -321,7 +321,7 @@ public sealed class MachineProject
                     using var read = JsonDocument.Parse(File.ReadAllText(path));
 
                     if (read.RootElement.TryGetProperty(BrowseKey, out var browse) &&
-                        string.Equals(browse.GetString(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase))
+                        string.Equals(browse.GetString(), PanelStarts.Takes, StringComparison.OrdinalIgnoreCase))
                         return true;
                 }
             }
@@ -333,7 +333,7 @@ public sealed class MachineProject
 
         if (StartsFrom.Length == 0) return null;
 
-        return string.Equals(StartsFrom, MachineStarts.Takes, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(StartsFrom, PanelStarts.Takes, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

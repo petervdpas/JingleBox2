@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Machines;
 using System;
 using System.Collections.Generic;
@@ -11,11 +11,13 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Linq;
 using System.IO;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
+using JingleBox2.Rack.Machines;
 
 namespace JingleBox2.ViewModels;
 
@@ -295,7 +297,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// button has to warm and it has to be something undo can take back. This used to say what it
     /// did to the two things showing the colour and to nothing else.
     /// </remarks>
-    public void Dressed(MachineTheme theme)
+    public void Dressed(PanelTheme theme)
     {
         if (Project is not { } project) return;
 
@@ -308,7 +310,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>The colours as they stand, for the dialog that fine tunes them.</summary>
-    public MachineTheme Theme => Project?.Theme ?? new MachineTheme(Bare);
+    public PanelTheme Theme => Project?.Theme ?? new PanelTheme(Bare);
 
     /// <summary>
     /// A machine nobody has saved yet, with an id of its own from the start.
@@ -328,7 +330,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             Id = "machine." + Guid.NewGuid().ToString("n")[..8],
             Name = "New machine",
             Version = "1.0",
-            Theme = new MachineTheme("#7B838C")
+            Theme = new PanelTheme("#7B838C")
         };
 
         Status = "A new machine. Save it somewhere to start keeping it.";
@@ -500,7 +502,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         int at = Project.Parameters.Count + 1;
 
-        var parameter = new MachineParameter
+        var parameter = new Parameter
         {
             Key = "p" + at,
             Name = "Parameter " + at,
@@ -548,7 +550,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public ObservableCollection<MachineParameterViewModel> Parameters { get; } = new();
 
     /// <summary>What the panel in the editor reads and writes: the parameters, and nothing kept.</summary>
-    public IMachineValues Values { get; }
+    public IPanelValues Values { get; }
 
     /// <summary>
     /// Where a recording's picture comes from while a panel is being laid out.
@@ -584,7 +586,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public IMachineZones PreviewZones { get; } = new MachinePreviewMap();
 
     /// <summary>And a wave, so a machine laid out round a picture is laid out round a picture.</summary>
-    public IMachineScope PreviewScope { get; } = new MachinePreviewScope();
+    public IPanelScope PreviewScope { get; } = new MachinePreviewScope();
 
     /// <summary>And a pattern to count, so the lamps and their pages take the room they will.</summary>
     public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
@@ -613,7 +615,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// It says what it did on the line under the title, which is where this page says everything
     /// else it has done.
     /// </remarks>
-    public IMachineMenu PreviewMenu { get; }
+    public IPanelMenu PreviewMenu { get; }
 
     /// <summary>
     /// What the picker on the panel being laid out offers.
@@ -628,13 +630,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// out against the wrong widths, and the category in front of it cannot be judged at all
     /// without the categories you actually file takes under.
     /// </remarks>
-    public IMachinePresets? Presets =>
+    public IPanelPresets? Presets =>
         Project is { } project && project.BrowsesTakes() != true
             ? new MachinePresetNames(PresetDesk)
             : Shelf;
 
     /// <summary>Your recordings, handed in by whoever built the editor.</summary>
-    public IMachinePresets? Shelf { get; set; }
+    public IPanelPresets? Shelf { get; set; }
 
     /// <summary>
     /// Puts a recording on the panel being designed, wherever the panel keeps one.
@@ -660,9 +662,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>The setting the machine keeps its recording in, or nothing when it keeps none.</summary>
-    private static string? Holder(MachineElement element)
+    private static string? Holder(PanelElement element)
     {
-        if (element.Element == MachineElementKinds.Take && element.Parameter.Length > 0)
+        if (element.Element == ElementKinds.Take && element.Parameter.Length > 0)
             return element.Parameter;
 
         foreach (var child in element.Children)
@@ -904,38 +906,38 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public IReadOnlyList<string> Library { get; } = new[]
     {
-        MachineElementKinds.Grid,
-        MachineElementKinds.Group,
-        MachineElementKinds.Row,
-        MachineElementKinds.Column,
-        MachineElementKinds.Strip,
-        MachineElementKinds.Knob,
-        MachineElementKinds.Fader,
-        MachineElementKinds.Switch,
-        MachineElementKinds.Number,
-        MachineElementKinds.Button,
-        MachineElementKinds.Choice,
-        MachineElementKinds.Led,
-        MachineElementKinds.Meter,
-        MachineElementKinds.Keys,
-        MachineElementKinds.Location,
-        MachineElementKinds.Wave,
-        MachineElementKinds.Envelope,
-        MachineElementKinds.Scope,
-        MachineElementKinds.Image,
-        MachineElementKinds.Take,
-        MachineElementKinds.Preset,
-        MachineElementKinds.Pads,
-        MachineElementKinds.Pad,
-        MachineElementKinds.PadPicker,
-        MachineElementKinds.Zones,
-        MachineElementKinds.ZonePicker,
-        MachineElementKinds.Slices,
-        MachineElementKinds.Menu,
-        MachineElementKinds.InstrumentName,
-        MachineElementKinds.Label,
-        MachineElementKinds.Text,
-        MachineElementKinds.Spacer
+        ElementKinds.Grid,
+        ElementKinds.Group,
+        ElementKinds.Row,
+        ElementKinds.Column,
+        ElementKinds.Strip,
+        ElementKinds.Knob,
+        ElementKinds.Fader,
+        ElementKinds.Switch,
+        ElementKinds.Number,
+        ElementKinds.Button,
+        ElementKinds.Choice,
+        ElementKinds.Led,
+        ElementKinds.Meter,
+        ElementKinds.Keys,
+        ElementKinds.Location,
+        ElementKinds.Wave,
+        ElementKinds.Envelope,
+        ElementKinds.Scope,
+        ElementKinds.Image,
+        ElementKinds.Take,
+        ElementKinds.Preset,
+        ElementKinds.Pads,
+        ElementKinds.Pad,
+        ElementKinds.PadPicker,
+        ElementKinds.Zones,
+        ElementKinds.ZonePicker,
+        ElementKinds.Slices,
+        ElementKinds.Menu,
+        ElementKinds.InstrumentName,
+        ElementKinds.Label,
+        ElementKinds.Text,
+        ElementKinds.Spacer
     };
 
     /// <summary>
@@ -997,7 +999,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// of saying "after that one". It is taken out first so that the place it is going to is
     /// counted without it, which is what somebody dragging it there is looking at.
     /// </remarks>
-    public void MoveInto(MachineElement moved, MachineElement? onto, int at = -1)
+    public void MoveInto(PanelElement moved, PanelElement? onto, int at = -1)
     {
         if (Project == null) return;
 
@@ -1039,7 +1041,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>Every picture an element and everything inside it names.</summary>
-    private static List<string> Pictures(MachineElement element)
+    private static List<string> Pictures(PanelElement element)
     {
         var found = new List<string>();
 
@@ -1049,9 +1051,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>Adds every picture that element names to the list, and then its children's.</summary>
-    private static void Gather(MachineElement element, List<string> into)
+    private static void Gather(PanelElement element, List<string> into)
     {
-        if (element.Element == MachineElementKinds.Image &&
+        if (element.Element == ElementKinds.Image &&
             element.Properties.TryGetValue("file", out var named) &&
             named.Length > 0)
         {
@@ -1138,9 +1140,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     }
 
     /// <summary>Points every picture element at its file's new name, however deep it sits.</summary>
-    private static void Rename(MachineElement element, IReadOnlyDictionary<string, string> moved)
+    private static void Rename(PanelElement element, IReadOnlyDictionary<string, string> moved)
     {
-        if (element.Element == MachineElementKinds.Image &&
+        if (element.Element == ElementKinds.Image &&
             element.Properties.TryGetValue("file", out var named) &&
             moved.TryGetValue(named, out var now))
         {
@@ -1173,7 +1175,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// there is nothing here to apply. What is left is everything else that was showing the old
     /// size: the row in the inspector, and the fact that the project now has something to save.
     /// </remarks>
-    public void Resized(MachineElement element)
+    public void Resized(PanelElement element)
     {
         if (Find(Elements, element) is { } wrapped) wrapped.Reread();
 
@@ -1197,9 +1199,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// The number of columns comes off the grid itself. A grid that has not said how wide it is
     /// gets one column, so parts stack downwards, which is at least a shape you can see.
     /// </remarks>
-    private static MachineElement Celled(MachineElementViewModel into, MachineElement arriving)
+    private static PanelElement Celled(MachineElementViewModel into, PanelElement arriving)
     {
-        if (into.Kind != MachineElementKinds.Grid) return arriving;
+        if (into.Kind != ElementKinds.Grid) return arriving;
 
         int columns = Math.Max(1, Split(into.Element, "columns"));
 
@@ -1237,13 +1239,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     private const int MostCells = 1024;
 
     /// <summary>How many things a comma separated property lists, or none when it says nothing.</summary>
-    private static int Split(MachineElement element, string key) =>
+    private static int Split(PanelElement element, string key) =>
         element.Properties.TryGetValue(key, out var said) && said.Length > 0
             ? said.Split(',').Length
             : 0;
 
     /// <summary>A whole number a property holds, or nothing at all when it holds something else.</summary>
-    private static int Whole(MachineElement element, string key) =>
+    private static int Whole(PanelElement element, string key) =>
         element.Properties.TryGetValue(key, out var said) &&
         int.TryParse(said, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
             ? parsed
@@ -1279,25 +1281,25 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// A single pad, for adding to a grid that is nearly right, arrives with a key rather than
     /// empty: its key is what a preset writes its line against.
     /// </remarks>
-    private static MachineElement Part(string kind)
+    private static PanelElement Part(string kind)
     {
-        var made = new MachineElement { Element = kind };
+        var made = new PanelElement { Element = kind };
 
-        if (kind == MachineElementKinds.Image)
+        if (kind == ElementKinds.Image)
         {
             made.Properties["width"] = "120";
             made.Properties["height"] = "60";
         }
 
-        if (kind == MachineElementKinds.Grid)
+        if (kind == ElementKinds.Grid)
         {
             made.Properties["rows"] = "Auto,Auto";
             made.Properties["columns"] = "Auto,Auto";
         }
 
-        if (kind == MachineElementKinds.Group) made.Properties["caption"] = "Group";
+        if (kind == ElementKinds.Group) made.Properties["caption"] = "Group";
 
-        if (kind == MachineElementKinds.Pads)
+        if (kind == ElementKinds.Pads)
         {
             made.Properties["rows"] = "4";
             made.Properties["columns"] = "4";
@@ -1306,16 +1308,16 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
             for (int at = 0; at < FreshPads; at++)
             {
-                made.Children.Add(new MachineElement
+                made.Children.Add(new PanelElement
                 {
-                    Element = MachineElementKinds.Pad,
+                    Element = ElementKinds.Pad,
                     Parameter = "pad" + (at + 1),
                     Properties = { ["key"] = (FirstPadKey + at).ToString(CultureInfo.InvariantCulture) },
                 });
             }
         }
 
-        if (kind == MachineElementKinds.Pad)
+        if (kind == ElementKinds.Pad)
             made.Properties["key"] = FirstPadKey.ToString(CultureInfo.InvariantCulture);
 
         return made;
@@ -1412,9 +1414,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// change everything except the picture of it. What gets saved is the project's own panel,
     /// which this only points at.
     /// </remarks>
-    public MachineFace? Shown =>
+    public Face? Shown =>
         Project is { } project
-            ? new MachineFace(new MachinePanel { Root = project.Panel.Root }, project.Parameters, project.Folder)
+            ? new Face(new Rack.Faces.Panel { Root = project.Panel.Root }, project.Parameters, project.Folder)
             : null;
 
     /// <summary>Just the keys, for choosing which parameter a control turns.</summary>
@@ -1422,8 +1424,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         Project?.Parameters.Select(p => p.Key).Where(k => k.Length > 0).ToArray() ?? Array.Empty<string>();
 
     /// <summary>The parameters as the canvas reads them: a copy, so a change is a different list.</summary>
-    public IReadOnlyList<MachineParameter> Shape =>
-        Project?.Parameters.ToArray() ?? Array.Empty<MachineParameter>();
+    public IReadOnlyList<Parameter> Shape =>
+        Project?.Parameters.ToArray() ?? Array.Empty<Parameter>();
 
     /// <summary>
     /// What is picked, named the way the canvas names it.
@@ -1433,7 +1435,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// one place the two are matched up, so a click on the panel and a click in the tree end on
     /// the same thing without either side knowing the other exists.
     /// </remarks>
-    public MachineElement? SelectedShape
+    public PanelElement? SelectedShape
     {
         get => SelectedElement?.Element;
         set => SelectedElement = value == null ? null : Find(Elements, value);
@@ -1444,7 +1446,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     /// <summary>The wrapper standing for that element, wherever it is in the tree.</summary>
     private static MachineElementViewModel? Find(
-        IEnumerable<MachineElementViewModel> among, MachineElement wanted)
+        IEnumerable<MachineElementViewModel> among, PanelElement wanted)
     {
         foreach (var one in among)
         {
@@ -1465,7 +1467,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// means, and refusing would leave the only place to drop a control the gaps between the
     /// ones already there.
     /// </remarks>
-    public void Drop(string kind, MachineElement? onto, int at = -1)
+    public void Drop(string kind, PanelElement? onto, int at = -1)
     {
         if (Project == null || string.IsNullOrWhiteSpace(kind)) return;
 
@@ -1506,17 +1508,17 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     /// <param name="kind">The part being added.</param>
     private string? Spare(string kind) =>
-        kind == MachineElementKinds.Menu && Every().Any(one => one.Kind == MachineElementKinds.Menu)
+        kind == ElementKinds.Menu && Every().Any(one => one.Kind == ElementKinds.Menu)
             ? "This machine already has a menu. There is one to a machine: pick the one it has and choose a corner for it."
             : null;
 
     /// <summary>Whether a kind of element has an inside to put things in.</summary>
     private static bool Holds(string kind) =>
-        kind is MachineElementKinds.Grid
-             or MachineElementKinds.Group
-             or MachineElementKinds.Row
-             or MachineElementKinds.Column
-             or MachineElementKinds.Strip;
+        kind is ElementKinds.Grid
+             or ElementKinds.Group
+             or ElementKinds.Row
+             or ElementKinds.Column
+             or ElementKinds.Strip;
 
     /// <summary>
     /// Tells whatever is drawing the panel that the description under it has moved.
@@ -1610,9 +1612,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         OnPropertyChanged(nameof(PicturePicked));
         OnPropertyChanged(nameof(PadsPicked));
 
-        if (value?.Element is { } picked && picked.Element == MachineElementKinds.Pads)
+        if (value?.Element is { } picked && picked.Element == ElementKinds.Pads)
         {
-            int held = picked.Children.Count(child => child.Element == MachineElementKinds.Pad);
+            int held = picked.Children.Count(child => child.Element == ElementKinds.Pad);
 
             if (int.TryParse(picked.Properties.GetValueOrDefault("columns"), out int across) && across > 0)
                 PadColumns = across;
@@ -1621,7 +1623,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
                 ? down
                 : Math.Max(1, (held + Math.Max(1, PadColumns) - 1) / Math.Max(1, PadColumns));
 
-            var lowest = picked.Children.FirstOrDefault(child => child.Element == MachineElementKinds.Pad);
+            var lowest = picked.Children.FirstOrDefault(child => child.Element == ElementKinds.Pad);
 
             if (lowest != null && lowest.Properties.GetValueOrDefault("key") is { Length: > 0 } key)
                 PadFirstKey = key;
@@ -1644,10 +1646,10 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// machine, so that, and only that, is offered separately, and only while the thing it would
     /// act on is what is picked.
     /// </remarks>
-    public bool PicturePicked => SelectedElement?.Kind == MachineElementKinds.Image;
+    public bool PicturePicked => SelectedElement?.Kind == ElementKinds.Image;
 
     /// <summary>True when a grid of pads is picked, which is the one shape you lay out at once.</summary>
-    public bool PadsPicked => SelectedElement?.Kind == MachineElementKinds.Pads;
+    public bool PadsPicked => SelectedElement?.Kind == ElementKinds.Pads;
 
     /// <summary>
     /// How many rows of buttons the grid has, and how many stand side by side.
@@ -1704,7 +1706,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     {
         if (SelectedElement?.Element is not { } pads) return;
 
-        if (pads.Element != MachineElementKinds.Pads) return;
+        if (pads.Element != ElementKinds.Pads) return;
 
         int across = Math.Clamp(PadColumns, 1, MostPads);
         int down = Math.Clamp(PadRows, 1, MostPads);
@@ -1715,7 +1717,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         if (first < 0) first = FirstPadKey;
 
         var kept = pads.Children
-            .Where(child => child.Element == MachineElementKinds.Pad)
+            .Where(child => child.Element == ElementKinds.Pad)
             .Select(child => child.Parameter)
             .ToList();
 
@@ -1723,9 +1725,9 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         for (int at = 0; at < wanted; at++)
         {
-            pads.Children.Add(new MachineElement
+            pads.Children.Add(new PanelElement
             {
-                Element = MachineElementKinds.Pad,
+                Element = ElementKinds.Pad,
                 Parameter = at < kept.Count && kept[at].Length > 0 ? kept[at] : "pad" + (at + 1),
                 Properties = { ["key"] = _notes.Name(first + at) },
             });
@@ -1752,7 +1754,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public void PutPicture(string path)
     {
-        if (SelectedElement is not { Kind: MachineElementKinds.Image } element) return;
+        if (SelectedElement is not { Kind: ElementKinds.Image } element) return;
 
         if (Project is not { IsSaved: true } project)
         {
@@ -1941,12 +1943,12 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// root that says nothing. There has to be something to hang the first element off, so a
     /// grid is put in and written back into the project, which means saving keeps it.
     /// </remarks>
-    private static MachineElement Root(MachineProject project)
+    private static PanelElement Root(MachineProject project)
     {
-        project.Panel ??= new MachinePanel();
-        project.Panel.Root ??= new MachineElement { Element = MachineElementKinds.Grid };
+        project.Panel ??= new Rack.Faces.Panel();
+        project.Panel.Root ??= new PanelElement { Element = ElementKinds.Grid };
 
-        if (project.Panel.Root.Element.Length == 0) project.Panel.Root.Element = MachineElementKinds.Grid;
+        if (project.Panel.Root.Element.Length == 0) project.Panel.Root.Element = ElementKinds.Grid;
 
         return project.Panel.Root;
     }

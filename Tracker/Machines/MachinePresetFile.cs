@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.ViewModels;
 using System;
@@ -9,9 +9,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Rack.Machines;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -102,9 +104,9 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
 
             var owned = Owned(machine);
 
-            IMachineValues? wide = null;
+            IPanelValues? wide = null;
             RecordingValues? loose = null;
-            Func<int, IMachineValues>? inside = null;
+            Func<int, IPanelValues>? inside = null;
             Func<string, int>? which = null;
 
             if (buttons.Count > 0)
@@ -249,7 +251,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
 
         var kind = Machine.SlotFor(machine.Id)?.Kind ?? TrackerInstrumentKind.Sample;
 
-        IMachineValues plain = kind switch
+        IPanelValues plain = kind switch
         {
             TrackerInstrumentKind.Synth =>
                 new SynthValues(new ViewModels.SynthPatchViewModel(sound.Patch, () => { }), sound),
@@ -257,7 +259,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
             _ => new RecordingValues(sound),
         };
 
-        if (Named(machine, MachineElementKinds.Take) is { Length: > 0 } take)
+        if (Named(machine, ElementKinds.Take) is { Length: > 0 } take)
             held[take] = Inside(sound.FilePath, home);
 
         foreach (string key in owned.Outside) held[key] = JsonValue.Create(plain.Get(key));
@@ -300,7 +302,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     /// writes a sixth line without this being told about it, and there is one place in the program
     /// that knows what "pad_pan" means.
     /// </remarks>
-    private JsonObject Block(IMachineValues values, Settings owned, string home)
+    private JsonObject Block(IPanelValues values, Settings owned, string home)
     {
         var block = new JsonObject();
 
@@ -319,7 +321,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     }
 
     /// <summary>Puts a block back on the thing it is about, by what the machine calls each line.</summary>
-    private void Apply(IMachineValues values, Settings owned, JsonObject block, string home)
+    private void Apply(IPanelValues values, Settings owned, JsonObject block, string home)
     {
         foreach (var (key, node) in block) Line(values, owned.Numbers, owned.Words, key, node, home);
     }
@@ -333,7 +335,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     /// name nobody recognises is worse than a knob left alone.
     /// </remarks>
     private void Line(
-        IMachineValues values,
+        IPanelValues values,
         ICollection<string> numbers, ICollection<string> words,
         string key, JsonNode? node, string home)
     {
@@ -373,7 +375,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     /// much of the wave the picture shows is a knob on the face like any other and is no more
     /// part of the instrument than which way you happen to be looking, so no preset carries it:
     /// loading a sound would otherwise set somebody else's view. See
-    /// <see cref="MachineParameter.Saved"/>.
+    /// <see cref="Parameter.Saved"/>.
     ///
     /// Three cases, and the middle one is the one that is easy to get wrong. A machine that
     /// holds no set of things has no blocks, so all of it is the machine's own. A machine that
@@ -450,9 +452,9 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
 
         return found;
 
-        static void Walk(MachineElement element, List<string> found)
+        static void Walk(PanelElement element, List<string> found)
         {
-            if (element.Element is MachineElementKinds.Take or MachineElementKinds.Text
+            if (element.Element is ElementKinds.Take or ElementKinds.Text
                 && element.Parameter.Length > 0
                 && !found.Contains(element.Parameter))
                 found.Add(element.Parameter);
@@ -532,7 +534,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
 
         foreach (var child in pads.Children)
         {
-            if (child.Element != MachineElementKinds.Pad) continue;
+            if (child.Element != ElementKinds.Pad) continue;
 
             string said = child.Properties.TryGetValue(KeyProperty, out string? held) ? held : "";
 
@@ -543,12 +545,12 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     }
 
     /// <summary>The grid of pads a machine draws, if it draws one.</summary>
-    private static MachineElement? Pads(MachineProject machine) =>
-        Find(machine, MachineElementKinds.Pads);
+    private static PanelElement? Pads(MachineProject machine) =>
+        Find(machine, ElementKinds.Pads);
 
     /// <summary>The map of zones a machine draws, if it draws one.</summary>
-    private static MachineElement? Map(MachineProject machine) =>
-        Find(machine, MachineElementKinds.Zones);
+    private static PanelElement? Map(MachineProject machine) =>
+        Find(machine, ElementKinds.Zones);
 
     /// <summary>
     /// Whichever of the two a machine has: the thing its things stand on.
@@ -558,7 +560,7 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     /// ways of holding a set of recordings, and a machine that did both would be two machines
     /// wearing one panel.
     /// </remarks>
-    private static MachineElement? Held(MachineProject machine) => Pads(machine) ?? Map(machine);
+    private static PanelElement? Held(MachineProject machine) => Pads(machine) ?? Map(machine);
 
     /// <summary>The first element of that kind anywhere on the machine's face, or nothing.</summary>
     /// <remarks>
@@ -566,11 +568,11 @@ public sealed class MachinePresetFile(IMachinePaths? paths = null) : IMachinePre
     /// no sensible second answer to give. Found by walking down from the root, so the first in
     /// reading order is the one that comes back.
     /// </remarks>
-    private static MachineElement? Find(MachineProject machine, string kind)
+    private static PanelElement? Find(MachineProject machine, string kind)
     {
         return machine.Panel.Root is { } root ? Look(root, kind) : null;
 
-        static MachineElement? Look(MachineElement element, string kind)
+        static PanelElement? Look(PanelElement element, string kind)
         {
             if (element.Element == kind) return element;
 

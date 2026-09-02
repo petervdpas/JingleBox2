@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 

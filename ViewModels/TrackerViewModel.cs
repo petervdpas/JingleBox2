@@ -18,7 +18,7 @@ using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
@@ -1336,7 +1336,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// been opened yet: a controller works whether or not the panel is on screen, and the panel
     /// showing the change afterwards is the same object having been moved.
     /// </remarks>
-    public IMachineValues? MachineValuesOn(int track) =>
+    public IPanelValues? MachineValuesOn(int track) =>
         InstrumentBoxFor(track)?.Designer?.Editor?.Values;
 
     /// <summary>
@@ -2308,7 +2308,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
     /// worked.
     /// </remarks>
-    public Machines.Interfaces.IMachineMenu MixerMenu { get; } =
+    public Rack.Faces.Interfaces.IPanelMenu MixerMenu { get; } =
         new Midi.ControlMenu(() => "", () => "the mixer", kind: Midi.LinkTargets.Mixer);
 
     /// <summary>

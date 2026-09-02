@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
 
@@ -48,7 +48,7 @@ public interface IMachineProjects
     /// answer, and whoever asked falls back to the panel written by hand.
     /// </remarks>
     /// <param name="id">The machine's id, as a song writes it down.</param>
-    MachinePanel? PanelFor(string? id);
+    Panel? PanelFor(string? id);
 
     /// <summary>
     /// Whether the machine an instrument of that kind is on is installed here.

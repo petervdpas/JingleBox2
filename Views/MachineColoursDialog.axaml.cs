@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
@@ -42,7 +42,7 @@ public partial class MachineColoursDialog : Window
     /// when the window closes, or a cancelled dialog would go on repainting a window nobody can
     /// see.
     /// </remarks>
-    public static Task<MachineTheme?> AskAsync(string name, MachineTheme theme)
+    public static Task<PanelTheme?> AskAsync(string name, PanelTheme theme)
     {
         var colours = new MachineColours(name, theme);
 
@@ -63,7 +63,7 @@ public partial class MachineColoursDialog : Window
         dialog.Opened += (_, _) => Show();
         dialog.Closed += (_, _) => colours.Changed -= Show;
 
-        return Modal.ShowAsync<MachineTheme?>(dialog, null);
+        return Modal.ShowAsync<PanelTheme?>(dialog, null);
     }
 
     /// <summary>
@@ -86,7 +86,7 @@ public partial class MachineColoursDialog : Window
     {
         if (DataContext is not MachineColours colours) return;
 
-        var usual = new MachineTheme(colours.AccentHex);
+        var usual = new PanelTheme(colours.AccentHex);
 
         colours.Face = usual.Face;
         colours.Panel = usual.Panel;

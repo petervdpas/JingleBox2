@@ -1,5 +1,5 @@
 using System.Text.Json;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 

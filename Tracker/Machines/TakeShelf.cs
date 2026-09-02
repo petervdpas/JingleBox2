@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -25,7 +25,7 @@ namespace JingleBox2.Tracker.Machines;
 /// since the same shelf serves a panel being designed, where it fills in a preview, and an
 /// instrument in a song, where it changes what the instrument plays.
 /// </remarks>
-public sealed class TakeShelf : IMachinePresets
+public sealed class TakeShelf : IPanelPresets
 {
     /// <summary>What the picker shows for a shelf with nothing hidden.</summary>
     /// <remarks>The same wording the takes list on RECORD uses, so the two read as one shelf.</remarks>

@@ -1,4 +1,4 @@
-using JingleBox2.Machines.Ui;
+using JingleBox2.Rack.Ui;
 using System;
 using JingleBox2.Waveform.Enums;
 

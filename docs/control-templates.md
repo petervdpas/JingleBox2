@@ -167,16 +167,16 @@ saying how much did not.
 
 ## The Menu part on a machine's face
 
-A machine's face can carry a **Menu**: `MachineElementKinds.Menu`, dropped onto the panel in the
+A machine's face can carry a **Menu**: `ElementKinds.Menu`, dropped onto the panel in the
 designer like a Knob, placed where the person building the machine wants it, and carried in
 `machine.json` with the rest of the face. It turns no parameter and never will. What is in it
-comes from the host through `IMachineMenu`, exactly the way `Keys`, `Take`, `Preset` and `Zones`
+comes from the host through `IPanelMenu`, exactly the way `Keys`, `Take`, `Preset` and `Zones`
 are already filled.
 
 It is deliberately not named after what it holds. What it holds is going to grow.
 
 **Which options it drops down is chosen in the designer**, a tick apiece, and the ticks are built
-from `MachineMenuOptions.All` so an option added later turns up without that page being told.
+from `MenuOptionWords.All` so an option added later turns up without that page being told.
 Two today:
 
 - `surfaces`: the control surfaces there is a template for on this machine, one line each.
@@ -188,7 +188,7 @@ added. `IMenuOptions` is that rule on its own, so it can be asked without a wind
 naming an option this build has never heard of carries the ones it does understand rather than
 refusing the part, and a line belonging to no option is always carried.
 
-The name badge went the same way and for the same reason. `MachineElementKinds.InstrumentName`
+The name badge went the same way and for the same reason. `ElementKinds.InstrumentName`
 is a part now, placed by the machine, where it used to be drawn over every panel from code in a
 corner this program chose. Two goes at moving it out of the Menu's way, beside it and then
 centred, both looked like furniture shuffled around somebody else's design, which is what they
@@ -243,7 +243,7 @@ worth having anyway: it is the repair when a knob has been moved.
 `ControlLink.IsLinking` and says which way it is about to turn it, since the menu is read again
 every time it opens and there is no other sign of the mode on a machine's face.
 
-**What a machine offers is a list of lines and not a menu.** `MachineMenuItem` is that shape:
+**What a machine offers is a list of lines and not a menu.** `PanelMenuItem` is that shape:
 what it says, a tip, whether it is worth pressing, which option it belongs to, and what pressing
 it does. Flat. The library turns those into menu items where the panel is drawn, because a panel
 described in a file has no business naming a toolkit's types, and the side effect is that the
@@ -363,5 +363,5 @@ one; an effect of our own will have a described face when there are effect engin
 and then it gets the same part for the same reason.
 
 **More options.** The part exists to be added to. Anything a machine's own face should be able to
-offer, that the machine cannot know by itself, is a word in `MachineMenuOptions` and a line from
+offer, that the machine cannot know by itself, is a word in `MenuOptionWords` and a line from
 whoever fills the menu.

@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -36,7 +36,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// hook at the root hears the whole panel.
     /// </param>
     public MachineElementViewModel(
-        MachineElement element,
+        PanelElement element,
         MachineElementViewModel? parent = null,
         Action? edited = null)
     {
@@ -73,17 +73,17 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// type four into would say the grid was four wide without making it so, which is why the two
     /// are set where they are acted on.
     /// </remarks>
-    private static bool Owned(MachineElement element, string key) =>
-        (element.Element == MachineElementKinds.Pads && key is RowsKey or ColumnsKey)
-        || (element.Element == MachineElementKinds.Preset && key == Tracker.Machines.MachineProject.SourceProperty)
-        || (element.Element == MachineElementKinds.Menu
-            && key is MachineMenuOptions.Property or MachineMenuCorners.Property);
+    private static bool Owned(PanelElement element, string key) =>
+        (element.Element == ElementKinds.Pads && key is RowsKey or ColumnsKey)
+        || (element.Element == ElementKinds.Preset && key == Tracker.Machines.MachineProject.SourceProperty)
+        || (element.Element == ElementKinds.Menu
+            && key is MenuOptionWords.Property or MenuCorners.Property);
 
     /// <summary>True when the picked thing is the picker a machine is started from.</summary>
-    public bool IsPicker => Element.Element == MachineElementKinds.Preset;
+    public bool IsPicker => Element.Element == ElementKinds.Preset;
 
     /// <summary>True when the picked thing is a menu, which carries options rather than a value.</summary>
-    public bool IsMenu => Element.Element == MachineElementKinds.Menu;
+    public bool IsMenu => Element.Element == ElementKinds.Menu;
 
     /// <summary>
     /// Which corner a menu sits in, in the words on the page.
@@ -111,21 +111,21 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// <summary>Which corner this menu sits in.</summary>
     public string Corner
     {
-        get => Element.Properties.TryGetValue(MachineMenuCorners.Property, out string? said)
+        get => Element.Properties.TryGetValue(MenuCorners.Property, out string? said)
             && Words.FirstOrDefault(one =>
                 string.Equals(one.Said, said.Trim(), StringComparison.OrdinalIgnoreCase)) is { Page: { } named }
                 ? named
                 : TopRightSaid;
         set
         {
-            string want = Words.FirstOrDefault(one => one.Page == value).Said ?? MachineMenuCorners.TopRight;
+            string want = Words.FirstOrDefault(one => one.Page == value).Said ?? MenuCorners.TopRight;
 
-            if (want == Words[0].Said && !Element.Properties.ContainsKey(MachineMenuCorners.Property)) return;
+            if (want == Words[0].Said && !Element.Properties.ContainsKey(MenuCorners.Property)) return;
 
-            if (Element.Properties.TryGetValue(MachineMenuCorners.Property, out string? was) && was == want)
+            if (Element.Properties.TryGetValue(MenuCorners.Property, out string? was) && was == want)
                 return;
 
-            Element.Properties[MachineMenuCorners.Property] = want;
+            Element.Properties[MenuCorners.Property] = want;
 
             OnPropertyChanged();
 
@@ -143,15 +143,15 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     private static readonly (string Said, string Page)[] Words =
     {
-        (MachineMenuCorners.TopRight, TopRightSaid),
-        (MachineMenuCorners.TopLeft, TopLeftSaid)
+        (MenuCorners.TopRight, TopRightSaid),
+        (MenuCorners.TopLeft, TopLeftSaid)
     };
 
     /// <summary>
     /// The options a menu can carry, each with a tick saying whether this one does.
     /// </summary>
     /// <remarks>
-    /// Built from <see cref="MachineMenuOptions.All"/> rather than written out here, so an option
+    /// Built from <see cref="MenuOptionWords.All"/> rather than written out here, so an option
     /// added later turns up in the designer without anybody being told: that is the whole point
     /// of the part being a menu rather than a part named after what is in it today.
     ///
@@ -171,7 +171,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     {
         var made = new List<MachineMenuOptionViewModel>();
 
-        foreach (string option in MachineMenuOptions.All)
+        foreach (string option in MenuOptionWords.All)
             made.Add(new MachineMenuOptionViewModel(Element, option, Ticked));
 
         return made;
@@ -203,12 +203,12 @@ public sealed partial class MachineElementViewModel : ObservableObject
     public string Source
     {
         get => Element.Properties.TryGetValue(Tracker.Machines.MachineProject.SourceProperty, out string? said)
-            && string.Equals(said.Trim(), MachineStarts.Takes, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(said.Trim(), PanelStarts.Takes, StringComparison.OrdinalIgnoreCase)
                 ? TakesSaid
                 : PresetsSaid;
         set
         {
-            string want = value == TakesSaid ? MachineStarts.Takes : MachineStarts.Presets;
+            string want = value == TakesSaid ? PanelStarts.Takes : PanelStarts.Presets;
 
             if (Element.Properties.TryGetValue(Tracker.Machines.MachineProject.SourceProperty, out string? was)
                 && was == want)
@@ -223,7 +223,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     }
 
     /// <summary>The element this stands for, which is the thing that gets written to the file.</summary>
-    public MachineElement Element { get; }
+    public PanelElement Element { get; }
 
     /// <summary>
     /// Whether this branch of the list is open.
@@ -281,7 +281,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// <summary>Says the element underneath has been written into.</summary>
     private void Wrote() => _edited?.Invoke();
 
-    /// <summary>Which kind of thing this is, by the names in <see cref="MachineElementKinds"/>.</summary>
+    /// <summary>Which kind of thing this is, by the names in <see cref="ElementKinds"/>.</summary>
     /// <remarks>
     /// Settable, because turning a knob into a fader is a smaller edit than deleting one and
     /// adding the other, and it keeps the parameter and the position that were already right.
@@ -296,7 +296,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
         get => Element.Element;
         set
         {
-            if (value == MachineElementKinds.Menu && Element.Element != MachineElementKinds.Menu && Elsewhere())
+            if (value == ElementKinds.Menu && Element.Element != ElementKinds.Menu && Elsewhere())
             {
                 OnPropertyChanged();
 
@@ -324,7 +324,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
         while (top.Parent is { } above) top = above;
 
-        return Under(top).Any(one => !ReferenceEquals(one, this) && one.Kind == MachineElementKinds.Menu);
+        return Under(top).Any(one => !ReferenceEquals(one, this) && one.Kind == ElementKinds.Menu);
     }
 
     /// <summary>That element and everything under it, depth first.</summary>
@@ -460,7 +460,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// step is the one way a designer can lose an edit: the tree would show it and the file
     /// would not have it.
     /// </remarks>
-    public MachineElementViewModel Add(MachineElement child)
+    public MachineElementViewModel Add(PanelElement child)
     {
         Element.Children.Add(child);
 
@@ -479,7 +479,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// means the end rather than a refusal: a drop past the last thing is a drop after the last
     /// thing, and that is what the hand meant.
     /// </remarks>
-    public MachineElementViewModel Put(MachineElement child, int at)
+    public MachineElementViewModel Put(PanelElement child, int at)
     {
         var wrapped = new MachineElementViewModel(child, this);
 
@@ -592,7 +592,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
 public sealed partial class MachineElementPropertyViewModel : ObservableObject
 {
     /// <summary>The element whose properties this row is one of, edited in place.</summary>
-    private readonly MachineElement element;
+    private readonly PanelElement element;
 
     /// <summary>
     /// Which entry the row is on.
@@ -605,7 +605,7 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
     private string key;
 
     /// <summary>Takes the row on to an element and the key it is showing.</summary>
-    public MachineElementPropertyViewModel(MachineElement element, string key)
+    public MachineElementPropertyViewModel(PanelElement element, string key)
     {
         this.element = element;
         this.key = key;
@@ -665,7 +665,7 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
 /// </summary>
 /// <remarks>
 /// The words on the page are here and the words in the file are in
-/// <see cref="MachineMenuOptions"/>, written out both ways round rather than one turned into the
+/// <see cref="MenuOptionWords"/>, written out both ways round rather than one turned into the
 /// other: what a machine's file says can be found by searching for it, and what the designer
 /// calls it can be reworded without changing any machine.json.
 ///
@@ -676,7 +676,7 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
 public sealed partial class MachineMenuOptionViewModel : ObservableObject
 {
     /// <summary>The element this is a tick on, edited in place.</summary>
-    private readonly MachineElement _element;
+    private readonly PanelElement _element;
 
     /// <summary>Which option, in the word the file uses.</summary>
     private readonly string _option;
@@ -685,7 +685,7 @@ public sealed partial class MachineMenuOptionViewModel : ObservableObject
     /// <param name="element">The menu being worked on.</param>
     /// <param name="option">Which option, in the word the file uses.</param>
     /// <param name="edited">Told when this writes into the element, or nothing.</param>
-    public MachineMenuOptionViewModel(MachineElement element, string option, Action? edited = null)
+    public MachineMenuOptionViewModel(PanelElement element, string option, Action? edited = null)
     {
         _element = element;
         _option = option;
@@ -706,8 +706,8 @@ public sealed partial class MachineMenuOptionViewModel : ObservableObject
     /// <summary>What each option is called on the page, against the word the file uses.</summary>
     private static readonly Dictionary<string, string> Words = new(StringComparer.Ordinal)
     {
-        [MachineMenuOptions.Surfaces] = "The control surfaces pointed at this",
-        [MachineMenuOptions.Learn] = "Learn a control"
+        [MenuOptionWords.Surfaces] = "The control surfaces pointed at this",
+        [MenuOptionWords.Learn] = "Learn a control"
     };
 
     /// <summary>Whether this menu carries that option.</summary>
@@ -729,8 +729,8 @@ public sealed partial class MachineMenuOptionViewModel : ObservableObject
             if (value) carried.Add(_option);
             else carried.RemoveAll(one => string.Equals(one, _option, StringComparison.OrdinalIgnoreCase));
 
-            _element.Properties[MachineMenuOptions.Property] =
-                string.Join(MachineMenuOptions.Between, carried);
+            _element.Properties[MenuOptionWords.Property] =
+                string.Join(MenuOptionWords.Between, carried);
 
             OnPropertyChanged();
 
@@ -740,7 +740,7 @@ public sealed partial class MachineMenuOptionViewModel : ObservableObject
 
     /// <summary>Which options this menu says it carries, which is all of them where it says none.</summary>
     private List<string> Carried() =>
-        _element.Properties.TryGetValue(MachineMenuOptions.Property, out string? said)
-            ? said.Split(MachineMenuOptions.Between, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
-            : MachineMenuOptions.All.ToList();
+        _element.Properties.TryGetValue(MenuOptionWords.Property, out string? said)
+            ? said.Split(MenuOptionWords.Between, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+            : MenuOptionWords.All.ToList();
 }

@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Tracker.Enums;
@@ -29,7 +29,7 @@ namespace JingleBox2.Tracker.Machines;
 /// Whose new note action it is. On the instrument rather than on the patch, because it is not
 /// part of the sound this machine makes: it is what the tracker does with the note before.
 /// </param>
-public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
+public sealed class MonoSynthValues(MonoSynthPatchViewModel patch, TrackerInstrument instrument) : PanelValues
 {
     /// <summary>What a new note does to the one the track is still sounding.</summary>
     private const string NewNoteKey = "new_note";

@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.ViewModels;
 using JingleBox2.Tracker.Enums;
@@ -10,7 +10,7 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class MachineValuesFor : IMachineValuesFor
 {
     /// <inheritdoc/>
-    public MachineValues? Instrument(
+    public PanelValues? Instrument(
         TrackerInstrument? instrument,
         TakeLibrary? shelf = null,
         DrumKitViewModel? kit = null,

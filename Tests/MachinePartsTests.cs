@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.ViewModels;
 using Xunit;
 
@@ -29,7 +29,7 @@ public class MachinePartsTests
     /// The test run's own output folder, which the build copies them into. Read rather than
     /// listed, so a machine added later is checked without anybody remembering to add it here.
     /// </remarks>
-    private static IEnumerable<(string Name, MachinePanel Panel)> Shipped()
+    private static IEnumerable<(string Name, Panel Panel)> Shipped()
     {
         string folder = Path.Combine(AppContext.BaseDirectory, "machines");
 
@@ -51,14 +51,14 @@ public class MachinePartsTests
 
     /// <summary>Only the half of a machine's file this is about.</summary>
     /// <param name="Panel">What it looks like.</param>
-    private sealed record Described(MachinePanel? Panel);
+    private sealed record Described(Panel? Panel);
 
     /// <summary>How a machine's file is written, which is how it has to be read.</summary>
     private static readonly JsonSerializerOptions Layout = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Every element in that panel, however deep.</summary>
     /// <param name="element">Where to start.</param>
-    private static IEnumerable<MachineElement> Below(MachineElement element)
+    private static IEnumerable<PanelElement> Below(PanelElement element)
     {
         yield return element;
 
@@ -83,7 +83,7 @@ public class MachinePartsTests
             seen++;
 
             Assert.True(
-                Below(panel.Root).Any(one => one.Element == MachineElementKinds.InstrumentName),
+                Below(panel.Root).Any(one => one.Element == ElementKinds.InstrumentName),
                 name + " has no InstrumentName on its face");
         }
 
@@ -102,13 +102,13 @@ public class MachinePartsTests
     {
         foreach (var (name, panel) in Shipped())
         {
-            var menu = Below(panel.Root).SingleOrDefault(one => one.Element == MachineElementKinds.Menu);
+            var menu = Below(panel.Root).SingleOrDefault(one => one.Element == ElementKinds.Menu);
 
             Assert.True(menu is not null, name + " has no Menu on its face");
 
             Assert.True(
-                menu!.Properties.TryGetValue(MachineMenuCorners.Property, out string? corner)
-                && corner == MachineMenuCorners.TopRight,
+                menu!.Properties.TryGetValue(MenuCorners.Property, out string? corner)
+                && corner == MenuCorners.TopRight,
                 name + " does not put its Menu in the upper right");
         }
     }
@@ -119,10 +119,10 @@ public class MachinePartsTests
     {
         foreach (var (name, panel) in Shipped())
         {
-            Assert.Equal(1, Below(panel.Root).Count(one => one.Element == MachineElementKinds.InstrumentName));
+            Assert.Equal(1, Below(panel.Root).Count(one => one.Element == ElementKinds.InstrumentName));
 
             Assert.True(
-                Below(panel.Root).Count(one => one.Element == MachineElementKinds.Menu) <= 1,
+                Below(panel.Root).Count(one => one.Element == ElementKinds.Menu) <= 1,
                 name + " has more than one Menu on its face");
         }
     }
@@ -140,7 +140,7 @@ public class MachinePartsTests
         foreach (var (name, panel) in Shipped())
             foreach (var one in Below(panel.Root))
             {
-                if (one.Element is not (MachineElementKinds.InstrumentName or MachineElementKinds.Menu)) continue;
+                if (one.Element is not (ElementKinds.InstrumentName or ElementKinds.Menu)) continue;
 
                 Assert.True(one.Parameter.Length == 0, name + " points " + one.Element + " at a parameter");
             }
@@ -152,8 +152,8 @@ public class MachinePartsTests
     {
         var library = new MachineEditorViewModel().Library;
 
-        Assert.Contains(MachineElementKinds.Menu, library);
-        Assert.Contains(MachineElementKinds.InstrumentName, library);
+        Assert.Contains(ElementKinds.Menu, library);
+        Assert.Contains(ElementKinds.InstrumentName, library);
     }
 
     /// <summary>
@@ -181,7 +181,7 @@ public class MachinePartsTests
     [Fact]
     public void The_shipped_files_name_the_parts_the_way_the_code_spells_them()
     {
-        Assert.Equal("InstrumentName", MachineElementKinds.InstrumentName);
-        Assert.Equal("Menu", MachineElementKinds.Menu);
+        Assert.Equal("InstrumentName", ElementKinds.InstrumentName);
+        Assert.Equal("Menu", ElementKinds.Menu);
     }
 }

@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
              xmlns:rec="clr-namespace:JingleBox2.Tracker.Records"
              xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:conv="clr-namespace:JingleBox2.Converters"

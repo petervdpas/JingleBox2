@@ -25,9 +25,9 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- What a machine is written against. The host knows machines only through this. -->
-    <ProjectReference Include="Machines.Abstractions\JingleBox2.Machines.Abstractions.csproj" />
+    <ProjectReference Include="Rack.Abstractions\JingleBox2.Rack.Abstractions.csproj" />
     <!-- And what a machine's panel is drawn with. -->
-    <ProjectReference Include="Machines.Ui\JingleBox2.Machines.Ui.csproj" />
+    <ProjectReference Include="Rack.Ui\JingleBox2.Rack.Ui.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The machines that ship. A machine is a project on disc, so the ones we supply are
@@ -49,16 +49,16 @@
   <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its
          sources and its build folder, and compile both twice. -->
-    <Compile Remove="Machines.Abstractions\**" />
-    <Compile Remove="Machines.Ui\**" />
-    <EmbeddedResource Remove="Machines.Abstractions\**" />
-    <EmbeddedResource Remove="Machines.Ui\**" />
-    <None Remove="Machines.Abstractions\**" />
-    <None Remove="Machines.Ui\**" />
-    <AvaloniaResource Remove="Machines.Abstractions\**" />
-    <AvaloniaResource Remove="Machines.Ui\**" />
-    <AvaloniaXaml Remove="Machines.Abstractions\**" />
-    <AvaloniaXaml Remove="Machines.Ui\**" />
+    <Compile Remove="Rack.Abstractions\**" />
+    <Compile Remove="Rack.Ui\**" />
+    <EmbeddedResource Remove="Rack.Abstractions\**" />
+    <EmbeddedResource Remove="Rack.Ui\**" />
+    <None Remove="Rack.Abstractions\**" />
+    <None Remove="Rack.Ui\**" />
+    <AvaloniaResource Remove="Rack.Abstractions\**" />
+    <AvaloniaResource Remove="Rack.Ui\**" />
+    <AvaloniaXaml Remove="Rack.Abstractions\**" />
+    <AvaloniaXaml Remove="Rack.Ui\**" />
 
     <!-- And the tests, for the same reason: a project inside this one's folder is swallowed by
          this one's own globs, which compiles its sources here as well and duplicates everything

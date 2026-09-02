@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
@@ -33,7 +33,7 @@ public sealed partial class RackMachine : ObservableObject
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
-    public MachineTheme Theme => Machine.For(Instrument.Kind).Theme;
+    public PanelTheme Theme => Machine.For(Instrument.Kind).Theme;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;

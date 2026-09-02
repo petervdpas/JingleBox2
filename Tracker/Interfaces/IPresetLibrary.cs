@@ -16,7 +16,7 @@ namespace JingleBox2.Tracker.Interfaces;
 /// the file.
 ///
 /// Called a library rather than the machine's presets because
-/// <c>JingleBox2.Machines.Abstractions.IMachinePresets</c> is already that name, and it is a
+/// <c>JingleBox2.Rack.Abstractions.IPanelPresets</c> is already that name, and it is a
 /// different thing: that one is the picker a panel puts in front of you, this one is where the
 /// files are read from.
 ///

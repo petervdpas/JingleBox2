@@ -1,8 +1,8 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Midi;
 using Xunit;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Controllers;
 
@@ -431,16 +431,16 @@ public class PanelOrderTests
     private readonly IPanelOrder _order = new PanelOrder();
 
     /// <summary>A knob on a panel, which is the one element kind that always turns something.</summary>
-    private static MachineElement Knob(string parameter) =>
-        new() { Element = MachineElementKinds.Knob, Parameter = parameter };
+    private static PanelElement Knob(string parameter) =>
+        new() { Element = ElementKinds.Knob, Parameter = parameter };
 
     /// <summary>A panel holding the given elements straight under its root grid.</summary>
-    private static MachinePanel Panel(params MachineElement[] children)
+    private static Panel Panel(params PanelElement[] children)
     {
-        var root = new MachineElement { Element = MachineElementKinds.Grid };
+        var root = new PanelElement { Element = ElementKinds.Grid };
         root.Children.AddRange(children);
 
-        return new MachinePanel { Root = root };
+        return new Panel { Root = root };
     }
 
     /// <summary>Controls come back in the order they are drawn, which is how they are read.</summary>
@@ -459,7 +459,7 @@ public class PanelOrderTests
     [Fact]
     public void Everything_in_a_group_comes_before_what_stands_after_it()
     {
-        var group = new MachineElement { Element = MachineElementKinds.Group };
+        var group = new PanelElement { Element = ElementKinds.Group };
         group.Children.Add(Knob("attack"));
         group.Children.Add(Knob("decay"));
 
@@ -487,7 +487,7 @@ public class PanelOrderTests
     [Fact]
     public void Things_that_turn_nothing_are_not_counted()
     {
-        var label = new MachineElement { Element = MachineElementKinds.Label };
+        var label = new PanelElement { Element = ElementKinds.Label };
 
         var panel = Panel(label, Knob("cutoff"));
 

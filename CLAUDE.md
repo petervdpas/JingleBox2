@@ -342,6 +342,15 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   one only put Serum in a list beside OddSkilla as though the two were the same kind of thing.
   Anything that is not a registered machine is moved to `instruments/retired` on the next open,
   which now includes the plugins that were shelved before this
+- **An effect of ours is a fourth word and not a kind of machine.** Engine, machine and instrument
+  were three; an effect sits beside machine. It is a face over an effect engine, it takes audio
+  rather than notes, and so it has no keyboard, no zones, no pads and no kit. Its own folder, its
+  own manifest, its own register and its own page in the designer, registered by the same rules a
+  machine is: two folders, `offered.txt`, and an id whose engine this build has not got read and
+  passed over. What the two share is the drawing, which is why the panel types stopped being
+  named for machines. An effect in use is a slot on a track's chain and takes no name of its own,
+  the way two of the same plugin on one track already read. `docs/effects.md` is the design, the
+  rename, the six engines and the order they are being built in; nothing but the rename is built
 - **The rack decides which machines a song can be given, so a machine can be taken off it.** It
   could not be, on the reasoning that a machine is not something you can be without, and that was
   the wrong shape: a machine you never reach for is one that should not be in the list a song
@@ -387,11 +396,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   every direction, so the room is left in every direction. Machine panels set `LabelAbove` and
   were unaffected by the height; the width moves every knob everywhere by nine pixels a side,
   which their grids absorb
-- `Knob` / `Fader` / `NumberField` (Machines.Ui/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field. They live in the machine UI assembly because a machine bought from somebody else is built out of the same controls the app's own machines are
-- `WaveformView` (Machines.Ui/): A recording's shape, with the window and the loop draggable on the picture
-- `MachinePanelView` (Machines.Ui/): A machine's face, built from what the machine says it looks like. Designing, every element can be picked and none can be turned; off, it is an ordinary panel
-- `MachinePartSample` (Machines.Ui/): One entry of the designer's library, drawn as the real control it adds
-- `ThemePalette` (Machines.Ui/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
+- `Knob` / `Fader` / `NumberField` (Rack.Ui/): The app's own value controls; a pot knob, a vertical fader, and a compact stepper field. They live in the machine UI assembly because a machine bought from somebody else is built out of the same controls the app's own machines are
+- `WaveformView` (Rack.Ui/): A recording's shape, with the window and the loop draggable on the picture
+- `PanelView` (Rack.Ui/): A machine's face, built from what the machine says it looks like. Designing, every element can be picked and none can be turned; off, it is an ordinary panel
+- `PartSample` (Rack.Ui/): One entry of the designer's library, drawn as the real control it adds
+- `ThemePalette` (Rack.Ui/): Theme colours for custom-drawn controls, read as `Color.*` keys so a theme swap lands at once
 - `MainViewModel`: Central orchestrator connecting audio, config, and MIDI subsystems
 - `PadViewModel`: Single pad state (name, source, volume, playback state)
 
@@ -455,12 +464,12 @@ declarations, GUIDs and struct layouts, which is data with a compiler attached, 
 the toolkit requires. `XErrors` installs the one X11 error handler a process has. `PanelPreview`
 and `PluginHostProcess` are entry points: this same executable started again, being something
 else. `PadMatrix` is three consts and `MixLinks` is nine templates named from XAML by
-`x:Static`, both data, and so are `MachineActions`, `MachineStarts`, `MachineElementKinds`,
+`x:Static`, both data, and so are `PanelActions`, `PanelStarts`, `ElementKinds`,
 `MachinePresetWords` and `PatternFont`. `PluginCrashGuard` is a door like the log's and its
 rules came out into `IRunMarker`. `ShortcutKeys` is one more door: one map for the application,
 hung on every window, and what it knows is `IShortcutMap` and `IShortcutContext` already.
 
-**The two machine assemblies are published, and the rule there is narrower.** `Machines.Abstractions`
+**The two machine assemblies are published, and the rule there is narrower.** `Rack.Abstractions`
 is what an outside machine links to and is the assembly `LICENSE.EXCEPTION` names, so everything
 public in either of them is a promise. The test is not "can it be stood in front of" but **would
 an outside machine ever write this down**. The parts every range control shares are public,
@@ -471,7 +480,42 @@ our own fader reads its track and how our own tick attribute is spelled are not:
 `FaderMath` and `TickList` are internal, with `InternalsVisibleTo` for the tests. Internal is not
 untested, and that line in the csproj is the whole of what it costs to keep the promise small.
 
-Five files in `Machines.Ui` declared `JingleBox2.UI`, the application's own namespace, inside the
+**The parts both worlds draw themselves out of are named for neither of them.** An effect of ours
+is not a machine and has a described face all the same, so the types a face is made of were
+called `MachinePanel`, `MachineElement`, `MachineElementKinds`, `MachineParameter` and the rest
+while half their callers were about to be effects. They are `Panel`, `PanelElement`,
+`ElementKinds`, `Parameter`, `IPanelValues`, `IPanelMenu`, `PanelMenuItem`, `MenuCorners`,
+`MenuOptionWords`, `IPanelPresets`, `IPanelScope`, `PanelActions`, `PanelStarts`, `PanelTheme`
+and `Face` now, and in the library `PanelView` and `PartSample`. The line is **do both worlds use
+it**, not does the word machine appear: `IMachine`, `IMachineKeys`, `IMachineNotes`,
+`IMachinePads`, `IMachineZones`, `IMachineSlices`, `IMachineTakes`, `IMachineLocation`,
+`IMachinePatch` and `IInstrumentName` keep their names, because a keyboard and a kit's pads are
+the instrument world and there the word is true. Nothing on disc moved: a `machine.json` names
+element words and property names, never a type.
+
+`Rack.Abstractions` is published, so it is a breaking change, and it was cheap exactly once.
+Nothing outside this repository ships against it yet, which is a window that closes on its own.
+
+**The namespaces say which world a contract belongs to, and the assemblies are named for the
+rack rather than for machines.** `JingleBox2.Rack.Faces` is what both worlds draw themselves out
+of, `JingleBox2.Rack.Machines` is what only an instrument has (a keyboard, zones, pads, slices,
+takes, a patch, a place in the pattern, the name badge), `JingleBox2.Rack.Effects` is what only
+an effect will have, and `JingleBox2.Rack.Ui` is the controls. The folders say the same thing:
+`Rack.Abstractions/Faces/` and `Rack.Abstractions/Machines/`, each with its own `Interfaces` and
+`Records` under it. The assemblies are `JingleBox2.Rack.Abstractions` and `JingleBox2.Rack.Ui`,
+which is what `LICENSE.EXCEPTION` names.
+
+**The shared level being a namespace of its own is what makes the `Panel` collision loud.**
+`Panel` is also `Avalonia.Controls.Panel`, and a namespace that encloses another is searched
+before any using: while the faces lived in `JingleBox2.Machines` and the controls in
+`JingleBox2.Machines.Ui`, ours won silently throughout the controls assembly and the toolkit's
+had to be spelled out where it was really wanted. `JingleBox2.Rack.Ui` encloses nothing, so a
+bare `Panel` there is the toolkit's again and a file that imports the faces is refused rather
+than answered. Which is what the first build after the split said, in one place: `PanelView`,
+now `Faces.Panel`. A cref that crosses the split is the same story in documentation, and is
+written out in full, since a `<see cref>` resolves by what the file it sits in can see.
+
+Five files in `Rack.Ui` declared `JingleBox2.UI`, the application's own namespace, inside the
 assembly this codebase is otherwise careful to keep clear of it. The compiler proved they were
 the only ones: taking the namespace away left nothing else in that assembly needing it.
 
@@ -566,7 +610,7 @@ dotnet build -c Debug --no-incremental 2>&1 | grep "warning CS1591" | sed 's/: w
 **1981 members across 284 files when this began** (2026-08-28), and **nought** when it was finished,
 the same day. The whole tree went through in one pass, folder by folder: `Audio/` and its plugins
 and routing, `Midi/`, `Config/`, `Tracker/` with its synth and its machines, `ViewModels/`,
-`Views/`, `Machines.Ui/`, `Machines.Abstractions/`, `Diagnostics/`, `Shortcuts/`, `Scripting/`,
+`Views/`, `Rack.Ui/`, `Rack.Abstractions/`, `Diagnostics/`, `Shortcuts/`, `Scripting/`,
 `Controllers/`, `Models/`, `UI/`, `Converters/`, `Waveform/`, `Help/`, `Controls/` and `Tests/`.
 About 2600 line comments came out and went upstairs into the documentation over the block they
 sat in.
@@ -813,7 +857,7 @@ whole exercise and is worth writing down rather than summarising:
   mode (Ctrl+Shift+M) and touching the control on the desk. The mapping names the machine and
   the parameter key, never a track or an instrument id, so it is Zampler's cutoff on every track
   and in every song; which track is a separate question answered by `ControlScope`. Only things
-  that name a `MachineParameter` can be pointed at, and buttons separately as actions; a label
+  that name a `Parameter` can be pointed at, and buttons separately as actions; a label
   or a take picker cannot, and does not glow. `MidiControlRouter` works out from three messages
   whether a control is a button, a knob or an encoder, since a CC says nothing about what sent
   it, and parks a control against an end until the stream turns round
@@ -1017,7 +1061,7 @@ whole exercise and is worth writing down rather than summarising:
   template from a newer version looks like: mostly this version's, and the useful answer is the
   part that works plus a line saying how much did not
 - **The instrument's name in the song is a part too, and used to be the exception that proved
-  the rule.** `MachineElementKinds.InstrumentName` is the badge, dropped on the panel like a Knob
+  the rule.** `ElementKinds.InstrumentName` is the badge, dropped on the panel like a Knob
   and placed by whoever builds the machine. It was drawn over every panel from code, in a corner
   this program chose, which is the one thing a machine's face is never supposed to have done to
   it: a machine that had never asked for a badge grew one, and a machine that put a Menu in that
@@ -1033,14 +1077,14 @@ whole exercise and is worth writing down rather than summarising:
   instrument list renames it. `Tests/MachinePartsTests.cs` reads the machines that ship off the
   disc and says each carries exactly one badge and at most one Menu, that neither is pointed at
   a parameter, and that the words in those files are the words the code spells
-- **A machine's face can carry a Menu, and it is a generic part.** `MachineElementKinds.Menu` is
+- **A machine's face can carry a Menu, and it is a generic part.** `ElementKinds.Menu` is
   dropped onto the panel in the designer like a Knob, placed where the person building the
   machine wants it, and carried in `machine.json` with the rest of the face. It turns no
-  parameter and never will: what is in it comes from the host through `IMachineMenu`, exactly the
+  parameter and never will: what is in it comes from the host through `IPanelMenu`, exactly the
   way `Keys`, `Take`, `Preset` and `Zones` are already filled. It is not named after what it
   holds, because what it holds is going to grow
 - **Which options it drops down is chosen in the designer**, tick by tick, from
-  `MachineMenuOptions.All`. Two today: `surfaces`, the control surfaces there is a template for
+  `MenuOptionWords.All`. Two today: `surfaces`, the control surfaces there is a template for
   on this machine, and `learn`, which turns over the same mode Ctrl+Shift+M turns over. An option
   added later turns up on the ticks and in every machine that has never been near that page,
   because a Menu naming no options carries all of them. `IMenuOptions` is that rule on its own so
@@ -1524,8 +1568,8 @@ whole exercise and is worth writing down rather than summarising:
 - The log switch is per area everywhere now. Ten places gated on `Log.IsOn`, which is any area at
   all, and then wrote to one: two of them on the audio thread, so switching MIDI logging on made
   the mixer do census work per block that nothing would ever print
-- A panel hears about a value it did not write. `IMachineValues.Said` is raised alongside the
-  owner's `Changed` callback, and `MachinePanelView` subscribes to it and reads itself again,
+- A panel hears about a value it did not write. `IPanelValues.Said` is raised alongside the
+  owner's `Changed` callback, and `PanelView` subscribes to it and reads itself again,
   coalesced to once a frame. Before this the only thing that made a panel redraw was the host
   bumping `Reread`, which happens when a kit or a zone is picked and never when a controller
   moves a knob: the number changed, the sound changed, and the picture sat there until something

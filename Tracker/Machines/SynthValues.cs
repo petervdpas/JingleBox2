@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.UI;
 using JingleBox2.ViewModels;
 using System;
@@ -27,7 +27,7 @@ namespace JingleBox2.Tracker.Machines;
 /// </remarks>
 /// <param name="patch">The wave, the envelope, the filter and the modulation.</param>
 /// <param name="instrument">Whose level it is, which is not the patch's.</param>
-public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : MachineValues
+public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument instrument) : PanelValues
 {
     /// <summary>The fader scale, so a level in decibels can be checked without a window.</summary>
     private readonly IGainScale _gain = new GainScale();
@@ -111,7 +111,7 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// </summary>
     /// <remarks>
     /// A knob on the face like any other, and the machine marks it as one nothing writes down.
-    /// See <see cref="MachineParameter.Saved"/>.
+    /// See <see cref="Parameter.Saved"/>.
     /// </remarks>
     private const string CyclesKey = "cycles";
 

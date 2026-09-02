@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using System;
@@ -180,7 +180,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
                 read,
                 new MachineProjectShape(
                     project?.Panel,
-                    (IReadOnlyList<MachineParameter>?)project?.Parameters ?? Array.Empty<MachineParameter>()),
+                    (IReadOnlyList<Parameter>?)project?.Parameters ?? Array.Empty<Parameter>()),
                 () => Moved = true,
                 Folder);
         }

@@ -1,10 +1,10 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Midi;
 using JingleBox2.Views;
 using System;
 using Xunit;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -145,8 +145,8 @@ public class PointingTests
     [Fact]
     public void The_preset_picker_offers_the_step_the_hand_is_reaching_for()
     {
-        Assert.Equal(MachineActions.PresetPrevious, _step.Side(10, 50));
-        Assert.Equal(MachineActions.PresetNext, _step.Side(90, 50));
+        Assert.Equal(PanelActions.PresetPrevious, _step.Side(10, 50));
+        Assert.Equal(PanelActions.PresetNext, _step.Side(90, 50));
     }
 
     /// <summary>A step moves one place along the shelf, either way.</summary>

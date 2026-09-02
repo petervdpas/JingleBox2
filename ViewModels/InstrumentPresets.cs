@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Tracker.Interfaces;
@@ -25,7 +25,7 @@ namespace JingleBox2.ViewModels;
 /// the id and the level stay, because this is still the same instrument standing in the same
 /// track; it has just been given a different sound to make.
 /// </remarks>
-public sealed partial class InstrumentPresets : ObservableObject, IMachinePresets
+public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
 {
     /// <summary>The machines this run has.</summary>
     private readonly IMachineProjects _machines;
@@ -214,10 +214,10 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     /// described in a file has no way of knowing what a preset object is. Which one is picked
     /// travels back as a number for the same reason.
     /// </remarks>
-    IReadOnlyList<string> IMachinePresets.Names => Items.Select(one => one.Name).ToList();
+    IReadOnlyList<string> IPanelPresets.Names => Items.Select(one => one.Name).ToList();
 
     /// <summary>Which one is showing, or -1 for none. Setting it loads that one.</summary>
-    int IMachinePresets.Picked
+    int IPanelPresets.Picked
     {
         get => Selected == null ? -1 : Items.IndexOf(Selected);
         set
@@ -229,11 +229,11 @@ public sealed partial class InstrumentPresets : ObservableObject, IMachinePreset
     }
 
     /// <summary>The categories the takes are filed under, or none on a machine offering presets.</summary>
-    IReadOnlyList<string> IMachinePresets.Filters =>
+    IReadOnlyList<string> IPanelPresets.Filters =>
         PicksTakes && _narrowing != null ? _narrowing.Filters.ToList() : Array.Empty<string>();
 
     /// <summary>Which category is in force. Setting it narrows what is on offer.</summary>
-    string IMachinePresets.Filter
+    string IPanelPresets.Filter
     {
         get => _narrowing?.Filter ?? "";
         set

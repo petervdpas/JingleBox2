@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using JingleBox2.Config;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Machines;
 using JingleBox2.ViewModels;
@@ -23,8 +23,8 @@ public class DesignHistoryTests
     {
         var project = new MachineProject { Id = "machine.test", Name = "Test", Folder = "/somewhere/real" };
 
-        project.Parameters.Add(new MachineParameter { Key = "cutoff", Name = "Cutoff", Min = 0, Max = 1 });
-        project.Panel = new MachinePanel { Root = new MachineElement { Element = MachineElementKinds.Grid } };
+        project.Parameters.Add(new Parameter { Key = "cutoff", Name = "Cutoff", Min = 0, Max = 1 });
+        project.Panel = new Panel { Root = new PanelElement { Element = ElementKinds.Grid } };
 
         return project;
     }
@@ -60,7 +60,7 @@ public class DesignHistoryTests
         var history = new DesignHistory();
         history.Opened(project);
 
-        project.Panel.Root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+        project.Panel.Root.Children.Add(new PanelElement { Element = ElementKinds.Knob });
         history.Did(project);
 
         Assert.True(history.NeedsSaving);
@@ -86,7 +86,7 @@ public class DesignHistoryTests
 
         for (int at = 1; at <= 3; at++)
         {
-            project.Panel.Root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+            project.Panel.Root.Children.Add(new PanelElement { Element = ElementKinds.Knob });
             history.Did(project);
 
             project.Version = "1." + at;
@@ -130,13 +130,13 @@ public class DesignHistoryTests
         var history = new DesignHistory();
         history.Opened(project);
 
-        project.Panel.Root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+        project.Panel.Root.Children.Add(new PanelElement { Element = ElementKinds.Knob });
         history.Did(project);
 
         project.Name = "Test Two";
         history.Did(project);
 
-        project.Parameters.Add(new MachineParameter { Key = "resonance" });
+        project.Parameters.Add(new Parameter { Key = "resonance" });
         history.Did(project);
 
         history.Undo(project);

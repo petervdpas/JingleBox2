@@ -1,8 +1,8 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -19,13 +19,13 @@ namespace JingleBox2.ViewModels;
 /// <param name="parameters">
 /// The parameters the editor is showing, which are both the description and the store here.
 /// </param>
-public sealed class MachinePreviewValues(ObservableCollection<MachineParameterViewModel> parameters) : IMachineValues
+public sealed class MachinePreviewValues(ObservableCollection<MachineParameterViewModel> parameters) : IPanelValues
 {
     /// <summary>
     /// Raised when a value here moved, so the panel drawing them follows.
     /// </summary>
     /// <remarks>
-    /// The same event <see cref="MachineValues"/> raises, and needed for the same reason: on the
+    /// The same event <see cref="PanelValues"/> raises, and needed for the same reason: on the
     /// rack a knob can be pointed at a machine and turned from the desk, and without this the
     /// panel would never hear about it. This class does not inherit that one because the editor's
     /// values are the parameters it is showing rather than a machine's settings.

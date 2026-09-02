@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Tracker.Enums;
@@ -41,7 +41,7 @@ public sealed class SamplerValues(
     ZoneMapViewModel map,
     SamplerPatchViewModel patch,
     TrackerInstrument instrument,
-    Func<SampleZoneViewModel?>? about = null) : MachineValues
+    Func<SampleZoneViewModel?>? about = null) : PanelValues
 {
     /// <summary>What a new note does to the one the track is still sounding.</summary>
     /// <remarks>

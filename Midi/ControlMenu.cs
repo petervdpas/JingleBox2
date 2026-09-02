@@ -6,9 +6,9 @@ using JingleBox2.Controllers;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
@@ -34,7 +34,7 @@ namespace JingleBox2.Midi;
 /// Which machine is asked for rather than held, since one of these serves a panel and the panel
 /// is shown a different machine as somebody works. Nothing for a page with none open.
 /// </remarks>
-public sealed class ControlMenu : IMachineMenu
+public sealed class ControlMenu : IPanelMenu
 {
     /// <summary>
     /// Which sort of thing this menu is about, in the word <see cref="ILinkTargets.KindOf"/> uses.
@@ -126,13 +126,13 @@ public sealed class ControlMenu : IMachineMenu
     public Action<string>? Told { get; set; }
 
     /// <inheritdoc/>
-    public IReadOnlyList<MachineMenuItem> Read()
+    public IReadOnlyList<PanelMenuItem> Read()
     {
         string id = _which() ?? "";
 
-        if (Desk is not { } link) return Array.Empty<MachineMenuItem>();
+        if (Desk is not { } link) return Array.Empty<PanelMenuItem>();
 
-        if (Names && id.Length == 0) return Array.Empty<MachineMenuItem>();
+        if (Names && id.Length == 0) return Array.Empty<PanelMenuItem>();
 
         string called = _named() is { Length: > 0 } word ? word : id;
 
@@ -202,14 +202,14 @@ public sealed class ControlMenu : IMachineMenu
     /// <param name="called">What the machine is called, for the wording.</param>
     /// <param name="controller">The controller as its profile calls it.</param>
     /// <param name="links">Its links on this machine.</param>
-    private MachineMenuItem Pointed(
+    private PanelMenuItem Pointed(
         ControlLink link,
         string called,
         string controller,
         IReadOnlyList<ControlMapping> links) =>
         new((controller.Length > 0 ? controller : Anonymous) + Beside + Counted(links.Count))
         {
-            Option = MachineMenuOptions.Surfaces,
+            Option = MenuOptionWords.Surfaces,
             Tip = "Points that controller at " + called + " the way this template says. One "
                   + "control does one job, so each of them takes back whatever has been pointed "
                   + "at the same thing since.",
@@ -233,10 +233,10 @@ public sealed class ControlMenu : IMachineMenu
     /// </remarks>
     /// <param name="link">Where the links live, and what holds the mode.</param>
     /// <param name="called">What the machine is called, for the wording.</param>
-    private MachineMenuItem Learning(ControlLink link, string called) =>
+    private PanelMenuItem Learning(ControlLink link, string called) =>
         new(link.IsLinking ? "Stop learning" : "Learn a control")
         {
-            Option = MachineMenuOptions.Learn,
+            Option = MenuOptionWords.Learn,
             Tip = link.IsLinking
                 ? "Turns the mode off again. The same as pressing Ctrl+Shift+M."
                 : "The same as pressing Ctrl+Shift+M. Rest the pointer on one of " + called

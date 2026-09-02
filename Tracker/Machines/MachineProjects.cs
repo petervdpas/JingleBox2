@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using System;
 using System.Collections.Generic;
 using JingleBox2.Tracker.Enums;
@@ -34,7 +34,7 @@ public sealed class MachineProjects : IMachineProjects
         id is { Length: > 0 } && _found.TryGetValue(id, out var machine) ? machine : null;
 
     /// <inheritdoc/>
-    public MachinePanel? PanelFor(string? id)
+    public Panel? PanelFor(string? id)
     {
         var machine = For(id);
 

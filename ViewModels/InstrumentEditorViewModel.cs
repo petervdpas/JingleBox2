@@ -12,12 +12,13 @@ using System.Linq;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.UI.Interfaces;
 using JingleBox2.Files;
@@ -79,7 +80,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// by anything else is recorded too. The panel is one of the ways a knob gets turned and
     /// increasingly not the usual one.
     /// </remarks>
-    private T Watched<T>(T values) where T : Machines.MachineValues
+    private T Watched<T>(T values) where T : Rack.Faces.PanelValues
     {
         values.Said += key => History.Did(_instrument, key);
 
@@ -366,7 +367,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
             };
         }
 
-        Described = new MachineFace(face, project.Parameters, project.Folder);
+        Described = new Face(face, project.Parameters, project.Folder);
 
         MachineTakes = shelf;
     }
@@ -378,7 +379,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public IMachineZones? MachineZones { get; private set; }
 
     /// <summary>The shape it is making, on a machine that generates its sound.</summary>
-    public IMachineScope? MachineScope { get; private set; }
+    public IPanelScope? MachineScope { get; private set; }
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
     public IMachineSlices? MachineSlices { get; private set; }
@@ -407,7 +408,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// A knob is pointed at OddSkilla's cutoff and not at track three's, so two instruments off
     /// one machine are one answer here, as they are everywhere else.
     /// </remarks>
-    public IMachineMenu MachineMenu { get; }
+    public IPanelMenu MachineMenu { get; }
 
     /// <summary>
     /// Bumped when everything the described panel shows may have moved.
@@ -444,10 +445,10 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// being handed a different machine and the machine itself has not changed: the same face,
     /// with a different recording behind it.
     /// </remarks>
-    public MachineFace? Described { get; private set; }
+    public Face? Described { get; private set; }
 
     /// <summary>Where that face reads and writes, which is this instrument.</summary>
-    public IMachineValues? Values { get; private set; }
+    public IPanelValues? Values { get; private set; }
 
     /// <summary>Where it looks up the recording it names.</summary>
     public IMachineTakes? MachineTakes { get; private set; }
@@ -492,7 +493,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public TrackerInstrument Instrument => _instrument;
 
     /// <summary>The machine's own theme: its colour and how far it is carried.</summary>
-    public MachineTheme Theme => Machine.For(_instrument.Kind).Theme;
+    public PanelTheme Theme => Machine.For(_instrument.Kind).Theme;
 
     /// <summary>Its colour on its own, for the band across the top of the panel.</summary>
     public string Colour => Theme.Accent;

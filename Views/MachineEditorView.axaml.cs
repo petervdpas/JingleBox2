@@ -698,7 +698,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// Over the panel but over nothing in particular means the machine itself, which is where a
     /// part let go over open space goes.
     /// </remarks>
-    private (Machines.MachineElement?, ViewModels.MachineElementViewModel?) Under(Point at)
+    private (Rack.Faces.PanelElement?, ViewModels.MachineElementViewModel?) Under(Point at)
     {
         var hit = this.InputHitTest(at) as Visual;
 
@@ -744,13 +744,13 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
 
         if (carrying.Kind is { } kind)
         {
-            inside = new Machines.Ui.MachinePartSample { Kind = kind, Width = 62, Height = 44 };
+            inside = new Rack.Ui.PartSample { Kind = kind, Width = 62, Height = 44 };
         }
         else
         {
             var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
 
-            row.Children.Add(new Machines.Ui.MachinePartSample
+            row.Children.Add(new Rack.Ui.PartSample
             {
                 Kind = carrying.Element?.Kind ?? "",
                 Width = 44,
@@ -790,7 +790,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// Both, because a drag crosses from one to the other and whichever is left holding a mark
     /// is showing something that is no longer true. Clearing is the same call with nothing in it.
     /// </remarks>
-    private void Mark(Machines.MachineElement? onPanel, ViewModels.MachineElementViewModel? onList)
+    private void Mark(Rack.Faces.PanelElement? onPanel, ViewModels.MachineElementViewModel? onList)
     {
         PanelCanvas.Marked = onPanel;
 
@@ -800,7 +800,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     }
 
     /// <summary>The outermost element, which is where a part let go over nothing goes.</summary>
-    private Machines.MachineElement? Root() => Editor?.Project?.Panel.Root;
+    private Rack.Faces.PanelElement? Root() => Editor?.Project?.Panel.Root;
 
 
 

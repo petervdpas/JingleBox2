@@ -1,8 +1,10 @@
-using JingleBox2.Machines;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Ui;
-using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.Ui;
+using JingleBox2.Rack.Ui.Interfaces;
 using Xunit;
+using JingleBox2.Rack.Machines;
 
 namespace JingleBox2.Tests;
 
@@ -22,12 +24,12 @@ public class PanelRulesTests
     private readonly IPresetStep _step = new PresetStep();
     private readonly INaming _naming = new Naming();
 
-    private static MachineElement Knob(string parameter) =>
-        new() { Element = MachineElementKinds.Knob, Parameter = parameter };
+    private static PanelElement Knob(string parameter) =>
+        new() { Element = ElementKinds.Knob, Parameter = parameter };
 
-    private static MachineElement Holding(params MachineElement[] children)
+    private static PanelElement Holding(params PanelElement[] children)
     {
-        var group = new MachineElement { Element = MachineElementKinds.Group };
+        var group = new PanelElement { Element = ElementKinds.Group };
 
         foreach (var child in children) group.Children.Add(child);
 
@@ -39,7 +41,7 @@ public class PanelRulesTests
     public void Nothing_has_no_order()
     {
         Assert.Empty(_order.Of(null));
-        Assert.Empty(_order.Of(new MachinePanel()));
+        Assert.Empty(_order.Of(new Panel()));
         Assert.Equal("", _order.At(null, 0));
     }
 
@@ -47,7 +49,7 @@ public class PanelRulesTests
     [Fact]
     public void The_order_is_depth_first()
     {
-        var panel = new MachinePanel
+        var panel = new Panel
         {
             Root = Holding(
                 Holding(Knob("cutoff"), Knob("resonance")),
@@ -67,7 +69,7 @@ public class PanelRulesTests
     [Fact]
     public void A_parameter_named_twice_counts_once()
     {
-        var panel = new MachinePanel
+        var panel = new Panel
         {
             Root = Holding(Knob("cutoff"), Knob("drive"), Knob("cutoff"), Knob("mix"))
         };
@@ -80,10 +82,10 @@ public class PanelRulesTests
     [Fact]
     public void A_label_is_not_in_the_order()
     {
-        var panel = new MachinePanel
+        var panel = new Panel
         {
             Root = Holding(
-                new MachineElement { Element = MachineElementKinds.Label },
+                new PanelElement { Element = ElementKinds.Label },
                 Knob("cutoff"))
         };
 
@@ -94,7 +96,7 @@ public class PanelRulesTests
     [Fact]
     public void Asking_outside_the_order_is_nothing()
     {
-        var panel = new MachinePanel { Root = Holding(Knob("cutoff")) };
+        var panel = new Panel { Root = Holding(Knob("cutoff")) };
 
         Assert.Equal("cutoff", _order.At(panel, 0));
         Assert.Equal("", _order.At(panel, 1));
@@ -205,9 +207,9 @@ public class PanelRulesTests
     [Fact]
     public void The_side_decides_the_step()
     {
-        Assert.Equal(MachineActions.PresetPrevious, _step.Side(10, 50));
-        Assert.Equal(MachineActions.PresetNext, _step.Side(90, 50));
-        Assert.Equal(MachineActions.PresetNext, _step.Side(50, 50));
+        Assert.Equal(PanelActions.PresetPrevious, _step.Side(10, 50));
+        Assert.Equal(PanelActions.PresetNext, _step.Side(90, 50));
+        Assert.Equal(PanelActions.PresetNext, _step.Side(50, 50));
     }
 
     /// <summary>A name is printed as a phrase, not as a run of capitalised words.</summary>

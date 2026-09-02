@@ -47,7 +47,7 @@ Audio runs through **BASS** (ManagedBass). Pads are streams the engine owns; the
 
 Plugins run **in a process of their own**, one per plugin, and so does the scan. A plugin that crashes takes only itself down: an effect passes its audio through, an instrument goes quiet, and the panel offers to start it again. The child process is this same executable started with `--plugin-host`, talking over a socket with the audio in shared memory.
 
-Machines are laid out rather than coded. Six engines are compiled in and a machine is a face over one of them, described in a `machine.json` the designer writes and drawn by the app: what the description does not draw, nobody draws. `Machines.Abstractions` is what a machine is and `Machines.Ui` is what it is drawn with, and those two are the assemblies `LICENSE.EXCEPTION` names.
+Machines are laid out rather than coded. Six engines are compiled in and a machine is a face over one of them, described in a `machine.json` the designer writes and drawn by the app: what the description does not draw, nobody draws. `Rack.Abstractions` is what a machine is and `Rack.Ui` is what it is drawn with, and those two are the assemblies `LICENSE.EXCEPTION` names.
 
 **The machine registry** is what this installation has, and it is the only thing that answers that. Two folders and only one of them is yours: beside the program is what ships, a source to take a machine from and never the answer to what is on the rack, and under the application folder is what you have actually registered. Removing a machine is not losing it, since the shipped copy stays where it was.
 
@@ -141,8 +141,8 @@ JingleBox2/
 ├─ Controllers/        # Controller profiles and their Lua codecs
 ├─ Shortcuts/          # What a key can ask for, and who answers
 ├─ Scripting/          # The Lua sandbox
-├─ Machines.Abstractions/  # What a machine is: the contract an outside one links to
-├─ Machines.Ui/        # What a machine is drawn with: knobs, faders, panels
+├─ Rack.Abstractions/  # What a machine is: the contract an outside one links to
+├─ Rack.Ui/        # What a machine is drawn with: knobs, faders, panels
 ├─ ViewModels/         # MVVM, CommunityToolkit
 ├─ Views/              # Avalonia views, and the app's own drawn controls
 ├─ Themes/             # One resource dictionary per theme

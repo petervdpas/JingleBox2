@@ -14,8 +14,8 @@ using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Faces;
 
 namespace JingleBox2.Views;
 
@@ -70,13 +70,13 @@ public partial class InstrumentPanel : UserControl
     {
         InitializeComponent();
 
-        MachineFace.ActionWanted += Asked;
+        Face.ActionWanted += Asked;
 
-        MachineFace.TakeWanted += PickTake;
+        Face.TakeWanted += PickTake;
 
-        MachineFace.LinkWanted += Offer;
-        MachineFace.LinkActionWanted += OfferAction;
-        MachineFace.UnlinkWanted += Drop;
+        Face.LinkWanted += Offer;
+        Face.LinkActionWanted += OfferAction;
+        Face.UnlinkWanted += Drop;
 
         DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
         UI.ThemeSwitch.Changed += Later;
@@ -128,7 +128,7 @@ public partial class InstrumentPanel : UserControl
 
     /// <summary>Does what a button on a described panel asked for.</summary>
     /// <remarks>
-    /// Matched against the names in <see cref="JingleBox2.Machines.MachineActions"/> rather than
+    /// Matched against the names in <see cref="JingleBox2.Rack.Faces.PanelActions"/> rather than
     /// against anything worked out from the string, so every action in the app can be found by
     /// searching for the word that is in the machine's file. One this build has never heard of
     /// does nothing, which is what lets a machine written against a later version still open.
@@ -137,47 +137,47 @@ public partial class InstrumentPanel : UserControl
     {
         switch (action)
         {
-            case Machines.MachineActions.ClearPad:
+            case Rack.Faces.PanelActions.ClearPad:
                 ClearPadSample_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Machines.MachineActions.LoadPads:
+            case Rack.Faces.PanelActions.LoadPads:
                 ImportPads_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Machines.MachineActions.ClearZone:
+            case Rack.Faces.PanelActions.ClearZone:
                 ClearZoneSample_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Machines.MachineActions.LoadZones:
+            case Rack.Faces.PanelActions.LoadZones:
                 ImportZones_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Machines.MachineActions.AddZone:
+            case Rack.Faces.PanelActions.AddZone:
                 Designer?.Editor?.Zones?.AddCommand.Execute(null);
 
                 break;
 
-            case Machines.MachineActions.RemoveZone:
+            case Rack.Faces.PanelActions.RemoveZone:
                 Designer?.Editor?.Zones?.RemoveCommand.Execute(null);
 
                 break;
 
-            case Machines.MachineActions.SpreadZones:
+            case Rack.Faces.PanelActions.SpreadZones:
                 Designer?.Editor?.Zones?.SpreadCommand.Execute(null);
 
                 break;
 
-            case Machines.MachineActions.PresetPrevious:
+            case Rack.Faces.PanelActions.PresetPrevious:
                 Step(-1);
 
                 break;
 
-            case Machines.MachineActions.PresetNext:
+            case Rack.Faces.PanelActions.PresetNext:
                 Step(1);
 
                 break;
@@ -195,7 +195,7 @@ public partial class InstrumentPanel : UserControl
     /// </remarks>
     private void Step(int by)
     {
-        if (MachineFace.Presets is not { } shelf) return;
+        if (Face.Presets is not { } shelf) return;
 
         int wanted = _step.Moved(shelf.Picked, shelf.Names.Count, by);
 
@@ -299,13 +299,13 @@ public partial class InstrumentPanel : UserControl
     {
         var link = Midi.ControlLink.Current;
 
-        MachineFace.Linking = link?.IsLinking ?? false;
+        Face.Linking = link?.IsLinking ?? false;
 
-        MachineFace.Linked = link is null || Designer?.Editor is not { } editor
+        Face.Linked = link is null || Designer?.Editor is not { } editor
             ? null
             : link.KeysOn(editor.MachineId);
 
-        MachineFace.LinkedActions = link is null || Designer?.Editor is not { } showing
+        Face.LinkedActions = link is null || Designer?.Editor is not { } showing
             ? null
             : link.ActionsOn(showing.MachineId);
     }

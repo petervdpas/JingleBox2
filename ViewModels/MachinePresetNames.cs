@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -15,7 +15,7 @@ namespace JingleBox2.ViewModels;
 /// Picking one does nothing. What a preset does to a machine happens where the machine is
 /// played, and the panel on the bench has no instrument behind it to do it to.
 /// </remarks>
-public sealed class MachinePresetNames : IMachinePresets
+public sealed class MachinePresetNames : IPanelPresets
 {
     /// <summary>The bench the presets are being written on, asked afresh rather than copied.</summary>
     /// <remarks>

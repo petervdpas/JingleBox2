@@ -4,8 +4,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             xmlns:machines="clr-namespace:JingleBox2.Machines;assembly=JingleBox2.Machines.Abstractions"
-             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
              x:Class="JingleBox2.Views.MachineEditorView"
              x:DataType="vm:MainViewModel">
 
@@ -204,7 +203,7 @@
                             ToolTip.Tip="{Binding}">
                       <StackPanel Spacing="1">
                         <Border Classes="sample">
-                          <ui:MachinePartSample Kind="{Binding}" />
+                          <ui:PartSample Kind="{Binding}" />
                         </Border>
 
                         <TextBlock Text="{Binding}" HorizontalAlignment="Center" FontSize="10" />
@@ -328,7 +327,7 @@
               <!-- Stretched, not sized to what is on it. What is drawn stays at the top left
                    either way, and a panel only as big as its knobs would leave a new machine
                    with nowhere to drop the first one. -->
-              <ui:MachinePanelView x:Name="PanelCanvas"
+              <ui:PanelView x:Name="PanelCanvas"
                                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                    MinHeight="200"
                                    Face="{Binding MachineEditor.Shown}"
@@ -347,7 +346,7 @@
                 <!-- The same three things the buttons under the panel list do, where the hand
                      already is. A right press picks the element up first, so the menu is always
                      about whatever was pressed rather than whatever was picked last. -->
-                <ui:MachinePanelView.ContextMenu>
+                <ui:PanelView.ContextMenu>
                   <ContextMenu>
                     <MenuItem Header="Remove"
                               Command="{Binding MachineEditor.RemoveElementCommand}"
@@ -360,8 +359,8 @@
                               Command="{Binding MachineEditor.MoveDownCommand}"
                               IsEnabled="{Binding MachineEditor.HasSelection}" />
                   </ContextMenu>
-                </ui:MachinePanelView.ContextMenu>
-              </ui:MachinePanelView>
+                </ui:PanelView.ContextMenu>
+              </ui:PanelView>
             </ScrollViewer>
             </Border>
           </DockPanel>

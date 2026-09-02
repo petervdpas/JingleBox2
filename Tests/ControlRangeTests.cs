@@ -1,5 +1,5 @@
-using JingleBox2.Machines.Ui;
-using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Rack.Ui;
+using JingleBox2.Rack.Ui.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;

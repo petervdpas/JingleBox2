@@ -80,7 +80,7 @@ public sealed class ControlMapping
     /// not the one in front of you now. The place is what the two have in common.
     ///
     /// Read through the order a panel reads in, so it means the third control your eye lands on
-    /// and not the third line of a file. See <see cref="Machines.PanelOrder"/>.
+    /// and not the third line of a file. See <see cref="JingleBox2.Rack.Faces.PanelOrder"/>.
     /// </remarks>
     public int Ordinal { get; set; } = -1;
 

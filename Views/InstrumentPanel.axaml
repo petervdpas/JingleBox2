@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             xmlns:ui="clr-namespace:JingleBox2.Machines.Ui;assembly=JingleBox2.Machines.Ui"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
              x:Class="JingleBox2.Views.InstrumentPanel"
              x:Name="Root"
              x:DataType="vmi:IInstrumentDesigner"
@@ -171,7 +171,7 @@
                  room the page has: a machine's own description says which of its parts spread
                  and which keep their size, and a panel held to its contents took that choice
                  away. -->
-            <ui:MachinePanelView x:Name="MachineFace"
+            <ui:PanelView x:Name="Face"
                                  IsVisible="{Binding Editor.IsDescribed}"
                                  Face="{Binding Editor.Described}"
                                  Values="{Binding Editor.Values}"

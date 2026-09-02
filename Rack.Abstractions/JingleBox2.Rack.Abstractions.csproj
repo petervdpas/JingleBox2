@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The contract an instrument is written against, and nothing else.
+
+    This assembly is what an outside machine links to, so it is deliberately thin and
+    deliberately dull: no Avalonia, no BASS, no view models. Everything in here is either a
+    description of what a machine is or a shape the host and the machine both have to agree
+    on. Adding a dependency here makes every instrument in the world depend on it too.
+
+    It is also the assembly named in LICENSE.EXCEPTION: linking against these types does not
+    put a module under the GPL, which is what makes an instrument somebody can sell possible.
+  -->
+  <PropertyGroup>
+    <!-- The documentation is an artefact of the build, not a comment nobody reads. Every seam
+         in this application is an interface and the prose lives on it; this is what turns that
+         into a file, and what makes the compiler say which public thing is still undocumented.
+         CS1591 is left switched on deliberately: it is the list of what is left to write. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>JingleBox2.Rack.Faces</RootNamespace>
+    <AssemblyName>JingleBox2.Rack.Abstractions</AssemblyName>
+  </PropertyGroup>
+
+</Project>

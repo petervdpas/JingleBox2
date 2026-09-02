@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -640,7 +640,7 @@ public sealed class MachineProjectShape
     /// </remarks>
     /// <param name="panel">The machine's face, or null for one that has none.</param>
     /// <param name="parameters">Everything it declares, in panel order.</param>
-    public MachineProjectShape(MachinePanel? panel, IReadOnlyList<MachineParameter> parameters)
+    public MachineProjectShape(Panel? panel, IReadOnlyList<Parameter> parameters)
     {
         Parameters = parameters;
 
@@ -666,7 +666,7 @@ public sealed class MachineProjectShape
 
         if (!HasThings)
         {
-            ThingParameters = Array.Empty<MachineParameter>();
+            ThingParameters = Array.Empty<Parameter>();
             ThingWords = Array.Empty<string>();
         }
     }
@@ -693,13 +693,13 @@ public sealed class MachineProjectShape
     }
 
     /// <summary>The element the machine's things stand on: its grid of pads, or its map of zones.</summary>
-    private MachineElement? _holder;
+    private PanelElement? _holder;
 
     /// <summary>Everything the machine declares, in panel order.</summary>
-    public IReadOnlyList<MachineParameter> Parameters { get; }
+    public IReadOnlyList<Parameter> Parameters { get; }
 
     /// <summary>What one of the machine's things is set by.</summary>
-    public IReadOnlyList<MachineParameter> ThingParameters { get; private set; } = Array.Empty<MachineParameter>();
+    public IReadOnlyList<Parameter> ThingParameters { get; private set; } = Array.Empty<Parameter>();
 
     /// <summary>
     /// The names of the machine's things, as the machine wrote them.
@@ -735,9 +735,9 @@ public sealed class MachineProjectShape
     public bool NamesThings => ThingKeys.Count > 0;
 
     /// <summary>What sort of thing one of them is, for the dropdown that narrows the list.</summary>
-    public string ThingKind => _holder?.Element == MachineElementKinds.Zones
-        ? MachineElementKinds.Zones
-        : MachineElementKinds.Pad;
+    public string ThingKind => _holder?.Element == ElementKinds.Zones
+        ? ElementKinds.Zones
+        : ElementKinds.Pad;
 
     /// <summary>
     /// And what one of them is called, in the singular.
@@ -747,7 +747,7 @@ public sealed class MachineProjectShape
     /// somebody chose. "Zones" without its s is a coincidence and not a rule: the next machine to
     /// hold a set of things will not be so obliging.
     /// </remarks>
-    public string ThingCalled => _holder?.Element == MachineElementKinds.Zones ? "Zone" : "Pad";
+    public string ThingCalled => _holder?.Element == ElementKinds.Zones ? "Zone" : "Pad";
 
     /// <summary>True when that setting is a recording, which is picked rather than typed.</summary>
     public bool IsTake(string key) => _takes.Contains(key);
@@ -789,16 +789,16 @@ public sealed class MachineProjectShape
     /// beside it move. Those belong to the control that draws them, which is what somebody looking
     /// for them would say they are, so its own properties are read for parameter keys as well.
     /// </remarks>
-    private void Walk(MachineElement element, List<string> keys, List<string> words)
+    private void Walk(PanelElement element, List<string> keys, List<string> words)
     {
         if (_holder == null
-            && element.Element is MachineElementKinds.Pads or MachineElementKinds.Zones)
+            && element.Element is ElementKinds.Pads or ElementKinds.Zones)
         {
             _holder = element;
 
             foreach (var child in element.Children)
             {
-                if (child.Element != MachineElementKinds.Pad) continue;
+                if (child.Element != ElementKinds.Pad) continue;
 
                 if (child.Properties.TryGetValue("key", out string? said) && said.Length > 0)
                     keys.Add(said);
@@ -815,13 +815,13 @@ public sealed class MachineProjectShape
             if (Parameters.Any(one => one.Key == said)) _drawn[said] = element.Element;
         }
 
-        if (element.Element is MachineElementKinds.Take or MachineElementKinds.Text
+        if (element.Element is ElementKinds.Take or ElementKinds.Text
             && element.Parameter.Length > 0
             && !words.Contains(element.Parameter))
         {
             words.Add(element.Parameter);
 
-            if (element.Element == MachineElementKinds.Take)
+            if (element.Element == ElementKinds.Take)
             {
                 _takes.Add(element.Parameter);
 

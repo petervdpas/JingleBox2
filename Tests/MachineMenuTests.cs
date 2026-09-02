@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using JingleBox2.Machines;
-using JingleBox2.Machines.Interfaces;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Enums;
 using Xunit;
@@ -16,7 +16,7 @@ namespace JingleBox2.Tests;
 /// <remarks>
 /// The part is drawn by the machine library and filled by the application, and this is the
 /// filling. It is answerable without a window because what a machine offers is a list of lines
-/// rather than a menu, which is the whole reason <see cref="MachineMenuItem"/> is a shape and
+/// rather than a menu, which is the whole reason <see cref="PanelMenuItem"/> is a shape and
 /// not a toolkit type.
 ///
 /// What is worth checking is that it lists exactly the templates the MIDI CC page lists, cut the
@@ -58,7 +58,7 @@ public class MachineMenuTests
     /// <param name="link">The desk itself, for the tests about the mode.</param>
     /// <param name="said">The last line the part asked to have said.</param>
     /// <param name="links">What is on the desk to begin with.</param>
-    private static IMachineMenu Part(
+    private static IPanelMenu Part(
         out List<ControlMapping> desk,
         out ControlLink link,
         out Func<string> said,
@@ -90,7 +90,7 @@ public class MachineMenuTests
 
         Assert.Equal(Learn, only.Said);
         Assert.True(only.Live);
-        Assert.Equal(MachineMenuOptions.Learn, only.Option);
+        Assert.Equal(MenuOptionWords.Learn, only.Option);
     }
 
     /// <summary>And a panel with no machine on it offers nothing to do at all.</summary>
@@ -238,7 +238,7 @@ public class MachineMenuTests
 
         Assert.Equal(2, offers.Count);
         Assert.Contains("1 control", offers[0].Said, StringComparison.Ordinal);
-        Assert.Equal(MachineMenuOptions.Surfaces, offers[0].Option);
+        Assert.Equal(MenuOptionWords.Surfaces, offers[0].Option);
     }
 
     /// <summary>An id that differs by case is a different machine, since an id is exact.</summary>
@@ -406,7 +406,7 @@ public class MachineMenuTests
     /// <summary>The menu the mixer's own button shows, over a desk holding those links.</summary>
     /// <param name="desk">The links, kept so a test can count them.</param>
     /// <param name="links">What is on the desk to begin with.</param>
-    private static IMachineMenu Mixer(out List<ControlMapping> desk, params ControlMapping[] links)
+    private static IPanelMenu Mixer(out List<ControlMapping> desk, params ControlMapping[] links)
     {
         var kept = new List<ControlMapping>(links);
 

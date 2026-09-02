@@ -5,15 +5,15 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
-using JingleBox2.Machines.Ui;
+using JingleBox2.Rack.Ui;
 using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using System;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Machines.Ui.Records;
+using JingleBox2.Rack.Ui.Records;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Rack.Ui.Interfaces;
 
 namespace JingleBox2.Views;
 

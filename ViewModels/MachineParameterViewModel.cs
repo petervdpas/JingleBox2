@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 
 namespace JingleBox2.ViewModels;
 
@@ -19,14 +19,14 @@ namespace JingleBox2.ViewModels;
 public sealed partial class MachineParameterViewModel : ObservableObject
 {
     /// <summary>Wraps one parameter, starting the preview knob where the machine says it rests.</summary>
-    public MachineParameterViewModel(MachineParameter parameter)
+    public MachineParameterViewModel(Parameter parameter)
     {
         Parameter = parameter;
         value = parameter.Default;
     }
 
     /// <summary>The parameter underneath, which is what a save writes out.</summary>
-    public MachineParameter Parameter { get; }
+    public Parameter Parameter { get; }
 
     /// <summary>What a panel and a link name this parameter by. Changing it breaks both.</summary>
     public string Key

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Views;
 using System;
 using System.Runtime.CompilerServices;
-using JingleBox2.Machines.Records;
+using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Views.Records;
 using JingleBox2.Views.Interfaces;
 
@@ -30,7 +30,7 @@ public sealed class MachineColours : ObservableObject
     /// <summary>Takes a copy of the machine's theme to work on.</summary>
     /// <param name="name">The machine's name, or a stand-in when it has not been given one yet.</param>
     /// <param name="theme">What it is wearing now, which is where the dialog starts.</param>
-    public MachineColours(string name, MachineTheme theme)
+    public MachineColours(string name, PanelTheme theme)
     {
         Name = name.Length > 0 ? name : "The machine";
 
@@ -52,7 +52,7 @@ public sealed class MachineColours : ObservableObject
     public string Name { get; }
 
     /// <summary>What has been chosen, ready to be put on the machine.</summary>
-    public MachineTheme Theme =>
+    public PanelTheme Theme =>
         new(AccentHex, Face, Panel, Edge, Mark, Row, RowOver, RowPicked);
 
     /// <summary>The colour itself, kept as text because that is how a theme is written down.</summary>

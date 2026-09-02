@@ -415,7 +415,7 @@ the encoders take the machine's parameters, in panel order
 the faders take the track's mixer strip
 ```
 
-Panel order is already a real thing here: `MachinePanel.Root` is a tree, controls in it name
+Panel order is already a real thing here: `Panel.Root` is a tree, controls in it name
 their parameter, and walking it depth first gives the order a person reads the face in. So the
 third encoder drives the third knob on whatever machine is in front of you, on every machine,
 including one somebody writes next year. Nothing is stored and nothing is guessed about the

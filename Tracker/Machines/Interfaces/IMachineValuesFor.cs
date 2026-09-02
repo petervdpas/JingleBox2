@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.ViewModels;
 
 namespace JingleBox2.Tracker.Machines.Interfaces;
@@ -41,7 +41,7 @@ public interface IMachineValuesFor
     /// <param name="mono">The mono synth patch the editor is already on, or nothing.</param>
     /// <param name="zones">The key map the editor is already on, or nothing.</param>
     /// <param name="sampler">The sampler's own settings, as the editor holds them, or nothing.</param>
-    MachineValues? Instrument(
+    PanelValues? Instrument(
         TrackerInstrument? instrument,
         TakeLibrary? shelf = null,
         DrumKitViewModel? kit = null,

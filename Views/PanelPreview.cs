@@ -102,7 +102,7 @@ public static class PanelPreview
             var pretend = new System.Collections.Generic.List<Midi.ControlMapping>();
 
             foreach (var parameter in Projects.For(PreviewApp.Wanted.SlotId)
-                                          ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Machines.MachineParameter>())
+                                          ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Rack.Faces.Parameter>())
             {
                 pretend.Add(new Midi.ControlMapping
                 {

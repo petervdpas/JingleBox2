@@ -6,10 +6,10 @@ using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
 using System;
 using System.ComponentModel;
-using JingleBox2.Machines.Ui;
+using JingleBox2.Rack.Ui;
 using JingleBox2.Waveform.Enums;
-using JingleBox2.Machines.Ui.Records;
-using JingleBox2.Machines.Ui.Interfaces;
+using JingleBox2.Rack.Ui.Records;
+using JingleBox2.Rack.Ui.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -20,7 +20,7 @@ namespace JingleBox2.Views;
 /// <remarks>
 /// Wiring only: pointer and button events in, redraws out. The viewport maths, the trim rules
 /// and the playback lifecycle live in JingleBox2.Waveform, and the outline building in
-/// JingleBox2.Machines.Ui, where the panel's own picture of a recording needs it too. That is
+/// JingleBox2.Rack.Ui, where the panel's own picture of a recording needs it too. That is
 /// what makes those testable without a window; there is nothing here that could be.
 ///
 /// Both edits rewrite the file where it lies rather than making a new take, so the window

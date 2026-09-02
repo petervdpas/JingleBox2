@@ -1,7 +1,7 @@
 using JingleBox2.Tracker.Synth;
 using JingleBox2.ViewModels;
 using System;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Tracker.Synth.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
@@ -21,7 +21,7 @@ namespace JingleBox2.Tracker.Machines;
 /// rather than asking for a still.
 /// </remarks>
 /// <param name="patch">The patch being drawn.</param>
-public sealed class SynthScope(SynthPatchViewModel patch) : IMachineScope
+public sealed class SynthScope(SynthPatchViewModel patch) : IPanelScope
 {
     /// <summary>The wave shapes, which are the same maths for every voice that draws one.</summary>
     /// <remarks>

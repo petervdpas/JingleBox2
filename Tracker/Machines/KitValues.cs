@@ -1,4 +1,4 @@
-using JingleBox2.Machines;
+using JingleBox2.Rack.Faces;
 using JingleBox2.ViewModels;
 using System;
 using JingleBox2.Files;
@@ -32,7 +32,7 @@ namespace JingleBox2.Tracker.Machines;
 /// sixteen. Both are the same mapping from a key to a thing on a pad, so they are the same
 /// class asked about a different pad.
 /// </param>
-public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? about = null) : MachineValues
+public sealed class KitValues(DrumKitViewModel kit, Func<DrumPadViewModel?>? about = null) : PanelValues
 {
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();

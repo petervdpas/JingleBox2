@@ -54,7 +54,7 @@ public sealed class MachineTint : IMachineTint
     private const string MutedBrushKey = "TextMutedBrush";
 
     /// <inheritdoc/>
-    public void Apply(Control panel, Machines.Records.MachineTheme? machine)
+    public void Apply(Control panel, Rack.Faces.Records.PanelTheme? machine)
     {
         Clear(panel);
 
@@ -71,7 +71,7 @@ public sealed class MachineTint : IMachineTint
     }
 
     /// <inheritdoc/>
-    public void Repaint(Control panel, Machines.Records.MachineTheme? machine)
+    public void Repaint(Control panel, Rack.Faces.Records.PanelTheme? machine)
     {
         Apply(panel, machine);
 
@@ -79,7 +79,7 @@ public sealed class MachineTint : IMachineTint
     }
 
     /// <inheritdoc/>
-    public MachineShades? Shades(Machines.Records.MachineTheme? machine)
+    public MachineShades? Shades(Rack.Faces.Records.PanelTheme? machine)
     {
         if (machine == null) return null;
 

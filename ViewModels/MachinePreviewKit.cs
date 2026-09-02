@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Machines.Interfaces;
+using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
@@ -252,7 +253,7 @@ public sealed class MachinePreviewMap : IMachineZones
 /// A sawtooth, because it is the shape that reads as a wave at a glance: a sine could be a
 /// squiggle and a square could be a mistake.
 /// </remarks>
-public sealed class MachinePreviewScope : IMachineScope
+public sealed class MachinePreviewScope : IPanelScope
 {
     /// <inheritdoc/>
     /// <remarks>
@@ -273,7 +274,7 @@ public sealed class MachinePreviewScope : IMachineScope
     /// <summary>
     /// Nowhere to subscribe, because nothing here is playing.
     /// </summary>
-    event EventHandler? IMachineScope.Changed
+    event EventHandler? IPanelScope.Changed
     {
         add { }
         remove { }
