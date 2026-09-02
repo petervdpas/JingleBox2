@@ -43,7 +43,7 @@ public sealed class TrackerNoteAdapter : INoteTrigger
     private readonly object _lock = new();
 
     /// <summary>The two halves as the application really has them, for the window to wire up.</summary>
-    public TrackerNoteAdapter(TrackerViewModel tracker, MachineRackViewModel rack)
+    public TrackerNoteAdapter(TrackerViewModel tracker, RackViewModel rack)
         : this(tracker, rack, () => tracker.ShowsMachines || !tracker.HasInstruments)
     {
     }

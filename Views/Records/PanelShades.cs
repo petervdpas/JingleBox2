@@ -11,7 +11,7 @@ namespace JingleBox2.Views.Records;
 /// <param name="Mark">The marks, curves and meters.</param>
 /// <param name="Ink">The lettering, dark or pale by whichever the face can be read against.</param>
 /// <param name="Muted">And the lettering that is only there if you look for it.</param>
-public readonly record struct MachineShades(
+public readonly record struct PanelShades(
     Color Face,
     Color Panel,
     Color Edge,

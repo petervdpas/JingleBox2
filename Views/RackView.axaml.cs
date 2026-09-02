@@ -13,12 +13,78 @@ namespace JingleBox2.Views;
 /// Taking an instrument into a song copies it, and the copy is then the song's own. Editing it
 /// here changes what new songs start from, not what an existing song sounds like.
 /// </remarks>
-public partial class MachinesView : UserControl
+public partial class RackView : UserControl
 {
-    /// <summary>Builds the page. The rack and its machines come through the data context.</summary>
-    public MachinesView()
+    /// <summary>A box's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
+    private readonly Interfaces.IPanelTint _tint = new PanelTint();
+
+    /// <summary>Builds the page. The rack and what is on it come through the data context.</summary>
+    /// <remarks>
+    /// An effect's face is painted in the effect's own colours, the same as a machine's panel is
+    /// and for the same reason: a box on a rack looks the way it looks whatever the room around
+    /// it is painted, and you know which one you are in front of before you have read anything on
+    /// it. Repainted when the picked effect changes, since the colours are its own.
+    ///
+    /// The pointing gesture is answered here as well. Resting on a control while the link mode is
+    /// on offers the effect and that parameter, which is a fact about your hardware and this
+    /// effect rather than about the track it may later stand on.
+    /// </remarks>
+    public RackView()
     {
         InitializeComponent();
+
+        EffectFace.LinkWanted += Offer;
+
+        DataContextChanged += (_, _) => Watch();
+    }
+
+    /// <summary>The rack this page is showing, or nothing before it has one.</summary>
+    private RackViewModel? Rack => DataContext as RackViewModel;
+
+    /// <summary>Follows the picked effect, so the face is painted in that effect's colours.</summary>
+    private void Watch()
+    {
+        if (Rack is not { } rack) return;
+
+        rack.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(RackViewModel.SelectedEffect)) Retint();
+        };
+
+        Retint();
+    }
+
+    /// <summary>Paints the effect's face in its own shades, or leaves it alone when there is none.</summary>
+    private void Retint()
+    {
+        if (Rack?.SelectedEffect is { } effect) _tint.Apply(EffectPlate, effect.Theme);
+    }
+
+    /// <summary>
+    /// Offers the effect and the control under the pointer, while the link mode is on.
+    /// </summary>
+    /// <remarks>
+    /// The same shape a machine's panel offers, with the effect's id where the machine's would
+    /// be: what is written down is the effect and the parameter's key, which is true of that
+    /// effect on any track's chain, in any song, on any installation that has it.
+    /// </remarks>
+    /// <param name="sender">The panel the pointer is on.</param>
+    /// <param name="key">The parameter the control under it turns.</param>
+    private void Offer(object? sender, string key)
+    {
+        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
+
+        if (Rack?.SelectedEffect is not { } effect) return;
+
+        link.Offer(new Midi.ControlMapping
+        {
+            Kind = Midi.Enums.ControlKind.Insert,
+            Scope = Midi.Enums.ControlScope.Focused,
+            Machine = effect.Id,
+            Key = key,
+            Owner = effect.Name,
+            Name = effect.Name + " " + key
+        });
     }
 
     /// <summary>
@@ -43,10 +109,10 @@ public partial class MachinesView : UserControl
     /// another one. Without it a rack the page has let go of would stay armed and would go on
     /// taking notes meant for the pattern.
     /// </summary>
-    private MachineRackViewModel? _bound;
+    private RackViewModel? _bound;
 
     /// <summary>The rack this page is showing, or nothing when it has not been given one.</summary>
-    private MachineRackViewModel? ViewModel => DataContext as MachineRackViewModel;
+    private RackViewModel? ViewModel => DataContext as RackViewModel;
 
     /// <summary>
     /// While this page is up, notes from the MIDI keyboard audition the instrument being

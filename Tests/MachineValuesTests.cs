@@ -133,12 +133,12 @@ public class MachineValuesTests
     [Fact]
     public void The_racks_preview_announces_itself_the_same_way()
     {
-        var shown = new ObservableCollection<MachineParameterViewModel>
+        var shown = new ObservableCollection<ParameterViewModel>
         {
             new(new Parameter { Key = "duty", Min = 0, Max = 1 })
         };
 
-        var values = new MachinePreviewValues(shown);
+        var values = new PreviewValues(shown);
 
         int said = 0;
         values.Said += _ => said++;

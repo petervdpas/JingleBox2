@@ -22,15 +22,15 @@ namespace JingleBox2.ViewModels;
 /// is why they are behind a dialog rather than on the page: a machine that wants a lighter face
 /// or a louder mark says so here, and only here.
 /// </remarks>
-public sealed class MachineColours : ObservableObject
+public sealed class PanelColours : ObservableObject
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>Takes a copy of the machine's theme to work on.</summary>
     /// <param name="name">The machine's name, or a stand-in when it has not been given one yet.</param>
     /// <param name="theme">What it is wearing now, which is where the dialog starts.</param>
-    public MachineColours(string name, PanelTheme theme)
+    public PanelColours(string name, PanelTheme theme)
     {
         Name = name.Length > 0 ? name : "The machine";
 
@@ -166,7 +166,7 @@ public sealed class MachineColours : ObservableObject
     }
 
     /// <summary>What the eight come to, for the preview to be painted from.</summary>
-    private MachineShades Shades => _tint.Shades(Theme) ?? default;
+    private PanelShades Shades => _tint.Shades(Theme) ?? default;
 
     /// <summary>The chassis, as the preview paints it.</summary>
     public IBrush FaceBrush => new SolidColorBrush(Shades.Face);

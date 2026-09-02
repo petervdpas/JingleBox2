@@ -21,7 +21,7 @@ namespace JingleBox2.ViewModels;
 /// downwards cannot have anything taken out of it. Nothing is stored twice: the children here
 /// are wrappers around the children there, and both lists are moved together.
 /// </remarks>
-public sealed partial class MachineElementViewModel : ObservableObject
+public sealed partial class PanelElementViewModel : ObservableObject
 {
     /// <summary>Wraps an element, and everything inside it, for the given parent.</summary>
     /// <remarks>
@@ -38,9 +38,9 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// Told whenever anything here writes into the element. Handed down to every child, so one
     /// hook at the root hears the whole panel.
     /// </param>
-    public MachineElementViewModel(
+    public PanelElementViewModel(
         PanelElement element,
-        MachineElementViewModel? parent = null,
+        PanelElementViewModel? parent = null,
         Action? edited = null,
         string outermost = "panel")
     {
@@ -49,13 +49,13 @@ public sealed partial class MachineElementViewModel : ObservableObject
         _edited = edited ?? parent?._edited;
         _outermost = outermost;
 
-        foreach (var child in element.Children) Children.Add(new MachineElementViewModel(child, this));
+        foreach (var child in element.Children) Children.Add(new PanelElementViewModel(child, this));
 
         foreach (var pair in element.Properties)
         {
             if (Owned(element, pair.Key)) continue;
 
-            Properties.Add(new MachineElementPropertyViewModel(element, pair.Key));
+            Properties.Add(new PanelElementPropertyViewModel(element, pair.Key));
         }
     }
 
@@ -163,21 +163,21 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// Made once and kept, because the ticks are what the page is bound to and rebuilding the
     /// list would take the bindings with it.
     /// </remarks>
-    public IReadOnlyList<MachineMenuOptionViewModel> Options => _options ??= Ticks();
+    public IReadOnlyList<MenuOptionViewModel> Options => _options ??= Ticks();
 
     /// <summary>Says a tick wrote into the element, which is the same edit as any other here.</summary>
     internal void Ticked() => Wrote();
 
     /// <summary>Behind <see cref="Options"/>.</summary>
-    private IReadOnlyList<MachineMenuOptionViewModel>? _options;
+    private IReadOnlyList<MenuOptionViewModel>? _options;
 
     /// <summary>One tick per option there is.</summary>
-    private IReadOnlyList<MachineMenuOptionViewModel> Ticks()
+    private IReadOnlyList<MenuOptionViewModel> Ticks()
     {
-        var made = new List<MachineMenuOptionViewModel>();
+        var made = new List<MenuOptionViewModel>();
 
         foreach (string option in MenuOptionWords.All)
-            made.Add(new MachineMenuOptionViewModel(Element, option, Ticked));
+            made.Add(new MenuOptionViewModel(Element, option, Ticked));
 
         return made;
     }
@@ -254,7 +254,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// is the one element with nothing above it, which is how the editor knows it cannot be
     /// removed.
     /// </remarks>
-    public MachineElementViewModel? Parent
+    public PanelElementViewModel? Parent
     {
         get => parent;
         set
@@ -266,7 +266,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     }
 
     /// <inheritdoc cref="Parent"/>
-    private MachineElementViewModel? parent;
+    private PanelElementViewModel? parent;
 
     /// <summary>
     /// Told whenever anything here writes into the element underneath.
@@ -334,7 +334,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
     /// <summary>That element and everything under it, depth first.</summary>
     /// <param name="element">Where to start.</param>
-    private static IEnumerable<MachineElementViewModel> Under(MachineElementViewModel element)
+    private static IEnumerable<PanelElementViewModel> Under(PanelElementViewModel element)
     {
         yield return element;
 
@@ -384,7 +384,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     [ObservableProperty] private bool isDropTarget;
 
     /// <summary>What is inside it, wrapped, and in the order the element holds them.</summary>
-    public ObservableCollection<MachineElementViewModel> Children { get; } = new();
+    public ObservableCollection<PanelElementViewModel> Children { get; } = new();
 
     /// <summary>
     /// Everything else about it, one row per property.
@@ -394,7 +394,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// which keys mean anything depends on the kind of element, and a designer that only offered
     /// the keys it knew would stop a machine using a control this version has not heard of.
     /// </remarks>
-    public ObservableCollection<MachineElementPropertyViewModel> Properties { get; } = new();
+    public ObservableCollection<PanelElementPropertyViewModel> Properties { get; } = new();
 
     /// <summary>What the outermost row is called, which is what is being designed.</summary>
     /// <remarks>
@@ -463,7 +463,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
                 break;
             }
 
-            if (!known) Properties.Add(new MachineElementPropertyViewModel(Element, pair.Key));
+            if (!known) Properties.Add(new PanelElementPropertyViewModel(Element, pair.Key));
         }
     }
 
@@ -473,11 +473,11 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// step is the one way a designer can lose an edit: the tree would show it and the file
     /// would not have it.
     /// </remarks>
-    public MachineElementViewModel Add(PanelElement child)
+    public PanelElementViewModel Add(PanelElement child)
     {
         Element.Children.Add(child);
 
-        var wrapped = new MachineElementViewModel(child, this);
+        var wrapped = new PanelElementViewModel(child, this);
 
         Children.Add(wrapped);
 
@@ -492,9 +492,9 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// means the end rather than a refusal: a drop past the last thing is a drop after the last
     /// thing, and that is what the hand meant.
     /// </remarks>
-    public MachineElementViewModel Put(PanelElement child, int at)
+    public PanelElementViewModel Put(PanelElement child, int at)
     {
-        var wrapped = new MachineElementViewModel(child, this);
+        var wrapped = new PanelElementViewModel(child, this);
 
         Put(wrapped, at);
 
@@ -508,7 +508,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// move. Moving them first means the panel is drawn again from a description that has not
     /// been touched yet, so what you see is what it was.
     /// </remarks>
-    public void Put(MachineElementViewModel child, int at)
+    public void Put(PanelElementViewModel child, int at)
     {
         int place = at < 0 || at > Children.Count ? Children.Count : at;
 
@@ -519,8 +519,8 @@ public sealed partial class MachineElementViewModel : ObservableObject
     }
 
     /// <summary>Takes one out, and returns whether it was in there to begin with.</summary>
-    /// <remarks>The description first, for the reason given on <see cref="Put(MachineElementViewModel, int)"/>.</remarks>
-    public bool Remove(MachineElementViewModel child)
+    /// <remarks>The description first, for the reason given on <see cref="Put(PanelElementViewModel, int)"/>.</remarks>
+    public bool Remove(PanelElementViewModel child)
     {
         int at = Children.IndexOf(child);
 
@@ -542,13 +542,13 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// the right sequence. A step that would run off either end does nothing rather than
     /// wrapping around, which is what a button held down expects.
     ///
-    /// The description first, for the reason given on <see cref="Put(MachineElementViewModel, int)"/>.
+    /// The description first, for the reason given on <see cref="Put(PanelElementViewModel, int)"/>.
     /// A move is where that mattered most, because nothing else happens afterwards to put it
     /// right: adding and removing both change what is picked, and the panel is drawn again for
     /// that instead. Flipping two things over leaves the same one picked, so the stale drawing
     /// stood until the machine was opened again.
     /// </remarks>
-    public bool Move(MachineElementViewModel child, int by)
+    public bool Move(PanelElementViewModel child, int by)
     {
         int at = Children.IndexOf(child);
 
@@ -579,12 +579,12 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
         Element.Properties[key] = "";
 
-        Properties.Add(new MachineElementPropertyViewModel(Element, key));
+        Properties.Add(new PanelElementPropertyViewModel(Element, key));
     });
 
     /// <summary>Takes a property row out, and the property with it.</summary>
-    public IRelayCommand<MachineElementPropertyViewModel> RemovePropertyCommand =>
-        new RelayCommand<MachineElementPropertyViewModel>(property =>
+    public IRelayCommand<PanelElementPropertyViewModel> RemovePropertyCommand =>
+        new RelayCommand<PanelElementPropertyViewModel>(property =>
         {
             if (property == null) return;
 
@@ -602,7 +602,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
 /// has. So the row remembers which key it is on and does the removing and adding itself when
 /// the key is changed, and the dictionary underneath stays the thing that is saved.
 /// </remarks>
-public sealed partial class MachineElementPropertyViewModel : ObservableObject
+public sealed partial class PanelElementPropertyViewModel : ObservableObject
 {
     /// <summary>The element whose properties this row is one of, edited in place.</summary>
     private readonly PanelElement element;
@@ -618,7 +618,7 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
     private string key;
 
     /// <summary>Takes the row on to an element and the key it is showing.</summary>
-    public MachineElementPropertyViewModel(PanelElement element, string key)
+    public PanelElementPropertyViewModel(PanelElement element, string key)
     {
         this.element = element;
         this.key = key;
@@ -686,7 +686,7 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
 /// left alone should do. So every tick starts on, and the property is only written once somebody
 /// has taken one off.
 /// </remarks>
-public sealed partial class MachineMenuOptionViewModel : ObservableObject
+public sealed partial class MenuOptionViewModel : ObservableObject
 {
     /// <summary>The element this is a tick on, edited in place.</summary>
     private readonly PanelElement _element;
@@ -698,7 +698,7 @@ public sealed partial class MachineMenuOptionViewModel : ObservableObject
     /// <param name="element">The menu being worked on.</param>
     /// <param name="option">Which option, in the word the file uses.</param>
     /// <param name="edited">Told when this writes into the element, or nothing.</param>
-    public MachineMenuOptionViewModel(PanelElement element, string option, Action? edited = null)
+    public MenuOptionViewModel(PanelElement element, string option, Action? edited = null)
     {
         _element = element;
         _option = option;

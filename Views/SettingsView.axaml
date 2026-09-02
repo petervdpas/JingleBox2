@@ -616,7 +616,7 @@
 
               <Border Classes="inset">
                 <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                  <ItemsControl ItemsSource="{Binding MachineShelf.Machines}">
+                  <ItemsControl ItemsSource="{Binding MachineShelf.Boxes}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
@@ -644,6 +644,54 @@
               </Border>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding MachineShelf.Hint}" />
+            </StackPanel>
+          </Border>
+
+          <!-- The other half of what this installation is made up of. The same page again,
+               because an effect is imported, added and thrown out exactly as a machine is: both
+               are a folder with a manifest at the top of it. What differs is where one goes
+               afterwards, which is a track's chain rather than a song's instrument list. -->
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Effects" />
+
+              <WrapPanel Orientation="Horizontal">
+                <Button Content="Import an effect..." Click="OnImportEffect"
+                        Margin="0,0,8,4" />
+                <TextBlock Classes="cardHint" VerticalAlignment="Center" Margin="0,0,0,4"
+                           Text="{Binding EffectShelf.Status}" />
+              </WrapPanel>
+
+              <Border Classes="inset">
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl ItemsSource="{Binding EffectShelf.Boxes}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,2">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding Version}" />
+                              <TextBlock Classes="cardHint" VerticalAlignment="Center" Text="{Binding State}" />
+                            </StackPanel>
+                            <TextBlock Classes="cardHint" Text="{Binding Author}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Remove" Classes="danger" Padding="8,3"
+                                  IsVisible="{Binding IsInstalled}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.RemoveCommand}"
+                                  CommandParameter="{Binding .}" />
+                          <Button Grid.Column="1" Content="Add" Padding="8,3"
+                                  IsVisible="{Binding IsAvailable}"
+                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).EffectShelf.AddCommand}"
+                                  CommandParameter="{Binding .}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </Border>
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding EffectShelf.Hint}" />
             </StackPanel>
           </Border>
 

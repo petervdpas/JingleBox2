@@ -653,7 +653,11 @@ public class PanelView : Decorator
             change.Property == PadsProperty ||
             change.Property == SlicesProperty ||
             change.Property == KeyboardProperty ||
-            change.Property == LocationProperty)
+            change.Property == LocationProperty ||
+            change.Property == MenuProperty ||
+            change.Property == InstrumentNameProperty ||
+            change.Property == ZonesProperty ||
+            change.Property == ScopeProperty)
         {
             Rebuild();
         }

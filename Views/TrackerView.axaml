@@ -576,7 +576,7 @@
                     Content="{Binding $parent[views:TrackerView].Instruments}">
       <ContentControl.ContentTemplate>
         <DataTemplate>
-          <views:MachinesView />
+          <views:RackView />
         </DataTemplate>
       </ContentControl.ContentTemplate>
     </ContentControl>

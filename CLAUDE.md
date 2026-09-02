@@ -356,6 +356,26 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   plain copy, folders and all, since a preset folder that did not arrive is the first thing
   anybody would have to make by hand. `IMachineRegistry` is gone: every member of it was a fact
   about a rack
+- **The rack page and everything both worlds draw with lost the machine in their names.**
+  `RackViewModel` and `RackView` are the page with the two tabs; `PanelElementViewModel`,
+  `PanelElementPropertyViewModel`, `MenuOptionViewModel`, `ParameterViewModel` and `PreviewValues`
+  are the designer's, which serves both; `IPanelTint`, `PanelTint`, `PanelShades`,
+  `PanelColoursDialog` and `PanelColours` are a box's own colours, which an effect has as much as
+  a machine. What kept its name is what only the instrument world has: `MachineWindow`,
+  `MachineShelfViewModel`, `MachinePresetDesk`, `MissingMachineDialog`, `MachineRack`,
+  `MachineProject`, and the preview parts for a kit, a keyboard, zones and slices
+- **An effect is picked on the rack and its face is drawn beside the list**, in its own colours,
+  with its own Menu in the corner. It is not an instrument and has no editor behind it: what its
+  knobs stand at there is a bench kept nowhere, since an effect in use is a slot on some track's
+  chain and two of the same effect are two sets of values. It is worth drawing all the same,
+  because that is where a hardware knob is pointed at one: what a link writes down is the
+  effect's id and the parameter's key, which is true of that effect on any chain, in any song, on
+  any installation that has it
+- **A part handed to a panel after its face was is drawn now.** `PanelView` rebuilt on the face,
+  the values, the takes and half a dozen others, and not on the menu, the name badge, the zones or
+  the scope. In XAML the properties are set in the order they are written, so a face set before a
+  menu meant a panel built without one that never heard about it: the effect's face on the rack
+  drew no hamburger, and nothing anywhere said why
 - **The rack's two folders live together: `rack/machines` and `rack/effects`**, beside the
   program for what ships and under the application folder for what this installation has. What an
   installation already had at the top of the app folder is carried into the rack folder once, on
@@ -364,6 +384,21 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   from what ships would leave all of that behind under a name nothing reads any more. Only when
   the new place is empty, so it happens once and never argues with a folder somebody has since
   worked in
+- **An effect is registered, imported, added and thrown out exactly as a machine is**, and it is
+  the same code doing it. `IRackArchive<T>` and `RackArchive<T>` are the zip, the staging folder
+  and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, System with its Import, Add and
+  Remove. What each world supplies is two answers, the name of the file at the top of a folder and
+  how a folder is read, so `MachineArchive` and `EffectArchive` are a dozen lines apiece. The one
+  thing that differs downstream is where a box goes afterwards: a machine becomes an instrument in
+  a song, an effect goes on a track's chain, which is the same difference a plugin instrument has
+  from a plugin effect
+- **`Ships` was answering no for every file of every machine that ships.** It compared the path
+  under the installed folder with the same path under the shipped one, and those never match: a
+  box installs into a folder named after its **id**, since that is the one name that cannot
+  collide by accident, while it ships in a folder named whatever its author called it. OddSkilla
+  ships in `OddSkilla` and installs as `machine.oddskilla`. So a song packed for somebody else
+  carried a copy of the presets they already had. It reads the folder's id and looks the shipped
+  box up by that now
 - **EchoBox is the first effect of ours, and it is a delay.** `Tracker/Effects/Delay.cs` is the
   engine, `rack/effects/EchoBox/effect.json` is the face, and `EffectEngines` is the one line
   that ties the id to the class. Four knobs: time, feedback, damp and mix. The time glides rather

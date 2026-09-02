@@ -61,12 +61,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
-    /// <summary>What effects this installation has, or nothing when none were read.</summary>
+    /// <summary>What effects this installation has, the one instance everything shares.</summary>
     /// <remarks>
-    /// Optional so that everything already built on this view model keeps working with no effect
-    /// world at all, which is also what a test wants.
+    /// Handed in by whoever read the disc, or an empty one, so that everything already built on
+    /// this view model keeps working with no effect world at all, which is what a test wants. One
+    /// instance either way: the rack's Effects tab and the shelf in SETTINGS are two views of the
+    /// same list, and adding an effect on one has to show on the other.
     /// </remarks>
-    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+    private readonly Tracker.Effects.Interfaces.IEffectProjects _effects;
 
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
@@ -174,7 +176,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public TrackerViewModel Tracker { get; }
 
     /// <summary>The machines you have, as a list to pick from and to open one of.</summary>
-    public MachineRackViewModel Machines { get; }
+    public RackViewModel Machines { get; }
 
     /// <summary>Where a machine is built, as opposed to the rack, which is what is installed.</summary>
     /// <remarks>
@@ -207,6 +209,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// waiting for the next start, and builds the list rather than redrawing an open panel.
     /// </remarks>
     public MachineShelfViewModel MachineShelf { get; }
+
+    /// <summary>
+    /// The same page again for effects, which are imported and thrown out exactly as machines are.
+    /// </summary>
+    public EffectShelfViewModel EffectShelf { get; }
 
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.
@@ -492,7 +499,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             string said = sender switch
             {
                 TrackerViewModel tracker => tracker.Status,
-                MachineRackViewModel instruments => instruments.Status,
+                RackViewModel instruments => instruments.Status,
                 RecordViewModel record => record.Status,
                 _ => ""
             };
@@ -1282,7 +1289,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
-        _effects = effects;
+        _effects = effects ?? new Tracker.Effects.EffectProjects();
         _audio = audio;
         _store = store;
         _cfg = cfg;
@@ -1306,11 +1313,15 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         var rack = new MachineRack();
 
         Tracker = new TrackerViewModel(audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService);
-        Machines = new MachineRackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
+        Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
         MachineShelf = new MachineShelfViewModel(_machines);
 
+        EffectShelf = new EffectShelfViewModel(_effects);
+
         MachineShelf.Changed += () => Machines.Refresh();
+
+        EffectShelf.Changed += () => Machines.Refresh();
 
         _padDeck = new PadDeck(Pads);
         Transport = new TransportSwitch(() => DeckForPage, Record, _padDeck, Tracker);

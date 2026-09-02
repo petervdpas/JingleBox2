@@ -3,7 +3,7 @@
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
         xmlns:views="clr-namespace:JingleBox2.Views"
         x:Class="JingleBox2.Views.MachineWindow"
-        x:DataType="vm:MachineRackViewModel"
+        x:DataType="vm:RackViewModel"
         Title="{Binding Selected.Name}"
         SizeToContent="WidthAndHeight"
         MinWidth="680"

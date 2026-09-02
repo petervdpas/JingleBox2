@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
 using Xunit;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -18,7 +18,7 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class MachineSaveAsTests : IDisposable
 {
-    private readonly IMachineArchive _crates = new MachineArchive();
+    private readonly IRackArchive<MachineProject> _crates = new MachineArchive();
 
     private readonly string _room =
         Path.Combine(Path.GetTempPath(), "jinglebox2-saveas-" + Guid.NewGuid().ToString("N"));

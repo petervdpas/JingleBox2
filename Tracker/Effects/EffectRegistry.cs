@@ -1,5 +1,6 @@
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Effects.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker.Effects;
 
@@ -9,8 +10,8 @@ namespace JingleBox2.Tracker.Effects;
 /// <see cref="EffectProject"/>, and an id is kept only when this build has an engine for it.
 /// There is nothing to forget between readings, since the list of effects is whatever
 /// <see cref="RackRegistry{T}.Load"/> hands back rather than a static one somewhere, and a
-/// shipped effect is taken by the plain copy the rack's rules already do, since an effect's
-/// folder is only files.
+/// shipped effect is taken by the archive, which is the same staging folder and the same swap a
+/// machine arrives through.
 ///
 /// The engine gate is why the Effects tab is empty today rather than showing five boxes that
 /// cannot sound. Every folder in the effects folder is read; each is offered to
@@ -20,6 +21,9 @@ public sealed class EffectRegistry : RackRegistry<EffectProject>
 {
     /// <summary>Which ids this build can actually make.</summary>
     private readonly IEffectEngines _engines;
+
+    /// <summary>Who puts an effect's files where the effect goes.</summary>
+    private readonly IRackArchive<EffectProject> _archive;
 
     /// <summary>
     /// Takes what this needs, or makes the ordinary ones.
@@ -37,14 +41,17 @@ public sealed class EffectRegistry : RackRegistry<EffectProject>
     /// </param>
     /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
     /// <param name="shipped">Where the effects that ship live, defaulted to beside the program.</param>
+    /// <param name="archive">Who carries an effect's folder. Left out, the ordinary one, pointed here.</param>
     public EffectRegistry(
         IEffectEngines? engines = null,
         IFilePaths? paths = null,
         IAppFolder? folder = null,
-        string? shipped = null)
+        string? shipped = null,
+        IRackArchive<EffectProject>? archive = null)
         : base("effects", "effect", paths, folder, shipped)
     {
         _engines = engines ?? new EffectEngines();
+        _archive = archive ?? new EffectArchive(this);
     }
 
     /// <inheritdoc/>
@@ -52,4 +59,7 @@ public sealed class EffectRegistry : RackRegistry<EffectProject>
 
     /// <inheritdoc/>
     protected override bool Register(EffectProject project) => _engines.Has(project.Id);
+
+    /// <inheritdoc/>
+    protected override bool Take(EffectProject project) => _archive.Add(project) != null;
 }

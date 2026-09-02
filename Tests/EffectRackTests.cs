@@ -195,6 +195,11 @@ public class EffectRackTests : IDisposable
     }
 
     /// <summary>A first run is offered everything that ships, and the offer is written down.</summary>
+    /// <remarks>
+    /// Landing in a folder named after its id rather than after the folder it shipped in, which
+    /// is what the archive does for a machine and for the same reason: an id is the one name that
+    /// cannot collide with somebody else's box by accident.
+    /// </remarks>
     [Fact]
     public void A_shipped_effect_never_offered_is_taken()
     {
@@ -203,7 +208,7 @@ public class EffectRackTests : IDisposable
         var taken = Registry("effect.echo").Load();
 
         Assert.Equal("effect.echo", Assert.Single(taken).Id);
-        Assert.True(File.Exists(System.IO.Path.Combine(Installed, "Echo", EffectProject.ManifestName)));
+        Assert.True(File.Exists(System.IO.Path.Combine(Installed, "effect.echo", EffectProject.ManifestName)));
         Assert.True(File.Exists(System.IO.Path.Combine(Installed, "offered.txt")));
     }
 
@@ -215,10 +220,10 @@ public class EffectRackTests : IDisposable
 
         Registry("effect.echo").Load();
 
-        Directory.Delete(System.IO.Path.Combine(Installed, "Echo"), recursive: true);
+        Directory.Delete(System.IO.Path.Combine(Installed, "effect.echo"), recursive: true);
 
         Assert.Empty(Registry("effect.echo").Load());
-        Assert.False(Directory.Exists(System.IO.Path.Combine(Installed, "Echo")));
+        Assert.False(Directory.Exists(System.IO.Path.Combine(Installed, "effect.echo")));
     }
 
     /// <summary>The folder existing is not the test, which is the fault the offer file was written for.</summary>
@@ -244,7 +249,7 @@ public class EffectRackTests : IDisposable
 
         Registry("effect.echo").Load();
 
-        string mine = System.IO.Path.Combine(Installed, "Echo");
+        string mine = System.IO.Path.Combine(Installed, "effect.echo");
         string preset = System.IO.Path.Combine(mine, EffectProject.PresetsFolder, "mine.json");
 
         File.WriteAllText(preset, "{}");
@@ -267,10 +272,10 @@ public class EffectRackTests : IDisposable
 
         Registry("effect.echo").Load();
 
-        string mine = System.IO.Path.Combine(Installed, "Echo", EffectProject.ManifestName);
+        string mine = System.IO.Path.Combine(Installed, "effect.echo", EffectProject.ManifestName);
 
         new EffectProject { Id = "effect.echo", Name = "Mine", Summary = "Edited here." }
-            .Save(System.IO.Path.Combine(Installed, "Echo"));
+            .Save(System.IO.Path.Combine(Installed, "effect.echo"));
 
         File.SetLastWriteTimeUtc(mine, DateTime.UtcNow.AddMinutes(5));
         File.SetLastWriteTimeUtc(System.IO.Path.Combine(from, EffectProject.ManifestName), DateTime.UtcNow);
@@ -294,12 +299,12 @@ public class EffectRackTests : IDisposable
     public void Ships_says_whether_the_same_file_is_beside_the_program()
     {
         Effect(Shipped, "Echo", "effect.echo");
-        Effect(Installed, "Echo", "effect.echo");
+        Effect(Installed, "effect.echo", "effect.echo");
         Effect(Installed, "Mine", "effect.mine");
 
         var registry = Registry();
 
-        Assert.True(registry.Ships(System.IO.Path.Combine(Installed, "Echo", EffectProject.ManifestName)));
+        Assert.True(registry.Ships(System.IO.Path.Combine(Installed, "effect.echo", EffectProject.ManifestName)));
         Assert.False(registry.Ships(System.IO.Path.Combine(Installed, "Mine", EffectProject.ManifestName)));
         Assert.False(registry.Ships(System.IO.Path.Combine(Shipped, "Echo", EffectProject.ManifestName)));
         Assert.False(registry.Ships(""));
@@ -359,6 +364,54 @@ public class EffectRackTests : IDisposable
 
         Assert.Equal("New place", Assert.Single(Registry("effect.echo").Load()).Name);
         Assert.True(Directory.Exists(Was));
+    }
+
+    /// <summary>
+    /// A row on the rack shows the effect's own face, on a bench of its own.
+    /// </summary>
+    /// <remarks>
+    /// The face and the bench are made once and handed back as they are: the panel redraws when
+    /// it is given a different face, so a row that built a new one on every read would redraw for
+    /// ever. What the knobs stand at starts where the effect says, and goes nowhere: an effect in
+    /// use is a slot on a track's chain, and this is where you look at one and point a controller
+    /// at it.
+    /// </remarks>
+    [Fact]
+    public void A_row_shows_the_effect_on_a_bench_of_its_own()
+    {
+        var effect = new EffectProject { Id = "effect.echo", Name = "Echo" };
+
+        effect.Parameters.Add(new Parameter { Key = "time", Name = "Time", Min = 10, Max = 2000, Default = 375 });
+
+        var row = new ViewModels.RackEffect(effect);
+
+        Assert.Same(row.Shown, row.Shown);
+        Assert.Same(row.Values, row.Values);
+        Assert.Same(row.Menu, row.Menu);
+
+        Assert.Equal(375, row.Values.Get("time"), 5);
+
+        row.Values.Set("time", 500);
+
+        Assert.Equal(500, row.Values.Get("time"), 5);
+        Assert.Equal(375, effect.Parameters[0].Default, 5);
+    }
+
+    /// <summary>And it carries the same menu a machine's face does, keyed by the effect.</summary>
+    /// <remarks>
+    /// With no desk behind it there is nothing to offer, not even the learning line, which is
+    /// the rule <c>ControlMenu</c> already keeps and <c>Tests/MachineMenuTests.cs</c> says in
+    /// full: a page with no hardware to point at offers nothing rather than a line that would do
+    /// nothing. What is worth saying here is that the row has one at all and hands the same one
+    /// back, since the panel is redrawn when it is given a different menu.
+    /// </remarks>
+    [Fact]
+    public void A_row_carries_a_menu_of_its_own()
+    {
+        var row = new ViewModels.RackEffect(new EffectProject { Id = "effect.echo", Name = "Echo" });
+
+        Assert.NotNull(row.Menu);
+        Assert.Empty(row.Menu.Read());
     }
 
     /// <summary>The list is what was last read, not everything ever read.</summary>

@@ -14,7 +14,6 @@ using System.IO;
 using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 using JingleBox2.Rack.Machines;
@@ -39,11 +38,11 @@ public sealed partial class DesignerViewModel : ObservableObject
     private readonly IMachineNotes _notes = new MachineNotes();
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>A machine going into a zip and coming back out.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineArchive Crates = new MachineArchive();
+    private static readonly IRackArchive<MachineProject> Crates = new MachineArchive();
 
     /// <summary>
     /// What has been done to the machine being designed, so it can be taken back.
@@ -170,7 +169,7 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         History.Changed += HistoryMoved;
 
-        Values = new MachinePreviewValues(Parameters);
+        Values = new PreviewValues(Parameters);
 
         PresetDesk = new MachinePresetDesk(() => Project as MachineProject);
 
@@ -455,7 +454,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// The whole machine, not the manifest alone. A machine is its folder: the manifest names
     /// pictures, presets and sounds by the names they have inside it, so writing it into an
     /// empty folder somewhere else would leave a machine that draws nothing. The files go first
-    /// and the manifest after them, through <see cref="IMachineArchive.CopyInto"/>.
+    /// and the manifest after them, through <see cref="IRackArchive{MachineProject}.CopyInto"/>.
     ///
     /// Save as, in the ordinary sense: the editor is pointed at the new folder afterwards and
     /// the old one is left exactly as it was. That is what makes it the way to put an edited
@@ -580,7 +579,7 @@ public sealed partial class DesignerViewModel : ObservableObject
             Step = 0.01
         };
 
-        var wrapped = new MachineParameterViewModel(parameter);
+        var wrapped = new ParameterViewModel(parameter);
 
         wrapped.PropertyChanged += Edited;
 
@@ -594,8 +593,8 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     /// <summary>Takes one out. What a song saved under that key is simply not read again.</summary>
     /// <remarks>Always enabled; a row exists only while its parameter does.</remarks>
-    public IRelayCommand<MachineParameterViewModel> RemoveParameterCommand =>
-        new RelayCommand<MachineParameterViewModel>(parameter =>
+    public IRelayCommand<ParameterViewModel> RemoveParameterCommand =>
+        new RelayCommand<ParameterViewModel>(parameter =>
         {
             if (Project == null || parameter == null) return;
 
@@ -615,7 +614,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// to is still the same list, so a page bound straight to it is never told anything has
     /// changed. This is filled from the project when one is opened and kept in step with it.
     /// </remarks>
-    public ObservableCollection<MachineParameterViewModel> Parameters { get; } = new();
+    public ObservableCollection<ParameterViewModel> Parameters { get; } = new();
 
     /// <summary>What the panel in the editor reads and writes: the parameters, and nothing kept.</summary>
     public IPanelValues Values { get; }
@@ -943,7 +942,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// start from rather than a single item. Holding the root in a collection also means opening
     /// another project is emptying and refilling one list, so nothing bound to it goes stale.
     /// </remarks>
-    public ObservableCollection<MachineElementViewModel> Elements { get; } = new();
+    public ObservableCollection<PanelElementViewModel> Elements { get; } = new();
 
     /// <summary>What is picked out in the tree, and what the inspector is showing.</summary>
     /// <remarks>
@@ -952,10 +951,10 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// panel wants anyway.
     /// </remarks>
     [ObservableProperty]
-    private MachineElementViewModel? selectedElement;
+    private PanelElementViewModel? selectedElement;
 
     /// <summary>Every line of the panel list, however deep, for anything that has to touch all of them.</summary>
-    public IEnumerable<MachineElementViewModel> Every()
+    public IEnumerable<PanelElementViewModel> Every()
     {
         foreach (var top in Elements)
         {
@@ -964,7 +963,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     }
 
     /// <summary>That element and everything under it, depth first.</summary>
-    private static IEnumerable<MachineElementViewModel> Below(MachineElementViewModel element)
+    private static IEnumerable<PanelElementViewModel> Below(PanelElementViewModel element)
     {
         yield return element;
 
@@ -1236,7 +1235,7 @@ public sealed partial class DesignerViewModel : ObservableObject
         pictures == 1 ? "its picture" : pictures + " pictures";
 
     /// <summary>Whether that element is somewhere inside this one, however deep.</summary>
-    private static bool Inside(MachineElementViewModel holder, MachineElementViewModel wanted)
+    private static bool Inside(PanelElementViewModel holder, PanelElementViewModel wanted)
     {
         for (var at = wanted.Parent; at != null; at = at.Parent)
         {
@@ -1278,7 +1277,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// The number of columns comes off the grid itself. A grid that has not said how wide it is
     /// gets one column, so parts stack downwards, which is at least a shape you can see.
     /// </remarks>
-    private static PanelElement Celled(MachineElementViewModel into, PanelElement arriving)
+    private static PanelElement Celled(PanelElementViewModel into, PanelElement arriving)
     {
         if (into.Kind != ElementKinds.Grid) return arriving;
 
@@ -1524,8 +1523,8 @@ public sealed partial class DesignerViewModel : ObservableObject
     public bool HasSelection => SelectedElement != null;
 
     /// <summary>The wrapper standing for that element, wherever it is in the tree.</summary>
-    private static MachineElementViewModel? Find(
-        IEnumerable<MachineElementViewModel> among, PanelElement wanted)
+    private static PanelElementViewModel? Find(
+        IEnumerable<PanelElementViewModel> among, PanelElement wanted)
     {
         foreach (var one in among)
         {
@@ -1643,7 +1642,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     }
 
     /// <summary>The element the settings pane is showing, watched while it is showing.</summary>
-    private MachineElementViewModel? _picked;
+    private PanelElementViewModel? _picked;
 
     /// <summary>
     /// The picked element said something about itself that changes the panel rather than the
@@ -1656,7 +1655,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     private void Picked(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MachineElementViewModel.Source)) return;
+        if (e.PropertyName != nameof(PanelElementViewModel.Source)) return;
 
         OnPropertyChanged(nameof(Presets));
 
@@ -1676,7 +1675,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// button without changing anything lays out what is already there. How many rows is said by
     /// the grid, or worked out from the buttons for one written before it said so.
     /// </remarks>
-    partial void OnSelectedElementChanged(MachineElementViewModel? value)
+    partial void OnSelectedElementChanged(PanelElementViewModel? value)
     {
         if (_picked != null) _picked.PropertyChanged -= Picked;
 
@@ -1868,7 +1867,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// row that already exists is written through rather than replaced, so somebody who had put
     /// the key there themselves keeps the row they were typing in.
     /// </remarks>
-    private static void Put(MachineElementViewModel element, string key, string value)
+    private static void Put(PanelElementViewModel element, string key, string value)
     {
         if (element.Properties.FirstOrDefault(row => row.Key == key) is { } already)
         {
@@ -1878,7 +1877,7 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         element.Element.Properties[key] = value;
 
-        element.Properties.Add(new MachineElementPropertyViewModel(element.Element, key));
+        element.Properties.Add(new PanelElementPropertyViewModel(element.Element, key));
     }
 
     /// <summary>
@@ -1889,7 +1888,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// unsubscribed when a project is closed: the wrappers are thrown away whole, and an event
     /// holds the listener rather than the other way about, so the old tree keeps nothing alive.
     /// </remarks>
-    private void Watch(MachineElementViewModel element)
+    private void Watch(PanelElementViewModel element)
     {
         element.PropertyChanged += Edited;
         element.Children.CollectionChanged += Grew;
@@ -1905,8 +1904,8 @@ public sealed partial class DesignerViewModel : ObservableObject
     {
         foreach (var added in e.NewItems ?? (System.Collections.IList)Array.Empty<object>())
         {
-            if (added is MachineElementViewModel element) Watch(element);
-            else if (added is MachineElementPropertyViewModel property) property.PropertyChanged += Edited;
+            if (added is PanelElementViewModel element) Watch(element);
+            else if (added is PanelElementPropertyViewModel property) property.PropertyChanged += Edited;
         }
 
         Redraw();
@@ -1928,9 +1927,9 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     private void Edited(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (sender is MachineParameterViewModel)
+        if (sender is ParameterViewModel)
         {
-            if (e.PropertyName is nameof(MachineParameterViewModel.Value) or nameof(MachineParameterViewModel.On)) return;
+            if (e.PropertyName is nameof(ParameterViewModel.Value) or nameof(ParameterViewModel.On)) return;
 
             ParametersChanged();
             return;
@@ -1998,14 +1997,14 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         foreach (var parameter in value.Parameters)
         {
-            var wrapped = new MachineParameterViewModel(parameter);
+            var wrapped = new ParameterViewModel(parameter);
 
             wrapped.PropertyChanged += Edited;
 
             Parameters.Add(wrapped);
         }
 
-        var root = new MachineElementViewModel(Root(value), edited: Redraw, outermost: _world.Word);
+        var root = new PanelElementViewModel(Root(value), edited: Redraw, outermost: _world.Word);
 
         Watch(root);
 

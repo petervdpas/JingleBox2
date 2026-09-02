@@ -1,7 +1,4 @@
 using System;
-using System.IO;
-using JingleBox2.Files;
-using JingleBox2.Files.Interfaces;
 using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Interfaces;
 
@@ -9,18 +6,17 @@ namespace JingleBox2.Tracker.Effects;
 
 /// <inheritdoc/>
 /// <remarks>
-/// An effect's folder is only files, so carrying it is a plain copy. There is no zip yet, and
-/// saying so is better than offering a button that would write half a parcel: importing one is
-/// the other half of that, and neither exists until an effect is worth handing to somebody.
+/// An effect travels the way a machine does, since both are a folder with a manifest at the top:
+/// the same zip, the same staging folder and the same swap, through <see cref="EffectArchive"/>.
 /// </remarks>
 public sealed class EffectWorld : IDesignWorld
 {
-    /// <summary>How a folder is carried whole.</summary>
-    private readonly IFolderCopy _copy;
+    /// <summary>Who unpacks and copies effects, since an effect's folder travels.</summary>
+    private readonly IRackArchive<EffectProject> _crates;
 
-    /// <summary>Takes how a folder is copied, or the ordinary way.</summary>
-    /// <param name="copy">Who carries a folder and everything under it.</param>
-    public EffectWorld(IFolderCopy? copy = null) => _copy = copy ?? new FolderCopy();
+    /// <summary>Takes the archive, or the ordinary one.</summary>
+    /// <param name="crates">Who carries and zips an effect's folder.</param>
+    public EffectWorld(IRackArchive<EffectProject>? crates = null) => _crates = crates ?? new EffectArchive();
 
     /// <inheritdoc/>
     public string Word => "effect";
@@ -43,32 +39,22 @@ public sealed class EffectWorld : IDesignWorld
     /// <inheritdoc/>
     public bool CopyInto(IDesignProject project, string folder)
     {
-        if (!project.IsSaved || string.IsNullOrWhiteSpace(folder)) return false;
+        if (project is not EffectProject effect) return false;
 
-        if (!Directory.Exists(project.Folder)) return false;
+        _crates.CopyInto(effect, folder);
 
-        try
-        {
-            _copy.Into(project.Folder, folder);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Fault(
-                Diagnostics.Enums.LogArea.Machines, "An effect could not be carried to " + folder, ex);
-
-            return false;
-        }
+        return true;
     }
 
     /// <inheritdoc/>
-    public bool Exports => false;
+    public bool Exports => true;
 
     /// <inheritdoc/>
     public bool HasPresets => false;
 
     /// <inheritdoc/>
-    /// <remarks>Nothing: there is no effect zip yet, and <see cref="Exports"/> says so.</remarks>
-    public void Export(IDesignProject project, string zipPath) { }
+    public void Export(IDesignProject project, string zipPath)
+    {
+        if (project is EffectProject effect) _crates.Export(effect, zipPath);
+    }
 }

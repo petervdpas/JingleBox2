@@ -3,8 +3,9 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             x:Class="JingleBox2.Views.MachinesView"
-             x:DataType="vm:MachineRackViewModel">
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
+             x:Class="JingleBox2.Views.RackView"
+             x:DataType="vm:RackViewModel">
 
   <UserControl.Styles>
     <Style Selector="TextBlock.field">
@@ -69,7 +70,7 @@
              is somebody else's program, used by a song rather than owned by this installation,
              and it is picked where a song picks its instruments and where a track adds an
              effect. -->
-        <TabControl Classes="rack">
+        <TabControl Classes="rack" SelectedIndex="{Binding RackTab}">
 
           <TabItem Header="Machines">
             <DockPanel>
@@ -146,7 +147,27 @@
 
       <!-- No card around it. The machine paints its own plate, edge and corners, and a card
            behind that is a second frame around the first. -->
-      <views:InstrumentPanel Grid.Column="2" />
+      <views:InstrumentPanel Grid.Column="2" IsVisible="{Binding ShowsMachine}" />
+
+      <!-- And the same room again for an effect, which is not an instrument and has no editor
+           behind it: what is drawn is the effect's own face, and what its knobs are standing at
+           here is a demonstration kept nowhere. It is worth drawing all the same, because this is
+           where a hardware knob is pointed at an effect and where its own Menu hands a control
+           surface back to it. -->
+      <Border Grid.Column="2" x:Name="EffectPlate"
+              IsVisible="{Binding ShowsEffect}"
+              VerticalAlignment="Top"
+              HorizontalAlignment="Left"
+              Background="{DynamicResource BgBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="6"
+              Padding="12">
+        <ui:PanelView x:Name="EffectFace"
+                      Face="{Binding SelectedEffect.Shown}"
+                      Values="{Binding SelectedEffect.Values}"
+                      Menu="{Binding SelectedEffect.Menu}" />
+      </Border>
 
     </Grid>
   </DockPanel>

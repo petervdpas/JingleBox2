@@ -18,16 +18,16 @@ namespace JingleBox2.Views;
 /// Nothing is written until Use these. What is on the right is the panel's own code tinted with
 /// what is showing, so there is no second recipe to keep in step with the first.
 /// </remarks>
-public partial class MachineColoursDialog : Window
+public partial class PanelColoursDialog : Window
 {
     /// <summary>Finding the window a modal sits over. Holds nothing, so one serves them all.</summary>
     private static readonly IDialogs Modal = new Dialogs();
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>Builds the window. Its eight swatches and its preview are filled in by <see cref="AskAsync"/>.</summary>
-    public MachineColoursDialog()
+    public PanelColoursDialog()
     {
         InitializeComponent();
     }
@@ -44,9 +44,9 @@ public partial class MachineColoursDialog : Window
     /// </remarks>
     public static Task<PanelTheme?> AskAsync(string name, PanelTheme theme)
     {
-        var colours = new MachineColours(name, theme);
+        var colours = new PanelColours(name, theme);
 
-        var dialog = new MachineColoursDialog { DataContext = colours };
+        var dialog = new PanelColoursDialog { DataContext = colours };
 
         if (dialog.FindControl<TextBlock>("Preamble") is { } preamble)
         {
@@ -70,7 +70,7 @@ public partial class MachineColoursDialog : Window
     /// Paints the preview in what is currently showing, through the panel's own tinting code,
     /// so there is no second recipe to keep in step with the first.
     /// </summary>
-    private void Retint(MachineColours colours)
+    private void Retint(PanelColours colours)
     {
         if (this.FindControl<Border>("Preview") is { } preview) _tint.Repaint(preview, colours.Theme);
     }
@@ -84,7 +84,7 @@ public partial class MachineColoursDialog : Window
     /// </remarks>
     private void Reset_Click(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not MachineColours colours) return;
+        if (DataContext is not PanelColours colours) return;
 
         var usual = new PanelTheme(colours.AccentHex);
 
@@ -99,7 +99,7 @@ public partial class MachineColoursDialog : Window
 
     /// <summary>Hands the eight back as a theme, which is the only moment anything is written.</summary>
     private void Confirm_Click(object? sender, RoutedEventArgs e) =>
-        Close(DataContext is MachineColours colours ? colours.Theme : null);
+        Close(DataContext is PanelColours colours ? colours.Theme : null);
 
     /// <summary>Closes with nothing, leaving the machine painted as it was.</summary>
     private void Cancel_Click(object? sender, RoutedEventArgs e) => Close(null);

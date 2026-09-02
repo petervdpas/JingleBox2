@@ -1,24 +1,25 @@
-namespace JingleBox2.Tracker.Machines.Interfaces;
+namespace JingleBox2.Tracker.Interfaces;
 
 /// <summary>
-/// A machine as it travels: one zip of the project folder, and the same folder again on
-/// somebody else's disc.
+/// A box as it travels: one zip of the project folder, and the same folder again on somebody
+/// else's disc.
 /// </summary>
 /// <remarks>
-/// A machine is already a folder with a manifest at the top of it, so there is nothing to
-/// invent here. The zip is that folder, and installing is putting it under
-/// <see cref="JingleBox2.Tracker.Interfaces.IRackRegistry{T}.Installed"/> in a folder named after the machine's id, which is
-/// the name songs write down and therefore the only name that cannot collide by accident.
+/// A machine and an effect are each already a folder with a manifest at the top of it, so there
+/// is nothing to invent here and nothing in it is about which of the two is in the folder. The
+/// zip is that folder, and installing is putting it under
+/// <see cref="IRackRegistry{T}.Installed"/> in a folder named after the box's id, which is the
+/// name songs write down and therefore the only name that cannot collide by accident.
 ///
-/// Two ways in and one door. A zip somebody was handed is unpacked; a machine the program ships
-/// with is copied off the shelf beside the program. What arrives is different, where it lands is
+/// Two ways in and one door. A zip somebody was handed is unpacked; one the program ships with
+/// is copied off the shelf beside the program. What arrives is different, where it lands is
 /// not, so both go through one install and get the same checking and the same swap.
 ///
 /// Everything a bundle says about where its contents go is a claim made by whoever built it, so
 /// none of it is believed: the id has to name a folder and not a path, and a file has to land
 /// inside the folder it is being written into. The rest of the app reads what is on the disc
-/// through <see cref="MachineProject.Open"/>, and this is the one place a stranger's file gets
-/// to put anything there.
+/// off the disc by reading the manifest, and this is the one place a stranger's file gets to put
+/// anything there.
 ///
 /// Everything here writes to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to the
 /// application's own area, as everything under this folder does. What a bundle was refused for
@@ -28,10 +29,11 @@ namespace JingleBox2.Tracker.Machines.Interfaces;
 /// A seam rather than a static class, and this is the one where it matters most. Every method
 /// makes folders, unpacks a stranger's zip into them and swaps one folder for another. The
 /// guards against a bundle writing outside its own folder are the whole reason the class exists
-/// and there was no way to put a question to any of them without installing a machine on the
+/// and there was no way to put a question to any of them without installing something on the
 /// person running the test.
 /// </remarks>
-public interface IMachineArchive
+/// <typeparam name="T">The manifest a box of this kind is read into.</typeparam>
+public interface IRackArchive<T> where T : class, IRackProject
 {
     /// <summary>Zips the project folder, manifest and sounds and all, into that file.</summary>
     /// <remarks>
@@ -42,18 +44,18 @@ public interface IMachineArchive
     /// how a machine gets corrected, and being made to delete the old file first would only be
     /// in the way.
     /// </remarks>
-    /// <param name="project">The machine to pack, which has to have been saved.</param>
+    /// <param name="project">The box to pack, which has to have been saved.</param>
     /// <param name="zipPath">Where the zip goes, folders made as needed.</param>
-    void Export(MachineProject project, string zipPath);
+    void Export(T project, string zipPath);
 
     /// <summary>
-    /// Copies everything a machine keeps beside its manifest into another folder.
+    /// Copies everything a box keeps beside its manifest into another folder.
     /// </summary>
     /// <remarks>
-    /// What a machine is, is the folder: the manifest names pictures, presets and sounds by the
+    /// What a box is, is the folder: the manifest names pictures, presets and sounds by the
     /// names they have inside it, so a manifest written into an empty folder somewhere else is a
-    /// machine that draws nothing and has no presets. Writing the manifest is
-    /// <see cref="MachineProject.Save"/>'s job and it does only that, correctly, since it is
+    /// face that draws nothing and has no presets. Writing the manifest is
+    /// the project's own save's job and it does only that, correctly, since it is
     /// called on every ordinary save and copying the whole folder onto itself each time would be
     /// absurd. This is the other half, for the one case where the folder changes.
     ///
@@ -61,21 +63,21 @@ public interface IMachineArchive
     /// and is behind whatever is on screen, so the caller writes the current one afterwards
     /// rather than copying a stale one and overwriting it a moment later.
     ///
-    /// Nothing in the destination is deleted, including a file this machine no longer has. The
-    /// same rule the registry keeps for a shipped machine being updated, and for the same
-    /// reason: what else is in that folder is not this machine's business.
+    /// Nothing in the destination is deleted, including a file this box no longer has. The
+    /// same rule the registry keeps for a shipped box being updated, and for the same
+    /// reason: what else is in that folder is not this box's business.
     ///
     /// Throws rather than reporting, as <see cref="Export"/> does: somebody has just pressed
     /// Save as and is waiting to be told either where it went or what stopped it.
     /// </remarks>
-    /// <param name="project">The machine to carry, which has to have been saved.</param>
+    /// <param name="project">The box to carry, which has to have been saved.</param>
     /// <param name="folder">Where its files go, made as needed.</param>
-    void CopyInto(MachineProject project, string folder);
+    void CopyInto(T project, string folder);
 
     /// <summary>
-    /// Unpacks a machine out of that zip and into the installed machines.
+    /// Unpacks a box out of that zip and in among the installed ones.
     /// </summary>
-    /// <returns>The machine as it now sits on the disc, or null when the zip held none.</returns>
+    /// <returns>The box as it now sits on the disc, or null when the zip held none.</returns>
     /// <remarks>
     /// Both shapes of zip are read: the folder's contents at the top, which is what
     /// <see cref="Export"/> writes, and the folder itself at the top, which is what somebody
@@ -87,35 +89,35 @@ public interface IMachineArchive
     /// installed and a line in the log.
     /// </remarks>
     /// <param name="zipPath">The zip somebody was handed.</param>
-    MachineProject? Import(string zipPath);
+    T? Import(string zipPath);
 
     /// <summary>
-    /// Takes a machine the program ships with and puts a copy of it among the installed ones.
+    /// Takes one the program ships with and puts a copy of it among the installed ones.
     /// </summary>
-    /// <returns>The machine as it now sits in the installed folder, or null when it could not go.</returns>
+    /// <returns>The box as it now sits in the installed folder, or null when it could not go.</returns>
     /// <remarks>
     /// The folder beside the program is a shelf to take from and is never written to, so this is
-    /// a copy in one direction and the shipped machine is left exactly as it was. That is what
-    /// makes removing a machine reversible: the copy goes, the original is still on the shelf.
+    /// a copy in one direction and the shipped copy is left exactly as it was. That is what
+    /// makes removing one reversible: the copy goes, the original is still on the shelf.
     ///
-    /// It ends where <see cref="Import"/> ends, by the same route, because a machine arriving
-    /// from a zip and a machine arriving from the shelf are the same event once the files are in
+    /// It ends where <see cref="Import"/> ends, by the same route, because one arriving from a
+    /// zip and one arriving from the shelf are the same event once the files are in
     /// hand. Both are checked the same way, both land through the same swap, and both are read
     /// back off the disc rather than believed.
     ///
-    /// Copying the installed folder onto itself is refused. That is not adding a machine, and
+    /// Copying the installed folder onto itself is refused. That is not adding anything, and
     /// the swap that finishes an install would be moving a folder out from under its own source.
     /// </remarks>
-    /// <param name="fromCrate">The machine on the shelf beside the program.</param>
-    MachineProject? Add(MachineProject fromCrate);
+    /// <param name="fromCrate">The box on the shelf beside the program.</param>
+    T? Add(T fromCrate);
 
-    /// <summary>Deletes an installed machine's folder.</summary>
+    /// <summary>Deletes an installed box's folder.</summary>
     /// <remarks>
     /// Only one that is installed. The shelf beside the program is what the application ships
-    /// and is never written to, which is exactly what lets this delete freely: a machine that
+    /// and is never written to, which is exactly what lets this delete freely: one that
     /// ships can be taken again with <see cref="Add"/> the moment it is gone.
     /// </remarks>
-    /// <param name="project">The machine to delete, which has to be an installed one.</param>
+    /// <param name="project">The box to delete, which has to be an installed one.</param>
     /// <returns>True when the folder is gone.</returns>
-    bool Remove(MachineProject project);
+    bool Remove(T project);
 }

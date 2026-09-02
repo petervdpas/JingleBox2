@@ -49,7 +49,7 @@ public partial class MachineWindow : Window
     /// in front is auditioning a machine; the same key on the pattern is writing a note, and
     /// which one it is is a question about which window you are looking at.
     /// </param>
-    public static void Show(MachineRackViewModel? rack, Window? owner, Action<bool>? inFront = null)
+    public static void Show(RackViewModel? rack, Window? owner, Action<bool>? inFront = null)
     {
         if (rack == null || owner == null) return;
 

@@ -152,6 +152,18 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// By the box's id and not by the path, which is the correction this needed. A box is
+    /// installed into a folder named after its id, since that is the one name that cannot collide
+    /// by accident, and it ships in a folder named whatever whoever made it called it: OddSkilla
+    /// ships in <c>OddSkilla</c> and installs as <c>machine.oddskilla</c>. Comparing the paths
+    /// therefore answered no for every file of every machine that ships, which is the opposite of
+    /// the truth and meant a song packed for somebody else carried a copy of the presets they
+    /// already had.
+    ///
+    /// So the folder the file is in is read for its id, the shipped box with that id is looked
+    /// up, and the question is whether the same file is in there.
+    /// </remarks>
     public bool Ships(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
@@ -164,7 +176,21 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
             if (!full.StartsWith(installed + Path.DirectorySeparatorChar, _paths.Comparison))
                 return false;
 
-            return File.Exists(Path.Combine(Shipped, full.Substring(installed.Length + 1)));
+            string inside = full.Substring(installed.Length + 1);
+            int cut = inside.IndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+
+            if (cut <= 0) return false;
+
+            string mine = Path.Combine(installed, inside[..cut]);
+            string rest = inside[(cut + 1)..];
+
+            if (Open(mine) is not { Id.Length: > 0 } here) return false;
+
+            foreach (var there in In(Shipped))
+                if (string.Equals(there.Id, here.Id, StringComparison.OrdinalIgnoreCase))
+                    return File.Exists(Path.Combine(there.Folder, rest));
+
+            return false;
         }
         catch (Exception)
         {

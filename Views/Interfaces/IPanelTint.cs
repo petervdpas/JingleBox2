@@ -27,7 +27,7 @@ namespace JingleBox2.Views.Interfaces;
 /// The arithmetic is worth being able to ask about on its own: a mix that comes out too dark
 /// is a panel nobody can read, and that is a number rather than a picture.
 /// </remarks>
-public interface IMachineTint
+public interface IPanelTint
 {
     /// <summary>
     /// Puts the machine's shades on the panel, or takes them off again when there is no
@@ -62,7 +62,7 @@ public interface IMachineTint
     /// Whatever the face turned out to be, the lettering has to be readable on it: a pale machine
     /// gets dark lettering the same way a dark one gets pale.
     /// </remarks>
-    MachineShades? Shades(Rack.Faces.Records.PanelTheme? machine);
+    PanelShades? Shades(Rack.Faces.Records.PanelTheme? machine);
 
     /// <summary>A colour written the way a machine writes one down.</summary>
     string Hex(Color colour);

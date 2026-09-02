@@ -15,7 +15,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class InstrumentSlot : ObservableObject
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>Builds one row of the instrument list.</summary>
     /// <param name="index">The number a pattern cell writes to reach this instrument.</param>

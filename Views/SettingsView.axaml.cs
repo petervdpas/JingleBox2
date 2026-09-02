@@ -105,4 +105,30 @@ public partial class SettingsView : UserControl
         string? path = picked[0].TryGetLocalPath();
         if (!string.IsNullOrWhiteSpace(path)) vm.MachineShelf.Import(path);
     }
+
+    /// <summary>
+    /// Brings an effect in from a zip, which is the same act and the same code as a machine's.
+    /// </summary>
+    private async void OnImportEffect(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+
+        var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storage == null) return;
+
+        var picked = await storage.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import an effect",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Effects") { Patterns = new[] { "*.zip" } }
+            }
+        });
+
+        if (picked.Count == 0) return;
+
+        string? path = picked[0].TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(path)) vm.EffectShelf.Import(path);
+    }
 }

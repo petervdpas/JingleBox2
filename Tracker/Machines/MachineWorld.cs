@@ -1,7 +1,6 @@
 using System;
 using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -14,11 +13,11 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class MachineWorld : IDesignWorld
 {
     /// <summary>Who unpacks and copies machines, since a machine's folder travels.</summary>
-    private readonly IMachineArchive _crates;
+    private readonly IRackArchive<MachineProject> _crates;
 
     /// <summary>Takes the archive, or the ordinary one.</summary>
     /// <param name="crates">Who carries and zips a machine's folder.</param>
-    public MachineWorld(IMachineArchive? crates = null) => _crates = crates ?? new MachineArchive();
+    public MachineWorld(IRackArchive<MachineProject>? crates = null) => _crates = crates ?? new MachineArchive();
 
     /// <inheritdoc/>
     public string Word => "machine";

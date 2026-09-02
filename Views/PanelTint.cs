@@ -8,7 +8,7 @@ using JingleBox2.Views.Interfaces;
 namespace JingleBox2.Views;
 
 /// <inheritdoc/>
-public sealed class MachineTint : IMachineTint
+public sealed class PanelTint : IPanelTint
 {
     /// <summary>
     /// The theme keys a panel's own resources stand in front of, every one declared rather than
@@ -79,7 +79,7 @@ public sealed class MachineTint : IMachineTint
     }
 
     /// <inheritdoc/>
-    public MachineShades? Shades(Rack.Faces.Records.PanelTheme? machine)
+    public PanelShades? Shades(Rack.Faces.Records.PanelTheme? machine)
     {
         if (machine == null) return null;
 
@@ -89,7 +89,7 @@ public sealed class MachineTint : IMachineTint
 
         var ink = Light(face) ? Color.FromRgb(0x14, 0x16, 0x1A) : Colors.White;
 
-        return new MachineShades(
+        return new PanelShades(
             face,
             Mix(hue, Colors.Black, machine.Panel),
             Mix(hue, Colors.White, machine.Edge),

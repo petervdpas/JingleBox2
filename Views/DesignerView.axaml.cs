@@ -27,7 +27,7 @@ namespace JingleBox2.Views;
 public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -129,7 +129,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     {
         if (Editor is not { Project: not null } editor) return;
 
-        var wanted = await MachineColoursDialog.AskAsync(editor.Project.Name, editor.Theme);
+        var wanted = await PanelColoursDialog.AskAsync(editor.Project.Name, editor.Theme);
 
         if (wanted == null) return;
 
@@ -529,7 +529,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// </remarks>
     private void Row_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Control row || row.DataContext is not MachineElementViewModel element) return;
+        if (sender is not Control row || row.DataContext is not PanelElementViewModel element) return;
 
         if (Editor is not { } editor) return;
 
@@ -550,7 +550,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// moved can be told from a drag, since letting go without moving means something different
     /// for both of them: a part is added where the selection is, and an element stays where it is.
     /// </remarks>
-    private sealed record Carrying(string? Kind, MachineElementViewModel? Element, Point From)
+    private sealed record Carrying(string? Kind, PanelElementViewModel? Element, Point From)
     {
         /// <summary>
         /// Set once the hand has travelled far enough for this to be a drag. Mutable on a
@@ -700,7 +700,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// Over the panel but over nothing in particular means the machine itself, which is where a
     /// part let go over open space goes.
     /// </remarks>
-    private (Rack.Faces.PanelElement?, ViewModels.MachineElementViewModel?) Under(Point at)
+    private (Rack.Faces.PanelElement?, ViewModels.PanelElementViewModel?) Under(Point at)
     {
         var hit = this.InputHitTest(at) as Visual;
 
@@ -792,7 +792,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// Both, because a drag crosses from one to the other and whichever is left holding a mark
     /// is showing something that is no longer true. Clearing is the same call with nothing in it.
     /// </remarks>
-    private void Mark(Rack.Faces.PanelElement? onPanel, ViewModels.MachineElementViewModel? onList)
+    private void Mark(Rack.Faces.PanelElement? onPanel, ViewModels.PanelElementViewModel? onList)
     {
         PanelCanvas.Marked = onPanel;
 
@@ -807,11 +807,11 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
 
 
     /// <summary>Which element a line of the list stands for, or nothing when it is not a line.</summary>
-    private static ViewModels.MachineElementViewModel? Row(object? source)
+    private static ViewModels.PanelElementViewModel? Row(object? source)
     {
         for (var at = source as Visual; at != null; at = Avalonia.VisualTree.VisualExtensions.GetVisualParent(at))
         {
-            if (at is TreeViewItem { DataContext: ViewModels.MachineElementViewModel element }) return element;
+            if (at is TreeViewItem { DataContext: ViewModels.PanelElementViewModel element }) return element;
         }
 
         return null;

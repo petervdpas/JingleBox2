@@ -29,7 +29,7 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class MachineRackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
+public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
 {
     /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
     private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
@@ -77,7 +77,7 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// something is sounding. Subscribed once here: it used to be done on every change of
     /// machine, so after ten switches the cursor was being moved ten times a tick.
     /// </remarks>
-    public MachineRackViewModel(
+    public RackViewModel(
         MachineRack rack,
         IInstrumentAudition audition,
         IMachineProjects machines,
@@ -291,6 +291,39 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
     /// <summary>True when this installation has an effect, so the tab can say what it is for.</summary>
     public bool HasEffects => Effects.Count > 0;
+
+    /// <summary>Which of the rack's two tabs is in front: nought machines, one effects.</summary>
+    /// <remarks>
+    /// Kept here rather than left to the tab strip, because what the page draws beside the list
+    /// follows it: a machine's box shows the instrument on it, and an effect shows its face.
+    /// </remarks>
+    [ObservableProperty]
+    private int _rackTab;
+
+    /// <summary>True when what should be drawn beside the list is an effect's face.</summary>
+    /// <remarks>
+    /// Both, and not either: an effect picked on a tab nobody is looking at is not what is in
+    /// front of you, and an effects tab with nothing picked has nothing to draw.
+    /// </remarks>
+    public bool ShowsEffect => RackTab == 1 && SelectedEffect is not null;
+
+    /// <summary>And true when it is a machine's own panel, which is what it always was.</summary>
+    public bool ShowsMachine => !ShowsEffect;
+
+    /// <summary>Told when the tab moved, so the page draws the other world.</summary>
+    /// <param name="value">Which tab is now in front.</param>
+    partial void OnRackTabChanged(int value) => Shown();
+
+    /// <summary>Told when the picked effect moved, for the same reason.</summary>
+    /// <param name="value">The effect now picked, or nothing.</param>
+    partial void OnSelectedEffectChanged(RackEffect? value) => Shown();
+
+    /// <summary>Says that what is drawn beside the list may have changed.</summary>
+    private void Shown()
+    {
+        OnPropertyChanged(nameof(ShowsEffect));
+        OnPropertyChanged(nameof(ShowsMachine));
+    }
 
     /// <summary>A machine's own box, under the id that says whose it is.</summary>
     /// <param name="machine">The machine to make a box for.</param>

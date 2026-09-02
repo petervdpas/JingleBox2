@@ -13,7 +13,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class RackMachine : ObservableObject, IRackRow
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>Shows one instrument off the rack. The instrument itself is held, not copied.</summary>
     public RackMachine(TrackerInstrument instrument) => Instrument = instrument;

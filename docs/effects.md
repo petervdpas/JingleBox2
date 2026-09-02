@@ -240,9 +240,11 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    offered, and a folder of one kind refusing to open as the other.
 4. **The delay.** The engine and the face are **done**: `Tracker/Effects/Delay.cs`, four knobs,
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
-   Effects tab. What is left of this step is the chain: putting one on a track, writing it into
-   the song and reading it back, bypass through the new part, and pointing a controller or a lane
-   at it.
+   Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
+   thrown out exactly as a machine is, through the same archive and the same page. What is left of
+   this step is the chain: putting one on a track, writing it into the song and reading it back,
+   bypass through the new part, and pointing a controller or a lane at it. The rack showing an
+   effect's face waits on that too, since a knob pointed at one has to have somewhere to land.
 5. **The other five engines.**
 
 ## Still open

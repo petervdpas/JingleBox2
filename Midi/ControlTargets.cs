@@ -39,7 +39,7 @@ public sealed class ControlTargets : IControlTargets
     private readonly IMachineProjects _machines;
 
     private readonly TrackerViewModel _tracker;
-    private readonly MachineRackViewModel? _rack;
+    private readonly RackViewModel? _rack;
 
     /// <param name="tracker">
     /// The song and everything in it: the tracks, their mixer strips, their instruments and the
@@ -59,7 +59,7 @@ public sealed class ControlTargets : IControlTargets
     /// transport link finds nothing and says so, which is what a test with no window wants.
     /// </param>
     public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
-                          MachineRackViewModel? rack = null, ITransportPresses? presses = null)
+                          RackViewModel? rack = null, ITransportPresses? presses = null)
     {
         _tracker = tracker;
         _machines = machines;

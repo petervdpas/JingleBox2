@@ -28,9 +28,22 @@ public interface IRackProject
     /// <summary>The one line under the name saying what sort of thing it is.</summary>
     string Summary { get; }
 
+    /// <summary>Who made it, for one that is going to be handed to somebody else.</summary>
+    string Author { get; }
+
+    /// <summary>Bumped by whoever makes it, and shown beside the name wherever it is listed.</summary>
+    string Version { get; }
+
     /// <summary>Its colours, which are its own and not the application's.</summary>
     PanelTheme Theme { get; }
 
     /// <summary>The folder it was read from, or empty for one that has never been saved.</summary>
     string Folder { get; }
+
+    /// <summary>Whether it has a folder yet, which is what everything touching the disc holds against.</summary>
+    /// <remarks>
+    /// Asked rather than worked out from <see cref="Folder"/> at each call site, since one of
+    /// those would eventually test the wrong thing about an empty string.
+    /// </remarks>
+    bool IsSaved { get; }
 }

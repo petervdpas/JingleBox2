@@ -1,6 +1,6 @@
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -15,7 +15,7 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class MachineRegistry : RackRegistry<MachineProject>
 {
     /// <summary>Who puts a machine's files where the machine goes.</summary>
-    private readonly IMachineArchive _archive;
+    private readonly IRackArchive<MachineProject> _archive;
 
     /// <summary>
     /// Takes the two things this needs, or makes the ordinary ones.
@@ -40,7 +40,7 @@ public sealed class MachineRegistry : RackRegistry<MachineProject>
     /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
     /// <param name="shipped">Where the machines that ship live, defaulted to beside the program.</param>
     public MachineRegistry(
-        IMachineArchive? archive = null,
+        IRackArchive<MachineProject>? archive = null,
         IFilePaths? paths = null,
         IAppFolder? folder = null,
         string? shipped = null)

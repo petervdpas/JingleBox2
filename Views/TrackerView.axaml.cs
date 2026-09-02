@@ -50,7 +50,7 @@ public partial class TrackerView : UserControl
     private static readonly IDragPayload DraggedInstrument = new InstrumentDragData();
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private static readonly IMachineTint Tint = new MachineTint();
+    private static readonly IPanelTint Tint = new PanelTint();
 
     /// <summary>Which letter sounds which note.</summary>
     private readonly IKeyboardNoteMap _keys = new KeyboardNoteMap();
@@ -76,11 +76,11 @@ public partial class TrackerView : UserControl
     /// is built with the tracker and would otherwise have to be handed back to it afterwards.
     /// The view needs it to show a page; the tracker itself does not need it at all.
     /// </remarks>
-    public static readonly Avalonia.StyledProperty<MachineRackViewModel?> InstrumentsProperty =
-        Avalonia.AvaloniaProperty.Register<TrackerView, MachineRackViewModel?>(nameof(Instruments));
+    public static readonly Avalonia.StyledProperty<RackViewModel?> InstrumentsProperty =
+        Avalonia.AvaloniaProperty.Register<TrackerView, RackViewModel?>(nameof(Instruments));
 
     /// <inheritdoc cref="InstrumentsProperty"/>
-    public MachineRackViewModel? Instruments
+    public RackViewModel? Instruments
     {
         get => GetValue(InstrumentsProperty);
         set => SetValue(InstrumentsProperty, value);

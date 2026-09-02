@@ -35,7 +35,7 @@ public partial class InstrumentPanel : UserControl
     private readonly IPresetStep _step = new PresetStep();
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
-    private readonly IMachineTint _tint = new MachineTint();
+    private readonly IPanelTint _tint = new PanelTint();
 
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();

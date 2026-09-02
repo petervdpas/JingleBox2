@@ -77,14 +77,16 @@ public class EffectDesignerTests : IDisposable
     }
 
     /// <summary>
-    /// An effect has no presets page and no export, and says so rather than offering either.
+    /// An effect has no presets page and says so, and it does travel as a zip.
     /// </summary>
     /// <remarks>
-    /// A machine's preset is an instrument file and an effect has no instrument; a zip needs an
-    /// importer at the other end and there is none. Both are pages that would open on nothing.
+    /// A machine's preset is an instrument file and an effect has no instrument, so that page
+    /// would open on nothing. The zip is another matter: an effect is a folder with a manifest at
+    /// the top of it, the same as a machine, so it is packed, handed over and imported by exactly
+    /// the same code.
     /// </remarks>
     [Fact]
-    public void An_effect_offers_neither_presets_nor_a_zip()
+    public void An_effect_has_no_presets_page_and_does_have_a_zip()
     {
         var designer = new DesignerViewModel(new EffectWorld());
 
@@ -92,8 +94,8 @@ public class EffectDesignerTests : IDisposable
         designer.Save(Folder("Echo"));
 
         Assert.False(designer.ShowsPresets);
-        Assert.False(designer.ShowsExport);
-        Assert.False(designer.CanExport);
+        Assert.True(designer.ShowsExport);
+        Assert.True(designer.CanExport);
     }
 
     /// <summary>What is laid out is written into the folder and read back the same.</summary>

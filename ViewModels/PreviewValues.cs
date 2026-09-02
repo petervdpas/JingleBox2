@@ -19,7 +19,7 @@ namespace JingleBox2.ViewModels;
 /// <param name="parameters">
 /// The parameters the editor is showing, which are both the description and the store here.
 /// </param>
-public sealed class MachinePreviewValues(ObservableCollection<MachineParameterViewModel> parameters) : IPanelValues
+public sealed class PreviewValues(ObservableCollection<ParameterViewModel> parameters) : IPanelValues
 {
     /// <summary>
     /// Raised when a value here moved, so the panel drawing them follows.
@@ -83,6 +83,6 @@ public sealed class MachinePreviewValues(ObservableCollection<MachineParameterVi
     /// A walk rather than a dictionary: a machine has a few dozen parameters at most, and the
     /// list is being edited underneath, so anything cached would go stale as a knob was added.
     /// </remarks>
-    private MachineParameterViewModel? Find(string key) =>
+    private ParameterViewModel? Find(string key) =>
         parameters.FirstOrDefault(p => p.Key == key);
 }

@@ -16,10 +16,10 @@ namespace JingleBox2.ViewModels;
 /// happens to be showing, the way a shop demonstrator turns a dial: an instrument in a song is
 /// where a value belongs.
 /// </remarks>
-public sealed partial class MachineParameterViewModel : ObservableObject
+public sealed partial class ParameterViewModel : ObservableObject
 {
     /// <summary>Wraps one parameter, starting the preview knob where the machine says it rests.</summary>
-    public MachineParameterViewModel(Parameter parameter)
+    public ParameterViewModel(Parameter parameter)
     {
         Parameter = parameter;
         value = parameter.Default;
