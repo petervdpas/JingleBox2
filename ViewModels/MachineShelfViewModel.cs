@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -75,14 +76,14 @@ public sealed class MachineShelfEntry
 /// as one to add.
 ///
 /// It reads the folders itself rather than asking the rack. The rack is built once at startup out
-/// of what <see cref="IMachineRegistry.Load"/> found, so it cannot answer for a machine that
+/// of what <see cref="IRackRegistry{T}.Load"/> found, so it cannot answer for a machine that
 /// arrived a minute ago, and it says nothing about what is only on offer.
 /// </remarks>
 public sealed partial class MachineShelfViewModel : ObservableObject
 {
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineRegistry Registry = new MachineRegistry();
+    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
 
     /// <summary>A machine going into a zip and coming back out.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>

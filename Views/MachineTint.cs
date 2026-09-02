@@ -103,6 +103,11 @@ public sealed class MachineTint : IMachineTint
         "#" + colour.R.ToString("X2") + colour.G.ToString("X2") + colour.B.ToString("X2");
 
     /// <inheritdoc/>
+    /// <inheritdoc/>
+    public IBrush Wash(string? colour, double amount) =>
+        Hue(colour, out var hue) ? new SolidColorBrush(hue, amount) : Brushes.Transparent;
+
+    /// <inheritdoc/>
     public bool Hue(string? colour, out Color hue)
     {
         hue = default;

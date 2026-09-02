@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Machines.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
@@ -35,7 +36,7 @@ namespace JingleBox2.Tracker.Machines;
 /// What goes wrong here is written to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to
 /// the application's own area, as everything under this folder is.
 /// </remarks>
-public sealed class MachineProject
+public sealed class MachineProject : IRackProject
 {
     /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>

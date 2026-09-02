@@ -8,8 +8,8 @@ using JingleBox2.ViewModels;
 using System;
 using System.Linq;
 using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Views.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -31,7 +31,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
 
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineRegistry Registry = new MachineRegistry();
+    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
 
     /// <summary>What is in the hand. See <see cref="DragGhost"/>.</summary>
     private readonly DragGhost _ghost;

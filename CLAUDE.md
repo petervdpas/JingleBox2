@@ -342,6 +342,38 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   one only put Serum in a list beside OddSkilla as though the two were the same kind of thing.
   Anything that is not a registered machine is moved to `instruments/retired` on the next open,
   which now includes the plugins that were shelved before this
+- **The registry is the rack's rather than the machines', because there are two worlds on it.**
+  `IRackRegistry<T>` and `RackRegistry<T>` are the two folder rules written once: what ships and
+  what this installation has, `offered.txt` so that removing something is not losing it and a new
+  arrival still arrives, bringing an installed copy up to date file by file with nothing ever
+  deleted, and the gate that reads a folder and leaves it there when this build has no engine for
+  its id. Not one of those says anything about notes or audio. `MachineRegistry` and
+  `EffectRegistry` are its two users and are what is left when the folders are taken out: four
+  answers apiece, which folder name, how a folder is read into a manifest, whether this build
+  will have it, and how a shipped one is taken. A machine's is the archive, since a machine also
+  arrives as a zip and has to be named around a folder that is already there; an effect's is the
+  plain copy, folders and all, since a preset folder that did not arrive is the first thing
+  anybody would have to make by hand. `IMachineRegistry` is gone: every member of it was a fact
+  about a rack
+- **The effect world is built and empty, and empty is the honest state of it.** `EffectProject`
+  is the manifest, `effect.json`, deliberately not `machine.json` with a flag on it: a folder is
+  one thing or the other, and a reader that had to open the file to find out which is a reader
+  that can be wrong. `EffectRegistry` reads `effects/` by the rack's rules, `EffectProjects`
+  holds what was found for the run, and the rack's Effects tab is that list. `IEffectEngines` is
+  the gate, and its table has nothing in it: an effect that could be had and makes no sound is
+  the box this codebase refuses to put on a rack, so the first entry arrives with the engine that
+  does the work rather than before it. There is deliberately no enum of effect engines with
+  numbers in it, unlike `TrackerInstrumentKind`: a song says which engine an instrument is on, and
+  a chain writes down an effect's id and never its engine, so nothing here is ever written to a
+  file and there is no number to keep still
+- **Registered and on the rack are the same fact for an effect, which they are not for a
+  machine.** A machine's box can be taken off the rack and put back, because the box is an
+  instrument you own with your own settings on it; an effect has nothing of the sort, since one in
+  use is a slot on a track's chain. So the Effects tab has no picker beside it and no shelf file:
+  what is registered is what is there, and losing one is unregistering it in SETTINGS. The rows
+  are `RackEffect` against the machines' `RackMachine`, drawn by one template and washed by one
+  set of styles through `IRackRow`, which is named in XAML because a compiled binding needs a type
+  and a row drawn twice would be two templates drifting apart
 - **An effect of ours is a fourth word and not a kind of machine.** Engine, machine and instrument
   were three; an effect sits beside machine. It is a face over an effect engine, it takes audio
   rather than notes, and so it has no keyboard, no zones, no pads and no kit. Its own folder, its

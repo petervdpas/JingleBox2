@@ -13,7 +13,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2;
 
@@ -34,7 +34,19 @@ public partial class MainWindow : Window
 {
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineRegistry Registry = new MachineRegistry();
+    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
+
+    /// <summary>
+    /// What effects this installation has, read the same way and by the same rules.
+    /// </summary>
+    /// <remarks>
+    /// A second registry rather than a second job for the first: the two worlds have their own
+    /// folders and their own manifests, and what they share is the rules, which is
+    /// <see cref="Tracker.RackRegistry{T}"/>. It finds nothing until there is an engine for an id, so
+    /// today it makes the folder, records what it has offered, and hands back none.
+    /// </remarks>
+    private static readonly IRackRegistry<Tracker.Effects.EffectProject> EffectShelf =
+        new Tracker.Effects.EffectRegistry();
 
     /// <summary>The settings file, read once on the way up and written whenever something moves.</summary>
     private readonly ConfigStore _store = new("JingleBox2");
@@ -170,11 +182,20 @@ public partial class MainWindow : Window
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
             () => machines.Count + " machine" + (machines.Count == 1 ? "" : "s") + " read from disc");
 
+        var effects = EffectShelf.Load();
+
+        var made = new Tracker.Effects.EffectProjects();
+
+        made.Keep(effects);
+
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App,
+            () => effects.Count + " effect" + (effects.Count == 1 ? "" : "s") + " read from disc");
+
         _audio = new BassAudioEngine(
             padCount: cfg.Rows * cfg.Columns,
             deviceRate: cfg.EngineSampleRate);
 
-        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects);
+        var vm = new MainViewModel(_audio, _store, cfg, _midi, _recording, _waveform, _routing, projects, made);
         DataContext = vm;
 
         var version = Assembly.GetExecutingAssembly()

@@ -61,6 +61,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
 
+    /// <summary>What effects this installation has, or nothing when none were read.</summary>
+    /// <remarks>
+    /// Optional so that everything already built on this view model keeps working with no effect
+    /// world at all, which is also what a test wants.
+    /// </remarks>
+    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
 
@@ -1259,9 +1266,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         IRecordingService recordingService,
         IWaveformService waveformService,
         IAudioRouting routing,
-        IMachineProjects machines)
+        IMachineProjects machines,
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
+        _effects = effects;
         _audio = audio;
         _store = store;
         _cfg = cfg;
@@ -1283,7 +1292,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         var rack = new MachineRack();
 
         Tracker = new TrackerViewModel(audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService);
-        Machines = new MachineRackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins);
+        Machines = new MachineRackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
         MachineShelf = new MachineShelfViewModel(_machines);
 

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.MachinesView"
              x:DataType="vm:MachineRackViewModel">
@@ -44,13 +45,13 @@
          The rack reads as a rack of coloured boxes rather than as a list with a coloured edge,
          and the row you have picked is that machine's colour rather than the application's.
          Here rather than on the list, since there are two lists and one rule. -->
-    <Style Selector="ListBox.rack ListBoxItem" x:DataType="vm:RackMachine">
+    <Style Selector="ListBox.rack ListBoxItem" x:DataType="vmi:IRackRow">
       <Setter Property="Background" Value="{Binding Row}" />
     </Style>
-    <Style Selector="ListBox.rack ListBoxItem:pointerover /template/ ContentPresenter" x:DataType="vm:RackMachine">
+    <Style Selector="ListBox.rack ListBoxItem:pointerover /template/ ContentPresenter" x:DataType="vmi:IRackRow">
       <Setter Property="Background" Value="{Binding RowOver}" />
     </Style>
-    <Style Selector="ListBox.rack ListBoxItem:selected /template/ ContentPresenter" x:DataType="vm:RackMachine">
+    <Style Selector="ListBox.rack ListBoxItem:selected /template/ ContentPresenter" x:DataType="vmi:IRackRow">
       <Setter Property="Background" Value="{Binding RowPicked}" />
     </Style>
   </UserControl.Styles>
@@ -111,28 +112,27 @@
           <TabItem Header="Effects">
             <DockPanel>
               <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,8,0,0">
-                <TextBlock Classes="cardHint" Text="Add an effect:"
-                           IsVisible="{Binding HasAvailableEffects}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding HasAvailableEffects}">
-                  <ComboBox Grid.Column="0" x:Name="EffectPicker"
-                            ItemsSource="{Binding AvailableEffects}"
-                            DisplayMemberBinding="{Binding Name}"
-                            HorizontalAlignment="Stretch"
-                            PlaceholderText="Pick an effect..." />
-                  <Button Grid.Column="1" Content="+ New" IsEnabled="False" />
-                </Grid>
 
-                <!-- There are none, and this says why rather than showing an empty picker. An
-                     effect is registered the way a machine is, and there is no effect engine
-                     for one to be on yet. -->
-                <TextBlock Classes="cardHint" Margin="0,4,0,0" TextWrapping="Wrap"
+                <!-- No picker beside this list, unlike the machines'. A machine's box can be
+                     taken off the rack and put back because the box is an instrument you own;
+                     an effect has nothing of the sort, since one in use is a slot on a track's
+                     chain. Registered and here are the same fact, and SETTINGS, System is where
+                     that changes. -->
+                <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                           Text="Every effect you have is here. Drop one on a track's chain, under the pattern."
+                           IsVisible="{Binding HasEffects}" />
+
+                <!-- There are none, and this says why rather than showing an empty list with no
+                     explanation. An effect is a face over an engine, the engine is compiled in,
+                     and an id with no engine behind it is read off disc and left there rather
+                     than shown as a box that cannot sound. -->
+                <TextBlock Classes="cardHint" TextWrapping="Wrap"
                            Text="No effects yet. A plugin effect goes on a track's chain, under the pattern."
-                           IsVisible="{Binding !HasAvailableEffects}" />
+                           IsVisible="{Binding !HasEffects}" />
               </StackPanel>
 
               <ListBox ItemsSource="{Binding Effects}"
-                       SelectedItem="{Binding Selected}"
-                       DoubleTapped="OpenMachine"
+                       SelectedItem="{Binding SelectedEffect}"
                        Classes="rack"
                        ItemTemplate="{StaticResource RackRow}" />
             </DockPanel>

@@ -83,9 +83,11 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         IMachineProjects machines,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
-        PluginLibraryViewModel? plugins = null)
+        PluginLibraryViewModel? plugins = null,
+        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
+        _effects = effects;
         _rack = rack;
         _audition = audition;
         _recordings = recordings;
@@ -247,24 +249,48 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
 
         Selected = Machines.FirstOrDefault(i => i.Id == keep) ?? Machines.FirstOrDefault();
 
+        Effected();
+
         _machines.OnRack(Machines.Select(one => one.Id).ToList());
 
         OfferedChanged();
     }
 
+    /// <summary>What effects this installation has, or nothing while nobody has said.</summary>
+    /// <remarks>
+    /// Optional, because a rack can be built in a test with no effects at all and because
+    /// nothing about a machine depends on there being any.
+    /// </remarks>
+    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+
     /// <summary>
-    /// The effects this installation has, which is none yet.
+    /// The effects this installation has.
     /// </summary>
     /// <remarks>
     /// Its own tab beside the machines, and its own list, because an effect is registered the
     /// way a machine is: a folder with an id, a face and presets, designed here and travelling
-    /// as a zip. There are none because there are no effect engines yet, and an id with no
-    /// engine behind it is refused rather than shown as a box that cannot sound, which is the
-    /// same gate a machine passes.
+    /// as a zip. An id with no engine behind it never reaches this, which is the same gate a
+    /// machine passes and is why the tab is empty until an engine is written.
     ///
-    /// Empty rather than absent, so the tab is there and says what it is for.
+    /// Registered is the whole of what is here, and there is no picker beside it. A machine can
+    /// be taken off the rack and put back because its box is an instrument you own, with your own
+    /// settings on it; an effect has nothing of the sort, since an effect in use is a slot on a
+    /// chain. So having one and it being here are the same fact, and losing one is unregistering
+    /// it in SETTINGS.
     /// </remarks>
-    public ObservableCollection<RackMachine> Effects { get; } = new();
+    public ObservableCollection<RackEffect> Effects { get; } = new();
+
+    /// <summary>Which effect is picked, which today is only the row that looks picked.</summary>
+    /// <remarks>
+    /// Its own property rather than the machines' <see cref="Selected"/>: the two lists hold
+    /// different things, and one selection between them would put an effect where everything
+    /// downstream expects an instrument.
+    /// </remarks>
+    [ObservableProperty]
+    private RackEffect? _selectedEffect;
+
+    /// <summary>True when this installation has an effect, so the tab can say what it is for.</summary>
+    public bool HasEffects => Effects.Count > 0;
 
     /// <summary>A machine's own box, under the id that says whose it is.</summary>
     /// <param name="machine">The machine to make a box for.</param>
@@ -650,16 +676,29 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
     /// <summary>True when there is a machine to add, so the picker can be hidden.</summary>
     public bool HasAvailableMachines => AvailableMachines.Count > 0;
 
+
     /// <summary>
-    /// The effects this installation has, for the picker on the effects tab.
+    /// Reads the effects tab from what is registered, keeping the row that was picked.
     /// </summary>
     /// <remarks>
-    /// None yet, and it says so rather than showing a picker with nothing in it. Effects are
-    /// registered the way machines are, and there are none because there are no effect engines
-    /// for one to be on.
+    /// Rebuilt with the machines rather than watched, since the two are read from disc in the
+    /// same act and an effect arriving or going is a thing somebody did in SETTINGS.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<Machine> AvailableEffects =>
-        System.Array.Empty<Machine>();
+    private void Effected()
+    {
+        string? held = SelectedEffect?.Id;
+
+        Effects.Clear();
+
+        if (_effects is { } registered)
+        {
+            foreach (var effect in registered.All) Effects.Add(new RackEffect(effect));
+        }
+
+        SelectedEffect = Effects.FirstOrDefault(one => one.Id == held) ?? Effects.FirstOrDefault();
+
+        OnPropertyChanged(nameof(HasEffects));
+    }
 
     /// <summary>The rack's own boxes are written when it is read, so this list moves with them.</summary>
     private void OfferedChanged()
@@ -669,8 +708,6 @@ public sealed partial class MachineRackViewModel : ObservableObject, IInstrument
         OnPropertyChanged(nameof(Offered));
     }
 
-    /// <summary>True when there is an effect to add.</summary>
-    public bool HasAvailableEffects => AvailableEffects.Count > 0;
 
     /// <summary>Puts another box on a machine this installation has.</summary>
     /// <remarks>

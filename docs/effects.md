@@ -1,8 +1,9 @@
 # Effects of our own
 
 Decided on 2026-09-02. The rack has had an empty Effects tab since it was split in two, and this
-is what goes in it. Of the five steps at the foot of this file, the first is done and the other
-four are not.
+is what goes in it. Of the five steps at the foot of this file, the first two are done and the
+other three are not. Nothing sounds yet, and nothing shows on the tab yet either, which is the
+gate working rather than a thing left out.
 
 ## An effect is not a machine
 
@@ -210,8 +211,14 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    enclosing namespace beats a using, and is an ambiguity anywhere else. Nothing on disc moved,
    which `Tests/MachinePartsTests.cs` says by reading the shipped manifests and passing
    untouched.
-2. **The effect world with nothing in it**: `EffectProject`, the register, the two folders and
-   `offered.txt`, the rack's Effects tab filled from it. Nothing sounds yet.
+2. **The effect world with nothing in it. Done.** The folder rules came out first, since they
+   were written for machines and are about neither: `IRackRegistry<T>` and `RackRegistry<T>` are
+   the two folders, the offer, the bringing up to date and the engine gate, and `MachineRegistry`
+   and `EffectRegistry` are what is left over when those are taken out. Then `EffectProject`
+   (`effect.json`), `EffectProjects`, `IEffectEngines` as the gate with an empty table, and the
+   rack's Effects tab drawn from what is registered, with no picker beside it: an effect cannot be
+   shelved, because there is no box of yours to shelve. `Tests/EffectRackTests.cs` is eighteen
+   tests and most of them are the refusals.
 3. **One engine end to end**: the delay. On the chain, saved and read back in a song, its face
    drawn, bypass through the new part, pointable and automatable, with the tests including the
    refusals.

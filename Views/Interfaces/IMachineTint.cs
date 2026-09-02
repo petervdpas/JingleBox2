@@ -69,4 +69,19 @@ public interface IMachineTint
 
     /// <summary>The colour a machine is painted in, or nothing when it does not say.</summary>
     bool Hue(string? colour, out Color hue);
+
+    /// <summary>
+    /// A box's own colour at a given weight, for the row it stands on in a list.
+    /// </summary>
+    /// <remarks>
+    /// What makes the rack read as a rack of coloured boxes rather than as a list with a coloured
+    /// edge. Nothing at all when the colour cannot be read, since a row painted a colour nobody
+    /// chose is worse than a row painted none.
+    ///
+    /// Here rather than on the row, because there are two kinds of row on the rack now and one
+    /// rule: a machine's box and an effect's are painted the same way out of the same theme.
+    /// </remarks>
+    /// <param name="colour">The box's own accent, as its theme spells it.</param>
+    /// <param name="amount">How much of it the row takes, which its theme also says.</param>
+    IBrush Wash(string? colour, double amount);
 }

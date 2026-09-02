@@ -16,10 +16,10 @@ namespace JingleBox2.Tracker.Machines;
 /// The shelf, which decides which machines a song can be given. Left out, the registry alone
 /// answers, which is what a caller with no rack wants: a test, a preview, or the designer.
 /// </param>
-public sealed class MissingMachines(IMachineRegistry? registry = null, IMachineRack? rack = null) : IMissingMachines
+public sealed class MissingMachines(IRackRegistry<MachineProject>? registry = null, IMachineRack? rack = null) : IMissingMachines
 {
     /// <summary>Who says what ships, which is the only place a missing machine's name survives.</summary>
-    private readonly IMachineRegistry _registry = registry ?? new MachineRegistry();
+    private readonly IRackRegistry<MachineProject> _registry = registry ?? new MachineRegistry();
 
     /// <summary>The shelf, or nothing when only the registry is being asked.</summary>
     private readonly IMachineRack? _rack = rack;

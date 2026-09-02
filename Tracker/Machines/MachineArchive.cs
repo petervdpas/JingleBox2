@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker.Machines;
 
@@ -11,7 +12,7 @@ namespace JingleBox2.Tracker.Machines;
 public sealed class MachineArchive : IMachineArchive
 {
     /// <summary>Who names the folder the installed machines live in.</summary>
-    private readonly IMachineRegistry _registry;
+    private readonly IRackRegistry<MachineProject> _registry;
 
     /// <summary>The two questions asked of every path written into a staging folder.</summary>
     private readonly IMachinePaths _paths;
@@ -31,7 +32,7 @@ public sealed class MachineArchive : IMachineArchive
     /// How a path is tested for being inside a folder. Left out, the ordinary one, which reads
     /// the rule off this system.
     /// </param>
-    public MachineArchive(IMachineRegistry? registry = null, IMachinePaths? paths = null)
+    public MachineArchive(IRackRegistry<MachineProject>? registry = null, IMachinePaths? paths = null)
     {
         _paths = paths ?? new MachinePaths();
         _registry = registry ?? new MachineRegistry(this);

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Tracker.Machines.Interfaces;
 
@@ -9,7 +10,7 @@ namespace JingleBox2.Tracker.Machines.Interfaces;
 /// The machines this run is working with, kept where a panel can ask for one.
 /// </summary>
 /// <remarks>
-/// <see cref="IMachineRegistry"/> reads the machines off the disc once, at startup, and hands
+/// <see cref="IRackRegistry{T}"/> reads the machines off the disc once, at startup, and hands
 /// back what it found. Until now that list was counted into the log and dropped, because the
 /// only thing anything wanted from a machine was its name and its colour, and those had already
 /// been pushed into <see cref="Machine"/>. A panel drawn from a machine's own description wants

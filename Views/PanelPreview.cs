@@ -15,6 +15,7 @@ using JingleBox2.Tracker.Machines;
 using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -37,7 +38,7 @@ public static class PanelPreview
 
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineRegistry Registry = new MachineRegistry();
+    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
 
     /// <summary>The machines this preview has, filled once before anything is drawn.</summary>
     /// <remarks>

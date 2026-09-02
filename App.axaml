@@ -4,6 +4,7 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              x:Class="JingleBox2.App"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -639,10 +640,12 @@
             </Grid>
         </DataTemplate>
 
-        <!-- A machine on the rack: no cell number to answer to, so just what it is, and the
-             colour it is. Every machine of ours has one of its own, so a rack full of boxes is
-             read the way a rack is: by which box, not by reading each label. -->
-        <DataTemplate x:Key="RackRow" x:DataType="vm:RackMachine">
+        <!-- A box on the rack: no cell number to answer to, so just what it is, and the colour
+             it is. Every one of ours has a colour of its own, so a rack full of boxes is read
+             the way a rack is: by which box, not by reading each label. Typed to the row rather
+             than to a machine, because the effects tab draws its rows with this same template
+             and a second copy of it would be a second copy to keep in step. -->
+        <DataTemplate x:Key="RackRow" x:DataType="vmi:IRackRow">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
                 <Border Grid.Column="0" Width="4" CornerRadius="2"
                         VerticalAlignment="Stretch"

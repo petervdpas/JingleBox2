@@ -5,11 +5,12 @@ using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
+using JingleBox2.ViewModels.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
 /// <summary>One row in the instrument rack. No number: a rack has no cell to answer to.</summary>
-public sealed partial class RackMachine : ObservableObject
+public sealed partial class RackMachine : ObservableObject, IRackRow
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IMachineTint _tint = new MachineTint();
@@ -47,14 +48,8 @@ public sealed partial class RackMachine : ObservableObject
     /// <summary>And heavier again for the row that is picked.</summary>
     public IBrush RowPicked => Wash(Theme.RowPicked);
 
-    /// <summary>
-    /// The machine's accent at a given weight, or nothing at all when the theme's colour cannot
-    /// be read: a row painted a colour nobody chose is worse than a row painted none.
-    /// </summary>
-    private IBrush Wash(double amount) =>
-        _tint.Hue(Theme.Accent, out var hue)
-            ? new SolidColorBrush(hue, amount)
-            : Brushes.Transparent;
+    /// <summary>The machine's accent at a given weight, which the tint is the one rule for.</summary>
+    private IBrush Wash(double amount) => _tint.Wash(Theme.Accent, amount);
 
     /// <summary>
     /// True for a machine's own slot: always there, called what the machine is called, and

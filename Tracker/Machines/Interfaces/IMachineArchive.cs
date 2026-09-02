@@ -7,7 +7,7 @@ namespace JingleBox2.Tracker.Machines.Interfaces;
 /// <remarks>
 /// A machine is already a folder with a manifest at the top of it, so there is nothing to
 /// invent here. The zip is that folder, and installing is putting it under
-/// <see cref="IMachineRegistry.Installed"/> in a folder named after the machine's id, which is
+/// <see cref="JingleBox2.Tracker.Interfaces.IRackRegistry{T}.Installed"/> in a folder named after the machine's id, which is
 /// the name songs write down and therefore the only name that cannot collide by accident.
 ///
 /// Two ways in and one door. A zip somebody was handed is unpacked; a machine the program ships
