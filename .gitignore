@@ -19,3 +19,9 @@ Thumbs.db
 
 # What a test run leaves behind.
 TestResults/
+
+# An application folder that landed in the project rather than beside the settings.
+# AppFolder.Path() is ApplicationData/JingleBox2, so a run whose XDG_CONFIG_HOME or HOME
+# points at this directory writes one here: config.json, controllers, instruments, machines
+# and a running marker. One was committed once. Nothing in the build or the code reads it.
+/JingleBox2/
