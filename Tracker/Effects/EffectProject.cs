@@ -33,7 +33,7 @@ namespace JingleBox2.Tracker.Effects;
 /// What goes wrong here is written to <see cref="Diagnostics.Enums.LogArea.Machines"/>, which is
 /// the rack's area rather than the machine world's alone.
 /// </remarks>
-public sealed class EffectProject : IRackProject, IEffect
+public sealed class EffectProject : IRackProject, IDesignProject, IEffect
 {
     /// <summary>What the file at the top of an effect's folder is called.</summary>
     /// <remarks>
@@ -48,7 +48,7 @@ public sealed class EffectProject : IRackProject, IEffect
     public const string PresetsFolder = "presets";
 
     /// <summary>Where the pictures on an effect's face go.</summary>
-    public const string ImagesFolder = "images";
+    public const string ImagesFolder = PanelImages.FolderName;
 
     /// <summary>How the manifest is written, which is laid out for reading.</summary>
     /// <remarks>
@@ -115,6 +115,33 @@ public sealed class EffectProject : IRackProject, IEffect
 
     /// <inheritdoc/>
     public string Colour => Theme.Accent;
+
+    /// <summary>The pictures in the folder, which is a rule about a face rather than a world.</summary>
+    /// <remarks>
+    /// The same rules a machine's pictures keep, and the same object: adding, sweeping,
+    /// renumbering and removing are four acts about a folder of files and nothing about what is
+    /// in the folder.
+    /// </remarks>
+    private static readonly Tracker.Interfaces.IPanelImages Pictures = new PanelImages();
+
+    /// <inheritdoc/>
+    public string? AddImage(string path) => Pictures.Add(Folder, path);
+
+    /// <inheritdoc/>
+    public int SweepImages(ISet<string> kept) => Pictures.Sweep(Folder, kept);
+
+    /// <inheritdoc/>
+    public IReadOnlyDictionary<string, string> RenumberImages() => Pictures.Renumber(Folder);
+
+    /// <inheritdoc/>
+    public bool RemoveImage(string named) => Pictures.Remove(Folder, named);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Never. An effect is handed a track's audio and no recordings at all, so a picker on its
+    /// face is browsing what it ships with or nothing.
+    /// </remarks>
+    public bool? BrowsesTakes() => false;
 
     /// <summary>Whether this project has a folder yet.</summary>
     [JsonIgnore]

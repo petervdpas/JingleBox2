@@ -18,6 +18,7 @@ using JingleBox2.Tracker.Machines.Interfaces;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 using JingleBox2.Rack.Machines;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -32,7 +33,7 @@ namespace JingleBox2.ViewModels;
 /// Nothing about a song here, and nothing about instruments: a machine is a box, and it becomes
 /// an instrument only when a song takes it.
 /// </remarks>
-public sealed partial class MachineEditorViewModel : ObservableObject
+public sealed partial class DesignerViewModel : ObservableObject
 {
     /// <summary>What a key is called, both ways round.</summary>
     private readonly IMachineNotes _notes = new MachineNotes();
@@ -94,7 +95,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Folder))]
     [NotifyPropertyChangedFor(nameof(Accent))]
     [NotifyPropertyChangedFor(nameof(AccentHex))]
-    private MachineProject? project;
+    private IDesignProject? project;
 
     /// <summary>
     /// Builds the editor with nothing open, and wires the three pages together.
@@ -106,15 +107,74 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// that closed itself on the strength of that instant snapped straight back to the panel every
     /// time it was opened. So this only says the answer moved and lets the strip decide.
     /// </remarks>
-    public MachineEditorViewModel()
+    /// <summary>Which of the two worlds this page is designing for.</summary>
+    private readonly IDesignWorld _world;
+
+    /// <summary>What one of these is called in a sentence, for the status line.</summary>
+    public string Word => _world.Word;
+
+    /// <summary>Whether this world has a presets page at all.</summary>
+    public bool ShowsPresets => _world.HasPresets;
+
+    /// <summary>Whether this world can be written out as a zip for somebody else.</summary>
+    public bool ShowsExport => _world.Exports;
+
+    /// <summary>
+    /// The wording on the page, which is the same sentence with one word changed.
+    /// </summary>
+    /// <remarks>
+    /// Built here rather than written twice in the drawing. There is one page and it is used by
+    /// both worlds, so a label saying machine on the effects tab would be the page lying about
+    /// what it is editing, and two copies of the drawing to fix it would be two copies to keep in
+    /// step.
+    /// </remarks>
+    public string Heading => "The " + _world.Word;
+
+    /// <inheritdoc cref="Heading"/>
+    public string SummaryHint => "One line, for somebody choosing between " + _world.Word + "s";
+
+    /// <inheritdoc cref="Heading"/>
+    public string NewTip => "A " + _world.Word + " nobody has made yet. It gets its id now and keeps it forever.";
+
+    /// <inheritdoc cref="Heading"/>
+    public string SaveTip =>
+        "Writes the " + _world.Word +
+        " to its folder. The button goes green while there are changes that are not on disc yet.";
+
+    /// <inheritdoc cref="Heading"/>
+    public string SaveAsTip =>
+        "Writes the whole " + _world.Word +
+        " into a folder you choose, everything in it and all, and works there from now on. " +
+        "The folder it came from is left as it was.";
+
+    /// <inheritdoc cref="Heading"/>
+    public string CancelTip =>
+        "Throws away everything done since the last save and reads the " + _world.Word +
+        " back as it was. Asked first, because it cannot be undone.";
+
+    /// <inheritdoc cref="Heading"/>
+    public string ExportTip =>
+        "Writes the whole " + _world.Word +
+        " out as a zip. That zip is what somebody else imports on the SETTINGS tab.";
+
+    /// <summary>
+    /// Builds the page for a world, machines unless told otherwise.
+    /// </summary>
+    /// <param name="world">
+    /// Which world is being designed for. Left out, machines, since that is what the DESIGNER
+    /// tab has always been and what every caller before effects existed meant.
+    /// </param>
+    public DesignerViewModel(IDesignWorld? world = null)
     {
+        _world = world ?? new MachineWorld();
+
         History.Changed += HistoryMoved;
 
         Values = new MachinePreviewValues(Parameters);
 
-        PresetDesk = new MachinePresetDesk(() => Project);
+        PresetDesk = new MachinePresetDesk(() => Project as MachineProject);
 
-        Utilities = new MachineUtilities(() => Project);
+        Utilities = new MachineUtilities(() => Project as MachineProject);
 
         Utilities.PropertyChanged += (_, e) =>
         {
@@ -217,8 +277,8 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
     /// <summary>What the editor says it is showing.</summary>
     public string Title => Project == null
-        ? "No machine open"
-        : Project.Name.Length > 0 ? Project.Name : "Untitled machine";
+        ? "No " + _world.Word + " open"
+        : Project.Name.Length > 0 ? Project.Name : "Untitled " + _world.Word;
 
     /// <summary>The line along the bottom: what the last thing done here did, or why it did not.</summary>
     [ObservableProperty] private string status = "";
@@ -325,29 +385,36 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// </remarks>
     public IRelayCommand NewCommand => new RelayCommand(() =>
     {
-        Project = new MachineProject
-        {
-            Id = "machine." + Guid.NewGuid().ToString("n")[..8],
-            Name = "New machine",
-            Version = "1.0",
-            Theme = new PanelTheme("#7B838C")
-        };
+        Project = _world.New();
 
-        Status = "A new machine. Save it somewhere to start keeping it.";
+        Status = "A new " + _world.Word + ". Save it somewhere to start keeping it.";
     });
+
+    /// <summary>
+    /// What is already written in that folder, without opening it here.
+    /// </summary>
+    /// <remarks>
+    /// Asked by Save as, which has to know whether it is about to land on somebody else's work.
+    /// Through the world rather than by naming a manifest, since the two worlds keep different
+    /// files and a page that read the wrong one would warn about nothing on one tab and about
+    /// everything on the other.
+    /// </remarks>
+    /// <param name="folder">The folder being written into.</param>
+    public IDesignProject? Read(string folder) => _world.Open(folder);
 
     /// <summary>Opens the project in that folder.</summary>
     /// <remarks>
     /// The presets are read before the panel is told, or the picker on it is handed a list that has
     /// not been filled in yet and draws an empty one.
     /// </remarks>
+    /// <param name="folder">The folder to read.</param>
     public void Open(string folder)
     {
-        var opened = MachineProject.Open(folder);
+        var opened = _world.Open(folder);
 
         if (opened == null)
         {
-            Status = "No machine in " + folder;
+            Status = "No " + _world.Word + " in " + folder;
             return;
         }
 
@@ -418,7 +485,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
             _versionWritten = Project.Version;
 
-            if (carry && Project.IsSaved) Crates.CopyInto(Project, folder!);
+            if (carry && Project.IsSaved) _world.CopyInto(Project, folder!);
 
             Project.Save(folder);
             Status = "Saved " + Project.Version + " to " + Project.Folder;
@@ -442,10 +509,11 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public bool NeedsFolder => Project is { IsSaved: false };
 
     /// <summary>True once there is something on disc worth handing to somebody.</summary>
-    public bool CanExport => Project is { IsSaved: true };
+    public bool CanExport => _world.Exports && Project is { IsSaved: true };
 
     /// <summary>What to call the zip, before anybody has said where to put it.</summary>
-    public string ExportName => Project == null ? "machine.zip" : Safe(Project.Name, "machine") + ".zip";
+    public string ExportName =>
+        Project == null ? _world.Word + ".zip" : Safe(Project.Name, _world.Word) + ".zip";
 
     /// <summary>
     /// Writes the machine out as a zip.
@@ -465,7 +533,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         try
         {
-            Crates.Export(project, zipPath);
+            _world.Export(project, zipPath);
 
             Status = "Exported '" + project.Name + "' to " + zipPath;
         }
@@ -564,6 +632,17 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// editor is only borrowing it.
     /// </remarks>
     public IMachineTakes? Takes { get; set; }
+
+    /// <summary>
+    /// The shelf of takes the picker dialog offers, when this world has one.
+    /// </summary>
+    /// <remarks>
+    /// Handed in rather than reached for through the window, because the page is bound to this
+    /// and not to the application: a view that walked up its own visual tree to find the takes
+    /// would be a view that knows what it is hosted by. Nothing for the effect designer, whose
+    /// faces are sent no recordings, and the picker is not offered there at all.
+    /// </remarks>
+    public TakeFilter? Browse { get; set; }
 
     /// <summary>Said when the machine open has changed, since its picker offers a different list.</summary>
     private void ShelfChanged() => OnPropertyChanged(nameof(Presets));
@@ -1886,7 +1965,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// <see cref="Rewrap"/>, and a history that emptied itself on the way would undo once and then
     /// refuse to undo again.
     /// </remarks>
-    partial void OnProjectChanged(MachineProject? value)
+    partial void OnProjectChanged(IDesignProject? value)
     {
         History.Opened(value);
 
@@ -1905,7 +1984,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// looked at still counts as a change, and one whose version was typed over does not get
     /// bumped as well.
     /// </remarks>
-    private void Wrap(MachineProject? value)
+    private void Wrap(IDesignProject? value)
     {
         Utilities?.Reread();
 
@@ -1926,7 +2005,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             Parameters.Add(wrapped);
         }
 
-        var root = new MachineElementViewModel(Root(value), edited: Redraw);
+        var root = new MachineElementViewModel(Root(value), edited: Redraw, outermost: _world.Word);
 
         Watch(root);
 
@@ -1943,7 +2022,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     /// root that says nothing. There has to be something to hang the first element off, so a
     /// grid is put in and written back into the project, which means saving keeps it.
     /// </remarks>
-    private static PanelElement Root(MachineProject project)
+    private static PanelElement Root(IDesignProject project)
     {
         project.Panel ??= new Rack.Faces.Panel();
         project.Panel.Root ??= new PanelElement { Element = ElementKinds.Grid };

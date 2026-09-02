@@ -150,7 +150,7 @@ public class MachinePartsTests
     [Fact]
     public void Both_parts_can_be_dropped_on_a_panel()
     {
-        var library = new MachineEditorViewModel().Library;
+        var library = new DesignerViewModel().Library;
 
         Assert.Contains(ElementKinds.Menu, library);
         Assert.Contains(ElementKinds.InstrumentName, library);

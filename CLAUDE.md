@@ -43,7 +43,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
-- The tab along the top is **DESIGNER**, and it was MACHINES. The page is where a machine's face
+- The tab along the top is **DESIGNER**, and it holds both worlds on two tabs of its own,
+  Machines and Effects. It was MACHINES. The page is where a machine's face
   is laid out, which is a job rather than a list of things: MACHINES read as the place your
   machines are kept, and the place they are kept is the rack in the tracker and the registry in
   SETTINGS. The types keep their names, since `MachineEditorViewModel` is what the thing is
@@ -374,6 +375,38 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   are `RackEffect` against the machines' `RackMachine`, drawn by one template and washed by one
   set of styles through `IRackRow`, which is named in XAML because a compiled binding needs a type
   and a row drawn twice would be two templates drifting apart
+- **There is one designer and it is told which world it is in.** Laying out a face, dropping
+  parts on it, naming parameters, sizing the columns and keeping the undo are the same work
+  whether the face belongs to a machine or to an effect, so `DesignerViewModel` and `DesignerView`
+  are one page used twice, on two tabs **inside DESIGNER**: Machines writes `machine.json` and
+  Effects writes `effect.json`. Inside the one page rather than two pages along the top, because
+  it is one workshop and which of the two you are laying out is a choice within it, the same way
+  the rack itself has Machines and Effects. Tabs rather than a picker, so nobody is halfway
+  through a machine and finds they were drawing an effect, and two instances rather than a mode,
+  so each holds its own project, its own undo and its own unsaved changes and switching between
+  them loses nothing
+- **New follows the tab, and the difference between the two is a help topic.** It was briefly a
+  dialog asking which you meant, and that was wrong twice over: a question in the way of a button
+  that used to do something is bad to work with, and the paragraph explaining a machine against an
+  effect was a sentence in the page when this application already has one place for that. The
+  badge beside New opens `designer.worlds`, which says what each is, that both are a face
+  over an engine that lives in the application rather than in the folder you are making, and why
+  the id New gives you never reaches the rack
+- **`IDesignWorld` is everything that differs, and it is small.** What a fresh one is, what its id
+  begins with, what the manifest is called, the word in a sentence on the status line, whether the
+  folder can be carried somewhere else, and whether there is a zip and a presets page. Nothing
+  else in the page knows which world it is in, and the wording is built from the word rather than
+  written twice: `The machine` and `The effect` are one heading. An effect offers no Export, since
+  a zip needs an importer at the other end and there is none, and no Presets page, since a
+  machine's preset is an instrument file and an effect has no instrument. `IDesignProject` is what
+  the page edits, implemented by both projects, and not one member of it is about notes or audio
+- **The two things that were written for machines and were never about them came out.**
+  `IPanelImages` is the pictures in a folder, added under the next free number, swept when nothing
+  names them, renumbered so there are no gaps, and one at a time when the last element showing one
+  goes; `IFolderCopy` is a folder carried whole, empty folders included, which is what taking a
+  shipped box and what Save as both are. `DesignHistory` went the same way: a step is the
+  project's own JSON, and it used to name the machine's type on both sides of the trip, where it
+  now asks the project what it is. So a world added later needs nothing in any of the three
 - **An effect of ours is a fourth word and not a kind of machine.** Engine, machine and instrument
   were three; an effect sits beside machine. It is a face over an effect engine, it takes audio
   rather than notes, and so it has no keyboard, no zones, no pads and no kit. Its own folder, its

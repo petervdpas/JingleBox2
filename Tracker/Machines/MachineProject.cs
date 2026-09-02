@@ -36,11 +36,19 @@ namespace JingleBox2.Tracker.Machines;
 /// What goes wrong here is written to <see cref="Diagnostics.Enums.LogArea.Machines"/> rather than to
 /// the application's own area, as everything under this folder is.
 /// </remarks>
-public sealed class MachineProject : IRackProject
+public sealed class MachineProject : IRackProject, IDesignProject
 {
     /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly IMachinePaths Inside = new MachinePaths();
+
+    /// <summary>The pictures in the folder, which is a rule about a face rather than a machine.</summary>
+    /// <remarks>
+    /// Shared rather than one apiece, and shared with the effect world as well: adding, sweeping,
+    /// renumbering and removing a picture are the same four acts whichever kind of box the folder
+    /// holds. The methods below are this machine's own way of being asked, and each is one line.
+    /// </remarks>
+    private static readonly Tracker.Interfaces.IPanelImages Pictures = new PanelImages();
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
@@ -74,14 +82,7 @@ public sealed class MachineProject : IRackProject
     /// the panel names the file, the folder carries it, and the two find each other again on
     /// whatever disc they land on.
     /// </remarks>
-    public const string ImagesFolder = "images";
-
-    /// <summary>What every picture in a machine is called, before its number.</summary>
-    /// <remarks>
-    /// Declared rather than written into the naming, so the one word every picture in every
-    /// machine is named after can be found by looking for it.
-    /// </remarks>
-    private const string ImageStem = "image";
+    public const string ImagesFolder = PanelImages.FolderName;
 
     /// <summary>How the manifest is written, which is laid out for reading.</summary>
     /// <remarks>
@@ -365,29 +366,7 @@ public sealed class MachineProject : IRackProject
     /// Taking one out again is <see cref="RemoveImage"/>, which the designer calls when the last
     /// element showing a picture goes.
     /// </remarks>
-    public string? AddImage(string path)
-    {
-        if (Folder.Length == 0) return null;
-
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
-
-        string images = Path.Combine(Folder, ImagesFolder);
-
-        Directory.CreateDirectory(images);
-
-        string suffix = Path.GetExtension(path);
-
-        for (int at = 1; ; at++)
-        {
-            string stem = ImageStem + at;
-
-            if (Directory.GetFiles(images, stem + ".*").Length > 0) continue;
-
-            File.Copy(path, Path.Combine(images, stem + suffix));
-
-            return ImagesFolder + "/" + stem + suffix;
-        }
-    }
+    public string? AddImage(string path) => Pictures.Add(Folder, path);
 
     /// <summary>
     /// Deletes every picture the machine no longer names, and says how many went.
@@ -401,40 +380,7 @@ public sealed class MachineProject : IRackProject
     /// Only files of ours are considered. Anything else somebody put in the folder is theirs.
     /// </remarks>
     /// <param name="kept">What the machine still names, as the panel writes it: "images/image1.png".</param>
-    public int SweepImages(ISet<string> kept)
-    {
-        if (Folder.Length == 0) return 0;
-
-        string images = Path.Combine(Folder, ImagesFolder);
-
-        if (!Directory.Exists(images)) return 0;
-
-        int gone = 0;
-
-        try
-        {
-            foreach (string file in Directory.GetFiles(images))
-            {
-                string stem = Path.GetFileNameWithoutExtension(file);
-
-                if (!stem.StartsWith(ImageStem, StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (!int.TryParse(stem[ImageStem.Length..], out _)) continue;
-
-                if (kept.Contains(ImagesFolder + "/" + Path.GetFileName(file))) continue;
-
-                File.Delete(file);
-
-                gone++;
-            }
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The pictures could not be swept in " + Folder, ex);
-        }
-
-        return gone;
-    }
+    public int SweepImages(ISet<string> kept) => Pictures.Sweep(Folder, kept);
 
     /// <summary>
     /// Closes the gaps in the picture numbers, and says what became what.
@@ -453,53 +399,7 @@ public sealed class MachineProject : IRackProject
     /// somebody can put things in, and renumbering is not a licence to rearrange it.
     /// </remarks>
     /// <returns>What each picture was called, against what it is called now.</returns>
-    public IReadOnlyDictionary<string, string> RenumberImages()
-    {
-        var moved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        if (Folder.Length == 0) return moved;
-
-        string images = Path.Combine(Folder, ImagesFolder);
-
-        if (!Directory.Exists(images)) return moved;
-
-        try
-        {
-            var ours = new List<(int At, string Path)>();
-
-            foreach (string file in Directory.GetFiles(images))
-            {
-                string stem = Path.GetFileNameWithoutExtension(file);
-
-                if (!stem.StartsWith(ImageStem, StringComparison.OrdinalIgnoreCase)) continue;
-
-                if (!int.TryParse(stem[ImageStem.Length..], out int at)) continue;
-
-                ours.Add((at, file));
-            }
-
-            ours.Sort((one, other) => one.At.CompareTo(other.At));
-
-            for (int i = 0; i < ours.Count; i++)
-            {
-                string was = ours[i].Path;
-                string suffix = Path.GetExtension(was);
-                string now = Path.Combine(images, ImageStem + (i + 1) + suffix);
-
-                if (_paths.Same(was, now)) continue;
-
-                File.Move(was, now);
-
-                moved[ImagesFolder + "/" + Path.GetFileName(was)] = ImagesFolder + "/" + Path.GetFileName(now);
-            }
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "The pictures could not be renumbered in " + Folder, ex);
-        }
-
-        return moved;
-    }
+    public IReadOnlyDictionary<string, string> RenumberImages() => Pictures.Renumber(Folder);
 
     /// <summary>
     /// Takes a picture out of the machine, file and all.
@@ -515,30 +415,5 @@ public sealed class MachineProject : IRackProject
     /// arrives out of a file somebody else may have written.
     /// </remarks>
     /// <param name="named">What the panel calls it, relative to the machine's own folder.</param>
-    public bool RemoveImage(string named)
-    {
-        if (Folder.Length == 0 || string.IsNullOrWhiteSpace(named)) return false;
-
-        try
-        {
-            string images = Path.GetFullPath(Path.Combine(Folder, ImagesFolder));
-            string wanted = Path.GetFullPath(Path.Combine(Folder, named));
-
-            if (!Inside.Under(wanted, images)) return false;
-
-            if (!File.Exists(wanted)) return false;
-
-            File.Delete(wanted);
-
-            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Machines, () => "machine picture removed: " + wanted);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Machines, "A picture could not be removed from " + Folder, ex);
-
-            return false;
-        }
-    }
+    public bool RemoveImage(string named) => Pictures.Remove(Folder, named);
 }

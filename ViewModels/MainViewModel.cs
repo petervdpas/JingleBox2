@@ -184,7 +184,19 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// what stands at the top of the panel is your takes and the categories they are filed
     /// under.
     /// </remarks>
-    public MachineEditorViewModel MachineEditor { get; } = new();
+    public DesignerViewModel Designer { get; } = new();
+
+    /// <summary>
+    /// The same page again, designing an effect instead of a machine.
+    /// </summary>
+    /// <remarks>
+    /// A second one of the same class rather than a mode on the first: two pages of work that
+    /// each have their own project open, their own undo and their own unsaved changes. Told which
+    /// world it is in through <see cref="Tracker.Effects.EffectWorld"/>, which is where the
+    /// handful of things that differ live, and given none of the machine world's take pickers,
+    /// since an effect is sent no recordings.
+    /// </remarks>
+    public DesignerViewModel EffectDesigner { get; } = new(new Tracker.Effects.EffectWorld());
 
     /// <summary>What machines are on the disc, for the settings page to list and add to.</summary>
     /// <remarks>
@@ -1284,10 +1296,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Takes = new TakeFilter(Record.Recordings);
 
-        MachineEditor.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
+        Designer.Browse = Takes;
 
-        MachineEditor.Shelf = new Tracker.Machines.TakeShelf(
-            Record.Recordings, take => MachineEditor.PutTake(take.FilePath));
+        Designer.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
+
+        Designer.Shelf = new Tracker.Machines.TakeShelf(
+            Record.Recordings, take => Designer.PutTake(take.FilePath));
 
         var rack = new MachineRack();
 

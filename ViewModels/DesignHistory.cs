@@ -4,8 +4,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using JingleBox2.Diagnostics;
-using JingleBox2.Tracker.Machines;
 using JingleBox2.Diagnostics.Enums;
+using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -105,7 +105,7 @@ public sealed class DesignHistory
     /// same effect, so the answer is not to hunt those down one at a time.
     /// </remarks>
     /// <param name="project">The machine as it was written.</param>
-    public void Saved(MachineProject? project)
+    public void Saved(IDesignProject? project)
     {
         _now = _saved = Said(project);
 
@@ -120,7 +120,7 @@ public sealed class DesignHistory
     /// It goes to one particular state, the one on disc, and empties the history because
     /// everything in it is now about a machine that no longer exists.
     /// </remarks>
-    public bool Cancel(MachineProject? project)
+    public bool Cancel(IDesignProject? project)
     {
         if (project is null || !NeedsSaving || _saved.Length == 0) return false;
 
@@ -153,7 +153,7 @@ public sealed class DesignHistory
     /// What was just opened is the machine as its folder holds it, so saved starts equal to now:
     /// there is nothing to save and nothing to cancel until somebody does something.
     /// </remarks>
-    public void Opened(MachineProject? project)
+    public void Opened(IDesignProject? project)
     {
         _done.Clear();
         _undone.Clear();
@@ -178,7 +178,7 @@ public sealed class DesignHistory
     /// machine reading exactly as it did before and cost a comparison. Over-telling is safe;
     /// under-telling would be an edit that cannot be undone.
     /// </remarks>
-    public void Did(MachineProject? project)
+    public void Did(IDesignProject? project)
     {
         if (_walking) return;
 
@@ -203,10 +203,10 @@ public sealed class DesignHistory
     }
 
     /// <summary>Takes the last change back, into the project it was made on.</summary>
-    public bool Undo(MachineProject? project) => Walk(_done, _undone, project, "undid");
+    public bool Undo(IDesignProject? project) => Walk(_done, _undone, project, "undid");
 
     /// <summary>Puts back the last thing undone.</summary>
-    public bool Redo(MachineProject? project) => Walk(_undone, _done, project, "did again");
+    public bool Redo(IDesignProject? project) => Walk(_undone, _done, project, "did again");
 
     /// <summary>
     /// Moves one step from one list to the other and puts the machine where that step says.
@@ -221,7 +221,7 @@ public sealed class DesignHistory
     /// <param name="project">The machine being designed, poured into in place rather than replaced.</param>
     /// <param name="said">The word for the log, which is the only difference between the two.</param>
     /// <returns>True when a step was taken, false when there was nothing to take or no project to put it on.</returns>
-    private bool Walk(List<string> from, List<string> onto, MachineProject? project, string said)
+    private bool Walk(List<string> from, List<string> onto, IDesignProject? project, string said)
     {
         if (project is null || from.Count == 0) return false;
 
@@ -260,13 +260,13 @@ public sealed class DesignHistory
     /// then refused by <see cref="Take"/> rather than being put back as an empty machine, which is
     /// the difference between an undo that does nothing and an undo that loses the work.
     /// </remarks>
-    private static string Said(MachineProject? project)
+    private static string Said(IDesignProject? project)
     {
         if (project is null) return "";
 
         try
         {
-            return JsonSerializer.Serialize(project, Layout);
+            return JsonSerializer.Serialize(project, project.GetType(), Layout);
         }
         catch (Exception bad)
         {
@@ -289,16 +289,16 @@ public sealed class DesignHistory
     /// The ones marked as not belonging in the file are left alone, which is what keeps the
     /// folder a machine came from pointing where it did.
     /// </remarks>
-    private static bool Take(MachineProject project, string said)
+    private static bool Take(IDesignProject project, string said)
     {
         if (said.Length == 0) return false;
 
         try
         {
-            var was = JsonSerializer.Deserialize<MachineProject>(said, Layout);
+            var was = JsonSerializer.Deserialize(said, project.GetType(), Layout);
             if (was is null) return false;
 
-            foreach (var property in typeof(MachineProject).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var property in project.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (!property.CanRead || !property.CanWrite) continue;
                 if (property.GetCustomAttribute<JsonIgnoreAttribute>() is not null) continue;

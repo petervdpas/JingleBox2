@@ -31,6 +31,9 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     /// <param name="element">The element to wrap.</param>
     /// <param name="parent">What holds it, or nothing for the root.</param>
+    /// <param name="outermost">
+    /// What the row with nothing above it is called: the word for whatever is being designed.
+    /// </param>
     /// <param name="edited">
     /// Told whenever anything here writes into the element. Handed down to every child, so one
     /// hook at the root hears the whole panel.
@@ -38,11 +41,13 @@ public sealed partial class MachineElementViewModel : ObservableObject
     public MachineElementViewModel(
         PanelElement element,
         MachineElementViewModel? parent = null,
-        Action? edited = null)
+        Action? edited = null,
+        string outermost = "panel")
     {
         Element = element;
         Parent = parent;
         _edited = edited ?? parent?._edited;
+        _outermost = outermost;
 
         foreach (var child in element.Children) Children.Add(new MachineElementViewModel(child, this));
 
@@ -391,6 +396,13 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     public ObservableCollection<MachineElementPropertyViewModel> Properties { get; } = new();
 
+    /// <summary>What the outermost row is called, which is what is being designed.</summary>
+    /// <remarks>
+    /// Handed in rather than known, since one designer serves both worlds and an element knows
+    /// nothing about either. A caller that says nothing gets "panel", which is true of both.
+    /// </remarks>
+    private readonly string _outermost;
+
     /// <summary>
     /// How the row reads in the tree.
     /// </summary>
@@ -399,7 +411,8 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// parameter says something. A group is known by what it is called and a control by what it
     /// turns, so one line covers both without the tree needing a column for each.
     ///
-    /// The outermost one is called the machine. It is a Column or a Grid like any other and the
+    /// The outermost one is called by what is being designed, a machine or an effect. It is a
+    /// Column or a Grid like any other and the
     /// inspector still says so, but on the list it is the thing everything else is inside, and
     /// that is what somebody looking for where a part will land is looking for. Reading it as
     /// "Column" made the one row that is always a valid target the hardest one to find.
@@ -408,7 +421,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     {
         get
         {
-            if (Parent == null) return "machine (" + Kind + ")";
+            if (Parent == null) return _outermost + " (" + Kind + ")";
 
             if (Element.Label.Length > 0) return Kind + " \"" + Element.Label + "\"";
 

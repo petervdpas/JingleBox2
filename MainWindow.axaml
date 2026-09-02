@@ -95,10 +95,36 @@
                            Instruments="{Binding $parent[TabItem].DataContext.Machines}" />
       </TabItem>
 
-      <!-- Where machines are built, as opposed to the rack in the tracker, which is what is
-           installed. Switched on under Looks, since somebody firing jingles has no use for it. -->
+      <!-- Where machines and effects are built, as opposed to the rack in the tracker, which
+           is what is installed. Switched on under Looks, since somebody firing jingles has no
+           use for it.
+
+           Two tabs inside the page rather than two pages: it is one workshop and one drawing,
+           and which of the two worlds you are laying out is a choice inside it, the same way the
+           rack itself has Machines and Effects. Each keeps its own project, its own undo and its
+           own unsaved changes, so switching between them loses nothing. -->
       <TabItem Header="DESIGNER" IsVisible="{Binding ShowMachineEditor}">
-        <views:MachineEditorView />
+        <TabControl Classes="worlds" Padding="0">
+          <TabControl.Styles>
+            <!-- The two worlds, at the size of a choice inside a page rather than a heading.
+                 The same treatment the rack's own two tabs get, and for the same reason: a
+                 heading here would read as a second page strip under the first. -->
+            <Style Selector="TabControl.worlds > TabItem">
+              <Setter Property="FontSize" Value="13" />
+              <Setter Property="MinHeight" Value="0" />
+              <Setter Property="Padding" Value="0,2,0,6" />
+              <Setter Property="Margin" Value="0,0,14,0" />
+            </Style>
+          </TabControl.Styles>
+
+          <TabItem Header="Machines">
+            <views:DesignerView DataContext="{Binding Designer}" />
+          </TabItem>
+
+          <TabItem Header="Effects">
+            <views:DesignerView DataContext="{Binding EffectDesigner}" />
+          </TabItem>
+        </TabControl>
       </TabItem>
 
       <TabItem Header="SETTINGS">

@@ -5,8 +5,8 @@
              xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
-             x:Class="JingleBox2.Views.MachineEditorView"
-             x:DataType="vm:MainViewModel">
+             x:Class="JingleBox2.Views.DesignerView"
+             x:DataType="vm:DesignerViewModel">
 
   <!-- Where a machine is built. The rack, in the tracker, is what is installed; this is the
        workshop, and what it holds is a project on disc: a folder with the machine in it, which
@@ -72,54 +72,60 @@
 
     <Border DockPanel.Dock="Top" Classes="card">
       <StackPanel Classes="cardBody">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
           <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
-                     Text="{Binding MachineEditor.Title}" />
+                     Text="{Binding Title}" />
 
           <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                      Margin="8,0,0,0"
                      TextTrimming="CharacterEllipsis"
-                     Text="{Binding MachineEditor.Project.Folder}" />
+                     Text="{Binding Project.Folder}" />
 
           <CheckBox Grid.Column="2" Content="Design" VerticalAlignment="Center"
-                    IsChecked="{Binding MachineEditor.Designing}"
-                    IsVisible="{Binding MachineEditor.CanDesign}"
+                    IsChecked="{Binding Designing}"
+                    IsVisible="{Binding CanDesign}"
                     ToolTip.Tip="On, a click picks a control up to be worked on. Off, the panel is the panel and a click turns it." />
 
-          <Button Grid.Column="3" Content="New" Command="{Binding MachineEditor.NewCommand}"
-                  ToolTip.Tip="A machine nobody has made yet. It gets its id now and keeps it forever." />
+          <Button Grid.Column="3" Content="New" Command="{Binding NewCommand}"
+                  ToolTip.Tip="{Binding NewTip}" />
 
-          <Button Grid.Column="4" Content="Open..." Click="Open_Click" />
+          <!-- Beside New, which is where the question is asked: what am I starting. What a
+               machine is and what an effect is belongs where everything else this program
+               explains about itself lives rather than in a sentence on the page. -->
+          <views:HelpBadge Grid.Column="4" Topic="designer.worlds" VerticalAlignment="Center" />
+
+          <Button Grid.Column="5" Content="Open..." Click="Open_Click" />
 
           <!-- Green while what is on screen is not what is in the folder. The same thing the
                song's Save button does, and for the same reason: a colour is read without being
                decoded. -->
-          <Button Grid.Column="5" Content="Save" Click="Save_Click"
-                  Classes.save="{Binding MachineEditor.NeedsSaving}"
-                  IsEnabled="{Binding MachineEditor.HasProject}"
-                  ToolTip.Tip="Writes the machine to its folder. The button goes green while there are changes that are not on disc yet." />
+          <Button Grid.Column="6" Content="Save" Click="Save_Click"
+                  Classes.save="{Binding NeedsSaving}"
+                  IsEnabled="{Binding HasProject}"
+                  ToolTip.Tip="{Binding SaveTip}" />
 
           <!-- The whole folder, not the manifest alone: a machine is its pictures, its presets
                and its sounds as much as its description. Beside Save because that is where a
                hand looks for it, and because the two differ by one question. -->
-          <Button Grid.Column="6" Content="Save as..." Click="SaveAs_Click"
-                  IsEnabled="{Binding MachineEditor.CanExport}"
-                  ToolTip.Tip="Writes the whole machine into a folder you choose, pictures and presets and sounds and all, and works there from now on. The folder it came from is left as it was." />
+          <Button Grid.Column="7" Content="Save as..." Click="SaveAs_Click"
+                  IsEnabled="{Binding CanExport}"
+                  ToolTip.Tip="{Binding SaveAsTip}" />
 
           <!-- Back to the folder, not back one step. Dead for a machine that has never been
                written down, whose changes are the whole of it. -->
-          <Button Grid.Column="7" Content="Cancel changes" Click="Cancel_Click"
-                  IsEnabled="{Binding MachineEditor.CanCancelChanges}"
-                  Classes.discard="{Binding MachineEditor.CanCancelChanges}"
-                  ToolTip.Tip="Throws away everything done since the last save and reads the machine back as it was. Asked first, because it cannot be undone." />
+          <Button Grid.Column="8" Content="Cancel changes" Click="Cancel_Click"
+                  IsEnabled="{Binding CanCancelChanges}"
+                  Classes.discard="{Binding CanCancelChanges}"
+                  ToolTip.Tip="{Binding CancelTip}" />
 
-          <Button Grid.Column="8" Content="Export..." Click="Export_Click"
-                  IsEnabled="{Binding MachineEditor.CanExport}"
-                  ToolTip.Tip="Writes the whole machine out as a zip: the manifest, the panel and the sounds it ships with. That zip is what somebody else imports on the SETTINGS tab." />
+          <Button Grid.Column="9" Content="Export..." Click="Export_Click"
+                  IsEnabled="{Binding CanExport}"
+                  IsVisible="{Binding ShowsExport}"
+                  ToolTip.Tip="{Binding ExportTip}" />
         </Grid>
 
-        <TextBlock Classes="cardHint" Text="{Binding MachineEditor.Status}"
-                   IsVisible="{Binding MachineEditor.Status.Length}" />
+        <TextBlock Classes="cardHint" Text="{Binding Status}"
+                   IsVisible="{Binding Status.Length}" />
       </StackPanel>
     </Border>
 
@@ -133,8 +139,8 @@
          room. The Design switch belongs to the first: on the other there is no panel being laid
          out for it to be about. -->
     <TabControl Classes="jobs" Margin="0,8,0,0" Padding="0"
-                IsVisible="{Binding MachineEditor.HasProject}"
-                SelectedIndex="{Binding MachineEditor.Page, Mode=TwoWay}">
+                IsVisible="{Binding HasProject}"
+                SelectedIndex="{Binding Page, Mode=TwoWay}">
       <TabControl.Styles>
         <!-- The size the pages across the top are. Fluent's own is a headline and cutting it
              down turned them into a footnote; these are the two halves of the screen and want
@@ -150,26 +156,26 @@
     <TabItem Header="Screen">
     <Grid Margin="0,8,0,0" MinWidth="0">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="{Binding MachineEditor.LeftWidth, Mode=TwoWay}" />
+        <ColumnDefinition Width="{Binding LeftWidth, Mode=TwoWay}" />
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="{Binding MachineEditor.RightWidth, Mode=TwoWay}" />
+        <ColumnDefinition Width="{Binding RightWidth, Mode=TwoWay}" />
       </Grid.ColumnDefinitions>
 
       <!-- What a panel can be made of. Drag one onto the panel to put it inside whatever it
            lands on, or click it to put it inside whatever is picked. -->
       <Grid Grid.Column="0">
         <Grid.RowDefinitions>
-          <RowDefinition Height="{Binding MachineEditor.PartsHeight, Mode=TwoWay}" />
+          <RowDefinition Height="{Binding PartsHeight, Mode=TwoWay}" />
           <RowDefinition Height="Auto" />
-          <RowDefinition Height="{Binding MachineEditor.PanelHeight, Mode=TwoWay}" />
+          <RowDefinition Height="{Binding PanelHeight, Mode=TwoWay}" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Classes="card">
           <DockPanel>
             <ToggleButton DockPanel.Dock="Top" Classes="fold"
-                          IsChecked="{Binding MachineEditor.PartsOpen}">
+                          IsChecked="{Binding PartsOpen}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
                 <TextBlock Classes="cardTitle" Text="Parts" />
@@ -178,13 +184,13 @@
 
             <!-- The card, less its title. Folded it is not hidden but gone, so the row it is in
                  has nothing to measure and shrinks to the title above it. -->
-            <DockPanel IsVisible="{Binding MachineEditor.PartsOpen}">
+            <DockPanel IsVisible="{Binding PartsOpen}">
               <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
                          Margin="0,6,0,0"
                          Text="A grid, a group, a row, a column and a strip hold other things. The rest are what you see." />
 
               <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-              <ItemsControl ItemsSource="{Binding MachineEditor.Library}" Margin="0,6,0,0">
+              <ItemsControl ItemsSource="{Binding Library}" Margin="0,6,0,0">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel Orientation="Horizontal" />
@@ -221,7 +227,7 @@
              of them, which would pull a folded card open again the moment it was dragged. -->
         <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
                       Height="10" HorizontalAlignment="Stretch"
-                      IsVisible="{Binding MachineEditor.PartsPanelSizable}"
+                      IsVisible="{Binding PartsPanelSizable}"
                       ToolTip.Tip="Drag to share the room between the parts and the panel." />
 
         <!-- The same panel as a list. Some things are easier to hit here than on the panel:
@@ -229,36 +235,36 @@
         <Border Grid.Row="2" Classes="card">
           <DockPanel>
             <ToggleButton DockPanel.Dock="Top" Classes="fold"
-                          IsChecked="{Binding MachineEditor.PanelOpen}">
+                          IsChecked="{Binding PanelOpen}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
                 <TextBlock Classes="cardTitle" Text="Panel" />
               </StackPanel>
             </ToggleButton>
 
-            <DockPanel IsVisible="{Binding MachineEditor.PanelOpen}">
+            <DockPanel IsVisible="{Binding PanelOpen}">
               <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6"
                     Margin="0,8,0,0">
                 <Button Grid.Column="0" Content="Remove" Classes="danger"
                         HorizontalAlignment="Stretch"
-                        IsEnabled="{Binding MachineEditor.HasSelection}"
-                        Command="{Binding MachineEditor.RemoveElementCommand}" />
+                        IsEnabled="{Binding HasSelection}"
+                        Command="{Binding RemoveElementCommand}" />
 
                 <Button Grid.Column="1" Content="↑"
-                        IsEnabled="{Binding MachineEditor.HasSelection}"
-                        Command="{Binding MachineEditor.MoveUpCommand}"
+                        IsEnabled="{Binding HasSelection}"
+                        Command="{Binding MoveUpCommand}"
                         ToolTip.Tip="Earlier among the things beside it, which is further left or further up." />
 
                 <Button Grid.Column="2" Content="↓"
-                        IsEnabled="{Binding MachineEditor.HasSelection}"
-                        Command="{Binding MachineEditor.MoveDownCommand}" />
+                        IsEnabled="{Binding HasSelection}"
+                        Command="{Binding MoveDownCommand}" />
               </Grid>
 
               <!-- A part can be dropped on a line here as well as on the panel. Some containers
                    have nothing in them yet and so nothing on screen to aim at. -->
               <TreeView x:Name="PanelTree"
-                        ItemsSource="{Binding MachineEditor.Elements}"
-                        SelectedItem="{Binding MachineEditor.SelectedElement, Mode=TwoWay}"
+                        ItemsSource="{Binding Elements}"
+                        SelectedItem="{Binding SelectedElement, Mode=TwoWay}"
                         Margin="0,8,0,0">
                 <TreeView.Styles>
                   <!-- The branch says whether it is open, so picking something on the panel can
@@ -278,12 +284,12 @@
                       <TextBlock.ContextMenu>
                         <ContextMenu>
                           <MenuItem Header="Remove"
-                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.RemoveElementCommand}" />
+                                    Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).RemoveElementCommand}" />
                           <Separator />
                           <MenuItem Header="Move earlier"
-                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.MoveUpCommand}" />
+                                    Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).MoveUpCommand}" />
                           <MenuItem Header="Move later"
-                                    Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.MoveDownCommand}" />
+                                    Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).MoveDownCommand}" />
                         </ContextMenu>
                       </TextBlock.ContextMenu>
                     </TextBlock>
@@ -296,14 +302,14 @@
       </Grid>
 
       <GridSplitter Grid.Column="1" Classes="handle" ResizeDirection="Columns" Width="10"
-                    IsVisible="{Binding MachineEditor.LeftColumnSizable}"
+                    IsVisible="{Binding LeftColumnSizable}"
                     ToolTip.Tip="Drag to give the parts and the panel list more room." />
 
       <Grid Grid.Column="2">
         <Grid.RowDefinitions>
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
-          <RowDefinition Height="{Binding MachineEditor.ParametersHeight, Mode=TwoWay}" />
+          <RowDefinition Height="{Binding ParametersHeight, Mode=TwoWay}" />
         </Grid.RowDefinitions>
 
         <!-- The machine, drawn from its own description, in its own colours. Turning a knob here
@@ -311,7 +317,7 @@
              machine. -->
         <Border Grid.Row="0" Classes="card">
           <DockPanel>
-            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="{Binding MachineEditor.Title}" />
+            <TextBlock DockPanel.Dock="Top" Classes="cardTitle" Text="{Binding Title}" />
 
             <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
                        Margin="0,8,0,0"
@@ -330,34 +336,34 @@
               <ui:PanelView x:Name="PanelCanvas"
                                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                                    MinHeight="200"
-                                   Face="{Binding MachineEditor.Shown}"
-                                   Values="{Binding MachineEditor.Values}"
-                                   Takes="{Binding MachineEditor.Takes}"
-                                   Presets="{Binding MachineEditor.Presets}"
-                                   Pads="{Binding MachineEditor.PreviewPads}"
-                                   Zones="{Binding MachineEditor.PreviewZones}"
-                                   Scope="{Binding MachineEditor.PreviewScope}"
-                                   Location="{Binding MachineEditor.PreviewLocation}"
-                                   Slices="{Binding MachineEditor.PreviewSlices}"
-                                   Menu="{Binding MachineEditor.PreviewMenu}"
-                                   InstrumentName="{Binding MachineEditor.PreviewName}"
-                                   Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
-                                   Designing="{Binding MachineEditor.Designing}">
+                                   Face="{Binding Shown}"
+                                   Values="{Binding Values}"
+                                   Takes="{Binding Takes}"
+                                   Presets="{Binding Presets}"
+                                   Pads="{Binding PreviewPads}"
+                                   Zones="{Binding PreviewZones}"
+                                   Scope="{Binding PreviewScope}"
+                                   Location="{Binding PreviewLocation}"
+                                   Slices="{Binding PreviewSlices}"
+                                   Menu="{Binding PreviewMenu}"
+                                   InstrumentName="{Binding PreviewName}"
+                                   Selected="{Binding SelectedShape, Mode=TwoWay}"
+                                   Designing="{Binding Designing}">
                 <!-- The same three things the buttons under the panel list do, where the hand
                      already is. A right press picks the element up first, so the menu is always
                      about whatever was pressed rather than whatever was picked last. -->
                 <ui:PanelView.ContextMenu>
                   <ContextMenu>
                     <MenuItem Header="Remove"
-                              Command="{Binding MachineEditor.RemoveElementCommand}"
-                              IsEnabled="{Binding MachineEditor.HasSelection}" />
+                              Command="{Binding RemoveElementCommand}"
+                              IsEnabled="{Binding HasSelection}" />
                     <Separator />
                     <MenuItem Header="Move earlier"
-                              Command="{Binding MachineEditor.MoveUpCommand}"
-                              IsEnabled="{Binding MachineEditor.HasSelection}" />
+                              Command="{Binding MoveUpCommand}"
+                              IsEnabled="{Binding HasSelection}" />
                     <MenuItem Header="Move later"
-                              Command="{Binding MachineEditor.MoveDownCommand}"
-                              IsEnabled="{Binding MachineEditor.HasSelection}" />
+                              Command="{Binding MoveDownCommand}"
+                              IsEnabled="{Binding HasSelection}" />
                   </ContextMenu>
                 </ui:PanelView.ContextMenu>
               </ui:PanelView>
@@ -368,7 +374,7 @@
 
         <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
                       Height="10" HorizontalAlignment="Stretch"
-                      IsVisible="{Binding MachineEditor.PanelParametersSizable}"
+                      IsVisible="{Binding PanelParametersSizable}"
                       ToolTip.Tip="Drag to share the room between the panel and its parameters." />
 
         <!-- What the machine can be set to. This is most of what a machine is: the panel is these
@@ -380,7 +386,7 @@
                  it: folded, there is nothing to add a parameter to on screen. -->
             <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
               <ToggleButton Grid.Column="0" Classes="fold"
-                            IsChecked="{Binding MachineEditor.ParametersOpen}">
+                            IsChecked="{Binding ParametersOpen}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
                   <TextBlock Classes="cardTitle" VerticalAlignment="Center" Text="Parameters" />
@@ -388,21 +394,21 @@
               </ToggleButton>
 
               <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center" Margin="8,0,0,0"
-                         IsVisible="{Binding MachineEditor.ParametersOpen}"
+                         IsVisible="{Binding ParametersOpen}"
                          TextTrimming="CharacterEllipsis"
                          Text="Key is what files use and never changes. Name is what the panel says." />
 
               <Button Grid.Column="2" Content="+ Parameter"
-                      IsVisible="{Binding MachineEditor.ParametersOpen}"
-                      Command="{Binding MachineEditor.AddParameterCommand}" />
+                      IsVisible="{Binding ParametersOpen}"
+                      Command="{Binding AddParameterCommand}" />
             </Grid>
 
             <!-- Across as well as down. A parameter's row is a fixed set of fields wider than
                  this column can be made, and without this the row's width becomes the column's
                  smallest width and pushes the machine's own details off the window. -->
             <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                          IsVisible="{Binding MachineEditor.ParametersOpen}">
-              <ItemsControl ItemsSource="{Binding MachineEditor.Parameters}" Margin="0,10,0,0">
+                          IsVisible="{Binding ParametersOpen}">
+              <ItemsControl ItemsSource="{Binding Parameters}" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:MachineParameterViewModel">
                     <Grid ColumnDefinitions="120,160,70,80,80,80,80,Auto" ColumnSpacing="6" Margin="0,0,0,6">
@@ -415,7 +421,7 @@
                       <TextBox Grid.Column="6" Text="{Binding Step}" ToolTip.Tip="How far one notch moves it." />
 
                       <Button Grid.Column="7" Content="✕" Classes="danger"
-                              Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).MachineEditor.RemoveParameterCommand}"
+                              Command="{Binding $parent[ItemsControl].((vm:DesignerViewModel)DataContext).RemoveParameterCommand}"
                               CommandParameter="{Binding}"
                               ToolTip.Tip="Takes it off the machine." />
                     </Grid>
@@ -428,55 +434,55 @@
       </Grid>
 
       <GridSplitter Grid.Column="3" Classes="handle" ResizeDirection="Columns" Width="10"
-                    IsVisible="{Binding MachineEditor.RightColumnSizable}"
+                    IsVisible="{Binding RightColumnSizable}"
                     ToolTip.Tip="Drag to give the panel more room, or the fields beside it." />
 
       <Grid Grid.Column="4">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
-          <RowDefinition Height="{Binding MachineEditor.PickedHeight, Mode=TwoWay}" />
+          <RowDefinition Height="{Binding PickedHeight, Mode=TwoWay}" />
         </Grid.RowDefinitions>
 
         <!-- What a machine is, before anything about how it sounds: its name, its id, who made
              it, and the colour it wears wherever it is shown. -->
         <Border Grid.Row="0" Classes="card">
           <StackPanel Classes="cardBody">
-            <ToggleButton Classes="fold" IsChecked="{Binding MachineEditor.MachineOpen}">
+            <ToggleButton Classes="fold" IsChecked="{Binding MachineOpen}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
-                <TextBlock Classes="cardTitle" Text="The machine" />
+                <TextBlock Classes="cardTitle" Text="{Binding Heading}" />
               </StackPanel>
             </ToggleButton>
 
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
-                  IsVisible="{Binding MachineEditor.MachineOpen}"
+                  IsVisible="{Binding MachineOpen}"
                   ColumnSpacing="10" RowSpacing="8">
               <!-- These write straight into the project, which is a plain object and says
                    nothing when it moves, so the editor is told here instead. On losing focus
                    rather than per keystroke: a name typed in is one edit and not eleven. -->
               <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Name:" />
-              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding MachineEditor.Project.Name}"
+              <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Project.Name}"
                        LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="What it is:" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding MachineEditor.Project.Summary}"
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Project.Summary}"
                        LostFocus="Machine_Changed"
-                       PlaceholderText="One line, for somebody choosing between machines" />
+                       PlaceholderText="{Binding SummaryHint}" />
 
               <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="Made by:" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MachineEditor.Project.Author}"
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Project.Author}"
                        LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Version:" />
               <TextBox Grid.Row="3" Grid.Column="1" Width="120" HorizontalAlignment="Left"
-                       Text="{Binding MachineEditor.Project.Version}"
+                       Text="{Binding Project.Version}"
                        LostFocus="Machine_Changed" />
 
               <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="Id:" />
               <TextBlock Grid.Row="4" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                          TextTrimming="CharacterEllipsis"
-                         Text="{Binding MachineEditor.Project.Id}"
+                         Text="{Binding Project.Id}"
                          ToolTip.Tip="What songs write down. Made once, and never changed." />
 
               <!-- Picked off the picture rather than typed, because six hex digits say nothing
@@ -485,12 +491,12 @@
               <TextBlock Grid.Row="5" Grid.Column="0" Classes="label" Text="Colour:"
                          VerticalAlignment="Top" Margin="0,3,0,0" />
               <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6"
-                          IsEnabled="{Binding MachineEditor.HasProject}">
-                <views:ColourPicker Height="124" Colour="{Binding MachineEditor.Accent, Mode=TwoWay}"
+                          IsEnabled="{Binding HasProject}">
+                <views:ColourPicker Height="124" Colour="{Binding Accent, Mode=TwoWay}"
                                     ToolTip.Tip="The colour the machine wears wherever it is shown. It keeps it whichever theme the application is wearing." />
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                   <TextBox Grid.Column="0" FontFamily="Consolas,Menlo,monospace"
-                           Text="{Binding MachineEditor.AccentHex, UpdateSourceTrigger=LostFocus}" />
+                           Text="{Binding AccentHex, UpdateSourceTrigger=LostFocus}" />
                   <Button Grid.Column="1" Content="Colours..." Click="Colours_Click"
                           ToolTip.Tip="The seven shades the colour is worked into: the face, the groups on it, the lines around them and the marks." />
                 </Grid>
@@ -501,7 +507,7 @@
 
         <GridSplitter Grid.Row="1" Classes="handle rows" ResizeDirection="Rows"
                       Height="10" HorizontalAlignment="Stretch"
-                      IsVisible="{Binding MachineEditor.MachinePickedSizable}"
+                      IsVisible="{Binding MachinePickedSizable}"
                       ToolTip.Tip="Drag to share the room between what the machine is and what you are working on." />
 
         <!-- The one thing that is picked, and everything about it. A control is a kind, the
@@ -509,19 +515,19 @@
         <Border Grid.Row="2" Classes="card">
           <DockPanel>
             <ToggleButton DockPanel.Dock="Top" Classes="fold"
-                          IsChecked="{Binding MachineEditor.PickedOpen}">
+                          IsChecked="{Binding PickedOpen}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
                 <TextBlock Classes="cardTitle" Text="What is picked" />
               </StackPanel>
             </ToggleButton>
 
-            <DockPanel IsVisible="{Binding MachineEditor.PickedOpen}">
+            <DockPanel IsVisible="{Binding PickedOpen}">
               <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
-                         IsVisible="{Binding !MachineEditor.HasSelection}"
+                         IsVisible="{Binding !HasSelection}"
                          Text="Nothing yet. Click something on the panel, or a line in the list." />
 
-              <ContentControl Content="{Binding MachineEditor.SelectedElement}" Margin="0,8,0,0">
+              <ContentControl Content="{Binding SelectedElement}" Margin="0,8,0,0">
                 <ContentControl.ContentTemplate>
                   <DataTemplate x:DataType="vm:MachineElementViewModel">
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
@@ -531,7 +537,7 @@
                               ColumnSpacing="10" RowSpacing="8">
                           <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Is a:" />
                           <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
-                                    ItemsSource="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.Library}"
+                                    ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Library}"
                                     SelectedItem="{Binding Kind}" />
 
                           <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Turns:" />
@@ -543,7 +549,7 @@
                           <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
                                     PlaceholderText="from the parameters..."
                                     SelectionChanged="Parameter_SelectionChanged"
-                                    ItemsSource="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.ParameterKeys}" />
+                                    ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).ParameterKeys}" />
 
                           <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="Says:" />
                           <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Label}"
@@ -625,33 +631,33 @@
                              its buttons, and ninety six of them dropped one at a time is not a
                              designer, so the shape is said once and the buttons are written. -->
                         <StackPanel Spacing="6"
-                                    IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadsPicked}">
+                                    IsVisible="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PadsPicked}">
                           <Grid ColumnDefinitions="Auto,56,Auto,56,Auto,70" ColumnSpacing="6">
                             <TextBlock Grid.Column="0" Classes="field" Text="Grid" />
                             <TextBox Grid.Column="1"
-                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadRows}"
+                                     Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PadRows}"
                                      ToolTip.Tip="How many rows of buttons." />
 
                             <TextBlock Grid.Column="2" Classes="field" Text="by" />
                             <TextBox Grid.Column="3"
-                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadColumns}"
+                                     Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PadColumns}"
                                      ToolTip.Tip="How many stand side by side. Six by sixteen is ninety six buttons." />
 
                             <TextBlock Grid.Column="4" Classes="field" Text="From key" />
                             <TextBox Grid.Column="5"
-                                     Text="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PadFirstKey}"
+                                     Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PadFirstKey}"
                                      ToolTip.Tip="The note the first pad answers to, written as the machine writes it: C-4. The rest run up from there. A plain number is taken too." />
                           </Grid>
 
                           <Button Content="Lay the grid out" HorizontalAlignment="Left"
-                                  Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.LayPadsCommand}"
+                                  Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).LayPadsCommand}"
                                   ToolTip.Tip="Writes that many buttons, keyed from there. Names already in the grid are kept in order, so adding a row does not throw away the ones you named." />
                         </StackPanel>
 
                         <Button Content="Choose a picture..."
                                 HorizontalAlignment="Left"
                                 Click="Picture_Click"
-                                IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.PicturePicked}"
+                                IsVisible="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PicturePicked}"
                                 ToolTip.Tip="Copies a png or jpg into the machine's own images folder and writes its name into the file property." />
 
                       </StackPanel>
@@ -667,7 +673,7 @@
     </Grid>
     </TabItem>
 
-    <TabItem Header="Presets">
+    <TabItem Header="Presets" IsVisible="{Binding ShowsPresets}">
     <!-- The presets page. A preset file is an instrument file, the same shape read by the same
          reader, so what there is to edit is the file. That is not a shortcut: a preset holds a
          pad pointing at a wave, a set of knobs, where a wave is cut, or nothing but a pointer at
@@ -686,24 +692,24 @@
           <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,*" ColumnSpacing="6" Margin="0,8,0,0">
             <Button Grid.Column="0" Content="+ Preset" HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
-                    Command="{Binding MachineEditor.PresetDesk.NewCommand}"
-                    IsEnabled="{Binding MachineEditor.PresetDesk.Ready}"
+                    Command="{Binding PresetDesk.NewCommand}"
+                    IsEnabled="{Binding PresetDesk.Ready}"
                     ToolTip.Tip="Writes a new file with the least a preset can be in it: a name, and a machine that plays your own recordings." />
 
             <Button Grid.Column="1" Content="Remove" Classes="danger"
                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                    Command="{Binding MachineEditor.PresetDesk.DeleteCommand}"
-                    IsEnabled="{Binding MachineEditor.PresetDesk.HasPreset}"
+                    Command="{Binding PresetDesk.DeleteCommand}"
+                    IsEnabled="{Binding PresetDesk.HasPreset}"
                     ToolTip.Tip="Deletes the preset and the recordings it was the only one playing. A folder another preset plays out of is left alone, and so is anything in there no preset named." />
           </Grid>
 
           <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
                      Margin="0,8,0,0"
-                     IsVisible="{Binding !MachineEditor.PresetDesk.Ready}"
+                     IsVisible="{Binding !PresetDesk.Ready}"
                      Text="Save the machine first. A preset lives in the machine's folder, and this one has not got one yet." />
 
-          <ListBox ItemsSource="{Binding MachineEditor.PresetDesk.Presets}"
-                   SelectedItem="{Binding MachineEditor.PresetDesk.Picked, Mode=TwoWay}">
+          <ListBox ItemsSource="{Binding PresetDesk.Presets}"
+                   SelectedItem="{Binding PresetDesk.Picked, Mode=TwoWay}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vmr:MachinePresetSlot">
                 <StackPanel Spacing="1" Margin="0,2">
@@ -720,20 +726,20 @@
         <DockPanel>
           <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
             <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center"
-                       Text="{Binding MachineEditor.PresetDesk.Picked.Name}" />
+                       Text="{Binding PresetDesk.Picked.Name}" />
 
             <TextBlock Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                        TextTrimming="CharacterEllipsis"
-                       Text="{Binding MachineEditor.PresetDesk.Said}" />
+                       Text="{Binding PresetDesk.Said}" />
 
             <Button Grid.Column="2" Content="Add waves..."
                     Click="PresetWaves_Click"
-                    IsEnabled="{Binding MachineEditor.PresetDesk.HasForm}"
+                    IsEnabled="{Binding PresetDesk.HasForm}"
                     ToolTip.Tip="Brings recordings in from anywhere, copies them into the machine beside this preset, and writes them onto the pads in order. A preset plays files that live inside the machine, so that the machine can be handed to somebody." />
 
             <Button Grid.Column="3" Content="Save preset"
-                    Command="{Binding MachineEditor.PresetDesk.SaveCommand}"
-                    IsEnabled="{Binding MachineEditor.PresetDesk.HasForm}"
+                    Command="{Binding PresetDesk.SaveCommand}"
+                    IsEnabled="{Binding PresetDesk.HasForm}"
                     ToolTip.Tip="Writes the file back. Anything it plays from outside the machine is brought inside first, so the preset arrives whole on somebody else's disc." />
           </Grid>
 
@@ -741,8 +747,8 @@
                saving. -->
           <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
                      Margin="0,8,0,0" Foreground="{DynamicResource DangerBrush}"
-                     IsVisible="{Binding MachineEditor.PresetDesk.HasProblem}"
-                     Text="{Binding MachineEditor.PresetDesk.Problem}" />
+                     IsVisible="{Binding PresetDesk.HasProblem}"
+                     Text="{Binding PresetDesk.Problem}" />
 
           <!-- The preset, set out the way the machine's own description says. A parameter the
                machine declares is a knob where the machine is played and a line here: one
@@ -753,7 +759,7 @@
                picker on its panel reads to know it should offer your shelf. -->
           <TextBlock DockPanel.Dock="Top" Classes="cardHint" TextWrapping="Wrap"
                      Margin="0,10,0,0"
-                     IsVisible="{Binding MachineEditor.PresetDesk.Browses}"
+                     IsVisible="{Binding PresetDesk.Browses}"
                      Text="This machine has no settings worth shipping: what it is, is the recording on it. So its picker offers your own takes, filed the way the RECORD tab files them, rather than a list of presets. Nothing here to fill in." />
 
           <!-- What the builder can still assign a value to, and the button that does it. A
@@ -765,28 +771,28 @@
                anything else. Both lists come off the machine's own description. -->
           <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,150,220,Auto" ColumnSpacing="8"
                 Margin="0,10,0,0"
-                IsVisible="{Binding MachineEditor.PresetDesk.HasForm}">
+                IsVisible="{Binding PresetDesk.HasForm}">
             <TextBlock Grid.Column="0" Classes="field" Text="Give a value to" />
 
             <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                      ItemsSource="{Binding MachineEditor.PresetDesk.Form.Kinds}"
-                      SelectedItem="{Binding MachineEditor.PresetDesk.Form.Kind, Mode=TwoWay}"
+                      ItemsSource="{Binding PresetDesk.Form.Kinds}"
+                      SelectedItem="{Binding PresetDesk.Form.Kind, Mode=TwoWay}"
                       ToolTip.Tip="What sort of thing: a pad, a knob, a fader, a recording. The sorts this machine actually has, read off its own panel." />
 
             <ComboBox Grid.Column="2" HorizontalAlignment="Stretch"
-                      ItemsSource="{Binding MachineEditor.PresetDesk.Form.Offers}"
-                      SelectedItem="{Binding MachineEditor.PresetDesk.Form.Offered, Mode=TwoWay}"
+                      ItemsSource="{Binding PresetDesk.Form.Offers}"
+                      SelectedItem="{Binding PresetDesk.Form.Offered, Mode=TwoWay}"
                       ToolTip.Tip="Which one. Pads are listed by the key each answers to." />
 
             <Button Grid.Column="3" Content="+ Add"
-                    Command="{Binding MachineEditor.PresetDesk.Form.AddCommand}"
-                    IsEnabled="{Binding MachineEditor.PresetDesk.Form.HasOffers}"
+                    Command="{Binding PresetDesk.Form.AddCommand}"
+                    IsEnabled="{Binding PresetDesk.Form.HasOffers}"
                     ToolTip.Tip="Starts saying something about it. A pad arrives with the lines a pad has and nothing in them. One the preset already speaks about is left alone." />
           </Grid>
 
           <ScrollViewer Margin="0,8,0,0"
-                        IsVisible="{Binding MachineEditor.PresetDesk.HasForm}">
-            <ItemsControl ItemsSource="{Binding MachineEditor.PresetDesk.Form.Sections}">
+                        IsVisible="{Binding PresetDesk.HasForm}">
+            <ItemsControl ItemsSource="{Binding PresetDesk.Form.Sections}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:PresetSection">
                   <StackPanel Spacing="2" Margin="0,0,0,10">
@@ -842,7 +848,7 @@
     </Grid>
     </TabItem>
 
-    <TabItem Header="Utilities" IsVisible="{Binding MachineEditor.ShowsUtilities}">
+    <TabItem Header="Utilities" IsVisible="{Binding ShowsUtilities}">
     <!-- The jobs somebody would otherwise do in a file manager and an audio editor. A list of
          them, and one of them open: two tools side by side already filled the width, and the
          ones still to come would not fit at all. -->
@@ -856,8 +862,8 @@
           <TextBlock Grid.Column="0" Classes="label" Text="Preset:" VerticalAlignment="Center" />
 
           <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
-                    ItemsSource="{Binding MachineEditor.Utilities.Presets}"
-                    SelectedItem="{Binding MachineEditor.Utilities.Preset}"
+                    ItemsSource="{Binding Utilities.Presets}"
+                    SelectedItem="{Binding Utilities.Preset}"
                     ToolTip.Tip="One of the presets of the machine open in the designer. To work on another machine's, open that machine." />
         </Grid>
       </Border>
@@ -865,29 +871,29 @@
       <!-- What it did, under everything, so no tool has to keep its own line. -->
       <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap" Margin="0,8,0,0"
                  Foreground="{DynamicResource DangerBrush}"
-                 IsVisible="{Binding MachineEditor.Utilities.HasProblem}"
-                 Text="{Binding MachineEditor.Utilities.Problem}" />
+                 IsVisible="{Binding Utilities.HasProblem}"
+                 Text="{Binding Utilities.Problem}" />
 
       <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" Margin="0,8,0,0"
-                 Text="{Binding MachineEditor.Utilities.Said}" />
+                 Text="{Binding Utilities.Said}" />
 
       <Panel Margin="0,12,0,0">
 
         <!-- The list. -->
         <Border Classes="card" VerticalAlignment="Top"
-                IsVisible="{Binding MachineEditor.Utilities.OnList}">
+                IsVisible="{Binding Utilities.OnList}">
           <StackPanel Classes="cardBody">
             <TextBlock Classes="cardTitle" Text="Utilities" />
 
             <TextBlock Classes="cardHint" TextWrapping="Wrap"
                        Text="What there is to do to the machine open here that is not drawing its panel or filling in a preset. Only the ones that apply are listed." />
 
-            <ItemsControl ItemsSource="{Binding MachineEditor.Utilities.Tools}" Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding Utilities.Tools}" Margin="0,4,0,0">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vmr:UtilityTool">
                   <Button Classes="tool" HorizontalAlignment="Stretch" Margin="0,3"
                           HorizontalContentAlignment="Left"
-                          Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).MachineEditor.Utilities.OpenCommand}"
+                          Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Utilities.OpenCommand}"
                           CommandParameter="{Binding}">
                     <StackPanel Spacing="2">
                       <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
@@ -902,11 +908,11 @@
 
         <!-- Renaming a preset. -->
         <Border Classes="card" VerticalAlignment="Top"
-                IsVisible="{Binding MachineEditor.Utilities.OnRename}">
+                IsVisible="{Binding Utilities.OnRename}">
           <StackPanel Classes="cardBody">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
               <Button Grid.Column="0" Content="&#x2039; Back"
-                      Command="{Binding MachineEditor.Utilities.BackCommand}" />
+                      Command="{Binding Utilities.BackCommand}" />
 
               <TextBlock Grid.Column="1" Classes="cardTitle" VerticalAlignment="Center"
                          Text="Rename a preset" />
@@ -921,35 +927,35 @@
               <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="File:" />
               <TextBlock Grid.Row="0" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                          TextTrimming="CharacterEllipsis"
-                         Text="{Binding MachineEditor.Utilities.PresetFile}" />
+                         Text="{Binding Utilities.PresetFile}" />
 
               <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="Recordings:" />
               <TextBlock Grid.Row="1" Grid.Column="1" Classes="cardHint" VerticalAlignment="Center"
                          TextTrimming="CharacterEllipsis"
-                         Text="{Binding MachineEditor.Utilities.WaveFolder}"
+                         Text="{Binding Utilities.WaveFolder}"
                          ToolTip.Tip="The folder this preset plays out of. It is renamed with the preset, unless another preset plays out of it too." />
             </Grid>
 
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" MaxWidth="640"
                   HorizontalAlignment="Left" Margin="0,4,0,0">
               <TextBox Grid.Column="0" MinWidth="320"
-                       Text="{Binding MachineEditor.Utilities.Wanted}"
-                       IsEnabled="{Binding MachineEditor.Utilities.HasPreset}"
+                       Text="{Binding Utilities.Wanted}"
+                       IsEnabled="{Binding Utilities.HasPreset}"
                        PlaceholderText="What it should be called" />
 
               <Button Grid.Column="1" Content="Rename"
-                      Command="{Binding MachineEditor.Utilities.RenameCommand}"
-                      IsEnabled="{Binding MachineEditor.Utilities.HasPreset}" />
+                      Command="{Binding Utilities.RenameCommand}"
+                      IsEnabled="{Binding Utilities.HasPreset}" />
             </Grid>
           </StackPanel>
         </Border>
 
         <!-- Levelling a set of recordings. -->
-        <Border Classes="card" IsVisible="{Binding MachineEditor.Utilities.OnLevel}">
+        <Border Classes="card" IsVisible="{Binding Utilities.OnLevel}">
           <DockPanel>
             <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*" ColumnSpacing="10">
               <Button Grid.Column="0" Content="&#x2039; Back"
-                      Command="{Binding MachineEditor.Utilities.BackCommand}" />
+                      Command="{Binding Utilities.BackCommand}" />
 
               <TextBlock Grid.Column="1" Classes="cardTitle" VerticalAlignment="Center"
                          Text="Level recordings" />
@@ -963,15 +969,15 @@
               <TextBlock Grid.Column="0" Classes="label" Text="Look at:" VerticalAlignment="Center" />
 
               <RadioButton Grid.Column="1" GroupName="scope" Content="This preset"
-                           IsVisible="{Binding MachineEditor.Utilities.HasPreset}"
-                           IsChecked="{Binding MachineEditor.Utilities.OnPresetScope}" />
+                           IsVisible="{Binding Utilities.HasPreset}"
+                           IsChecked="{Binding Utilities.OnPresetScope}" />
 
               <RadioButton Grid.Column="2" GroupName="scope" Content="The whole machine"
-                           IsChecked="{Binding MachineEditor.Utilities.OnMachineScope}"
+                           IsChecked="{Binding Utilities.OnMachineScope}"
                            ToolTip.Tip="Every recording every preset of this machine plays, each one once: a file two presets share is one file and is moved once." />
 
               <RadioButton Grid.Column="3" GroupName="scope" Content="A folder"
-                           IsChecked="{Binding MachineEditor.Utilities.OnFolderScope}" />
+                           IsChecked="{Binding Utilities.OnFolderScope}" />
 
               <Button Grid.Column="4" Content="Choose..." HorizontalAlignment="Left"
                       Click="LevelFolder_Click"
@@ -980,30 +986,30 @@
 
             <TextBlock DockPanel.Dock="Top" Classes="cardHint" Margin="0,6,0,0"
                        TextTrimming="CharacterEllipsis"
-                       Text="{Binding MachineEditor.Utilities.Looking}" />
+                       Text="{Binding Utilities.Looking}" />
 
             <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,180,Auto,Auto,*,Auto"
                   ColumnSpacing="10" Margin="0,10,0,0">
               <TextBlock Grid.Column="0" Classes="label" Text="Loudest onto:" VerticalAlignment="Center" />
 
               <ui:Slide Grid.Column="1" VerticalAlignment="Center"
-                        Minimum="{Binding MachineEditor.Utilities.LeastTarget}"
-                        Maximum="{Binding MachineEditor.Utilities.MostTarget}"
+                        Minimum="{Binding Utilities.LeastTarget}"
+                        Maximum="{Binding Utilities.MostTarget}"
                         SmallStep="0.5" LargeStep="3" DefaultValue="-1"
-                        Value="{Binding MachineEditor.Utilities.Target}" />
+                        Value="{Binding Utilities.Target}" />
 
               <TextBlock Grid.Column="2" VerticalAlignment="Center" MinWidth="52"
                          FontFamily="Consolas,Menlo,monospace" FontSize="11"
-                         Text="{Binding MachineEditor.Utilities.Target, StringFormat={}{0:0.0} dB}" />
+                         Text="{Binding Utilities.Target, StringFormat={}{0:0.0} dB}" />
 
               <CheckBox Grid.Column="3" VerticalAlignment="Center"
-                        IsChecked="{Binding MachineEditor.Utilities.KeepsBalance}"
+                        IsChecked="{Binding Utilities.KeepsBalance}"
                         Content="Keep the balance"
                         ToolTip.Tip="One gain for the whole set, taken from the loudest file, so a kit that was simply recorded quiet comes up without the quiet things starting to shout. Off, every file is put on the target itself, which suits a folder of odds and ends that were never a set." />
 
               <Button Grid.Column="5" Content="Level them"
-                      Command="{Binding MachineEditor.Utilities.LevelCommand}"
-                      IsEnabled="{Binding MachineEditor.Utilities.CanLevel}" />
+                      Command="{Binding Utilities.LevelCommand}"
+                      IsEnabled="{Binding Utilities.CanLevel}" />
             </Grid>
 
             <Border Classes="inset" Margin="0,10,0,0" Padding="0">
@@ -1012,11 +1018,11 @@
                      recordings, and neither does the machine that plays your own shelf. -->
                 <TextBlock Classes="cardHint" Margin="10,8" TextWrapping="Wrap"
                            VerticalAlignment="Top"
-                           IsVisible="{Binding !MachineEditor.Utilities.HasWaves}"
-                           Text="{Binding MachineEditor.Utilities.Nothing}" />
+                           IsVisible="{Binding !Utilities.HasWaves}"
+                           Text="{Binding Utilities.Nothing}" />
 
-                <ScrollViewer IsVisible="{Binding MachineEditor.Utilities.HasWaves}">
-                  <ItemsControl ItemsSource="{Binding MachineEditor.Utilities.Waves}">
+                <ScrollViewer IsVisible="{Binding Utilities.HasWaves}">
+                  <ItemsControl ItemsSource="{Binding Utilities.Waves}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:WaveLevel">
                         <Grid ColumnDefinitions="*,70,70" ColumnSpacing="8" Margin="8,3">

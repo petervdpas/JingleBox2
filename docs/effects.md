@@ -2,8 +2,10 @@
 
 Decided on 2026-09-02. The rack has had an empty Effects tab since it was split in two, and this
 is what goes in it. Of the five steps at the foot of this file, the first two are done and the
-other three are not. Nothing sounds yet, and nothing shows on the tab yet either, which is the
-gate working rather than a thing left out.
+other two are not, and they were swapped: the designer came before the first engine, so the first
+pedal is laid out in the tool rather than hand-written into a manifest. Nothing sounds yet, and
+nothing shows on the rack's Effects tab yet either, which is the gate working rather than a thing
+left out.
 
 ## An effect is not a machine
 
@@ -222,15 +224,27 @@ Reverb and the compressor are each a piece of work on their own and go last for 
 3. **One engine end to end**: the delay. On the chain, saved and read back in a song, its face
    drawn, bypass through the new part, pointable and automatable, with the tests including the
    refusals.
-4. **The EFFECTS designer tab**, which is where the remaining five faces get made.
+3. **The effects designer. Done**, and moved ahead of the engines so that a face is drawn in
+   the tool rather than typed into a manifest by hand. One page told which world it is in:
+   `IDesignWorld` is the handful of things that differ and `IDesignProject` is what the page
+   edits, so the two are instances of one view model and one drawing, on two tabs inside
+   DESIGNER rather than two pages along the top. New follows the tab it is pressed on, and what a
+   machine is against what an effect is lives in the help, under a badge beside New. What came
+   out on the way was everything that had been written for machines and was never about them: the
+   pictures in a folder (`IPanelImages`), a folder carried whole (`IFolderCopy`), and the design
+   history, which asked the project what type it is instead of naming the machine's.
+   `Tests/EffectDesignerTests.cs` is the seam: which world makes which id, which pages are
+   offered, and a folder of one kind refusing to open as the other.
+4. **The delay end to end**: on the chain, saved and read back in a song, bypass through the new
+   part, pointable and automatable, with the tests including the refusals.
 5. **The other five engines.**
 
 ## Still open
 
 - **What the six are called.** A machine is not called Sampler, it is called Zampler, and a pedal
   wants the same treatment. Nothing about the design waits on it, but the folders do.
-- **What the designer tab is called**, and whether it is offered beside DESIGNER the same way,
-  which is a setting today.
+- Nothing about where the designer lives: both worlds are tabs inside DESIGNER, which is the one
+  switch under Looks that already decides whether the workshop is shown at all.
 - **Whether an effect can be pointed at while its face is not in front of you.** A machine link
   answers only while the track plays that machine, which is what stops knob one meaning six
   things. The equivalent for an effect is the track's chain holding it, and whether the slot has

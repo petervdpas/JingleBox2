@@ -32,6 +32,9 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// <summary>What the log calls one of these, in the singular.</summary>
     private readonly string _word;
 
+    /// <summary>How a folder is carried whole, which is what taking a shipped one is.</summary>
+    private readonly IFolderCopy _copy = new FolderCopy();
+
     /// <summary>
     /// Takes what every registry needs, whatever is being kept.
     /// </summary>
@@ -122,7 +125,7 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
             string into = Path.Combine(Installed, Path.GetFileName(project.Folder.TrimEnd(
                 Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
 
-            Copy(project.Folder, into);
+            _copy.Into(project.Folder, into);
 
             return true;
         }
@@ -317,31 +320,6 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
         catch (Exception ex)
         {
             Log.Fault(LogArea.Machines, "A " + _word + " could not be brought up to date from " + shipped, ex);
-        }
-    }
-
-    /// <summary>Copies a folder and everything under it, making what it lands in.</summary>
-    /// <remarks>
-    /// The empty folders as well as the files. A box's folder always has the same shape, and one
-    /// of the folders in it is where you put a preset of your own: arriving without it, the first
-    /// thing anybody does with the box is make a folder the box was supposed to have.
-    /// </remarks>
-    /// <param name="from">The folder being copied.</param>
-    /// <param name="into">Where it goes, which is made if it is not there.</param>
-    private static void Copy(string from, string into)
-    {
-        Directory.CreateDirectory(into);
-
-        foreach (string folder in Directory.EnumerateDirectories(from, "*", SearchOption.AllDirectories))
-            Directory.CreateDirectory(Path.Combine(into, Path.GetRelativePath(from, folder)));
-
-        foreach (string file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
-        {
-            string to = Path.Combine(into, Path.GetRelativePath(from, file));
-
-            if (Path.GetDirectoryName(to) is { Length: > 0 } folder) Directory.CreateDirectory(folder);
-
-            File.Copy(file, to, overwrite: true);
         }
     }
 

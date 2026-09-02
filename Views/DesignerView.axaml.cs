@@ -24,7 +24,7 @@ namespace JingleBox2.Views;
 /// The pickers belong to the window, so they are opened here and only the answer goes to the
 /// view model, the same arrangement the recordings importer uses.
 /// </remarks>
-public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShortcutContext
+public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutContext
 {
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IMachineTint _tint = new MachineTint();
@@ -53,7 +53,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// The preview is painted in the machine's own colours, so it is repainted whenever another
     /// machine is opened and mixed again when the theme moves under both.
     /// </remarks>
-    public MachineEditorView()
+    public DesignerView()
     {
         InitializeComponent();
 
@@ -99,8 +99,8 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// </remarks>
     private void OnEditorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(MachineEditorViewModel.Project)
-            or nameof(MachineEditorViewModel.Accent)) Retint();
+        if (e.PropertyName is nameof(DesignerViewModel.Project)
+            or nameof(DesignerViewModel.Accent)) Retint();
     }
 
     /// <summary>
@@ -224,7 +224,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// The machine being built, reached through the application's view model because this page
     /// is shown inside it rather than given an editor of its own.
     /// </summary>
-    private MachineEditorViewModel? Editor => (DataContext as MainViewModel)?.MachineEditor;
+    private DesignerViewModel? Editor => DataContext as DesignerViewModel;
 
     /// <summary>Opens a machine project, which is a folder on somebody's disc.</summary>
     private async void Open_Click(object? sender, RoutedEventArgs e)
@@ -396,7 +396,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     {
         if (Editor?.Project is not { } mine) return null;
 
-        var there = Tracker.Machines.MachineProject.Open(folder);
+        var there = Editor?.Read(folder);
 
         if (there == null || string.Equals(there.Id, mine.Id, StringComparison.OrdinalIgnoreCase)) return null;
 
@@ -421,7 +421,7 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
 
         var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export the machine",
+            Title = "Export the " + editor.Word,
             SuggestedFileName = editor.ExportName,
             DefaultExtension = "zip",
             FileTypeChoices = new[] { MachinePack }
@@ -490,14 +490,16 @@ public partial class MachineEditorView : UserControl, Shortcuts.Interfaces.IShor
     /// </remarks>
     private async void PickTake(object? sender, string key)
     {
-        if (DataContext is not MainViewModel main) return;
+        if (Editor is not { } editor) return;
 
-        var take = await TakeDialog.PickAsync(main.Takes);
+        if (editor.Browse is not { } shelf) return;
+
+        var take = await TakeDialog.PickAsync(shelf);
 
         if (take == null || take.FilePath.Length == 0) return;
 
-        main.MachineEditor.Values.SetText(key, take.FilePath);
-        main.MachineEditor.Redraw();
+        editor.Values.SetText(key, take.FilePath);
+        editor.Redraw();
     }
 
     /// <summary>
