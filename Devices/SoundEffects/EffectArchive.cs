@@ -1,6 +1,5 @@
 using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Devices.SoundEffects;
 
@@ -22,7 +21,7 @@ public sealed class EffectArchive : RackArchive<EffectProject>
     /// </remarks>
     /// <param name="registry">Who names the installed folder. Left out, the ordinary one.</param>
     /// <param name="paths">How a path is tested for being inside a folder.</param>
-    public EffectArchive(IRackRegistry<EffectProject>? registry = null, IMachinePaths? paths = null)
+    public EffectArchive(IRackRegistry<EffectProject>? registry = null, ISoundMachinePaths? paths = null)
         : base(registry ?? new EffectRegistry(), paths)
     {
     }

@@ -10,11 +10,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -40,11 +40,11 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
     /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachinePaths Inside = new MachinePaths();
+    private static readonly ISoundMachinePaths Inside = new SoundMachinePaths();
 
     /// <summary>How a preset file is read and written.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachinePresetFile PresetFiles = new MachinePresetFile();
+    private static readonly ISoundMachinePresetFile PresetFiles = new SoundMachinePresetFile();
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
@@ -56,10 +56,10 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// Asked every time, because the machine open in the designer changes underneath this page and
     /// a held one would have the presets written into the folder of a machine nobody is looking at.
     /// </remarks>
-    private readonly Func<MachineProject?> _project;
+    private readonly Func<SoundMachineProject?> _project;
 
     /// <summary>Takes the desk on to whichever machine the designer has open.</summary>
-    public MachinePresetDesk(Func<MachineProject?> project) => _project = project;
+    public MachinePresetDesk(Func<SoundMachineProject?> project) => _project = project;
 
     /// <summary>What the machine ships with, in the order its folder lists them.</summary>
     public ObservableCollection<MachinePresetSlot> Presets { get; } = new();
@@ -160,7 +160,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
                 if (sound != null)
                 {
-                    if (Machine.SlotFor(older.Id) is { } was) sound.Kind = was.Kind;
+                    if (SoundMachine.SlotFor(older.Id) is { } was) sound.Kind = was.Kind;
 
                     sound.Kit?.Clamp();
 
@@ -196,7 +196,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// <summary>Where this machine keeps them, or nothing when the machine has not been saved.</summary>
     public string Folder =>
         _project() is { Folder.Length: > 0 } project
-            ? Path.Combine(project.Folder, MachineProject.PresetsFolder)
+            ? Path.Combine(project.Folder, SoundMachineProject.PresetsFolder)
             : "";
 
     /// <summary>True once there is a folder to keep presets in, which means a saved machine.</summary>
@@ -340,7 +340,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
         if (folder.Length > 0 && Directory.Exists(folder))
         {
             foreach (string path in Directory
-                         .EnumerateFiles(folder, "*" + MachineRack.Extension)
+                         .EnumerateFiles(folder, "*" + SoundMachineRack.Extension)
                          .OrderBy(path => path, StringComparer.Ordinal))
             {
                 Presets.Add(new MachinePresetSlot(Named(path), path));
@@ -652,7 +652,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     }
 
     /// <summary>What the machine calls the settings one of its things can hold.</summary>
-    private IReadOnlyList<string> Words(Devices.SoundMachines.MachineProject? machine) =>
+    private IReadOnlyList<string> Words(Devices.SoundMachines.SoundMachineProject? machine) =>
         machine == null
             ? Array.Empty<string>()
             : new MachineProjectShape(machine.Panel, machine.Parameters).ThingWords;
@@ -694,7 +694,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     {
         int highest = 0;
 
-        foreach (string path in Directory.EnumerateFiles(folder, "*" + MachineRack.Extension))
+        foreach (string path in Directory.EnumerateFiles(folder, "*" + SoundMachineRack.Extension))
         {
             string stem = Path.GetFileNameWithoutExtension(path);
 
@@ -707,7 +707,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
 
         for (int at = highest + 1; ; at++)
         {
-            string wanted = Path.Combine(folder, at.ToString("00") + " Preset" + MachineRack.Extension);
+            string wanted = Path.Combine(folder, at.ToString("00") + " Preset" + SoundMachineRack.Extension);
 
             if (!File.Exists(wanted)) return wanted;
         }
@@ -722,7 +722,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     /// </remarks>
     private string Blank(string name) =>
         "{\n"
-        + "  \"" + MachinePresetFile.NameKey + "\": \"" + name + "\",\n"
-        + "  \"" + MachinePresetFile.MachineKey + "\": \"" + (_project()?.Id ?? "") + "\"\n"
+        + "  \"" + SoundMachinePresetFile.NameKey + "\": \"" + name + "\",\n"
+        + "  \"" + SoundMachinePresetFile.MachineKey + "\": \"" + (_project()?.Id ?? "") + "\"\n"
         + "}\n";
 }

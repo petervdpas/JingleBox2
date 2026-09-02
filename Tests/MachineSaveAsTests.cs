@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using JingleBox2.Devices.SoundMachines;
 using Xunit;
-using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -13,22 +13,22 @@ namespace JingleBox2.Tests;
 /// A machine is its folder, not its manifest: the manifest names pictures, presets and sounds
 /// by the names they have inside it, so a manifest written on its own into an empty folder is a
 /// machine that draws nothing and has no presets. That was the whole of what
-/// <see cref="MachineProject.Save"/> did when given a folder, and it is why saving to another
+/// <see cref="SoundMachineProject.Save"/> did when given a folder, and it is why saving to another
 /// place had to grow a second half rather than being a one-line command over the first.
 /// </remarks>
 public class MachineSaveAsTests : IDisposable
 {
-    private readonly IRackArchive<MachineProject> _crates = new MachineArchive();
+    private readonly IRackArchive<SoundMachineProject> _crates = new SoundMachineArchive();
 
     private readonly string _room =
         Path.Combine(Path.GetTempPath(), "jinglebox2-saveas-" + Guid.NewGuid().ToString("N"));
 
     /// <summary>A machine on the disc with a picture, a preset and a sound beside its manifest.</summary>
-    private MachineProject Machine(string named)
+    private SoundMachineProject Machine(string named)
     {
         string folder = Path.Combine(_room, named);
 
-        var project = new MachineProject { Id = "machine.test", Name = named, Version = "1.00" };
+        var project = new SoundMachineProject { Id = "machine.test", Name = named, Version = "1.00" };
 
         project.Save(folder);
 
@@ -70,12 +70,12 @@ public class MachineSaveAsTests : IDisposable
 
         _crates.CopyInto(project, into);
 
-        Assert.False(File.Exists(Path.Combine(into, MachineProject.ManifestName)));
+        Assert.False(File.Exists(Path.Combine(into, SoundMachineProject.ManifestName)));
 
         project.Save(into);
 
         Assert.Equal(into, project.Folder);
-        Assert.Equal("from", MachineProject.Open(into)!.Name);
+        Assert.Equal("from", SoundMachineProject.Open(into)!.Name);
     }
 
     /// <summary>
@@ -92,7 +92,7 @@ public class MachineSaveAsTests : IDisposable
         _crates.CopyInto(project, Path.Combine(_room, "into"));
 
         Assert.True(File.Exists(Path.Combine(from, "images", "logo.svg")));
-        Assert.True(File.Exists(Path.Combine(from, MachineProject.ManifestName)));
+        Assert.True(File.Exists(Path.Combine(from, SoundMachineProject.ManifestName)));
     }
 
     /// <summary>
@@ -141,7 +141,7 @@ public class MachineSaveAsTests : IDisposable
         _crates.CopyInto(project, project.Folder);
         _crates.CopyInto(project, project.Folder + Path.DirectorySeparatorChar);
 
-        Assert.True(File.Exists(Path.Combine(project.Folder, MachineProject.ManifestName)));
+        Assert.True(File.Exists(Path.Combine(project.Folder, SoundMachineProject.ManifestName)));
         Assert.Equal("<svg/>", File.ReadAllText(Path.Combine(project.Folder, "images", "logo.svg")));
     }
 
@@ -152,7 +152,7 @@ public class MachineSaveAsTests : IDisposable
     [Fact]
     public void A_machine_with_no_folder_is_refused()
     {
-        var project = new MachineProject { Id = "machine.test", Name = "nowhere" };
+        var project = new SoundMachineProject { Id = "machine.test", Name = "nowhere" };
 
         Assert.Throws<InvalidOperationException>(
             () => _crates.CopyInto(project, Path.Combine(_room, "into")));

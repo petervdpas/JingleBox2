@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Devices.SoundEffects;
-using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Devices.SoundMachines;
 using Xunit;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Tests;
 
@@ -23,9 +23,9 @@ namespace JingleBox2.Tests;
 public class RackDeviceTests
 {
     /// <summary>A machine's list, filled with machines.</summary>
-    private static IRackDevices<MachineProject> Machines(params MachineProject[] found)
+    private static IRackDevices<SoundMachineProject> Machines(params SoundMachineProject[] found)
     {
-        var kept = new MachineProjects();
+        var kept = new SoundMachineProjects();
 
         kept.Keep(found);
 
@@ -56,7 +56,7 @@ public class RackDeviceTests
     [Fact]
     public void Both_answer_for_what_they_were_given()
     {
-        var machines = Machines(new MachineProject { Id = "machine.oddskilla", Name = "OddSkilla" });
+        var machines = Machines(new SoundMachineProject { Id = "machine.oddskilla", Name = "OddSkilla" });
         var effects = Effects(new EffectProject { Id = "effect.echobox", Name = "EchoBox" });
 
         Assert.True(machines.Has("machine.oddskilla"));
@@ -73,7 +73,7 @@ public class RackDeviceTests
     [Fact]
     public void An_id_is_matched_without_case()
     {
-        Assert.True(Machines(new MachineProject { Id = "machine.zampler" }).Has("MACHINE.ZAMPLER"));
+        Assert.True(Machines(new SoundMachineProject { Id = "machine.zampler" }).Has("MACHINE.ZAMPLER"));
         Assert.True(Effects(new EffectProject { Id = "effect.echobox" }).Has("Effect.EchoBox"));
     }
 
@@ -98,7 +98,7 @@ public class RackDeviceTests
     [Fact]
     public void A_device_with_no_id_is_not_kept()
     {
-        Assert.Empty(Machines(new MachineProject { Id = "", Name = "Nameless" }).All);
+        Assert.Empty(Machines(new SoundMachineProject { Id = "", Name = "Nameless" }).All);
         Assert.Empty(Effects(new EffectProject { Id = "", Name = "Nameless" }).All);
     }
 
@@ -144,8 +144,8 @@ public class RackDeviceTests
     public void A_face_with_nothing_on_it_is_nothing_to_draw()
     {
         var machines = Machines(
-            new MachineProject { Id = "machine.faced", Panel = Faced() },
-            new MachineProject { Id = "machine.bare" });
+            new SoundMachineProject { Id = "machine.faced", Panel = Faced() },
+            new SoundMachineProject { Id = "machine.bare" });
 
         var effects = Effects(
             new EffectProject { Id = "effect.faced", Panel = Faced() },

@@ -17,7 +17,7 @@ using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 using JingleBox2.Rack.Machines;
-using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -42,7 +42,7 @@ public sealed partial class DesignerViewModel : ObservableObject
 
     /// <summary>A machine going into a zip and coming back out.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IRackArchive<MachineProject> Crates = new MachineArchive();
+    private static readonly IRackArchive<SoundMachineProject> Crates = new SoundMachineArchive();
 
     /// <summary>
     /// What has been done to the machine being designed, so it can be taken back.
@@ -168,15 +168,15 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </param>
     public DesignerViewModel(IDesignWorld? world = null)
     {
-        _world = world ?? new MachineWorld();
+        _world = world ?? new SoundMachineWorld();
 
         History.Changed += HistoryMoved;
 
         Values = new PreviewValues(Parameters);
 
-        PresetDesk = new MachinePresetDesk(() => Project as MachineProject);
+        PresetDesk = new MachinePresetDesk(() => Project as SoundMachineProject);
 
-        Utilities = new MachineUtilities(() => Project as MachineProject);
+        Utilities = new MachineUtilities(() => Project as SoundMachineProject);
 
         Utilities.PropertyChanged += (_, e) =>
         {
@@ -457,7 +457,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// The whole machine, not the manifest alone. A machine is its folder: the manifest names
     /// pictures, presets and sounds by the names they have inside it, so writing it into an
     /// empty folder somewhere else would leave a machine that draws nothing. The files go first
-    /// and the manifest after them, through <see cref="IRackArchive{MachineProject}.CopyInto"/>.
+    /// and the manifest after them, through <see cref="IRackArchive{SoundMachineProject}.CopyInto"/>.
     ///
     /// Save as, in the ordinary sense: the editor is pointed at the new folder afterwards and
     /// the old one is left exactly as it was. That is what makes it the way to put an edited

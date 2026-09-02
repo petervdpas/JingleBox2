@@ -28,7 +28,7 @@ public sealed class KitPads(DrumKitViewModel kit, Midi.Interfaces.IMidiMonitor? 
 {
     /// <summary>Following a list of things and what each of them says.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineWatch Watching = new MachineWatch();
+    private static readonly ISoundMachineWatch Watching = new SoundMachineWatch();
 
     /// <summary>
     /// Whether the kit is being watched yet.
@@ -113,7 +113,7 @@ public sealed class KitPads(DrumKitViewModel kit, Midi.Interfaces.IMidiMonitor? 
     /// </summary>
     /// <remarks>
     /// A kit refilled from a chop is a new set of pads, which is why the list is watched as well
-    /// as the pads in it: see <see cref="MachineWatch"/>.
+    /// as the pads in it: see <see cref="SoundMachineWatch"/>.
     /// </remarks>
     private void Listen()
     {

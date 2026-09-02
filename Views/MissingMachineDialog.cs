@@ -29,7 +29,7 @@ public static class MissingMachineDialog
     /// so it says they are not being offered and the body gives one line apiece.
     /// </remarks>
     /// <param name="machines">What is not being offered. Nothing to say for an empty list.</param>
-    public static Task ShowAsync(IReadOnlyList<MissingMachine> machines)
+    public static Task ShowAsync(IReadOnlyList<MissingSoundMachine> machines)
     {
         if (machines is not { Count: > 0 }) return Task.CompletedTask;
 
@@ -67,7 +67,7 @@ public static class MissingMachineDialog
     /// </remarks>
     /// <param name="machine">What the instrument is on, or nothing to say nothing.</param>
     /// <param name="instrument">What the instrument is called.</param>
-    public static Task ShowAsync(MissingMachine? machine, string instrument)
+    public static Task ShowAsync(MissingSoundMachine? machine, string instrument)
     {
         if (machine is null) return Task.CompletedTask;
 

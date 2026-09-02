@@ -135,7 +135,7 @@ public partial class PluginStrip : UserControl
             return;
         }
 
-        if (control.DataContext is EffectDeviceViewModel ours) EffectWindow.Show(ours, owner);
+        if (control.DataContext is EffectDeviceViewModel ours) SoundEffectWindow.Show(ours, owner);
     }
 
     /// <summary>
@@ -150,6 +150,6 @@ public partial class PluginStrip : UserControl
     {
         PluginWindow.CloseFor(device);
 
-        EffectWindow.CloseFor(device);
+        SoundEffectWindow.CloseFor(device);
     }
 }

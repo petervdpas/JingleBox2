@@ -1,5 +1,4 @@
 using JingleBox2.Devices.SoundEffects.Interfaces;
-using JingleBox2.Tracker;
 
 namespace JingleBox2.Devices.SoundEffects;
 

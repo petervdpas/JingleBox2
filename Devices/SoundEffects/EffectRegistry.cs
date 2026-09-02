@@ -1,7 +1,6 @@
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Devices.SoundEffects.Interfaces;
-using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Devices.SoundEffects;
 

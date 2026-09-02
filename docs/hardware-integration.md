@@ -558,7 +558,7 @@ design has failed and a contributor will have to send a patch rather than a file
 rule machines already live under, and it is checkable in one command.
 
 **A file is dropped in a folder and works.** Shipped files are copied into the application folder
-on first run and are a starting point rather than the answer, the way `MachineRegistry` does it.
+on first run and are a starting point rather than the answer, the way `SoundMachineRegistry` does it.
 No rebuild, no registration, no list of known devices to add a line to.
 
 **A device with no file works anyway.** Contribution is optional for ever. That is rung one and

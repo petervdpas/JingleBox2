@@ -1,4 +1,3 @@
-using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.Tracker.Enums;
 
@@ -9,7 +8,7 @@ namespace JingleBox2.Tracker.Enums;
 /// <remarks>
 /// These numbers are in people's files, so they do not move and none is ever reused. The
 /// readable side of the same fact, what the machine is called and what it is for, is
-/// <see cref="Machine"/>: an instrument of a kind whose machine is not installed here still has
+/// <see cref="JingleBox2.Devices.SoundMachines.Records.SoundMachine"/>: an instrument of a kind whose machine is not installed here still has
 /// to be named, and what it is named is the engine rather than a machine that is not there.
 ///
 /// Named is not played. An instrument is on a machine, and one whose machine is not registered

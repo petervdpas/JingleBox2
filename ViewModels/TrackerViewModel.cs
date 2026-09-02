@@ -51,7 +51,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private Devices.SoundEffects.Interfaces.IEffectProjects? Ours { get; }
 
     /// <summary>The machines this run has, the one instance everything shares.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>Every edit to a pattern, so each one lands in the undo history.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -67,7 +67,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>The machines a song wants that this installation has not got.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private readonly IMissingMachines Missing;
+    private readonly IMissingSoundMachines Missing;
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     /// <remarks>
@@ -89,7 +89,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Only read here, and only when a machine is brought into the song: a song's instruments
     /// are its own, so nothing on the rack reaches back into a song already written.
     /// </remarks>
-    private readonly MachineRack _rack;
+    private readonly SoundMachineRack _rack;
 
     /// <summary>
     /// Asks the mixer what every strip is reading, so the meters on the screen move.
@@ -585,7 +585,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
             () => _player.EnsurePlayerOn(track, instrument),
             _machines,
             InstrumentEdited,
-            () => new TrackInstrumentDesigner(track, instrument, _machines, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
+            () => new TrackInstrumentPanel(track, instrument, _machines, this, InstrumentEdited, _waveforms, this, _rack, _recordings, MidiKeys),
             () => ClearTrackInstrument(track));
 
         _instrumentBoxes[track] = box;
@@ -899,9 +899,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// </param>
     public TrackerViewModel(
         IAudioEngine audio,
-        MachineRack rack,
+        SoundMachineRack rack,
         ObservableCollection<Recording> recordings,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         ConfigStore? configStore = null,
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
@@ -970,7 +970,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         _store = new SongStore();
         _rack = rack;
-        Missing = new MissingMachines(rack: _rack);
+        Missing = new MissingSoundMachines(rack: _rack);
         _recordings = recordings;
 
         song = Song.CreateDefault();

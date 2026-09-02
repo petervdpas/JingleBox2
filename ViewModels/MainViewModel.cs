@@ -4,7 +4,6 @@ using JingleBox2.Audio;
 using JingleBox2.Config;
 using JingleBox2.Midi;
 using JingleBox2.Controllers;
-using JingleBox2.Tracker;
 using JingleBox2.Audio.Records;
 using JingleBox2.UI;
 using System;
@@ -23,6 +22,7 @@ using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Controllers.Interfaces;
+using JingleBox2.Devices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -59,7 +59,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     private readonly IPluginChainState _chains = new PluginChainState();
 
     /// <summary>The machines this run has, the one instance everything shares.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>What effects this installation has, the one instance everything shares.</summary>
     /// <remarks>
@@ -1297,7 +1297,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         IRecordingService recordingService,
         IWaveformService waveformService,
         IAudioRouting routing,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         Devices.SoundEffects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
@@ -1322,7 +1322,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         Designer.Shelf = new Devices.SoundMachines.TakeShelf(
             Record.Recordings, take => Designer.PutTake(take.FilePath));
 
-        var rack = new MachineRack();
+        var rack = new SoundMachineRack();
 
         Tracker = new TrackerViewModel(
             audio, rack, Record.Recordings, _machines, store, cfg, Plugins, waveformService, _effects,

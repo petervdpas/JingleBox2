@@ -42,7 +42,7 @@ public partial class InstrumentWindow : Window
     /// them. Nothing is applied by saying it; the mappings are walked per message, so the next
     /// thing you touch resolves against this track instead.
     /// </remarks>
-    public static void Show(object key, TrackInstrumentDesigner designer, Window owner, Action? closed = null)
+    public static void Show(object key, TrackInstrumentPanel designer, Window owner, Action? closed = null)
     {
         if (key == null || designer == null || owner == null) return;
 

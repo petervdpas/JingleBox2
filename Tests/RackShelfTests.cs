@@ -1,6 +1,7 @@
 
 using JingleBox2.Tracker;
 using Xunit;
+using JingleBox2.Devices.SoundMachines;
 
 namespace JingleBox2.Tests;
 
@@ -22,7 +23,7 @@ public class RackShelfTests
 {
     /// <summary>A rack of its own, under a name no other test uses.</summary>
     /// <param name="named">What to call the folder.</param>
-    private static MachineRack Rack(string named) => new("jinglebox2-shelf-" + named);
+    private static SoundMachineRack Rack(string named) => new("jinglebox2-shelf-" + named);
 
     /// <summary>A rack that has never been opened has been offered nothing.</summary>
     [Fact]
@@ -52,7 +53,7 @@ public class RackShelfTests
     {
         var rack = Rack("taken");
 
-        var box = TrackerInstrument.CreateOn(JingleBox2.Tracker.Records.Machine.For(
+        var box = TrackerInstrument.CreateOn(JingleBox2.Devices.SoundMachines.Records.SoundMachine.For(
             JingleBox2.Tracker.Enums.TrackerInstrumentKind.Synth), "OddSkilla");
 
         box.Id = "machine.oddskilla";

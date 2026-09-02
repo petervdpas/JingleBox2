@@ -23,7 +23,7 @@ public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
 {
     /// <summary>Following a list of things and what each of them says.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineWatch Watching = new MachineWatch();
+    private static readonly ISoundMachineWatch Watching = new SoundMachineWatch();
 
     /// <summary>
     /// Whether the map is being watched yet.
@@ -112,7 +112,7 @@ public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
     /// <remarks>
     /// A map refilled from a chop or from a folder of samples is a new set of zones, which is
     /// why the list is watched as well as the zones in it: see
-    /// <see cref="MachineWatch"/>.
+    /// <see cref="SoundMachineWatch"/>.
     /// </remarks>
     private void Listen()
     {

@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
+        x:Class="JingleBox2.Views.SoundEffectWindow"
+        x:DataType="vm:EffectDeviceViewModel"
+        Title="{Binding Name}"
+        SizeToContent="WidthAndHeight"
+        MaxWidth="1400"
+        MaxHeight="1000"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- One of our effects, off a chain, in a window of its own. The same face the rack draws and
+       the same face the designer laid out; what differs is what is behind it, which here is the
+       engine the audio is actually going through, so a knob turned is heard on the next block. -->
+  <Border x:Name="Plate"
+          Background="{DynamicResource BgBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="6"
+          Padding="12">
+    <ui:PanelView x:Name="Face"
+                  Face="{Binding Shown}"
+                  Values="{Binding Values}"
+                  Menu="{Binding Menu}" />
+  </Border>
+
+</Window>

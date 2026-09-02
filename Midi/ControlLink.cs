@@ -59,7 +59,7 @@ public sealed class ControlLink
     /// The one this session is using.
     /// </summary>
     /// <remarks>
-    /// A static, and the same reason as <see cref="Devices.SoundMachines.MachineProjects"/>:
+    /// A static, and the same reason as <see cref="Devices.SoundMachines.SoundMachineProjects"/>:
     /// there is exactly one controller on the desk, the mode it is in is the same mode
     /// everywhere at once, and the panels that have to know are drawn from a description that
     /// has never heard of a view model. Threading a reference through every designer, window

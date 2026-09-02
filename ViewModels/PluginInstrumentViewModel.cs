@@ -29,13 +29,13 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
     /// <summary>Which values adapter reads a given instrument.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineValuesFor ValuesFor = new MachineValuesFor();
+    private static readonly ISoundMachineValuesFor ValuesFor = new SoundMachineValuesFor();
 
     /// <summary>The machines this run has.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>How a machine that is not here is named, which its own kind cannot do.</summary>
-    private readonly Devices.SoundMachines.Interfaces.IMissingMachines _missing;
+    private readonly Devices.SoundMachines.Interfaces.IMissingSoundMachines _missing;
 
     /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
@@ -54,7 +54,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     private readonly Action? _changed;
 
     /// <summary>Builds the designer for a machine of ours, on the first ask.</summary>
-    private readonly Func<TrackInstrumentDesigner>? _designer;
+    private readonly Func<TrackInstrumentPanel>? _designer;
 
     /// <summary>The plugin, once something has asked for it, so its patch can be read back.</summary>
     private IPluginInstrument? _plugin;
@@ -88,14 +88,14 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     public PluginInstrumentViewModel(
         TrackerInstrument instrument,
         Func<IPluginInstrument?> live,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         Action? changed = null,
-        Func<TrackInstrumentDesigner>? designer = null,
+        Func<TrackInstrumentPanel>? designer = null,
         Action? remove = null,
-        Devices.SoundMachines.Interfaces.IMissingMachines? missing = null)
+        Devices.SoundMachines.Interfaces.IMissingSoundMachines? missing = null)
     {
         _machines = machines;
-        _missing = missing ?? new Devices.SoundMachines.MissingMachines();
+        _missing = missing ?? new Devices.SoundMachines.MissingSoundMachines();
         _instrument = instrument;
         _live = live;
         _changed = changed;
@@ -141,11 +141,11 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// Kept rather than made afresh, so coming back to a track shows the panel as it was left
     /// and does not build a second editor over the same instrument.
     /// </remarks>
-    public TrackInstrumentDesigner? Designer =>
+    public TrackInstrumentPanel? Designer =>
         IsPlugin ? null : _built ??= _designer?.Invoke();
 
     /// <summary>The designer once it exists, so coming back to a track shows the same one.</summary>
-    private TrackInstrumentDesigner? _built;
+    private TrackInstrumentPanel? _built;
 
     /// <summary>What the instrument is called in this song, which is the name on the block.</summary>
     public string Name => _instrument.Name;
@@ -176,7 +176,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// itself as "Mono synth" and the message tells somebody to register a thing that is not on
     /// the list under that name.
     /// </remarks>
-    public Devices.SoundMachines.Records.MissingMachine? Missing => _missing.For(_instrument);
+    public Devices.SoundMachines.Records.MissingSoundMachine? Missing => _missing.For(_instrument);
 
     /// <summary>The second line of its block: which machine it is, and how it is set.</summary>
     /// <remarks>
@@ -208,7 +208,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// three controls your eye lands on when you open the machine rather than the first three
     /// lines of a file.
     ///
-    /// Read through a throwaway adapter from <see cref="Devices.SoundMachines.MachineValuesFor"/>,
+    /// Read through a throwaway adapter from <see cref="Devices.SoundMachines.SoundMachineValuesFor"/>,
     /// which is cheap: it is a view model over the patch the instrument already holds. What it
     /// is not is the machine's editor, which is what the panel needs and what this deliberately
     /// does not build.

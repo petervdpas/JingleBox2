@@ -39,24 +39,36 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   application keeps its things, and how a file is written whole. `AppFolder` and `SafeFile` sat
   in `Config/` and were moved here, since neither is about the settings and `AppFolder`'s own
   remarks said so: a plugin's own process needs it and has no settings to read
-- `Devices/` - The two worlds of boxes on the rack, a folder each. `Devices/SoundMachines/` is
-  the soundmachine half: the registry, the projects, the archive, the preset file and the values
-  adapters that put a face over an engine. `Devices/SoundEffects/` is the effect half: its own
-  registry, projects and archive, and the engines. Both lived under `Tracker/` until now, which
-  was true of the first one on the day it was written, when a machine was a thing a song played
-  and nothing else, and had been false ever since: not one file in either is about a pattern, a
-  clock or a song, and the effect half was only ever there because it was made beside the machine
-  half. The namespaces are `JingleBox2.Devices.SoundMachines` and `JingleBox2.Devices.SoundEffects`,
-  which is the folder said again, and that is the rule: **the folder and the namespace say the
-  same thing**. Not under `Rack.*`, although the rack is what both are about, for two reasons that
-  agree: `Rack.Abstractions` and `Rack.Ui` are the published assemblies and this is the
-  application, and a source folder called `Rack` beside the lowercase `rack/` that holds what
-  ships is the `controllers/` fault again, one folder on Windows and two here. The word is
-  **soundmachine** rather than machine because it is one of the four this file is arranged around
-  and the folder is where it can finally be said. The types inside kept their names, deliberately:
-  `MachineRegistry`, `MachineProject`, `EffectRegistry` and the rest are what they always were, and
-  a `machine.json` on somebody's disc names no type at all
-- `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the machine rack
+- `Devices/` - What is on the rack, in three levels. The top of the folder is the device level,
+  which is what both worlds share and says nothing about notes or audio: `RackRegistry<T>` and
+  its two-folder rule, `RackArchive<T>` and the zip, `RackDevices<T>` and what was found for the
+  run, `PanelImages`, and in `Devices/Interfaces/` the five `IRack*` plus `IPanelImages`,
+  `IDesignProject` and `IDesignWorld`. `Devices/SoundMachines/` is the soundmachine half: the
+  registry, the projects, the rack itself, the preset file and library, and the values adapters
+  that put a face over an engine. `Devices/SoundEffects/` is the effect half: its own registry,
+  projects and archive, and the engines.
+
+  All of it lived under `Tracker/`, which was true of the first file on the day it was written,
+  when a machine was a thing a song played and nothing else, and had been false ever since: not
+  one file in any of the three is about a pattern, a clock or a song. What stayed behind is what
+  a song owns, and `TrackerInstrument` is the whole reason the line falls there, since **a
+  soundmachine used in a song is an instrument**: `SoundMachine` is the box, `SoundMachinePreset` is a
+  sound you start from, and neither is in a song.
+
+  The namespaces are `JingleBox2.Devices`, `JingleBox2.Devices.SoundMachines` and
+  `JingleBox2.Devices.SoundEffects`, which is the folder said again, and that is the rule: **the
+  folder and the namespace say the same thing**. Not under `Rack.*`, although the rack is what
+  all of it is about, for two reasons that agree: `Rack.Abstractions` and `Rack.Ui` are the
+  published assemblies and this is the application, and a source folder called `Rack` beside the
+  lowercase `rack/` that holds what ships is the `controllers/` fault again, one folder on
+  Windows and two here. The word is **soundmachine** rather than machine because it is one of the
+  four this file is arranged around, and where a type is about the preset rather than about the
+  file format it says so: `SoundMachinePreset` is the record and `SoundMachinePresets` is the
+  shelf it comes off. That shelf was in a file called `MachinePreset.cs` beside a record of
+  almost the same name, which is what made it look like the same thing written twice; it is one
+  type to a file named after it, like everything else here
+- `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the instruments a song
+  owns. The rack it used to hold is in `Devices/`
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
@@ -193,7 +205,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `MidiService.Read` and the router into an `INoteTrigger`: both spellings of a release, running
   status, a chord, and aftertouch, which shares a note's shape and must not be read as a key
   coming up. `Tests/NoteAdapterTests.cs` is the half-choosing above. `Tests/MachineKeysTests.cs`
-  presses keys on a real `DesignerKeys` through `IMachineKeys` and reads what is lit. That last
+  presses keys on a real `SoundDeviceKeys` through `IMachineKeys` and reads what is lit. That last
   one found a fault the moment it existed: `Play` no longer refused a key that was already down,
   so a letter held on the computer keyboard retriggered the machine on every repeat
 - `IMachineKeys.Down` and `Up` are that light on its own, for a note that was played elsewhere:
@@ -263,7 +275,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   through. `Tests/MixerIsolationTests.cs` plays a note on one track and asks what every other
   track is sounding, because everything in here is indexed by track number and indexed things go
   wrong quietly
-- `MachineRack` (Tracker/): What you have, in `%APPDATA%/JingleBox2/instruments/`, one file
+- `SoundMachineRack` (Tracker/): What you have, in `%APPDATA%/JingleBox2/instruments/`, one file
   each. The machines, one apiece under their own names, and the plugins you have added. Nothing
   else: anything that is neither is moved to `instruments/retired/` on the next open, since
   there is no longer any way to make one. A machine cannot be renamed, deleted or duplicated; a
@@ -275,7 +287,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
     not move. An engine has no face and no name a person sees
   - A **machine** is a face over an engine: a folder holding `machine.json`, its badge, its
     presets and its own `sounds`, made in the designer and travelling as a zip. It carries no
-    engine and cannot: which engine it is on is decided by its id, and `Machine.Register` refuses
+    engine and cannot: which engine it is on is decided by its id, and `SoundMachine.Register` refuses
     an id it has no engine for. That is why a machine designed under a new id is read off disc
     and never reaches the rack, and it is the one thing standing between here and a machine
     somebody else can ship
@@ -304,7 +316,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   **A machine is its folder, and Save as is the half of saving that knows it.** The manifest
   names pictures, presets and sounds by the names they have inside the folder, so a
   `machine.json` written into an empty folder somewhere else is a machine that draws nothing and
-  has no presets. `MachineProject.Save` writes the manifest and only that, rightly, since it is
+  has no presets. `SoundMachineProject.Save` writes the manifest and only that, rightly, since it is
   called on every ordinary save and copying the whole folder onto itself each time would be
   absurd; `IMachineArchive.CopyInto` is the other half, for the one case where the folder
   changes. The files first and the manifest after them, because the one on disc is behind
@@ -324,7 +336,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
   Everything asks it. What the rack shows, what a panel is drawn from, what a song can sound,
   and which machines a song is missing are all one question with one answer, and there is one
-  list that gives it: `IMachineRegistry` reads the folders and `IMachineProjects` holds what it
+  list that gives it: `IMachineRegistry` reads the folders and `ISoundMachineProjects` holds what it
   found for the run. A machine whose id this build has no engine for is read and passed over, so
   a machines folder from a later version is harmless, and that gate is what has to move before a
   machine written by somebody else can be registered at all.
@@ -333,7 +345,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   on that machine, and the machine is not here. It goes on naming it until the track is pointed
   at another instrument, it saves unchanged, and it shows a grey "Sampler" named for its
   engine.
-  `IMachineProjects.Has` is the test, asked in `TrackerPlayer` before anything sounds. Nothing
+  `ISoundMachineProjects.Has` is the test, asked in `TrackerPlayer` before anything sounds. Nothing
   about hearing silence explains it, so it is said twice and in two different moments. Opening
   the song puts a line on the status bar naming what is not registered, which is a note for
   somebody who wants to know before they start. Opening one of those instruments refuses and
@@ -352,7 +364,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   was written before the registry existed and had been quietly untrue ever since: the registry is
   what this installation has and is the only thing that answers that. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
-  (`MachineRack`, `MachineRackViewModel`, `RackMachine`, `MachinesView`) and the tracker's say
+  (`SoundMachineRack`, `MachineRackViewModel`, `RackMachine`, `MachinesView`) and the tracker's say
   instrument (`Song.Instruments`, `InstrumentSlot`, `AddInstrumentCommand`)
 - **The rack is what this installation has registered, in two tabs: Machines and Effects.** A
   plugin is on neither and never should have been on the rack at all: a CLAP or a VST3 is
@@ -365,7 +377,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   what this installation has, `offered.txt` so that removing something is not losing it and a new
   arrival still arrives, bringing an installed copy up to date file by file with nothing ever
   deleted, and the gate that reads a folder and leaves it there when this build has no engine for
-  its id. Not one of those says anything about notes or audio. `MachineRegistry` and
+  its id. Not one of those says anything about notes or audio. `SoundMachineRegistry` and
   `EffectRegistry` are its two users and are what is left when the folders are taken out: four
   answers apiece, which folder name, how a folder is read into a manifest, whether this build
   will have it, and how a shipped one is taken. A machine's is the archive, since a machine also
@@ -378,9 +390,9 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `PanelElementPropertyViewModel`, `MenuOptionViewModel`, `ParameterViewModel` and `PreviewValues`
   are the designer's, which serves both; `IPanelTint`, `PanelTint`, `PanelShades`,
   `PanelColoursDialog` and `PanelColours` are a box's own colours, which an effect has as much as
-  a machine. What kept its name is what only the instrument world has: `MachineWindow`,
-  `MachineShelfViewModel`, `MachinePresetDesk`, `MissingMachineDialog`, `MachineRack`,
-  `MachineProject`, and the preview parts for a kit, a keyboard, zones and slices
+  a machine. What kept its name is what only the instrument world has: `SoundMachineWindow`,
+  `MachineShelfViewModel`, `MachinePresetDesk`, `MissingMachineDialog`, `SoundMachineRack`,
+  `SoundMachineProject`, and the preview parts for a kit, a keyboard, zones and slices
 - **The transport answers its two keys on every window, not only on the main one.** Space and
   Ctrl+R were handled by the main window's own key handler, so opening anything else stopped them
   working: a machine's panel, an effect off a chain, a plugin's window. A transport that stops
@@ -425,7 +437,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   not on a track in the first place, so no answer phrased as a track number could ever have
   reached it: a knob pointed at an effect on a pad moved nothing, ever. `IEffectInFront` is the
   one answer, `IEffectShown` is the three things a link needs about a box (which effect, where it
-  is standing, and what its knobs stand at), and `EffectWindow` says both halves, on opening as
+  is standing, and what its knobs stand at), and `SoundEffectWindow` says both halves, on opening as
   well as on being brought forward, since whether a window hears that it was activated is the
   window manager's business
 - **And it was written into the engine rather than through the values, so the picture never
@@ -474,7 +486,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   the same code doing it. `IRackArchive<T>` and `RackArchive<T>` are the zip, the staging folder
   and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, System with its Import, Add and
   Remove. What each world supplies is two answers, the name of the file at the top of a folder and
-  how a folder is read, so `MachineArchive` and `EffectArchive` are a dozen lines apiece. The one
+  how a folder is read, so `SoundMachineArchive` and `EffectArchive` are a dozen lines apiece. The one
   thing that differs downstream is where a box goes afterwards: a machine becomes an instrument in
   a song, an effect goes on a track's chain, which is the same difference a plugin instrument has
   from a plugin effect
@@ -598,7 +610,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   picks from. Taking it off is not losing it. The machine stays registered, the picker underneath
   offers it back, and losing one is unregistering it in SETTINGS, System
 - Which means the rack cannot be rebuilt from the registry on every open, or a machine taken off
-  would be back the next morning with nothing to say why. `IMachineRack.Shelved` is the record,
+  would be back the next morning with nothing to say why. `ISoundMachineRack.Shelved` is the record,
   `instruments/shelved.txt`, one id to a line: a machine this rack has never been offered gets
   its box, and one it has been offered is left alone whether or not the box is still there. The
   registry's own `offered.txt` is the same rule for the same reason, and this is that rule one
@@ -662,6 +674,35 @@ a second implementation belongs upstairs.
 whatever nobody could place and end up as a bag. `KeyRegions` shares a keyboard out, `SampleUsers`
 answers who plays a recording, `RunMarker` is the note a run leaves. If a name cannot be found,
 the class is usually two classes.
+
+**And it is named in the four words, which means a soundmachine is called one.** The vocabulary
+this file is arranged around is engine, device, soundmachine and effect, and for a long while the
+code said machine where the file said soundmachine, which is how a reader ends up with two words
+for one thing and no way to tell whether the difference means anything. The soundmachine world
+says it now, right through: `SoundMachine` is the record, and `SoundMachineRack`,
+`SoundMachineProject`, `SoundMachineProjects`, `SoundMachineRegistry`, `SoundMachineArchive`,
+`SoundMachinePaths`, `SoundMachineWatch`, `SoundMachineWorld`, `SoundMachineValuesFor`,
+`SoundMachinePresetFile`, `SoundMachinePreset`, `SoundMachinePresets`, `MissingSoundMachine` and
+`MissingSoundMachines` with their interfaces. `SoundMachineWindow` and `SoundEffectWindow` are the
+two windows a box opens in, named the same way and named as a pair, since before this one said
+machine and the other said effect and only one of them was a word this file uses.
+
+Not renamed, deliberately: `IMachineKeys`, `IMachineNotes`, `IMachinePads`, `IMachineZones`,
+`IMachineSlices`, `IMachineTakes`, `IMachineLocation` and `IMachinePatch` in `Rack.Abstractions`.
+That assembly is the published promise and `LICENSE.EXCEPTION` names it, and those eight are about
+a keyboard, a kit's pads and a map rather than about the box, which is the one place the plain
+word is still true.
+
+**The panel a face stands in is not a designer, and was called one in three places.**
+`ISoundDevicePanel` is what a face needs behind it: the editor, the octave to test at, the note
+trigger, the two scope numbers, the hold length and the two halves of a key press. Nothing in it
+designs anything, and DESIGNER is `DesignerViewModel` and `DesignerView`, which lays a face out, so
+the old `IInstrumentDesigner` put two unrelated things one letter apart. It is also not per track:
+`RackViewModel` implements it, over a soundmachine or an effect on the rack, where there is no
+song and no track. `TrackInstrumentPanel` is the implementation over the instrument one track
+plays, which is the one place the word instrument is right, since a soundmachine used in a song is
+an instrument. `SoundDeviceKeys` is the keyboard on that face and `Views/SoundDevicePanel.axaml`
+is the face.
 
 **Every class that does something gets one.** That is the rule, and it is wider than the one
 that used to be written here, which said a pure rule holder was already answerable and could stay
@@ -824,7 +865,7 @@ folder is the classes: the things that do something.
 `clr-namespace`, so moving one breaks an `x:DataType` in a way only the Avalonia compiler catches,
 and only on a build that is not incremental. Four views needed a second `xmlns` for this:
 `HelpWindow`, `MachineEditorView`, `PluginStrip` and `SongDialog`. Nothing in XAML names an enum
-or an interface but `InstrumentPanel`, which is bound to `IInstrumentDesigner`.
+or an interface but `SoundDevicePanel`, which is bound to `ISoundDevicePanel`.
 
 ### There are no line comments
 
@@ -1105,7 +1146,7 @@ whole exercise and is worth writing down rather than summarising:
   through `RecordingImport` and repoints the instruments, skipping anything already there byte
   for byte, so opening one twice adds nothing
 - RECORD asks the songs as well as the rack before deleting a take (`SampleUsers` over
-  `MachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
+  `SoundMachineRack` and `SongStore`). A song owns its instruments, so a recording nothing on the
   rack plays can still be the sound of three songs, and deleting it used to empty them with
   nothing said. Only `song.json` is read for this, and the answer is cached per song by its
   write time: the shelf asks once per take, so the uncached version opened every song file
@@ -1267,7 +1308,7 @@ whole exercise and is worth writing down rather than summarising:
   of the same layout per song is the same work done again for every song, it cannot be handed to
   anybody, and the layer it lands in depended on which of two identical-looking panels the
   pointer happened to be over. `ControlLink.Handle` writes to the desk and nothing else does,
-  `Pointable.InSong` and `InstrumentPanel.InSong` are gone with the decision they carried, and
+  `Pointable.InSong` and `SoundDevicePanel.InSong` are gone with the decision they carried, and
   what an older song is still holding is still read and is still displaced by an arriving link,
   so nothing laid down before this starts fighting what is laid down now
 - **A card is one controller against one target, which is a template.** `Views/ControlLinksView.axaml`
@@ -2008,8 +2049,8 @@ whole exercise and is worth writing down rather than summarising:
 - An instrument's block prints its machine's first three controls, the same as the effects after
   it, and getting there meant fixing something that was wrong rather than adding a binding. Which
   values adapter reads an instrument was written out twice, in `InstrumentEditorViewModel` and in
-  `MachinePresetFile`, and both wrote it while doing something else. It is now
-  `Devices/SoundMachines/MachineValuesFor.cs` and the editor calls it. The view models are optional
+  `SoundMachinePresetFile`, and both wrote it while doing something else. It is now
+  `Devices/SoundMachines/SoundMachineValuesFor.cs` and the editor calls it. The view models are optional
   there because that is the only way the two callers differ: an editor owns the one the panel
   edits and must hand it over, or the panel and the values would be looking at two copies of one
   patch, and anything only reading wants a throwaway. Which three controls is `PanelOrder`, so

@@ -17,6 +17,8 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
+using JingleBox2.Devices.SoundMachines.Records;
+using JingleBox2.Devices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -29,7 +31,7 @@ namespace JingleBox2.ViewModels;
 /// document of its own, and a knob you turned is not a change you should have to remember to
 /// keep. Writes are held back until the turning stops.
 /// </remarks>
-public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigner, Midi.Interfaces.IPlaysNotes
+public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel, Midi.Interfaces.IPlaysNotes
 {
     /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
     private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
@@ -38,13 +40,13 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     private readonly IPluginHost _host = new PluginHost();
 
     /// <summary>The machines this run has, the one instance everything shares.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>How long the knobs have to be still before the file is written.</summary>
     private static readonly TimeSpan SaveDelay = TimeSpan.FromMilliseconds(600);
 
     /// <summary>The shelf itself: one file per instrument, read and written here.</summary>
-    private readonly MachineRack _rack;
+    private readonly SoundMachineRack _rack;
 
     /// <summary>How a note is heard, borrowed from the tracker so there is one audio engine.</summary>
     private readonly IInstrumentAudition _audition;
@@ -78,9 +80,9 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// machine, so after ten switches the cursor was being moved ten times a tick.
     /// </remarks>
     public RackViewModel(
-        MachineRack rack,
+        SoundMachineRack rack,
         IInstrumentAudition audition,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null,
@@ -240,7 +242,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
 
         Machines.Clear();
 
-        foreach (var machine in Machine.Installed)
+        foreach (var machine in SoundMachine.Installed)
         {
             var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
 
@@ -354,7 +356,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
 
     /// <summary>A machine's own box, under the id that says whose it is.</summary>
     /// <param name="machine">The machine to make a box for.</param>
-    private static TrackerInstrument Boxed(Machine machine)
+    private static TrackerInstrument Boxed(SoundMachine machine)
     {
         var made = TrackerInstrument.CreateOn(machine, machine.Name);
 
@@ -392,7 +394,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
 
         foreach (var instrument in _rack.List())
         {
-            if (Machine.IsSlot(instrument.Id)) continue;
+            if (SoundMachine.IsSlot(instrument.Id)) continue;
 
             string name = instrument.Name;
 
@@ -405,7 +407,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
 
         var shelved = _rack.Shelved;
 
-        foreach (var machine in Machine.Installed)
+        foreach (var machine in SoundMachine.Installed)
         {
             if (shelved.Contains(machine.SlotId)) continue;
 
@@ -477,7 +479,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     }
 
     /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
-    public IMachineKeys MachineKeys => _machineKeys ??= new DesignerKeys(this);
+    public IMachineKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
 
     /// <inheritdoc cref="MachineKeys"/>
     private IMachineKeys? _machineKeys;
@@ -706,7 +708,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
                     null,
                     one,
                     twice.Contains(one.Name) ? one.Name + "  " + one.Format.ToString().ToUpperInvariant() : one.Name,
-                    Machine.For(Tracker.Enums.TrackerInstrumentKind.Plugin).Theme.Accent)));
+                    SoundMachine.For(Tracker.Enums.TrackerInstrumentKind.Plugin).Theme.Accent)));
 
             return offered;
         }
@@ -730,8 +732,8 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// truth: there is nothing to add. Offering the five that are sitting in the list above it
     /// was offering to do nothing, five times.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<Machine> AvailableMachines =>
-        Machine.Installed
+    public System.Collections.Generic.IReadOnlyList<SoundMachine> AvailableMachines =>
+        SoundMachine.Installed
             .Where(one => Machines.All(row => row.Id != one.SlotId))
             .ToList();
 
@@ -776,8 +778,8 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// Always enabled. A machine that is not registered here is refused with a reason in the
     /// status line, which is more use than a greyed row nobody can ask about.
     /// </remarks>
-    public IRelayCommand<Machine> NewFromMachineCommand =>
-        new RelayCommand<Machine>(NewFromMachine);
+    public IRelayCommand<SoundMachine> NewFromMachineCommand =>
+        new RelayCommand<SoundMachine>(NewFromMachine);
 
     /// <summary>
     /// Puts that machine's box back on the rack.
@@ -789,7 +791,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// which is a different act with a different button.
     /// </remarks>
     /// <param name="machine">Which machine to put back.</param>
-    private void NewFromMachine(Machine? machine)
+    private void NewFromMachine(SoundMachine? machine)
     {
         if (machine == null)
         {
@@ -797,7 +799,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
             return;
         }
 
-        if (!Machine.Installed.Any(one => one.Kind == machine.Kind))
+        if (!SoundMachine.Installed.Any(one => one.Kind == machine.Kind))
         {
             Status = $"'{machine.Name}' is not registered here.";
             return;

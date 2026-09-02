@@ -1,0 +1,211 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
+             xmlns:views="clr-namespace:JingleBox2.Views"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
+             x:Class="JingleBox2.Views.SoundDevicePanel"
+             x:Name="Root"
+             x:DataType="vmi:ISoundDevicePanel"
+             Foreground="{DynamicResource TextPrimaryBrush}"
+             Padding="2">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.field">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.8" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- A label and its control, kept together on one line of the top row. -->
+    <Style Selector="StackPanel.entry">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Spacing" Value="6" />
+      <Setter Property="Margin" Value="0,0,16,6" />
+    </Style>
+
+    <!-- The instrument's name, in the corner rather than on a line of its own. Everything else
+         on this panel belongs to the machine; the name is the one thing that belongs to the
+         song, and it earns a badge rather than a row. Quiet until the pointer is on it, so a
+         panel at rest is all machine. -->
+    <!-- The chip the rest of the app uses for a track or a category, with a box in it instead
+         of a line, because this one is typed into. The Border does the badge; the box inside it
+         is made to disappear so what shows is the chip and the word.
+
+         Painted in the panel's own lettering rather than its accent, which is what the badge
+         everywhere else uses. A machine panel is already wearing the machine's colour, and the
+         accent chip on it came out dark red on dark red. The ink is the one colour on a machine
+         that is chosen to be readable against its face, whatever face that is. -->
+    <Style Selector="Border.badge.instrument">
+      <Setter Property="Background">
+        <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" Opacity="0.10" />
+      </Setter>
+      <Setter Property="BorderBrush">
+        <SolidColorBrush Color="{DynamicResource Color.TextPrimary}" Opacity="0.30" />
+      </Setter>
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+
+    <Style Selector="TextBox.name">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,DejaVu Sans Mono,monospace" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="TextBox.name /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <!-- One block of the voice: a heading with its knobs or faders under it. -->
+    <Style Selector="StackPanel.group">
+      <Setter Property="Spacing" Value="6" />
+      <Setter Property="Margin" Value="0,0,24,10" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- The machine itself: a plate in its own colours, standing inside whatever is holding it.
+       The gap around it is the control's padding, so a rack can leave room around the box and
+       a window of its own can give it every pixel it has. -->
+  <Border Background="{DynamicResource BgBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="6"
+          Padding="12">
+
+  <Panel>
+
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="8"
+                IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+            <!-- Everything that is a name or a choice, on as few lines as it takes -->
+            <WrapPanel Orientation="Horizontal">
+              <!-- Somewhere to start. On most machines that is one of the presets shipped in
+                   its own folder; on the Recording machine it is one of your takes, because a
+                   recording machine with no recording on it has no settings worth shipping.
+                   Either way the name, the id and the level stay: this is still the same
+                   instrument, given a different sound to make. -->
+              <StackPanel Classes="entry" IsVisible="{Binding !Editor.IsDescribed}">
+                <TextBlock Classes="field" Text="{Binding Presets.Caption}" />
+
+                <!-- One control, not three: the arrows, the name and how far through you are
+                     all say the same fact and have to move together. The arrows are how you
+                     hunt for a sound; pressing the name opens the whole list. -->
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <!-- Only where the list is takes. A machine offering its own presets has
+                       nothing to narrow, and the picker keeps the whole width. -->
+                  <ComboBox Width="132" VerticalAlignment="Center"
+                            IsVisible="{Binding Presets.PicksTakes}"
+                            ItemsSource="{Binding Editor.Takes.Filters}"
+                            SelectedItem="{Binding Editor.Takes.Filter}"
+                            ToolTip.Tip="Narrow the takes to one category. They are filed on the RECORD tab." />
+
+                  <ui:Chooser ItemsSource="{Binding Presets.Items}"
+                              SelectedItem="{Binding Presets.Selected, Mode=TwoWay}"
+                              Placeholder="Presets..."
+                              ToolTip.Tip="{Binding Presets.Hint}" />
+                </StackPanel>
+              </StackPanel>
+
+            </WrapPanel>
+
+            <!-- What it is playing, for the panel this program draws itself. A described
+                 machine says it where it wants it said, with a Take part, or does not say it. -->
+            <TextBlock Classes="cardHint"
+                       Text="{Binding Editor.SourceText}"
+                       IsVisible="{Binding !Editor.IsDescribed}"
+                       TextTrimming="CharacterEllipsis" />
+
+
+
+            <!-- Plugin instruments. The plugin does the playing, so there is no wave to draw
+                 and no envelope of ours to set: what is here is the plugin's own. -->
+            <StackPanel Spacing="8" IsVisible="{Binding Editor.IsPlugin}">
+              <TextBlock Classes="cardHint"
+                         IsVisible="{Binding Editor.HasPluginProblem}"
+                         TextWrapping="Wrap"
+                         Text="{Binding Editor.PluginProblem}" />
+
+              <Border Classes="inset" IsVisible="{Binding Editor.HasPluginPanel}" HorizontalAlignment="Left">
+                <StackPanel Spacing="10">
+                  <TextBlock Classes="section" Text="{Binding Editor.PluginText}" />
+
+                  <!-- The plugin's own interface opens in a window of its own. Serum draws
+                       itself at 1190 by 740 and Vital at 1400 by 820, which is a window, not
+                       a panel on a page. -->
+                  <Button Content="Open the plugin"
+                          HorizontalAlignment="Left"
+                          Click="OpenPluginWindow_Click"
+                          ToolTip.Tip="The plugin's own interface, in a window you can leave open while you work." />
+
+                  <!-- The instrument's own level, on top of whatever the plugin plays at. The
+                       volume column in a pattern rides this the same as for any instrument. -->
+                  <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                               Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
+                               Ticks="6,0,-12,-40"
+                               HorizontalAlignment="Left"
+                               ToolTip.Tip="Unity is 0 dB, and above it is makeup gain."
+                               Value="{Binding Editor.VolumeDecibels}" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <!-- The machine's own face, drawn from what the machine says it looks like, and
+                 the whole panel. Every machine has one now: each was written out in XAML once,
+                 and each was kept until its description drew the same thing to the pixel. A
+                 machine this installation does not have draws nothing here, which is what the
+                 list in SETTINGS is for.
+
+                 Across the page, not pinned to the left. What a machine is drawn against is the
+                 room the page has: a machine's own description says which of its parts spread
+                 and which keep their size, and a panel held to its contents took that choice
+                 away. -->
+            <ui:PanelView x:Name="Face"
+                                 IsVisible="{Binding Editor.IsDescribed}"
+                                 Face="{Binding Editor.Described}"
+                                 Values="{Binding Editor.Values}"
+                                 Takes="{Binding Editor.MachineTakes}"
+                                 Pads="{Binding Editor.MachinePads}"
+                                 Zones="{Binding Editor.MachineZones}"
+                                 Scope="{Binding Editor.MachineScope}"
+                                 Slices="{Binding Editor.MachineSlices}"
+                                 Keyboard="{Binding MachineKeys}"
+                                 Location="{Binding MachineLocation}"
+                                 Menu="{Binding Editor.MachineMenu}"
+                                 InstrumentName="{Binding Editor.Named}"
+                                 Presets="{Binding Presets}"
+                                 Reread="{Binding Editor.PanelReread}"
+                                 Playhead="{Binding Editor.Playhead}"
+                                 Trigger="{Binding NoteTrigger}"
+                                 HoldSeconds="{Binding HoldSeconds}" />
+
+            <!-- The keyboard, at the foot where a keyboard goes, and the same on every panel.
+                 It plays, it shows what is playing, and it carries its own octave: the lamps
+                 are not a setting beside the keys, they are where the keys are looking. -->
+            <ui:Clavier Octave="{Binding Octave}"
+                           HorizontalAlignment="Left"
+                           Margin="0,14,0,0"
+                           IsVisible="{Binding Editor.ShowsSharedKeys}"
+                           Lit="{Binding MachineKeys.Lit}"
+                           Command="{Binding KeyPressCommand}"
+                           ReleaseCommand="{Binding KeyLetCommand}"
+                           ToolTip.Tip="Click the keys to play, or type them (Z to M, Q to P). A key lights while it is held down, not for as long as what it started goes on sounding. The arrows and the lamps move the three octaves on show." />
+
+    </StackPanel>
+  </ScrollViewer>
+
+  </Panel>
+  </Border>
+
+</UserControl>

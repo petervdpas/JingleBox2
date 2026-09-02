@@ -64,7 +64,7 @@ Every machine so far is a described panel over one of the engines the applicatio
 sample, kit, sampler, synth, mono synth. This one is none of those, so it needs a kind of its
 own and a voice of its own.
 
-That is the piece `MachineRegistry` already admits is missing: "A machine the app has no engine
+That is the piece `SoundMachineRegistry` already admits is missing: "A machine the app has no engine
 for is read and ignored for now. That is the piece the contract still needs." A scratch machine
 is the first real reason to finish it, and a good one to design against, because it is the
 furthest thing from the existing five: no envelope, no note-on triggering a sound, no release.

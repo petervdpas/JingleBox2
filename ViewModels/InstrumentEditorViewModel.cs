@@ -26,6 +26,7 @@ using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Devices.SoundMachines;
 using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -40,14 +41,14 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
     /// <summary>How a preset file is read and written.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachinePresetFile PresetFiles = new MachinePresetFile();
+    private static readonly ISoundMachinePresetFile PresetFiles = new SoundMachinePresetFile();
 
     /// <summary>Which values adapter reads a given instrument.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachineValuesFor ValuesFor = new MachineValuesFor();
+    private static readonly ISoundMachineValuesFor ValuesFor = new SoundMachineValuesFor();
 
     /// <summary>The machines this run has.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>What a kit and a map do identically with a chopped recording.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -166,7 +167,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         int index,
         TrackerInstrument instrument,
         Action changed,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         IWaveformService? waveforms = null,
         IInstrumentAudition? audition = null,
         ObservableCollection<Recording>? recordings = null,
@@ -235,7 +236,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (instrument.IsKit)
         {
-            int declared = _machines.For(Machine.For(instrument.Kind).SlotId)
+            int declared = _machines.For(SoundMachine.For(instrument.Kind).SlotId)
                 is { } project
                 ? PresetFiles.Buttons(project).Count
                 : 0;
@@ -283,7 +284,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </summary>
     /// <remarks>
     /// Two things have to be true. The machine has to be installed with a panel laid out, which
-    /// is what <see cref="Tracker.Interfaces.IRackDevices{T}.PanelFor"/> answers; and this build has to know how to
+    /// is what <see cref="Devices.Interfaces.IRackDevices{T}.PanelFor"/> answers; and this build has to know how to
     /// turn that machine's parameters into an instrument's settings, which is what the values
     /// are. A machine with a face and nobody to read it draws knobs that turn nothing, so the
     /// panel written by hand is shown instead and nothing is lost.
@@ -319,7 +320,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
     private void Describe(IWaveformService? waveforms)
     {
-        string id = Machine.For(_instrument.Kind).SlotId;
+        string id = SoundMachine.For(_instrument.Kind).SlotId;
 
         if (_machines.PanelFor(id) is not { } face) return;
 
@@ -493,7 +494,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public TrackerInstrument Instrument => _instrument;
 
     /// <summary>The machine's own theme: its colour and how far it is carried.</summary>
-    public PanelTheme Theme => Machine.For(_instrument.Kind).Theme;
+    public PanelTheme Theme => SoundMachine.For(_instrument.Kind).Theme;
 
     /// <summary>Its colour on its own, for the band across the top of the panel.</summary>
     public string Colour => Theme.Accent;
@@ -570,7 +571,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// one that matters is the plugin's, since that is what has to be found again when a song is
     /// opened on another machine.
     /// </remarks>
-    public bool CanRename => !Machine.IsSlot(_instrument.Id) && !_instrument.IsPlugin;
+    public bool CanRename => !SoundMachine.IsSlot(_instrument.Id) && !_instrument.IsPlugin;
 
     /// <summary>
     /// Wraps a machine's change callback so the chop editor hears about it too.
@@ -749,7 +750,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// cutoff rather than at this instrument's, so the machine is what the mapping names and
     /// the name on the front is not it: that can be reworded, and the id never is.
     /// </remarks>
-    public string MachineId => Machine.For(_instrument.Kind).SlotId;
+    public string MachineId => SoundMachine.For(_instrument.Kind).SlotId;
 
     /// <summary>
     /// The device this is editing, as anything outside it needs it.
@@ -759,7 +760,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// in the same words. A machine that is not installed here still answers, greyed and named
     /// for its engine, which is what a link pointed at it would name anyway.
     /// </remarks>
-    public Rack.Devices.Interfaces.IDevice Device => Machine.For(_instrument.Kind);
+    public Rack.Devices.Interfaces.IDevice Device => SoundMachine.For(_instrument.Kind);
 
     /// <summary>True on the machine with a single voice and its own patch.</summary>
     public bool IsMonoSynth => _instrument.IsMonoSynth;

@@ -36,7 +36,7 @@ public sealed class ControlTargets : IControlTargets
     private readonly IPanelOrder _order = new PanelOrder();
 
     /// <summary>The machines this run has.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>The effects this run has, for a knob pointed at one of ours on a chain.</summary>
     private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
@@ -74,7 +74,7 @@ public sealed class ControlTargets : IControlTargets
     /// ours is looked for on the track you are working on and on the rack, which is what this did
     /// before a face could be opened off a chain at all.
     /// </param>
-    public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
+    public ControlTargets(TrackerViewModel tracker, ISoundMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
                           Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
                           ViewModels.Interfaces.IEffectInFront? front = null)

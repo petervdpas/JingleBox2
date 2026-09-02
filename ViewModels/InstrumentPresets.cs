@@ -6,9 +6,9 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Devices.SoundMachines.Records;
+using JingleBox2.Devices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -28,7 +28,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
 {
     /// <summary>The machines this run has.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>The presets those machines ship with.</summary>
     private readonly IPresetLibrary _presets;
@@ -78,12 +78,12 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     public InstrumentPresets(
         TrackerInstrument instrument,
         Action applied,
-        IMachineProjects machines,
+        ISoundMachineProjects machines,
         ObservableCollection<Audio.Records.Recording>? takes = null,
         TakeFilter? narrowing = null)
     {
         _machines = machines;
-        _presets = new MachinePresets(machines);
+        _presets = new SoundMachinePresets(machines);
         _instrument = instrument;
         _applied = applied;
         _takes = takes;
@@ -124,7 +124,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// </remarks>
     private bool StartsFromTakes()
     {
-        string id = Machine.For(_instrument.Kind).SlotId;
+        string id = SoundMachine.For(_instrument.Kind).SlotId;
 
         if (_machines.For(id)?.BrowsesTakes() is { } said) return said;
 
@@ -132,13 +132,13 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     }
 
     /// <summary>What this machine has to offer, in the order its folder lists them.</summary>
-    public ObservableCollection<MachinePreset> Items { get; } = new();
+    public ObservableCollection<SoundMachinePreset> Items { get; } = new();
 
     /// <summary>True when there is anything to pick, so the panel can grey the picker.</summary>
     public bool Any => Items.Count > 0;
 
     /// <summary>The last one loaded. Setting it loads it.</summary>
-    [ObservableProperty] private MachinePreset? selected;
+    [ObservableProperty] private SoundMachinePreset? selected;
 
     /// <summary>
     /// Puts the picked sound on the instrument, and says so.
@@ -147,7 +147,7 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// Nothing happens while the list is being rebuilt: the rebuild clears the selection and would
     /// otherwise be read as somebody picking nothing, and then picking the first thing again.
     /// </remarks>
-    partial void OnSelectedChanged(MachinePreset? value)
+    partial void OnSelectedChanged(SoundMachinePreset? value)
     {
         if (_filling || value == null) return;
 
@@ -161,13 +161,13 @@ public sealed partial class InstrumentPresets : ObservableObject, IPanelPresets
     /// leaves everything else about the machine where it was, which is the same promise a real
     /// preset makes about the name and the level.
     /// </remarks>
-    private MachinePreset Take(Audio.Records.Recording recording)
+    private SoundMachinePreset Take(Audio.Records.Recording recording)
     {
         var sound = TrackerInstrument.CreateSample(recording.Name, recording.FilePath, _instrument.BaseNote);
 
         sound.Shape = null;
 
-        return new MachinePreset(recording.Name, sound);
+        return new SoundMachinePreset(recording.Name, sound);
     }
 
     /// <summary>Reads the machine's folder again, or your takes on the machine that offers those.</summary>

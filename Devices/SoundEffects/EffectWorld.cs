@@ -1,6 +1,6 @@
 using System;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Devices.SoundEffects;
 

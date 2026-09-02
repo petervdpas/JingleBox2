@@ -3,7 +3,7 @@
         xmlns:vm="clr-namespace:JingleBox2.ViewModels"
         xmlns:views="clr-namespace:JingleBox2.Views"
         x:Class="JingleBox2.Views.InstrumentWindow"
-        x:DataType="vm:TrackInstrumentDesigner"
+        x:DataType="vm:TrackInstrumentPanel"
         Title="{Binding Title}"
         SizeToContent="WidthAndHeight"
         MinWidth="680"
@@ -16,5 +16,5 @@
 
        No heading of its own: the window is called what the heading said, and a panel this full
        has better uses for the room. -->
-  <views:InstrumentPanel Padding="0" />
+  <views:SoundDevicePanel Padding="0" />
 </Window>

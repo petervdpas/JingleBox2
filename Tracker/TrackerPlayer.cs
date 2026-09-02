@@ -122,16 +122,16 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// it, which answers that every machine is missing: a player built without being told what is
     /// installed is a player that has not been wired up, and silence says so.
     /// </param>
-    public TrackerPlayer(IAudioEngine audio, IMachineProjects? machines = null)
+    public TrackerPlayer(IAudioEngine audio, ISoundMachineProjects? machines = null)
     {
         _audio = audio;
-        _machines = machines ?? new Devices.SoundMachines.MachineProjects();
+        _machines = machines ?? new Devices.SoundMachines.SoundMachineProjects();
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }
 
     /// <summary>Which machines this installation has, asked before anything is allowed to sound.</summary>
-    private readonly IMachineProjects _machines;
+    private readonly ISoundMachineProjects _machines;
 
     /// <summary>How often the plugins are counted and their state written down.</summary>
     private const int WatchMilliseconds = 1000;

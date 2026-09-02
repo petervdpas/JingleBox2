@@ -6,8 +6,7 @@ using System.Text.Json.Serialization;
 using JingleBox2.Rack.Devices.Interfaces;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Devices.SoundEffects;
 
@@ -21,7 +20,7 @@ namespace JingleBox2.Devices.SoundEffects;
 /// the registry reads.
 ///
 /// It is not a machine and this is not
-/// <see cref="JingleBox2.Devices.SoundMachines.MachineProject"/> with a flag on it. What a
+/// <see cref="JingleBox2.Devices.SoundMachines.SoundMachineProject"/> with a flag on it. What a
 /// machine carries that an effect has no use for is most of it: which engine it borrows, where
 /// its picker gets its list, and a folder of sounds, all of which are about a thing that is
 /// sent notes and plays them back. What is left is what any box on the rack is, which is
@@ -124,7 +123,7 @@ public sealed class EffectProject : IRackProject, IDesignProject, IDevice
     /// renumbering and removing are four acts about a folder of files and nothing about what is
     /// in the folder.
     /// </remarks>
-    private static readonly Tracker.Interfaces.IPanelImages Pictures = new PanelImages();
+    private static readonly Devices.Interfaces.IPanelImages Pictures = new PanelImages();
 
     /// <inheritdoc/>
     public string? AddImage(string path) => Pictures.Add(Folder, path);

@@ -18,13 +18,13 @@ namespace JingleBox2.Devices.SoundMachines;
 /// How this system decides two paths are the same. Left out, the rule this system really has;
 /// given, whatever a test wants to hold it to.
 /// </param>
-public sealed class PresetWaves(IMachinePaths? paths = null, IFilePaths? files = null) : IPresetWaves
+public sealed class PresetWaves(ISoundMachinePaths? paths = null, IFilePaths? files = null) : IPresetWaves
 {
     /// <summary>How two paths are compared, which is a fact about the disc and not about here.</summary>
     private readonly IFilePaths _files = files ?? new FilePaths();
 
     /// <summary>Where a name written inside a machine really is, and back again.</summary>
-    private readonly IMachinePaths _paths = paths ?? new MachinePaths(files);
+    private readonly ISoundMachinePaths _paths = paths ?? new SoundMachinePaths(files);
 
     /// <summary>What a recording is called at the end, and the whole of how one is recognised.</summary>
     private const string Kind = ".wav";

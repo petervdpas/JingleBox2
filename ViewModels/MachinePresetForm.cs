@@ -277,7 +277,7 @@ public sealed partial class MachinePresetForm : ObservableObject
 {
     /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachinePaths MachineFolder = new MachinePaths();
+    private static readonly ISoundMachinePaths MachineFolder = new SoundMachinePaths();
 
     /// <summary>The preset itself, which every line on the page reads and writes.</summary>
     private readonly JsonObject _held;
@@ -683,7 +683,7 @@ public sealed class MachineProjectShape
     {
         if (_holder is not { } holder) return null;
 
-        if (!holder.Properties.TryGetValue(Devices.SoundMachines.MachinePresetFile.SettingsProperty, out string? said)
+        if (!holder.Properties.TryGetValue(Devices.SoundMachines.SoundMachinePresetFile.SettingsProperty, out string? said)
             || said.Trim().Length == 0)
             return null;
 

@@ -96,7 +96,7 @@ public sealed partial class MachineUtilities : ObservableObject
 
     /// <summary>Whether a path is inside a machine, and what it is called in there.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IMachinePaths Inside = new MachinePaths();
+    private static readonly ISoundMachinePaths Inside = new SoundMachinePaths();
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
@@ -108,10 +108,10 @@ public sealed partial class MachineUtilities : ObservableObject
     /// Asked every time, because the machine changes underneath this page and a held one would
     /// have the tools acting on a machine whose name is no longer at the top of the window.
     /// </remarks>
-    private readonly Func<MachineProject?> _open;
+    private readonly Func<SoundMachineProject?> _open;
 
     /// <summary>Reads the open machine's presets and works out which tools apply.</summary>
-    public MachineUtilities(Func<MachineProject?> open)
+    public MachineUtilities(Func<SoundMachineProject?> open)
     {
         _open = open;
 
@@ -130,7 +130,7 @@ public sealed partial class MachineUtilities : ObservableObject
 
     /// <summary>Where it keeps its presets.</summary>
     public string Home =>
-        _open() is { Folder.Length: > 0 } one ? Path.Combine(one.Folder, MachineProject.PresetsFolder) : "";
+        _open() is { Folder.Length: > 0 } one ? Path.Combine(one.Folder, SoundMachineProject.PresetsFolder) : "";
 
     /// <summary>The presets in it.</summary>
     public ObservableCollection<MachinePresetSlot> Presets { get; } = new();

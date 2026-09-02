@@ -83,11 +83,11 @@ public class MissingMachineTests
     }
 
     /// <summary>A projects list holding exactly the machines named, and nothing else.</summary>
-    private static IMachineProjects Holding(params string[] ids)
+    private static ISoundMachineProjects Holding(params string[] ids)
     {
-        var projects = new MachineProjects();
+        var projects = new SoundMachineProjects();
 
-        projects.Keep(Array.ConvertAll(ids, id => new MachineProject { Id = id }));
+        projects.Keep(Array.ConvertAll(ids, id => new SoundMachineProject { Id = id }));
 
         return projects;
     }

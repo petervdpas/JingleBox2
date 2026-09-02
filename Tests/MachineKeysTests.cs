@@ -20,7 +20,7 @@ namespace JingleBox2.Tests;
 /// A panel that kept its own record of the presses it had heard showed nothing for the one
 /// keyboard people actually play.
 ///
-/// Against <see cref="DesignerKeys"/> itself rather than against the monitor alone, because the
+/// Against <see cref="SoundDeviceKeys"/> itself rather than against the monitor alone, because the
 /// wiring is half the rule: which presses also sound a note, which do not, and whether a key let
 /// go of goes dark while what it started is still ringing.
 /// </remarks>
@@ -367,10 +367,10 @@ public class MachineKeysTests
     /// <summary>Enough of a designer to hang a keyboard on: what it played and heard.</summary>
     /// <remarks>
     /// Everything below the monitor, the sounding notes and the two counters is what
-    /// <see cref="IInstrumentDesigner"/> asks for and no test looks at. A real designer owns a
+    /// <see cref="ISoundDevicePanel"/> asks for and no test looks at. A real designer owns a
     /// window; this one owns two numbers.
     /// </remarks>
-    private sealed class Designer : IInstrumentDesigner
+    private sealed class Designer : ISoundDevicePanel
     {
         /// <summary>Made on first use, so two designers sharing a monitor still differ.</summary>
         private IMachineKeys? _keys;
@@ -412,7 +412,7 @@ public class MachineKeysTests
         /// queue it for ever depends on which thread first touched it, which in a suite is
         /// whatever ran before this test.
         /// </remarks>
-        public IMachineKeys MachineKeys => _keys ??= new DesignerKeys(this, read => read());
+        public IMachineKeys MachineKeys => _keys ??= new SoundDeviceKeys(this, read => read());
 
         public InstrumentPresets? Presets => null;
 
@@ -429,9 +429,9 @@ public class MachineKeysTests
         public int Let { get; private set; }
 
         /// <inheritdoc/>
-        void IInstrumentDesigner.Play(Note note, int volume) => Played++;
+        void ISoundDevicePanel.Play(Note note, int volume) => Played++;
 
         /// <inheritdoc/>
-        void IInstrumentDesigner.Let(Note note) => Let++;
+        void ISoundDevicePanel.Let(Note note) => Let++;
     }
 }

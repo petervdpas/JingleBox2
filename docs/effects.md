@@ -124,7 +124,7 @@ Kept as they are, because only the instrument world has them: `IMachine`, `IMach
 `IMachineNotes`, `MachineNotes`, `IMachinePads`, `IMachineZones`, `IMachineSlices`,
 `IMachineTakes`, `IMachineLocation`, `IMachinePatch`, `IInstrumentName`. Everything in the
 application's own assemblies that is genuinely about machines keeps its name too:
-`MachineProject`, `MachineRegistry`, `MachineRack`, `MachineEditorViewModel` and the rest.
+`SoundMachineProject`, `SoundMachineRegistry`, `SoundMachineRack`, `MachineEditorViewModel` and the rest.
 
 Two of those rows are the awkward ones and are worth saying out loud. `MachineMenuOptions` is
 the words a menu can carry and `MenuOptions` is already taken by the rule that reads them, which
@@ -142,7 +142,7 @@ shape as a machine's folder for the same reasons: `presets/` for what it ships w
 for what is drawn on it, and the whole folder is what travels as a zip. No `sounds/`, since an
 effect plays nothing back.
 
-The manifest is `EffectProject`, which is `MachineProject` without the parts an effect has no use
+The manifest is `EffectProject`, which is `SoundMachineProject` without the parts an effect has no use
 for: no starting-from, no engine borrowing, no sounds. Id, name, summary, author, version,
 colours, parameters and a `Panel`.
 
@@ -243,7 +243,7 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    untouched.
 2. **The effect world with nothing in it. Done.** The folder rules came out first, since they
    were written for machines and are about neither: `IRackRegistry<T>` and `RackRegistry<T>` are
-   the two folders, the offer, the bringing up to date and the engine gate, and `MachineRegistry`
+   the two folders, the offer, the bringing up to date and the engine gate, and `SoundMachineRegistry`
    and `EffectRegistry` are what is left over when those are taken out. Then `EffectProject`
    (`effect.json`), `EffectProjects`, `IEffectEngines` as the gate with an empty table, and the
    rack's Effects tab drawn from what is registered, with no picker beside it: an effect cannot be

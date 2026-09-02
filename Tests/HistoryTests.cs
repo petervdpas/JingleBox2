@@ -19,9 +19,9 @@ public class DesignHistoryTests
     /// A machine with one parameter and a panel with a root in it: enough for a step to have
     /// something in it that a test can move, and a folder so it can be shown not to travel.
     /// </summary>
-    private static MachineProject Machine()
+    private static SoundMachineProject Machine()
     {
-        var project = new MachineProject { Id = "machine.test", Name = "Test", Folder = "/somewhere/real" };
+        var project = new SoundMachineProject { Id = "machine.test", Name = "Test", Folder = "/somewhere/real" };
 
         project.Parameters.Add(new Parameter { Key = "cutoff", Name = "Cutoff", Min = 0, Max = 1 });
         project.Panel = new Panel { Root = new PanelElement { Element = ElementKinds.Grid } };

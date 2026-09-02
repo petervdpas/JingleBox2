@@ -15,7 +15,8 @@ using JingleBox2.Devices.SoundMachines;
 using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio;
-using JingleBox2.Tracker.Interfaces;
+using JingleBox2.Devices.SoundMachines.Records;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -38,7 +39,7 @@ public static class PanelPreview
 
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
+    private static readonly IRackRegistry<SoundMachineProject> Registry = new SoundMachineRegistry();
 
     /// <summary>The machines this preview has, filled once before anything is drawn.</summary>
     /// <remarks>
@@ -46,7 +47,7 @@ public static class PanelPreview
     /// the one the main window builds. It is read by whichever panel is being previewed, which is
     /// not the method that fills it, so it cannot be a local.
     /// </remarks>
-    private static readonly IMachineProjects Projects = new MachineProjects();
+    private static readonly ISoundMachineProjects Projects = new SoundMachineProjects();
 
     /// <summary>The switch that takes over startup, followed by the machine's name.</summary>
     public const string Argument = "--panel";
@@ -69,15 +70,15 @@ public static class PanelPreview
         args != null && args.Any(a => string.Equals(a, Argument, StringComparison.Ordinal));
 
     /// <summary>Which machine was asked for, or the first one installed when none was named.</summary>
-    private static Machine Wanted(string[] args)
+    private static SoundMachine Wanted(string[] args)
     {
         int at = Array.IndexOf(args, Argument);
         string name = at >= 0 && at + 1 < args.Length ? args[at + 1] : "";
 
-        return Machine.All.FirstOrDefault(m =>
+        return SoundMachine.All.FirstOrDefault(m =>
                    string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
-               ?? Machine.Installed.FirstOrDefault()
-               ?? Machine.Plugin;
+               ?? SoundMachine.Installed.FirstOrDefault()
+               ?? SoundMachine.Plugin;
     }
 
     /// <summary>
@@ -258,7 +259,7 @@ public static class PanelPreview
     private sealed class PreviewApp : Application
     {
         /// <summary>Which machine's panel is opened, set before the application is built.</summary>
-        public static Machine Wanted { get; set; } = Machine.Plugin;
+        public static SoundMachine Wanted { get; set; } = SoundMachine.Plugin;
 
         /// <summary>False to see the panel with no track behind it, the way the rack shows it.</summary>
         public static bool Playing { get; set; } = true;
@@ -315,7 +316,7 @@ public static class PanelPreview
 
                 var shelf = Takes();
 
-                var designer = new TrackInstrumentDesigner(
+                var designer = new TrackInstrumentPanel(
                     0, instrument, Projects, new Silent(), () => { },
                     new JingleBox2.Audio.WaveformService(),
                     Playing ? new Marching() : null,
@@ -344,7 +345,7 @@ public static class PanelPreview
                     Content = new ScrollViewer
                     {
                         Padding = new Thickness(18),
-                        Content = new InstrumentPanel { DataContext = designer }
+                        Content = new SoundDevicePanel { DataContext = designer }
                     }
                 };
             }

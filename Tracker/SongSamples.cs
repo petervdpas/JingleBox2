@@ -9,6 +9,7 @@ using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Devices.SoundMachines;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio;
+using JingleBox2.Devices.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -20,7 +21,7 @@ public sealed class SongSamples : ISongSamples
 
     /// <summary>The machines folder on disc.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
-    private static readonly IRackRegistry<MachineProject> Registry = new MachineRegistry();
+    private static readonly IRackRegistry<SoundMachineProject> Registry = new SoundMachineRegistry();
 
     /// <summary>How this system decides two names are the same recording.</summary>
     private readonly IFilePaths _paths;

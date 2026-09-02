@@ -2,10 +2,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 using JingleBox2.ViewModels.Interfaces;
+using JingleBox2.Devices.SoundMachines.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -34,7 +34,7 @@ public sealed partial class RackMachine : ObservableObject, IRackRow
     public string Name => Instrument.Name;
 
     /// <summary>The machine's own theme, which is what everything about it is painted from.</summary>
-    public PanelTheme Theme => Machine.For(Instrument.Kind).Theme;
+    public PanelTheme Theme => SoundMachine.For(Instrument.Kind).Theme;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;
@@ -55,7 +55,7 @@ public sealed partial class RackMachine : ObservableObject, IRackRow
     /// True for a machine's own slot: always there, called what the machine is called, and
     /// neither renamed nor deleted.
     /// </summary>
-    public bool IsSlot => Machine.IsSlot(Id);
+    public bool IsSlot => SoundMachine.IsSlot(Id);
 
     /// <summary>False for a slot, which cannot be deleted. A plugin can.</summary>
     public bool IsYours => !IsSlot;

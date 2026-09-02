@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.Views.SoundMachineWindow"
+        x:DataType="vm:RackViewModel"
+        Title="{Binding Selected.Name}"
+        SizeToContent="WidthAndHeight"
+        MinWidth="680"
+        MaxWidth="1400"
+        MaxHeight="1000"
+        WindowStartupLocation="CenterOwner">
+
+  <!-- The machine being worked on, in a window of its own: the same panel a track's instrument
+       opens in, over the machine the rack has picked. A panel full of knobs wants a window it
+       can be as big as it needs in, and it wants to stay up while you do something else. -->
+  <views:SoundDevicePanel Padding="0" />
+
+</Window>

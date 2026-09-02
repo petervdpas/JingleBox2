@@ -61,7 +61,7 @@ public sealed partial class InstrumentSlot : ObservableObject
     /// absent rather than as an ordinary instrument that happens not to sound.
     /// </remarks>
     public PanelTheme Theme =>
-        _offered ? Instrument.Machine.Theme : JingleBox2.Tracker.Records.Machine.Absent;
+        _offered ? Instrument.Machine.Theme : JingleBox2.Devices.SoundMachines.Records.SoundMachine.Absent;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;

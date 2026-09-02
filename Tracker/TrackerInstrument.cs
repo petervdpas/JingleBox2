@@ -3,6 +3,7 @@ using System;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
+using JingleBox2.Devices.SoundMachines.Records;
 
 namespace JingleBox2.Tracker;
 
@@ -176,7 +177,7 @@ public sealed class TrackerInstrument
 
     /// <summary>Which machine this instrument is on, by name and description.</summary>
     [JsonIgnore]
-    public Machine Machine => Machine.For(Kind);
+    public SoundMachine Machine => SoundMachine.For(Kind);
 
     /// <summary>
     /// One line saying what this instrument is: which machine, and a word about how it is set.
@@ -320,7 +321,7 @@ public sealed class TrackerInstrument
     /// on it. Left out, it fell through to the last arm and came back an OddSkilla wearing the
     /// name you had just typed.
     /// </remarks>
-    public static TrackerInstrument CreateOn(Machine machine, string name) => machine?.Kind switch
+    public static TrackerInstrument CreateOn(SoundMachine machine, string name) => machine?.Kind switch
     {
         TrackerInstrumentKind.MonoSynth => CreateMonoSynth(name),
         TrackerInstrumentKind.Kit => CreateKit(name),

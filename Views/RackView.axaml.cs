@@ -84,7 +84,7 @@ public partial class RackView : UserControl
     /// made as big as it wants and left up while you write a pattern.
     /// </remarks>
     private void OpenMachine(object? sender, RoutedEventArgs e) =>
-        MachineWindow.Show(ViewModel, TopLevel.GetTopLevel(this) as Window);
+        SoundMachineWindow.Show(ViewModel, TopLevel.GetTopLevel(this) as Window);
 
     /// <summary>
     /// Whether the page is up. Half of what decides where a played note goes, the other half
@@ -161,7 +161,7 @@ public partial class RackView : UserControl
     /// <summary>Puts another box on the machine picked, under a name nothing else has.</summary>
     private void NewFromMachine_Click(object? sender, RoutedEventArgs e)
     {
-        if (ViewModel != null && MachinePicker.SelectedItem is JingleBox2.Tracker.Records.Machine machine)
+        if (ViewModel != null && MachinePicker.SelectedItem is JingleBox2.Devices.SoundMachines.Records.SoundMachine machine)
             ViewModel.NewFromMachineCommand.Execute(machine);
     }
 

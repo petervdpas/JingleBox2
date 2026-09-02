@@ -52,7 +52,7 @@ public class EffectDesignerTests : IDisposable
         designer.NewCommand.Execute(null);
 
         Assert.Equal("machine", designer.Word);
-        Assert.IsType<MachineProject>(designer.Project);
+        Assert.IsType<SoundMachineProject>(designer.Project);
         Assert.StartsWith("machine.", designer.Project!.Id, StringComparison.Ordinal);
         Assert.True(designer.ShowsPresets);
         Assert.True(designer.ShowsExport);
