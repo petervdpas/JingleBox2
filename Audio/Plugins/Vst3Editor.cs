@@ -71,17 +71,29 @@ public sealed unsafe class Vst3Editor : IPluginEditor
     /// </remarks>
     internal static Vst3Editor? Open(IEditController* controller)
     {
-        if (controller == null || controller->Vtbl == null || controller->Vtbl->CreateView == null) return null;
+        if (controller == null || controller->Vtbl == null || controller->Vtbl->CreateView == null)
+        {
+            Said("no view: the plugin's controller does not offer one");
+            return null;
+        }
 
         using var kind = new NativeText(Vst3Abi.EditorView);
         var view = (IPlugView*)controller->Vtbl->CreateView(controller, kind.Pointer);
 
-        if (view == null || view->Vtbl == null) return null;
+        if (view == null || view->Vtbl == null)
+        {
+            Said("no view: the plugin was asked for its editor and gave nothing back");
+            return null;
+        }
 
         using var platform = new NativeText(Vst3Abi.PlatformWindowType);
 
-        if (view->Vtbl->IsPlatformTypeSupported(view, platform.Pointer) != Vst3Abi.ResultOk)
+        int supported = view->Vtbl->IsPlatformTypeSupported(view, platform.Pointer);
+
+        if (supported != Vst3Abi.ResultOk)
         {
+            Said("no view: the plugin will not draw into a " + Vst3Abi.PlatformWindowType
+                 + " window, it answered " + supported);
             Release(view);
             return null;
         }
@@ -95,6 +107,10 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         lock (Registry) Open_[slot] = editor;
 
         view->Vtbl->SetFrame(view, (void*)frame);
+
+        var asked = editor.Size;
+
+        Said("the plugin has a view, and it wants " + asked.Width + " by " + asked.Height);
 
         return editor;
     }
@@ -122,17 +138,75 @@ public sealed unsafe class Vst3Editor : IPluginEditor
     public bool CanResize => !_disposed && _view->Vtbl->CanResize(_view) == Vst3Abi.ResultTrue;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Asked of the view rather than assumed: the face is optional, and a view without one works
+    /// the number out for itself. Nothing is done with the answer either way, since a plugin that
+    /// refuses the number is a plugin that did not want it.
+    ///
+    /// Before the window, which is Steinberg's own order. A view that lays itself out on being
+    /// attached has to know the scaling by then, or it lays out for a screen that is not the one
+    /// it is about to appear on.
+    /// </remarks>
+    public void Scaled(double factor)
+    {
+        if (_disposed || factor <= 0 || double.IsNaN(factor) || double.IsInfinity(factor)) return;
+
+        void* found = null;
+
+        fixed (byte* wanted = Vst3Abi.PlugViewContentScaleId)
+        {
+            if (_view->Vtbl->Base.QueryInterface(_view, wanted, &found) != Vst3Abi.ResultOk
+                || found == null)
+                return;
+        }
+
+        var scaling = (IPlugViewContentScale*)found;
+
+        try
+        {
+            if (scaling->Vtbl != null && scaling->Vtbl->SetContentScaleFactor != null)
+                scaling->Vtbl->SetContentScaleFactor(scaling, (float)factor);
+        }
+        finally
+        {
+            if (scaling->Vtbl != null && scaling->Vtbl->Base.Release != null)
+                scaling->Vtbl->Base.Release(scaling);
+        }
+    }
+
+    /// <inheritdoc/>
     public bool Attach(nint window)
     {
-        if (_disposed || _attached || window == 0) return false;
+        if (_disposed || _attached || window == 0)
+        {
+            Said("not handing the window over: "
+                 + (_disposed ? "the view is gone" : _attached ? "it is already in one" : "there is no window"));
+            return false;
+        }
 
         using var platform = new NativeText(Vst3Abi.PlatformWindowType);
 
-        if (_view->Vtbl->Attached(_view, (void*)window, platform.Pointer) != Vst3Abi.ResultOk) return false;
+        int took = _view->Vtbl->Attached(_view, (void*)window, platform.Pointer);
+
+        if (took != Vst3Abi.ResultOk)
+        {
+            Said("the plugin refused the window, answering " + took);
+            return false;
+        }
 
         _attached = true;
         return true;
     }
+
+    /// <summary>Writes a line about the window, where the log is on.</summary>
+    /// <remarks>
+    /// Every way this can fail used to fail silently, so a plugin that never appeared and one
+    /// that was never asked looked identical from the log, which is the only thing anybody has
+    /// when it happens on somebody else's machine.
+    /// </remarks>
+    /// <param name="what">What happened, in the words the log shows.</param>
+    private static void Said(string what) =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => "editor: " + what);
 
     /// <inheritdoc/>
     public void Detach()

@@ -23,6 +23,29 @@ public interface IPluginEditor : IDisposable
     bool CanResize { get; }
 
     /// <summary>
+    /// Tells the plugin how much the screen it is about to appear on is scaled by.
+    /// </summary>
+    /// <remarks>
+    /// Windows scales by telling each program a number rather than by handing it more pixels, so
+    /// a plugin that draws its own interface cannot know that the window it was given is 150 per
+    /// cent of the size it thinks. The host has to say so, and has to say so before the window is
+    /// handed over, since a view that lays itself out on being attached needs the number by then.
+    ///
+    /// Nothing happens where the plugin does not offer to be told, which is most of them: a
+    /// plugin built on somebody else's toolkit reads the scaling itself. One that draws its own,
+    /// as Arturia's range does, believes the host and nothing else, and told nothing lays out at
+    /// a size unrelated to its window, which is a window that is up, active, taking the mouse,
+    /// and blank.
+    ///
+    /// Nought or nonsense is ignored rather than passed on, because a scaling of nought is a
+    /// window with no pixels in it.
+    /// </remarks>
+    /// <param name="factor">1 for an unscaled screen, 1.5 for 150 per cent.</param>
+    void Scaled(double factor)
+    {
+    }
+
+    /// <summary>
     /// Puts the plugin's interface inside a window the host owns. The handle is whatever this
     /// platform calls a window: an X11 window id, an HWND, an NSView.
     /// </summary>
@@ -32,6 +55,7 @@ public interface IPluginEditor : IDisposable
     /// killed Serum: the plugin lays itself out against the size it is told and never recovers
     /// from having been told one pixel.
     /// </remarks>
+    /// <param name="window">The window to draw into.</param>
     bool Attach(nint window);
 
     /// <summary>Takes it back out, before the window goes away.</summary>

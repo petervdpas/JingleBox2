@@ -287,6 +287,26 @@ internal static class Vst3Abi
     /// <summary>The host's side of that window, which is where a resize request arrives.</summary>
     public static readonly byte[] PlugFrameId = Uid(0x367FAF01, 0xAFA94693, 0x8D4DA2A0, 0xED0882A3);
 
+    /// <summary>
+    /// The view's own face for being told how much the screen is scaled by.
+    /// </summary>
+    /// <remarks>
+    /// Windows scales by telling each program a number rather than by giving it more pixels, so
+    /// a plugin drawing its own interface has no way of knowing that 100 by 100 means 150 by 150
+    /// on this display. The host has to say, and Steinberg's own guidance is to say it before
+    /// the view is given a window.
+    ///
+    /// A plugin built on somebody else's toolkit usually reads the scaling itself and does not
+    /// care; one that draws its own, as Arturia's whole range does, believes what it is told and
+    /// nothing else. Told nothing, it lays out at a size that has no relation to the window it
+    /// was handed, and what you get is a window that is up, active, answering the mouse, and
+    /// blank.
+    ///
+    /// Optional, as the specification has it: a view that does not offer this face is a view
+    /// that works the number out for itself, and the answer is to leave it alone.
+    /// </remarks>
+    public static readonly byte[] PlugViewContentScaleId = Uid(0x65ED9690, 0x8AC44525, 0x8AADEF7A, 0x72EA703F);
+
     /// <summary>The notes handed to a plugin at the start of a block.</summary>
     public static readonly byte[] EventListId = Uid(0x3A2C4214, 0x346349FE, 0xB2C4F397, 0xB9695A44);
 
@@ -1006,6 +1026,25 @@ internal struct ViewRect
     public int Height => Bottom - Top;
 }
 
+/// <summary>
+/// The view's face for the screen's scaling, which is the root's three and one more.
+/// </summary>
+/// <remarks>
+/// The factor is a single, not a double: the specification's <c>ScaleFactor</c> is a float, and
+/// handing over eight bytes where four are expected puts rubbish in the plugin's register.
+/// </remarks>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IPlugViewContentScaleVtbl
+{
+    /// <summary>The root's three.</summary>
+    public FUnknownVtbl Base;
+
+    /// <summary>
+    /// How much the screen this view is on is scaled by: 1 for none, 1.5 for 150 per cent.
+    /// </summary>
+    public delegate* unmanaged[Cdecl]<void*, float, int> SetContentScaleFactor;
+}
+
 /// <summary>A plugin's own interface: a window it draws itself, inside one the host lends it.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct IPlugViewVtbl
@@ -1070,4 +1109,12 @@ internal unsafe struct IPlugView
 {
     /// <summary>The table of function pointers.</summary>
     public IPlugViewVtbl* Vtbl;
+}
+
+/// <summary>A view asked how much the screen it is on is scaled by.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct IPlugViewContentScale
+{
+    /// <summary>The table of function pointers.</summary>
+    public IPlugViewContentScaleVtbl* Vtbl;
 }

@@ -258,6 +258,17 @@ public sealed class PluginEditorHost : NativeControlHost
     }
 
     /// <summary>
+    /// How much the screen this control is on is scaled by, or 1 where nothing says.
+    /// </summary>
+    /// <remarks>
+    /// Windows scales by telling each program a number, and a plugin drawing its own interface
+    /// believes the host or nothing. Read off the window rather than kept, since a window dragged
+    /// to a second screen is on a different scaling from the one it opened on.
+    /// </remarks>
+    private double Scaling =>
+        TopLevel.GetTopLevel(this) is { RenderScaling: > 0 } top ? top.RenderScaling : 1;
+
+    /// <summary>
     /// Waits for the window to be on screen at a real size, then lets the plugin in.
     /// </summary>
     /// <remarks>
@@ -266,6 +277,16 @@ public sealed class PluginEditorHost : NativeControlHost
     /// plugin never shown at all, and on a platform where the question cannot be asked the
     /// answer is yes on the first round.
     /// </remarks>
+    /// <summary>Writes a line about the window, where the log is on.</summary>
+    /// <remarks>
+    /// Every way this could fail used to fail silently, so from a log a plugin that refused its
+    /// window and one that was never offered one looked exactly the same, and both looked like a
+    /// plugin that simply has no interface.
+    /// </remarks>
+    /// <param name="what">What happened, in the words the log shows.</param>
+    private static void Said(string what) =>
+        Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Plugins, () => "editor host: " + what);
+
     private void Settle()
     {
         _settling?.Stop();
@@ -280,6 +301,10 @@ public sealed class PluginEditorHost : NativeControlHost
 
             if (_attached || _handle == 0 || Editor == null)
             {
+                if (!_attached)
+                    Said("given up waiting for the window: "
+                         + (_handle == 0 ? "it went away" : "the editor went away"));
+
                 _settling?.Stop();
                 return;
             }
@@ -287,6 +312,10 @@ public sealed class PluginEditorHost : NativeControlHost
             if (rounds < SettleRounds && !XEmbed.OnScreen(_handle, out _, out _)) return;
 
             _settling?.Stop();
+
+            Said(rounds < SettleRounds
+                ? "the window is on screen after " + rounds + " rounds"
+                : "the window never said it was on screen; handing it over anyway");
 
             Show();
         };
@@ -317,18 +346,34 @@ public sealed class PluginEditorHost : NativeControlHost
     private void Show()
     {
         var editor = Editor;
-        if (editor == null || _handle == 0 || _attached) return;
+
+        if (editor == null || _handle == 0 || _attached)
+        {
+            Said(editor == null ? "there is no editor to show"
+                : _handle == 0 ? "there is no window to show it in"
+                : "it is already showing");
+            return;
+        }
+
+        editor.Scaled(Scaling);
 
         try
         {
             _attached = editor.Attach(_handle);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             _attached = false;
+
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Plugins,
+                "the plugin threw while being given its window", ex);
         }
 
-        if (!_attached) return;
+        if (!_attached)
+        {
+            Said("the plugin would not take the window");
+            return;
+        }
 
         bool active = (TopLevel.GetTopLevel(this) as Window)?.IsActive == true || _active;
 
