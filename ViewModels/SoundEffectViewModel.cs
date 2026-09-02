@@ -196,6 +196,16 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     /// </remarks>
     public IPanelValues Values => _values ??= Watched(new SoundEffectValues(Engine));
 
+    /// <summary>
+    /// The presets this effect ships, behind the picker on its face.
+    /// </summary>
+    /// <remarks>
+    /// A fresh one each time the panel asks, so a preset saved in the designer turns up here
+    /// without the two being wired together. Picking one writes through <see cref="Values"/>,
+    /// which is what moves the sound and redraws the face in one act.
+    /// </remarks>
+    public IPanelPresets Presets => new SoundEffectPresetNames(Effect, Values);
+
     /// <inheritdoc cref="Values"/>
     private IPanelValues? _values;
 

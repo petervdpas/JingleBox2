@@ -81,6 +81,13 @@
           "Children": []
         },
         {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
           "Element": "Group",
           "Parameter": "",
           "Label": "",
@@ -105,7 +112,6 @@
                   "Properties": {
                     "span": "3",
                     "dial": "44",
-                    "headroom": "50",
                     "lines": "1"
                   },
                   "Children": []
@@ -117,7 +123,6 @@
                   "Properties": {
                     "span": "3",
                     "dial": "44",
-                    "headroom": "50",
                     "lines": "1"
                   },
                   "Children": []
@@ -129,7 +134,6 @@
                   "Properties": {
                     "span": "3",
                     "dial": "44",
-                    "headroom": "50",
                     "lines": "1"
                   },
                   "Children": []
@@ -141,7 +145,6 @@
                   "Properties": {
                     "span": "3",
                     "dial": "44",
-                    "headroom": "50",
                     "lines": "1"
                   },
                   "Children": []

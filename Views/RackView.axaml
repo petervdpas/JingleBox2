@@ -177,6 +177,7 @@
         <ui:PanelView x:Name="EffectFace"
                       Face="{Binding SelectedEffect.Shown}"
                       Values="{Binding SelectedEffect.Values}"
+                      Presets="{Binding SelectedEffect.Presets}"
                       Menu="{Binding SelectedEffect.Menu}" />
       </Border>
 

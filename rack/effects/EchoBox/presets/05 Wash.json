@@ -1,0 +1,8 @@
+{
+  "Name": "Wash",
+  "Effect": "effect.echobox",
+  "time": 780,
+  "feedback": 0.62,
+  "damp": 0.5,
+  "mix": 0.55
+}

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.SoundDevices.Interfaces;
@@ -11,6 +12,9 @@ namespace JingleBox2.SoundDevices.SoundEffects;
 /// </remarks>
 public sealed class SoundEffectWorld : IDesignWorld
 {
+    /// <summary>What a face may carry. Holds nothing, so one serves the world.</summary>
+    private readonly IPanelParts _parts = new PanelParts();
+
     /// <summary>Who unpacks and copies effects, since an effect's folder travels.</summary>
     private readonly IRackArchive<SoundEffectProject> _crates;
 
@@ -20,6 +24,17 @@ public sealed class SoundEffectWorld : IDesignWorld
     /// <summary>Takes the archive, or the ordinary one.</summary>
     /// <param name="crates">Who carries and zips an effect's folder.</param>
     public SoundEffectWorld(IRackArchive<SoundEffectProject>? crates = null) => _crates = crates ?? new SoundEffectArchive();
+
+    /// <inheritdoc/>
+    /// <remarks>An effect is handed a whole track's audio and is sent no notes at all.</remarks>
+    public bool Played => false;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Everything a box that is not played can fill, which is the list without the eight that
+    /// need notes or a kit behind them.
+    /// </remarks>
+    public IReadOnlyList<string> Parts => _parts.For(Played);
 
     /// <inheritdoc/>
     public string Word => "effect";
@@ -56,7 +71,14 @@ public sealed class SoundEffectWorld : IDesignWorld
     public bool Exports => true;
 
     /// <inheritdoc/>
-    public bool HasPresets => false;
+    /// <remarks>
+    /// It said no for a while, on the reasoning that a machine's preset is an instrument file and
+    /// an effect has no instrument. That was an argument about how presets happened to be stored
+    /// here rather than about what an effect is: every delay ever built ships them, and an
+    /// effect's preset is a handful of numbers, which is less to write down than a machine's
+    /// rather than more.
+    /// </remarks>
+    public bool HasPresets => true;
 
     /// <inheritdoc/>
     public void Export(IDesignProject project, string zipPath)

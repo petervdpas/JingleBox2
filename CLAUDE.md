@@ -486,10 +486,10 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   the same code doing it. `IRackArchive<T>` and `RackArchive<T>` are the zip, the staging folder
   and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, System with its Import, Add and
   Remove. What each world supplies is two answers, the name of the file at the top of a folder and
-  how a folder is read, so `SoundMachineArchive` and `SoundEffectArchive` are a dozen lines apiece. The one
-  thing that differs downstream is where a box goes afterwards: a machine becomes an instrument in
-  a song, an effect goes on a track's chain, which is the same difference a plugin instrument has
-  from a plugin effect
+  how a folder is read, so `SoundMachineArchive` and `SoundEffectArchive` are a dozen lines
+  apiece. The one thing that differs downstream is where a box goes afterwards: a machine
+  becomes an instrument in a song, an effect goes on a track's chain, which is the same
+  difference a plugin instrument has from a plugin effect
 - **`Ships` was answering no for every file of every machine that ships.** It compared the path
   under the installed folder with the same path under the shipped one, and those never match: a
   box installs into a folder named after its **id**, since that is the one name that cannot
@@ -497,6 +497,59 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   ships in `OddSkilla` and installs as `machine.oddskilla`. So a song packed for somebody else
   carried a copy of the presets they already had. It reads the folder's id and looks the shipped
   box up by that now
+- **A preset nobody can pick is a preset nobody has.** The shelf, the page and six files were all
+  in place and EchoBox's face had no picker on it, and nothing anywhere filled one for an effect.
+  `SoundEffectPresetNames` is the picker's list, made fresh each time a face asks for it so a
+  preset saved in the designer turns up without the two being wired together, and supplied in all
+  three places an effect's face is drawn: the box on a chain and its own window, the rack row, and
+  the designer's preview. `ElementKinds.Preset` is on EchoBox's face above the Delay group
+- **Picking one writes through `IPanelValues` and never into the engine**, which is the rule this
+  codebase has already paid for once with a hardware knob: a value written past the panel's own
+  values moves the sound and leaves every knob on the screen where it was, and from a chair that
+  reads as a preset that did nothing rather than as a picture that is stale. It applies on the
+  rack too, unlike a soundmachine's picker on the designer's bench, which does nothing because
+  there is no instrument behind it: an effect's face always has values, whether a real engine's on
+  a chain or the bench the rack keeps
+- **`headroom` on EchoBox's knobs was fifty and was pure gap.** It is how far down a dial starts so
+  it stands on the same line as the switches beside it, and EchoBox has four knobs and no
+  switches, so all it did was hold the name half an inch above the dial. Ouroboros keeps its
+  fifty and should: every strip on it mixes knobs and switches, which is the case the property
+  exists for
+- **EchoBox ships with six of them**, in `rack/effects/EchoBox/presets/`, which is beside the
+  program and is therefore content this repository is answerable for: Slapback, Doubler, Quarter,
+  Tape Echo, Dub and Wash. `Tests/ShippedPresetTests.cs` walks that folder with the reader the
+  application uses rather than trusting it, because a shipped preset goes wrong the way content
+  goes wrong: a key spelled differently from the one on the face is dropped as the file is read,
+  silently and correctly, and what somebody hears is a control that did not move. It also says out
+  loud when it cannot find the folder, since a test that quietly passes where its subject is
+  missing reports nothing for the rest of its life
+- **An effect has presets, and the page for them is a form rather than a file.** It said no for a
+  while, on the reasoning that a machine's preset is an instrument file and an effect has no
+  instrument. That was an argument about how presets happened to be stored here rather than about
+  what an effect is: every delay ever built ships them, and an effect's preset is a handful of
+  numbers, which is less to write down than a machine's and not more. `SoundEffectPreset` is a
+  name and where each control stands, keyed by the parameter's own key so a preset written today
+  still means the same thing after somebody adds a knob in the middle of the face.
+  `SoundEffectPresets` is the shelf, `presets` inside the effect's own folder, so they travel in
+  the zip
+- The two presets pages differ because the two worlds keep different things in one. A
+  soundmachine's page shows the JSON, and has to: a preset there holds a pad pointing at a wave, a
+  keyboard map, where a take is cut, or nothing but a pointer at the recordings you already have,
+  and a form with a box for each of those would be four forms that still could not say the fifth
+  thing somebody wants next. An effect's can only ever be numbers, so it gets the form the machine
+  could not have, one row per control with a slider and a box, and nobody has to see a brace
+- **What a slider hands back is not a number anybody can read.** Dragging the time across the page
+  produced 527.2144522144523 on a control that moves in whole milliseconds. Snapped to the
+  parameter's own step where the value is written down rather than only where it is drawn, since
+  the file is what somebody reads and what travels, and rounded to what the step can express:
+  snapping is a division and a multiplication, and 0.35 on a step of a hundredth comes back as
+  0.35000000000000003, which is the same number to a listener and a different one to a file
+- Everything unhappy is where the tests are. A folder that is not there, a file that is not JSON,
+  a value naming a control the effect has not got, a value past the end of its range, NaN, a name
+  with a separator in it, New pressed twice, a rename onto a name that is taken, a rename to
+  nothing, and an effect that has never been saved. Every one of those is a way to lose a preset
+  somebody made, which is why the shelf answers rather than throws: one preset that will not read
+  is one preset, not the whole effect
 - **EchoBox is the first effect of ours, and it is a delay.** `SoundDevices/SoundEffects/Delay.cs` is the
   engine, `rack/effects/EchoBox/effect.json` is the face, and `SoundEffectEngines` is the one line
   that ties the id to the class. Four knobs: time, feedback, damp and mix. The time glides rather

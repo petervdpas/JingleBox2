@@ -77,23 +77,25 @@ public class SoundEffectDesignerTests : IDisposable
     }
 
     /// <summary>
-    /// An effect has no presets page and says so, and it does travel as a zip.
+    /// An effect has a presets page and travels as a zip.
     /// </summary>
     /// <remarks>
-    /// A machine's preset is an instrument file and an effect has no instrument, so that page
-    /// would open on nothing. The zip is another matter: an effect is a folder with a manifest at
-    /// the top of it, the same as a machine, so it is packed, handed over and imported by exactly
-    /// the same code.
+    /// The page said no for a while, on the reasoning that a machine's preset is an instrument
+    /// file and an effect has no instrument. That was an argument about how presets happened to
+    /// be stored here rather than about what an effect is: every delay ever built ships them, and
+    /// an effect's preset is a handful of numbers. The zip was never in doubt: an effect is a
+    /// folder with a manifest at the top of it, the same as a machine, so it is packed, handed
+    /// over and imported by exactly the same code.
     /// </remarks>
     [Fact]
-    public void An_effect_has_no_presets_page_and_does_have_a_zip()
+    public void An_effect_has_a_presets_page_and_a_zip()
     {
         var designer = new DesignerViewModel(new SoundEffectWorld());
 
         designer.NewCommand.Execute(null);
         designer.Save(Folder("Echo"));
 
-        Assert.False(designer.ShowsPresets);
+        Assert.True(designer.ShowsPresets);
         Assert.True(designer.ShowsExport);
         Assert.True(designer.CanExport);
     }

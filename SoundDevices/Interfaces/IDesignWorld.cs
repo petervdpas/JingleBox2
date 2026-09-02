@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 namespace JingleBox2.SoundDevices.Interfaces;
 
 /// <summary>
@@ -16,6 +17,32 @@ namespace JingleBox2.SoundDevices.Interfaces;
 /// </remarks>
 public interface IDesignWorld
 {
+    /// <summary>
+    /// Which parts the designer may put on a face in this world, in the order a panel is built
+    /// in.
+    /// </summary>
+    /// <remarks>
+    /// A part is a control plus whatever the host has to supply behind it, and a box that is not
+    /// played can answer none of the services a keyboard, a kit or a keyboard map need. Offered
+    /// one anyway, somebody draws it, saves it into the manifest, and gets a control that is
+    /// silent for ever with nothing saying why.
+    ///
+    /// The list itself is <see cref="IPanelParts"/>, so the two worlds cannot drift apart the
+    /// first time a part is added.
+    /// </remarks>
+    IReadOnlyList<string> Parts { get; }
+
+    /// <summary>
+    /// Whether a box in this world is sent notes and plays them.
+    /// </summary>
+    /// <remarks>
+    /// The one fact the two worlds actually differ by, and everything else that differs is worked
+    /// out from it rather than said again: <see cref="Parts"/> is this question asked of
+    /// <see cref="IPanelParts"/>. Said as a fact rather than as a list, so a second consequence
+    /// added later has something true to hang off instead of a second list to keep in step.
+    /// </remarks>
+    bool Played { get; }
+
     /// <summary>What one of these is called in a sentence: "machine" or "effect".</summary>
     string Word { get; }
 

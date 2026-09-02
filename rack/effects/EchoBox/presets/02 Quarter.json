@@ -1,0 +1,8 @@
+{
+  "Name": "Quarter",
+  "Effect": "effect.echobox",
+  "time": 500,
+  "feedback": 0.35,
+  "damp": 0.3,
+  "mix": 0.3
+}

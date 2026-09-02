@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.SoundDevices.Interfaces;
@@ -12,6 +13,9 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// </remarks>
 public sealed class SoundMachineWorld : IDesignWorld
 {
+    /// <summary>What a face may carry. Holds nothing, so one serves the world.</summary>
+    private readonly IPanelParts _parts = new PanelParts();
+
     /// <summary>Who unpacks and copies machines, since a machine's folder travels.</summary>
     private readonly IRackArchive<SoundMachineProject> _crates;
 
@@ -21,6 +25,17 @@ public sealed class SoundMachineWorld : IDesignWorld
     /// <summary>Takes the archive, or the ordinary one.</summary>
     /// <param name="crates">Who carries and zips a machine's folder.</param>
     public SoundMachineWorld(IRackArchive<SoundMachineProject>? crates = null) => _crates = crates ?? new SoundMachineArchive();
+
+    /// <inheritdoc/>
+    /// <remarks>A soundmachine is played, which is what it is for.</remarks>
+    public bool Played => true;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The whole list, since a soundmachine is played and can answer every service a part asks
+    /// the host for.
+    /// </remarks>
+    public IReadOnlyList<string> Parts => _parts.For(Played);
 
     /// <inheritdoc/>
     public string Word => "machine";

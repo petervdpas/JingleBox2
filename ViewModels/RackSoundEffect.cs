@@ -85,6 +85,16 @@ public sealed partial class RackSoundEffect : ObservableObject, IRackRow
     /// </remarks>
     public IPanelValues Values => _values ??= new PreviewValues(Knobs);
 
+    /// <summary>
+    /// The presets this effect ships, behind the picker on the face drawn beside the list.
+    /// </summary>
+    /// <remarks>
+    /// It applies, unlike a soundmachine's picker on the designer's bench. What an effect's knobs
+    /// stand at on the rack is a bench kept nowhere, so putting a preset on it costs nothing and
+    /// is the only way to hear what the preset is without putting the effect on a chain first.
+    /// </remarks>
+    public IPanelPresets Presets => new SoundEffectPresetNames(Effect, Values);
+
     /// <inheritdoc cref="Values"/>
     private IPanelValues? _values;
 

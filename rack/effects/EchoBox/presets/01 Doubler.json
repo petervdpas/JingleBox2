@@ -1,0 +1,8 @@
+{
+  "Name": "Doubler",
+  "Effect": "effect.echobox",
+  "time": 38,
+  "feedback": 0.05,
+  "damp": 0.15,
+  "mix": 0.42
+}

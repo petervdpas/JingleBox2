@@ -1,0 +1,8 @@
+{
+  "Name": "Dub",
+  "Effect": "effect.echobox",
+  "time": 420,
+  "feedback": 0.78,
+  "damp": 0.72,
+  "mix": 0.44
+}

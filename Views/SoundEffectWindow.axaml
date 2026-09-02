@@ -22,6 +22,7 @@
     <ui:PanelView x:Name="Face"
                   Face="{Binding Shown}"
                   Values="{Binding Values}"
+                  Presets="{Binding Presets}"
                   Menu="{Binding Menu}" />
   </Border>
 

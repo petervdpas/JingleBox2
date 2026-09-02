@@ -174,6 +174,10 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         PresetDesk = new SoundMachinePresetDesk(() => Project as SoundMachineProject);
 
+        EffectPresetDesk = new SoundEffectPresetDesk(
+            () => Project as SoundDevices.SoundEffects.SoundEffectProject,
+            () => Values);
+
         Utilities = new SoundMachinePresetTools(() => Project as SoundMachineProject);
 
         Utilities.PropertyChanged += (_, e) =>
@@ -198,6 +202,24 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// other, and putting them on one screen means neither gets the room.
     /// </remarks>
     public SoundMachinePresetDesk PresetDesk { get; }
+
+    /// <summary>
+    /// The presets page for an effect, which is the other half of the same tab.
+    /// </summary>
+    /// <remarks>
+    /// Its own page and not the machine's. A soundmachine's preset is a whole instrument file, so
+    /// that page shows the file and lets you work on it, which is the only thing that could hold
+    /// a kit, a keyboard map and where a take is cut all at once. An effect's preset can only
+    /// ever be a handful of numbers, so it gets the form the machine could not have: one row per
+    /// control with its value in a box.
+    /// </remarks>
+    public Interfaces.ISoundEffectPresetDesk EffectPresetDesk { get; }
+
+    /// <summary>True on the presets page of a world whose boxes are played.</summary>
+    public bool ShowsMachinePresets => ShowsPresets && _world.Played;
+
+    /// <summary>True on the presets page of a world whose boxes are not.</summary>
+    public bool ShowsEffectPresets => ShowsPresets && !_world.Played;
 
     /// <summary>
     /// The jobs that are neither drawing a panel nor filling in a preset.
@@ -267,7 +289,11 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     partial void OnPageChanged(int value)
     {
-        if (OnPresets) PresetDesk.Reread();
+        if (OnPresets)
+        {
+            PresetDesk.Reread();
+            EffectPresetDesk.Reread();
+        }
 
         if (OnUtilities) Utilities.Reread();
     }
@@ -423,6 +449,8 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         PresetDesk.Reread();
 
+        EffectPresetDesk.Reread();
+
         ShelfChanged();
     }
 
@@ -498,6 +526,8 @@ public sealed partial class DesignerViewModel : ObservableObject
             History.Saved(Project);
 
             PresetDesk.Reread();
+
+            EffectPresetDesk.Reread();
         }
         catch (Exception ex)
         {
@@ -710,9 +740,11 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// without the categories you actually file takes under.
     /// </remarks>
     public IPanelPresets? Presets =>
-        Project is { } project && project.BrowsesTakes() != true
-            ? new SoundMachinePresetNames(PresetDesk)
-            : Shelf;
+        Project is SoundDevices.SoundEffects.SoundEffectProject effect
+            ? new SoundEffectPresetNames(effect, Values)
+            : Project is { } project && project.BrowsesTakes() != true
+                ? new SoundMachinePresetNames(PresetDesk)
+                : Shelf;
 
     /// <summary>Your recordings, handed in by whoever built the editor.</summary>
     public IPanelPresets? Shelf { get; set; }
@@ -975,49 +1007,16 @@ public sealed partial class DesignerViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The kinds of element that can be put on a panel here.
+    /// The kinds of element that can be put on a panel here, which is the world's answer.
     /// </summary>
     /// <remarks>
-    /// Written out rather than found by looking over the constants, so that the order is the one
-    /// that suits somebody building a panel, containers first and controls after, and so that a
-    /// constant added for a control this designer cannot yet place does not turn up in the list
-    /// on its own.
+    /// It was one list for both worlds, so the Effects tab offered a keyboard, a kit, a keyboard
+    /// map and a name badge on an effect's face. Each of those is a control plus a service the
+    /// host has to supply behind it, and a box handed a track's audio can supply none of them, so
+    /// what you got was a part that drew, saved into the manifest, and stayed silent for ever
+    /// with nothing saying why.
     /// </remarks>
-    public IReadOnlyList<string> Library { get; } = new[]
-    {
-        ElementKinds.Grid,
-        ElementKinds.Group,
-        ElementKinds.Row,
-        ElementKinds.Column,
-        ElementKinds.Strip,
-        ElementKinds.Knob,
-        ElementKinds.Fader,
-        ElementKinds.Switch,
-        ElementKinds.Number,
-        ElementKinds.Button,
-        ElementKinds.Choice,
-        ElementKinds.Led,
-        ElementKinds.Meter,
-        ElementKinds.Keys,
-        ElementKinds.Location,
-        ElementKinds.Wave,
-        ElementKinds.Envelope,
-        ElementKinds.Scope,
-        ElementKinds.Image,
-        ElementKinds.Take,
-        ElementKinds.Preset,
-        ElementKinds.Pads,
-        ElementKinds.Pad,
-        ElementKinds.PadPicker,
-        ElementKinds.Zones,
-        ElementKinds.ZonePicker,
-        ElementKinds.Slices,
-        ElementKinds.Menu,
-        ElementKinds.InstrumentName,
-        ElementKinds.Label,
-        ElementKinds.Text,
-        ElementKinds.Spacer
-    };
+    public IReadOnlyList<string> Library => _world.Parts;
 
     /// <summary>
     /// Puts an element of that kind inside whatever is picked out.

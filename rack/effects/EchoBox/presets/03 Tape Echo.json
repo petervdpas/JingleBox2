@@ -1,0 +1,8 @@
+{
+  "Name": "Tape Echo",
+  "Effect": "effect.echobox",
+  "time": 260,
+  "feedback": 0.5,
+  "damp": 0.68,
+  "mix": 0.34
+}
