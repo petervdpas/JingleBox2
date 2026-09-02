@@ -34,6 +34,9 @@ public partial class InstrumentPanel : UserControl
     /// <summary>Walking a shelf of presets: which way, and where it stops.</summary>
     private readonly IPresetStep _step = new PresetStep();
 
+    /// <summary>What makes this face pointable at whichever device it is drawing.</summary>
+    private readonly DeviceRemote _remote;
+
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
 
@@ -74,29 +77,27 @@ public partial class InstrumentPanel : UserControl
 
         Face.TakeWanted += PickTake;
 
-        Face.LinkWanted += Offer;
-        Face.LinkActionWanted += OfferAction;
-        Face.UnlinkWanted += Drop;
+        _remote = new DeviceRemote(Face, () => Designer?.Editor?.Device);
 
-        DataContextChanged += (_, _) => { Watch(); ShowLinks(); };
+        DataContextChanged += (_, _) => { Watch(); _remote.Show(); };
         UI.ThemeSwitch.Changed += Later;
 
         LinkKey.Watch(this);
 
         AttachedToVisualTree += (_, _) =>
         {
-            if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
+            _remote.Watch();
 
             Midi.ControlActions.Current.Fired += Do;
 
-            ShowLinks();
+            _remote.Show();
         };
 
         DetachedFromVisualTree += (_, _) =>
         {
             UI.ThemeSwitch.Changed -= Later;
 
-            if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
+            _remote.Stop();
 
             Midi.ControlActions.Current.Fired -= Do;
         };
@@ -205,73 +206,6 @@ public partial class InstrumentPanel : UserControl
     /// <summary>The designer whose editor is being watched, so it is let go of again.</summary>
     private System.ComponentModel.INotifyPropertyChanged? _watched;
 
-    /// <summary>
-    /// Offers what the pointer is resting on to whatever is holding a controller.
-    /// </summary>
-    /// <remarks>
-    /// The machine and the key, and no track. A knob is pointed at Zampler's cutoff rather than
-    /// at track three's, so the same link works on every track that plays a Zampler and follows
-    /// you as you move between them. What names a track is the mixer, which is a different kind
-    /// of mapping for a different reason: see <see cref="Midi.Enums.ControlScope"/>.
-    /// </remarks>
-    private void Offer(object? sender, string key)
-    {
-        if (Midi.ControlLink.Current is not { IsLinking: true } link)
-        {
-            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
-                "panel: pointer on '" + key + "' but "
-                + (Midi.ControlLink.Current is null ? "THERE IS NO LINK" : "the mode is off"));
-
-            return;
-        }
-
-        if (Designer?.Editor is not { } editor)
-        {
-            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Midi, () =>
-                "panel: pointer on '" + key + "' but THERE IS NO EDITOR behind the panel, so nothing is offered");
-
-            return;
-        }
-
-        link.Offer(new Midi.ControlMapping
-        {
-            Kind = Midi.Enums.ControlKind.Instrument,
-            Scope = Midi.Enums.ControlScope.Focused,
-            Machine = editor.MachineId,
-            Key = key,
-            Owner = editor.MachineName,
-            Name = editor.MachineName + " " + key
-        });
-    }
-
-    /// <summary>
-    /// Offers a button on the panel, which is a press rather than a value.
-    /// </summary>
-    /// <remarks>
-    /// A knob points at a parameter, which lives on the instrument and can be written by
-    /// anything. A button points at something to be done, and only a panel knows how to do it:
-    /// see <see cref="Midi.ControlActions"/>.
-    ///
-    /// The pickup is a jump, because a press is a press: there is nothing to work out and
-    /// nothing to pick up from.
-    /// </remarks>
-    private void OfferAction(object? sender, string action)
-    {
-        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
-        if (Designer?.Editor is not { } editor) return;
-
-        link.Offer(new Midi.ControlMapping
-        {
-            Kind = Midi.Enums.ControlKind.Action,
-            Scope = Midi.Enums.ControlScope.Focused,
-            Machine = editor.MachineId,
-            Key = action,
-            Pickup = Midi.Enums.ControlPickup.Jump,
-            Owner = editor.MachineName,
-            Name = editor.MachineName + " " + action.Replace('_', ' ')
-        });
-    }
-
     /// <summary>Does what a mapped hardware button asked for, if it asked this machine.</summary>
     /// <remarks>
     /// Handed to the drawing thread, because the message arrives on the MIDI thread and what
@@ -283,31 +217,6 @@ public partial class InstrumentPanel : UserControl
         if (!string.Equals(machine, editor.MachineId, StringComparison.Ordinal)) return;
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() => Asked(this, action));
-    }
-
-    /// <summary>Takes whatever is pointed at that control off it.</summary>
-    private void Drop(object? sender, string key)
-    {
-        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
-        if (Designer?.Editor is not { } editor) return;
-
-        link.Unlink(editor.MachineId, key);
-    }
-
-    /// <summary>Tells the panel what mode the pointer is in and what is already pointed at.</summary>
-    private void ShowLinks()
-    {
-        var link = Midi.ControlLink.Current;
-
-        Face.Linking = link?.IsLinking ?? false;
-
-        Face.Linked = link is null || Designer?.Editor is not { } editor
-            ? null
-            : link.KeysOn(editor.MachineId);
-
-        Face.LinkedActions = link is null || Designer?.Editor is not { } showing
-            ? null
-            : link.ActionsOn(showing.MachineId);
     }
 
     /// <summary>

@@ -43,7 +43,7 @@ public class MachineMenuTests
     /// <param name="device">Which desk it was learned on.</param>
     private static ControlMapping OnMachine(string key, int cc, string device = "Desk One") => new()
     {
-        Kind = ControlKind.Instrument,
+        Kind = ControlKind.Device,
         Machine = Id,
         Key = key,
         Owner = Named,

@@ -20,9 +20,16 @@ The two ends of the wire may not share a name. So the hardware end is the **cont
 throughout, and `ControlDeviceLinks` was renamed `ControllerLinks` to stop it saying otherwise.
 
 In the interface the umbrella is not shown at all. A card is headed with the thing itself and
-the sort of thing is a quiet word beside it: `OddSkilla  machine`, `Serum 2  effect`,
-`Track 3  mixer`, `Transport`. Nobody has to learn the umbrella to read the page, and the three
-words that are shown are the three words a person already uses.
+the sort of thing is a quiet word beside it: `OddSkilla  device`, `EchoBox  device`,
+`Track 3  mixer`, `Transport`. Nobody has to learn the umbrella to read the page.
+
+**A soundmachine and an effect are both devices, and a link says so.** The rack holds devices and
+a device is one or the other; to a hardware knob they are one thing, a box with a face, an id and
+a control you rested the pointer on. Which of the two it is decides where the link is looked for
+when a message arrives, the machine the track plays or an effect on that track's chain, and
+nothing else about it. So the word in a file is `device`. A template already on somebody's disc
+says `machine` and is read as one. `effect` is still refused: in one of these files it has only
+ever meant a plugin, and a plugin cannot be pointed at.
 
 ## A template is one controller against one target
 

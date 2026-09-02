@@ -15,6 +15,9 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class RackView : UserControl
 {
+    /// <summary>What makes the effect's face pointable at the effect it is drawing.</summary>
+    private readonly DeviceRemote _remote;
+
     /// <summary>A box's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly Interfaces.IPanelTint _tint = new PanelTint();
 
@@ -33,21 +36,13 @@ public partial class RackView : UserControl
     {
         InitializeComponent();
 
-        EffectFace.LinkWanted += Offer;
+        _remote = new DeviceRemote(EffectFace, () => Rack?.SelectedEffect?.Effect);
 
         LinkKey.Watch(EffectFace);
 
-        AttachedToVisualTree += (_, _) =>
-        {
-            if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
+        AttachedToVisualTree += (_, _) => _remote.Watch();
 
-            ShowLinks();
-        };
-
-        DetachedFromVisualTree += (_, _) =>
-        {
-            if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
-        };
+        DetachedFromVisualTree += (_, _) => _remote.Stop();
 
         DataContextChanged += (_, _) => Watch();
     }
@@ -55,21 +50,6 @@ public partial class RackView : UserControl
     /// <summary>The rack this page is showing, or nothing before it has one.</summary>
     private RackViewModel? Rack => DataContext as RackViewModel;
 
-
-    /// <summary>Tells the face what mode the pointer is in and what is already pointed at.</summary>
-    /// <remarks>
-    /// The same three things a machine's panel is told, and told the same way: the glow over a
-    /// control is how somebody knows the gesture is live and which controls already have
-    /// something on them. Without it the mode is on and nothing on the screen says so.
-    /// </remarks>
-    private void ShowLinks()
-    {
-        var link = Midi.ControlLink.Current;
-
-        EffectFace.Linking = link?.IsLinking ?? false;
-
-        EffectFace.Linked = link is null || Rack?.SelectedEffect is not { } effect ? null : link.KeysOn(effect.Id);
-    }
 
     /// <summary>Follows the picked effect, so the face is painted in that effect's colours.</summary>
     private void Watch()
@@ -82,7 +62,7 @@ public partial class RackView : UserControl
 
             Retint();
 
-            ShowLinks();
+            _remote.Show();
         };
 
         Retint();
@@ -94,32 +74,6 @@ public partial class RackView : UserControl
         if (Rack?.SelectedEffect is { } effect) _tint.Apply(EffectPlate, effect.Theme);
     }
 
-    /// <summary>
-    /// Offers the effect and the control under the pointer, while the link mode is on.
-    /// </summary>
-    /// <remarks>
-    /// The same shape a machine's panel offers, with the effect's id where the machine's would
-    /// be: what is written down is the effect and the parameter's key, which is true of that
-    /// effect on any track's chain, in any song, on any installation that has it.
-    /// </remarks>
-    /// <param name="sender">The panel the pointer is on.</param>
-    /// <param name="key">The parameter the control under it turns.</param>
-    private void Offer(object? sender, string key)
-    {
-        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
-
-        if (Rack?.SelectedEffect is not { } effect) return;
-
-        link.Offer(new Midi.ControlMapping
-        {
-            Kind = Midi.Enums.ControlKind.Insert,
-            Scope = Midi.Enums.ControlScope.Focused,
-            Machine = effect.Id,
-            Key = key,
-            Owner = effect.Name,
-            Name = effect.Name + " " + key
-        });
-    }
 
     /// <summary>
     /// Opens the machine in hand, in its own window.

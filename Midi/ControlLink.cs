@@ -481,7 +481,7 @@ public sealed class ControlLink
 
         return one.Kind switch
         {
-            ControlKind.Instrument or ControlKind.Action =>
+            ControlKind.Device or ControlKind.Action =>
                 one.Machine.Length > 0 && wanted.Machine.Length > 0
                 && !string.Equals(one.Machine, wanted.Machine, StringComparison.Ordinal),
 
@@ -513,7 +513,7 @@ public sealed class ControlLink
 
         foreach (var one in Mappings)
         {
-            if (one.Kind != ControlKind.Instrument || one.Key.Length == 0) continue;
+            if (one.Kind != ControlKind.Device || one.Key.Length == 0) continue;
 
             if (one.Machine.Length > 0 && !string.Equals(one.Machine, machine, StringComparison.Ordinal))
                 continue;
@@ -537,12 +537,12 @@ public sealed class ControlLink
         Changing();
 
         int gone = Song?.Invoke()?.RemoveAll(one =>
-            (one.Kind == ControlKind.Instrument || one.Kind == ControlKind.Action)
+            (one.Kind == ControlKind.Device || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal)) ?? 0;
 
         lock (_lock) gone += _mappings.RemoveAll(one =>
-            (one.Kind == ControlKind.Instrument || one.Kind == ControlKind.Action)
+            (one.Kind == ControlKind.Device || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal));
 

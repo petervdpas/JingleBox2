@@ -104,7 +104,7 @@ public sealed class ControlMenu : IPanelMenu
         Func<ControlLink?>? desk = null,
         IControllerProfiles? profiles = null,
         ILinkTargets? naming = null,
-        string kind = LinkTargets.Machine)
+        string kind = LinkTargets.Device)
     {
         _which = which;
         _kind = kind;

@@ -107,7 +107,7 @@ public static class PanelPreview
             {
                 pretend.Add(new Midi.ControlMapping
                 {
-                    Kind = Midi.Enums.ControlKind.Instrument,
+                    Kind = Midi.Enums.ControlKind.Device,
                     Machine = PreviewApp.Wanted.SlotId,
                     Key = parameter.Key
                 });

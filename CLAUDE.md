@@ -516,6 +516,37 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   shipped box and what Save as both are. `DesignHistory` went the same way: a step is the
   project's own JSON, and it used to name the machine's type on both sides of the trip, where it
   now asks the project what it is. So a world added later needs nothing in any of the three
+- **The rack holds devices, and a device is a soundmachine or an effect.** That is the word the
+  whole of this half of the program is arranged around now, and it is worth being exact about the
+  four:
+  - an **engine** is compiled in and makes or works on the sound. It has no face and no name a
+    person sees
+  - a **device** is a face over an engine: a folder with a manifest, an id, parameters, presets
+    and a picture, registered here, on the rack, drawn by one library, laid out in one designer,
+    zipped and handed to somebody by one archive
+  - a **soundmachine** is a device that is played. Notes go in and sound comes out, and in a song
+    it becomes an **instrument**: your name, your settings, its own id
+  - an **effect** is a device that is not played. A whole track's audio goes in and comes back
+    changed, and in a song it is a box on a track's chain
+  So the only difference between the two kinds of device is what happens to it once it is in a
+  song, which is the same difference a plugin instrument has from a plugin effect. Everywhere
+  else, where there were two of something there is now one: `IRackRegistry`, `RackArchive`,
+  `RackShelfViewModel`, `RackView`, the designer, and the link
+- **Pointing a controller at something is a device thing, and used to be two.**
+  `ControlKind.Device` is that one kind, which is `Instrument` renamed and the same number, so
+  every link already in somebody's settings is what it was. `IDeviceLinks` is the one maker: a
+  link names the device's id and the key of the control under the pointer, nothing about the
+  track, the slot, or which of the two worlds it came from. `ControlTargets.OnDevice` is the one
+  resolver and has two places to look, the machine the track plays and the effects on its chain.
+  A file says `device`, reads `machine` as one, and still refuses `effect`, since that word has
+  only ever meant a plugin in a template and a plugin cannot be pointed at
+- **It was written out three times and the two copies were wrong.** A machine's face offered
+  `Instrument`; the rack's effect face and an effect's own window offered `Insert`, which is the
+  word for a plugin. The settings reader throws every plugin link away as it reads, and the glow
+  only counts device links. So a knob pointed at an effect lit nothing, worked until the
+  application was closed, and was gone in the morning, with nothing anywhere saying why. One
+  maker, one kind, one resolver: `Tests/DeviceLinkTests.cs` is the whole rule, including that
+  an effect's link is still there when the settings are read
 - **An effect of ours is a fourth word and not a kind of machine.** Engine, machine and instrument
   were three; an effect sits beside machine. It is a face over an effect engine, it takes audio
   rather than notes, and so it has no keyboard, no zones, no pads and no kit. Its own folder, its

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using JingleBox2.Rack.Effects.Interfaces;
+using JingleBox2.Rack.Devices.Interfaces;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Records;
 using JingleBox2.Tracker.Interfaces;
@@ -33,7 +33,7 @@ namespace JingleBox2.Tracker.Effects;
 /// What goes wrong here is written to <see cref="Diagnostics.Enums.LogArea.Machines"/>, which is
 /// the rack's area rather than the machine world's alone.
 /// </remarks>
-public sealed class EffectProject : IRackProject, IDesignProject, IEffect
+public sealed class EffectProject : IRackProject, IDesignProject, IDevice
 {
     /// <summary>What the file at the top of an effect's folder is called.</summary>
     /// <remarks>

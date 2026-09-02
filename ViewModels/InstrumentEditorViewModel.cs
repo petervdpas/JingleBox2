@@ -751,6 +751,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </remarks>
     public string MachineId => Machine.For(_instrument.Kind).SlotId;
 
+    /// <summary>
+    /// The device this is editing, as anything outside it needs it.
+    /// </summary>
+    /// <remarks>
+    /// What remote control is pointed at: an id and a name, which a machine and an effect answer
+    /// in the same words. A machine that is not installed here still answers, greyed and named
+    /// for its engine, which is what a link pointed at it would name anyway.
+    /// </remarks>
+    public Rack.Devices.Interfaces.IDevice Device => Machine.For(_instrument.Kind);
+
     /// <summary>True on the machine with a single voice and its own patch.</summary>
     public bool IsMonoSynth => _instrument.IsMonoSynth;
 

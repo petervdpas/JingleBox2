@@ -22,6 +22,9 @@ public partial class EffectWindow : Window
     /// <summary>What is already open, so a box shows the window it has rather than another.</summary>
     private static readonly Dictionary<object, EffectWindow> Open = new();
 
+    /// <summary>What makes this face pointable at the effect it is drawing.</summary>
+    private readonly DeviceRemote _remote;
+
     /// <summary>A box's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
 
@@ -42,61 +45,18 @@ public partial class EffectWindow : Window
 
         DeckKeys.Listen(this);
 
-        Face.LinkWanted += Offer;
+        _remote = new DeviceRemote(Face, () => Device?.Effect);
 
         LinkKey.Watch(Face);
 
-        Opened += (_, _) =>
-        {
-            if (Midi.ControlLink.Current is { } link) link.Changed += ShowLinks;
+        Opened += (_, _) => _remote.Watch();
 
-            ShowLinks();
-        };
-
-        Closed += (_, _) =>
-        {
-            if (Midi.ControlLink.Current is { } link) link.Changed -= ShowLinks;
-        };
+        Closed += (_, _) => _remote.Stop();
     }
 
-
-    /// <summary>Tells the face what mode the pointer is in and what is already pointed at.</summary>
-    /// <remarks>
-    /// The same three things a machine's panel is told, and told the same way: the glow over a
-    /// control is how somebody knows the gesture is live and which controls already have
-    /// something on them. Without it the mode is on and nothing on the screen says so.
-    /// </remarks>
-    private void ShowLinks()
-    {
-        var link = Midi.ControlLink.Current;
-
-        Face.Linking = link?.IsLinking ?? false;
-
-        Face.Linked = link is null || Device?.Effect is not { } effect ? null : link.KeysOn(effect.Id);
-    }
 
     /// <summary>The box this window is about, or nothing before it has one.</summary>
     private EffectDeviceViewModel? Device => DataContext as EffectDeviceViewModel;
-
-    /// <summary>Offers the effect and the control under the pointer, while the mode is on.</summary>
-    /// <param name="sender">The panel the pointer is on.</param>
-    /// <param name="key">The parameter the control under it turns.</param>
-    private void Offer(object? sender, string key)
-    {
-        if (Midi.ControlLink.Current is not { IsLinking: true } link) return;
-
-        if (Device is not { } device) return;
-
-        link.Offer(new Midi.ControlMapping
-        {
-            Kind = Midi.Enums.ControlKind.Insert,
-            Scope = Midi.Enums.ControlScope.Focused,
-            Machine = device.Effect.Id,
-            Key = key,
-            Owner = device.Name,
-            Name = device.Name + " " + key
-        });
-    }
 
     /// <summary>
     /// Opens that box's face over the app's window, or brings the one that is open forward.

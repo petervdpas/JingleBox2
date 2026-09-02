@@ -52,7 +52,7 @@ public sealed class ControlMapping
     public int Cc { get; set; }
 
     /// <summary>What sort of thing it is pointed at, which decides which fields below are read.</summary>
-    public ControlKind Kind { get; set; } = ControlKind.Instrument;
+    public ControlKind Kind { get; set; } = ControlKind.Device;
 
     /// <summary>Whether it follows the track you are working on or stays on one.</summary>
     public ControlScope Scope { get; set; } = ControlScope.Focused;
@@ -194,7 +194,7 @@ public sealed class ControlMapping
 
         return Kind switch
         {
-            ControlKind.Instrument or ControlKind.Action =>
+            ControlKind.Device or ControlKind.Action =>
                 string.Equals(other.Machine, Machine, StringComparison.Ordinal)
                 && string.Equals(other.Key, Key, StringComparison.Ordinal),
 

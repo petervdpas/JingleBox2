@@ -111,7 +111,7 @@ public sealed class ControlTargets : IControlTargets
 
         var found = mapping.Kind switch
         {
-            ControlKind.Instrument => OnMachine(mapping, track) ?? OnRack(mapping),
+            ControlKind.Device => OnDevice(mapping, track),
             ControlKind.Insert => OnPlugin(mapping, track),
             ControlKind.Mix => OnStrip(mapping, track),
             ControlKind.Action => OnButton(mapping),
@@ -177,7 +177,7 @@ public sealed class ControlTargets : IControlTargets
                 yield return new ControlChoice(
                     new ControlMapping
                     {
-                        Kind = ControlKind.Instrument,
+                        Kind = ControlKind.Device,
                         Scope = ControlScope.Fixed,
                         Track = track,
                         Machine = machine,
@@ -396,8 +396,6 @@ public sealed class ControlTargets : IControlTargets
         var chain = _tracker.InsertsOn(track);
         if (chain is null) return null;
 
-        if (OnOurs(mapping, track, chain) is { } ours) return ours;
-
         var wanted = Insert(chain, mapping);
         if (wanted is null) return null;
 
@@ -419,6 +417,26 @@ public sealed class ControlTargets : IControlTargets
     }
 
     /// <summary>
+    /// A device of ours: the machine the track plays, or an effect on its chain.
+    /// </summary>
+    /// <remarks>
+    /// One link kind and two places to look, in that order, because to a hardware knob a
+    /// soundmachine and an effect are the same thing: a box on the rack with a face and an id.
+    /// Which of the two it is decides where it is found and nothing else, and a link that names
+    /// neither answers nothing, which is the ordinary case for a knob pointed at something the
+    /// track you are on has not got.
+    ///
+    /// The rack is tried last for a machine, since a machine open on the rack is being worked on
+    /// rather than played and a track that really has it should win.
+    /// </remarks>
+    /// <param name="mapping">What the control was pointed at.</param>
+    /// <param name="track">The track it resolves against, which is the one in front of you.</param>
+    private IControlTarget? OnDevice(ControlMapping mapping, int track) =>
+        OnMachine(mapping, track)
+        ?? OnEffect(mapping, track, _tracker.InsertsOn(track))
+        ?? OnRack(mapping);
+
+    /// <summary>
     /// One of our effects on that track's chain, when that is what the mapping names.
     /// </summary>
     /// <remarks>
@@ -438,9 +456,9 @@ public sealed class ControlTargets : IControlTargets
     /// <param name="mapping">What the control was pointed at.</param>
     /// <param name="track">The track it resolves against, which is the one in front of you.</param>
     /// <param name="chain">That track's chain.</param>
-    private IControlTarget? OnOurs(ControlMapping mapping, int track, PluginChain chain)
+    private IControlTarget? OnEffect(ControlMapping mapping, int track, PluginChain? chain)
     {
-        if (mapping.Machine.Length == 0 || mapping.Key.Length == 0) return null;
+        if (chain is null || mapping.Machine.Length == 0 || mapping.Key.Length == 0) return null;
 
         foreach (var device in chain.Devices)
         {

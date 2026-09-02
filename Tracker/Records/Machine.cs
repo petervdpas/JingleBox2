@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.Devices.Interfaces;
 
 namespace JingleBox2.Tracker.Records;
 
@@ -34,7 +34,7 @@ public sealed record Machine(
     string Name,
     string Summary,
     bool IsOurs,
-    PanelTheme Theme) : IMachine
+    PanelTheme Theme) : IDevice
 {
     /// <summary>The machine's own colour, which is where everything it is painted with starts.</summary>
     public string Colour => Theme.Accent;
@@ -46,7 +46,7 @@ public sealed record Machine(
     /// "machine.zampler" is what a Zampler is, whether it is the box on the shelf or the line
     /// in a song saying which machine an instrument was made on.
     /// </remarks>
-    string IMachine.Id => SlotId;
+    string IDevice.Id => SlotId;
 
     /// <summary>
     /// The instrument id a machine's own slot in the rack uses.

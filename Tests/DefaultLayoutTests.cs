@@ -128,7 +128,7 @@ public class DefaultLayoutTests
         var link = Encoder(layout, 30);
 
         Assert.NotNull(link);
-        Assert.Equal(ControlKind.Instrument, link!.Kind);
+        Assert.Equal(ControlKind.Device, link!.Kind);
         Assert.Equal(ControlScope.Focused, link.Scope);
         Assert.Equal(0, link.Ordinal);
 
@@ -258,7 +258,7 @@ public class DefaultLayoutTests
         var link = Knobbed(layout, 22);
 
         Assert.NotNull(link);
-        Assert.Equal(ControlKind.Instrument, link!.Kind);
+        Assert.Equal(ControlKind.Device, link!.Kind);
         Assert.Equal(ControlScope.Focused, link.Scope);
         Assert.Equal(0, link.Ordinal);
 
@@ -337,7 +337,7 @@ public class DefaultLayoutTests
         Assert.Equal(ControlScope.Fixed, slider.Scope);
         Assert.Equal(0, slider.Track);
 
-        Assert.Equal(ControlKind.Instrument, knob!.Kind);
+        Assert.Equal(ControlKind.Device, knob!.Kind);
         Assert.Equal(ControlScope.Focused, knob.Scope);
         Assert.Equal(0, knob.Ordinal);
 

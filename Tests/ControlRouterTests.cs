@@ -25,7 +25,7 @@ public class ControlRouterTests
         Device = device,
         Channel = 1,
         Cc = cc,
-        Kind = ControlKind.Instrument,
+        Kind = ControlKind.Device,
         Machine = "machine.oddskilla",
         Key = "duty",
         Pickup = pickup

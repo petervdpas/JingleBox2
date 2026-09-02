@@ -1007,7 +1007,7 @@ public sealed class SongStore : ISongStore
         public int Track { get; set; }
 
         /// <summary>What kind of thing is moved: the instrument, an insert, or the strip.</summary>
-        public Midi.Enums.ControlKind Kind { get; set; } = Midi.Enums.ControlKind.Instrument;
+        public Midi.Enums.ControlKind Kind { get; set; } = Midi.Enums.ControlKind.Device;
 
         /// <summary>How it gets from one point to the next.</summary>
         public AutomationPlay Play { get; set; } = AutomationPlay.Lines;

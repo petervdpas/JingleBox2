@@ -164,7 +164,7 @@ public sealed class ControlTemplates : IControlTemplates
             if (_targets.Pickup(entry.Pickup ?? "") is { } pickup) one.Pickup = pickup;
             if (_targets.Turn(entry.Turn ?? "") is { } turn) one.Turn = turn;
 
-            if (entry.Track >= 1 && one.Kind is ControlKind.Instrument or ControlKind.Insert)
+            if (entry.Track >= 1 && one.Kind is ControlKind.Device or ControlKind.Insert)
             {
                 one.Scope = ControlScope.Fixed;
                 one.Track = entry.Track - 1;
@@ -226,7 +226,7 @@ public sealed class ControlTemplates : IControlTemplates
     /// <summary>Whether a link on a machine or an effect is nailed to a track rather than following you.</summary>
     /// <param name="one">The link to ask about.</param>
     private static bool Pinned(ControlMapping one) =>
-        one.Scope == ControlScope.Fixed && one.Kind is ControlKind.Instrument or ControlKind.Insert;
+        one.Scope == ControlScope.Fixed && one.Kind is ControlKind.Device or ControlKind.Insert;
 
     /// <summary>
     /// Whether a link names a strip, which is what makes a template cover the whole mixer.

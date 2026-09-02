@@ -276,7 +276,7 @@ public sealed class DefaultLayout
                 Device = device,
                 Channel = control.Channel,
                 Cc = control.Cc,
-                Kind = ControlKind.Instrument,
+                Kind = ControlKind.Device,
                 Ordinal = place,
                 Scope = ControlScope.Focused,
                 Pickup = control.Pickup,

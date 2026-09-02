@@ -30,7 +30,7 @@ public class ControlCardTests
     /// <param name="key">Which parameter.</param>
     private static ControlMapping OnMachine(string machine, string named, string key) => new()
     {
-        Kind = ControlKind.Instrument,
+        Kind = ControlKind.Device,
         Machine = machine,
         Key = key,
         Owner = named,
@@ -72,7 +72,7 @@ public class ControlCardTests
 
         var track = new ControlMapping
         {
-            Kind = ControlKind.Instrument,
+            Kind = ControlKind.Device,
             Scope = ControlScope.Focused,
             Machine = "machine.oddskilla",
             Key = "cutoff",

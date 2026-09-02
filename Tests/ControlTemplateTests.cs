@@ -35,7 +35,7 @@ public class ControlTemplateTests
     /// <param name="cc">Which controller number.</param>
     private static ControlMapping OnMachine(string key, int cc) => new()
     {
-        Kind = ControlKind.Instrument,
+        Kind = ControlKind.Device,
         Machine = "machine.oddskilla",
         Key = key,
         Owner = "OddSkilla",
@@ -51,15 +51,22 @@ public class ControlTemplateTests
     private static string Somewhere(string named) =>
         Path.Combine(Templates.Folder(), named + "." + ControlTemplates.Extension);
 
-    /// <summary>What a machine template says, in the words a person reads in the file.</summary>
+    /// <summary>
+    /// What a device template says, in the words a person reads in the file.
+    /// </summary>
+    /// <remarks>
+    /// The word is device and not machine, since a soundmachine and an effect are the same thing
+    /// to a link: an id and the key of the control it was pointed at. A file already on somebody's
+    /// disc says machine and is still read, which the test below says.
+    /// </remarks>
     [Fact]
-    public void A_machine_is_named_by_its_id_and_its_own_keys()
+    public void A_device_is_named_by_its_id_and_its_own_keys()
     {
         var template = Templates.Describe("nanoKONTROL2", new[] { OnMachine("attack", 0) });
 
         Assert.NotNull(template);
         Assert.Equal("nanoKONTROL2", template!.Controller);
-        Assert.Equal("machine", template.Target.Kind);
+        Assert.Equal("device", template.Target.Kind);
         Assert.Equal("machine.oddskilla", template.Target.Id);
         Assert.Equal("OddSkilla", template.Target.Name);
         Assert.Equal("attack", template.Controls[0].Parameter);
@@ -341,7 +348,7 @@ public class ControlLinksPageTests
     /// <param name="cc">Which controller number.</param>
     private static ControlMapping OnMachine(string key, int cc) => new()
     {
-        Kind = ControlKind.Instrument,
+        Kind = ControlKind.Device,
         Machine = "machine.oddskilla",
         Key = key,
         Owner = "OddSkilla",
@@ -450,7 +457,7 @@ public class ControlLinksPageTests
             OnMachine("attack", 0),
             new()
             {
-                Kind = ControlKind.Instrument,
+                Kind = ControlKind.Device,
                 Machine = "machine.ouroboros",
                 Key = "tune",
                 Owner = "Ouroboros",

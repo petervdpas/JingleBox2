@@ -10,20 +10,41 @@ namespace JingleBox2.Midi;
 /// <inheritdoc/>
 public sealed class LinkTargets : ILinkTargets
 {
-    /// <summary>A machine on the rack, or an instrument on a track, which is one in use.</summary>
+    /// <summary>What a device's link is made of, so a file and a face agree. Holds nothing.</summary>
+    private static readonly Interfaces.IDeviceLinks Devices = new DeviceLinks();
+
+    /// <summary>
+    /// A device: a box on the rack with a face, which is a soundmachine or an effect.
+    /// </summary>
+    /// <remarks>
+    /// One word for both, because to a link they are one thing: an id its manifest carries and
+    /// the key of the control the knob was pointed at. Which of the two it is decides where the
+    /// link is looked for and nothing else about it, so a file that said which would be saying
+    /// something the reader has to check anyway.
+    /// </remarks>
+    public const string Device = "device";
+
+    /// <summary>
+    /// What a device used to be called in a file, when a machine was the only one there was.
+    /// </summary>
+    /// <remarks>
+    /// Read as <see cref="Device"/> and never written. Every template already on somebody's disc
+    /// says this, and every one of them is about a machine, which is a device.
+    /// </remarks>
     public const string Machine = "machine";
 
     /// <summary>
-    /// A plugin on a track's insert chain, which no link may point at.
+    /// A plugin on a track's chain, which no link may point at.
     /// </summary>
     /// <remarks>
-    /// Kept as a word because a template written before this may carry it, and one that does is
-    /// read far enough to be counted and left out rather than failing the whole file.
+    /// Refused, and the word is kept only so that a file carrying one is counted and left out
+    /// rather than failing the whole file. A plugin is somebody else's program and brings its own
+    /// MIDI learn, so a link made here would be a second mapping beside the one the plugin
+    /// already keeps with nothing able to make the two agree.
     ///
-    /// A hardware control cannot be pointed at a plugin. A plugin is somebody else's program and
-    /// brings its own MIDI learn, so a link made here would be a second mapping beside the one
-    /// the plugin already keeps, and nothing could make the two agree. Remote control is for
-    /// machines, our own effects and the mixer.
+    /// It is not the word for one of our effects and never was: an effect of ours is a box this
+    /// installation registered, with an id and a face, which is a <see cref="Device"/>. Nothing
+    /// has ever written this word about one, so a file that says it means a plugin.
     /// </remarks>
     public const string Effect = "effect";
 
@@ -98,7 +119,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string KindOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Instrument or ControlKind.Action => Machine,
+        ControlKind.Device or ControlKind.Action => Device,
         ControlKind.Insert => Effect,
         ControlKind.Mix => Mixer,
         _ => Transport
@@ -107,7 +128,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string IdOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Instrument or ControlKind.Action => one.Machine,
+        ControlKind.Device or ControlKind.Action => one.Machine,
         ControlKind.Insert => one.Plugin,
         ControlKind.Mix => one.Track == Tracker.TrackerPlayer.MasterStrip
             ? Master
@@ -118,7 +139,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string ParameterOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Instrument or ControlKind.Action => one.Key,
+        ControlKind.Device or ControlKind.Action => one.Key,
         ControlKind.Insert => one.Parameter.ToString(CultureInfo.InvariantCulture),
         ControlKind.Mix => Strip.FirstOrDefault(each => each.What == one.Mix).Said ?? "",
         _ => Keys.FirstOrDefault(each => each.Key == one.Transport).Said ?? ""
@@ -143,8 +164,8 @@ public sealed class LinkTargets : ILinkTargets
 
         return first.Kind switch
         {
-            ControlKind.Instrument or ControlKind.Action =>
-                first.Machine.Length > 0 ? first.Machine : "Any machine",
+            ControlKind.Device or ControlKind.Action =>
+                first.Machine.Length > 0 ? first.Machine : "A device",
             ControlKind.Insert => first.Plugin.Length > 0 ? first.Plugin : "An effect",
             ControlKind.Mix => "Mixer",
             _ => "Transport"
@@ -154,7 +175,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public int RankOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Instrument or ControlKind.Action => 0,
+        ControlKind.Device or ControlKind.Action => 0,
         ControlKind.Insert => 1,
         ControlKind.Mix => 2,
         _ => 3
@@ -210,16 +231,10 @@ public sealed class LinkTargets : ILinkTargets
     /// <param name="parameter">Which parameter.</param>
     private static ControlMapping? Made(string kind, string id, string parameter)
     {
-        if (Same(kind, Machine))
+        if (Same(kind, Device) || Same(kind, Machine))
             return parameter.Length == 0 || id.Length == 0
                 ? null
-                : new ControlMapping
-                {
-                    Kind = ControlKind.Instrument,
-                    Scope = ControlScope.Focused,
-                    Machine = id,
-                    Key = parameter
-                };
+                : Devices.On(id, "", parameter);
 
         if (Same(kind, Effect)) return null;
 
@@ -265,7 +280,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <param name="one">The link to read.</param>
     private static string Guessed(ControlMapping one)
     {
-        if (one.Kind is not (ControlKind.Instrument or ControlKind.Action)) return "";
+        if (one.Kind is not (ControlKind.Device or ControlKind.Action)) return "";
         if (one.Key.Length == 0 || one.Name.Length == 0) return "";
 
         string spaced = " " + one.Key.Replace('_', ' ');
