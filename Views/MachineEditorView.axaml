@@ -340,6 +340,7 @@
                                    Scope="{Binding MachineEditor.PreviewScope}"
                                    Location="{Binding MachineEditor.PreviewLocation}"
                                    Slices="{Binding MachineEditor.PreviewSlices}"
+                                   Menu="{Binding MachineEditor.PreviewMenu}"
                                    Selected="{Binding MachineEditor.SelectedShape, Mode=TwoWay}"
                                    Designing="{Binding MachineEditor.Designing}">
                 <!-- The same three things the buttons under the panel list do, where the hand
@@ -562,6 +563,34 @@
                                     SelectedItem="{Binding Source, Mode=TwoWay}"
                                     ToolTip.Tip="Its own presets are a handful shipped with the machine. Your recordings run to hundreds, so that one gets a category list in front of it." />
                         </Grid>
+
+                        <!-- A menu carries options rather than turning a value, and which ones
+                             is a tick apiece rather than a property to be typed. The list is
+                             built from the options there are, so one added later turns up here
+                             without this page being told. -->
+                        <StackPanel Spacing="4" IsVisible="{Binding IsMenu}">
+                          <!-- A menu is drawn over the panel rather than in it, so where it was
+                               dropped makes no difference and its corner is the whole of where
+                               it is. Two of them, because the top is where a hand looks for a
+                               menu and the bottom is where a machine's own controls run out. -->
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Margin="0,0,0,4">
+                            <TextBlock Grid.Column="0" Classes="label" Text="Sits in:" />
+                            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                      ItemsSource="{Binding Corners}"
+                                      SelectedItem="{Binding Corner, Mode=TwoWay}"
+                                      ToolTip.Tip="Which corner of the panel it sits in. It is drawn over the machine's own controls, so dropping it somewhere else on the panel changes nothing." />
+                          </Grid>
+
+                          <TextBlock Classes="cardTitle" Text="Drops down" />
+
+                          <ItemsControl ItemsSource="{Binding Options}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:MachineMenuOptionViewModel">
+                                <CheckBox Content="{Binding Said}" IsChecked="{Binding On}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
 
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                           <TextBlock Grid.Column="0" Classes="cardTitle" VerticalAlignment="Center" Text="Set to" />

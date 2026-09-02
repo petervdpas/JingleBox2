@@ -90,10 +90,24 @@ public sealed class DesignHistory
     /// <summary>True when what is on screen is not what is in the folder.</summary>
     public bool NeedsSaving => _now != _saved;
 
-    /// <summary>Says the machine has just been written to disc, so this is what saved means now.</summary>
-    public void Saved(MachineProject? project) 
+    /// <summary>
+    /// Says the machine has just been written to disc, so this is what saved means now.
+    /// </summary>
+    /// <remarks>
+    /// Both, and that is the whole of it: what is on disc is what is on screen at the moment it
+    /// is written, by definition. Setting only the one on disc left the other holding whatever
+    /// it last saw, and saving itself moves the machine: the version is bumped on the way out,
+    /// so the file carries 1.12 while this went on believing the screen still said 1.11. The two
+    /// then differ for ever, which is a Save button that goes green and never goes back and a
+    /// Cancel changes that offers to throw away a change nobody made.
+    ///
+    /// It is not only the version. Anything a save does to the machine on its way past has the
+    /// same effect, so the answer is not to hunt those down one at a time.
+    /// </remarks>
+    /// <param name="project">The machine as it was written.</param>
+    public void Saved(MachineProject? project)
     {
-        _saved = Said(project);
+        _now = _saved = Said(project);
 
         Changed?.Invoke();
     }

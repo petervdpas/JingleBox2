@@ -182,6 +182,7 @@
                                  Slices="{Binding Editor.MachineSlices}"
                                  Keyboard="{Binding MachineKeys}"
                                  Location="{Binding MachineLocation}"
+                                 Menu="{Binding Editor.MachineMenu}"
                                  Presets="{Binding Presets}"
                                  Reread="{Binding Editor.PanelReread}"
                                  Playhead="{Binding Editor.Playhead}"

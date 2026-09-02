@@ -118,6 +118,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(MachineUtilities.HasWork)) OnPropertyChanged(nameof(ShowsUtilities));
         };
+
+        PreviewMenu = new Midi.MachineLinks(
+            () => Project?.Id ?? "",
+            () => Project?.Name ?? "")
+        {
+            Told = said => Status = said
+        };
     }
 
     /// <summary>
@@ -583,6 +590,21 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
 
     /// <summary>
+    /// What the hardware on this desk does to the machine being laid out.
+    /// </summary>
+    /// <remarks>
+    /// The real thing rather than a demonstration, unlike the kit and the map beside it, and it
+    /// can be: the machine open here has the id everything else in this application knows it by,
+    /// so what your controllers do to it is a real answer and applying a template really applies
+    /// one. A made up list would be worse than useless, since somebody laying out a Links part
+    /// would be judging its width against names nobody has.
+    ///
+    /// It says what it did on the line under the title, which is where this page says everything
+    /// else it has done.
+    /// </remarks>
+    public IMachineMenu PreviewMenu { get; }
+
+    /// <summary>
     /// What the picker on the panel being laid out offers.
     /// </summary>
     /// <remarks>
@@ -898,6 +920,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.Zones,
         MachineElementKinds.ZonePicker,
         MachineElementKinds.Slices,
+        MachineElementKinds.Menu,
         MachineElementKinds.Label,
         MachineElementKinds.Text,
         MachineElementKinds.Spacer
@@ -924,6 +947,13 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         var into = SelectedElement ?? Elements.FirstOrDefault();
 
         if (into == null) return;
+
+        if (Spare(kind!) is { } refused)
+        {
+            Status = refused;
+
+            return;
+        }
 
         SelectedElement = into.Add(Celled(into, Part(kind!)));
 
@@ -1435,12 +1465,38 @@ public sealed partial class MachineEditorViewModel : ObservableObject
 
         if (target == null) return;
 
+        if (Spare(kind) is { } refused)
+        {
+            Status = refused;
+
+            return;
+        }
+
         SelectedElement = target.Put(Celled(target, Part(kind)), at);
 
         Designing = true;
 
         Status = "Added " + kind + ".";
     }
+
+    /// <summary>
+    /// Why that part cannot be added, or nothing when it can.
+    /// </summary>
+    /// <remarks>
+    /// One menu to a machine, and it is the only part with a limit. A menu is drawn over the
+    /// panel in the corner it names rather than laid out with the controls, so a second one is
+    /// either in the same corner drawing over the first or in another corner offering the same
+    /// lines twice. Neither is a thing anybody meant, and both are the kind of mistake you only
+    /// notice with the designer shut.
+    ///
+    /// Said rather than silently dropped, and said in terms of what to do instead: the one that
+    /// is there is the one to move, and moving it is choosing a corner.
+    /// </remarks>
+    /// <param name="kind">The part being added.</param>
+    private string? Spare(string kind) =>
+        kind == MachineElementKinds.Menu && Every().Any(one => one.Kind == MachineElementKinds.Menu)
+            ? "This machine already has a menu. There is one to a machine: pick the one it has and choose a corner for it."
+            : null;
 
     /// <summary>Whether a kind of element has an inside to put things in.</summary>
     private static bool Holds(string kind) =>
@@ -1856,7 +1912,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             Parameters.Add(wrapped);
         }
 
-        var root = new MachineElementViewModel(Root(value));
+        var root = new MachineElementViewModel(Root(value), edited: Redraw);
 
         Watch(root);
 

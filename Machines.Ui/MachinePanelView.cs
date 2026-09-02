@@ -15,6 +15,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
+using JingleBox2.Machines.Records;
 using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
@@ -128,6 +129,20 @@ public class MachinePanelView : Decorator
     /// <summary>Where the track playing this instrument has got to.</summary>
     public static readonly StyledProperty<IMachineLocation?> LocationProperty =
         AvaloniaProperty.Register<MachinePanelView, IMachineLocation?>(nameof(Location));
+
+    /// <summary>
+    /// What the hardware on somebody's desk does to this machine.
+    /// </summary>
+    /// <remarks>
+    /// Beside the presets and the map rather than among the settings, because it is none of the
+    /// machine's business: which controller is plugged in and what it has been pointed at belong
+    /// to the room the machine is being played in, and change while the panel is on screen.
+    ///
+    /// Nothing here means the Menu part draws nothing outside the designer, the same answer the
+    /// map and the pads give when whoever is showing the panel has none to offer.
+    /// </remarks>
+    public static readonly StyledProperty<IMachineMenu?> MenuProperty =
+        AvaloniaProperty.Register<MachinePanelView, IMachineMenu?>(nameof(Menu));
 
     /// <summary>
     /// The machine's own folder, which is what the pictures on its panel are named against.
@@ -459,6 +474,13 @@ public class MachinePanelView : Decorator
         set => SetValue(LocationProperty, value);
     }
 
+    /// <inheritdoc cref="MenuProperty"/>
+    public IMachineMenu? Menu
+    {
+        get => GetValue(MenuProperty);
+        set => SetValue(MenuProperty, value);
+    }
+
     /// <inheritdoc cref="SelectedProperty"/>
     public MachineElement? Selected
     {
@@ -721,6 +743,9 @@ public class MachinePanelView : Decorator
 
         var built = Build(panel.Root, parameters);
 
+        if (Cornered(panel.Root, parameters) is { } corner && built is not null)
+            built = new Panel { Children = { built, corner } };
+
         if (_handles.Parent is Panel was) was.Children.Remove(_handles);
         if (_glow.Parent is Panel lit) lit.Children.Remove(_glow);
 
@@ -783,6 +808,8 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
         };
+
+        if (element.Element == MachineElementKinds.Menu) return null;
 
         built ??= Designing ? Waiting(element) : null;
 
@@ -871,6 +898,49 @@ public class MachinePanelView : Decorator
             control.Height = height;
             control.VerticalAlignment = VerticalAlignment.Top;
         }
+    }
+
+    /// <summary>
+    /// The machine's Menu, drawn over the panel in the corner it names, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Over the panel and never in it, which is why <see cref="Build"/> gives nothing back for
+    /// one. A Menu is the one place this program speaks on somebody's front panel: laid out with
+    /// the machine's own controls it would take a row of the face and push everything else about,
+    /// and dropped into a column it would land wherever the drop happened rather than where a
+    /// hand looks for it.
+    ///
+    /// So where it is dropped in the tree makes no difference and only its corner does. It is
+    /// still skinned and registered like anything else, so it can be picked and worked on in the
+    /// designer exactly as a knob is.
+    ///
+    /// The first one, if a machine has somehow been given two. Two menus over one panel would
+    /// draw on top of each other in the same corner, and the answer to a machine that asks for
+    /// something impossible is to do the sane half of it.
+    /// </remarks>
+    /// <param name="root">The panel's outermost element, to look through.</param>
+    /// <param name="parameters">What the machine's controls stand for.</param>
+    private Control? Cornered(MachineElement root, Dictionary<string, MachineParameter> parameters)
+    {
+        if (Menus(root).FirstOrDefault() is not { } element) return null;
+
+        if (BuildMenu(element) is not { } built) return null;
+
+        Sized(element, built);
+        Tipped(element, built);
+
+        return Apart(element, Skin(element, built, holdsOthers: false));
+    }
+
+    /// <summary>Every Menu anywhere in that tree, in the order they are written down.</summary>
+    /// <param name="element">Where to start looking.</param>
+    private static IEnumerable<MachineElement> Menus(MachineElement element)
+    {
+        if (element.Element == MachineElementKinds.Menu) yield return element;
+
+        foreach (var child in element.Children)
+            foreach (var found in Menus(child))
+                yield return found;
     }
 
     /// <summary>
@@ -2102,6 +2172,163 @@ public class MachinePanelView : Decorator
         if (take.Length == 0) return "Pick a recording...";
 
         return Takes?.Describe(take) is { Length: > 0 } described ? described : take;
+    }
+
+    /// <summary>
+    /// The three bars, and behind them what your controllers do to this machine.
+    /// </summary>
+    /// <remarks>
+    /// A button and not a list, because what is behind it is a shelf rather than a setting and a
+    /// machine's face has no room to stand one open. What is on offer is asked for when the
+    /// button is pressed rather than when the panel is built: a layout saved to disc a moment
+    /// ago, or a knob pointed at this machine while the panel was open, would both be missing
+    /// from anything read earlier.
+    ///
+    /// Nothing to offer draws nothing outside the designer, the same answer the map and the pads
+    /// give. Inside it the button draws anyway, since a machine is being laid out and a panel
+    /// that left a hole would be laid out around the hole.
+    /// </remarks>
+    /// <param name="element">The part as the machine described it.</param>
+    private Control? BuildMenu(MachineElement element)
+    {
+        if (this.Menu is null && !Designing) return null;
+
+        string caption = Text(element, "caption");
+
+        var button = new PushButton
+        {
+            Label = element.Label.Length > 0 ? element.Label : null,
+            CapText = caption.Length > 0 ? caption : Bars,
+        };
+
+        if (Measurement(element, "cap") is { } wide) button.CapWidth = wide;
+        if (Measurement(element, "capHeight") is { } tall) button.CapHeight = tall;
+
+        var (across, down) = Cornered(Text(element, MachineMenuCorners.Property));
+
+        button.HorizontalAlignment = across;
+        button.VerticalAlignment = down;
+
+        button.Pressed += (_, _) => Offered(button, element);
+
+        return button;
+    }
+
+    /// <summary>
+    /// The four corners, spelled out both ways.
+    /// </summary>
+    /// <remarks>
+    /// Written as a map of literal words rather than worked out from the toolkit's own names, so
+    /// what a machine may write in its file is a decision here and does not move when something
+    /// is renamed in somebody else's library. A machine on somebody's disc outlives a
+    /// refactoring.
+    /// </remarks>
+    private static readonly (string Said, HorizontalAlignment Across, VerticalAlignment Down)[] Corners =
+    {
+        (MachineMenuCorners.TopRight, HorizontalAlignment.Right, VerticalAlignment.Top),
+        (MachineMenuCorners.TopLeft, HorizontalAlignment.Left, VerticalAlignment.Top),
+        (MachineMenuCorners.BottomRight, HorizontalAlignment.Right, VerticalAlignment.Bottom),
+        (MachineMenuCorners.BottomLeft, HorizontalAlignment.Left, VerticalAlignment.Bottom)
+    };
+
+    /// <summary>
+    /// Which corner that word names, and the top right for a word that names none.
+    /// </summary>
+    /// <remarks>
+    /// A corner and never a stretch, whatever is holding it. Dropped into a grid with one column
+    /// an ordinary control fills the width, which for this one would be a bar across the machine
+    /// where a button belongs: it is not a control of the machine's, it is the one place this
+    /// program speaks on somebody's front panel, and it has to keep out of the way of the things
+    /// that are the machine.
+    ///
+    /// The top right by default, which is where every program puts this button and therefore the
+    /// first place a hand looks.
+    /// </remarks>
+    /// <param name="said">The word out of the file.</param>
+    private static (HorizontalAlignment Across, VerticalAlignment Down) Cornered(string said)
+    {
+        foreach (var corner in Corners)
+            if (string.Equals(corner.Said, said.Trim(), StringComparison.OrdinalIgnoreCase))
+                return (corner.Across, corner.Down);
+
+        return (Corners[0].Across, Corners[0].Down);
+    }
+
+    /// <summary>What is on a Links part nobody has worded: the three bars every program uses.</summary>
+    private const string Bars = "\u2630";
+
+    /// <summary>
+    /// Asks what is on offer and shows it under the button that was pressed.
+    /// </summary>
+    /// <remarks>
+    /// Nothing on offer shows nothing rather than an empty box, and that is deliberately left to
+    /// whoever fills this rather than answered here: a machine nobody has pointed anything at
+    /// wants a line saying so, and only the host can word one.
+    /// </remarks>
+    /// <param name="under">The button the menu hangs from.</param>
+    /// <param name="element">The part as the machine described it, which says which options it carries.</param>
+    private void Offered(Control under, MachineElement element)
+    {
+        var wanted = Wanted(element).ToList();
+
+        if (wanted.Count == 0) return;
+
+        new MenuFlyout { ItemsSource = Listed(wanted) }.ShowAt(under);
+    }
+
+    /// <summary>
+    /// Only the lines belonging to the options this Menu carries.
+    /// </summary>
+    /// <remarks>
+    /// The host offers everything it has and the machine's file says which of it this Menu is
+    /// for, which is what makes the part generic: an option added later is offered by the host
+    /// and carried by any machine that asks for it, with nothing here to change.
+    ///
+    /// A Menu naming no options carries all of them, which is what one dropped on a panel and
+    /// left alone should do. An option this host has never heard of matches nothing and leaves
+    /// the rest alone, the same answer an element of an unknown kind gets. A line belonging to no
+    /// option is always carried: it is something the Menu always says rather than part of an
+    /// option anybody chose.
+    /// </remarks>
+    /// <param name="element">The part as the machine described it.</param>
+    private IEnumerable<MachineMenuItem> Wanted(MachineElement element)
+    {
+        var offers = this.Menu?.Read() ?? Array.Empty<MachineMenuItem>();
+
+        var named = Options.Named(Has(element, MachineMenuOptions.Property)
+            ? Text(element, MachineMenuOptions.Property)
+            : null);
+
+        return offers.Where(one => Options.Carries(named, one.Option));
+    }
+
+    /// <summary>Which options a Menu carries, as a rule that can be asked without a window.</summary>
+    private static readonly IMenuOptions Options = new MenuOptions();
+
+    /// <summary>
+    /// The same lines as menu items.
+    /// </summary>
+    /// <remarks>
+    /// Handed over as the menu's source rather than built into it, since a control put into an
+    /// items source is its own container. Nothing here decides anything.
+    /// </remarks>
+    /// <param name="offers">The lines to draw.</param>
+    private static List<MenuItem> Listed(IEnumerable<MachineMenuItem> offers)
+    {
+        var made = new List<MenuItem>();
+
+        foreach (var offer in offers)
+        {
+            var item = new MenuItem { Header = offer.Said, IsEnabled = offer.Live };
+
+            if (offer.Chosen is { } chosen) item.Click += (_, _) => chosen();
+
+            if (offer.Tip.Length > 0) ToolTip.SetTip(item, offer.Tip);
+
+            made.Add(item);
+        }
+
+        return made;
     }
 
     /// <summary>

@@ -1001,6 +1001,49 @@ whole exercise and is worth writing down rather than summarising:
 - What cannot be read is left out and counted rather than failing the lot, which is what a
   template from a newer version looks like: mostly this version's, and the useful answer is the
   part that works plus a line saying how much did not
+- **A machine's face can carry a Menu, and it is a generic part.** `MachineElementKinds.Menu` is
+  dropped onto the panel in the designer like a Knob, placed where the person building the
+  machine wants it, and carried in `machine.json` with the rest of the face. It turns no
+  parameter and never will: what is in it comes from the host through `IMachineMenu`, exactly the
+  way `Keys`, `Take`, `Preset` and `Zones` are already filled. It is not named after what it
+  holds, because what it holds is going to grow
+- **Which options it drops down is chosen in the designer**, tick by tick, from
+  `MachineMenuOptions.All`. Two today: `surfaces`, the control surfaces there is a template for
+  on this machine, and `learn`, which turns over the same mode Ctrl+Shift+M turns over. An option
+  added later turns up on the ticks and in every machine that has never been near that page,
+  because a Menu naming no options carries all of them. `IMenuOptions` is that rule on its own so
+  it can be asked without a window: a machine naming an option this build has never heard of
+  carries the ones it does understand rather than refusing the part, and a line belonging to no
+  option is always carried
+- **A corner of the machine, and not of the window around it**, which is the whole reason it had
+  to be a part. A button on the editor's card would be the host talking about the machine from
+  outside it, would exist only in the designer, and would be gone in the rack's window and in a
+  track's instrument window, which is where somebody actually sits with a machine and a
+  controller. It is also the only shape that does not break the rule this file keeps in three
+  places, that nothing is added to a machine's face from code, since here the machine asks for it
+- **It is drawn over the panel rather than in it.** `Build` gives nothing back for a Menu and the
+  panel puts it on a layer of its own, so where it is dropped in the tree makes no difference and
+  the corner is the whole of where it is: laid out with the machine's controls it would take a
+  row of the face and push everything else about. All four corners are offered, chosen from a
+  list in the designer rather than typed, since a machine with its name badge in one and its logo
+  across another has to be able to put it out of the way. The top right is the default
+- **One menu to a machine**, and it is the only part with a limit: a second is either in the same
+  corner drawing over the first or in another offering the same lines twice. Adding one where
+  there is one already says so and names what to do instead, and turning another part into a menu
+  is refused the same way; the one that exists may still be turned into something else and back,
+  since the rule is about a second menu and not about the menu
+- **A template is the links themselves and not a file**: the card the MIDI CC page draws, cut by
+  `ILinkTargets`. So the surfaces option lists one line per controller pointed at this machine,
+  and picking one re-applies that template through `ControlLink.Take`, which takes back anything
+  pointed elsewhere on that machine since. Hardware A and B against machines 1 and 2 is four
+  templates and there is no conflict between them: a link records the controller it was learned
+  on, so A and B both drive machine 1 and neither displaces the other
+- `Midi/MachineLinks.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
+  rule the cards are cut by, so the page and the part cannot drift into listing different things,
+  and nothing in it compares an id itself: how exact an id is is that rule's business. It reaches
+  the links through a question defaulting to `ControlLink.Current`, which is the door the
+  instrument panel already goes through, and a question rather than the door itself so that
+  having no desk at all can be tested
 - `RackMachine.DetailText` was a second copy of `TrackerInstrument.Detail` and is the instrument's
   own answer again. The two had already drifted, which is what that duplication always does: only
   one of them had been told that effects exist, so the row called an effect a plugin. This file

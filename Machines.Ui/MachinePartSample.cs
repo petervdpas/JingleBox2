@@ -105,6 +105,8 @@ public sealed class MachinePartSample : Decorator
     private const string ZonePickerKind = "ZonePicker";
     /// <inheritdoc cref="GridKind"/>
     private const string TextKind = "Text";
+    /// <inheritdoc cref="GridKind"/>
+    private const string MenuKind = "Menu";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
     /// <remarks>
@@ -222,6 +224,7 @@ public sealed class MachinePartSample : Decorator
         ZonesKind => BuildZones(),
         ZonePickerKind => BuildSlotPicker("Low", "High"),
         TextKind => BuildTextBox(),
+        MenuKind => BuildMenu(),
         _ => null,
     };
 
@@ -384,6 +387,22 @@ public sealed class MachinePartSample : Decorator
         FontSize = 10,
         Padding = new Thickness(8, 3),
         IsHitTestVisible = false,
+    };
+
+    /// <summary>
+    /// The three bars, on the same cap every other button on a machine wears.
+    /// </summary>
+    /// <remarks>
+    /// Not lit and not held. The others in the library are left somewhere plainly alive because
+    /// a knob at the bottom of its travel looks broken; this one has no travel and nothing to
+    /// report, and a lamp on it would be saying something it never says.
+    /// </remarks>
+    private static Control BuildMenu() => new PushButton
+    {
+        CapText = "\u2630",
+        CapWidth = 30,
+        CapHeight = 20,
+        FontSize = 11,
     };
 
     /// <summary>A latching button, held down, with its lamp lit to say so.</summary>

@@ -468,6 +468,32 @@ public static class MachineElementKinds
     /// </remarks>
     public const string Slices = "Slices";
 
+    /// <summary>
+    /// The control surfaces there is a layout for on this machine. Properties: corner, caption,
+    /// cap, capHeight.
+    /// </summary>
+    /// <remarks>
+    /// A knob on a controller can be pointed at this machine, and this is where the machine says
+    /// that belongs on its face: pressing it lists the desks a layout has been kept for, and one
+    /// line more that starts learning, which is the same mode Ctrl+Shift+M turns over.
+    ///
+    /// It turns no parameter and never will. Which desk is plugged in and what has been kept for
+    /// it are facts about the room the machine is being played in, not about the machine, so none
+    /// of it can be written into a song and none of it is the machine's to know. What is on offer
+    /// comes from whoever is showing the panel, through <see cref="IMachineMenu"/>, the same way
+    /// the presets and the map do.
+    ///
+    /// <b>It goes in a corner and it may not go anywhere else.</b> This is the one place the
+    /// program itself speaks on somebody's front panel, so it keeps out of the way of the things
+    /// that are the machine, and it never stretches to fill what is holding it however that is
+    /// laid out. <c>corner</c> is which one: topRight, which is the default and where every
+    /// program puts this button, or topLeft, bottomRight or bottomLeft.
+    ///
+    /// <c>caption</c> is what is written on it, and says nothing by default, which draws the
+    /// three bars every program uses for a menu. A machine with room for a word may use one.
+    /// </remarks>
+    public const string Menu = "Menu";
+
     /// <summary>Room left deliberately empty.</summary>
     public const string Spacer = "Spacer";
 }

@@ -180,6 +180,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         History.Opened(instrument);
         _changed = changed;
 
+        MachineMenu = new Midi.MachineLinks(() => MachineId, () => MachineName);
+
         Action<Note> tap = play ?? (note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
         Recordings = recordings ?? new ObservableCollection<Recording>();
@@ -378,6 +380,20 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
     public IMachineSlices? MachineSlices { get; private set; }
+
+    /// <summary>
+    /// What the hardware on this desk does to this machine, for the Links part on its face.
+    /// </summary>
+    /// <remarks>
+    /// One per editor and never rebuilt, unlike the pads and the map: it holds nothing about the
+    /// machine and asks which one every time it is worked, so an instrument pointed at another
+    /// machine needs nothing done to it here.
+    ///
+    /// By the machine's id rather than by this instrument, which is the whole design of a link.
+    /// A knob is pointed at OddSkilla's cutoff and not at track three's, so two instruments off
+    /// one machine are one answer here, as they are everywhere else.
+    /// </remarks>
+    public IMachineMenu MachineMenu { get; }
 
     /// <summary>
     /// Bumped when everything the described panel shows may have moved.

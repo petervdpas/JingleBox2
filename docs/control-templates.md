@@ -144,6 +144,89 @@ What cannot be read is left out and counted rather than failing the lot. A templ
 newer version is mostly this version's, and the useful answer is the part that works plus a line
 saying how much did not.
 
+## The Menu part on a machine's face
+
+A machine's face can carry a **Menu**: `MachineElementKinds.Menu`, dropped onto the panel in the
+designer like a Knob, placed where the person building the machine wants it, and carried in
+`machine.json` with the rest of the face. It turns no parameter and never will. What is in it
+comes from the host through `IMachineMenu`, exactly the way `Keys`, `Take`, `Preset` and `Zones`
+are already filled.
+
+It is deliberately not named after what it holds. What it holds is going to grow.
+
+**Which options it drops down is chosen in the designer**, a tick apiece, and the ticks are built
+from `MachineMenuOptions.All` so an option added later turns up without that page being told.
+Two today:
+
+- `surfaces`: the control surfaces there is a template for on this machine, one line each.
+- `learn`: start or stop learning, which is the same mode Ctrl+Shift+M turns over.
+
+A Menu naming no options carries all of them, which is what one dropped on a panel and left alone
+should do, and what every machine written before an option existed goes on doing when one is
+added. `IMenuOptions` is that rule on its own, so it can be asked without a window: a machine
+naming an option this build has never heard of carries the ones it does understand rather than
+refusing the part, and a line belonging to no option is always carried.
+
+**A corner of the machine, and not of the window around it.** That is the whole reason it had to
+be a part. A button on the editor's card would be the host talking about the machine from outside
+it, would exist only in the designer, and would be gone in the rack's window and in a track's
+instrument window, which is where somebody actually sits with a machine and a controller.
+
+**It is drawn over the panel rather than in it**, so where it is dropped in the tree makes no
+difference and its corner is the whole of where it is. Laid out with the machine's own controls
+it would take a row of the face and push everything else about, and dropped into a column it
+would land wherever the drop happened rather than where a hand looks for it. All four corners are
+offered, since a machine with its name badge in one and its logo across another has to be able to
+put it out of the way; the top right is the default, being where every program has ever put this
+button.
+
+**One menu to a machine**, and it is the only part with a limit. A second one is either in the
+same corner drawing over the first or in another corner offering the same lines twice, and both
+are the kind of mistake you only notice with the designer shut. Adding one where there is one
+already says so and names what to do instead, which is to pick the one that is there and choose a
+corner for it; turning some other part into a menu is refused the same way, and the one that
+exists may still be turned into something else and back.
+
+What it drops down today, on a machine two desks are pointed at:
+
+```
+  nanoKONTROL2  ·  12 controls
+  MiniLab 3  ·  8 controls
+  Learn a control
+```
+
+**A template is the links themselves and not a file.** It is the card the MIDI CC page draws, cut
+by `ILinkTargets`, so a machine nobody has pointed anything at lists no surfaces at all and one
+with a nanoKONTROL2 pointed at it lists that. Picking a surface re-applies its template through
+`ControlLink.Take`, which takes back anything pointed elsewhere on that machine since.
+
+Hardware A and B against machines 1 and 2 is four templates, and there is no conflict between
+them: a link records the controller it was learned on, so A and B both drive machine 1 and
+neither displaces the other. That is also why picking a surface is usually a no-op, and why it is
+worth having anyway: it is the repair when a knob has been moved.
+
+**The learn line is the keystroke and not a second way of doing it.** It turns over the same
+`ControlLink.IsLinking` and says which way it is about to turn it, since the menu is read again
+every time it opens and there is no other sign of the mode on a machine's face.
+
+**What a machine offers is a list of lines and not a menu.** `MachineMenuItem` is that shape:
+what it says, a tip, whether it is worth pressing, which option it belongs to, and what pressing
+it does. Flat. The library turns those into menu items where the panel is drawn, because a panel
+described in a file has no business naming a toolkit's types, and the side effect is that the
+whole of what a machine offers can be put a question to without a window.
+
+`Midi/MachineLinks.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
+rule the cards are cut by, and reaches the links through a question defaulting to
+`ControlLink.Current`, which is the door the instrument panel already goes through to offer a
+link at all. A question rather than the door itself, so that having no desk at all can be tested:
+a static cannot be stood in front of.
+
+`Tests/MachineMenuTests.cs` and `Tests/MenuOptionsTests.cs` are the two halves, and most of what
+they ask is not the happy path: no machine, no desk, an id that differs by case, a plugin and a
+mixer strip that are not this machine's templates, a link naming no controller, a line pressed
+after its links were taken off, an options list that is empty, untidy, repeated, or names a word
+this build has never heard of.
+
 ## What was built for it
 
 `ControlMapping.Owner` is new: what a link is pointed at, in the words on the front of it. The
@@ -223,19 +306,21 @@ track is not on its chain.
 
 ## Still open
 
-**Templates are not read on startup.** The folder is where they gather and where the picker
-opens, and nothing walks it. Reading one lays links down, which is a thing that should happen
-because somebody asked rather than because a file appeared. What might be worth having is a list
-of what is in the folder, so importing is picking a name rather than finding a path.
+**Templates are still not read on startup, and should not be.** Laying links down is a thing
+that should happen because somebody asked rather than because a file appeared. What was missing
+was the list, and the shelf is that list: the folder is walked when a machine's Links part is
+worked, so applying one is picking a name rather than finding a path. What has no such list yet
+is the mixer and the transport, which have no face of their own to carry a part.
 
-**A machine that is not registered here.** A template naming one imports and its links wait,
-exactly as they do for a controller that is not plugged in, and nothing says which machine it
-was for. The situation is already answered elsewhere, where a song naming an unregistered
-machine is read, passed over, and said once rather than left silent, and this should say the
-same thing in the same words.
+**The MIDI CC page still opens a file box.** Its Export and Import ask for a path. Export is the
+way a template leaves this computer, which does want a destination; Import is the one worth
+looking at again.
 
-**Recording.** Learning a link is still a gesture spread across the panels that offer one:
-`Views/Pointable.cs`, the machine panel and the transport bar each call `ControlLink.Offer`. It wants to be a subsystem of its own rather than a habit four views share,
-and the reason is the same reason the templates wanted a file: recording a whole template in one
-pass, control by control, is a thing the page should be able to drive rather than something that
-only happens as a side effect of resting a pointer somewhere.
+**The mixer, the transport and our own effects have no face to carry a Menu.** The mixer and the
+transport are drawn by this program rather than described by anybody, so there is nowhere to drop
+one; an effect of our own will have a described face when there are effect engines to have one,
+and then it gets the same part for the same reason.
+
+**More options.** The part exists to be added to. Anything a machine's own face should be able to
+offer, that the machine cannot know by itself, is a word in `MachineMenuOptions` and a line from
+whoever fills the menu.

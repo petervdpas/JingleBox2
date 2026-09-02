@@ -43,6 +43,83 @@ public class DesignHistoryTests
     }
 
     /// <summary>
+    /// Saving leaves nothing owing, even though saving itself moves the machine.
+    /// </summary>
+    /// <remarks>
+    /// This is the fault it was written for. A save bumps the version on its way out, so the
+    /// file carries 1.12 while the history went on believing the screen said 1.11, and the two
+    /// then differ for ever: the Save button goes green and never goes back, and Cancel changes
+    /// offers to throw away a change nobody made. What is on disc is what is on screen at the
+    /// moment it is written, by definition, so saying so is the whole of the fix and it covers
+    /// anything else a save does on its way past rather than only the version.
+    /// </remarks>
+    [Fact]
+    public void Saving_leaves_nothing_owing_although_saving_moves_the_machine()
+    {
+        var project = Machine();
+        var history = new DesignHistory();
+        history.Opened(project);
+
+        project.Panel.Root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+        history.Did(project);
+
+        Assert.True(history.NeedsSaving);
+
+        project.Version = "1.12";
+        history.Saved(project);
+
+        Assert.False(history.NeedsSaving);
+    }
+
+    /// <summary>And saving again, which is where the version really moves.</summary>
+    /// <remarks>
+    /// The first save of a session may not bump at all, so a fault here hides until the second
+    /// press. Somebody who saves twice is somebody who has been working, which is exactly who
+    /// notices a Save button that will not go cold.
+    /// </remarks>
+    [Fact]
+    public void Saving_twice_leaves_nothing_owing_either()
+    {
+        var project = Machine();
+        var history = new DesignHistory();
+        history.Opened(project);
+
+        for (int at = 1; at <= 3; at++)
+        {
+            project.Panel.Root.Children.Add(new MachineElement { Element = MachineElementKinds.Knob });
+            history.Did(project);
+
+            project.Version = "1." + at;
+            history.Saved(project);
+
+            Assert.False(history.NeedsSaving);
+        }
+    }
+
+    /// <summary>And an edit after a save still counts as one.</summary>
+    /// <remarks>
+    /// The other half of the same fix: saying the two are equal must not leave the history deaf
+    /// to what happens next, or the button would go cold and stay cold.
+    /// </remarks>
+    [Fact]
+    public void An_edit_after_a_save_still_needs_saving()
+    {
+        var project = Machine();
+        var history = new DesignHistory();
+        history.Opened(project);
+
+        project.Version = "1.12";
+        history.Saved(project);
+
+        Assert.False(history.NeedsSaving);
+
+        project.Name = "Something else";
+        history.Did(project);
+
+        Assert.True(history.NeedsSaving);
+    }
+
+    /// <summary>
     /// The face, the parameters and the name are one document, so undo walks back through all
     /// three in the order they were done.
     /// </summary>

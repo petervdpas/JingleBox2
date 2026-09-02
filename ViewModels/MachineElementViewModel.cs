@@ -4,6 +4,7 @@ using JingleBox2.Machines;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace JingleBox2.ViewModels;
 
@@ -28,10 +29,20 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// few dozen elements at most, and building it lazily would mean the parent of an element
     /// depending on whether anybody had looked at it yet.
     /// </remarks>
-    public MachineElementViewModel(MachineElement element, MachineElementViewModel? parent = null)
+    /// <param name="element">The element to wrap.</param>
+    /// <param name="parent">What holds it, or nothing for the root.</param>
+    /// <param name="edited">
+    /// Told whenever anything here writes into the element. Handed down to every child, so one
+    /// hook at the root hears the whole panel.
+    /// </param>
+    public MachineElementViewModel(
+        MachineElement element,
+        MachineElementViewModel? parent = null,
+        Action? edited = null)
     {
         Element = element;
         Parent = parent;
+        _edited = edited ?? parent?._edited;
 
         foreach (var child in element.Children) Children.Add(new MachineElementViewModel(child, this));
 
@@ -64,10 +75,115 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// </remarks>
     private static bool Owned(MachineElement element, string key) =>
         (element.Element == MachineElementKinds.Pads && key is RowsKey or ColumnsKey)
-        || (element.Element == MachineElementKinds.Preset && key == Tracker.Machines.MachineProject.SourceProperty);
+        || (element.Element == MachineElementKinds.Preset && key == Tracker.Machines.MachineProject.SourceProperty)
+        || (element.Element == MachineElementKinds.Menu
+            && key is MachineMenuOptions.Property or MachineMenuCorners.Property);
 
     /// <summary>True when the picked thing is the picker a machine is started from.</summary>
     public bool IsPicker => Element.Element == MachineElementKinds.Preset;
+
+    /// <summary>True when the picked thing is a menu, which carries options rather than a value.</summary>
+    public bool IsMenu => Element.Element == MachineElementKinds.Menu;
+
+    /// <summary>
+    /// Which corner a menu sits in, in the words on the page.
+    /// </summary>
+    /// <remarks>
+    /// A choice and not a property to be typed, because there are two of them and both are
+    /// spelled in a way nobody would guess. Where the part is dropped in the tree makes no
+    /// difference: a menu is drawn over the panel rather than in it, so its corner is the whole
+    /// of where it is.
+    /// </remarks>
+    public IReadOnlyList<string> Corners { get; } =
+        new[] { TopRightSaid, TopLeftSaid, BottomRightSaid, BottomLeftSaid };
+
+    /// <summary>What each corner is called on the page, against the word the file uses.</summary>
+    /// <remarks>
+    /// Written out both ways round rather than one turned into the other, so the words in the
+    /// file can be found by searching for them and the words on the page can be changed without
+    /// changing what any machine.json says.
+    /// </remarks>
+    private const string TopRightSaid = "Upper right";
+
+    /// <inheritdoc cref="TopRightSaid"/>
+    private const string TopLeftSaid = "Upper left";
+
+    /// <inheritdoc cref="TopRightSaid"/>
+    private const string BottomRightSaid = "Lower right";
+
+    /// <inheritdoc cref="TopRightSaid"/>
+    private const string BottomLeftSaid = "Lower left";
+
+    /// <summary>Which corner this menu sits in.</summary>
+    public string Corner
+    {
+        get => Element.Properties.TryGetValue(MachineMenuCorners.Property, out string? said)
+            && Words.FirstOrDefault(one =>
+                string.Equals(one.Said, said.Trim(), StringComparison.OrdinalIgnoreCase)) is { Page: { } named }
+                ? named
+                : TopRightSaid;
+        set
+        {
+            string want = Words.FirstOrDefault(one => one.Page == value).Said ?? MachineMenuCorners.TopRight;
+
+            if (want == Words[0].Said && !Element.Properties.ContainsKey(MachineMenuCorners.Property)) return;
+
+            if (Element.Properties.TryGetValue(MachineMenuCorners.Property, out string? was) && was == want)
+                return;
+
+            Element.Properties[MachineMenuCorners.Property] = want;
+
+            OnPropertyChanged();
+
+            Wrote();
+        }
+    }
+
+    /// <summary>
+    /// Each corner in the word the file uses against the words on the page.
+    /// </summary>
+    /// <remarks>
+    /// Written out both ways round rather than one turned into the other, so what a machine's
+    /// file says can be found by searching for it and what the designer calls it can be reworded
+    /// without changing any machine.json.
+    /// </remarks>
+    private static readonly (string Said, string Page)[] Words =
+    {
+        (MachineMenuCorners.TopRight, TopRightSaid),
+        (MachineMenuCorners.TopLeft, TopLeftSaid),
+        (MachineMenuCorners.BottomRight, BottomRightSaid),
+        (MachineMenuCorners.BottomLeft, BottomLeftSaid)
+    };
+
+    /// <summary>
+    /// The options a menu can carry, each with a tick saying whether this one does.
+    /// </summary>
+    /// <remarks>
+    /// Built from <see cref="MachineMenuOptions.All"/> rather than written out here, so an option
+    /// added later turns up in the designer without anybody being told: that is the whole point
+    /// of the part being a menu rather than a part named after what is in it today.
+    ///
+    /// Made once and kept, because the ticks are what the page is bound to and rebuilding the
+    /// list would take the bindings with it.
+    /// </remarks>
+    public IReadOnlyList<MachineMenuOptionViewModel> Options => _options ??= Ticks();
+
+    /// <summary>Says a tick wrote into the element, which is the same edit as any other here.</summary>
+    internal void Ticked() => Wrote();
+
+    /// <summary>Behind <see cref="Options"/>.</summary>
+    private IReadOnlyList<MachineMenuOptionViewModel>? _options;
+
+    /// <summary>One tick per option there is.</summary>
+    private IReadOnlyList<MachineMenuOptionViewModel> Ticks()
+    {
+        var made = new List<MachineMenuOptionViewModel>();
+
+        foreach (string option in MachineMenuOptions.All)
+            made.Add(new MachineMenuOptionViewModel(Element, option, Ticked));
+
+        return made;
+    }
 
     /// <summary>
     /// What the two browsers are called, in the order they are offered.
@@ -109,6 +225,8 @@ public sealed partial class MachineElementViewModel : ObservableObject
             Element.Properties[Tracker.Machines.MachineProject.SourceProperty] = want;
 
             OnPropertyChanged();
+
+            Wrote();
         }
     }
 
@@ -153,21 +271,79 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// <inheritdoc cref="Parent"/>
     private MachineElementViewModel? parent;
 
+    /// <summary>
+    /// Told whenever anything here writes into the element underneath.
+    /// </summary>
+    /// <remarks>
+    /// The elements are plain data and say nothing when they are edited, so an edit made through
+    /// one of these reaches the machine and nothing else: the history's idea of what is on screen
+    /// stays where it was, and the difference between that and what a save writes is permanent.
+    /// From the outside that is a Save button that goes green and never goes back.
+    ///
+    /// So every setter here that writes into the element ends at <see cref="Wrote"/>, rather than
+    /// each one being remembered about at its own call site. The one that was forgotten is the
+    /// one that breaks saving, and it will not be the same one twice.
+    /// </remarks>
+    private readonly Action? _edited;
+
+    /// <summary>Says the element underneath has been written into.</summary>
+    private void Wrote() => _edited?.Invoke();
+
     /// <summary>Which kind of thing this is, by the names in <see cref="MachineElementKinds"/>.</summary>
     /// <remarks>
     /// Settable, because turning a knob into a fader is a smaller edit than deleting one and
     /// adding the other, and it keeps the parameter and the position that were already right.
+    ///
+    /// Turning something into a menu is refused where the machine already has one, the same rule
+    /// adding one keeps and for the same reason: there is one to a machine. Refused by leaving
+    /// the kind where it was and saying so, since the picker would otherwise show a kind the
+    /// element is not.
     /// </remarks>
     public string Kind
     {
         get => Element.Element;
         set
         {
+            if (value == MachineElementKinds.Menu && Element.Element != MachineElementKinds.Menu && Elsewhere())
+            {
+                OnPropertyChanged();
+
+                return;
+            }
+
             Element.Element = value;
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(Display));
+
+            Wrote();
         }
+    }
+
+    /// <summary>Whether a menu already exists somewhere on this machine other than here.</summary>
+    /// <remarks>
+    /// Asked from the top of the tree, which is what the parent chain is for: an element knows
+    /// its parent, so the root can be reached from anywhere in the panel and the whole of it
+    /// walked from there.
+    /// </remarks>
+    private bool Elsewhere()
+    {
+        var top = this;
+
+        while (top.Parent is { } above) top = above;
+
+        return Under(top).Any(one => !ReferenceEquals(one, this) && one.Kind == MachineElementKinds.Menu);
+    }
+
+    /// <summary>That element and everything under it, depth first.</summary>
+    /// <param name="element">Where to start.</param>
+    private static IEnumerable<MachineElementViewModel> Under(MachineElementViewModel element)
+    {
+        yield return element;
+
+        foreach (var child in element.Children)
+            foreach (var one in Under(child))
+                yield return one;
     }
 
     /// <summary>The parameter this control turns, by key. Empty for anything that turns nothing.</summary>
@@ -180,6 +356,8 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(Display));
+
+            Wrote();
         }
     }
 
@@ -193,6 +371,8 @@ public sealed partial class MachineElementViewModel : ObservableObject
 
             OnPropertyChanged();
             OnPropertyChanged(nameof(Display));
+
+            Wrote();
         }
     }
 
@@ -486,4 +666,89 @@ public sealed partial class MachineElementPropertyViewModel : ObservableObject
             OnPropertyChanged();
         }
     }
+}
+
+/// <summary>
+/// One option a menu may carry, as a tick in the designer.
+/// </summary>
+/// <remarks>
+/// The words on the page are here and the words in the file are in
+/// <see cref="MachineMenuOptions"/>, written out both ways round rather than one turned into the
+/// other: what a machine's file says can be found by searching for it, and what the designer
+/// calls it can be reworded without changing any machine.json.
+///
+/// A menu that names no options carries all of them, which is what one dropped on a panel and
+/// left alone should do. So every tick starts on, and the property is only written once somebody
+/// has taken one off.
+/// </remarks>
+public sealed partial class MachineMenuOptionViewModel : ObservableObject
+{
+    /// <summary>The element this is a tick on, edited in place.</summary>
+    private readonly MachineElement _element;
+
+    /// <summary>Which option, in the word the file uses.</summary>
+    private readonly string _option;
+
+    /// <summary>One option of one menu.</summary>
+    /// <param name="element">The menu being worked on.</param>
+    /// <param name="option">Which option, in the word the file uses.</param>
+    /// <param name="edited">Told when this writes into the element, or nothing.</param>
+    public MachineMenuOptionViewModel(MachineElement element, string option, Action? edited = null)
+    {
+        _element = element;
+        _option = option;
+        _edited = edited;
+    }
+
+    /// <summary>Told when this writes into the element, so the machine counts as changed.</summary>
+    private readonly Action? _edited;
+
+    /// <summary>What this option is called on the page.</summary>
+    /// <remarks>
+    /// A word out of a file that nothing here has a name for still gets a line, spelled as the
+    /// file spells it, since a machine naming an option this build has never heard of should be
+    /// visible rather than silently dropped from the designer.
+    /// </remarks>
+    public string Said => Words.TryGetValue(_option, out string? said) ? said : _option;
+
+    /// <summary>What each option is called on the page, against the word the file uses.</summary>
+    private static readonly Dictionary<string, string> Words = new(StringComparer.Ordinal)
+    {
+        [MachineMenuOptions.Surfaces] = "The control surfaces pointed at this",
+        [MachineMenuOptions.Learn] = "Learn a control"
+    };
+
+    /// <summary>Whether this menu carries that option.</summary>
+    /// <remarks>
+    /// Taking the last one off leaves a menu that drops down nothing, which is allowed and is
+    /// what somebody laying out a panel around a part they have not decided about wants. It is
+    /// not a state the part hides in: the button is still there and still says so by opening
+    /// nothing.
+    /// </remarks>
+    public bool On
+    {
+        get => Carried().Contains(_option, StringComparer.OrdinalIgnoreCase);
+        set
+        {
+            var carried = Carried();
+
+            if (value == carried.Contains(_option, StringComparer.OrdinalIgnoreCase)) return;
+
+            if (value) carried.Add(_option);
+            else carried.RemoveAll(one => string.Equals(one, _option, StringComparison.OrdinalIgnoreCase));
+
+            _element.Properties[MachineMenuOptions.Property] =
+                string.Join(MachineMenuOptions.Between, carried);
+
+            OnPropertyChanged();
+
+            _edited?.Invoke();
+        }
+    }
+
+    /// <summary>Which options this menu says it carries, which is all of them where it says none.</summary>
+    private List<string> Carried() =>
+        _element.Properties.TryGetValue(MachineMenuOptions.Property, out string? said)
+            ? said.Split(MachineMenuOptions.Between, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()
+            : MachineMenuOptions.All.ToList();
 }
