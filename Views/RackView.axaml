@@ -62,7 +62,10 @@
        page beside it uses. -->
   <DockPanel>
 
-    <Grid ColumnDefinitions="240,12,*">
+    <!-- The list is 320 rather than 240, because what it draws is a name and a sentence under it
+         saying what the box is, and at 240 that sentence folded onto three lines for every effect
+         with anything to say about itself. -->
+    <Grid ColumnDefinitions="320,12,*">
 
       <Border Grid.Column="0" Classes="card">
         <!-- Two tabs and one rule for both: what is on a tab is what this installation has
