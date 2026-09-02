@@ -278,6 +278,13 @@
       },
       "Children": [
         {
+          "Element": "InstrumentName",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
           "Element": "Column",
           "Parameter": "",
           "Label": "",

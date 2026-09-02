@@ -182,6 +182,8 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         MachineMenu = new Midi.MachineLinks(() => MachineId, () => MachineName);
 
+        Named = new InstrumentName(this);
+
         Action<Note> tap = play ?? (note => audition?.Audition(instrument, note, TrackerCell.NoVolume));
 
         Recordings = recordings ?? new ObservableCollection<Recording>();
@@ -380,6 +382,18 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
     public IMachineSlices? MachineSlices { get; private set; }
+
+    /// <summary>
+    /// What this instrument is called, as the badge on a machine's face reads and writes it.
+    /// </summary>
+    /// <remarks>
+    /// Beside <see cref="Name"/> rather than instead of it: that is the name itself and this is
+    /// the two questions a panel asks about it, which are what it says and whether it may be
+    /// changed here. One per editor and never rebuilt, since it holds nothing and reads the
+    /// instrument every time, so an instrument renamed anywhere else says so here without being
+    /// told.
+    /// </remarks>
+    public IInstrumentName Named { get; }
 
     /// <summary>
     /// What the hardware on this desk does to this machine, for the Links part on its face.

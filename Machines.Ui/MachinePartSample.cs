@@ -107,6 +107,8 @@ public sealed class MachinePartSample : Decorator
     private const string TextKind = "Text";
     /// <inheritdoc cref="GridKind"/>
     private const string MenuKind = "Menu";
+    /// <inheritdoc cref="GridKind"/>
+    private const string InstrumentNameKind = "InstrumentName";
 
     /// <summary>Which part to show. Anything this version has never heard of shows nothing.</summary>
     /// <remarks>
@@ -225,6 +227,7 @@ public sealed class MachinePartSample : Decorator
         ZonePickerKind => BuildSlotPicker("Low", "High"),
         TextKind => BuildTextBox(),
         MenuKind => BuildMenu(),
+        InstrumentNameKind => BuildInstrumentNameBadge(),
         _ => null,
     };
 
@@ -403,6 +406,29 @@ public sealed class MachinePartSample : Decorator
         CapWidth = 30,
         CapHeight = 20,
         FontSize = 11,
+    };
+
+    /// <summary>
+    /// The badge, with a name on it somebody might plausibly have given an instrument.
+    /// </summary>
+    /// <remarks>
+    /// A name and not the word Name, since the chip is what the part is and a chip with its own
+    /// label on it would read as a control called Name rather than as somewhere a name goes.
+    /// </remarks>
+    private static Control BuildInstrumentNameBadge() => new Border
+    {
+        Background = new SolidColorBrush(Color.FromArgb(26, 255, 255, 255)),
+        BorderBrush = new SolidColorBrush(Color.FromArgb(77, 255, 255, 255)),
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(4),
+        Padding = new Thickness(5, 1),
+        Child = new TextBlock
+        {
+            Text = "Bassline",
+            FontSize = 10,
+            FontWeight = FontWeight.SemiBold,
+            FontFamily = new FontFamily("Cascadia Mono,Consolas,DejaVu Sans Mono,monospace"),
+        },
     };
 
     /// <summary>A latching button, held down, with its lamp lit to say so.</summary>

@@ -3,7 +3,7 @@
   "Name": "OddSkilla",
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
-  "Version": "1.14",
+  "Version": "1.15",
   "Engine": "",
   "Theme": {
     "Accent": "#E2A03F",
@@ -258,6 +258,21 @@
                 "margin": "0,0,0,14",
                 "align": "bottom"
               },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "Element": "Row",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": [
+            {
+              "Element": "InstrumentName",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {},
               "Children": []
             }
           ]

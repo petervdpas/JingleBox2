@@ -183,6 +183,7 @@
                                  Keyboard="{Binding MachineKeys}"
                                  Location="{Binding MachineLocation}"
                                  Menu="{Binding Editor.MachineMenu}"
+                                 InstrumentName="{Binding Editor.Named}"
                                  Presets="{Binding Presets}"
                                  Reread="{Binding Editor.PanelReread}"
                                  Playhead="{Binding Editor.Playhead}"
@@ -203,19 +204,6 @@
 
     </StackPanel>
   </ScrollViewer>
-
-    <!-- Over the panel, not above it: a line spent on the name is a line the machine does not
-         get, and the corner is empty on every machine we ship. Read only for a machine on the
-         rack, which keeps the machine's own name; a song's instrument is yours to call
-         anything. -->
-    <Border Classes="badge instrument"
-            HorizontalAlignment="Right" VerticalAlignment="Top"
-            Margin="0,2,2,0"
-            ToolTip.Tip="What this instrument is called in the song. A machine keeps the machine's name. Duplicate it to have one of your own.">
-      <TextBox Classes="name"
-               Text="{Binding Editor.Name}"
-               IsReadOnly="{Binding !Editor.CanRename}" />
-    </Border>
 
   </Panel>
   </Border>

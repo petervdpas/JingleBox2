@@ -88,6 +88,13 @@
                 "margin": "0,50,0,0"
               },
               "Children": []
+            },
+            {
+              "Element": "InstrumentName",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {},
+              "Children": []
             }
           ]
         },
@@ -400,7 +407,7 @@
                               "Label": "",
                               "Properties": {
                                 "dial": "40",
-                                "tip": "How loud this pad is, under the track\u0027s own level."
+                                "tip": "How loud this pad is, under the track's own level."
                               },
                               "Children": []
                             },
@@ -410,7 +417,7 @@
                               "Label": "",
                               "Properties": {
                                 "dial": "40",
-                                "tip": "Where this pad stands on the kit. The track\u0027s own pan is added to it."
+                                "tip": "Where this pad stands on the kit. The track's own pan is added to it."
                               },
                               "Children": []
                             },

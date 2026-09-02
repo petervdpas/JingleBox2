@@ -131,6 +131,20 @@ public class MachinePanelView : Decorator
         AvaloniaProperty.Register<MachinePanelView, IMachineLocation?>(nameof(Location));
 
     /// <summary>
+    /// The instrument's name in the song, for a machine that carries a badge for it.
+    /// </summary>
+    /// <remarks>
+    /// Beside the presets and the map rather than among the settings, because it is not the
+    /// machine's: a machine is called what the machine is called, and an instrument off it is
+    /// yours to call anything.
+    ///
+    /// Nothing here means the badge draws nothing outside the designer, the same answer the map
+    /// and the pads give when whoever is showing the panel has none to offer.
+    /// </remarks>
+    public static readonly StyledProperty<IInstrumentName?> InstrumentNameProperty =
+        AvaloniaProperty.Register<MachinePanelView, IInstrumentName?>(nameof(InstrumentName));
+
+    /// <summary>
     /// What the hardware on somebody's desk does to this machine.
     /// </summary>
     /// <remarks>
@@ -474,6 +488,13 @@ public class MachinePanelView : Decorator
         set => SetValue(LocationProperty, value);
     }
 
+    /// <inheritdoc cref="InstrumentNameProperty"/>
+    public IInstrumentName? InstrumentName
+    {
+        get => GetValue(InstrumentNameProperty);
+        set => SetValue(InstrumentNameProperty, value);
+    }
+
     /// <inheritdoc cref="MenuProperty"/>
     public IMachineMenu? Menu
     {
@@ -805,6 +826,7 @@ public class MachinePanelView : Decorator
             MachineElementKinds.Zones => BuildZones(element),
             MachineElementKinds.ZonePicker => BuildZonePicker(element),
             MachineElementKinds.Slices => BuildSlices(element),
+            MachineElementKinds.InstrumentName => BuildInstrumentName(element),
             MachineElementKinds.Spacer => BuildSpacer(element),
             _ => null,
         };
@@ -2173,6 +2195,90 @@ public class MachinePanelView : Decorator
 
         return Takes?.Describe(take) is { Length: > 0 } described ? described : take;
     }
+
+    /// <summary>
+    /// The badge with what this is called on it, typed into where that is allowed.
+    /// </summary>
+    /// <remarks>
+    /// A chip rather than a row, because a line spent on the name is a line the machine does not
+    /// get, and it is drawn where the machine put it rather than in a corner this program chose.
+    /// It used to be the second: a badge laid over every panel from code, which is the one thing
+    /// a machine's face is never supposed to have done to it. A machine that had never asked for
+    /// one grew it, and a machine with something of its own in that corner had the two drawn on
+    /// top of each other.
+    ///
+    /// Read only where what is being shown is the machine itself rather than an instrument off
+    /// it, since renaming there would be renaming the machine, which is a different act in a
+    /// different place.
+    ///
+    /// Written back as it is typed rather than when the box is left, because there is nothing
+    /// here to leave it for: a panel is not a form and nobody presses anything afterwards.
+    /// </remarks>
+    /// <param name="element">The part as the machine described it.</param>
+    private Control? BuildInstrumentName(MachineElement element)
+    {
+        if (InstrumentName is null && !Designing) return null;
+
+        var palette = ThemePalette.From(this);
+
+        var box = new TextBox
+        {
+            Text = InstrumentName?.Said ?? (Designing ? Anybody : ""),
+            IsReadOnly = InstrumentName?.Fixed ?? false,
+            FontSize = BadgeText,
+            FontWeight = FontWeight.SemiBold,
+            FontFamily = Mono,
+            TextAlignment = TextAlignment.Center,
+            Padding = new Thickness(0),
+            MinWidth = 0,
+            MinHeight = 0,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        box.TextChanged += (_, _) =>
+        {
+            if (InstrumentName is { Fixed: false } named && named.Said != (box.Text ?? "")) named.Said = box.Text ?? "";
+        };
+
+        Reads(() =>
+        {
+            if (InstrumentName is not { } named) return;
+
+            if (!box.IsFocused && box.Text != named.Said) box.Text = named.Said;
+        });
+
+        var chip = new Border
+        {
+            Child = box,
+            Background = new SolidColorBrush(ThemePalette.Alpha(palette.Text, BadgeFill)),
+            BorderBrush = new SolidColorBrush(ThemePalette.Alpha(palette.Text, BadgeEdge)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(5, 1),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        if (Measurement(element, "width") is { } wide) box.Width = wide;
+
+        return chip;
+    }
+
+    /// <summary>What a name badge says while a panel is being laid out and there is nobody on it.</summary>
+    private const string Anybody = "Bassline";
+
+    /// <summary>How big the lettering on a name badge is.</summary>
+    private const double BadgeText = 10;
+
+    /// <summary>How much of the panel's own lettering colour fills a name badge, and edges it.</summary>
+    private const byte BadgeFill = 26;
+
+    /// <inheritdoc cref="BadgeFill"/>
+    private const byte BadgeEdge = 77;
+
+    /// <summary>What a name is written in, which is what every reading on a panel is written in.</summary>
+    private static readonly FontFamily Mono = new("Cascadia Mono,Consolas,DejaVu Sans Mono,monospace");
 
     /// <summary>
     /// The three bars, and behind them what your controllers do to this machine.

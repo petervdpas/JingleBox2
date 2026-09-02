@@ -167,6 +167,13 @@ added. `IMenuOptions` is that rule on its own, so it can be asked without a wind
 naming an option this build has never heard of carries the ones it does understand rather than
 refusing the part, and a line belonging to no option is always carried.
 
+The name badge went the same way and for the same reason. `MachineElementKinds.InstrumentName`
+is a part now, placed by the machine, where it used to be drawn over every panel from code in a
+corner this program chose. Two goes at moving it out of the Menu's way, beside it and then
+centred, both looked like furniture shuffled around somebody else's design, which is what they
+were. What it shows belongs to the song rather than to the machine, so it comes from the host
+through `IInstrumentName`, exactly as the Menu's lines do.
+
 **A corner of the machine, and not of the window around it.** That is the whole reason it had to
 be a part. A button on the editor's card would be the host talking about the machine from outside
 it, would exist only in the designer, and would be gone in the rack's window and in a track's

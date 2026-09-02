@@ -494,6 +494,28 @@ public static class MachineElementKinds
     /// </remarks>
     public const string Menu = "Menu";
 
+    /// <summary>
+    /// The instrument's name in the song, as a badge. Properties: width.
+    /// </summary>
+    /// <remarks>
+    /// The instrument's own name, which belongs to the song and not to the machine: a machine is
+    /// called what the machine is called, and an instrument off it is yours to call anything. So
+    /// it turns no parameter and cannot: it comes from whoever is showing the panel, through
+    /// <see cref="IInstrumentName"/>, the same way the presets and the map do, and it is read only
+    /// where what is being shown is the machine itself rather than an instrument.
+    ///
+    /// It is a part so that the machine says where it goes. This program used to draw it in a
+    /// corner over every panel, which is the one thing a machine's face is never supposed to
+    /// have done to it: a machine that had never asked for it grew one, and a machine with
+    /// something of its own in that corner had the two drawn on top of each other.
+    ///
+    /// A machine with no InstrumentName on it shows no name, which is a machine saying its face is
+    /// its own.
+    /// Nothing is lost by that: the window is titled with it, the rack lists it, and the song's
+    /// instrument list renames it.
+    /// </remarks>
+    public const string InstrumentName = "InstrumentName";
+
     /// <summary>Room left deliberately empty.</summary>
     public const string Spacer = "Spacer";
 }

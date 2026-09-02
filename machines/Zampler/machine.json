@@ -328,6 +328,13 @@
                 "margin": "0,20,0,0"
               },
               "Children": []
+            },
+            {
+              "Element": "InstrumentName",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {},
+              "Children": []
             }
           ]
         },

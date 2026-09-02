@@ -254,6 +254,13 @@
                 "width": "258"
               },
               "Children": []
+            },
+            {
+              "Element": "InstrumentName",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {},
+              "Children": []
             }
           ]
         },

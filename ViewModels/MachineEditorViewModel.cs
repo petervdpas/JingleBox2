@@ -590,6 +590,17 @@ public sealed partial class MachineEditorViewModel : ObservableObject
     public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
 
     /// <summary>
+    /// And a name for the badge, since a badge laid out around an empty one is the wrong width.
+    /// </summary>
+    /// <remarks>
+    /// A demonstration like the kit and the map beside it, and for the same reason: what a
+    /// machine is called here is the machine's own name and what the badge shows in use is an
+    /// instrument's, which is a different length and is not this page's to invent. Fixed, since
+    /// there is no instrument here to rename.
+    /// </remarks>
+    public IInstrumentName PreviewName { get; } = new MachinePreviewName();
+
+    /// <summary>
     /// What the hardware on this desk does to the machine being laid out.
     /// </summary>
     /// <remarks>
@@ -921,6 +932,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
         MachineElementKinds.ZonePicker,
         MachineElementKinds.Slices,
         MachineElementKinds.Menu,
+        MachineElementKinds.InstrumentName,
         MachineElementKinds.Label,
         MachineElementKinds.Text,
         MachineElementKinds.Spacer

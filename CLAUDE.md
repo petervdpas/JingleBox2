@@ -1001,6 +1001,23 @@ whole exercise and is worth writing down rather than summarising:
 - What cannot be read is left out and counted rather than failing the lot, which is what a
   template from a newer version looks like: mostly this version's, and the useful answer is the
   part that works plus a line saying how much did not
+- **The instrument's name in the song is a part too, and used to be the exception that proved
+  the rule.** `MachineElementKinds.InstrumentName` is the badge, dropped on the panel like a Knob
+  and placed by whoever builds the machine. It was drawn over every panel from code, in a corner
+  this program chose, which is the one thing a machine's face is never supposed to have done to
+  it: a machine that had never asked for a badge grew one, and a machine that put a Menu in that
+  corner had the two drawn on top of each other. Two goes at moving it out of the way, beside the
+  Menu and then centred, both looked like what they were, which is furniture shuffled around
+  somebody else's design
+- It turns no parameter and cannot: a machine is called what the machine is called and an
+  instrument off it is yours to call anything, so the name belongs to the song. `IInstrumentName`
+  is the two questions a panel asks about it, what it says and whether it may be changed here,
+  and a machine on the rack answers the second no, since renaming there would be renaming the
+  machine. A machine with no badge shows no name, which is a machine saying its face is its own;
+  nothing is lost, because the window is titled with it, the rack lists it and the song's
+  instrument list renames it. `Tests/MachinePartsTests.cs` reads the machines that ship off the
+  disc and says each carries exactly one badge and at most one Menu, that neither is pointed at
+  a parameter, and that the words in those files are the words the code spells
 - **A machine's face can carry a Menu, and it is a generic part.** `MachineElementKinds.Menu` is
   dropped onto the panel in the designer like a Knob, placed where the person building the
   machine wants it, and carried in `machine.json` with the rest of the face. It turns no
