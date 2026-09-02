@@ -16,7 +16,6 @@ using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Tracker.Records;
@@ -374,16 +373,16 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     }
 
     /// <summary>The kit behind the pads, on a machine that has any.</summary>
-    public IMachinePads? MachinePads { get; private set; }
+    public IPanelPads? MachinePads { get; private set; }
 
     /// <summary>The map behind the zones, on a machine that lays recordings across the keyboard.</summary>
-    public IMachineZones? MachineZones { get; private set; }
+    public IPanelZones? MachineZones { get; private set; }
 
     /// <summary>The shape it is making, on a machine that generates its sound.</summary>
     public IPanelScope? MachineScope { get; private set; }
 
     /// <summary>The recording being cut into pieces, on a machine that fills itself from one.</summary>
-    public IMachineSlices? MachineSlices { get; private set; }
+    public IPanelSlices? MachineSlices { get; private set; }
 
     /// <summary>
     /// What this instrument is called, as the badge on a machine's face reads and writes it.
@@ -452,7 +451,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     public IPanelValues? Values { get; private set; }
 
     /// <summary>Where it looks up the recording it names.</summary>
-    public IMachineTakes? MachineTakes { get; private set; }
+    public IPanelTakes? MachineTakes { get; private set; }
 
     /// <summary>True when the panel comes off the machine rather than out of this program.</summary>
     public bool IsDescribed => Described != null;

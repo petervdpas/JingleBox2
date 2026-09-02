@@ -10,9 +10,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines;
 using JingleBox2.Tracker;
 using JingleBox2.SoundDevices.SoundMachines.Records;
 
@@ -26,7 +24,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 public sealed class SoundMachinePresetFile(ISoundMachinePaths? paths = null) : ISoundMachinePresetFile
 {
     /// <summary>What a key is called, both ways round.</summary>
-    private readonly IMachineNotes _notes = new MachineNotes();
+    private readonly IPanelNotes _notes = new PanelNotes();
 
     /// <summary>Where a name written inside a machine really is, and back again.</summary>
     private readonly ISoundMachinePaths _paths = paths ?? new SoundMachinePaths();

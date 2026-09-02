@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using JingleBox2.Rack.SoundDevices.Faces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.ViewModels;
 using Xunit;
 

@@ -1,10 +1,10 @@
 using System.Globalization;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines;
+namespace JingleBox2.Rack.SoundDevices.Faces;
 
 /// <inheritdoc/>
-public sealed class MachineNotes : IMachineNotes
+public sealed class PanelNotes : IPanelNotes
 {
     /// <summary>
     /// The twelve, each padded to two characters.

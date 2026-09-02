@@ -1,4 +1,4 @@
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

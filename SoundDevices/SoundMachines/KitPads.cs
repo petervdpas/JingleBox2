@@ -1,7 +1,7 @@
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
 namespace JingleBox2.SoundDevices.SoundMachines;
@@ -24,7 +24,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// note held on the drawn keyboard does. Left out, a pad still sounds and still lights itself,
 /// and the keyboard stays dark: that is what a preview has, since there is no hand on it.
 /// </param>
-public sealed class KitPads(DrumKitViewModel kit, Midi.Interfaces.IMidiMonitor? keys = null) : IMachinePads
+public sealed class KitPads(DrumKitViewModel kit, Midi.Interfaces.IMidiMonitor? keys = null) : IPanelPads
 {
     /// <summary>Following a list of things and what each of them says.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>

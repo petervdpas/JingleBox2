@@ -1,4 +1,4 @@
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// The instrument's name in the song, which is the one thing on a panel that is not the machine's.
@@ -9,7 +9,7 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// name is the one thing on the face that is not the machine's.
 ///
 /// So the machine cannot hold it and the host must. The same arrangement
-/// <see cref="JingleBox2.Rack.SoundDevices.Faces.Interfaces.IPanelPresets"/> and <see cref="IMachineZones"/> already keep, and for the same
+/// <see cref="IPanelPresets"/> and <see cref="IPanelZones"/> already keep, and for the same
 /// reason: it is not a setting, it cannot be written into the machine, and it changes while the
 /// panel is on screen.
 ///

@@ -12,11 +12,9 @@ using System.Globalization;
 using System.Linq;
 using System.IO;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
-using JingleBox2.Rack.SoundDevices.SoundMachines;
 using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.ViewModels;
@@ -35,7 +33,7 @@ namespace JingleBox2.ViewModels;
 public sealed partial class DesignerViewModel : ObservableObject
 {
     /// <summary>What a key is called, both ways round.</summary>
-    private readonly IMachineNotes _notes = new MachineNotes();
+    private readonly IPanelNotes _notes = new PanelNotes();
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
@@ -633,7 +631,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// Set by whoever builds the editor, since the shelf belongs to the application and the
     /// editor is only borrowing it.
     /// </remarks>
-    public IMachineTakes? Takes { get; set; }
+    public IPanelTakes? Takes { get; set; }
 
     /// <summary>
     /// The shelf of takes the picker dialog offers, when this world has one.
@@ -658,19 +656,19 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// demonstration that exists so the controls have their real shape while a panel is being
     /// laid out around them.
     /// </remarks>
-    public IMachinePads PreviewPads { get; } = new SoundMachinePreviewKit();
+    public IPanelPads PreviewPads { get; } = new SoundMachinePreviewKit();
 
     /// <inheritdoc cref="PreviewPads"/>
-    public IMachineSlices PreviewSlices { get; } = new SoundMachinePreviewSlices();
+    public IPanelSlices PreviewSlices { get; } = new SoundMachinePreviewSlices();
 
     /// <summary>And a map for the panel to draw, for the same reason there is a kit.</summary>
-    public IMachineZones PreviewZones { get; } = new SoundMachinePreviewMap();
+    public IPanelZones PreviewZones { get; } = new SoundMachinePreviewMap();
 
     /// <summary>And a wave, so a machine laid out round a picture is laid out round a picture.</summary>
     public IPanelScope PreviewScope { get; } = new SoundMachinePreviewScope();
 
     /// <summary>And a pattern to count, so the lamps and their pages take the room they will.</summary>
-    public IMachineLocation PreviewLocation { get; } = new SoundMachinePreviewLocation();
+    public IPanelLocation PreviewLocation { get; } = new SoundMachinePreviewLocation();
 
     /// <summary>
     /// And a name for the badge, since a badge laid out around an empty one is the wrong width.

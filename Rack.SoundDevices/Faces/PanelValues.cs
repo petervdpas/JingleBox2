@@ -4,19 +4,19 @@ using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 namespace JingleBox2.Rack.SoundDevices.Faces;
 
 /// <summary>
-/// What a machine's settings are held in, with the announcing done for it.
+/// What a sound device's settings are held in, with the announcing done for it.
 /// </summary>
 /// <remarks>
-/// Every machine has to tell whatever is watching when one of its settings moves: the panel
+/// Every sound device has to tell whatever is watching when one of its settings moves: the panel
 /// redraws from it, the song is marked as worth saving by it, and anything else showing the
-/// same setting follows it. Left to each machine to remember, one of them will not, and the way
-/// that fails is the worst kind: the sound is right and the picture is wrong, so it looks like
-/// a drawing fault rather than a missing line, and it is invisible to the hand because a knob
-/// you are dragging draws itself from your hand rather than from the setting. It shows up the
-/// first time something else moves the value, which is to say the first time a controller does.
+/// same setting follows it. Left to each sound device to remember, one of them will not, and the
+/// way that fails is the worst kind: the sound is right and the picture is wrong, so it looks like
+/// a drawing fault rather than a missing line, and it is invisible to the hand because a knob you
+/// are dragging draws itself from your hand rather than from the setting. It shows up the first
+/// time something else moves the value, which is to say the first time a controller does.
 ///
-/// So <see cref="Set"/> is sealed and does the announcing, and a machine writes its values in
-/// <see cref="Write"/> and says whether anything moved. A machine cannot now move a value
+/// So <see cref="Set"/> is sealed and does the announcing, and a sound device writes its values in
+/// <see cref="Write"/> and says whether anything moved. A sound device cannot now move a value
 /// quietly, because there is nowhere left to do it.
 ///
 /// <c>Moved</c> is the other half of the same rule: it writes only when the value really
@@ -68,7 +68,7 @@ public abstract class PanelValues : IPanelValues
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Nothing, unless a machine says otherwise. Most of them are numbers from end to end and
+    /// Nothing, unless a sound device says otherwise. Most of them are numbers from end to end and
     /// have no text to answer with.
     /// </remarks>
     public virtual string GetText(string key) => "";
@@ -87,7 +87,9 @@ public abstract class PanelValues : IPanelValues
     /// <summary>Writes one text setting, and says whether it actually changed.</summary>
     protected virtual bool WriteText(string key, string value) => false;
 
-    /// <summary>Says it moved, for the few things that change without going through a key.</summary>
+    /// <summary>
+    /// Says it moved, for the few things that change without going through a key.
+    /// </summary>
     protected void Say(string key = "")
     {
         Changed?.Invoke();
@@ -104,7 +106,9 @@ public abstract class PanelValues : IPanelValues
         return true;
     }
 
-    /// <summary>The same for a switch, which a panel hands over as a number either side of a half.</summary>
+    /// <summary>
+    /// The same for a switch, which a panel hands over as a number either side of a half.
+    /// </summary>
     protected static bool Moved(bool was, double now, Action<bool> write)
     {
         bool wanted = now > 0.5;

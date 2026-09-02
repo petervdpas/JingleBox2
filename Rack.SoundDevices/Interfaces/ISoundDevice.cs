@@ -14,8 +14,8 @@ namespace JingleBox2.Rack.SoundDevices.Interfaces;
 /// What differs between the two is what happens to a device once it is in a song. A soundmachine
 /// is played, and there it becomes an instrument with your name and your settings; an effect is
 /// handed a whole track's audio and stands on that track's chain. Neither of those is a question
-/// this answers, which is why one contract serves both: it was two, `ISoundDevice` and `ISoundDevice`,
-/// declaring the same four members in two files.
+/// this answers, which is why one contract serves both: it was two, <c>IMachine</c> and
+/// <c>IEffect</c>, declaring the same four members in two files.
 ///
 /// Everything here is fixed for the life of the device. What it holds, the sound it makes or
 /// works on, and the panel it is laid out on are separate contracts, so a device can be described

@@ -3,26 +3,28 @@ using System.Collections.Generic;
 namespace JingleBox2.Rack.SoundDevices.Faces;
 
 /// <summary>
-/// The options a machine's Menu part can carry, one literal each.
+/// The options a sound device's Menu part can carry, one literal each.
 /// </summary>
 /// <remarks>
-/// A Menu is a generic part: the machine says it wants one and which options are on it, and the
-/// host fills those options in. Two today and there will be more, which is the whole reason the
-/// part is not called after either of them and the words live here rather than being built into
-/// the drawing.
+/// A Menu is a generic part: the sound device says it wants one and which options are on it, and
+/// the host fills those options in. Two today and there will be more, which is the whole reason the
+/// part is not called after either of them and the words live here rather than being built into the
+/// drawing.
 ///
 /// Written out as constants rather than an enum, the same as
-/// <see cref="ElementKinds"/> and for the same reason: a machine may name an option this
+/// <see cref="ElementKinds"/> and for the same reason: a sound device may name an option this
 /// host has never heard of, and the answer is to leave that line out rather than to refuse the
-/// file. A machine naming none carries every option there is, which is what a Menu dropped on a
-/// panel and left alone should do.
+/// file. A sound device naming none carries every option there is, which is what a Menu dropped on
+/// a panel and left alone should do.
 /// </remarks>
 public static class MenuOptionWords
 {
-    /// <summary>The control surfaces there is a template for on this machine, one line each.</summary>
+    /// <summary>
+    /// The control surfaces there is a template for on this sound device, one line each.
+    /// </summary>
     /// <remarks>
-    /// Picking one points that controller at this machine the way its template says. What a
-    /// template is, and which of them name this machine, is the host's to answer.
+    /// Picking one points that controller at this sound device the way its template says. What a
+    /// template is, and which of them name this sound device, is the host's to answer.
     /// </remarks>
     public const string Surfaces = "surfaces";
 
@@ -36,7 +38,7 @@ public static class MenuOptionWords
     /// </remarks>
     public static readonly IReadOnlyList<string> All = new[] { Surfaces, Learn };
 
-    /// <summary>What the property naming them is called in a machine's file.</summary>
+    /// <summary>What the property naming them is called in a sound device's file.</summary>
     public const string Property = "options";
 
     /// <summary>What separates them in that property.</summary>

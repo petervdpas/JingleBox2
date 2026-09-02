@@ -1,4 +1,4 @@
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker;
@@ -18,7 +18,7 @@ namespace JingleBox2.Tests;
 /// </remarks>
 public class PadKeyLightTests
 {
-    private static (IMachinePads Pads, IMidiMonitor Keys, DrumKit Kit) Kitted()
+    private static (IPanelPads Pads, IMidiMonitor Keys, DrumKit Kit) Kitted()
     {
         var kit = new DrumKit();
 

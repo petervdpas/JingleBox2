@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using System.ComponentModel;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.Rack.Controls;
 
@@ -14,7 +14,7 @@ namespace JingleBox2.Rack.Controls;
 /// It has no way of loading anything, on purpose. The recording is whichever one the machine
 /// already plays, so there is one place to put a sample and this is not it. What a piece becomes
 /// afterwards, a stretch of keyboard on one machine and one key on another, is settled by
-/// whoever supplied the <see cref="IMachineSlices"/>, so nothing here has to know which machine
+/// whoever supplied the <see cref="IPanelSlices"/>, so nothing here has to know which machine
 /// it is sitting on.
 ///
 /// It lives here rather than in the program because a machine carries it on its own face. A
@@ -24,8 +24,8 @@ namespace JingleBox2.Rack.Controls;
 public class ChopEditor : Decorator
 {
     /// <summary>Backs <see cref="Slices"/>: the recording being cut and where its boundaries are.</summary>
-    public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
-        AvaloniaProperty.Register<ChopEditor, IMachineSlices?>(nameof(Slices));
+    public static readonly StyledProperty<IPanelSlices?> SlicesProperty =
+        AvaloniaProperty.Register<ChopEditor, IPanelSlices?>(nameof(Slices));
 
     /// <summary>
     /// Backs <see cref="PictureHeight"/>. The rest of the control is one row of fields, so this
@@ -64,7 +64,7 @@ public class ChopEditor : Decorator
     /// having been held on to; and this control is handed a different machine every time the
     /// panel above it changes what it is showing.
     /// </remarks>
-    private IMachineSlices? _watching;
+    private IPanelSlices? _watching;
 
     /// <inheritdoc cref="_watching"/>
     private PropertyChangedEventHandler? _listening;
@@ -84,7 +84,7 @@ public class ChopEditor : Decorator
     }
 
     /// <inheritdoc cref="SlicesProperty"/>
-    public IMachineSlices? Slices
+    public IPanelSlices? Slices
     {
         get => GetValue(SlicesProperty);
         set => SetValue(SlicesProperty, value);

@@ -10,7 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
@@ -30,7 +30,7 @@ namespace JingleBox2.ViewModels;
 /// opens, and written back through the callback whenever they change, so the pieces stay the
 /// one place they live.
 /// </remarks>
-public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSlices
+public sealed partial class SliceEditorViewModel : ObservableObject, IPanelSlices
 {
     /// <summary>Where a recording gets cut into pieces.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -350,7 +350,7 @@ public sealed partial class SliceEditorViewModel : ObservableObject, IMachineSli
     /// </remarks>
     public IRelayCommand SliceCommand => new RelayCommand(Cut);
 
-    /// <inheritdoc cref="IMachineSlices.Chop"/>
+    /// <inheritdoc cref="IPanelSlices.Chop"/>
     /// <remarks>
     /// A machine drawn from its own description has no bindings: it is handed the thing it is
     /// showing and calls it. So the act is offered plainly as well, and both go to the same

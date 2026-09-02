@@ -1,7 +1,7 @@
 using JingleBox2.ViewModels;
 using System;
 using System.Linq;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
 namespace JingleBox2.SoundDevices.SoundMachines;
@@ -19,7 +19,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// first time an edge was dragged, and an edge is dragged on every movement of the pointer.
 /// </remarks>
 /// <param name="map">The map on the other side, which is the one the editor is already on.</param>
-public sealed class SamplerZones(ZoneMapViewModel map) : IMachineZones
+public sealed class SamplerZones(ZoneMapViewModel map) : IPanelZones
 {
     /// <summary>Following a list of things and what each of them says.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>

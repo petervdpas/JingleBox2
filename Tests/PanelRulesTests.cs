@@ -1,10 +1,8 @@
 using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Rack.Controls;
 using JingleBox2.Rack.Controls.Interfaces;
 using Xunit;
-using JingleBox2.Rack.SoundDevices.SoundMachines;
 
 namespace JingleBox2.Tests;
 
@@ -20,7 +18,7 @@ namespace JingleBox2.Tests;
 public class PanelRulesTests
 {
     private readonly IPanelOrder _order = new PanelOrder();
-    private readonly IMachineNotes _notes = new MachineNotes();
+    private readonly IPanelNotes _notes = new PanelNotes();
     private readonly IPresetStep _step = new PresetStep();
     private readonly INaming _naming = new Naming();
 

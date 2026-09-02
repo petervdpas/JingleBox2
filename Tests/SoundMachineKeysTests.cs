@@ -4,7 +4,7 @@ using JingleBox2.ViewModels;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
@@ -354,7 +354,7 @@ public class SoundMachineKeysTests
     }
 
     /// <summary>A keyboard and the designer under it, which is the pair every test needs.</summary>
-    private static (IMachineKeys Keys, Designer Designer) Keyboard()
+    private static (IPanelKeys Keys, Designer Designer) Keyboard()
     {
         var designer = new Designer();
 
@@ -362,7 +362,7 @@ public class SoundMachineKeysTests
     }
 
     /// <summary>What the keyboard is showing lit, as note numbers.</summary>
-    private static IEnumerable<int> Lit(IMachineKeys keys) => keys.Lit.Cast<int>();
+    private static IEnumerable<int> Lit(IPanelKeys keys) => keys.Lit.Cast<int>();
 
     /// <summary>Enough of a designer to hang a keyboard on: what it played and heard.</summary>
     /// <remarks>
@@ -373,7 +373,7 @@ public class SoundMachineKeysTests
     private sealed class Designer : ISoundDevicePanel
     {
         /// <summary>Made on first use, so two designers sharing a monitor still differ.</summary>
-        private IMachineKeys? _keys;
+        private IPanelKeys? _keys;
 
         /// <summary>Takes a monitor to share, or keeps one of its own.</summary>
         public Designer(MidiMonitor? monitor = null) => Monitor = monitor ?? new MidiMonitor();
@@ -412,7 +412,7 @@ public class SoundMachineKeysTests
         /// queue it for ever depends on which thread first touched it, which in a suite is
         /// whatever ran before this test.
         /// </remarks>
-        public IMachineKeys MachineKeys => _keys ??= new SoundDeviceKeys(this, read => read());
+        public IPanelKeys MachineKeys => _keys ??= new SoundDeviceKeys(this, read => read());
 
         public InstrumentPresets? Presets => null;
 
@@ -420,7 +420,7 @@ public class SoundMachineKeysTests
 
         public bool HasLocation => false;
 
-        public IMachineLocation? MachineLocation => null;
+        public IPanelLocation? MachineLocation => null;
 
         /// <summary>How many notes the panel asked to be sounded.</summary>
         public int Played { get; private set; }

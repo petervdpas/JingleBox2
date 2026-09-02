@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels.Interfaces;
@@ -94,7 +94,7 @@ public interface ISoundDevicePanel
     /// than that one did: which keys have something on them and which one is in hand, neither of
     /// which the shared keyboard could say because it did not know what it was standing under.
     /// </remarks>
-    IMachineKeys MachineKeys { get; }
+    IPanelKeys MachineKeys { get; }
 
     /// <summary>
     /// Which keys are down, from every producer, or nothing for a panel standing on its own.
@@ -136,5 +136,5 @@ public interface ISoundDevicePanel
     /// Never null, because the row is drawn dimmed where nothing is playing rather than taken
     /// off a panel that has asked for it.
     /// </remarks>
-    IMachineLocation? MachineLocation { get; }
+    IPanelLocation? MachineLocation { get; }
 }

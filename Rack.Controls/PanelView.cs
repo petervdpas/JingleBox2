@@ -15,13 +15,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Rack.Controls.Enums;
 using JingleBox2.Rack.Controls.Interfaces;
 using JingleBox2.Rack.Controls.Records;
 using JingleBox2.Rack.SoundDevices.Faces;
-using JingleBox2.Rack.SoundDevices.SoundMachines;
 
 namespace JingleBox2.Rack.Controls;
 
@@ -50,7 +48,7 @@ public class PanelView : Decorator
     private readonly IPresetStep _step = new PresetStep();
 
     /// <summary>What a key is called, both ways round.</summary>
-    private static readonly IMachineNotes _notes = new MachineNotes();
+    private static readonly IPanelNotes _notes = new PanelNotes();
 
     /// <summary>
     /// The machine being drawn: its panel, its parameters and where it is kept, as one thing.
@@ -76,8 +74,8 @@ public class PanelView : Decorator
     /// Nothing here is a shelf of takes to choose from, since choosing is <see cref="TakeWanted"/>
     /// and belongs to whoever put the panel on screen.
     /// </remarks>
-    public static readonly StyledProperty<IMachineTakes?> TakesProperty =
-        AvaloniaProperty.Register<PanelView, IMachineTakes?>(nameof(Takes));
+    public static readonly StyledProperty<IPanelTakes?> TakesProperty =
+        AvaloniaProperty.Register<PanelView, IPanelTakes?>(nameof(Takes));
 
     /// <summary>
     /// Where the machine can be started from, for the picker at the top of the panel.
@@ -99,8 +97,8 @@ public class PanelView : Decorator
     /// and what it plays are settings; which one is in hand and which are lit are the kit as a
     /// thing on screen, and neither belongs in a song.
     /// </remarks>
-    public static readonly StyledProperty<IMachinePads?> PadsProperty =
-        AvaloniaProperty.Register<PanelView, IMachinePads?>(nameof(Pads));
+    public static readonly StyledProperty<IPanelPads?> PadsProperty =
+        AvaloniaProperty.Register<PanelView, IPanelPads?>(nameof(Pads));
 
     /// <summary>
     /// The map behind the zones, for a machine that lays recordings across the keyboard.
@@ -110,8 +108,8 @@ public class PanelView : Decorator
     /// declared on the panel and never move; a map is as many stretches of keyboard as the
     /// instrument turned out to need, and how many that is is not the machine's to say.
     /// </remarks>
-    public static readonly StyledProperty<IMachineZones?> ZonesProperty =
-        AvaloniaProperty.Register<PanelView, IMachineZones?>(nameof(Zones));
+    public static readonly StyledProperty<IPanelZones?> ZonesProperty =
+        AvaloniaProperty.Register<PanelView, IPanelZones?>(nameof(Zones));
 
     /// <summary>
     /// The shape the machine is making, for a machine that generates its sound.
@@ -124,16 +122,16 @@ public class PanelView : Decorator
         AvaloniaProperty.Register<PanelView, IPanelScope?>(nameof(Scope));
 
     /// <summary>The recording being cut into pieces, for a machine that fills itself from one.</summary>
-    public static readonly StyledProperty<IMachineSlices?> SlicesProperty =
-        AvaloniaProperty.Register<PanelView, IMachineSlices?>(nameof(Slices));
+    public static readonly StyledProperty<IPanelSlices?> SlicesProperty =
+        AvaloniaProperty.Register<PanelView, IPanelSlices?>(nameof(Slices));
 
     /// <summary>What the keyboard on the machine's face plays and shows.</summary>
-    public static readonly StyledProperty<IMachineKeys?> KeyboardProperty =
-        AvaloniaProperty.Register<PanelView, IMachineKeys?>(nameof(Keyboard));
+    public static readonly StyledProperty<IPanelKeys?> KeyboardProperty =
+        AvaloniaProperty.Register<PanelView, IPanelKeys?>(nameof(Keyboard));
 
     /// <summary>Where the track playing this instrument has got to.</summary>
-    public static readonly StyledProperty<IMachineLocation?> LocationProperty =
-        AvaloniaProperty.Register<PanelView, IMachineLocation?>(nameof(Location));
+    public static readonly StyledProperty<IPanelLocation?> LocationProperty =
+        AvaloniaProperty.Register<PanelView, IPanelLocation?>(nameof(Location));
 
     /// <summary>
     /// The instrument's name in the song, for a machine that carries a badge for it.
@@ -431,7 +429,7 @@ public class PanelView : Decorator
     }
 
     /// <inheritdoc cref="TakesProperty"/>
-    public IMachineTakes? Takes
+    public IPanelTakes? Takes
     {
         get => GetValue(TakesProperty);
         set => SetValue(TakesProperty, value);
@@ -452,14 +450,14 @@ public class PanelView : Decorator
     }
 
     /// <inheritdoc cref="PadsProperty"/>
-    public IMachinePads? Pads
+    public IPanelPads? Pads
     {
         get => GetValue(PadsProperty);
         set => SetValue(PadsProperty, value);
     }
 
     /// <inheritdoc cref="ZonesProperty"/>
-    public IMachineZones? Zones
+    public IPanelZones? Zones
     {
         get => GetValue(ZonesProperty);
         set => SetValue(ZonesProperty, value);
@@ -473,21 +471,21 @@ public class PanelView : Decorator
     }
 
     /// <inheritdoc cref="SlicesProperty"/>
-    public IMachineSlices? Slices
+    public IPanelSlices? Slices
     {
         get => GetValue(SlicesProperty);
         set => SetValue(SlicesProperty, value);
     }
 
     /// <inheritdoc cref="KeyboardProperty"/>
-    public IMachineKeys? Keyboard
+    public IPanelKeys? Keyboard
     {
         get => GetValue(KeyboardProperty);
         set => SetValue(KeyboardProperty, value);
     }
 
     /// <inheritdoc cref="LocationProperty"/>
-    public IMachineLocation? Location
+    public IPanelLocation? Location
     {
         get => GetValue(LocationProperty);
         set => SetValue(LocationProperty, value);

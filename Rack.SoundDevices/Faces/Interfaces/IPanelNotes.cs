@@ -1,5 +1,5 @@
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// What a key is called, for the parts of a machine that have to write one down.
@@ -13,7 +13,7 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// somebody hunting for a pad on a keyboard is looking for. The two directions are a pair, and
 /// a pair that disagrees is a pad that sounds a different note from the one written on it.
 /// </remarks>
-public interface IMachineNotes
+public interface IPanelNotes
 {
     /// <summary>That semitone as a note, or nothing when it is not one.</summary>
     string Name(int semitone);

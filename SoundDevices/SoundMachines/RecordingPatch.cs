@@ -1,5 +1,5 @@
 using System.Text.Json;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Tracker;
 
 namespace JingleBox2.SoundDevices.SoundMachines;
@@ -21,7 +21,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// and the fields go with it.
 /// </remarks>
 /// <param name="instrument">The instrument being read and written, held rather than copied.</param>
-public sealed class RecordingPatch(TrackerInstrument instrument) : IMachinePatch
+public sealed class RecordingPatch(TrackerInstrument instrument) : IPanelPatch
 {
     /// <summary>The recording itself, by the name the shelf knows it under.</summary>
     /// <remarks>

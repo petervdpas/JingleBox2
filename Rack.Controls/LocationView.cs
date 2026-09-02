@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using System;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.Rack.Controls;
 
@@ -27,8 +27,8 @@ namespace JingleBox2.Rack.Controls;
 public class LocationView : StackPanel
 {
     /// <summary>Where the lamps read from.</summary>
-    public static readonly StyledProperty<IMachineLocation?> LocationProperty =
-        AvaloniaProperty.Register<LocationView, IMachineLocation?>(nameof(Location));
+    public static readonly StyledProperty<IPanelLocation?> LocationProperty =
+        AvaloniaProperty.Register<LocationView, IPanelLocation?>(nameof(Location));
 
     /// <summary>Written over the lamps. Empty for none.</summary>
     public static readonly StyledProperty<string?> CaptionProperty =
@@ -96,7 +96,7 @@ public class LocationView : StackPanel
     }
 
     /// <inheritdoc cref="LocationProperty"/>
-    public IMachineLocation? Location
+    public IPanelLocation? Location
     {
         get => GetValue(LocationProperty);
         set => SetValue(LocationProperty, value);
@@ -182,7 +182,7 @@ public class LocationView : StackPanel
     /// than a method, so it is not the same delegate twice and could not be unsubscribed without
     /// having been held on to.
     /// </remarks>
-    private IMachineLocation? _watching;
+    private IPanelLocation? _watching;
 
     /// <inheritdoc cref="_watching"/>
     private EventHandler? _listening;

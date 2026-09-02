@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
@@ -220,10 +220,10 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
     /// <inheritdoc/>
     /// <remarks>Built the first time a machine asks for it, since most panels never do.</remarks>
-    public IMachineKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
+    public IPanelKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
 
     /// <summary>Kept so it can be let go of in <see cref="Close"/>.</summary>
-    private IMachineKeys? _machineKeys;
+    private IPanelKeys? _machineKeys;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -292,11 +292,11 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
     /// <inheritdoc/>
     /// <remarks>Built the first time a described face asks for it, since most do not.</remarks>
-    public Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? MachineLocation =>
+    public Rack.SoundDevices.Faces.Interfaces.IPanelLocation? MachineLocation =>
         _place ??= Location is { } place ? new SoundDevices.SoundMachines.TrackLocation(place) : null;
 
     /// <summary>Built the first time a machine's face asks for the lamps.</summary>
-    private Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? _place;
+    private Rack.SoundDevices.Faces.Interfaces.IPanelLocation? _place;
 
     /// <summary>Plays C at the panel's own octave, which is what the TEST cap does.</summary>
     private void Test() => Play(Note.FromOctave(0, Octave));

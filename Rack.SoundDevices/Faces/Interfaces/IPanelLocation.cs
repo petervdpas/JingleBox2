@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// Where the track playing this instrument has got to, for a machine that puts that on its face.
@@ -16,10 +16,10 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// differ in it, and a song that remembered it would be a song remembering when you were
 /// looking at it.
 ///
-/// <see cref="Changed"/> for the reason <see cref="IMachineKeys"/> has one. A lamp moves on
+/// <see cref="Changed"/> for the reason <see cref="IPanelKeys"/> has one. A lamp moves on
 /// every row the pattern plays, and that is not a redraw of the panel.
 /// </remarks>
-public interface IMachineLocation
+public interface IPanelLocation
 {
     /// <summary>
     /// True when there is really a track behind this.

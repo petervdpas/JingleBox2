@@ -5,7 +5,7 @@ using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
@@ -30,7 +30,7 @@ namespace JingleBox2.ViewModels;
 /// down is the monitor's, and this holds neither: a second copy would be wrong the first time a
 /// note was played.
 /// </remarks>
-public sealed class SoundDeviceKeys : IMachineKeys, IDisposable
+public sealed class SoundDeviceKeys : IPanelKeys, IDisposable
 {
     /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
     private readonly IPanelKeyboard _keyboard = new PanelKeyboard();

@@ -1,5 +1,5 @@
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// Where a panel goes to find out about the recordings a machine names.
@@ -16,7 +16,7 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// there is no picture and the wording is whatever can be said about a name, which is what a
 /// panel showing a recording that has since been thrown away should look like.
 /// </remarks>
-public interface IMachineTakes
+public interface IPanelTakes
 {
     /// <summary>The shape of that recording, or nothing when there is none to draw.</summary>
     float[]? Peaks(string take);

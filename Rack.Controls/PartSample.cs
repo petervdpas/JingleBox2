@@ -5,7 +5,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using System;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Rack.Controls.Enums;
 using JingleBox2.Rack.Controls.Records;
 
@@ -569,7 +568,7 @@ public sealed class PartSample : Decorator
     };
 
     /// <summary>A track a third of the way through the first of two pages.</summary>
-    private sealed class SampleRun : IMachineLocation
+    private sealed class SampleRun : IPanelLocation
     {
         /// <summary>
         /// Two pages rather than the eight a full pattern has.
@@ -619,7 +618,7 @@ public sealed class PartSample : Decorator
     /// The same reason the pads on a chip are real buttons. Nothing here can be edited: the chip
     /// is not hit testable, so the drag that moves an edge never reaches it.
     /// </remarks>
-    private sealed class SampleMap : IMachineZones
+    private sealed class SampleMap : IPanelZones
     {
         /// <summary>
         /// Three stretches of keyboard, laid end to end with no gap between them.
@@ -670,7 +669,7 @@ public sealed class PartSample : Decorator
         /// there is no drag to move one. Holding the handlers would be holding a list that is
         /// never read.
         /// </remarks>
-        event EventHandler? IMachineZones.Changed
+        event EventHandler? IPanelZones.Changed
         {
             add { }
             remove { }

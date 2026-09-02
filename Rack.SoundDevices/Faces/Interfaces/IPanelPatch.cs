@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// The settings of one instrument made on a machine, as the machine keeps them.
@@ -16,9 +16,11 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// misses one it expected uses its default. That rule is what makes a settings file survive
 /// both the machine and the host moving on.
 /// </remarks>
-public interface IMachinePatch
+public interface IPanelPatch
 {
-    /// <summary>Takes what was written down, and keeps its defaults for whatever is missing.</summary>
+    /// <summary>
+    /// Takes what was written down, and keeps its defaults for whatever is missing.
+    /// </summary>
     void Read(JsonElement json);
 
     /// <summary>Writes everything it would need to be itself again.</summary>

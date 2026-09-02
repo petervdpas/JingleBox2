@@ -5,7 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using System;
 using System.Collections.Generic;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Rack.Controls.Records;
 
 namespace JingleBox2.Rack.Controls;
@@ -23,14 +23,14 @@ namespace JingleBox2.Rack.Controls;
 /// grid, and the pads are the part of the panel somebody is watching while they play.
 ///
 /// Which pads there are is not described and cannot be: it is the kit, and the kit is whoever's
-/// song this is. So the grid is handed a <see cref="IMachinePads"/> and the machine says only
+/// song this is. So the grid is handed a <see cref="IPanelPads"/> and the machine says only
 /// how many across and how big.
 /// </remarks>
 public class PadGrid : Decorator
 {
     /// <summary>Backs <see cref="Pads"/>, the kit behind the grid.</summary>
-    public static readonly StyledProperty<IMachinePads?> PadsProperty =
-        AvaloniaProperty.Register<PadGrid, IMachinePads?>(nameof(Pads));
+    public static readonly StyledProperty<IPanelPads?> PadsProperty =
+        AvaloniaProperty.Register<PadGrid, IPanelPads?>(nameof(Pads));
 
     /// <summary>
     /// Backs <see cref="Columns"/>: how many pads stand side by side. Four, on every drum
@@ -100,7 +100,7 @@ public class PadGrid : Decorator
     /// Both are kept because the subscription has to come off the kit it went on, and by the
     /// time the grid is handed a different kit the property already holds the new one.
     /// </remarks>
-    private IMachinePads? _watching;
+    private IPanelPads? _watching;
 
     /// <inheritdoc cref="_watching"/>
     private EventHandler? _listening;
@@ -121,7 +121,7 @@ public class PadGrid : Decorator
     }
 
     /// <summary>The kit behind the grid: what is on each pad, which is lit, which is picked.</summary>
-    public IMachinePads? Pads
+    public IPanelPads? Pads
     {
         get => GetValue(PadsProperty);
         set => SetValue(PadsProperty, value);

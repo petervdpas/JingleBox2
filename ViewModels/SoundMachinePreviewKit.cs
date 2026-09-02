@@ -5,7 +5,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels;
@@ -23,7 +22,7 @@ namespace JingleBox2.ViewModels;
 /// would say once somebody put drums on it is longer, which is why the caps are sized by the
 /// machine rather than by what is written on them.
 /// </remarks>
-public sealed class SoundMachinePreviewKit : IMachinePads
+public sealed class SoundMachinePreviewKit : IPanelPads
 {
     /// <summary>Which pad is in hand, which is the one thing on the bench that really moves.</summary>
     private int _picked;
@@ -80,7 +79,7 @@ public sealed class SoundMachinePreviewKit : IMachinePads
 /// a preview that went looking for one of your recordings would put a different machine on the
 /// bench depending on what you had recorded.
 /// </remarks>
-public sealed class SoundMachinePreviewSlices : IMachineSlices
+public sealed class SoundMachinePreviewSlices : IPanelSlices
 {
     /// <summary>How many peaks the made-up picture has.</summary>
     /// <remarks>
@@ -179,7 +178,7 @@ public sealed class SoundMachinePreviewSlices : IMachineSlices
 /// covered, and one zone across the whole of it never shows that. They can be dragged: the panel
 /// being laid out is a real panel, and a boundary moved here moves nothing but this.
 /// </remarks>
-public sealed class SoundMachinePreviewMap : IMachineZones
+public sealed class SoundMachinePreviewMap : IPanelZones
 {
     /// <summary>Three zones covering the keyboard, each with its root in the middle of it.</summary>
     /// <remarks>
@@ -292,7 +291,7 @@ public sealed class SoundMachinePreviewScope : IPanelScope
 /// A pattern of the usual length, stopped part way through, so the chip shows a lit lamp and a
 /// picked page as well as the dark ones.
 /// </remarks>
-public sealed class SoundMachinePreviewLocation : IMachineLocation
+public sealed class SoundMachinePreviewLocation : IPanelLocation
 {
     /// <summary>Four pages of eight lines, which is a pattern of the usual length.</summary>
     private static readonly string[] Runs = { "0-7", "8-15", "16-23", "24-31" };
@@ -323,7 +322,7 @@ public sealed class SoundMachinePreviewLocation : IMachineLocation
     /// <summary>
     /// Nowhere to subscribe, because nothing here is playing.
     /// </summary>
-    event EventHandler? IMachineLocation.Changed
+    event EventHandler? IPanelLocation.Changed
     {
         add { }
         remove { }

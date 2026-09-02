@@ -1,13 +1,13 @@
 using System;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// The kit behind a panel's pads: what each one says, which are sounding, and which is in hand.
 /// </summary>
 /// <remarks>
 /// None of this is a setting. What a pad is called and what it plays are settings and go through
-/// <see cref="JingleBox2.Rack.SoundDevices.Faces.Interfaces.IPanelValues"/> like everything else; what is here is the kit as a thing on
+/// <see cref="IPanelValues"/> like everything else; what is here is the kit as a thing on
 /// screen. Which pad is in hand is not saved anywhere and should not be: it is where somebody's
 /// attention is, and a song that remembered it would be a song claiming that mattered. Which
 /// pads are lit is what the machine is doing this instant.
@@ -20,15 +20,19 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// crash rings on under the snare that follows it and both pads are lit at once; rebuilding the
 /// panel for that would blink every knob on the machine forty times a second.
 /// </remarks>
-public interface IMachinePads
+public interface IPanelPads
 {
-    /// <summary>How many there are. The panel says how they are arranged, this says how many.</summary>
+    /// <summary>
+    /// How many there are. The panel says how they are arranged, this says how many.
+    /// </summary>
     int Count { get; }
 
     /// <summary>What is written on that pad: its name, or what it is playing, or nothing.</summary>
     string Cap(int at);
 
-    /// <summary>The key that fires it, in the wording the rest of the app uses for a note.</summary>
+    /// <summary>
+    /// The key that fires it, in the wording the rest of the app uses for a note.
+    /// </summary>
     string Note(int at);
 
     /// <summary>Whether it is sounding this instant.</summary>
@@ -37,7 +41,9 @@ public interface IMachinePads
     /// <summary>Whether anything is on it, so an empty pad can be drawn as an empty pad.</summary>
     bool Filled(int at);
 
-    /// <summary>Which one the controls beside the grid are about. Written when one is pressed.</summary>
+    /// <summary>
+    /// Which one the controls beside the grid are about. Written when one is pressed.
+    /// </summary>
     int Picked { get; set; }
 
     /// <summary>Hits it, which is what pressing a pad on a drum machine has always done.</summary>

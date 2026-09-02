@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.SoundDevices.SoundMachines;
 
@@ -22,7 +22,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// more would be the machine's face holding the tracker's view models.
 /// </remarks>
 /// <param name="place">The lamps, already following whatever is playing.</param>
-public sealed class TrackLocation(TrackLocationViewModel place) : IMachineLocation
+public sealed class TrackLocation(TrackLocationViewModel place) : IPanelLocation
 {
     /// <inheritdoc/>
     public bool Live => place.IsLive;

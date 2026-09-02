@@ -172,7 +172,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   says. A key on the hardware arrives through `INoteTrigger` on its way past to being played. A
   mouse on a drawn key and a letter on the computer keyboard say so through `Pressed` and
   `Released`, because the panel they are on sounds them itself and putting those back into the
-  stream would sound everything twice. `IMachineKeys` lost `Down` and `Up` again as a result:
+  stream would sound everything twice. `IPanelKeys` lost `Down` and `Up` again as a result:
   they were a door for "played somewhere else" and the monitor is that door
 - A buffer off a MIDI port is not one message, and reading it as one is what hung keys. `Read`
   took the first message and the rest of the delivery was dropped. The traffic hid it perfectly:
@@ -205,10 +205,10 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `MidiService.Read` and the router into an `INoteTrigger`: both spellings of a release, running
   status, a chord, and aftertouch, which shares a note's shape and must not be read as a key
   coming up. `Tests/NoteAdapterTests.cs` is the half-choosing above. `Tests/SoundMachineKeysTests.cs`
-  presses keys on a real `SoundDeviceKeys` through `IMachineKeys` and reads what is lit. That last
+  presses keys on a real `SoundDeviceKeys` through `IPanelKeys` and reads what is lit. That last
   one found a fault the moment it existed: `Play` no longer refused a key that was already down,
   so a letter held on the computer keyboard retriggered the machine on every repeat
-- `IMachineKeys.Down` and `Up` are that light on its own, for a note that was played elsewhere:
+- `IPanelKeys.Down` and `Up` are that light on its own, for a note that was played elsewhere:
   a key on the hardware has already been sounded by whoever the notes are going to, and playing
   it again there would sound everything twice. `TrackerNoteAdapter` also stopped dropping the
   release for the rack: a note-off has nothing to be written into there, which was the reason,
@@ -719,12 +719,40 @@ The sound effect world says it too: `SoundEffectProject`, `SoundEffectProjects`,
 chain. And the umbrella: `ISoundDevice`, `SoundDeviceLinks`, `SoundDeviceRemote`,
 `ControlKind.SoundDevice`, and `sounddevice` as the word a template file uses.
 
-Not renamed, deliberately: `IMachineKeys`, `IMachineNotes`, `IMachinePads`, `IMachineZones`,
-`IMachineSlices`, `IMachineTakes`, `IMachineLocation` and `IMachinePatch` in `Rack.SoundDevices`.
-That assembly is the published promise and `LICENSE.EXCEPTION` names it, and those eight are about
-a keyboard, a kit's pads and a map rather than about the box, which is the one place the plain
-word is still true. `IPluginEffect` and `ClapEffect` keep theirs as well, because a plugin that
-works on audio really is a plugin effect and both already say plugin.
+**The SDK has no two worlds in it, and thinking it did is what kept a folder empty.**
+`Rack.SoundDevices` held `Faces/` for what both worlds draw out of and `SoundMachines/` for what
+only a played box has, and the obvious question was where the matching `SoundEffects/` had got
+to. The answer was not that an effect needs nothing. It was that the split is not world-shaped at
+all.
+
+Asked one at a time, most of the nine were not about being played. `IPanelNotes` is what a key is
+called, and a delay with its time in note values wants exactly that. `IPanelTakes` is where a
+panel finds out about the recordings a box names, which is a convolution reverb's impulse
+response as much as a sampler's. `IPanelLocation` is where the track has got to, and an effect
+sits on a track. `IPanelPatch` is a box's settings as it keeps them. The same test caught two in
+the shared folder going the other way: `IPanelScope` had been written up as a synth tracing its
+own wave, when the contract is fill this buffer with the shape you are making, and a compressor
+tracing its gain reduction is the same call; and `IPanelPresets` was called a machine thing
+because `SoundEffectWorld.HasPresets` is false, which is a gap in this application rather than a
+fact about effects, since every delay ever built ships presets.
+
+So the contracts are named for the part they serve and they live together: `IPanelKeys`,
+`IPanelPads`, `IPanelZones`, `IPanelSlices`, `IPanelTakes`, `IPanelNotes`, `IPanelPatch` and
+`IPanelLocation`, beside `IPanelValues`, `IPanelMenu`, `IPanelPresets`, `IPanelScope` and
+`IPanelOrder`. Whether a given box answers one is a fact about that box rather than about which
+of two worlds it is in. The two worlds are real where the difference is real, which is what a
+song does with the box, and that is application code: `SoundDevices/SoundMachines/` and
+`SoundDevices/SoundEffects/`.
+
+`IInstrumentName` kept its own word, because it is the instrument's name in the song and an
+effect on a chain takes no name of its own. `IPluginEffect` and `ClapEffect` keep theirs as well,
+because a plugin that works on audio really is a plugin effect and both already say plugin.
+
+Still open, and it is the fault this uncovered: `DesignerViewModel.Library` is one unfiltered
+list bound straight into the page, and `IDesignWorld` says nothing about parts, so the Effects
+tab offers `Keys`, `Pads`, `Pad`, `PadPicker`, `Zones`, `ZonePicker`, `Slices`, `Take`,
+`Location` and `InstrumentName` on an effect's face. `Scope` and `Preset` are deliberately not on
+that list: they belong on an effect and are only unwired.
 
 **The panel a face stands in is not a designer, and was called one in three places.**
 `ISoundDevicePanel` is what a face needs behind it: the editor, the octave to test at, the note
@@ -790,7 +818,7 @@ public in either of them is a promise. The test is not "can it be stood in front
 an outside machine ever write this down**. The parts every range control shares are public,
 because a machine drawing a control of its own should feel like the ones we ship: `IRangeValue`,
 `IMeterScale`, `INumericInput`, `IWaveformGeometry`, `INaming`, and in the contract itself
-`IPanelOrder`, `IMachineNotes` and `IPresetStep`. How our own knob sweeps its 270 degrees, how
+`IPanelOrder`, `IPanelNotes` and `IPresetStep`. How our own knob sweeps its 270 degrees, how
 our own fader reads its track and how our own tick attribute is spelled are not: `KnobMath`,
 `FaderMath` and `TickList` are internal, with `InternalsVisibleTo` for the tests. Internal is not
 untested, and that line in the csproj is the whole of what it costs to keep the promise small.
@@ -802,9 +830,9 @@ while half their callers were about to be effects. They are `Panel`, `PanelEleme
 `ElementKinds`, `Parameter`, `IPanelValues`, `IPanelMenu`, `PanelMenuItem`, `MenuCorners`,
 `MenuOptionWords`, `IPanelPresets`, `IPanelScope`, `PanelActions`, `PanelStarts`, `PanelTheme`
 and `Face` now, and in the library `PanelView` and `PartSample`. The line is **do both worlds use
-it**, not does the word machine appear: `IMachine`, `IMachineKeys`, `IMachineNotes`,
-`IMachinePads`, `IMachineZones`, `IMachineSlices`, `IMachineTakes`, `IMachineLocation`,
-`IMachinePatch` and `IInstrumentName` keep their names, because a keyboard and a kit's pads are
+it**, not does the word machine appear: `IMachine`, `IPanelKeys`, `IPanelNotes`,
+`IPanelPads`, `IPanelZones`, `IPanelSlices`, `IPanelTakes`, `IPanelLocation`,
+`IPanelPatch` and `IInstrumentName` keep their names, because a keyboard and a kit's pads are
 the instrument world and there the word is true. Nothing on disc moved: a `machine.json` names
 element words and property names, never a type.
 
@@ -815,12 +843,12 @@ Nothing outside this repository ships against it yet, which is a window that clo
 says what the assembly is to somebody else, exactly the way `Helper`, `Util` and `Manager` do, so
 nobody could tell from it whether a new contract belonged in there. It said the wrong thing twice
 more: the folder did not say the namespace, since `Rack.Abstractions/Faces/` was
-`JingleBox2.Rack.SoundDevices` with the middle silently dropped, and inside it the `Machines/` folder
-went on saying machine after the application had started saying soundmachine. It is `Rack.SoundDevices`
-now, folder, assembly and root namespace all the same words, with `Rack.SoundDevices/SoundMachines/` and
-`JingleBox2.Rack.SoundMachines` under it. `LICENSE.EXCEPTION` names the new one, and it had to
-change in the same breath, since that document naming an assembly nothing builds any more is a
-licence that grants nothing.
+`JingleBox2.Rack.Faces` with the middle silently dropped, and inside it the `Machines/` folder
+went on saying machine after the application had started saying soundmachine. It is
+`Rack.SoundDevices` now, folder, assembly and root namespace all the same words, holding
+`Rack.SoundDevices/Faces/` and `Interfaces/ISoundDevice.cs`. `LICENSE.EXCEPTION` names the new
+one, and it had to change in the same breath, since that document naming an assembly nothing
+builds any more is a licence that grants nothing.
 
 `Rack.Ui` went with it and is `Rack.Controls`, for a milder version of the same reason: Ui names
 the layer a thing sits in rather than the thing, and what is in there is a knob, a fader, a
@@ -833,8 +861,7 @@ rack rather than for machines.** `JingleBox2.Rack.SoundDevices` is what both wor
 of, `JingleBox2.Rack.SoundMachines` is what only an instrument has (a keyboard, zones, pads, slices,
 takes, a patch, a place in the pattern, the name badge), `JingleBox2.Rack.SoundEffects` is what only
 an effect will have, and `JingleBox2.Rack.Controls` is the controls. The folders say the same thing:
-`Rack.SoundDevices/Faces/` and `Rack.SoundDevices/SoundMachines/`, each with its own `Interfaces` and
-`Records` under it. The assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
+`Rack.SoundDevices/Faces/`, with its own `Interfaces` and `Records` under it. The assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
 which is what `LICENSE.EXCEPTION` names.
 
 **The shared level being a namespace of its own is what makes the `Panel` collision loud.**
@@ -1070,7 +1097,7 @@ whole exercise and is worth writing down rather than summarising:
   the end of a stream, which reaches RECORD as a message about a stream rather than about the
   file somebody just tried to open. The audio itself is still salvaged rather than refused, and
   that is deliberate: what a take really holds beats what its header claims
-- `MachineNotes.Semitone` chose between a note and a plain number by how long the text was, and
+- `PanelNotes.Semitone` chose between a note and a plain number by how long the text was, and
   three characters is both. Every plain number from 100 to 119 was read as a note, failed to be
   one, and came back as nothing: the top two octaves, which are notes a machine can be asked to
   play. The note is tried first now and the number second

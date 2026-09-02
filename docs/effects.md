@@ -120,9 +120,9 @@ And in `Rack.Controls`:
 | `MachinePanelView` | `PanelView` |
 | `MachinePartSample` | `PartSample` |
 
-Kept as they are, because only the instrument world has them: `IMachine`, `IMachineKeys`,
-`IMachineNotes`, `MachineNotes`, `IMachinePads`, `IMachineZones`, `IMachineSlices`,
-`IMachineTakes`, `IMachineLocation`, `IMachinePatch`, `IInstrumentName`. Everything in the
+Kept as they are, because only the instrument world has them: `IMachine`, `IPanelKeys`,
+`IPanelNotes`, `PanelNotes`, `IPanelPads`, `IPanelZones`, `IPanelSlices`,
+`IPanelTakes`, `IPanelLocation`, `IPanelPatch`, `IInstrumentName`. Everything in the
 application's own assemblies that is genuinely about machines keeps its name too:
 `SoundMachineProject`, `SoundMachineRegistry`, `SoundMachineRack`, `MachineEditorViewModel` and the rest.
 

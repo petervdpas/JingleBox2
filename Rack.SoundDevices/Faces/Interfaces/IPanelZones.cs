@@ -1,6 +1,6 @@
 using System;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// The map behind a panel's zones: what each one covers, what is on it, and which is in hand.
@@ -20,14 +20,16 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 ///
 /// Adding a zone, taking one away and spreading them out are not here. They are things asked of
 /// the host, the way loading samples onto a kit is, and they arrive through
-/// <see cref="JingleBox2.Rack.SoundDevices.Faces.PanelActions"/> like every other thing a button asks for.
+/// <see cref="PanelActions"/> like every other thing a button asks for.
 /// </remarks>
-public interface IMachineZones
+public interface IPanelZones
 {
     /// <summary>How many zones the map holds.</summary>
     int Count { get; }
 
-    /// <summary>What that zone is called: its name, or the recording's, or the keys it covers.</summary>
+    /// <summary>
+    /// What that zone is called: its name, or the recording's, or the keys it covers.
+    /// </summary>
     string Cap(int at);
 
     /// <summary>The lowest key it answers to.</summary>
@@ -39,13 +41,19 @@ public interface IMachineZones
     /// <summary>The key at which its recording plays untouched.</summary>
     int Root(int at);
 
-    /// <summary>Whether anything is on it, so an empty zone can be drawn as an empty zone.</summary>
+    /// <summary>
+    /// Whether anything is on it, so an empty zone can be drawn as an empty zone.
+    /// </summary>
     bool Filled(int at);
 
-    /// <summary>Which one the settings beside the map are about. Written when one is pressed.</summary>
+    /// <summary>
+    /// Which one the settings beside the map are about. Written when one is pressed.
+    /// </summary>
     int Picked { get; set; }
 
-    /// <summary>Puts that zone where a drag has left it: the two edges and the root at once.</summary>
+    /// <summary>
+    /// Puts that zone where a drag has left it: the two edges and the root at once.
+    /// </summary>
     void Move(int at, int low, int high, int root);
 
     /// <summary>Told when any of the above has moved.</summary>

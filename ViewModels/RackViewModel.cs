@@ -11,7 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
@@ -220,11 +220,11 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
-    public Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? MachineLocation =>
+    public Rack.SoundDevices.Faces.Interfaces.IPanelLocation? MachineLocation =>
         _place ??= Location is { } place ? new SoundDevices.SoundMachines.TrackLocation(place) : null;
 
     /// <inheritdoc cref="MachineLocation"/>
-    private Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? _place;
+    private Rack.SoundDevices.Faces.Interfaces.IPanelLocation? _place;
 
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     /// <remarks>
@@ -479,10 +479,10 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     }
 
     /// <summary>The keyboard a machine draws on its own face, standing on the same two things.</summary>
-    public IMachineKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
+    public IPanelKeys MachineKeys => _machineKeys ??= new SoundDeviceKeys(this);
 
     /// <inheritdoc cref="MachineKeys"/>
-    private IMachineKeys? _machineKeys;
+    private IPanelKeys? _machineKeys;
 
     /// <summary>Which keys are down, which is the application's one monitor of the notes.</summary>
     public Midi.Interfaces.IMidiMonitor? MidiKeys { get; set; }

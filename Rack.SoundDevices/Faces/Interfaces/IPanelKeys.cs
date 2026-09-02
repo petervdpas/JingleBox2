@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// The keyboard on a machine's own face: what is sounding, what has something on it, and which
@@ -17,10 +17,10 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// instant, and which key is in hand is where somebody is looking. The octave on show is the
 /// one part that is a setting, and it stays where it was: on the element, as a parameter.
 ///
-/// <see cref="Changed"/> for the same reason <see cref="IMachinePads"/> has one. A key lights
+/// <see cref="Changed"/> for the same reason <see cref="IPanelPads"/> has one. A key lights
 /// while a note sounds and goes out when it stops, and neither is a redraw of the panel.
 /// </remarks>
-public interface IMachineKeys
+public interface IPanelKeys
 {
     /// <summary>
     /// The semitones held down now, as absolute note numbers.

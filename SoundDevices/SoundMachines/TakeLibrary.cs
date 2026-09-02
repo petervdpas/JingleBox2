@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 
@@ -25,7 +25,7 @@ namespace JingleBox2.SoundDevices.SoundMachines;
 /// bare name is understood as well, since that is what a picker shows and what somebody typing
 /// into a machine file would write, and it is looked up on the shelf.
 /// </remarks>
-public sealed class TakeLibrary : IMachineTakes
+public sealed class TakeLibrary : IPanelTakes
 {
     /// <summary>Reading and writing WAV files. Holds nothing, so one serves the whole object.</summary>
     private readonly IWavFile _wav = new WavFile();

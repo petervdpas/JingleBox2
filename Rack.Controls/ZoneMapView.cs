@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Rack.Controls.Records;
 
 namespace JingleBox2.Rack.Controls;
@@ -41,8 +41,8 @@ public class ZoneMapView : ThemedControl
     private const int Highest = 119;
 
     /// <summary>The map behind it.</summary>
-    public static readonly StyledProperty<IMachineZones?> ZonesProperty =
-        AvaloniaProperty.Register<ZoneMapView, IMachineZones?>(nameof(Zones));
+    public static readonly StyledProperty<IPanelZones?> ZonesProperty =
+        AvaloniaProperty.Register<ZoneMapView, IPanelZones?>(nameof(Zones));
 
     /// <summary>How tall one lane of zones is.</summary>
     public static readonly StyledProperty<double> LaneHeightProperty =
@@ -82,7 +82,7 @@ public class ZoneMapView : ThemedControl
     }
 
     /// <inheritdoc cref="ZonesProperty"/>
-    public IMachineZones? Zones
+    public IPanelZones? Zones
     {
         get => GetValue(ZonesProperty);
         set => SetValue(ZonesProperty, value);
@@ -134,7 +134,7 @@ public class ZoneMapView : ThemedControl
     /// than a method, so it is not the same delegate twice and could not be unsubscribed without
     /// having been held on to.
     /// </remarks>
-    private IMachineZones? _watching;
+    private IPanelZones? _watching;
 
     /// <inheritdoc cref="_watching"/>
     private EventHandler? _listening;

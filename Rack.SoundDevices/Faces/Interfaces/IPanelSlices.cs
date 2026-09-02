@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
-namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+namespace JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 /// <summary>
 /// One recording and where it is cut, for the machines that fill themselves from a single take.
@@ -21,9 +21,11 @@ namespace JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 /// Where the cuts are is read back off the pieces rather than stored, so the pieces are the
 /// truth. Move a boundary and the two pieces either side of it are what changed.
 /// </remarks>
-public interface IMachineSlices : INotifyPropertyChanged
+public interface IPanelSlices : INotifyPropertyChanged
 {
-    /// <summary>The shape of the whole take, or nothing when there is none on the machine.</summary>
+    /// <summary>
+    /// The shape of the whole take, or nothing when there is none on the machine.
+    /// </summary>
     float[]? Peaks { get; }
 
     /// <summary>Where it is cut, as fractions of the whole, including both ends.</summary>
@@ -32,16 +34,24 @@ public interface IMachineSlices : INotifyPropertyChanged
     /// <summary>The piece in hand, or -1 for none. Written when one is clicked.</summary>
     int SelectedSlice { get; set; }
 
-    /// <summary>The most pieces this machine can hold, which is how many places it has for one.</summary>
+    /// <summary>
+    /// The most pieces this machine can hold, which is how many places it has for one.
+    /// </summary>
     int MaxSlices { get; }
 
-    /// <summary>How far through the take the machine has got, or -1 while nothing is sounding.</summary>
+    /// <summary>
+    /// How far through the take the machine has got, or -1 while nothing is sounding.
+    /// </summary>
     double Playhead { get; }
 
-    /// <summary>Whether the piece in hand repeats, which is what draws the dashed handles.</summary>
+    /// <summary>
+    /// Whether the piece in hand repeats, which is what draws the dashed handles.
+    /// </summary>
     bool Looping { get; }
 
-    /// <summary>Where that repeat starts, inside the piece. Written by dragging its handle.</summary>
+    /// <summary>
+    /// Where that repeat starts, inside the piece. Written by dragging its handle.
+    /// </summary>
     double LoopStart { get; set; }
 
     /// <summary>Where it ends, the other of the two handles.</summary>

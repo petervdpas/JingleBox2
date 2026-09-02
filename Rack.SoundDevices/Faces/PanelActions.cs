@@ -5,14 +5,14 @@ namespace JingleBox2.Rack.SoundDevices.Faces;
 /// The things a panel can ask the host to do, which are not settings and never will be.
 /// </summary>
 /// <remarks>
-/// Almost everything on a machine is a number, and a control that moves one needs nothing from
+/// Almost everything on a sound device is a number, and a control that moves one needs nothing from
 /// the host but somewhere to write it. A few are not. Taking the recording off a pad is not a
 /// value it could be set to, and loading samples onto a kit opens a file dialog, reads a disc
 /// and copies what it finds: none of that can live behind a knob.
 ///
 /// Written out one by one so every action in the app can be found by searching for the string
-/// that is in the machine's file, and matched by name so a machine naming one this host has
-/// never heard of gets a button that does nothing rather than a panel that will not open.
+/// that is in the sound device's file, and matched by name so a sound device naming one this host
+/// has never heard of gets a button that does nothing rather than a panel that will not open.
 /// </remarks>
 public static class PanelActions
 {
@@ -25,7 +25,9 @@ public static class PanelActions
     /// <summary>Takes the recording off the zone in hand.</summary>
     public const string ClearZone = "clear_zone";
 
-    /// <summary>Asks for samples from anywhere and lays them across the keyboard, one zone apiece.</summary>
+    /// <summary>
+    /// Asks for samples from anywhere and lays them across the keyboard, one zone apiece.
+    /// </summary>
     public const string LoadZones = "load_zones";
 
     /// <summary>Another zone, put where there is room and left empty.</summary>
@@ -39,7 +41,7 @@ public static class PanelActions
 
     /// <summary>The preset before this one on the shelf.</summary>
     /// <remarks>
-    /// These two are not named by a machine's file, which every other action here is. They are
+    /// These two are not named by a sound device's file, which every other action here is. They are
     /// what the preset picker itself offers, because a shelf of presets is not a parameter: it
     /// is a list, and what a hand wants of a list is the next one and the one before. Pointing
     /// at the left of the picker offers the first and at the right the second, which is where
