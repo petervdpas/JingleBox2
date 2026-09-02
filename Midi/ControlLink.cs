@@ -52,14 +52,14 @@ public sealed class ControlLink
         _mappings = mappings;
         _changed = changed;
 
-        _mappings.RemoveAll(one => one.Kind == ControlKind.Insert);
+        _mappings.RemoveAll(one => one.Kind == ControlKind.Plugin);
     }
 
     /// <summary>
     /// The one this session is using.
     /// </summary>
     /// <remarks>
-    /// A static, and the same reason as <see cref="Devices.SoundMachines.SoundMachineProjects"/>:
+    /// A static, and the same reason as <see cref="SoundDevices.SoundMachines.SoundMachineProjects"/>:
     /// there is exactly one controller on the desk, the mode it is in is the same mode
     /// everywhere at once, and the panels that have to know are drawn from a description that
     /// has never heard of a view model. Threading a reference through every designer, window
@@ -511,11 +511,11 @@ public sealed class ControlLink
 
         return one.Kind switch
         {
-            ControlKind.Device or ControlKind.Action =>
+            ControlKind.SoundDevice or ControlKind.Action =>
                 one.Machine.Length > 0 && wanted.Machine.Length > 0
                 && !string.Equals(one.Machine, wanted.Machine, StringComparison.Ordinal),
 
-            ControlKind.Insert =>
+            ControlKind.Plugin =>
                 one.Plugin.Length > 0 && wanted.Plugin.Length > 0
                 && !string.Equals(one.Plugin, wanted.Plugin, StringComparison.Ordinal),
 
@@ -543,7 +543,7 @@ public sealed class ControlLink
 
         foreach (var one in Mappings)
         {
-            if (one.Kind != ControlKind.Device || one.Key.Length == 0) continue;
+            if (one.Kind != ControlKind.SoundDevice || one.Key.Length == 0) continue;
 
             if (one.Machine.Length > 0 && !string.Equals(one.Machine, machine, StringComparison.Ordinal))
                 continue;
@@ -567,12 +567,12 @@ public sealed class ControlLink
         Changing();
 
         int gone = Song?.Invoke()?.RemoveAll(one =>
-            (one.Kind == ControlKind.Device || one.Kind == ControlKind.Action)
+            (one.Kind == ControlKind.SoundDevice || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal)) ?? 0;
 
         lock (_lock) gone += _mappings.RemoveAll(one =>
-            (one.Kind == ControlKind.Device || one.Kind == ControlKind.Action)
+            (one.Kind == ControlKind.SoundDevice || one.Kind == ControlKind.Action)
             && string.Equals(one.Machine, machine, StringComparison.Ordinal)
             && string.Equals(one.Key, key, StringComparison.Ordinal));
 

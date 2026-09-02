@@ -68,7 +68,7 @@ public sealed class PatternEdit : IPatternEdit
             pattern[from.Line, from.Track, column] = pattern[from.Line, from.Track, column - 1];
 
         pattern[from.Line, from.Track, at] =
-            new TrackerCell(note, instrument, TrackerCell.ClampVolume(volume), TrackerEffect.None);
+            new TrackerCell(note, instrument, TrackerCell.ClampVolume(volume), TrackerCommand.None);
 
         return at;
     }
@@ -114,7 +114,7 @@ public sealed class PatternEdit : IPatternEdit
 
             case CellColumn.Effect:
                 var effect = cell.Effect.IsNone
-                    ? new TrackerEffect(TrackerEffect.SetVolume, 0)
+                    ? new TrackerCommand(TrackerCommand.SetVolume, 0)
                     : cell.Effect;
                 pattern[cursor.Line, cursor.Track, cursor.NoteColumn] =
                     cell with { Effect = effect with { Parameter = ShiftIn(effect.Parameter, value) } };
@@ -154,7 +154,7 @@ public sealed class PatternEdit : IPatternEdit
             CellColumn.Note => TrackerCell.Empty,
             CellColumn.Instrument => cell with { Instrument = TrackerCell.NoInstrument },
             CellColumn.Volume => cell with { Volume = TrackerCell.NoVolume },
-            CellColumn.Effect => cell with { Effect = TrackerEffect.None },
+            CellColumn.Effect => cell with { Effect = TrackerCommand.None },
             _ => cell
         };
     }

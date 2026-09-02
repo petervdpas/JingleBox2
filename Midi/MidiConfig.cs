@@ -22,7 +22,7 @@ public sealed class MidiConfig
     public string? InputDevice { get; set; }
 
     /// <summary>Every controller the app knows about, with the job it was given.</summary>
-    public List<MidiDeviceBinding> Devices { get; set; } = new();
+    public List<MidiPortBinding> Devices { get; set; } = new();
 
     /// <summary>
     /// Whether a mapped button toggles a pad or always starts it from the beginning.

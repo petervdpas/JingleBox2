@@ -39,7 +39,7 @@ public partial class MixerView : UserControl
     }
 
     /// <summary>What a machine offers, drawn as menu items. The same rule a machine's face uses.</summary>
-    private readonly Rack.Ui.Interfaces.IMenuLines _lines = new Rack.Ui.MenuLines();
+    private readonly Rack.Controls.Interfaces.IMenuLines _lines = new Rack.Controls.MenuLines();
 
     /// <summary>
     /// Shows what the hardware on this desk does to the mixer.

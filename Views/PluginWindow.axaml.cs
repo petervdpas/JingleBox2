@@ -156,7 +156,7 @@ public partial class PluginWindow : Window
     }
 
     /// <summary>Opens a device's window, or brings the one it already has to the front.</summary>
-    public static void Show(PluginDeviceViewModel device, Window owner)
+    public static void Show(PluginSlotViewModel device, Window owner)
     {
         if (device == null) return;
 
@@ -193,7 +193,7 @@ public partial class PluginWindow : Window
         PluginControlsViewModel panel,
         string title,
         Window owner,
-        PluginDeviceViewModel? device,
+        PluginSlotViewModel? device,
         Action? closed)
     {
         if (key == null || panel == null) return;
@@ -248,7 +248,7 @@ public partial class PluginWindow : Window
 
         Open.Remove(key);
 
-        if (key is PluginDeviceViewModel device) device.IsOpen = false;
+        if (key is PluginSlotViewModel device) device.IsOpen = false;
 
         window.Close();
     }

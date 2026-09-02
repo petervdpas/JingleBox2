@@ -6,9 +6,9 @@ using JingleBox2.Controllers;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
-using JingleBox2.Rack.Faces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Midi.Interfaces;
 
 namespace JingleBox2.Midi;
@@ -104,7 +104,7 @@ public sealed class ControlMenu : IPanelMenu
         Func<ControlLink?>? desk = null,
         IControllerProfiles? profiles = null,
         ILinkTargets? naming = null,
-        string kind = LinkTargets.Device)
+        string kind = LinkTargets.SoundDevice)
     {
         _which = which;
         _kind = kind;

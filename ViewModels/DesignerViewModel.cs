@@ -2,8 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Rack.Faces;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Rack.SoundDevices.Faces;
+using JingleBox2.SoundDevices.SoundMachines;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,13 +11,13 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.Linq;
 using System.IO;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
-using JingleBox2.Rack.Machines;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -174,13 +174,13 @@ public sealed partial class DesignerViewModel : ObservableObject
 
         Values = new PreviewValues(Parameters);
 
-        PresetDesk = new MachinePresetDesk(() => Project as SoundMachineProject);
+        PresetDesk = new SoundMachinePresetDesk(() => Project as SoundMachineProject);
 
-        Utilities = new MachineUtilities(() => Project as SoundMachineProject);
+        Utilities = new SoundMachinePresetTools(() => Project as SoundMachineProject);
 
         Utilities.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MachineUtilities.HasWork)) OnPropertyChanged(nameof(ShowsUtilities));
+            if (e.PropertyName == nameof(SoundMachinePresetTools.HasWork)) OnPropertyChanged(nameof(ShowsPresetTools));
         };
 
         PreviewMenu = new Midi.ControlMenu(
@@ -199,7 +199,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// what the machine sounds like when somebody first meets it have nothing to say to each
     /// other, and putting them on one screen means neither gets the room.
     /// </remarks>
-    public MachinePresetDesk PresetDesk { get; }
+    public SoundMachinePresetDesk PresetDesk { get; }
 
     /// <summary>
     /// The jobs that are neither drawing a panel nor filling in a preset.
@@ -209,7 +209,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// recordings have nothing to say to each other about layout, and neither of them is
     /// something you do while you are doing anything else.
     /// </remarks>
-    public MachineUtilities Utilities { get; } = null!;
+    public SoundMachinePresetTools Utilities { get; } = null!;
 
     /// <summary>
     /// Which page is open: nought the screen, one the presets, two the tools.
@@ -253,7 +253,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// true; the case it covers is an installation with the rack emptied, where the page would
     /// be two cards about nothing.
     /// </remarks>
-    public bool ShowsUtilities => Utilities.HasWork;
+    public bool ShowsPresetTools => Utilities.HasWork;
 
     /// <summary>
     /// Reads the machine's presets folder when that tab is opened.
@@ -658,19 +658,19 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// demonstration that exists so the controls have their real shape while a panel is being
     /// laid out around them.
     /// </remarks>
-    public IMachinePads PreviewPads { get; } = new MachinePreviewKit();
+    public IMachinePads PreviewPads { get; } = new SoundMachinePreviewKit();
 
     /// <inheritdoc cref="PreviewPads"/>
-    public IMachineSlices PreviewSlices { get; } = new MachinePreviewSlices();
+    public IMachineSlices PreviewSlices { get; } = new SoundMachinePreviewSlices();
 
     /// <summary>And a map for the panel to draw, for the same reason there is a kit.</summary>
-    public IMachineZones PreviewZones { get; } = new MachinePreviewMap();
+    public IMachineZones PreviewZones { get; } = new SoundMachinePreviewMap();
 
     /// <summary>And a wave, so a machine laid out round a picture is laid out round a picture.</summary>
-    public IPanelScope PreviewScope { get; } = new MachinePreviewScope();
+    public IPanelScope PreviewScope { get; } = new SoundMachinePreviewScope();
 
     /// <summary>And a pattern to count, so the lamps and their pages take the room they will.</summary>
-    public IMachineLocation PreviewLocation { get; } = new MachinePreviewLocation();
+    public IMachineLocation PreviewLocation { get; } = new SoundMachinePreviewLocation();
 
     /// <summary>
     /// And a name for the badge, since a badge laid out around an empty one is the wrong width.
@@ -681,7 +681,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// instrument's, which is a different length and is not this page's to invent. Fixed, since
     /// there is no instrument here to rename.
     /// </remarks>
-    public IInstrumentName PreviewName { get; } = new MachinePreviewName();
+    public IInstrumentName PreviewName { get; } = new SoundMachinePreviewName();
 
     /// <summary>
     /// What the hardware on this desk does to the machine being laid out.
@@ -713,7 +713,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     public IPanelPresets? Presets =>
         Project is { } project && project.BrowsesTakes() != true
-            ? new MachinePresetNames(PresetDesk)
+            ? new SoundMachinePresetNames(PresetDesk)
             : Shelf;
 
     /// <summary>Your recordings, handed in by whoever built the editor.</summary>
@@ -1497,7 +1497,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     public Face? Shown =>
         Project is { } project
-            ? new Face(new Rack.Faces.Panel { Root = project.Panel.Root }, project.Parameters, project.Folder)
+            ? new Face(new Rack.SoundDevices.Faces.Panel { Root = project.Panel.Root }, project.Parameters, project.Folder)
             : null;
 
     /// <summary>Just the keys, for choosing which parameter a control turns.</summary>
@@ -2026,7 +2026,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     /// </remarks>
     private static PanelElement Root(IDesignProject project)
     {
-        project.Panel ??= new Rack.Faces.Panel();
+        project.Panel ??= new Rack.SoundDevices.Faces.Panel();
         project.Panel.Root ??= new PanelElement { Element = ElementKinds.Grid };
 
         if (project.Panel.Root.Element.Length == 0) project.Panel.Root.Element = ElementKinds.Grid;

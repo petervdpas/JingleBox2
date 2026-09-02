@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Tracker.Records;
 
 namespace JingleBox2.ViewModels.Interfaces;

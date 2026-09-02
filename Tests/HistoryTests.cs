@@ -1,9 +1,9 @@
 using System;
 using System.Threading;
 using JingleBox2.Config;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Tracker;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.ViewModels;
 using Xunit;
 using JingleBox2.Tracker.Enums;

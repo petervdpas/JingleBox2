@@ -13,8 +13,8 @@ namespace JingleBox2.Tracker.Records;
 /// track last played" rather than as an error.
 /// </param>
 /// <param name="Volume">How loud, 0 to <see cref="MaxVolume"/>, or <see cref="NoVolume"/>.</param>
-/// <param name="Effect">One effect command, or <see cref="TrackerEffect.None"/>.</param>
-public readonly record struct TrackerCell(Note Note, int Instrument, int Volume, TrackerEffect Effect)
+/// <param name="Effect">One effect command, or <see cref="TrackerCommand.None"/>.</param>
+public readonly record struct TrackerCell(Note Note, int Instrument, int Volume, TrackerCommand Effect)
 {
     /// <summary>A blank instrument column. Not an error: the track's own instrument is used.</summary>
     public const int NoInstrument = -1;
@@ -39,7 +39,7 @@ public readonly record struct TrackerCell(Note Note, int Instrument, int Volume,
 
     /// <summary>Every column blank, which is what a pattern is filled with.</summary>
     public static readonly TrackerCell Empty =
-        new(Note.Empty, NoInstrument, NoVolume, TrackerEffect.None);
+        new(Note.Empty, NoInstrument, NoVolume, TrackerCommand.None);
 
     /// <summary>True when every column is blank, so the file need not store it.</summary>
     public bool IsEmpty =>

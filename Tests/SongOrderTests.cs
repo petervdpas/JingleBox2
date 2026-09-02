@@ -32,7 +32,7 @@ public class SongOrderTests
             song.Order.Add(pattern);
         }
 
-        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 64, TrackerEffect.None);
+        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 64, TrackerCommand.None);
 
         return song;
     }
@@ -61,7 +61,7 @@ public class SongOrderTests
 
         int copy = song.ClonePattern(0);
 
-        song.Patterns[copy][0, 0] = new TrackerCell(new Note(72), 1, 32, TrackerEffect.None);
+        song.Patterns[copy][0, 0] = new TrackerCell(new Note(72), 1, 32, TrackerCommand.None);
 
         Assert.Equal(new Note(60), song.Patterns[0][0, 0].Note);
         Assert.Equal(new Note(72), song.Patterns[copy][0, 0].Note);

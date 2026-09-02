@@ -26,7 +26,7 @@ namespace JingleBox2.ViewModels;
 /// spending an evening wondering why the buttons do nothing.
 ///
 /// A view over the rows rather than a replacement for them. Each port is still a
-/// <see cref="MidiDeviceViewModel"/> with its own binding, saved and loaded exactly as before,
+/// <see cref="MidiPortViewModel"/> with its own binding, saved and loaded exactly as before,
 /// so nothing underneath this had to change and a device with no profile is a surface with one
 /// port that behaves as it always did.
 /// </remarks>
@@ -36,10 +36,10 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     private readonly IControllerProfiles _profiles = new ControllerProfiles();
 
     /// <summary>The rows underneath, which are what is actually stored and opened.</summary>
-    private readonly IReadOnlyList<MidiDeviceViewModel> _ports;
+    private readonly IReadOnlyList<MidiPortViewModel> _ports;
 
     /// <summary>Told to drop a port for good, or null where forgetting is not offered.</summary>
-    private readonly Action<MidiDeviceViewModel>? _forget;
+    private readonly Action<MidiPortViewModel>? _forget;
 
     /// <summary>True while the ticks are being read off the ports, so they do not write back.</summary>
     private bool _reading;
@@ -50,8 +50,8 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     /// <param name="name">What the hardware is called, from the profile or from the port itself.</param>
     /// <param name="ports">Its ports, still the rows that hold the jobs.</param>
     /// <param name="forget">Told to drop a port, where forgetting is offered.</param>
-    public ControlSurfaceViewModel(string name, IReadOnlyList<MidiDeviceViewModel> ports,
-                                   Action<MidiDeviceViewModel>? forget = null)
+    public ControlSurfaceViewModel(string name, IReadOnlyList<MidiPortViewModel> ports,
+                                   Action<MidiPortViewModel>? forget = null)
     {
         Name = name;
         _ports = ports;
@@ -62,10 +62,10 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
 
         _reading = true;
 
-        drivesPads = Any(MidiDeviceRole.Pads);
-        drivesTracker = Any(MidiDeviceRole.Tracker);
-        drivesControls = Any(MidiDeviceRole.Controls);
-        drivesTransport = Any(MidiDeviceRole.Transport);
+        drivesPads = Any(MidiPortRole.Pads);
+        drivesTracker = Any(MidiPortRole.Tracker);
+        drivesControls = Any(MidiPortRole.Controls);
+        drivesTransport = Any(MidiPortRole.Transport);
 
         _reading = false;
     }
@@ -105,16 +105,16 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     [ObservableProperty] private bool drivesTransport;
 
     /// <summary>Any of the four moving puts that job on the ports that can do it.</summary>
-    partial void OnDrivesPadsChanged(bool value) => Put(MidiDeviceRole.Pads, value);
+    partial void OnDrivesPadsChanged(bool value) => Put(MidiPortRole.Pads, value);
 
     /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
-    partial void OnDrivesTrackerChanged(bool value) => Put(MidiDeviceRole.Tracker, value);
+    partial void OnDrivesTrackerChanged(bool value) => Put(MidiPortRole.Tracker, value);
 
     /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
-    partial void OnDrivesControlsChanged(bool value) => Put(MidiDeviceRole.Controls, value);
+    partial void OnDrivesControlsChanged(bool value) => Put(MidiPortRole.Controls, value);
 
     /// <inheritdoc cref="OnDrivesPadsChanged(bool)"/>
-    partial void OnDrivesTransportChanged(bool value) => Put(MidiDeviceRole.Transport, value);
+    partial void OnDrivesTransportChanged(bool value) => Put(MidiPortRole.Transport, value);
 
     /// <summary>Only for hardware that is not plugged in. One on the desk comes straight back.</summary>
     public bool CanForget => !IsConnected && _forget is not null;
@@ -132,7 +132,7 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     });
 
     /// <summary>True when any port already has that job, which is how the ticks start out.</summary>
-    private bool Any(MidiDeviceRole role) => _ports.Any(one => (one.Role & role) != 0);
+    private bool Any(MidiPortRole role) => _ports.Any(one => (one.Role & role) != 0);
 
     /// <summary>
     /// Puts a job on the ports that can do it, and takes it off the ones that cannot.
@@ -142,7 +142,7 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
     /// A layout somebody built by hand before this page existed has to be undoable from it, or
     /// the tick reads as broken while a port nobody can see keeps working.
     /// </remarks>
-    private void Put(MidiDeviceRole role, bool wanted)
+    private void Put(MidiPortRole role, bool wanted)
     {
         if (_reading) return;
 
@@ -152,10 +152,10 @@ public sealed partial class ControlSurfaceViewModel : ObservableObject
 
             switch (role)
             {
-                case MidiDeviceRole.Pads: port.DrivesPads = on; break;
-                case MidiDeviceRole.Tracker: port.DrivesTracker = on; break;
-                case MidiDeviceRole.Controls: port.DrivesControls = on; break;
-                case MidiDeviceRole.Transport: port.DrivesTransport = on; break;
+                case MidiPortRole.Pads: port.DrivesPads = on; break;
+                case MidiPortRole.Tracker: port.DrivesTracker = on; break;
+                case MidiPortRole.Controls: port.DrivesControls = on; break;
+                case MidiPortRole.Transport: port.DrivesTransport = on; break;
             }
         }
     }

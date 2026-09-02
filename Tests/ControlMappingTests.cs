@@ -22,7 +22,7 @@ public class ControlMappingTests
     private static ControlMapping Link(string device = "Minilab3 MIDI", int cc = 86, int channel = 1) => new()
     {
         Device = device, Channel = channel, Cc = cc,
-        Kind = ControlKind.Device, Machine = "machine.zampler", Key = "cutoff"
+        Kind = ControlKind.SoundDevice, Machine = "machine.zampler", Key = "cutoff"
     };
 
     /// <summary>A controller message as it would arrive off that port.</summary>

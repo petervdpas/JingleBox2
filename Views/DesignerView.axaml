@@ -4,7 +4,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:vmr="clr-namespace:JingleBox2.ViewModels.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              x:Class="JingleBox2.Views.DesignerView"
              x:DataType="vm:DesignerViewModel">
 
@@ -711,7 +711,7 @@
           <ListBox ItemsSource="{Binding PresetDesk.Presets}"
                    SelectedItem="{Binding PresetDesk.Picked, Mode=TwoWay}">
             <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="vmr:MachinePresetSlot">
+              <DataTemplate x:DataType="vmr:SoundMachinePresetSlot">
                 <StackPanel Spacing="1" Margin="0,2">
                   <TextBlock Text="{Binding Name}" />
                   <TextBlock Classes="cardHint" Text="{Binding FileName}" />
@@ -848,7 +848,7 @@
     </Grid>
     </TabItem>
 
-    <TabItem Header="Utilities" IsVisible="{Binding ShowsUtilities}">
+    <TabItem Header="Utilities" IsVisible="{Binding ShowsPresetTools}">
     <!-- The jobs somebody would otherwise do in a file manager and an audio editor. A list of
          them, and one of them open: two tools side by side already filled the width, and the
          ones still to come would not fit at all. -->
@@ -890,7 +890,7 @@
 
             <ItemsControl ItemsSource="{Binding Utilities.Tools}" Margin="0,4,0,0">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vmr:UtilityTool">
+                <DataTemplate x:DataType="vmr:PresetTool">
                   <Button Classes="tool" HorizontalAlignment="Stretch" Margin="0,3"
                           HorizontalContentAlignment="Left"
                           Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Utilities.OpenCommand}"

@@ -1,7 +1,7 @@
 
 using JingleBox2.Tracker;
 using Xunit;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 
 namespace JingleBox2.Tests;
 
@@ -17,7 +17,7 @@ namespace JingleBox2.Tests;
 ///
 /// Taking a machine off the rack is not losing it. The machine stays registered, so a song that
 /// uses it still sounds and the picker offers it back. Losing one is unregistering it, which is
-/// a different act on a different page, and `MissingMachineTests` is where that is checked.
+/// a different act on a different page, and `MissingSoundMachineTests` is where that is checked.
 /// </remarks>
 public class RackShelfTests
 {
@@ -53,7 +53,7 @@ public class RackShelfTests
     {
         var rack = Rack("taken");
 
-        var box = TrackerInstrument.CreateOn(JingleBox2.Devices.SoundMachines.Records.SoundMachine.For(
+        var box = TrackerInstrument.CreateOn(JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.For(
             JingleBox2.Tracker.Enums.TrackerInstrumentKind.Synth), "OddSkilla");
 
         box.Id = "machine.oddskilla";

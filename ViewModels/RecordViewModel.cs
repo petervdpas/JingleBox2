@@ -573,7 +573,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
         foreach (var device in _recordingService.GetInputDevices())
             InputDevices.Add(device);
 
-        SelectedDevice = new InputDeviceSelector().Pick(InputDevices, previous);
+        SelectedDevice = new AudioInputSelector().Pick(InputDevices, previous);
     }
 
     /// <summary>

@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
-using JingleBox2.Rack.Faces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using Xunit;
 
 namespace JingleBox2.Tests;

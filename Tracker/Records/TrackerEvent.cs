@@ -14,7 +14,7 @@ namespace JingleBox2.Tracker.Records;
 /// reads as "whatever this column last played".
 /// </param>
 /// <param name="Gain">The volume column as a 0 to 1 gain, or null when the column is blank.</param>
-/// <param name="Effect">The effect command on this cell, or <see cref="TrackerEffect.None"/>.</param>
+/// <param name="Effect">The effect command on this cell, or <see cref="TrackerCommand.None"/>.</param>
 /// <remarks>
 /// The column is beside the track because the two together are what names a voice. A stop that
 /// named only its track would take a whole chord down to end one note of it, which is the same
@@ -27,10 +27,10 @@ public readonly record struct TrackerEvent(
     Note Note,
     int Instrument,
     float? Gain,
-    TrackerEffect Effect)
+    TrackerCommand Effect)
 {
     /// <summary>The event that silences one column, with every other column saying nothing.</summary>
     public static TrackerEvent Stop(int track, int column = 0) =>
         new(track, column, TrackerEventKind.Stop, Note.Off, TrackerCell.NoInstrument, null,
-            TrackerEffect.None);
+            TrackerCommand.None);
 }

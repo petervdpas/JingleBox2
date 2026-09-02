@@ -14,8 +14,8 @@ using JingleBox2.Music;
 using JingleBox2.Music.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Views.Interfaces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces;
 
 namespace JingleBox2.Views;
 
@@ -35,7 +35,7 @@ public partial class SoundDevicePanel : UserControl
     private readonly IPresetStep _step = new PresetStep();
 
     /// <summary>What makes this face pointable at whichever device it is drawing.</summary>
-    private readonly DeviceRemote _remote;
+    private readonly SoundDeviceRemote _remote;
 
     /// <summary>A machine's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
@@ -77,7 +77,7 @@ public partial class SoundDevicePanel : UserControl
 
         Face.TakeWanted += PickTake;
 
-        _remote = new DeviceRemote(Face, () => Designer?.Editor?.Device);
+        _remote = new SoundDeviceRemote(Face, () => Designer?.Editor?.Device);
 
         DataContextChanged += (_, _) => { Watch(); _remote.Show(); };
         UI.ThemeSwitch.Changed += Later;
@@ -129,7 +129,7 @@ public partial class SoundDevicePanel : UserControl
 
     /// <summary>Does what a button on a described panel asked for.</summary>
     /// <remarks>
-    /// Matched against the names in <see cref="JingleBox2.Rack.Faces.PanelActions"/> rather than
+    /// Matched against the names in <see cref="JingleBox2.Rack.SoundDevices.Faces.PanelActions"/> rather than
     /// against anything worked out from the string, so every action in the app can be found by
     /// searching for the word that is in the machine's file. One this build has never heard of
     /// does nothing, which is what lets a machine written against a later version still open.
@@ -138,47 +138,47 @@ public partial class SoundDevicePanel : UserControl
     {
         switch (action)
         {
-            case Rack.Faces.PanelActions.ClearPad:
+            case Rack.SoundDevices.Faces.PanelActions.ClearPad:
                 ClearPadSample_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Rack.Faces.PanelActions.LoadPads:
+            case Rack.SoundDevices.Faces.PanelActions.LoadPads:
                 ImportPads_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Rack.Faces.PanelActions.ClearZone:
+            case Rack.SoundDevices.Faces.PanelActions.ClearZone:
                 ClearZoneSample_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Rack.Faces.PanelActions.LoadZones:
+            case Rack.SoundDevices.Faces.PanelActions.LoadZones:
                 ImportZones_Click(this, new RoutedEventArgs());
 
                 break;
 
-            case Rack.Faces.PanelActions.AddZone:
+            case Rack.SoundDevices.Faces.PanelActions.AddZone:
                 Designer?.Editor?.Zones?.AddCommand.Execute(null);
 
                 break;
 
-            case Rack.Faces.PanelActions.RemoveZone:
+            case Rack.SoundDevices.Faces.PanelActions.RemoveZone:
                 Designer?.Editor?.Zones?.RemoveCommand.Execute(null);
 
                 break;
 
-            case Rack.Faces.PanelActions.SpreadZones:
+            case Rack.SoundDevices.Faces.PanelActions.SpreadZones:
                 Designer?.Editor?.Zones?.SpreadCommand.Execute(null);
 
                 break;
 
-            case Rack.Faces.PanelActions.PresetPrevious:
+            case Rack.SoundDevices.Faces.PanelActions.PresetPrevious:
                 Step(-1);
 
                 break;
 
-            case Rack.Faces.PanelActions.PresetNext:
+            case Rack.SoundDevices.Faces.PanelActions.PresetNext:
                 Step(1);
 
                 break;

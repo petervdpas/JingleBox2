@@ -34,7 +34,7 @@ playing it back is the identical write arriving from the clock instead of from a
 recording half of automation and this machine records itself.
 
 **The machine's face is a described panel.** A fader, a take picker, a picture of the waveform
-with the needle drawn on it. All of that exists in `Rack.Ui` and is spelled in `machine.json`
+with the needle drawn on it. All of that exists in `Rack.Controls` and is spelled in `machine.json`
 like every other machine.
 
 ## The two things that do not exist yet

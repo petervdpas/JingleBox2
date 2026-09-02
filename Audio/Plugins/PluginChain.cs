@@ -17,7 +17,7 @@ namespace JingleBox2.Audio.Plugins;
 public sealed class PluginChain : IAudioInsert
 {
     /// <summary>The chain in the order a person edits it. Only ever touched under the lock.</summary>
-    private readonly List<Device> _devices = new();
+    private readonly List<Slot> _devices = new();
 
     /// <summary>
     /// Held by every edit and by the one moment a block takes its copy of the list, which is
@@ -29,16 +29,16 @@ public sealed class PluginChain : IAudioInsert
     /// What the audio thread walks. Rebuilt on the first block after an edit rather than by the
     /// edit itself, so a burst of changes costs one copy instead of one apiece.
     /// </summary>
-    private Device[] _snapshot = Array.Empty<Device>();
+    private Slot[] _snapshot = Array.Empty<Slot>();
 
     /// <summary>True when <see cref="_snapshot"/> is older than <see cref="_devices"/>.</summary>
     private bool _stale = true;
 
     /// <summary>One box in the chain: what it is, and whether it is switched on.</summary>
-    public sealed class Device
+    public sealed class Slot
     {
         /// <summary>Wraps something that takes audio so the chain can carry it.</summary>
-        public Device(IAudioInsert insert) => Insert = insert;
+        public Slot(IAudioInsert insert) => Insert = insert;
 
         /// <summary>The thing the audio actually goes through.</summary>
         public IAudioInsert Insert { get; }
@@ -62,15 +62,15 @@ public sealed class PluginChain : IAudioInsert
     /// The chain in order, as a copy: whoever is reading it is usually about to draw it, and a
     /// list that changed under a redraw would be worse than one that is a moment out of date.
     /// </summary>
-    public IReadOnlyList<Device> Devices
+    public IReadOnlyList<Slot> Slots
     {
         get { lock (_lock) return _devices.ToArray(); }
     }
 
     /// <summary>Puts something on the end of the chain and hands back its place in it.</summary>
-    public Device Add(IAudioInsert insert)
+    public Slot Add(IAudioInsert insert)
     {
-        var device = new Device(insert);
+        var device = new Slot(insert);
 
         lock (_lock)
         {
@@ -82,7 +82,7 @@ public sealed class PluginChain : IAudioInsert
     }
 
     /// <summary>Takes a device out. Nothing happens for one that is not in this chain.</summary>
-    public void Remove(Device device)
+    public void Remove(Slot device)
     {
         lock (_lock)
         {
@@ -97,7 +97,7 @@ public sealed class PluginChain : IAudioInsert
     /// asked to move the first device up is an ordinary thing for a button to do rather than a
     /// fault.
     /// </returns>
-    public bool Move(Device device, int offset)
+    public bool Move(Slot device, int offset)
     {
         lock (_lock)
         {
@@ -136,7 +136,7 @@ public sealed class PluginChain : IAudioInsert
     /// </remarks>
     public void Process(float[] buffer, int frames)
     {
-        Device[] chain;
+        Slot[] chain;
 
         lock (_lock)
         {

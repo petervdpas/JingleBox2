@@ -139,7 +139,7 @@ public sealed class ConfigStore : IConfigStore
     /// matrix here, which is the only place that count is enforced.
     ///
     /// Two migrations live here and stay: pads written before profiles existed are moved into a
-    /// "default" profile, and <see cref="Midi.Interfaces.IMidiDeviceBindings.Normalize"/> brings a file that
+    /// "default" profile, and <see cref="Midi.Interfaces.IMidiPortBindings.Normalize"/> brings a file that
     /// named one MIDI device across to the roles. Both are cheap and both have to keep working
     /// for as long as anybody has an old file, which is for ever.
     /// </remarks>
@@ -171,7 +171,7 @@ public sealed class ConfigStore : IConfigStore
         cfg.Midi ??= new MidiConfig();
         cfg.Midi.Pads ??= new List<MidiMapping>();
 
-        new MidiDeviceBindings().Normalize(cfg.Midi);
+        new MidiPortBindings().Normalize(cfg.Midi);
 
         while (cfg.Midi.Pads.Count < padCount)
         {

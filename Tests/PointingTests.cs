@@ -1,10 +1,10 @@
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Midi;
 using JingleBox2.Views;
 using System;
 using Xunit;
 using JingleBox2.Midi.Enums;
-using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.Tests;
 

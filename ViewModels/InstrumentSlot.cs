@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Avalonia.Media;
 using JingleBox2.Tracker;
 using System.Globalization;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Views.Interfaces;
 using JingleBox2.Views;
 
@@ -61,7 +61,7 @@ public sealed partial class InstrumentSlot : ObservableObject
     /// absent rather than as an ordinary instrument that happens not to sound.
     /// </remarks>
     public PanelTheme Theme =>
-        _offered ? Instrument.Machine.Theme : JingleBox2.Devices.SoundMachines.Records.SoundMachine.Absent;
+        _offered ? Instrument.Machine.Theme : JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.Absent;
 
     /// <summary>Its colour on its own, for the bar down the side of the row.</summary>
     public string Colour => Theme.Accent;

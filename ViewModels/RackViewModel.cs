@@ -11,14 +11,14 @@ using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
-using JingleBox2.Devices.SoundMachines.Records;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines.Records;
+using JingleBox2.SoundDevices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -86,7 +86,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null,
-        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
     {
         _machines = machines;
         _effects = effects;
@@ -119,12 +119,12 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     public event EventHandler? RackChanged;
 
     /// <summary>What is on the rack: the machines in the order they are declared, then plugins.</summary>
-    public ObservableCollection<RackMachine> Machines { get; } = new();
+    public ObservableCollection<RackSoundMachine> Machines { get; } = new();
 
     /// <summary>Which one is open, and so what the panel below is showing.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMachines))]
-    private RackMachine? selected;
+    private RackSoundMachine? selected;
 
     /// <summary>
     /// True whenever a row is picked, since anything on the rack can be taken off it.
@@ -220,11 +220,11 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     public bool HasLocation => Location?.IsLive == true;
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
-    public Rack.Machines.Interfaces.IMachineLocation? MachineLocation =>
-        _place ??= Location is { } place ? new Devices.SoundMachines.TrackLocation(place) : null;
+    public Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? MachineLocation =>
+        _place ??= Location is { } place ? new SoundDevices.SoundMachines.TrackLocation(place) : null;
 
     /// <inheritdoc cref="MachineLocation"/>
-    private Rack.Machines.Interfaces.IMachineLocation? _place;
+    private Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? _place;
 
     /// <summary>Reads the rack back off disk, keeping the selection where it can.</summary>
     /// <remarks>
@@ -246,7 +246,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
         {
             var slot = held.FirstOrDefault(i => i.Id == machine.SlotId);
 
-            if (slot != null) Machines.Add(new RackMachine(slot));
+            if (slot != null) Machines.Add(new RackSoundMachine(slot));
         }
 
         Selected = Machines.FirstOrDefault(i => i.Id == keep) ?? Machines.FirstOrDefault();
@@ -263,7 +263,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// Optional, because a rack can be built in a test with no effects at all and because
     /// nothing about a machine depends on there being any.
     /// </remarks>
-    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? _effects;
 
     /// <summary>
     /// The effects this installation has.
@@ -280,7 +280,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// chain. So having one and it being here are the same fact, and losing one is unregistering
     /// it in SETTINGS.
     /// </remarks>
-    public ObservableCollection<RackEffect> Effects { get; } = new();
+    public ObservableCollection<RackSoundEffect> Effects { get; } = new();
 
     /// <summary>Which effect is picked, which today is only the row that looks picked.</summary>
     /// <remarks>
@@ -289,7 +289,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// downstream expects an instrument.
     /// </remarks>
     [ObservableProperty]
-    private RackEffect? _selectedEffect;
+    private RackSoundEffect? _selectedEffect;
 
     /// <summary>True when this installation has an effect, so the tab can say what it is for.</summary>
     public bool HasEffects => Effects.Count > 0;
@@ -343,7 +343,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
     /// <summary>Told when the picked effect moved, for the same reason.</summary>
     /// <param name="value">The effect now picked, or nothing.</param>
-    partial void OnSelectedEffectChanged(RackEffect? value) => Shown();
+    partial void OnSelectedEffectChanged(RackSoundEffect? value) => Shown();
 
     /// <summary>Says that what is drawn beside the list may have changed.</summary>
     private void Shown()
@@ -567,7 +567,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// The keyboard then moves to the piece that is picked, so playing it plays that piece rather
     /// than whatever happens to live under the octave you were left on.
     /// </remarks>
-    partial void OnSelectedChanged(RackMachine? value)
+    partial void OnSelectedChanged(RackSoundMachine? value)
     {
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanRename));
@@ -756,7 +756,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
 
         if (_effects is { } registered)
         {
-            foreach (var effect in registered.All) Effects.Add(new RackEffect(effect));
+            foreach (var effect in registered.All) Effects.Add(new RackSoundEffect(effect));
         }
 
         SelectedEffect = Effects.FirstOrDefault(one => one.Id == held) ?? Effects.FirstOrDefault();
@@ -848,7 +848,7 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
         {
             _rack.Save(instrument);
 
-            var row = new RackMachine(instrument);
+            var row = new RackSoundMachine(instrument);
             Machines.Add(row);
             Selected = row;
 

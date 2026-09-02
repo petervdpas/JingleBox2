@@ -3,10 +3,10 @@ using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Records;
-using JingleBox2.Devices.SoundMachines;
-using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Faces;
+using JingleBox2.SoundDevices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces;
 
 namespace JingleBox2.ViewModels;
 
@@ -35,7 +35,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     private readonly ISoundMachineProjects _machines;
 
     /// <summary>How a machine that is not here is named, which its own kind cannot do.</summary>
-    private readonly Devices.SoundMachines.Interfaces.IMissingSoundMachines _missing;
+    private readonly SoundDevices.SoundMachines.Interfaces.IMissingSoundMachines _missing;
 
     /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
@@ -92,10 +92,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         Action? changed = null,
         Func<TrackInstrumentPanel>? designer = null,
         Action? remove = null,
-        Devices.SoundMachines.Interfaces.IMissingSoundMachines? missing = null)
+        SoundDevices.SoundMachines.Interfaces.IMissingSoundMachines? missing = null)
     {
         _machines = machines;
-        _missing = missing ?? new Devices.SoundMachines.MissingSoundMachines();
+        _missing = missing ?? new SoundDevices.SoundMachines.MissingSoundMachines();
         _instrument = instrument;
         _live = live;
         _changed = changed;
@@ -176,7 +176,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// itself as "Mono synth" and the message tells somebody to register a thing that is not on
     /// the list under that name.
     /// </remarks>
-    public Devices.SoundMachines.Records.MissingSoundMachine? Missing => _missing.For(_instrument);
+    public SoundDevices.SoundMachines.Records.MissingSoundMachine? Missing => _missing.For(_instrument);
 
     /// <summary>The second line of its block: which machine it is, and how it is set.</summary>
     /// <remarks>
@@ -204,11 +204,11 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// <remarks>
     /// The same thing the effects after it print, and for the same reason: a row of boxes with
     /// names on them tells you the order of the chain and nothing at all about the sound. Which
-    /// few is <see cref="JingleBox2.Rack.Faces.PanelOrder"/>, the order the panel reads, so it is the first
+    /// few is <see cref="JingleBox2.Rack.SoundDevices.Faces.PanelOrder"/>, the order the panel reads, so it is the first
     /// three controls your eye lands on when you open the machine rather than the first three
     /// lines of a file.
     ///
-    /// Read through a throwaway adapter from <see cref="Devices.SoundMachines.SoundMachineValuesFor"/>,
+    /// Read through a throwaway adapter from <see cref="SoundDevices.SoundMachines.SoundMachineValuesFor"/>,
     /// which is cheap: it is a view model over the patch the instrument already holds. What it
     /// is not is the machine's editor, which is what the panel needs and what this deliberately
     /// does not build.
@@ -216,10 +216,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// A plugin instrument prints nothing here, because its settings are its own and are read
     /// through the plugin. Its block says the plugin's name instead.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<DeviceReading> Summary => _summary ??= Pick();
+    public System.Collections.Generic.IReadOnlyList<ControlReading> Summary => _summary ??= Pick();
 
     /// <summary>What was last read off the patch, or null when it has to be read again.</summary>
-    private System.Collections.Generic.List<DeviceReading>? _summary;
+    private System.Collections.Generic.List<ControlReading>? _summary;
 
     /// <summary>True when there is anything to print under the name.</summary>
     public bool HasSummary => Summary.Count > 0;
@@ -235,9 +235,9 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// panel needs and is deliberately not built. A plugin instrument answers with nothing,
     /// because its settings live inside the plugin and its block says the plugin's name instead.
     /// </remarks>
-    private System.Collections.Generic.List<DeviceReading> Pick()
+    private System.Collections.Generic.List<ControlReading> Pick()
     {
-        var found = new System.Collections.Generic.List<DeviceReading>(Shown);
+        var found = new System.Collections.Generic.List<ControlReading>(Shown);
 
         if (_instrument.IsPlugin) return found;
 
@@ -250,7 +250,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
 
             if (project.Parameters.Find(one => one.Key == key) is not { } parameter) continue;
 
-            found.Add(new DeviceReading(
+            found.Add(new ControlReading(
                 parameter.Name.Length > 0 ? parameter.Name : parameter.Key,
                 Reads(values.Get(key), parameter.Unit)));
         }

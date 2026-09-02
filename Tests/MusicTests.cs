@@ -189,7 +189,7 @@ public class MusicTests
     {
         Assert.Equal(128, TrackerCell.MaxVolume);
         Assert.True(_midi.VolumeFor(_midi.MaxVelocity) < TrackerCell.MaxVolume);
-        Assert.Equal("80", new TrackerCell(new Note(60), 0, TrackerCell.MaxVolume, TrackerEffect.None).VolumeText);
+        Assert.Equal("80", new TrackerCell(new Note(60), 0, TrackerCell.MaxVolume, TrackerCommand.None).VolumeText);
     }
 
     /// <summary>The two letter rows are exactly one octave apart, which is the whole layout.</summary>

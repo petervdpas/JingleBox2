@@ -34,7 +34,7 @@ public class AutomationTests
     private static AutomationLane Cutoff(int track = 0) => new()
     {
         Track = track,
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Machine = "zampler",
         Key = "cutoff"
     };
@@ -179,7 +179,7 @@ public class AutomationTests
         pattern.Lane(Cutoff());
         pattern.Lane(new AutomationLane
         {
-            Kind = ControlKind.Device, Machine = "zampler", Key = "resonance"
+            Kind = ControlKind.SoundDevice, Machine = "zampler", Key = "resonance"
         });
 
         Assert.Equal(2, pattern.Lanes.Count);
@@ -376,7 +376,7 @@ public class AutomationTests
         var back = Assert.Single(was!.Patterns[0].Lanes);
 
         Assert.Equal(1, back.Track);
-        Assert.Equal(ControlKind.Device, back.Kind);
+        Assert.Equal(ControlKind.SoundDevice, back.Kind);
         Assert.Equal(AutomationPlay.Points, back.Play);
         Assert.Equal("zampler", back.Machine);
         Assert.Equal("cutoff", back.Key);
@@ -398,7 +398,7 @@ public class AutomationTests
         song.Patterns[0].Lane(new AutomationLane
         {
             Track = 2,
-            Kind = ControlKind.Insert,
+            Kind = ControlKind.Plugin,
             Plugin = "vst3:Serum",
             Slot = 1,
             Parameter = 74
@@ -406,7 +406,7 @@ public class AutomationTests
 
         var back = SongStore.Uncopy(SongStore.Copy(song))!.Patterns[0].Lanes[0];
 
-        Assert.Equal(ControlKind.Insert, back.Kind);
+        Assert.Equal(ControlKind.Plugin, back.Kind);
         Assert.Equal("vst3:Serum", back.Plugin);
         Assert.Equal(1, back.Slot);
         Assert.Equal(74u, back.Parameter);
@@ -512,7 +512,7 @@ public class AutomationPlaybackTests
     private static AutomationLane Cutoff(int track = 0) => new()
     {
         Track = track,
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Machine = "zampler",
         Key = "cutoff"
     };
@@ -654,7 +654,7 @@ public class AutomationPlaybackTests
     /// </summary>
     private static ControlMapping Link() => new()
     {
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Scope = ControlScope.Focused,
         Machine = "zampler",
         Key = "cutoff",
@@ -817,7 +817,7 @@ public class AutomationPlaybackTests
 
         var layout = new ControlMapping
         {
-            Kind = ControlKind.Device, Machine = "zampler", Key = "", Ordinal = 2
+            Kind = ControlKind.SoundDevice, Machine = "zampler", Key = "", Ordinal = 2
         };
 
         Assert.False(recorder.Moved(layout, new Knob(), 0.5));
@@ -879,7 +879,7 @@ public class AutomationListTests
             {
                 var mapping = new ControlMapping
                 {
-                    Kind = ControlKind.Device,
+                    Kind = ControlKind.SoundDevice,
                     Scope = ControlScope.Fixed,
                     Track = track,
                     Machine = "zampler",

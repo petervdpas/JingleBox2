@@ -20,7 +20,7 @@ public sealed class PluginWindowViewModel : ObservableObject
     /// The only reason to hold it is the bypass, which is why null is an ordinary state here
     /// rather than something to guard against.
     /// </remarks>
-    private readonly PluginDeviceViewModel? _device;
+    private readonly PluginSlotViewModel? _device;
 
     /// <summary>
     /// Makes the window's contents around a panel that is already built.
@@ -32,7 +32,7 @@ public sealed class PluginWindowViewModel : ObservableObject
     /// part of that.
     /// </param>
     /// <param name="device">The chain box, when there is one, which is what carries the bypass.</param>
-    public PluginWindowViewModel(PluginControlsViewModel panel, string name, PluginDeviceViewModel? device = null)
+    public PluginWindowViewModel(PluginControlsViewModel panel, string name, PluginSlotViewModel? device = null)
     {
         Panel = panel;
         Name = name;

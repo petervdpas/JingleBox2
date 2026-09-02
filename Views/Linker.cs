@@ -3,8 +3,8 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
 using System;
-using JingleBox2.Rack.Ui;
-using JingleBox2.Rack.Ui.Records;
+using JingleBox2.Rack.Controls;
+using JingleBox2.Rack.Controls.Records;
 
 namespace JingleBox2.Views;
 

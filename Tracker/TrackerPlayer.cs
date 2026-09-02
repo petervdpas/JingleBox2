@@ -13,7 +13,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -125,7 +125,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public TrackerPlayer(IAudioEngine audio, ISoundMachineProjects? machines = null)
     {
         _audio = audio;
-        _machines = machines ?? new Devices.SoundMachines.SoundMachineProjects();
+        _machines = machines ?? new SoundDevices.SoundMachines.SoundMachineProjects();
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }
@@ -1063,7 +1063,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
         {
             if (_synth.Mixer.InsertOn(track) is not PluginChain chain) continue;
 
-            var leaving = chain.Devices.ToArray();
+            var leaving = chain.Slots.ToArray();
 
             chain.Clear();
 
@@ -1569,11 +1569,11 @@ public sealed class TrackerPlayer : ITrackerPlayer
     {
         float gain = (e.Gain ?? 1f) * (float)(instrument?.Volume ?? 1.0);
 
-        if (e.Effect.Command == TrackerEffect.SetVolume)
+        if (e.Effect.Command == TrackerCommand.SetVolume)
             gain = Math.Clamp(e.Effect.Parameter / (float)TrackerCell.MaxVolume, 0f, 1f);
 
         float? pan = null;
-        if (e.Effect.Command == TrackerEffect.SetPan)
+        if (e.Effect.Command == TrackerCommand.SetPan)
         {
             pan = Math.Clamp((e.Effect.Parameter - 64) / 64f, -1f, 1f);
         }
@@ -1677,7 +1677,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
             line.Append("chain of ").Append(chain.Count).Append(": ");
 
             bool first = true;
-            foreach (var device in chain.Devices)
+            foreach (var device in chain.Slots)
             {
                 if (!first) line.Append(", ");
                 first = false;

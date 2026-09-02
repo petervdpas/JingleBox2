@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -120,7 +120,7 @@ public abstract partial class RackShelfViewModel<T> : ObservableObject where T :
     /// The two things somebody has to be told before they use this list.
     /// </summary>
     /// <remarks>
-    /// <see cref="JingleBox2.Devices.SoundMachines.Records.SoundMachine.Register"/> runs once, at startup, and everything downstream of
+    /// <see cref="JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.Register"/> runs once, at startup, and everything downstream of
     /// it, the rack, the panels and the names songs are read with, is built from what it took. A
     /// machine registered half way through a session would be missing from all of that, so adding
     /// stops at the disc and the page says so instead of pretending otherwise.

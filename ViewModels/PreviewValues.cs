@@ -1,8 +1,8 @@
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

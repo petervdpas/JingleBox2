@@ -52,13 +52,13 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// </param>
     public PluginChainViewModel(
         PluginLibraryViewModel plugins,
-        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
-        Devices.SoundEffects.Interfaces.IEffectEngines? engines = null,
-        IEffectInFront? front = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines? engines = null,
+        ISoundEffectInFront? front = null)
     {
         Plugins = plugins;
         _effects = effects;
-        _engines = engines ?? new Devices.SoundEffects.EffectEngines();
+        _engines = engines ?? new SoundDevices.SoundEffects.SoundEffectEngines();
         Front = front;
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };
@@ -94,7 +94,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
         {
             if (!device.IsOpen) continue;
 
-            if (device is PluginDeviceViewModel plugin)
+            if (device is PluginSlotViewModel plugin)
             {
                 foreach (var parameter in plugin.Readouts) parameter.Refresh();
             }
@@ -110,20 +110,20 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// list can run to hundreds. Nothing at all when there are none, which is what the tab in
     /// SETTINGS is for.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<Devices.SoundEffects.EffectProject> Ours =>
-        _effects?.All ?? System.Array.Empty<Devices.SoundEffects.EffectProject>();
+    public System.Collections.Generic.IReadOnlyList<SoundDevices.SoundEffects.SoundEffectProject> Ours =>
+        _effects?.All ?? System.Array.Empty<SoundDevices.SoundEffects.SoundEffectProject>();
 
     /// <summary>True when there is one of ours to offer, so the list can be left out.</summary>
     public bool HasOurs => Ours.Count > 0;
 
     /// <summary>What effects of ours this installation has, or nothing when none were read.</summary>
-    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? _effects;
 
     /// <summary>Which of them this build can actually make.</summary>
-    private readonly Devices.SoundEffects.Interfaces.IEffectEngines _engines;
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines _engines;
 
     /// <summary>The boxes in this chain, in the order the audio goes through them.</summary>
-    public ObservableCollection<IChainDevice> Devices { get; } = new();
+    public ObservableCollection<IChainSlot> Devices { get; } = new();
 
     /// <summary>
     /// Where a face opened off this chain says it is in front, or nothing.
@@ -133,7 +133,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// window is opened on and the box is what the window can tell. This view knows nothing
     /// about links and does not want to.
     /// </remarks>
-    public IEffectInFront? Front { get; }
+    public ISoundEffectInFront? Front { get; }
 
     /// <summary>
     /// What this view is pointed at, which is where the chain really lives.
@@ -176,8 +176,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public IRelayCommand<PluginInfo> AddCommand => new RelayCommand<PluginInfo>(Add);
 
     /// <summary>Adds one of ours to the end of the chain, which is the other half of the plus.</summary>
-    public IRelayCommand<Devices.SoundEffects.EffectProject> AddOursCommand =>
-        new RelayCommand<Devices.SoundEffects.EffectProject>(Add);
+    public IRelayCommand<SoundDevices.SoundEffects.SoundEffectProject> AddOursCommand =>
+        new RelayCommand<SoundDevices.SoundEffects.SoundEffectProject>(Add);
 
     /// <summary>
     /// Puts one of our effects on the end of the chain.
@@ -191,7 +191,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// that passes the audio through, which is the same gate the rack keeps.
     /// </remarks>
     /// <param name="effect">Which effect, as the registry read it off the disc.</param>
-    public void Add(Devices.SoundEffects.EffectProject? effect)
+    public void Add(SoundDevices.SoundEffects.SoundEffectProject? effect)
     {
         if (effect == null || Target == null) return;
 
@@ -207,7 +207,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
 
         var device = Target.Chain.Add(engine);
 
-        Devices.Add(new EffectDeviceViewModel(this, effect, engine, device));
+        Devices.Add(new SoundEffectViewModel(this, effect, engine, device));
 
         NotifyChanged();
 
@@ -260,7 +260,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
         AboutTo();
 
         var device = Target.Chain.Add(effect);
-        var row = new PluginDeviceViewModel(this, effect, device);
+        var row = new PluginSlotViewModel(this, effect, device);
 
         Devices.Add(row);
         _poll.Start();
@@ -281,7 +281,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// apart. Then its own interface goes, before the plugin does: a plugin drawing into a
     /// window that has already been disposed is a crash inside its own toolkit.
     /// </remarks>
-    public void Remove(IChainDevice device)
+    public void Remove(IChainSlot device)
     {
         if (Target == null) return;
 
@@ -292,7 +292,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
         Target.Chain.Remove(device.Device);
         Devices.Remove(device);
 
-        if (device is PluginDeviceViewModel plugin)
+        if (device is PluginSlotViewModel plugin)
         {
             plugin.Panel.Close();
             plugin.Effect.Dispose();
@@ -314,7 +314,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// </remarks>
     /// <param name="device">The row being moved, which carries the chain entry the audio order is kept in.</param>
     /// <param name="offset">Minus one for earlier in the chain, plus one for later.</param>
-    public void Move(IChainDevice device, int offset)
+    public void Move(IChainSlot device, int offset)
     {
         if (Target == null) return;
         if (!Target.Chain.Move(device.Device, offset)) return;
@@ -346,7 +346,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// removed, because a window belonging to the track you have just left is a window over
     /// somebody else's plugin.
     /// </remarks>
-    public event System.Action<IChainDevice>? DeviceClosing;
+    public event System.Action<IChainSlot>? DeviceClosing;
 
     /// <summary>
     /// Raised before the chain is about to gain or lose a plugin.
@@ -441,20 +441,20 @@ public sealed partial class PluginChainViewModel : ObservableObject
             return;
         }
 
-        foreach (var device in Target.Chain.Devices)
+        foreach (var device in Target.Chain.Slots)
         {
             if (device.Insert is IPluginEffect effect)
             {
-                Devices.Add(new PluginDeviceViewModel(this, effect, device));
+                Devices.Add(new PluginSlotViewModel(this, effect, device));
 
                 continue;
             }
 
-            if (device.Insert is not Devices.SoundEffects.Interfaces.IEffectEngine engine) continue;
+            if (device.Insert is not SoundDevices.SoundEffects.Interfaces.ISoundEffectEngine engine) continue;
 
             if (_effects?.For(engine.Id) is not { } ours) continue;
 
-            Devices.Add(new EffectDeviceViewModel(this, ours, engine, device));
+            Devices.Add(new SoundEffectViewModel(this, ours, engine, device));
         }
 
         if (Devices.Count > 0) _poll.Start();

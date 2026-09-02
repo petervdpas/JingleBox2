@@ -18,11 +18,11 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Controllers.Interfaces;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -68,7 +68,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// instance either way: the rack's Effects tab and the shelf in SETTINGS are two views of the
     /// same list, and adding an effect on one has to show on the other.
     /// </remarks>
-    private readonly Devices.SoundEffects.Interfaces.IEffectProjects _effects;
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects _effects;
 
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
@@ -83,7 +83,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// tracks' chain follows the cursor, the master's follows nothing, and a pad's is not on a
     /// track at all, which is three ways for a track number to be the wrong answer.
     /// </remarks>
-    private readonly Interfaces.IEffectInFront _effectInFront = new EffectInFront();
+    private readonly Interfaces.ISoundEffectInFront _effectInFront = new SoundEffectInFront();
 
     /// <summary>
     /// What a controller does before anybody has pointed it at anything.
@@ -206,11 +206,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <remarks>
     /// A second one of the same class rather than a mode on the first: two pages of work that
     /// each have their own project open, their own undo and their own unsaved changes. Told which
-    /// world it is in through <see cref="Devices.SoundEffects.EffectWorld"/>, which is where the
+    /// world it is in through <see cref="SoundDevices.SoundEffects.SoundEffectWorld"/>, which is where the
     /// handful of things that differ live, and given none of the machine world's take pickers,
     /// since an effect is sent no recordings.
     /// </remarks>
-    public DesignerViewModel EffectDesigner { get; } = new(new Devices.SoundEffects.EffectWorld());
+    public DesignerViewModel EffectDesigner { get; } = new(new SoundDevices.SoundEffects.SoundEffectWorld());
 
     /// <summary>What machines are on the disc, for the settings page to list and add to.</summary>
     /// <remarks>
@@ -220,12 +220,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// one of them looks like, so the rack builds its list again there and then rather than
     /// waiting for the next start, and builds the list rather than redrawing an open panel.
     /// </remarks>
-    public MachineShelfViewModel MachineShelf { get; }
+    public SoundMachineShelfViewModel MachineShelf { get; }
 
     /// <summary>
     /// The same page again for effects, which are imported and thrown out exactly as machines are.
     /// </summary>
-    public EffectShelfViewModel EffectShelf { get; }
+    public SoundEffectShelfViewModel EffectShelf { get; }
 
     /// <summary>
     /// Where everything in the app says where you are and what it has just done.
@@ -1050,7 +1050,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public PluginLibraryViewModel Plugins { get; private set; } = new();
 
     /// <summary>Every output the card offers, filled once while starting.</summary>
-    public ObservableCollection<OutputDevice> OutputDevices { get; } = new();
+    public ObservableCollection<AudioOutput> OutputDevices { get; } = new();
 
     /// <summary>
     /// The pads of the open profile, in the order they are laid out.
@@ -1100,7 +1100,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// Where the sound goes. Changing it takes everything down and brings it up on the new
     /// card, and the tracker's stream is reopened after it.
     /// </summary>
-    [ObservableProperty] private OutputDevice? selectedOutputDevice;
+    [ObservableProperty] private AudioOutput? selectedOutputDevice;
 
     /// <summary>
     /// Which profile is open. Shown at the head of PADS and again on FIRE, so what is under
@@ -1298,10 +1298,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         IWaveformService waveformService,
         IAudioRouting routing,
         ISoundMachineProjects machines,
-        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
     {
         _machines = machines;
-        _effects = effects ?? new Devices.SoundEffects.EffectProjects();
+        _effects = effects ?? new SoundDevices.SoundEffects.SoundEffectProjects();
         _audio = audio;
         _store = store;
         _cfg = cfg;
@@ -1317,9 +1317,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Designer.Browse = Takes;
 
-        Designer.Takes = new Devices.SoundMachines.TakeLibrary(Record.Recordings, waveformService);
+        Designer.Takes = new SoundDevices.SoundMachines.TakeLibrary(Record.Recordings, waveformService);
 
-        Designer.Shelf = new Devices.SoundMachines.TakeShelf(
+        Designer.Shelf = new SoundDevices.SoundMachines.TakeShelf(
             Record.Recordings, take => Designer.PutTake(take.FilePath));
 
         var rack = new SoundMachineRack();
@@ -1329,9 +1329,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             _effectInFront);
         Machines = new RackViewModel(rack, Tracker, _machines, Record.Recordings, waveformService, Plugins, _effects);
 
-        MachineShelf = new MachineShelfViewModel(_machines);
+        MachineShelf = new SoundMachineShelfViewModel(_machines);
 
-        EffectShelf = new EffectShelfViewModel(_effects);
+        EffectShelf = new SoundEffectShelfViewModel(_effects);
 
         MachineShelf.Changed += () => Machines.Refresh();
 
@@ -1504,7 +1504,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             });
 
         var screen = new ControllerScreens(
-            () => new MidiDeviceBindings().DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.EveryRole),
+            () => new MidiPortBindings().DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole),
             _profiles,
             new ArturiaDisplay(midiService, null, _profiles),
             new MackieDisplay(midiService, _profiles, () => surface.Device));

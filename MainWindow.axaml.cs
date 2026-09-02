@@ -10,8 +10,8 @@ using System.Reflection;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
-using JingleBox2.Devices.SoundMachines;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2;
 
@@ -40,11 +40,11 @@ public partial class MainWindow : Window
     /// <remarks>
     /// A second registry rather than a second job for the first: the two worlds have their own
     /// folders and their own manifests, and what they share is the rules, which is
-    /// <see cref="Devices.RackRegistry{T}"/>. It finds nothing until there is an engine for an
+    /// <see cref="SoundDevices.RackRegistry{T}"/>. It finds nothing until there is an engine for an
     /// id, so today it makes the folder, records what it has offered, and hands back none.
     /// </remarks>
-    private static readonly IRackRegistry<Devices.SoundEffects.EffectProject> EffectShelf =
-        new Devices.SoundEffects.EffectRegistry();
+    private static readonly IRackRegistry<SoundDevices.SoundEffects.SoundEffectProject> EffectShelf =
+        new SoundDevices.SoundEffects.SoundEffectRegistry();
 
     /// <summary>The settings file, read once on the way up and written whenever something moves.</summary>
     private readonly ConfigStore _store = new("JingleBox2");
@@ -160,7 +160,7 @@ public partial class MainWindow : Window
 
         var machines = Registry.Load();
 
-        var projects = new Devices.SoundMachines.SoundMachineProjects();
+        var projects = new SoundDevices.SoundMachines.SoundMachineProjects();
 
         projects.Keep(machines);
 
@@ -169,7 +169,7 @@ public partial class MainWindow : Window
 
         var effects = EffectShelf.Load();
 
-        var made = new Devices.SoundEffects.EffectProjects();
+        var made = new SoundDevices.SoundEffects.SoundEffectProjects();
 
         made.Keep(effects);
 

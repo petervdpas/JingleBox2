@@ -23,7 +23,7 @@ public partial class SoundEffectWindow : Window
     private static readonly Dictionary<object, SoundEffectWindow> Open = new();
 
     /// <summary>What makes this face pointable at the effect it is drawing.</summary>
-    private readonly DeviceRemote _remote;
+    private readonly SoundDeviceRemote _remote;
 
     /// <summary>A box's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly IPanelTint _tint = new PanelTint();
@@ -56,7 +56,7 @@ public partial class SoundEffectWindow : Window
 
         DeckKeys.Listen(this);
 
-        _remote = new DeviceRemote(Face, () => Device?.Effect);
+        _remote = new SoundDeviceRemote(Face, () => Device?.Effect);
 
         LinkKey.Watch(Face);
 
@@ -79,14 +79,14 @@ public partial class SoundEffectWindow : Window
 
 
     /// <summary>The box this window is about, or nothing before it has one.</summary>
-    private EffectDeviceViewModel? Device => DataContext as EffectDeviceViewModel;
+    private SoundEffectViewModel? Device => DataContext as SoundEffectViewModel;
 
     /// <summary>
     /// Opens that box's face over the app's window, or brings the one that is open forward.
     /// </summary>
     /// <param name="device">The box on the chain, and nothing is opened without one.</param>
     /// <param name="owner">The window this one sits over, and nothing is opened without one.</param>
-    public static void Show(EffectDeviceViewModel? device, Window? owner)
+    public static void Show(SoundEffectViewModel? device, Window? owner)
     {
         if (device == null || owner == null) return;
 

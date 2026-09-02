@@ -620,7 +620,7 @@ Still not built: the default layout, matching on identity rather than on a port 
 the device's settings back, and Mackie Control.
 
 The transport half needed nothing from profiles, which is the rule above holding up in practice.
-`MidiTransportRouter` reads whichever port is ticked for `MidiDeviceRole.Transport` and works the
+`MidiTransportRouter` reads whichever port is ticked for `MidiPortRole.Transport` and works the
 same `TransportSwitch` the caps and the space bar use, so it is page sensitive without knowing it.
 Cycle, rewind and forward are recognised and named in the log while doing nothing, so finding a
 use for one is a line in a switch rather than a rediscovery of the protocol.

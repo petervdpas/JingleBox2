@@ -10,7 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;

@@ -694,7 +694,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// Over the panel but over nothing in particular means the machine itself, which is where a
     /// part let go over open space goes.
     /// </remarks>
-    private (Rack.Faces.PanelElement?, ViewModels.PanelElementViewModel?) Under(Point at)
+    private (Rack.SoundDevices.Faces.PanelElement?, ViewModels.PanelElementViewModel?) Under(Point at)
     {
         var hit = this.InputHitTest(at) as Visual;
 
@@ -740,13 +740,13 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
 
         if (carrying.Kind is { } kind)
         {
-            inside = new Rack.Ui.PartSample { Kind = kind, Width = 62, Height = 44 };
+            inside = new Rack.Controls.PartSample { Kind = kind, Width = 62, Height = 44 };
         }
         else
         {
             var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6 };
 
-            row.Children.Add(new Rack.Ui.PartSample
+            row.Children.Add(new Rack.Controls.PartSample
             {
                 Kind = carrying.Element?.Kind ?? "",
                 Width = 44,
@@ -786,7 +786,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     /// Both, because a drag crosses from one to the other and whichever is left holding a mark
     /// is showing something that is no longer true. Clearing is the same call with nothing in it.
     /// </remarks>
-    private void Mark(Rack.Faces.PanelElement? onPanel, ViewModels.PanelElementViewModel? onList)
+    private void Mark(Rack.SoundDevices.Faces.PanelElement? onPanel, ViewModels.PanelElementViewModel? onList)
     {
         PanelCanvas.Marked = onPanel;
 
@@ -796,7 +796,7 @@ public partial class DesignerView : UserControl, Shortcuts.Interfaces.IShortcutC
     }
 
     /// <summary>The outermost element, which is where a part let go over nothing goes.</summary>
-    private Rack.Faces.PanelElement? Root() => Editor?.Project?.Panel.Root;
+    private Rack.SoundDevices.Faces.PanelElement? Root() => Editor?.Project?.Panel.Root;
 
 
 

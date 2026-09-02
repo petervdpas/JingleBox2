@@ -1,6 +1,6 @@
 using System;
-using JingleBox2.Devices.SoundEffects;
-using JingleBox2.Devices.SoundEffects.Interfaces;
+using JingleBox2.SoundDevices.SoundEffects;
+using JingleBox2.SoundDevices.SoundEffects.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;
@@ -42,7 +42,7 @@ public class DelayTests
     /// <param name="frames">How many frames to render.</param>
     /// <param name="block">How many at a time, since a block is the caller's business.</param>
     /// <param name="input">What the left channel holds at each frame; the right holds the same.</param>
-    private static float[] Through(IEffectEngine delay, int frames, int block, Func<int, float> input)
+    private static float[] Through(ISoundEffectEngine delay, int frames, int block, Func<int, float> input)
     {
         var caught = new float[frames * 2];
         var buffer = new float[block * 2];
@@ -304,11 +304,11 @@ public class DelayTests
     [Fact]
     public void The_engine_list_makes_an_echobox()
     {
-        var engines = new EffectEngines();
+        var engines = new SoundEffectEngines();
 
-        Assert.True(engines.Has(EffectEngines.EchoBox));
+        Assert.True(engines.Has(SoundEffectEngines.EchoBox));
         Assert.True(engines.Has("EFFECT.ECHOBOX"));
-        Assert.IsType<Delay>(engines.Make(EffectEngines.EchoBox, Rate, 512));
+        Assert.IsType<Delay>(engines.Make(SoundEffectEngines.EchoBox, Rate, 512));
 
         Assert.False(engines.Has("effect.somebody-elses"));
         Assert.Null(engines.Make("effect.somebody-elses", Rate, 512));
@@ -323,10 +323,10 @@ public class DelayTests
     [Fact]
     public void Two_of_them_are_two()
     {
-        var engines = new EffectEngines();
+        var engines = new SoundEffectEngines();
 
-        var one = engines.Make(EffectEngines.EchoBox, Rate, 512)!;
-        var other = engines.Make(EffectEngines.EchoBox, Rate, 512)!;
+        var one = engines.Make(SoundEffectEngines.EchoBox, Rate, 512)!;
+        var other = engines.Make(SoundEffectEngines.EchoBox, Rate, 512)!;
 
         one.SetValue(Delay.Time, 111);
 

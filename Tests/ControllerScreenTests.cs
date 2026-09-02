@@ -229,7 +229,7 @@ public class ControllerScreenTests
         public string PortIs(string? device) => _real.PortIs(device);
 
         /// <inheritdoc/>
-        public bool PortTakes(string? device, JingleBox2.Midi.Enums.MidiDeviceRole role) =>
+        public bool PortTakes(string? device, JingleBox2.Midi.Enums.MidiPortRole role) =>
             _real.PortTakes(device, role);
 
         /// <inheritdoc/>

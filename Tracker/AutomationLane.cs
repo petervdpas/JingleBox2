@@ -42,7 +42,7 @@ public sealed class AutomationLane
     /// held, and there is nothing for a curve between two lines to mean. <see cref="Automatable"/>
     /// is where that is said once.
     /// </remarks>
-    public ControlKind Kind { get; set; } = ControlKind.Device;
+    public ControlKind Kind { get; set; } = ControlKind.SoundDevice;
 
     /// <summary>The machine, by its slot id, for a parameter on the track's instrument.</summary>
     public string Machine { get; set; } = "";
@@ -91,7 +91,7 @@ public sealed class AutomationLane
 
     /// <summary>Which kinds can be a lane at all.</summary>
     public static bool Automatable(ControlKind kind) =>
-        kind is ControlKind.Device or ControlKind.Insert or ControlKind.Mix;
+        kind is ControlKind.SoundDevice or ControlKind.Plugin or ControlKind.Mix;
 
     /// <summary>
     /// The mapping this lane would be, so the ordinary resolution can answer it.
@@ -128,12 +128,12 @@ public sealed class AutomationLane
 
         return Kind switch
         {
-            ControlKind.Device =>
+            ControlKind.SoundDevice =>
                 string.Equals(mapping.Machine, Machine, StringComparison.Ordinal)
                 && string.Equals(mapping.Key, Key, StringComparison.Ordinal)
                 && Key.Length > 0,
 
-            ControlKind.Insert =>
+            ControlKind.Plugin =>
                 string.Equals(mapping.Plugin, Plugin, StringComparison.Ordinal)
                 && mapping.Parameter == Parameter
                 && (Plugin.Length > 0 || mapping.Slot == Slot),
@@ -163,7 +163,7 @@ public sealed class AutomationLane
 
         if (track < 0 && track != TrackerPlayer.MasterStrip) return null;
 
-        if (mapping.Kind == ControlKind.Device && mapping.Key.Length == 0) return null;
+        if (mapping.Kind == ControlKind.SoundDevice && mapping.Key.Length == 0) return null;
 
         return new AutomationLane
         {

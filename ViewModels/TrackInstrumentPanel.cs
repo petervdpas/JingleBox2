@@ -3,11 +3,11 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 
@@ -292,11 +292,11 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
 
     /// <inheritdoc/>
     /// <remarks>Built the first time a described face asks for it, since most do not.</remarks>
-    public Rack.Machines.Interfaces.IMachineLocation? MachineLocation =>
-        _place ??= Location is { } place ? new Devices.SoundMachines.TrackLocation(place) : null;
+    public Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? MachineLocation =>
+        _place ??= Location is { } place ? new SoundDevices.SoundMachines.TrackLocation(place) : null;
 
     /// <summary>Built the first time a machine's face asks for the lamps.</summary>
-    private Rack.Machines.Interfaces.IMachineLocation? _place;
+    private Rack.SoundDevices.SoundMachines.Interfaces.IMachineLocation? _place;
 
     /// <summary>Plays C at the panel's own octave, which is what the TEST cap does.</summary>
     private void Test() => Play(Note.FromOctave(0, Octave));

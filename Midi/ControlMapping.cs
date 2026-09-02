@@ -52,7 +52,7 @@ public sealed class ControlMapping
     public int Cc { get; set; }
 
     /// <summary>What sort of thing it is pointed at, which decides which fields below are read.</summary>
-    public ControlKind Kind { get; set; } = ControlKind.Device;
+    public ControlKind Kind { get; set; } = ControlKind.SoundDevice;
 
     /// <summary>Whether it follows the track you are working on or stays on one.</summary>
     public ControlScope Scope { get; set; } = ControlScope.Focused;
@@ -80,7 +80,7 @@ public sealed class ControlMapping
     /// not the one in front of you now. The place is what the two have in common.
     ///
     /// Read through the order a panel reads in, so it means the third control your eye lands on
-    /// and not the third line of a file. See <see cref="JingleBox2.Rack.Faces.PanelOrder"/>.
+    /// and not the third line of a file. See <see cref="JingleBox2.Rack.SoundDevices.Faces.PanelOrder"/>.
     /// </remarks>
     public int Ordinal { get; set; } = -1;
 
@@ -194,11 +194,11 @@ public sealed class ControlMapping
 
         return Kind switch
         {
-            ControlKind.Device or ControlKind.Action =>
+            ControlKind.SoundDevice or ControlKind.Action =>
                 string.Equals(other.Machine, Machine, StringComparison.Ordinal)
                 && string.Equals(other.Key, Key, StringComparison.Ordinal),
 
-            ControlKind.Insert =>
+            ControlKind.Plugin =>
                 string.Equals(other.Plugin, Plugin, StringComparison.Ordinal)
                 && other.Parameter == Parameter,
 

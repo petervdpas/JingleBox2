@@ -402,7 +402,7 @@ public class SongTests
         var live = Made();
 
         var chain = new PluginChainConfig();
-        chain.Devices.Add(new PluginDeviceConfig { Id = "reverb", Name = "Reverb", Path = "/p/reverb.clap" });
+        chain.Devices.Add(new PluginSlotConfig { Id = "reverb", Name = "Reverb", Path = "/p/reverb.clap" });
         live.Mix[0].Plugins = chain;
 
         var was = SongStore.Uncopy(SongStore.Copy(live))!;
@@ -422,7 +422,7 @@ public class SongTests
         var live = Made();
 
         var chain = new PluginChainConfig();
-        chain.Devices.Add(new PluginDeviceConfig
+        chain.Devices.Add(new PluginSlotConfig
         {
             Id = "serum",
             Name = "Serum 2 FX",
@@ -456,7 +456,7 @@ public class SongTests
         var live = Made();
 
         var chain = new PluginChainConfig();
-        chain.Devices.Add(new PluginDeviceConfig { Id = "serum", Name = "Serum 2 FX", State = new byte[64] });
+        chain.Devices.Add(new PluginSlotConfig { Id = "serum", Name = "Serum 2 FX", State = new byte[64] });
 
         live.Mix[0].Plugins = chain;
         live.Name = "beside";
@@ -489,7 +489,7 @@ public class SongTests
     public void A_chain_described_is_the_same_chain_without_the_patches()
     {
         var chain = new PluginChainConfig();
-        chain.Devices.Add(new PluginDeviceConfig { Id = "one", Name = "One", State = new byte[] { 1, 2 } });
+        chain.Devices.Add(new PluginSlotConfig { Id = "one", Name = "One", State = new byte[] { 1, 2 } });
 
         var described = chain.Described();
 
@@ -507,7 +507,7 @@ public class SongTests
     public void A_chain_saved_before_patches_existed_reads_back_as_one_without_any()
     {
         var chain = new PluginChainConfig();
-        chain.Devices.Add(new PluginDeviceConfig { Id = "old", Name = "Old" });
+        chain.Devices.Add(new PluginSlotConfig { Id = "old", Name = "Old" });
 
         var was = SongStore.Uncopy(SongStore.Copy(WithChain(chain)))!;
 

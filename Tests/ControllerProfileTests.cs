@@ -294,16 +294,16 @@ public class ControllerProfileTests
     [Fact]
     public void Which_port_takes_which_job_comes_from_the_file()
     {
-        Assert.True(_profiles.PortTakes(Lab, MidiDeviceRole.Controls));
-        Assert.True(_profiles.PortTakes(Lab, MidiDeviceRole.Transport));
+        Assert.True(_profiles.PortTakes(Lab, MidiPortRole.Controls));
+        Assert.True(_profiles.PortTakes(Lab, MidiPortRole.Transport));
 
-        Assert.True(_profiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Transport));
-        Assert.False(_profiles.PortTakes("Minilab3 MCU/HUI", MidiDeviceRole.Pads));
+        Assert.True(_profiles.PortTakes("Minilab3 MCU/HUI", MidiPortRole.Transport));
+        Assert.False(_profiles.PortTakes("Minilab3 MCU/HUI", MidiPortRole.Pads));
 
-        Assert.False(_profiles.PortTakes("Minilab3 ALV", MidiDeviceRole.Controls));
-        Assert.False(_profiles.PortTakes("Minilab3 DIN THRU", MidiDeviceRole.Pads));
+        Assert.False(_profiles.PortTakes("Minilab3 ALV", MidiPortRole.Controls));
+        Assert.False(_profiles.PortTakes("Minilab3 DIN THRU", MidiPortRole.Pads));
 
-        Assert.True(_profiles.PortTakes(Nobodys, MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes(Nobodys, MidiPortRole.Controls));
     }
 
     /// <summary>The other files here name their devices as the MiniLab's does.</summary>
@@ -465,10 +465,10 @@ public class ControllerProfileTests
     [Fact]
     public void And_the_transport_still_lands_on_the_right_port()
     {
-        Assert.True(_profiles.PortTakes("KeyLab mkII 49 MIDI", MidiDeviceRole.Controls));
-        Assert.True(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiDeviceRole.Transport));
-        Assert.False(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiDeviceRole.Pads));
-        Assert.True(_profiles.PortTakes("KeyLab mkII 49 Sync", MidiDeviceRole.Controls));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 MIDI", MidiPortRole.Controls));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiPortRole.Transport));
+        Assert.False(_profiles.PortTakes("KeyLab mkII 49 DAW", MidiPortRole.Pads));
+        Assert.True(_profiles.PortTakes("KeyLab mkII 49 Sync", MidiPortRole.Controls));
     }
 
     /// <summary>

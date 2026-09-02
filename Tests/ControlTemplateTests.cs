@@ -35,7 +35,7 @@ public class ControlTemplateTests
     /// <param name="cc">Which controller number.</param>
     private static ControlMapping OnMachine(string key, int cc) => new()
     {
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Machine = "machine.oddskilla",
         Key = key,
         Owner = "OddSkilla",
@@ -66,7 +66,7 @@ public class ControlTemplateTests
 
         Assert.NotNull(template);
         Assert.Equal("nanoKONTROL2", template!.Controller);
-        Assert.Equal("device", template.Target.Kind);
+        Assert.Equal("sounddevice", template.Target.Kind);
         Assert.Equal("machine.oddskilla", template.Target.Id);
         Assert.Equal("OddSkilla", template.Target.Name);
         Assert.Equal("attack", template.Controls[0].Parameter);
@@ -348,7 +348,7 @@ public class ControlLinksPageTests
     /// <param name="cc">Which controller number.</param>
     private static ControlMapping OnMachine(string key, int cc) => new()
     {
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Machine = "machine.oddskilla",
         Key = key,
         Owner = "OddSkilla",
@@ -457,7 +457,7 @@ public class ControlLinksPageTests
             OnMachine("attack", 0),
             new()
             {
-                Kind = ControlKind.Device,
+                Kind = ControlKind.SoundDevice,
                 Machine = "machine.ouroboros",
                 Key = "tune",
                 Owner = "Ouroboros",

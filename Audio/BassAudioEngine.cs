@@ -212,20 +212,20 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<OutputDevice> GetOutputDevices()
+    public IReadOnlyList<AudioOutput> GetOutputDevices()
     {
-        var list = new List<OutputDevice>();
+        var list = new List<AudioOutput>();
 
         for (int i = 0; Bass.GetDeviceInfo(i, out var info); i++)
         {
             if (!info.IsEnabled) continue;
-            list.Add(new OutputDevice(i, info.Name));
+            list.Add(new AudioOutput(i, info.Name));
         }
 
         return list;
     }
 
-    IEnumerable<OutputDevice> IAudioEngine.GetOutputDevices() => GetOutputDevices();
+    IEnumerable<AudioOutput> IAudioEngine.GetOutputDevices() => GetOutputDevices();
 
     /// <inheritdoc/>
     public void SetOutputDevice(int deviceId)

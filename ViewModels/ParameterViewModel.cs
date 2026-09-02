@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 
 namespace JingleBox2.ViewModels;
 

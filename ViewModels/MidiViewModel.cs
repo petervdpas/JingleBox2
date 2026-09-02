@@ -31,7 +31,7 @@ public sealed partial class MidiViewModel : ObservableObject
 
     /// <summary>Which device has been pointed at which half of the application.</summary>
     /// <remarks>Holds nothing of its own, so one is enough for the page's whole life.</remarks>
-    private readonly IMidiDeviceBindings _bindings = new MidiDeviceBindings();
+    private readonly IMidiPortBindings _bindings = new MidiPortBindings();
 
     /// <summary>Where the settings are written when a job or a pad mapping moves.</summary>
     private readonly ConfigStore _store;
@@ -50,7 +50,7 @@ public sealed partial class MidiViewModel : ObservableObject
     private PadMidiMappingViewModel? _learningTarget;
 
     /// <summary>Every port, connected or merely remembered. What the system offers.</summary>
-    public ObservableCollection<MidiDeviceViewModel> Devices { get; } = new();
+    public ObservableCollection<MidiPortViewModel> Devices { get; } = new();
 
     /// <summary>
     /// The same ports gathered into the hardware they belong to. What a person owns.
@@ -149,7 +149,7 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         Devices.Clear();
         foreach (var entry in _bindings.Merge(_midi.GetInputDevices(), _cfg.Midi.Devices))
-            Devices.Add(new MidiDeviceViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged, Forget));
+            Devices.Add(new MidiPortViewModel(entry.Device, entry.IsConnected, entry.Role, OnDeviceRoleChanged, Forget));
 
         HasDevices = Devices.Count > 0;
 
@@ -192,11 +192,11 @@ public sealed partial class MidiViewModel : ObservableObject
     /// Only offered for a device that is not connected: one that is plugged in comes straight
     /// back the next time the list is read.
     /// </remarks>
-    private void Forget(MidiDeviceViewModel device)
+    private void Forget(MidiPortViewModel device)
     {
         if (device is null || device.IsConnected) return;
 
-        _bindings.SetRole(_cfg.Midi.Devices, device.Name, MidiDeviceRole.None);
+        _bindings.SetRole(_cfg.Midi.Devices, device.Name, MidiPortRole.None);
 
         int gone = Midi.ControlLink.Current?.Forget(device.Name) ?? 0;
 
@@ -216,7 +216,7 @@ public sealed partial class MidiViewModel : ObservableObject
     }
 
     /// <summary>A job was ticked or unticked, so the ports follow and the settings are written.</summary>
-    private void OnDeviceRoleChanged(MidiDeviceViewModel device)
+    private void OnDeviceRoleChanged(MidiPortViewModel device)
     {
         _bindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
 
@@ -224,7 +224,7 @@ public sealed partial class MidiViewModel : ObservableObject
         ApplyBindings();
         SaveMidi();
 
-        Status = device.Role == MidiDeviceRole.None
+        Status = device.Role == MidiPortRole.None
             ? $"'{device.Name}' drives nothing."
             : $"'{device.Name}' drives {DescribeRole(device.Role)}.";
     }
@@ -235,7 +235,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// </summary>
     private void ApplyBindings()
     {
-        var wanted = _bindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceBindings.EveryRole);
+        var wanted = _bindings.DevicesWith(_cfg.Midi.Devices, MidiPortBindings.EveryRole);
 
         foreach (var open in _midi.OpenDevices)
         {
@@ -251,7 +251,7 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <remarks>All of them, joined, since more than one controller can be pointed at the pads.</remarks>
     private void UpdatePadDevice()
     {
-        var pads = _bindings.DevicesWith(_cfg.Midi.Devices, MidiDeviceRole.Pads);
+        var pads = _bindings.DevicesWith(_cfg.Midi.Devices, MidiPortRole.Pads);
         PadDevice = pads.Count == 0 ? "" : string.Join(", ", pads);
     }
 
@@ -271,14 +271,14 @@ public sealed partial class MidiViewModel : ObservableObject
 
         if (open == 0)
         {
-            bool anyBound = Devices.Any(d => d.Role != MidiDeviceRole.None);
+            bool anyBound = Devices.Any(d => d.Role != MidiPortRole.None);
 
             return anyBound
                 ? "Nothing is plugged in. What is listed keeps what it was set to drive."
                 : "No controller assigned yet. Tick Pads, Tracker or Controls.";
         }
 
-        var missing = Devices.Where(d => !d.IsConnected && d.Role != MidiDeviceRole.None).ToList();
+        var missing = Devices.Where(d => !d.IsConnected && d.Role != MidiPortRole.None).ToList();
         if (missing.Count > 0)
             return $"{open} controller(s) open. Not connected: {string.Join(", ", missing.Select(d => d.Name))}.";
 
@@ -290,15 +290,15 @@ public sealed partial class MidiViewModel : ObservableObject
     /// Written out per combination rather than joined from parts, because "the pads and the
     /// tracker" is a sentence and "Pads, Tracker" is a list of tick boxes read aloud.
     /// </remarks>
-    private static string DescribeRole(MidiDeviceRole role) => role switch
+    private static string DescribeRole(MidiPortRole role) => role switch
     {
-        MidiDeviceRole.Pads => "the pads",
-        MidiDeviceRole.Tracker => "the tracker",
-        MidiDeviceRole.Controls => "the knobs and faders",
-        MidiDeviceRole.Pads | MidiDeviceRole.Tracker => "the pads and the tracker",
-        MidiDeviceRole.Pads | MidiDeviceRole.Controls => "the pads and the knobs",
-        MidiDeviceRole.Tracker | MidiDeviceRole.Controls => "the tracker and the knobs",
-        MidiDeviceBindings.EveryRole => "the pads, the tracker and the knobs",
+        MidiPortRole.Pads => "the pads",
+        MidiPortRole.Tracker => "the tracker",
+        MidiPortRole.Controls => "the knobs and faders",
+        MidiPortRole.Pads | MidiPortRole.Tracker => "the pads and the tracker",
+        MidiPortRole.Pads | MidiPortRole.Controls => "the pads and the knobs",
+        MidiPortRole.Tracker | MidiPortRole.Controls => "the tracker and the knobs",
+        MidiPortBindings.EveryRole => "the pads, the tracker and the knobs",
         _ => "nothing"
     };
 
@@ -366,7 +366,7 @@ public sealed partial class MidiViewModel : ObservableObject
             return;
 
         var role = _bindings.RoleFor(_cfg.Midi.Devices, msg.Device);
-        if ((role & MidiDeviceRole.Pads) == 0)
+        if ((role & MidiPortRole.Pads) == 0)
         {
             Status = $"'{msg.Device}' does not drive the pads, so it cannot be learned here.";
             return;

@@ -1,10 +1,10 @@
-using JingleBox2.Rack.Faces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
-using JingleBox2.Rack.Ui;
-using JingleBox2.Rack.Ui.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.Rack.Controls;
+using JingleBox2.Rack.Controls.Interfaces;
 using Xunit;
-using JingleBox2.Rack.Machines;
+using JingleBox2.Rack.SoundDevices.SoundMachines;
 
 namespace JingleBox2.Tests;
 

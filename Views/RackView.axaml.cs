@@ -16,7 +16,7 @@ namespace JingleBox2.Views;
 public partial class RackView : UserControl
 {
     /// <summary>What makes the effect's face pointable at the effect it is drawing.</summary>
-    private readonly DeviceRemote _remote;
+    private readonly SoundDeviceRemote _remote;
 
     /// <summary>A box's colour mixed into the theme's. Holds nothing, so one is enough.</summary>
     private readonly Interfaces.IPanelTint _tint = new PanelTint();
@@ -36,7 +36,7 @@ public partial class RackView : UserControl
     {
         InitializeComponent();
 
-        _remote = new DeviceRemote(EffectFace, () => Rack?.SelectedEffect?.Effect);
+        _remote = new SoundDeviceRemote(EffectFace, () => Rack?.SelectedEffect?.Effect);
 
         LinkKey.Watch(EffectFace);
 
@@ -161,7 +161,7 @@ public partial class RackView : UserControl
     /// <summary>Puts another box on the machine picked, under a name nothing else has.</summary>
     private void NewFromMachine_Click(object? sender, RoutedEventArgs e)
     {
-        if (ViewModel != null && MachinePicker.SelectedItem is JingleBox2.Devices.SoundMachines.Records.SoundMachine machine)
+        if (ViewModel != null && MachinePicker.SelectedItem is JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine machine)
             ViewModel.NewFromMachineCommand.Execute(machine);
     }
 

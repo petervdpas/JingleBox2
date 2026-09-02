@@ -5,13 +5,13 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.PluginStrip"
              xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
-             xmlns:ef="clr-namespace:JingleBox2.Devices.SoundEffects"
+             xmlns:ef="clr-namespace:JingleBox2.SoundDevices.SoundEffects"
              x:DataType="vm:PluginChainViewModel">
 
   <UserControl.Resources>
     <!-- One control and its reading. The same row whether the block is a plugin or one of our
          machines, because to a track they are the same thing. -->
-    <DataTemplate x:Key="Reading" x:DataType="vmr:DeviceReading">
+    <DataTemplate x:Key="Reading" x:DataType="vmr:ControlReading">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
         <TextBlock Grid.Column="0" Classes="deviceKey" Text="{Binding Name}" />
         <TextBlock Grid.Column="1" Classes="deviceValue" Text="{Binding Text}" />
@@ -291,7 +291,7 @@
           </ItemsControl.ItemsPanel>
 
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vmi:IChainDevice">
+            <DataTemplate x:DataType="vmi:IChainSlot">
               <Border Classes="device"
                       Classes.open="{Binding IsOpen}"
                       Classes.off="{Binding IsBypassed}">
@@ -375,7 +375,7 @@
                      and what somebody reaches for on a fresh installation is what came with it. -->
                 <ItemsControl ItemsSource="{Binding Ours}" IsVisible="{Binding HasOurs}">
                   <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="ef:EffectProject">
+                    <DataTemplate x:DataType="ef:SoundEffectProject">
                       <Button HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Left"
                               Background="Transparent" BorderThickness="0"

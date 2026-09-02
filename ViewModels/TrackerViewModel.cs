@@ -5,7 +5,7 @@ using JingleBox2.Config;
 using JingleBox2.Diagnostics;
 using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.Views;
 using System;
 using System.Collections.Generic;
@@ -18,13 +18,13 @@ using System.Threading.Tasks;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -48,7 +48,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// chain in the song are views of one list, and an effect added in SETTINGS has to show on
     /// the plus without anybody restarting.
     /// </remarks>
-    private Devices.SoundEffects.Interfaces.IEffectProjects? Ours { get; }
+    private SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? Ours { get; }
 
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly ISoundMachineProjects _machines;
@@ -906,8 +906,8 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null,
-        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
-        IEffectInFront? front = null)
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+        ISoundEffectInFront? front = null)
     {
         _machines = machines;
         Ours = effects;
@@ -2325,7 +2325,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
     /// worked.
     /// </remarks>
-    public Rack.Faces.Interfaces.IPanelMenu MixerMenu { get; } =
+    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu MixerMenu { get; } =
         new Midi.ControlMenu(() => "", () => "the mixer", kind: Midi.LinkTargets.Mixer);
 
     /// <summary>
@@ -3677,7 +3677,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         Status = "Silent: " + Listed(all.Select(machine => machine.Name).ToList());
 
-        await Views.MissingMachineDialog.ShowAsync(all);
+        await Views.MissingSoundMachineDialog.ShowAsync(all);
     }
 
     /// <summary>Names in a row, the way anybody would say them out loud.</summary>

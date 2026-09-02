@@ -3,7 +3,7 @@
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
              xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
              xmlns:views="clr-namespace:JingleBox2.Views"
-             xmlns:ui="clr-namespace:JingleBox2.Rack.Ui;assembly=JingleBox2.Rack.Ui"
+             xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              x:Class="JingleBox2.Views.SoundDevicePanel"
              x:Name="Root"
              x:DataType="vmi:ISoundDevicePanel"

@@ -23,7 +23,7 @@ namespace JingleBox2.Tests;
 public class ControlDeskTests
 {
     /// <summary>What a device's control offers. Holds nothing, so one serves every test here.</summary>
-    private static readonly IDeviceLinks Links = new DeviceLinks();
+    private static readonly ISoundDeviceLinks Links = new SoundDeviceLinks();
 
     /// <summary>The Korg, as its port is called here.</summary>
     private const string Korg = "nanoKONTROL2 _ CTRL";

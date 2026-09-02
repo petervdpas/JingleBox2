@@ -39,9 +39,9 @@ public sealed class MidiDispatcher
     /// <param name="bindings">Which device does which job, defaulted to the real rules.</param>
     public MidiDispatcher(MidiConfig cfg, Action<MidiMessage>? pads, Action<MidiMessage>? tracker,
                           Action<MidiMessage>? controls = null, Action<MidiMessage>? transport = null,
-                          IMidiDeviceBindings? bindings = null)
+                          IMidiPortBindings? bindings = null)
     {
-        _bindings = bindings ?? new MidiDeviceBindings();
+        _bindings = bindings ?? new MidiPortBindings();
         _cfg = cfg;
         _pads = pads;
         _tracker = tracker;
@@ -50,7 +50,7 @@ public sealed class MidiDispatcher
     }
 
     /// <summary>Which device has been pointed at which half of the application.</summary>
-    private readonly IMidiDeviceBindings _bindings;
+    private readonly IMidiPortBindings _bindings;
 
     /// <summary>
     /// Hands the message to each half its device has been pointed at.
@@ -67,14 +67,14 @@ public sealed class MidiDispatcher
 
         var role = _bindings.RoleFor(_cfg.Devices, msg.Device);
 
-        if (role == MidiDeviceRole.None)
+        if (role == MidiPortRole.None)
             Log.Write(LogArea.Midi, () =>
                 "dispatch " + msg.Type + " ch" + msg.Channel + " val=" + msg.Value
                 + " from '" + msg.Device + "' DRIVES NOTHING: it has been given no job in SETTINGS");
 
-        if ((role & MidiDeviceRole.Pads) != 0) _pads?.Invoke(msg);
-        if ((role & MidiDeviceRole.Tracker) != 0) _tracker?.Invoke(msg);
-        if ((role & MidiDeviceRole.Controls) != 0) _controls?.Invoke(msg);
-        if ((role & MidiDeviceRole.Transport) != 0) _transport?.Invoke(msg);
+        if ((role & MidiPortRole.Pads) != 0) _pads?.Invoke(msg);
+        if ((role & MidiPortRole.Tracker) != 0) _tracker?.Invoke(msg);
+        if ((role & MidiPortRole.Controls) != 0) _controls?.Invoke(msg);
+        if ((role & MidiPortRole.Transport) != 0) _transport?.Invoke(msg);
     }
 }

@@ -178,7 +178,7 @@ public interface IControllerProfiles
     /// A port the profile does not mention takes everything, because nothing is known about it
     /// and a silent refusal is worse than a port that does too much.
     /// </remarks>
-    bool PortTakes(string? device, MidiDeviceRole role);
+    bool PortTakes(string? device, MidiPortRole role);
 
     /// <summary>
     /// How a control should be read, when the file knows the hardware well enough to say.

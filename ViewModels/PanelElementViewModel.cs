@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -80,7 +80,7 @@ public sealed partial class PanelElementViewModel : ObservableObject
     /// </remarks>
     private static bool Owned(PanelElement element, string key) =>
         (element.Element == ElementKinds.Pads && key is RowsKey or ColumnsKey)
-        || (element.Element == ElementKinds.Preset && key == Devices.SoundMachines.SoundMachineProject.SourceProperty)
+        || (element.Element == ElementKinds.Preset && key == SoundDevices.SoundMachines.SoundMachineProject.SourceProperty)
         || (element.Element == ElementKinds.Menu
             && key is MenuOptionWords.Property or MenuCorners.Property);
 
@@ -207,7 +207,7 @@ public sealed partial class PanelElementViewModel : ObservableObject
     /// <summary>Which of the two this picker browses.</summary>
     public string Source
     {
-        get => Element.Properties.TryGetValue(Devices.SoundMachines.SoundMachineProject.SourceProperty, out string? said)
+        get => Element.Properties.TryGetValue(SoundDevices.SoundMachines.SoundMachineProject.SourceProperty, out string? said)
             && string.Equals(said.Trim(), PanelStarts.Takes, StringComparison.OrdinalIgnoreCase)
                 ? TakesSaid
                 : PresetsSaid;
@@ -215,11 +215,11 @@ public sealed partial class PanelElementViewModel : ObservableObject
         {
             string want = value == TakesSaid ? PanelStarts.Takes : PanelStarts.Presets;
 
-            if (Element.Properties.TryGetValue(Devices.SoundMachines.SoundMachineProject.SourceProperty, out string? was)
+            if (Element.Properties.TryGetValue(SoundDevices.SoundMachines.SoundMachineProject.SourceProperty, out string? was)
                 && was == want)
                 return;
 
-            Element.Properties[Devices.SoundMachines.SoundMachineProject.SourceProperty] = want;
+            Element.Properties[SoundDevices.SoundMachines.SoundMachineProject.SourceProperty] = want;
 
             OnPropertyChanged();
 

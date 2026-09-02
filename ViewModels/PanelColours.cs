@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Views;
 using System;
 using System.Runtime.CompilerServices;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Views.Records;
 using JingleBox2.Views.Interfaces;
 

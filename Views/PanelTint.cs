@@ -54,7 +54,7 @@ public sealed class PanelTint : IPanelTint
     private const string MutedBrushKey = "TextMutedBrush";
 
     /// <inheritdoc/>
-    public void Apply(Control panel, Rack.Faces.Records.PanelTheme? machine)
+    public void Apply(Control panel, Rack.SoundDevices.Faces.Records.PanelTheme? machine)
     {
         Clear(panel);
 
@@ -71,7 +71,7 @@ public sealed class PanelTint : IPanelTint
     }
 
     /// <inheritdoc/>
-    public void Repaint(Control panel, Rack.Faces.Records.PanelTheme? machine)
+    public void Repaint(Control panel, Rack.SoundDevices.Faces.Records.PanelTheme? machine)
     {
         Apply(panel, machine);
 
@@ -79,7 +79,7 @@ public sealed class PanelTint : IPanelTint
     }
 
     /// <inheritdoc/>
-    public PanelShades? Shades(Rack.Faces.Records.PanelTheme? machine)
+    public PanelShades? Shades(Rack.SoundDevices.Faces.Records.PanelTheme? machine)
     {
         if (machine == null) return null;
 

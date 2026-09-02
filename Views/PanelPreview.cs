@@ -11,12 +11,12 @@ using System.Linq;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio;
-using JingleBox2.Devices.SoundMachines.Records;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Records;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -104,11 +104,11 @@ public static class PanelPreview
             var pretend = new System.Collections.Generic.List<Midi.ControlMapping>();
 
             foreach (var parameter in Projects.For(PreviewApp.Wanted.SlotId)
-                                          ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Rack.Faces.Parameter>())
+                                          ?.Parameters.Take(2) ?? System.Linq.Enumerable.Empty<JingleBox2.Rack.SoundDevices.Faces.Parameter>())
             {
                 pretend.Add(new Midi.ControlMapping
                 {
-                    Kind = Midi.Enums.ControlKind.Device,
+                    Kind = Midi.Enums.ControlKind.SoundDevice,
                     Machine = PreviewApp.Wanted.SlotId,
                     Key = parameter.Key
                 });

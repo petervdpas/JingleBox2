@@ -3,7 +3,7 @@ using System;
 using System.Text.Json.Serialization;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines.Records;
+using JingleBox2.SoundDevices.SoundMachines.Records;
 
 namespace JingleBox2.Tracker;
 

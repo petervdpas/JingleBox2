@@ -103,7 +103,7 @@ public class TrackerHistoryTests : IDisposable
 
         var link = new Midi.ControlMapping
         {
-            Kind = Midi.Enums.ControlKind.Device,
+            Kind = Midi.Enums.ControlKind.SoundDevice,
             Scope = Midi.Enums.ControlScope.Focused,
             Machine = "zampler",
             Key = "cutoff"
@@ -130,7 +130,7 @@ public class TrackerHistoryTests : IDisposable
     {
         var lane = First.Lane(new AutomationLane
         {
-            Kind = Midi.Enums.ControlKind.Device, Machine = "zampler", Key = "cutoff"
+            Kind = Midi.Enums.ControlKind.SoundDevice, Machine = "zampler", Key = "cutoff"
         });
 
         lane.Put(0, 0.25);

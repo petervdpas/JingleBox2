@@ -6,10 +6,10 @@ using System.Text.Json;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.Tracker;
 

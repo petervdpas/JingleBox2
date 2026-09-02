@@ -76,7 +76,7 @@ public class VolumeScaleTests
     [Fact]
     public void TheVolumeEffectIsOnTheSameScale()
     {
-        var cell = new TrackerCell(new Note(60), 0, 32, new TrackerEffect(TrackerEffect.SetVolume, 32));
+        var cell = new TrackerCell(new Note(60), 0, 32, new TrackerCommand(TrackerCommand.SetVolume, 32));
         var wide = _scale.Widen(cell);
 
         Assert.Equal(64, wide.Volume);
@@ -87,12 +87,12 @@ public class VolumeScaleTests
     [Fact]
     public void NoOtherEffectIsTouched()
     {
-        var cell = new TrackerCell(new Note(60), 0, 32, new TrackerEffect(TrackerEffect.SetPan, 64));
+        var cell = new TrackerCell(new Note(60), 0, 32, new TrackerCommand(TrackerCommand.SetPan, 64));
         var wide = _scale.Widen(cell);
 
         Assert.Equal(64, wide.Volume);
         Assert.Equal(64, wide.Effect.Parameter);
-        Assert.Equal(TrackerEffect.SetPan, wide.Effect.Command);
+        Assert.Equal(TrackerCommand.SetPan, wide.Effect.Command);
     }
 
     /// <summary>
@@ -103,7 +103,7 @@ public class VolumeScaleTests
     public void AnOldSongComesBackAtItsOwnLevel()
     {
         var song = Song.CreateDefault();
-        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 32, TrackerEffect.None);
+        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 32, TrackerCommand.None);
 
         string said = SongStore.Copy(song);
 
@@ -123,7 +123,7 @@ public class VolumeScaleTests
     public void ASongOfThisBuildIsLeftAlone()
     {
         var song = Song.CreateDefault();
-        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 100, TrackerEffect.None);
+        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 100, TrackerCommand.None);
 
         var once = SongStore.Uncopy(SongStore.Copy(song));
         var twice = SongStore.Uncopy(SongStore.Copy(once!));
@@ -140,7 +140,7 @@ public class VolumeScaleTests
     public void ASongWithNoVersionIsOld()
     {
         var song = Song.CreateDefault();
-        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 32, TrackerEffect.None);
+        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, 32, TrackerCommand.None);
 
         string said = string.Join('\n',
             SongStore.Copy(song).Split('\n').Where(line => !line.Contains("ersion")));

@@ -50,7 +50,7 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[2, 0, 0] = new TrackerCell(new Note(60), 1, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[2, 0, 0] = new TrackerCell(new Note(60), 1, TrackerCell.NoVolume, TrackerCommand.None);
 
         Assert.Equal(new Note(60), pattern[2, 0].Note);
     }
@@ -61,9 +61,9 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         Assert.Equal(new Note(60), pattern[0, 0, 0].Note);
         Assert.Equal(new Note(64), pattern[0, 0, 1].Note);
@@ -86,7 +86,7 @@ public class NoteColumnTests
     public void Widening_a_track_keeps_what_was_written()
     {
         var pattern = new Pattern(16, 4);
-        pattern[0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         pattern.SetColumns(0, 3);
 
@@ -102,8 +102,8 @@ public class NoteColumnTests
     public void Narrowing_a_track_takes_its_last_columns_with_it()
     {
         var pattern = Chords();
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         pattern.SetColumns(0, 1);
 
@@ -121,8 +121,8 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 2] = new TrackerCell(new Note(48), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 2] = new TrackerCell(new Note(48), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         pattern.MoveTrack(0, 2);
 
@@ -169,8 +169,8 @@ public class NoteColumnTests
         song.SetColumns(0, 3);
 
         var pattern = song.Patterns[0];
-        pattern[4, 0, 0] = new TrackerCell(new Note(60), 1, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[4, 0, 2] = new TrackerCell(new Note(67), 1, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[4, 0, 0] = new TrackerCell(new Note(60), 1, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[4, 0, 2] = new TrackerCell(new Note(67), 1, TrackerCell.NoVolume, TrackerCommand.None);
 
         var back = SongStore.Uncopy(SongStore.Copy(song))!;
 
@@ -194,8 +194,8 @@ public class NoteColumnTests
         var song = Song.CreateDefault();
         song.SetColumns(0, 2);
 
-        song.Patterns[0][0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        song.Patterns[0][0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        song.Patterns[0][0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         string written = SongStore.Copy(song);
 
@@ -208,7 +208,7 @@ public class NoteColumnTests
     public void A_song_that_never_heard_of_columns_reads_as_one_apiece()
     {
         var song = Song.CreateDefault();
-        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         string written = SongStore.Copy(song).Replace("\"NoteColumns\": [", "\"Ignored\": [");
 
@@ -225,8 +225,8 @@ public class NoteColumnTests
         var song = Song.CreateDefault();
         song.SetColumns(0, 3);
 
-        song.Patterns[0][0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var events = new TrackerSequencer(song.TrackCount)
             .EventsFor(song, new TrackerPosition(0, 0))
@@ -248,7 +248,7 @@ public class NoteColumnTests
         var song = Song.CreateDefault();
         song.SetColumns(0, 2);
 
-        song.Patterns[0][0, 0, 1] = new TrackerCell(Note.Off, 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0, 1] = new TrackerCell(Note.Off, 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var stop = new TrackerSequencer(song.TrackCount)
             .EventsFor(song, new TrackerPosition(0, 0))
@@ -273,10 +273,10 @@ public class NoteColumnTests
         song.SetColumns(0, 2);
 
         var pattern = song.Patterns[0];
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 1] = new TrackerCell(new Note(64), 1, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 1] = new TrackerCell(new Note(64), 1, TrackerCell.NoVolume, TrackerCommand.None);
         pattern[1, 0, 0] = new TrackerCell(new Note(62), TrackerCell.NoInstrument, TrackerCell.NoVolume,
-            TrackerEffect.None);
+            TrackerCommand.None);
 
         var sequencer = new TrackerSequencer(song.TrackCount);
         sequencer.EventsFor(song, new TrackerPosition(0, 0));
@@ -433,7 +433,7 @@ public class NoteColumnTests
         var song = Song.CreateDefault();
         song.SetColumns(0, 5);
 
-        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         Assert.Equal(3, song.ColumnsUsed(0));
     }
@@ -453,7 +453,7 @@ public class NoteColumnTests
         song.AddPattern();
         song.SetColumns(0, 4);
 
-        song.Patterns[1][0, 0, 3] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[1][0, 0, 3] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         Assert.Equal(4, song.ColumnsUsed(0));
     }
@@ -544,8 +544,8 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var block = PatternBlock.Copy(pattern, new PatternSelection(0, 0, 0, 0))!;
 
@@ -561,8 +561,8 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 1] = new TrackerCell(new Note(64), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var block = PatternBlock.Copy(pattern, new PatternSelection(0, 0, 0, 0))!;
 
@@ -577,7 +577,7 @@ public class NoteColumnTests
     public void Clearing_a_track_clears_its_chords_too()
     {
         var pattern = Chords();
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         Edits.ClearTrack(pattern, 0);
 
@@ -594,8 +594,8 @@ public class NoteColumnTests
     {
         var pattern = Chords();
 
-        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerEffect.None);
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 0] = new TrackerCell(new Note(60), 0, TrackerCell.NoVolume, TrackerCommand.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         Edits.InsertLine(pattern, new PatternCursor(0, 0, CellColumn.Note, 2));
 
@@ -616,7 +616,7 @@ public class NoteColumnTests
     {
         var song = Song.CreateDefault();
         song.SetColumns(0, 3);
-        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        song.Patterns[0][0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var step = SongStore.Uncopy(SongStore.Copy(song))!;
 
@@ -642,7 +642,7 @@ public class NoteColumnTests
     public void A_step_carries_the_column_counts()
     {
         var pattern = Chords();
-        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerEffect.None);
+        pattern[0, 0, 2] = new TrackerCell(new Note(67), 0, TrackerCell.NoVolume, TrackerCommand.None);
 
         var kept = pattern.Cells();
         var columns = pattern.ColumnCounts();

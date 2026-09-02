@@ -8,7 +8,7 @@ using JingleBox2.Audio.Plugins.Records;
 namespace JingleBox2.Audio.Plugins;
 
 /// <summary>One saved effect: which plugin, whether it was switched off, and its settings.</summary>
-public sealed class PluginDeviceConfig
+public sealed class PluginSlotConfig
 {
     /// <summary>
     /// Which effect of ours this is, or empty for somebody else's plugin.
@@ -75,7 +75,7 @@ public sealed class PluginDeviceConfig
 public sealed class PluginChainConfig
 {
     /// <summary>The devices, first to last, which is the order the audio goes through them.</summary>
-    public List<PluginDeviceConfig> Devices { get; set; } = new();
+    public List<PluginSlotConfig> Devices { get; set; } = new();
 
     /// <summary>True for a track with nothing on it, which is most tracks.</summary>
     public bool IsEmpty => Devices.Count == 0;
@@ -90,7 +90,7 @@ public sealed class PluginChainConfig
 
         foreach (var device in Devices)
         {
-            copy.Devices.Add(new PluginDeviceConfig
+            copy.Devices.Add(new PluginSlotConfig
             {
                 Effect = device.Effect,
                 Path = device.Path,
@@ -130,7 +130,7 @@ public sealed class PluginChainState : IPluginChainState
     private readonly IPluginHost _plugins = new PluginHost();
 
     /// <summary>Which effects of ours this build can make, for the boxes that are not plugins.</summary>
-    private readonly Devices.SoundEffects.Interfaces.IEffectEngines _engines = new Devices.SoundEffects.EffectEngines();
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines _engines = new SoundDevices.SoundEffects.SoundEffectEngines();
 
     /// <inheritdoc/>
     public PluginChainConfig Capture(PluginChain? chain, bool patches = false)
@@ -138,9 +138,9 @@ public sealed class PluginChainState : IPluginChainState
         var config = new PluginChainConfig();
         if (chain == null) return config;
 
-        foreach (var device in chain.Devices)
+        foreach (var device in chain.Slots)
         {
-            if (device.Insert is Devices.SoundEffects.Interfaces.IEffectEngine ours)
+            if (device.Insert is SoundDevices.SoundEffects.Interfaces.ISoundEffectEngine ours)
             {
                 config.Devices.Add(Written(ours, device));
 
@@ -149,7 +149,7 @@ public sealed class PluginChainState : IPluginChainState
 
             if (device.Insert is not IPluginEffect effect) continue;
 
-            var saved = new PluginDeviceConfig
+            var saved = new PluginSlotConfig
             {
                 Path = effect.Info.Path,
                 Id = effect.Info.Id,
@@ -181,11 +181,11 @@ public sealed class PluginChainState : IPluginChainState
     /// </remarks>
     /// <param name="engine">The effect that is running.</param>
     /// <param name="device">Its place in the chain, which is what carries the bypass.</param>
-    private static PluginDeviceConfig Written(
-        Devices.SoundEffects.Interfaces.IEffectEngine engine,
-        PluginChain.Device device)
+    private static PluginSlotConfig Written(
+        SoundDevices.SoundEffects.Interfaces.ISoundEffectEngine engine,
+        PluginChain.Slot device)
     {
-        var saved = new PluginDeviceConfig
+        var saved = new PluginSlotConfig
         {
             Effect = engine.Id,
             Name = engine.Id,
@@ -204,7 +204,7 @@ public sealed class PluginChainState : IPluginChainState
 
         var lumps = new List<byte[]>();
 
-        foreach (var device in chain.Devices)
+        foreach (var device in chain.Slots)
             if (device.Insert is IPluginEffect effect) lumps.Add(effect.SaveState());
 
         return lumps;
@@ -220,7 +220,7 @@ public sealed class PluginChainState : IPluginChainState
         var missing = new List<string>();
         if (chain == null) return missing;
 
-        foreach (var device in chain.Devices)
+        foreach (var device in chain.Slots)
         {
             chain.Remove(device);
             (device.Insert as IPluginEffect)?.Dispose();

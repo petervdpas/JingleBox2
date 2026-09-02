@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Devices.SoundMachines.Records;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Records;
+using JingleBox2.SoundDevices.SoundMachines;
 
 namespace JingleBox2.ViewModels;
 

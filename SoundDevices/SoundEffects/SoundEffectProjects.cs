@@ -1,0 +1,13 @@
+using JingleBox2.SoundDevices.SoundEffects.Interfaces;
+
+namespace JingleBox2.SoundDevices.SoundEffects;
+
+/// <inheritdoc/>
+/// <remarks>
+/// Nothing of its own: what effects this installation has is the rack's own question, asked the
+/// same way for both worlds. The interface stays as a name for it, since everything that takes
+/// one names what it wants rather than a shape with a parameter in it.
+/// </remarks>
+public sealed class SoundEffectProjects : RackSoundDevices<SoundEffectProject>, ISoundEffectProjects
+{
+}

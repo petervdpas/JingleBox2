@@ -283,7 +283,7 @@ shared, through `IMenuLines`, which is the one place a line becomes something on
 link is on a strip and the menu names no strip, since the whole desk is one thing to point a
 controller at.
 
-`Tests/MachineMenuTests.cs` and `Tests/MenuOptionsTests.cs` are the two halves, and most of what
+`Tests/SoundMachineMenuTests.cs` and `Tests/MenuOptionsTests.cs` are the two halves, and most of what
 they ask is not the happy path: no machine, no desk, an id that differs by case, a plugin and a
 mixer strip that are not this machine's templates, a link naming no controller, a line pressed
 after its links were taken off, an options list that is empty, untidy, repeated, or names a word
@@ -358,7 +358,7 @@ side here.
 
 ## Automation still points at a plugin
 
-A lane names an insert on a track's chain, through the same `ControlKind.Insert` and the same
+A lane names an insert on a track's chain, through the same `ControlKind.Plugin` and the same
 `ControlTargets.OnPlugin`, which is why neither was removed with the rest. It is a different
 thing from a link and wants different answers: a lane is this song saying what a parameter does
 over these lines, so it belongs to the song, it is not a fact about your hardware, and it has no

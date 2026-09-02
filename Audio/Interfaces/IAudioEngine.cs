@@ -34,7 +34,7 @@ public interface IAudioEngine : IDisposable
     float GetOutputLevel();
 
     /// <summary>Every output the machine offers, in the order the system lists them.</summary>
-    IEnumerable<OutputDevice> GetOutputDevices();
+    IEnumerable<AudioOutput> GetOutputDevices();
 
     /// <summary>
     /// Sends everything to that output from now on.

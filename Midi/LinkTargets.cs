@@ -11,7 +11,7 @@ namespace JingleBox2.Midi;
 public sealed class LinkTargets : ILinkTargets
 {
     /// <summary>What a device's link is made of, so a file and a face agree. Holds nothing.</summary>
-    private static readonly Interfaces.IDeviceLinks Devices = new DeviceLinks();
+    private static readonly Interfaces.ISoundDeviceLinks Devices = new SoundDeviceLinks();
 
     /// <summary>
     /// A device: a box on the rack with a face, which is a soundmachine or an effect.
@@ -22,16 +22,8 @@ public sealed class LinkTargets : ILinkTargets
     /// link is looked for and nothing else about it, so a file that said which would be saying
     /// something the reader has to check anyway.
     /// </remarks>
-    public const string Device = "device";
+    public const string SoundDevice = "sounddevice";
 
-    /// <summary>
-    /// What a device used to be called in a file, when a machine was the only one there was.
-    /// </summary>
-    /// <remarks>
-    /// Read as <see cref="Device"/> and never written. Every template already on somebody's disc
-    /// says this, and every one of them is about a machine, which is a device.
-    /// </remarks>
-    public const string Machine = "machine";
 
     /// <summary>
     /// A plugin on a track's chain, which no link may point at.
@@ -43,10 +35,10 @@ public sealed class LinkTargets : ILinkTargets
     /// already keeps with nothing able to make the two agree.
     ///
     /// It is not the word for one of our effects and never was: an effect of ours is a box this
-    /// installation registered, with an id and a face, which is a <see cref="Device"/>. Nothing
+    /// installation registered, with an id and a face, which is a <see cref="SoundDevice"/>. Nothing
     /// has ever written this word about one, so a file that says it means a plugin.
     /// </remarks>
-    public const string Effect = "effect";
+    public const string Plugin = "plugin";
 
     /// <summary>One strip of the mixer, the master included.</summary>
     public const string Mixer = "mixer";
@@ -119,8 +111,8 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string KindOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Device or ControlKind.Action => Device,
-        ControlKind.Insert => Effect,
+        ControlKind.SoundDevice or ControlKind.Action => SoundDevice,
+        ControlKind.Plugin => Plugin,
         ControlKind.Mix => Mixer,
         _ => Transport
     };
@@ -128,8 +120,8 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string IdOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Device or ControlKind.Action => one.Machine,
-        ControlKind.Insert => one.Plugin,
+        ControlKind.SoundDevice or ControlKind.Action => one.Machine,
+        ControlKind.Plugin => one.Plugin,
         ControlKind.Mix => one.Track == Tracker.TrackerPlayer.MasterStrip
             ? Master
             : (one.Track + 1).ToString(CultureInfo.InvariantCulture),
@@ -139,8 +131,8 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public string ParameterOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Device or ControlKind.Action => one.Key,
-        ControlKind.Insert => one.Parameter.ToString(CultureInfo.InvariantCulture),
+        ControlKind.SoundDevice or ControlKind.Action => one.Key,
+        ControlKind.Plugin => one.Parameter.ToString(CultureInfo.InvariantCulture),
         ControlKind.Mix => Strip.FirstOrDefault(each => each.What == one.Mix).Said ?? "",
         _ => Keys.FirstOrDefault(each => each.Key == one.Transport).Said ?? ""
     };
@@ -164,9 +156,9 @@ public sealed class LinkTargets : ILinkTargets
 
         return first.Kind switch
         {
-            ControlKind.Device or ControlKind.Action =>
+            ControlKind.SoundDevice or ControlKind.Action =>
                 first.Machine.Length > 0 ? first.Machine : "A device",
-            ControlKind.Insert => first.Plugin.Length > 0 ? first.Plugin : "An effect",
+            ControlKind.Plugin => first.Plugin.Length > 0 ? first.Plugin : "An effect",
             ControlKind.Mix => "Mixer",
             _ => "Transport"
         };
@@ -175,8 +167,8 @@ public sealed class LinkTargets : ILinkTargets
     /// <inheritdoc/>
     public int RankOf(ControlMapping one) => one.Kind switch
     {
-        ControlKind.Device or ControlKind.Action => 0,
-        ControlKind.Insert => 1,
+        ControlKind.SoundDevice or ControlKind.Action => 0,
+        ControlKind.Plugin => 1,
         ControlKind.Mix => 2,
         _ => 3
     };
@@ -223,7 +215,7 @@ public sealed class LinkTargets : ILinkTargets
     /// Every branch refuses rather than guessing. A machine with no key, a strip that is neither
     /// the master nor a track number, and a word that is not one of the mixer's six or the
     /// transport's five all come back as nothing, and the caller counts what it could not read.
-    /// So does a plugin, always: see <see cref="Effect"/>. That count is the whole of what a
+    /// So does a plugin, always: see <see cref="Plugin"/>. That count is the whole of what a
     /// person can be told about a file this version will not take.
     /// </remarks>
     /// <param name="kind">One of the four words.</param>
@@ -231,12 +223,12 @@ public sealed class LinkTargets : ILinkTargets
     /// <param name="parameter">Which parameter.</param>
     private static ControlMapping? Made(string kind, string id, string parameter)
     {
-        if (Same(kind, Device) || Same(kind, Machine))
+        if (Same(kind, SoundDevice))
             return parameter.Length == 0 || id.Length == 0
                 ? null
                 : Devices.On(id, "", parameter);
 
-        if (Same(kind, Effect)) return null;
+        if (Same(kind, Plugin)) return null;
 
         if (Same(kind, Mixer))
         {
@@ -280,7 +272,7 @@ public sealed class LinkTargets : ILinkTargets
     /// <param name="one">The link to read.</param>
     private static string Guessed(ControlMapping one)
     {
-        if (one.Kind is not (ControlKind.Device or ControlKind.Action)) return "";
+        if (one.Kind is not (ControlKind.SoundDevice or ControlKind.Action)) return "";
         if (one.Key.Length == 0 || one.Name.Length == 0) return "";
 
         string spaced = " " + one.Key.Replace('_', ' ');

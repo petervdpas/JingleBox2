@@ -324,7 +324,7 @@ public sealed class ControllerProfiles : IControllerProfiles
         && string.Equals(control.Press, "momentary", StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc/>
-    public bool PortTakes(string? device, MidiDeviceRole role)
+    public bool PortTakes(string? device, MidiPortRole role)
     {
         if (For(device) is not { } profile) return true;
 
@@ -334,7 +334,7 @@ public sealed class ControllerProfiles : IControllerProfiles
         return port.Role switch
         {
             "controls" => true,
-            "transport" => role == MidiDeviceRole.Transport,
+            "transport" => role == MidiPortRole.Transport,
             _ => false
         };
     }

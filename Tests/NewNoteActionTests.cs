@@ -5,7 +5,7 @@ using JingleBox2.Audio.Plugins.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Devices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines;
 using JingleBox2.Tracker.Synth;
 using Xunit;
 

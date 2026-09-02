@@ -19,7 +19,7 @@ public sealed class VolumeScale : IVolumeScale
     /// <inheritdoc/>
     public TrackerCell Widen(TrackerCell cell)
     {
-        var effect = cell.Effect.Command == TrackerEffect.SetVolume
+        var effect = cell.Effect.Command == TrackerCommand.SetVolume
             ? cell.Effect with
             {
                 Parameter = Math.Clamp(

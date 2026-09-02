@@ -5,7 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
-using JingleBox2.Devices.Interfaces;
+using JingleBox2.SoundDevices.Interfaces;
 
 namespace JingleBox2.ViewModels;
 

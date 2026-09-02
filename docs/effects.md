@@ -85,7 +85,7 @@ part that only one world can use is a part written twice eventually.
 ## The rename
 
 The parts an effect draws itself out of are the parts a machine draws itself out of, and they
-are named for machines. `Rack.Abstractions` is published and everything public in it is a
+are named for machines. `Rack.SoundDevices` is published and everything public in it is a
 promise, so this is a breaking change, and it is cheap exactly once: nothing outside this
 repository ships against it yet.
 
@@ -93,7 +93,7 @@ The line to draw is not "does the word machine appear" but **do both worlds use 
 use is renamed. What only the instrument world uses keeps the name it has, because there the
 word is true.
 
-Renamed, in `Rack.Abstractions`:
+Renamed, in `Rack.SoundDevices`:
 
 | Now | Becomes |
 | --- | --- |
@@ -113,7 +113,7 @@ Renamed, in `Rack.Abstractions`:
 | `MachineTheme` | `PanelTheme` |
 | `MachineFace` | `Face` |
 
-And in `Rack.Ui`:
+And in `Rack.Controls`:
 
 | Now | Becomes |
 | --- | --- |
@@ -142,7 +142,7 @@ shape as a machine's folder for the same reasons: `presets/` for what it ships w
 for what is drawn on it, and the whole folder is what travels as a zip. No `sounds/`, since an
 effect plays nothing back.
 
-The manifest is `EffectProject`, which is `SoundMachineProject` without the parts an effect has no use
+The manifest is `SoundEffectProject`, which is `SoundMachineProject` without the parts an effect has no use
 for: no starting-from, no engine borrowing, no sounds. Id, name, summary, author, version,
 colours, parameters and a `Panel`.
 
@@ -160,7 +160,7 @@ What has to move is the writing down. `PluginChainState.Capture` walks the chain
 `IPluginEffect` and skips anything else, and `Restore` loads every entry through the plugin host.
 So a chain entry needs to be able to say which of the two it is:
 
-- `PluginDeviceConfig` gains an effect id, empty for a plugin, and the parameter values of one of
+- `PluginSlotConfig` gains an effect id, empty for a plugin, and the parameter values of one of
   ours are keyed by the effect's own parameter keys, which the existing
   `Dictionary<string, double>` already holds without changing shape.
 - `Restore` reads the id first: ours is built from the register, a plugin goes to the plugin host
@@ -204,7 +204,7 @@ which is exactly when a hand is reaching for a knob:
 - a pad's chain is not on a track, so no answer phrased as a track number could reach it. A knob
   pointed at an effect on a pad moved nothing, ever
 
-`IEffectInFront` is the one answer, asked before anything else, and `IEffectShown` is the three
+`ISoundEffectInFront` is the one answer, asked before anything else, and `ISoundEffectShown` is the three
 things a link needs about a box: which effect it is, where it is standing (for the sentence on the
 status line, since a chain is not always on a track), and what its knobs stand at. The window says
 it on opening as well as on being brought forward, because whether a window hears that it was
@@ -233,21 +233,21 @@ Reverb and the compressor are each a piece of work on their own and go last for 
 ## The order of work
 
 1. **The rename. Done**, and with it the namespaces and the assemblies. The types first, then
-   `JingleBox2.Machines` became `JingleBox2.Rack.Faces` with `JingleBox2.Rack.Machines` beside it
-   for what only an instrument has and `JingleBox2.Rack.Effects` waiting for what only an effect
-   will have. The two assemblies are `JingleBox2.Rack.Abstractions` and `JingleBox2.Rack.Ui`,
+   `JingleBox2.Machines` became `JingleBox2.Rack.SoundDevices` with `JingleBox2.Rack.SoundMachines` beside it
+   for what only an instrument has and `JingleBox2.Rack.SoundEffects` waiting for what only an effect
+   will have. The two assemblies are `JingleBox2.Rack.SoundDevices` and `JingleBox2.Rack.Controls`,
    which is what `LICENSE.EXCEPTION` names. No warnings and the suite green at 1186. `Panel` collides with `Avalonia.Controls.Panel` and the collision is
-   written up in `CLAUDE.md`: ours wins silently inside `JingleBox2.Rack.Ui`, since the
+   written up in `CLAUDE.md`: ours wins silently inside `JingleBox2.Rack.Controls`, since the
    enclosing namespace beats a using, and is an ambiguity anywhere else. Nothing on disc moved,
-   which `Tests/MachinePartsTests.cs` says by reading the shipped manifests and passing
+   which `Tests/SoundMachinePartsTests.cs` says by reading the shipped manifests and passing
    untouched.
 2. **The effect world with nothing in it. Done.** The folder rules came out first, since they
    were written for machines and are about neither: `IRackRegistry<T>` and `RackRegistry<T>` are
    the two folders, the offer, the bringing up to date and the engine gate, and `SoundMachineRegistry`
-   and `EffectRegistry` are what is left over when those are taken out. Then `EffectProject`
-   (`effect.json`), `EffectProjects`, `IEffectEngines` as the gate with an empty table, and the
+   and `SoundEffectRegistry` are what is left over when those are taken out. Then `SoundEffectProject`
+   (`effect.json`), `SoundEffectProjects`, `ISoundEffectEngines` as the gate with an empty table, and the
    rack's Effects tab drawn from what is registered, with no picker beside it: an effect cannot be
-   shelved, because there is no box of yours to shelve. `Tests/EffectRackTests.cs` is eighteen
+   shelved, because there is no box of yours to shelve. `Tests/SoundEffectRackTests.cs` is eighteen
    tests and most of them are the refusals.
 3. **One engine end to end**: the delay. On the chain, saved and read back in a song, its face
    drawn, bypass through the new part, pointable and automatable, with the tests including the
@@ -261,9 +261,9 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    out on the way was everything that had been written for machines and was never about them: the
    pictures in a folder (`IPanelImages`), a folder carried whole (`IFolderCopy`), and the design
    history, which asked the project what type it is instead of naming the machine's.
-   `Tests/EffectDesignerTests.cs` is the seam: which world makes which id, which pages are
+   `Tests/SoundEffectDesignerTests.cs` is the seam: which world makes which id, which pages are
    offered, and a folder of one kind refusing to open as the other.
-4. **The delay.** The engine and the face are **done**: `Devices/SoundEffects/Delay.cs`, four knobs,
+4. **The delay.** The engine and the face are **done**: `SoundDevices/SoundEffects/Delay.cs`, four knobs,
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
    Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
    thrown out exactly as a machine is, through the same archive and the same page. What is left of

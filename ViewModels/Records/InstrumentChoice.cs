@@ -23,4 +23,4 @@ namespace JingleBox2.ViewModels.Records;
 /// templates that are not interchangeable.
 /// </param>
 /// <param name="Colour">The dot down the side, which is the machine's own or the plugin's grey.</param>
-public sealed record InstrumentChoice(RackMachine? Machine, PluginInfo? Plugin, string Said, string Colour);
+public sealed record InstrumentChoice(RackSoundMachine? Machine, PluginInfo? Plugin, string Said, string Colour);

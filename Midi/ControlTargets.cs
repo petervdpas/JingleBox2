@@ -1,6 +1,6 @@
 using Avalonia.Threading;
 using JingleBox2.Audio.Plugins;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Tracker;
 using JingleBox2.ViewModels;
 using System;
@@ -10,10 +10,10 @@ using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
 using JingleBox2.Midi.Enums;
 using JingleBox2.Audio.Plugins.Interfaces;
-using JingleBox2.Rack.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
-using JingleBox2.Devices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
 namespace JingleBox2.Midi;
 
@@ -39,13 +39,13 @@ public sealed class ControlTargets : IControlTargets
     private readonly ISoundMachineProjects _machines;
 
     /// <summary>The effects this run has, for a knob pointed at one of ours on a chain.</summary>
-    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? _effects;
 
     private readonly TrackerViewModel _tracker;
     private readonly RackViewModel? _rack;
 
     /// <summary>Which chain has a face of ours open in front, or nothing.</summary>
-    private readonly ViewModels.Interfaces.IEffectInFront? _front;
+    private readonly ViewModels.Interfaces.ISoundEffectInFront? _front;
 
     /// <param name="tracker">
     /// The song and everything in it: the tracks, their mixer strips, their instruments and the
@@ -76,8 +76,8 @@ public sealed class ControlTargets : IControlTargets
     /// </param>
     public ControlTargets(TrackerViewModel tracker, ISoundMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
-                          Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
-                          ViewModels.Interfaces.IEffectInFront? front = null)
+                          SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
+                          ViewModels.Interfaces.ISoundEffectInFront? front = null)
     {
         _tracker = tracker;
         _machines = machines;
@@ -107,7 +107,7 @@ public sealed class ControlTargets : IControlTargets
     {
         if (mapping is null) return null;
 
-        if (mapping.Kind == ControlKind.Device && OnFront(mapping) is { } ahead) return ahead;
+        if (mapping.Kind == ControlKind.SoundDevice && OnFront(mapping) is { } ahead) return ahead;
 
         int track = mapping.Scope == ControlScope.Fixed ? mapping.Track : _tracker.FocusedTrack;
 
@@ -115,7 +115,7 @@ public sealed class ControlTargets : IControlTargets
             return mapping.Kind switch
             {
                 ControlKind.Mix => OnStrip(mapping, track),
-                ControlKind.Insert => OnPlugin(mapping, track),
+                ControlKind.Plugin => OnPlugin(mapping, track),
                 _ => null
             };
 
@@ -123,8 +123,8 @@ public sealed class ControlTargets : IControlTargets
 
         var found = mapping.Kind switch
         {
-            ControlKind.Device => OnDevice(mapping, track),
-            ControlKind.Insert => OnPlugin(mapping, track),
+            ControlKind.SoundDevice => OnDevice(mapping, track),
+            ControlKind.Plugin => OnPlugin(mapping, track),
             ControlKind.Mix => OnStrip(mapping, track),
             ControlKind.Action => OnButton(mapping),
             ControlKind.Transport => OnTransport(mapping),
@@ -189,7 +189,7 @@ public sealed class ControlTargets : IControlTargets
                 yield return new ControlChoice(
                     new ControlMapping
                     {
-                        Kind = ControlKind.Device,
+                        Kind = ControlKind.SoundDevice,
                         Scope = ControlScope.Fixed,
                         Track = track,
                         Machine = machine,
@@ -219,7 +219,7 @@ public sealed class ControlTargets : IControlTargets
 
         int slot = 0;
 
-        foreach (var device in chain.Devices)
+        foreach (var device in chain.Slots)
         {
             if (device.Insert is not IPluginParameters plugin) continue;
 
@@ -230,7 +230,7 @@ public sealed class ControlTargets : IControlTargets
                 yield return new ControlChoice(
                     new ControlMapping
                     {
-                        Kind = ControlKind.Insert,
+                        Kind = ControlKind.Plugin,
                         Scope = ControlScope.Fixed,
                         Track = track,
                         Plugin = plugin.Info.Id,
@@ -552,13 +552,13 @@ public sealed class ControlTargets : IControlTargets
     {
         if (chain is null || mapping.Machine.Length == 0 || mapping.Key.Length == 0) return null;
 
-        foreach (var device in chain.Devices)
+        foreach (var device in chain.Slots)
         {
-            if (device.Insert is not Devices.SoundEffects.Interfaces.IEffectEngine engine) continue;
+            if (device.Insert is not SoundDevices.SoundEffects.Interfaces.ISoundEffectEngine engine) continue;
 
             if (!string.Equals(engine.Id, mapping.Machine, StringComparison.OrdinalIgnoreCase)) continue;
 
-            return Reaching(mapping, engine.Id, where, new Devices.SoundEffects.EffectValues(engine));
+            return Reaching(mapping, engine.Id, where, new SoundDevices.SoundEffects.SoundEffectValues(engine));
         }
 
         return null;
@@ -576,7 +576,7 @@ public sealed class ControlTargets : IControlTargets
     /// values are the object the face is reading, so a write that goes past them moves the sound
     /// and leaves every knob on the screen where it was, which from a chair reads as a link that
     /// was never made. It is the same door a machine's parameter is written through, and it is
-    /// the reason <see cref="Rack.Faces.Interfaces.IPanelValues.Said"/> exists.
+    /// the reason <see cref="Rack.SoundDevices.Faces.Interfaces.IPanelValues.Said"/> exists.
     /// </remarks>
     /// <param name="mapping">What the control was pointed at.</param>
     /// <param name="id">Which effect, by the id its manifest carries.</param>
@@ -611,7 +611,7 @@ public sealed class ControlTargets : IControlTargets
     /// </remarks>
     private static IPluginParameters? Insert(PluginChain chain, ControlMapping mapping)
     {
-        var loaded = chain.Devices
+        var loaded = chain.Slots
             .Select(device => device.Insert as IPluginParameters)
             .Where(one => one != null)
             .ToList();

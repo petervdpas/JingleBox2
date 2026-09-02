@@ -30,7 +30,7 @@ public class ControlCardTests
     /// <param name="key">Which parameter.</param>
     private static ControlMapping OnMachine(string machine, string named, string key) => new()
     {
-        Kind = ControlKind.Device,
+        Kind = ControlKind.SoundDevice,
         Machine = machine,
         Key = key,
         Owner = named,
@@ -72,7 +72,7 @@ public class ControlCardTests
 
         var track = new ControlMapping
         {
-            Kind = ControlKind.Device,
+            Kind = ControlKind.SoundDevice,
             Scope = ControlScope.Focused,
             Machine = "machine.oddskilla",
             Key = "cutoff",
@@ -91,9 +91,9 @@ public class ControlCardTests
     [Fact]
     public void A_template_naming_a_plugin_is_refused()
     {
-        Assert.Null(Targets.Point(LinkTargets.Effect, "vst3:serum", "12", "Serum", "Serum Cutoff"));
+        Assert.Null(Targets.Point(LinkTargets.Plugin, "vst3:serum", "12", "Serum", "Serum Cutoff"));
 
-        Assert.NotNull(Targets.Point(LinkTargets.Machine, "machine.oddskilla", "cutoff", "OddSkilla", "OddSkilla cutoff"));
+        Assert.NotNull(Targets.Point(LinkTargets.SoundDevice, "machine.oddskilla", "cutoff", "OddSkilla", "OddSkilla cutoff"));
     }
 
     /// <summary>By the id rather than the name, so two machines never share a card.</summary>
@@ -207,14 +207,14 @@ public class ControlCardTests
         {
             new()
             {
-                Kind = ControlKind.Insert,
+                Kind = ControlKind.Plugin,
                 Plugin = "56534558",
                 Parameter = 3,
                 Name = "Serum 2 Filter Cutoff"
             },
             new()
             {
-                Kind = ControlKind.Insert,
+                Kind = ControlKind.Plugin,
                 Plugin = "56534558",
                 Parameter = 4,
                 Owner = "Serum 2",
@@ -239,7 +239,7 @@ public class ControlCardTests
         {
             new ControlMapping
             {
-                Kind = ControlKind.Insert,
+                Kind = ControlKind.Plugin,
                 Plugin = "56534558",
                 Parameter = 3,
                 Name = "Serum 2 Filter Cutoff"
@@ -252,7 +252,7 @@ public class ControlCardTests
     public void The_cards_come_in_the_order_a_sound_is_made_in()
     {
         int machine = Targets.RankOf(OnMachine("machine.oddskilla", "OddSkilla", "cutoff"));
-        int effect = Targets.RankOf(new ControlMapping { Kind = ControlKind.Insert });
+        int effect = Targets.RankOf(new ControlMapping { Kind = ControlKind.Plugin });
         int mixer = Targets.RankOf(MixLinks.On(MixControl.Volume, 0));
         int transport = Targets.RankOf(TransportLinks.For(TransportKey.Play));
 

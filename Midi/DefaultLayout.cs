@@ -63,11 +63,11 @@ public sealed class DefaultLayout
 
     private readonly object _lock = new();
 
-    /// <summary>What has been seen on each device, and what it turned out to be.</summary>
-    private readonly Dictionary<string, Device> _devices = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>What has been seen on each controller, and what it turned out to be.</summary>
+    private readonly Dictionary<string, Controller> _controllers = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>One controller, and everything seen on it so far.</summary>
-    private sealed class Device
+    private sealed class Controller
     {
         /// <summary>Its controls, by channel and number.</summary>
         public readonly Dictionary<(int Channel, int Cc), Control> Controls = new();
@@ -124,8 +124,8 @@ public sealed class DefaultLayout
 
         lock (_lock)
         {
-            if (!_devices.TryGetValue(message.Device, out var device))
-                _devices[message.Device] = device = new Device();
+            if (!_controllers.TryGetValue(message.Device, out var device))
+                _controllers[message.Device] = device = new Controller();
 
             var at = (message.Channel, message.Value);
 
@@ -240,7 +240,7 @@ public sealed class DefaultLayout
     };
 
     /// <summary>Where this control stands among the others doing its job, counting from nought.</summary>
-    private static int Place(Device device, Control control) =>
+    private static int Place(Controller device, Control control) =>
         device.Controls.Values
             .Where(one => Job(one.Kind) == Job(control.Kind))
             .OrderBy(one => one.Channel)
@@ -276,7 +276,7 @@ public sealed class DefaultLayout
                 Device = device,
                 Channel = control.Channel,
                 Cc = control.Cc,
-                Kind = ControlKind.Device,
+                Kind = ControlKind.SoundDevice,
                 Ordinal = place,
                 Scope = ControlScope.Focused,
                 Pickup = control.Pickup,
@@ -289,6 +289,6 @@ public sealed class DefaultLayout
     {
         if (string.IsNullOrWhiteSpace(device)) return;
 
-        lock (_lock) _devices.Remove(device);
+        lock (_lock) _controllers.Remove(device);
     }
 }

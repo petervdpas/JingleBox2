@@ -114,7 +114,7 @@ public partial class PluginStrip : UserControl
     /// </remarks>
     /// <param name="instrument">The instrument whose machine has gone.</param>
     private static System.Threading.Tasks.Task Missing(PluginInstrumentViewModel instrument) =>
-        MissingMachineDialog.ShowAsync(instrument.Missing, instrument.Instrument.Name);
+        MissingSoundMachineDialog.ShowAsync(instrument.Missing, instrument.Instrument.Name);
 
     /// <summary>
     /// Opens the effect whose block was pressed.
@@ -128,14 +128,14 @@ public partial class PluginStrip : UserControl
         if (sender is not Control control) return;
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
-        if (control.DataContext is PluginDeviceViewModel plugin)
+        if (control.DataContext is PluginSlotViewModel plugin)
         {
             PluginWindow.Show(plugin, owner);
 
             return;
         }
 
-        if (control.DataContext is EffectDeviceViewModel ours) SoundEffectWindow.Show(ours, owner);
+        if (control.DataContext is SoundEffectViewModel ours) SoundEffectWindow.Show(ours, owner);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public partial class PluginStrip : UserControl
     /// ours is a panel, and both have to go before the thing behind them does.
     /// </remarks>
     /// <param name="device">The box on its way out.</param>
-    private static void Closing(ViewModels.Interfaces.IChainDevice device)
+    private static void Closing(ViewModels.Interfaces.IChainSlot device)
     {
         PluginWindow.CloseFor(device);
 

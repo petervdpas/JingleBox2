@@ -68,16 +68,16 @@ public sealed class TrackerCellText : ITrackerCellText
     /// version has to read back and be written out again untouched, or opening a song here
     /// would quietly throw away what somebody else's copy put in it.
     /// </remarks>
-    private static bool TryReadEffect(string text, out TrackerEffect effect)
+    private static bool TryReadEffect(string text, out TrackerCommand effect)
     {
-        effect = TrackerEffect.None;
+        effect = TrackerCommand.None;
         if (text == BlankEffect) return true;
         if (text.Length != 3) return false;
 
         if (!int.TryParse(text[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int parameter))
             return false;
 
-        effect = new TrackerEffect(char.ToUpperInvariant(text[0]), parameter);
+        effect = new TrackerCommand(char.ToUpperInvariant(text[0]), parameter);
         return true;
     }
 }

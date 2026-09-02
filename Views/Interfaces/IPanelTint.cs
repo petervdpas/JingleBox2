@@ -37,7 +37,7 @@ public interface IPanelTint
     /// Taken off first in every case, so what shows through when a machine says nothing is the
     /// application's own colour and not the last machine's.
     /// </remarks>
-    void Apply(Control panel, Rack.Faces.Records.PanelTheme? machine);
+    void Apply(Control panel, Rack.SoundDevices.Faces.Records.PanelTheme? machine);
 
     /// <summary>
     /// The same, and every drawn control inside it told to draw itself again.
@@ -49,7 +49,7 @@ public interface IPanelTint
     /// the whole of the feedback while somebody is moving the colour about, so the panel is
     /// told outright.
     /// </remarks>
-    void Repaint(Control panel, Rack.Faces.Records.PanelTheme? machine);
+    void Repaint(Control panel, Rack.SoundDevices.Faces.Records.PanelTheme? machine);
 
     /// <summary>
     /// What a machine's theme comes to, once the distances have been worked out from its colour.
@@ -62,7 +62,7 @@ public interface IPanelTint
     /// Whatever the face turned out to be, the lettering has to be readable on it: a pale machine
     /// gets dark lettering the same way a dark one gets pale.
     /// </remarks>
-    PanelShades? Shades(Rack.Faces.Records.PanelTheme? machine);
+    PanelShades? Shades(Rack.SoundDevices.Faces.Records.PanelTheme? machine);
 
     /// <summary>A colour written the way a machine writes one down.</summary>
     string Hex(Color colour);

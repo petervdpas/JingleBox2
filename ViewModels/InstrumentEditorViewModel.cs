@@ -12,21 +12,21 @@ using System.Linq;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
-using JingleBox2.Rack.Faces;
+using JingleBox2.Rack.SoundDevices.Faces;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Rack.Machines.Interfaces;
+using JingleBox2.Rack.SoundDevices.Faces.Interfaces;
+using JingleBox2.Rack.SoundDevices.SoundMachines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Tracker.Records;
 using JingleBox2.UI.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Devices.SoundMachines;
-using JingleBox2.Devices.SoundMachines.Interfaces;
-using JingleBox2.Devices.SoundMachines.Records;
+using JingleBox2.SoundDevices.SoundMachines;
+using JingleBox2.SoundDevices.SoundMachines.Interfaces;
+using JingleBox2.SoundDevices.SoundMachines.Records;
 
 namespace JingleBox2.ViewModels;
 
@@ -81,7 +81,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// by anything else is recorded too. The panel is one of the ways a knob gets turned and
     /// increasingly not the usual one.
     /// </remarks>
-    private T Watched<T>(T values) where T : Rack.Faces.PanelValues
+    private T Watched<T>(T values) where T : Rack.SoundDevices.Faces.PanelValues
     {
         values.Said += key => History.Did(_instrument, key);
 
@@ -284,7 +284,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// </summary>
     /// <remarks>
     /// Two things have to be true. The machine has to be installed with a panel laid out, which
-    /// is what <see cref="Devices.Interfaces.IRackDevices{T}.PanelFor"/> answers; and this build has to know how to
+    /// is what <see cref="SoundDevices.Interfaces.IRackSoundDevices{T}.PanelFor"/> answers; and this build has to know how to
     /// turn that machine's parameters into an instrument's settings, which is what the values
     /// are. A machine with a face and nobody to read it draws knobs that turn nothing, so the
     /// panel written by hand is shown instead and nothing is lost.
@@ -333,7 +333,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
             SayAgain();
         }
 
-        var shelf = new Devices.SoundMachines.TakeLibrary(Recordings, waveforms);
+        var shelf = new SoundDevices.SoundMachines.TakeLibrary(Recordings, waveforms);
 
         if (ValuesFor.Instrument(
                 _instrument, shelf, Kit, Patch, MonoSynth, Zones, Sampler) is not { } made)
@@ -345,7 +345,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (IsKit && Kit is { } kit)
         {
-            MachinePads = new Devices.SoundMachines.KitPads(kit, _keys);
+            MachinePads = new SoundDevices.SoundMachines.KitPads(kit, _keys);
             MachineSlices = Slices;
 
             kit.PropertyChanged += (_, e) =>
@@ -355,11 +355,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         }
         else if (IsSynth && Patch is { } voice)
         {
-            MachineScope = new Devices.SoundMachines.SynthScope(voice);
+            MachineScope = new SoundDevices.SoundMachines.SynthScope(voice);
         }
         else if (IsSampler && Zones is { } zones)
         {
-            MachineZones = new Devices.SoundMachines.SamplerZones(zones);
+            MachineZones = new SoundDevices.SoundMachines.SamplerZones(zones);
             MachineSlices = Slices;
 
             zones.PropertyChanged += (_, e) =>
@@ -760,7 +760,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
     /// in the same words. A machine that is not installed here still answers, greyed and named
     /// for its engine, which is what a link pointed at it would name anyway.
     /// </remarks>
-    public Rack.Devices.Interfaces.IDevice Device => SoundMachine.For(_instrument.Kind);
+    public Rack.SoundDevices.Interfaces.ISoundDevice Device => SoundMachine.For(_instrument.Kind);
 
     /// <summary>True on the machine with a single voice and its own patch.</summary>
     public bool IsMonoSynth => _instrument.IsMonoSynth;

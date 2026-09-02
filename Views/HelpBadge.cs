@@ -4,8 +4,8 @@ using Avalonia.Input;
 using Avalonia.Media;
 using JingleBox2.Help;
 using System.Globalization;
-using JingleBox2.Rack.Ui;
-using JingleBox2.Rack.Ui.Records;
+using JingleBox2.Rack.Controls;
+using JingleBox2.Rack.Controls.Records;
 using JingleBox2.Help.Interfaces;
 
 namespace JingleBox2.Views;

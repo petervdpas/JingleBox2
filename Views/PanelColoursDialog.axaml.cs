@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using JingleBox2.ViewModels;
 using System.Threading.Tasks;
-using JingleBox2.Rack.Faces.Records;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
