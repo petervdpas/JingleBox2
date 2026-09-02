@@ -10,7 +10,7 @@ using System.Reflection;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2;
@@ -43,8 +43,8 @@ public partial class MainWindow : Window
     /// <see cref="Tracker.RackRegistry{T}"/>. It finds nothing until there is an engine for an id, so
     /// today it makes the folder, records what it has offered, and hands back none.
     /// </remarks>
-    private static readonly IRackRegistry<Tracker.Effects.EffectProject> EffectShelf =
-        new Tracker.Effects.EffectRegistry();
+    private static readonly IRackRegistry<Devices.SoundEffects.EffectProject> EffectShelf =
+        new Devices.SoundEffects.EffectRegistry();
 
     /// <summary>The settings file, read once on the way up and written whenever something moves.</summary>
     private readonly ConfigStore _store = new("JingleBox2");
@@ -160,7 +160,7 @@ public partial class MainWindow : Window
 
         var machines = Registry.Load();
 
-        var projects = new Tracker.Machines.MachineProjects();
+        var projects = new Devices.SoundMachines.MachineProjects();
 
         projects.Keep(machines);
 
@@ -169,7 +169,7 @@ public partial class MainWindow : Window
 
         var effects = EffectShelf.Load();
 
-        var made = new Tracker.Effects.EffectProjects();
+        var made = new Devices.SoundEffects.EffectProjects();
 
         made.Keep(effects);
 

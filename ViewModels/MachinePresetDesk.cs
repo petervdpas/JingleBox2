@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -14,7 +14,7 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -652,7 +652,7 @@ public sealed partial class MachinePresetDesk : ObservableObject
     }
 
     /// <summary>What the machine calls the settings one of its things can hold.</summary>
-    private IReadOnlyList<string> Words(Tracker.Machines.MachineProject? machine) =>
+    private IReadOnlyList<string> Words(Devices.SoundMachines.MachineProject? machine) =>
         machine == null
             ? Array.Empty<string>()
             : new MachineProjectShape(machine.Panel, machine.Parameters).ThingWords;

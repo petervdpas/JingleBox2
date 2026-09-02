@@ -24,8 +24,8 @@ using JingleBox2.UI.Interfaces;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -332,7 +332,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
             SayAgain();
         }
 
-        var shelf = new Tracker.Machines.TakeLibrary(Recordings, waveforms);
+        var shelf = new Devices.SoundMachines.TakeLibrary(Recordings, waveforms);
 
         if (ValuesFor.Instrument(
                 _instrument, shelf, Kit, Patch, MonoSynth, Zones, Sampler) is not { } made)
@@ -344,7 +344,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
 
         if (IsKit && Kit is { } kit)
         {
-            MachinePads = new Tracker.Machines.KitPads(kit, _keys);
+            MachinePads = new Devices.SoundMachines.KitPads(kit, _keys);
             MachineSlices = Slices;
 
             kit.PropertyChanged += (_, e) =>
@@ -354,11 +354,11 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         }
         else if (IsSynth && Patch is { } voice)
         {
-            MachineScope = new Tracker.Machines.SynthScope(voice);
+            MachineScope = new Devices.SoundMachines.SynthScope(voice);
         }
         else if (IsSampler && Zones is { } zones)
         {
-            MachineZones = new Tracker.Machines.SamplerZones(zones);
+            MachineZones = new Devices.SoundMachines.SamplerZones(zones);
             MachineSlices = Slices;
 
             zones.PropertyChanged += (_, e) =>

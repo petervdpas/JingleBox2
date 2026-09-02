@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using JingleBox2.ViewModels;
 using Xunit;
 using JingleBox2.Tracker.Enums;

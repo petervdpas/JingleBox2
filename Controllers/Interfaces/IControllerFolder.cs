@@ -40,8 +40,8 @@ public interface IControllerFolder
     /// never changes and wrong the moment one is added. The folder was made the first time a
     /// codec shipped, so the profile that shipped an hour later could never arrive: the folder
     /// was there, so there was nothing to do. Exactly the mistake
-    /// <see cref="Tracker.Machines.MachineRegistry"/> had already made and already fixed, which
-    /// is where this is copied from.
+    /// <see cref="Devices.SoundMachines.MachineRegistry"/> had already made and already
+    /// fixed, which is where this is copied from.
     ///
     /// So what is recorded is the offer, not the folder. A file this installation has never been
     /// offered is put in; one it has been offered is left alone whether or not it is still

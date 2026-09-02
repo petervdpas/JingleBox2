@@ -263,7 +263,7 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    history, which asked the project what type it is instead of naming the machine's.
    `Tests/EffectDesignerTests.cs` is the seam: which world makes which id, which pages are
    offered, and a folder of one kind refusing to open as the other.
-4. **The delay.** The engine and the face are **done**: `Tracker/Effects/Delay.cs`, four knobs,
+4. **The delay.** The engine and the face are **done**: `Devices/SoundEffects/Delay.cs`, four knobs,
    measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
    Effects tab, with its own section in SETTINGS, System: imported from a zip, added back and
    thrown out exactly as a machine is, through the same archive and the same page. What is left of

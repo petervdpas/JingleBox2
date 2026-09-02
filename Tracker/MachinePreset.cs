@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text.Json;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -109,7 +109,7 @@ public sealed class MachinePresets : IPresetLibrary
     /// </remarks>
     private string Folder(Machine machine) =>
         _machines.For(machine.SlotId) is { Folder.Length: > 0 } project
-            ? Path.Combine(project.Folder, Machines.MachineProject.PresetsFolder)
+            ? Path.Combine(project.Folder, Devices.SoundMachines.MachineProject.PresetsFolder)
             : "";
 
     /// <summary>

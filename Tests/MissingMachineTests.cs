@@ -6,8 +6,8 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
 using JingleBox2.Tracker.Enums;
-using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Tracker.Records;
 using Xunit;
 

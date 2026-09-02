@@ -39,6 +39,23 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   application keeps its things, and how a file is written whole. `AppFolder` and `SafeFile` sat
   in `Config/` and were moved here, since neither is about the settings and `AppFolder`'s own
   remarks said so: a plugin's own process needs it and has no settings to read
+- `Devices/` - The two worlds of boxes on the rack, a folder each. `Devices/SoundMachines/` is
+  the soundmachine half: the registry, the projects, the archive, the preset file and the values
+  adapters that put a face over an engine. `Devices/SoundEffects/` is the effect half: its own
+  registry, projects and archive, and the engines. Both lived under `Tracker/` until now, which
+  was true of the first one on the day it was written, when a machine was a thing a song played
+  and nothing else, and had been false ever since: not one file in either is about a pattern, a
+  clock or a song, and the effect half was only ever there because it was made beside the machine
+  half. The namespaces are `JingleBox2.Devices.SoundMachines` and `JingleBox2.Devices.SoundEffects`,
+  which is the folder said again, and that is the rule: **the folder and the namespace say the
+  same thing**. Not under `Rack.*`, although the rack is what both are about, for two reasons that
+  agree: `Rack.Abstractions` and `Rack.Ui` are the published assemblies and this is the
+  application, and a source folder called `Rack` beside the lowercase `rack/` that holds what
+  ships is the `controllers/` fault again, one folder on Windows and two here. The word is
+  **soundmachine** rather than machine because it is one of the four this file is arranged around
+  and the folder is where it can finally be said. The types inside kept their names, deliberately:
+  `MachineRegistry`, `MachineProject`, `EffectRegistry` and the rest are what they always were, and
+  a `machine.json` on somebody's disc names no type at all
 - `Tracker/` - Song model, sequencing, playback, `.jibx` song files, and the machine rack
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
@@ -468,7 +485,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   ships in `OddSkilla` and installs as `machine.oddskilla`. So a song packed for somebody else
   carried a copy of the presets they already had. It reads the folder's id and looks the shipped
   box up by that now
-- **EchoBox is the first effect of ours, and it is a delay.** `Tracker/Effects/Delay.cs` is the
+- **EchoBox is the first effect of ours, and it is a delay.** `Devices/SoundEffects/Delay.cs` is the
   engine, `rack/effects/EchoBox/effect.json` is the face, and `EffectEngines` is the one line
   that ties the id to the class. Four knobs: time, feedback, damp and mix. The time glides rather
   than jumps, since a delay line read from a different place on the next sample is a click and
@@ -660,11 +677,11 @@ machine.
 So a static class is a decision to be untestable, and it is almost never worth making. The ones
 that were here became sealed instance classes behind interfaces in one pass: the note and
 keyboard maths in `Music/`, the viewport and gain rules in `UI/`, the filters and curves in
-`Tracker/Synth/`, the machines folder in `Tracker/Machines/`, and the pattern, slice and song
-rules at the root of `Tracker/`. A second pass took `Audio/`, `Midi/`, `Config/`,
-`Diagnostics/`, `Views/` and the theme; a third took the two machine assemblies, `Shortcuts/`,
-`Controllers/`, `Help/` and what was left in `ViewModels/`. What is left static is twenty one
-things and every one of them is on the list below.
+`Tracker/Synth/`, the machines folder, which is `Devices/SoundMachines/` now, and the
+pattern, slice and song rules at the root of `Tracker/`. A second pass took `Audio/`,
+`Midi/`, `Config/`, `Diagnostics/`, `Views/` and the theme; a third took the two machine
+assemblies, `Shortcuts/`, `Controllers/`, `Help/` and what was left in `ViewModels/`. What
+is left static is twenty one things and every one of them is on the list below.
 
 **Three doors stay static, and each one has the same reason.** `Log`, `CrashReport`,
 `ThemeSwitch`, and the two under them, `LinkKey` and `Pointable`. An application has one log,
@@ -878,6 +895,22 @@ is public for exactly that. What was missing was somewhere to put the tests.
 `Tests/` is inside the application's folder, so `JingleBox2.csproj` has to remove it from its own
 globs the way it already does for the machine assemblies. Without that the app compiles the test
 sources into itself and every generated assembly attribute is defined twice.
+
+**And a renamed project outlives its own rename, because `obj/` is not tracked.** The machine
+assemblies became `Rack.Abstractions` and `Rack.Ui`, git took the sources with the rename, and
+`Machines.Abstractions/` and `Machines.Ui/` stayed on the disc holding nothing but an old `obj/`
+and `bin/`. The csproj removes the two new names from its globs and has never heard of the two
+old ones, so the app swept `Machines.Ui/obj/.../JingleBox2.Machines.Ui.AssemblyInfo.cs` into
+itself and every assembly attribute was defined twice: sixteen errors of `CS0579`, all of them
+naming generated files, none of them naming anything anybody wrote. `dotnet clean` does not touch
+it, since clean only knows the projects the solution still has.
+
+The shape is worth more than the instance, because it comes back every time a project is renamed
+or dropped: **the compile glob is over the folder, and the folder outlives the project.** So a
+rename is only finished once the old directory is gone, and the tell is an error inside `obj/`
+naming an assembly that is not in the solution any more. Rack.Abstractions and Rack.Ui had to be
+removed from the glob for the same reason `Tests/` did, which is that everything here lives under
+one folder.
 
 Four of the newer files are about rules that used to be a comparison buried in a control, and
 each one was written because the buried version was wrong. `Tests/VolumeScaleTests.cs` is the
@@ -1806,7 +1839,7 @@ whole exercise and is worth writing down rather than summarising:
   other run does rather than mid-sentence: it is why `Announce` is allowed to run twice in one
   process. Not asked about first, unlike deleting a recording, because a log is not somebody's
   work
-- `LogArea.Machines` is the sixth area, and everything under `Tracker/Machines/` writes to it
+- `LogArea.Machines` is the sixth area, and everything under `Devices/SoundMachines/` writes to it
   rather than to the app's. It is a whole half of this program and it says almost nothing while
   nothing is wrong; the day a machine draws an empty panel or comes back from a zip missing a
   picture, the last thing anybody wants is to read that out of everything the application did at
@@ -1976,7 +2009,7 @@ whole exercise and is worth writing down rather than summarising:
   it, and getting there meant fixing something that was wrong rather than adding a binding. Which
   values adapter reads an instrument was written out twice, in `InstrumentEditorViewModel` and in
   `MachinePresetFile`, and both wrote it while doing something else. It is now
-  `Tracker/Machines/MachineValuesFor.cs` and the editor calls it. The view models are optional
+  `Devices/SoundMachines/MachineValuesFor.cs` and the editor calls it. The view models are optional
   there because that is the only way the two callers differ: an editor owns the one the panel
   edits and must hand it over, or the panel and the values would be looking at two copies of one
   patch, and anything only reading wants a throwaway. Which three controls is `PanelOrder`, so

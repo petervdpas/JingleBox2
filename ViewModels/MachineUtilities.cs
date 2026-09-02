@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -13,7 +13,7 @@ using JingleBox2.ViewModels.Enums;
 using JingleBox2.ViewModels.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Interfaces;
 
 namespace JingleBox2.ViewModels;

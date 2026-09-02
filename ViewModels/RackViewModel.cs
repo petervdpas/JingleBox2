@@ -14,7 +14,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
 
@@ -84,7 +84,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
         ObservableCollection<Recording> recordings,
         IWaveformService? waveforms = null,
         PluginLibraryViewModel? plugins = null,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
+        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
         _effects = effects;
@@ -219,7 +219,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
 
     /// <summary>The same lamps, for a machine that draws them on its own face.</summary>
     public Rack.Machines.Interfaces.IMachineLocation? MachineLocation =>
-        _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
+        _place ??= Location is { } place ? new Devices.SoundMachines.TrackLocation(place) : null;
 
     /// <inheritdoc cref="MachineLocation"/>
     private Rack.Machines.Interfaces.IMachineLocation? _place;
@@ -261,7 +261,7 @@ public sealed partial class RackViewModel : ObservableObject, IInstrumentDesigne
     /// Optional, because a rack can be built in a test with no effects at all and because
     /// nothing about a machine depends on there being any.
     /// </remarks>
-    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
 
     /// <summary>
     /// The effects this installation has.

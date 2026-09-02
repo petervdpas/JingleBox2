@@ -13,7 +13,7 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Midi.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.Midi;
 
@@ -39,7 +39,7 @@ public sealed class ControlTargets : IControlTargets
     private readonly IMachineProjects _machines;
 
     /// <summary>The effects this run has, for a knob pointed at one of ours on a chain.</summary>
-    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
 
     private readonly TrackerViewModel _tracker;
     private readonly RackViewModel? _rack;
@@ -76,7 +76,7 @@ public sealed class ControlTargets : IControlTargets
     /// </param>
     public ControlTargets(TrackerViewModel tracker, IMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
-                          Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+                          Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
                           ViewModels.Interfaces.IEffectInFront? front = null)
     {
         _tracker = tracker;
@@ -554,11 +554,11 @@ public sealed class ControlTargets : IControlTargets
 
         foreach (var device in chain.Devices)
         {
-            if (device.Insert is not Tracker.Effects.Interfaces.IEffectEngine engine) continue;
+            if (device.Insert is not Devices.SoundEffects.Interfaces.IEffectEngine engine) continue;
 
             if (!string.Equals(engine.Id, mapping.Machine, StringComparison.OrdinalIgnoreCase)) continue;
 
-            return Reaching(mapping, engine.Id, where, new Tracker.Effects.EffectValues(engine));
+            return Reaching(mapping, engine.Id, where, new Devices.SoundEffects.EffectValues(engine));
         }
 
         return null;

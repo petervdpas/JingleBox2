@@ -5,7 +5,7 @@
              xmlns:views="clr-namespace:JingleBox2.Views"
              x:Class="JingleBox2.Views.PluginStrip"
              xmlns:vmi="clr-namespace:JingleBox2.ViewModels.Interfaces"
-             xmlns:ef="clr-namespace:JingleBox2.Tracker.Effects"
+             xmlns:ef="clr-namespace:JingleBox2.Devices.SoundEffects"
              x:DataType="vm:PluginChainViewModel">
 
   <UserControl.Resources>

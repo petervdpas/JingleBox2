@@ -79,7 +79,7 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// </param>
     public void UsePlugins(
         PluginLibraryViewModel plugins,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
         Interfaces.IEffectInFront? front = null)
     {
         Effect = new PluginChainViewModel(plugins, effects, front: front)

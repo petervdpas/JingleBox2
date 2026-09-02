@@ -89,8 +89,9 @@ public sealed record Machine(
     /// for its engine, which is all anybody knows about a machine that is not here.
     ///
     /// A row to show, and not a thing that can be played. Whether an instrument may sound is a
-    /// separate question with its own answer, <see cref="Machines.Interfaces.IMachineProjects.Has"/>,
-    /// and it says no for exactly the machines this stands in for.
+    /// separate question with its own answer,
+    /// <see cref="JingleBox2.Devices.SoundMachines.Interfaces.IMachineProjects.Has"/>, and
+    /// it says no for exactly the machines this stands in for.
     /// </remarks>
     public static Machine? SlotFor(string? id) =>
         KindOf(id) is { } kind ? For(kind) : null;
@@ -249,8 +250,8 @@ public sealed record Machine(
     ///
     /// Nor may what comes back be taken as permission to play. This names a row; whether the
     /// machine behind it is really installed is
-    /// <see cref="Machines.Interfaces.IMachineProjects.Has"/>, and an instrument it says no to is
-    /// silent.
+    /// <see cref="JingleBox2.Devices.SoundMachines.Interfaces.IMachineProjects.Has"/>, and an
+    /// instrument it says no to is silent.
     /// </remarks>
     public static Machine For(TrackerInstrumentKind kind) =>
         Registered.FirstOrDefault(one => one.Kind == kind)

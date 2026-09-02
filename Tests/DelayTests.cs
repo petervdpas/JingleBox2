@@ -1,6 +1,6 @@
 using System;
-using JingleBox2.Tracker.Effects;
-using JingleBox2.Tracker.Effects.Interfaces;
+using JingleBox2.Devices.SoundEffects;
+using JingleBox2.Devices.SoundEffects.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;

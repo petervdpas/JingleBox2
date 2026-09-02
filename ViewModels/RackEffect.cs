@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Effects;
+using JingleBox2.Devices.SoundEffects;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Views;
 using JingleBox2.Views.Interfaces;

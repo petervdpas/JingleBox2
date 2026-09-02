@@ -52,13 +52,13 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// </param>
     public PluginChainViewModel(
         PluginLibraryViewModel plugins,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
-        Tracker.Effects.Interfaces.IEffectEngines? engines = null,
+        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
+        Devices.SoundEffects.Interfaces.IEffectEngines? engines = null,
         IEffectInFront? front = null)
     {
         Plugins = plugins;
         _effects = effects;
-        _engines = engines ?? new Tracker.Effects.EffectEngines();
+        _engines = engines ?? new Devices.SoundEffects.EffectEngines();
         Front = front;
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };
@@ -110,17 +110,17 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// list can run to hundreds. Nothing at all when there are none, which is what the tab in
     /// SETTINGS is for.
     /// </remarks>
-    public System.Collections.Generic.IReadOnlyList<Tracker.Effects.EffectProject> Ours =>
-        _effects?.All ?? System.Array.Empty<Tracker.Effects.EffectProject>();
+    public System.Collections.Generic.IReadOnlyList<Devices.SoundEffects.EffectProject> Ours =>
+        _effects?.All ?? System.Array.Empty<Devices.SoundEffects.EffectProject>();
 
     /// <summary>True when there is one of ours to offer, so the list can be left out.</summary>
     public bool HasOurs => Ours.Count > 0;
 
     /// <summary>What effects of ours this installation has, or nothing when none were read.</summary>
-    private readonly Tracker.Effects.Interfaces.IEffectProjects? _effects;
+    private readonly Devices.SoundEffects.Interfaces.IEffectProjects? _effects;
 
     /// <summary>Which of them this build can actually make.</summary>
-    private readonly Tracker.Effects.Interfaces.IEffectEngines _engines;
+    private readonly Devices.SoundEffects.Interfaces.IEffectEngines _engines;
 
     /// <summary>The boxes in this chain, in the order the audio goes through them.</summary>
     public ObservableCollection<IChainDevice> Devices { get; } = new();
@@ -176,8 +176,8 @@ public sealed partial class PluginChainViewModel : ObservableObject
     public IRelayCommand<PluginInfo> AddCommand => new RelayCommand<PluginInfo>(Add);
 
     /// <summary>Adds one of ours to the end of the chain, which is the other half of the plus.</summary>
-    public IRelayCommand<Tracker.Effects.EffectProject> AddOursCommand =>
-        new RelayCommand<Tracker.Effects.EffectProject>(Add);
+    public IRelayCommand<Devices.SoundEffects.EffectProject> AddOursCommand =>
+        new RelayCommand<Devices.SoundEffects.EffectProject>(Add);
 
     /// <summary>
     /// Puts one of our effects on the end of the chain.
@@ -191,7 +191,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     /// that passes the audio through, which is the same gate the rack keeps.
     /// </remarks>
     /// <param name="effect">Which effect, as the registry read it off the disc.</param>
-    public void Add(Tracker.Effects.EffectProject? effect)
+    public void Add(Devices.SoundEffects.EffectProject? effect)
     {
         if (effect == null || Target == null) return;
 
@@ -450,7 +450,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
                 continue;
             }
 
-            if (device.Insert is not Tracker.Effects.Interfaces.IEffectEngine engine) continue;
+            if (device.Insert is not Devices.SoundEffects.Interfaces.IEffectEngine engine) continue;
 
             if (_effects?.For(engine.Id) is not { } ours) continue;
 

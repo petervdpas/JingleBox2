@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using JingleBox2.Rack.Faces;
-using JingleBox2.Tracker.Effects;
+using JingleBox2.Devices.SoundEffects;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using Xunit;
 
 namespace JingleBox2.Tests;

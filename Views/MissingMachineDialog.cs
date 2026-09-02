@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using JingleBox2.Tracker.Machines.Records;
+using JingleBox2.Devices.SoundMachines.Records;
 
 namespace JingleBox2.Views;
 

@@ -13,7 +13,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.Tracker;
 
@@ -125,7 +125,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     public TrackerPlayer(IAudioEngine audio, IMachineProjects? machines = null)
     {
         _audio = audio;
-        _machines = machines ?? new Machines.MachineProjects();
+        _machines = machines ?? new Devices.SoundMachines.MachineProjects();
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }

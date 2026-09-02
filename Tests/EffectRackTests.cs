@@ -4,8 +4,8 @@ using System.Linq;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Records;
-using JingleBox2.Tracker.Effects;
-using JingleBox2.Tracker.Effects.Interfaces;
+using JingleBox2.Devices.SoundEffects;
+using JingleBox2.Devices.SoundEffects.Interfaces;
 using Xunit;
 
 namespace JingleBox2.Tests;

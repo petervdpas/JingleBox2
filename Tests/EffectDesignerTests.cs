@@ -1,8 +1,8 @@
 using System;
 using System.IO;
 using JingleBox2.Rack.Faces;
-using JingleBox2.Tracker.Effects;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundEffects;
+using JingleBox2.Devices.SoundMachines;
 using JingleBox2.ViewModels;
 using Xunit;
 

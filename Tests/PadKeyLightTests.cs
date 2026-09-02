@@ -2,7 +2,7 @@ using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.Midi;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using JingleBox2.ViewModels;
 using Xunit;
 

@@ -7,7 +7,7 @@ using System.Linq;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Tracker.Interfaces;
 
 namespace JingleBox2.ViewModels;

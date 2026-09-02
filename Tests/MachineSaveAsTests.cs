@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using Xunit;
 using JingleBox2.Tracker.Interfaces;
 

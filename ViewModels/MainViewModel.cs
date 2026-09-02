@@ -19,7 +19,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Audio.Routing.Interfaces;
 using JingleBox2.Midi.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Controllers.Interfaces;
@@ -68,7 +68,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// instance either way: the rack's Effects tab and the shelf in SETTINGS are two views of the
     /// same list, and adding an effect on one has to show on the other.
     /// </remarks>
-    private readonly Tracker.Effects.Interfaces.IEffectProjects _effects;
+    private readonly Devices.SoundEffects.Interfaces.IEffectProjects _effects;
 
     /// <summary>The controller scripts, kept because they watch their own folder.</summary>
     private readonly ControllerCodecs _codecs;
@@ -206,11 +206,11 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <remarks>
     /// A second one of the same class rather than a mode on the first: two pages of work that
     /// each have their own project open, their own undo and their own unsaved changes. Told which
-    /// world it is in through <see cref="Tracker.Effects.EffectWorld"/>, which is where the
+    /// world it is in through <see cref="Devices.SoundEffects.EffectWorld"/>, which is where the
     /// handful of things that differ live, and given none of the machine world's take pickers,
     /// since an effect is sent no recordings.
     /// </remarks>
-    public DesignerViewModel EffectDesigner { get; } = new(new Tracker.Effects.EffectWorld());
+    public DesignerViewModel EffectDesigner { get; } = new(new Devices.SoundEffects.EffectWorld());
 
     /// <summary>What machines are on the disc, for the settings page to list and add to.</summary>
     /// <remarks>
@@ -1298,10 +1298,10 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         IWaveformService waveformService,
         IAudioRouting routing,
         IMachineProjects machines,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null)
+        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null)
     {
         _machines = machines;
-        _effects = effects ?? new Tracker.Effects.EffectProjects();
+        _effects = effects ?? new Devices.SoundEffects.EffectProjects();
         _audio = audio;
         _store = store;
         _cfg = cfg;
@@ -1317,9 +1317,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Designer.Browse = Takes;
 
-        Designer.Takes = new Tracker.Machines.TakeLibrary(Record.Recordings, waveformService);
+        Designer.Takes = new Devices.SoundMachines.TakeLibrary(Record.Recordings, waveformService);
 
-        Designer.Shelf = new Tracker.Machines.TakeShelf(
+        Designer.Shelf = new Devices.SoundMachines.TakeShelf(
             Record.Recordings, take => Designer.PutTake(take.FilePath));
 
         var rack = new MachineRack();

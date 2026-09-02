@@ -8,8 +8,8 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using JingleBox2.ViewModels.Records;
-using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -683,7 +683,7 @@ public sealed class MachineProjectShape
     {
         if (_holder is not { } holder) return null;
 
-        if (!holder.Properties.TryGetValue(Tracker.Machines.MachinePresetFile.SettingsProperty, out string? said)
+        if (!holder.Properties.TryGetValue(Devices.SoundMachines.MachinePresetFile.SettingsProperty, out string? said)
             || said.Trim().Length == 0)
             return null;
 

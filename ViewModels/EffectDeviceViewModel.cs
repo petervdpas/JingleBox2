@@ -5,8 +5,8 @@ using CommunityToolkit.Mvvm.Input;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Interfaces;
-using JingleBox2.Tracker.Effects;
-using JingleBox2.Tracker.Effects.Interfaces;
+using JingleBox2.Devices.SoundEffects;
+using JingleBox2.Devices.SoundEffects.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.ViewModels.Records;
 

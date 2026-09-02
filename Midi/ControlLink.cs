@@ -59,12 +59,12 @@ public sealed class ControlLink
     /// The one this session is using.
     /// </summary>
     /// <remarks>
-    /// A static, and the same reason as <see cref="Tracker.Machines.MachineProjects"/>: there is
-    /// exactly one controller on the desk, the mode it is in is the same mode everywhere at
-    /// once, and the panels that have to know are drawn from a description that has never heard
-    /// of a view model. Threading a reference through every designer, window and panel to say
-    /// one bool would be a lot of wiring to express something that is true of the application
-    /// rather than of any part of it.
+    /// A static, and the same reason as <see cref="Devices.SoundMachines.MachineProjects"/>:
+    /// there is exactly one controller on the desk, the mode it is in is the same mode
+    /// everywhere at once, and the panels that have to know are drawn from a description that
+    /// has never heard of a view model. Threading a reference through every designer, window
+    /// and panel to say one bool would be a lot of wiring to express something that is true of
+    /// the application rather than of any part of it.
     /// </remarks>
     public static ControlLink? Current { get; private set; }
 

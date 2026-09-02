@@ -6,7 +6,7 @@ using JingleBox2.Audio.Interfaces;
 using JingleBox2.Rack.Machines.Interfaces;
 using JingleBox2.ViewModels.Interfaces;
 using JingleBox2.Tracker.Records;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -292,7 +292,7 @@ public sealed partial class TrackInstrumentDesigner : ObservableObject, IInstrum
     /// <inheritdoc/>
     /// <remarks>Built the first time a described face asks for it, since most do not.</remarks>
     public Rack.Machines.Interfaces.IMachineLocation? MachineLocation =>
-        _place ??= Location is { } place ? new Tracker.Machines.TrackLocation(place) : null;
+        _place ??= Location is { } place ? new Devices.SoundMachines.TrackLocation(place) : null;
 
     /// <summary>Built the first time a machine's face asks for the lamps.</summary>
     private Rack.Machines.Interfaces.IMachineLocation? _place;

@@ -130,7 +130,7 @@ public sealed class PluginChainState : IPluginChainState
     private readonly IPluginHost _plugins = new PluginHost();
 
     /// <summary>Which effects of ours this build can make, for the boxes that are not plugins.</summary>
-    private readonly Tracker.Effects.Interfaces.IEffectEngines _engines = new Tracker.Effects.EffectEngines();
+    private readonly Devices.SoundEffects.Interfaces.IEffectEngines _engines = new Devices.SoundEffects.EffectEngines();
 
     /// <inheritdoc/>
     public PluginChainConfig Capture(PluginChain? chain, bool patches = false)
@@ -140,7 +140,7 @@ public sealed class PluginChainState : IPluginChainState
 
         foreach (var device in chain.Devices)
         {
-            if (device.Insert is Tracker.Effects.Interfaces.IEffectEngine ours)
+            if (device.Insert is Devices.SoundEffects.Interfaces.IEffectEngine ours)
             {
                 config.Devices.Add(Written(ours, device));
 
@@ -182,7 +182,7 @@ public sealed class PluginChainState : IPluginChainState
     /// <param name="engine">The effect that is running.</param>
     /// <param name="device">Its place in the chain, which is what carries the bypass.</param>
     private static PluginDeviceConfig Written(
-        Tracker.Effects.Interfaces.IEffectEngine engine,
+        Devices.SoundEffects.Interfaces.IEffectEngine engine,
         PluginChain.Device device)
     {
         var saved = new PluginDeviceConfig

@@ -5,7 +5,7 @@ using JingleBox2.Config;
 using JingleBox2.Diagnostics;
 using JingleBox2.Audio.Records;
 using JingleBox2.Tracker;
-using JingleBox2.Tracker.Machines;
+using JingleBox2.Devices.SoundMachines;
 using JingleBox2.Views;
 using System;
 using System.Collections.Generic;
@@ -24,7 +24,7 @@ using JingleBox2.Tracker.Records;
 using JingleBox2.Files;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Tracker.Interfaces;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
@@ -48,7 +48,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// chain in the song are views of one list, and an effect added in SETTINGS has to show on
     /// the plus without anybody restarting.
     /// </remarks>
-    private Tracker.Effects.Interfaces.IEffectProjects? Ours { get; }
+    private Devices.SoundEffects.Interfaces.IEffectProjects? Ours { get; }
 
     /// <summary>The machines this run has, the one instance everything shares.</summary>
     private readonly IMachineProjects _machines;
@@ -906,7 +906,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         AppConfig? config = null,
         PluginLibraryViewModel? plugins = null,
         IWaveformService? waveforms = null,
-        Tracker.Effects.Interfaces.IEffectProjects? effects = null,
+        Devices.SoundEffects.Interfaces.IEffectProjects? effects = null,
         IEffectInFront? front = null)
     {
         _machines = machines;

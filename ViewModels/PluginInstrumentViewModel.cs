@@ -3,8 +3,8 @@ using JingleBox2.Tracker;
 using System;
 using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.ViewModels.Records;
-using JingleBox2.Tracker.Machines;
-using JingleBox2.Tracker.Machines.Interfaces;
+using JingleBox2.Devices.SoundMachines;
+using JingleBox2.Devices.SoundMachines.Interfaces;
 using JingleBox2.Rack.Faces.Interfaces;
 using JingleBox2.Rack.Faces;
 
@@ -35,7 +35,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     private readonly IMachineProjects _machines;
 
     /// <summary>How a machine that is not here is named, which its own kind cannot do.</summary>
-    private readonly Tracker.Machines.Interfaces.IMissingMachines _missing;
+    private readonly Devices.SoundMachines.Interfaces.IMissingMachines _missing;
 
     /// <summary>The song's instrument: its name, its machine, and its patch.</summary>
     private readonly TrackerInstrument _instrument;
@@ -92,10 +92,10 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
         Action? changed = null,
         Func<TrackInstrumentDesigner>? designer = null,
         Action? remove = null,
-        Tracker.Machines.Interfaces.IMissingMachines? missing = null)
+        Devices.SoundMachines.Interfaces.IMissingMachines? missing = null)
     {
         _machines = machines;
-        _missing = missing ?? new Tracker.Machines.MissingMachines();
+        _missing = missing ?? new Devices.SoundMachines.MissingMachines();
         _instrument = instrument;
         _live = live;
         _changed = changed;
@@ -176,7 +176,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// itself as "Mono synth" and the message tells somebody to register a thing that is not on
     /// the list under that name.
     /// </remarks>
-    public Tracker.Machines.Records.MissingMachine? Missing => _missing.For(_instrument);
+    public Devices.SoundMachines.Records.MissingMachine? Missing => _missing.For(_instrument);
 
     /// <summary>The second line of its block: which machine it is, and how it is set.</summary>
     /// <remarks>
@@ -208,7 +208,7 @@ public sealed partial class PluginInstrumentViewModel : ObservableObject
     /// three controls your eye lands on when you open the machine rather than the first three
     /// lines of a file.
     ///
-    /// Read through a throwaway adapter from <see cref="Tracker.Machines.MachineValuesFor"/>,
+    /// Read through a throwaway adapter from <see cref="Devices.SoundMachines.MachineValuesFor"/>,
     /// which is cheap: it is a view model over the patch the instrument already holds. What it
     /// is not is the machine's editor, which is what the panel needs and what this deliberately
     /// does not build.

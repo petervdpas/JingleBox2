@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using JingleBox2.Tracker.Effects;
-using JingleBox2.Tracker.Effects.Interfaces;
+using JingleBox2.Devices.SoundEffects;
+using JingleBox2.Devices.SoundEffects.Interfaces;
 
 namespace JingleBox2.ViewModels;
 
