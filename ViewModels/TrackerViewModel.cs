@@ -2297,6 +2297,21 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private ControlLinksViewModel? _deskControls;
 
     /// <summary>
+    /// What the hardware on this desk does to the mixer, for the button in the mixer's corner.
+    /// </summary>
+    /// <remarks>
+    /// The same list a machine's own Menu shows and the same class behind it, pointed at the
+    /// mixer instead of at one machine. It names no particular strip: a link there is on a strip,
+    /// and the whole desk is one thing to point a controller at, so what somebody wants to see is
+    /// what their nanoKONTROL2 does to the mixer rather than a menu per fader.
+    ///
+    /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
+    /// worked.
+    /// </remarks>
+    public Machines.Interfaces.IMachineMenu MixerMenu { get; } =
+        new Midi.ControlMenu(() => "", () => "the mixer", kind: Midi.LinkTargets.Mixer);
+
+    /// <summary>
     /// Shows a page, or goes back to the pattern when the page asked for is already up.
     /// </summary>
     /// <remarks>

@@ -72,7 +72,7 @@ public class MachineMenuTests
         link = made;
         said = () => last;
 
-        return new MachineLinks(() => Id, () => Named, () => made) { Told = line => last = line };
+        return new ControlMenu(() => Id, () => Named, () => made) { Told = line => last = line };
     }
 
     /// <summary>
@@ -97,7 +97,7 @@ public class MachineMenuTests
     [Fact]
     public void A_panel_with_no_machine_offers_nothing_at_all()
     {
-        var part = new MachineLinks(() => "", desk: () => new ControlLink(new List<ControlMapping>(), () => { }));
+        var part = new ControlMenu(() => "", desk: () => new ControlLink(new List<ControlMapping>(), () => { }));
 
         Assert.Empty(part.Read());
     }
@@ -106,7 +106,7 @@ public class MachineMenuTests
     [Fact]
     public void A_machine_named_nothing_offers_nothing_at_all()
     {
-        Assert.Empty(new MachineLinks(() => null!, desk: () => new ControlLink(new List<ControlMapping>(), () => { })).Read());
+        Assert.Empty(new ControlMenu(() => null!, desk: () => new ControlLink(new List<ControlMapping>(), () => { })).Read());
     }
 
     /// <summary>
@@ -119,7 +119,7 @@ public class MachineMenuTests
     [Fact]
     public void With_no_desk_at_all_there_is_nothing_at_all()
     {
-        Assert.Empty(new MachineLinks(() => Id, () => Named, () => null).Read());
+        Assert.Empty(new ControlMenu(() => Id, () => Named, () => null).Read());
     }
 
     /// <summary>
@@ -326,12 +326,97 @@ public class MachineMenuTests
     [Fact]
     public void A_machine_with_no_name_is_spoken_of_by_its_id()
     {
-        var part = new MachineLinks(
+        var part = new ControlMenu(
             () => Id,
             () => "",
             () => new ControlLink(new List<ControlMapping>(), () => { }));
 
         Assert.Contains(Id, Assert.Single(part.Read()).Tip, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The mixer is one thing to point a controller at, however many strips a link is on.
+    /// </summary>
+    /// <remarks>
+    /// A machine names itself, since a knob pointed at OddSkilla has nothing to do with the
+    /// machine on the next box. The mixer names none: what somebody wants to see there is what
+    /// their desk does to the mixer, not a menu per fader.
+    /// </remarks>
+    [Fact]
+    public void The_mixer_is_one_thing_however_many_strips_are_pointed_at()
+    {
+        var offers = Mixer(
+            out _,
+            Fader(MixControl.Volume, 0, 0),
+            Fader(MixControl.Volume, 1, 1),
+            Fader(MixControl.Pan, 2, 2, "Desk Two")).Read();
+
+        Assert.Equal(3, offers.Count);
+        Assert.StartsWith("Desk One", offers[0].Said, StringComparison.Ordinal);
+        Assert.Contains("2 controls", offers[0].Said, StringComparison.Ordinal);
+        Assert.StartsWith("Desk Two", offers[1].Said, StringComparison.Ordinal);
+        Assert.Equal(Learn, offers[2].Said);
+    }
+
+    /// <summary>And a knob pointed at a machine is that machine's business, not the mixer's.</summary>
+    [Fact]
+    public void A_machine_is_not_one_of_the_mixers_templates()
+    {
+        Assert.Equal(Learn, Assert.Single(Mixer(out _, OnMachine("attack", 0)).Read()).Said);
+    }
+
+    /// <summary>And a strip is not one of a machine's, which is the same rule from the other side.</summary>
+    [Fact]
+    public void A_strip_is_not_one_of_a_machines_templates()
+    {
+        Assert.Equal(Learn,
+            Assert.Single(Part(out _, out _, out _, Fader(MixControl.Volume, 0, 0)).Read()).Said);
+    }
+
+    /// <summary>Picking a desk on the mixer lays its strips back down.</summary>
+    [Fact]
+    public void Picking_a_desk_on_the_mixer_lays_its_strips_back_down()
+    {
+        var part = Mixer(out var desk, Fader(MixControl.Volume, 0, 0));
+
+        var template = part.Read()[0];
+
+        desk.Clear();
+
+        template.Chosen!();
+
+        Assert.Equal(MixControl.Volume, Assert.Single(desk).Mix);
+    }
+
+    /// <summary>A fader on a strip, as the mixer writes one down.</summary>
+    /// <param name="what">Which of the strip's controls.</param>
+    /// <param name="track">Which strip.</param>
+    /// <param name="cc">Which controller number.</param>
+    /// <param name="device">Which desk it was learned on.</param>
+    private static ControlMapping Fader(MixControl what, int track, int cc, string device = "Desk One")
+    {
+        var one = MixLinks.On(what, track);
+
+        one.Device = device;
+        one.Cc = cc;
+
+        return one;
+    }
+
+    /// <summary>The menu the mixer's own button shows, over a desk holding those links.</summary>
+    /// <param name="desk">The links, kept so a test can count them.</param>
+    /// <param name="links">What is on the desk to begin with.</param>
+    private static IMachineMenu Mixer(out List<ControlMapping> desk, params ControlMapping[] links)
+    {
+        var kept = new List<ControlMapping>(links);
+
+        desk = kept;
+
+        return new ControlMenu(
+            () => "",
+            () => "the mixer",
+            () => new ControlLink(kept, () => { }),
+            kind: LinkTargets.Mixer);
     }
 
     /// <summary>

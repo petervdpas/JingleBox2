@@ -1078,7 +1078,19 @@ whole exercise and is worth writing down rather than summarising:
   pointed elsewhere on that machine since. Hardware A and B against machines 1 and 2 is four
   templates and there is no conflict between them: a link records the controller it was learned
   on, so A and B both drive machine 1 and neither displaces the other
-- `Midi/MachineLinks.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
+- **The mixer has the same button and it is not the same thing.** The Menu part is generic: a
+  machine asks for one, says which corner, and ticks which options it carries, and there will be
+  more options. The mixer is drawn by this program rather than described by anybody, so there is
+  no description to drop a part into and no options to tick: it is a button in the mixer card's
+  own header, always showing the control surfaces pointed at the mixer and the line that starts
+  learning. What the two share is the lines behind them, and `IMenuLines` is the one place a line
+  becomes something on a screen, so "a line with no command is dead" is not spelled twice
+- A mixer link is on a strip, and the mixer's menu names no strip: the whole desk is one thing to
+  point a controller at, so what somebody wants to see is what their nanoKONTROL2 does to the
+  mixer rather than a menu per fader. That is the whole of what an empty id means to
+  `Midi/ControlMenu.cs`, which is what `MachineLinks` became when it stopped being only about
+  machines
+- `Midi/ControlMenu.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
   rule the cards are cut by, so the page and the part cannot drift into listing different things,
   and nothing in it compares an id itself: how exact an id is is that rule's business. It reaches
   the links through a question defaulting to `ControlLink.Current`, which is the door the

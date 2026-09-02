@@ -17,6 +17,7 @@ using System.Linq;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Records;
 using JingleBox2.Machines.Ui.Enums;
+using JingleBox2.Machines.Ui.Interfaces;
 using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
@@ -2389,7 +2390,7 @@ public class MachinePanelView : Decorator
 
         if (wanted.Count == 0) return;
 
-        new MenuFlyout { ItemsSource = Listed(wanted) }.ShowAt(under);
+        new MenuFlyout { ItemsSource = Lines.Listed(wanted) }.ShowAt(under);
     }
 
     /// <summary>
@@ -2421,31 +2422,8 @@ public class MachinePanelView : Decorator
     /// <summary>Which options a Menu carries, as a rule that can be asked without a window.</summary>
     private static readonly IMenuOptions Options = new MenuOptions();
 
-    /// <summary>
-    /// The same lines as menu items.
-    /// </summary>
-    /// <remarks>
-    /// Handed over as the menu's source rather than built into it, since a control put into an
-    /// items source is its own container. Nothing here decides anything.
-    /// </remarks>
-    /// <param name="offers">The lines to draw.</param>
-    private static List<MenuItem> Listed(IEnumerable<MachineMenuItem> offers)
-    {
-        var made = new List<MenuItem>();
-
-        foreach (var offer in offers)
-        {
-            var item = new MenuItem { Header = offer.Said, IsEnabled = offer.Live };
-
-            if (offer.Chosen is { } chosen) item.Click += (_, _) => chosen();
-
-            if (offer.Tip.Length > 0) ToolTip.SetTip(item, offer.Tip);
-
-            made.Add(item);
-        }
-
-        return made;
-    }
+    /// <summary>What a machine offers, drawn as menu items. Shared with the mixer's own button.</summary>
+    private static readonly IMenuLines Lines = new MenuLines();
 
     /// <summary>
     /// One of what is on offer, kept with the place it came from in the list.

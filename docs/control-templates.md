@@ -228,11 +228,18 @@ it does. Flat. The library turns those into menu items where the panel is drawn,
 described in a file has no business naming a toolkit's types, and the side effect is that the
 whole of what a machine offers can be put a question to without a window.
 
-`Midi/MachineLinks.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
+`Midi/ControlMenu.cs` is what fills the menu today. It keys by `ILinkTargets.KeyOf`, the same
 rule the cards are cut by, and reaches the links through a question defaulting to
 `ControlLink.Current`, which is the door the instrument panel already goes through to offer a
 link at all. A question rather than the door itself, so that having no desk at all can be tested:
 a static cannot be stood in front of.
+
+**The mixer has the same button and it is not the same part.** It is drawn by this program rather
+than described by anybody, so there is nothing to drop a part into: the button sits in the mixer
+card's own header and always shows the two things, with no options to tick. Only the lines are
+shared, through `IMenuLines`, which is the one place a line becomes something on a screen. A mixer
+link is on a strip and the menu names no strip, since the whole desk is one thing to point a
+controller at.
 
 `Tests/MachineMenuTests.cs` and `Tests/MenuOptionsTests.cs` are the two halves, and most of what
 they ask is not the happy path: no machine, no desk, an id that differs by case, a plugin and a

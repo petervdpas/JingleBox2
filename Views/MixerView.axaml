@@ -38,11 +38,19 @@
 
     <Border Classes="card">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-          <TextBlock Classes="cardTitle" Text="Mixer" />
+        <!-- The same button a machine's face carries, in the same corner, and the same lines
+             behind it. The mixer is drawn by this program rather than described by anybody, so
+             there is no part to drop and it goes in the card's own header. -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,10">
+          <TextBlock Grid.Column="0" Classes="cardTitle" Text="Mixer" />
 
-          <views:HelpBadge Topic="mixer.strips" />
-        </StackPanel>
+          <views:HelpBadge Grid.Column="1" Topic="mixer.strips" />
+
+          <ui:PushButton Grid.Column="3" x:Name="MixerMenuButton"
+                         Mark="Bars" CapWidth="30" CapHeight="20"
+                         Pressed="MixerMenu_Pressed"
+                         ToolTip.Tip="What your controllers do to the mixer. Point one at a template you have already made, or start learning." />
+        </Grid>
 
         <!-- What the master makes move over the pattern. Under the mixer rather than under the
              pattern, because the master is not a track and the panel down there is about the

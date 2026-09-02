@@ -34,10 +34,28 @@ namespace JingleBox2.Midi;
 /// Which machine is asked for rather than held, since one of these serves a panel and the panel
 /// is shown a different machine as somebody works. Nothing for a page with none open.
 /// </remarks>
-public sealed class MachineLinks : IMachineMenu
+public sealed class ControlMenu : IMachineMenu
 {
-    /// <summary>Which machine the panel is showing, by the id songs and templates write down.</summary>
-    private readonly Func<string> _machine;
+    /// <summary>
+    /// Which sort of thing this menu is about, in the word <see cref="ILinkTargets.KindOf"/> uses.
+    /// </summary>
+    /// <remarks>
+    /// A machine, or the mixer. Asked of the naming rule rather than spelled out, so this and
+    /// the MIDI CC page's cards cut the links by one rule and cannot drift into listing
+    /// different things.
+    /// </remarks>
+    private readonly string _kind;
+
+    /// <summary>
+    /// Which particular one, or nothing for every one of that kind.
+    /// </summary>
+    /// <remarks>
+    /// A machine names itself, since a knob pointed at OddSkilla has nothing to do with the
+    /// machine on the next box. The mixer names none: a link there is on a strip and the whole
+    /// desk is one thing to point a controller at, so what somebody wants to see on the mixer is
+    /// what their nanoKONTROL2 does to the mixer rather than a menu per fader.
+    /// </remarks>
+    private readonly Func<string> _which;
 
     /// <summary>What that machine is called on the front of it, for the wording.</summary>
     private readonly Func<string> _named;
@@ -64,24 +82,33 @@ public sealed class MachineLinks : IMachineMenu
     /// <summary>What a target is called, so this cuts the links exactly as a card and a file do.</summary>
     private readonly ILinkTargets _naming;
 
-    /// <summary>What one machine's face can offer about the hardware pointed at it.</summary>
-    /// <param name="machine">Which machine the panel is showing, by id.</param>
-    /// <param name="named">What that machine is called, for the wording. Left out, the id is used.</param>
+    /// <summary>What one thing can offer about the hardware pointed at it.</summary>
+    /// <param name="which">
+    /// Which one, by the id songs and templates write down, or nothing for every one of that
+    /// kind, which is what the mixer wants.
+    /// </param>
+    /// <param name="named">What it is called, for the wording. Left out, the id is used.</param>
+    /// <param name="kind">
+    /// Which sort of thing, in the word the naming rule uses. Left out, a machine, since that is
+    /// what almost every one of these is about.
+    /// </param>
     /// <param name="desk">Where the links live. Left out, the one the application set up.</param>
     /// <param name="profiles">
     /// What is known about the controllers plugged in. Left out, one of its own; the application
     /// hands the same one to everything, since what a device is doing is remembered in it.
     /// </param>
     /// <param name="naming">What a target is called, shared with the page so the two agree.</param>
-    public MachineLinks(
-        Func<string> machine,
+    public ControlMenu(
+        Func<string> which,
         Func<string>? named = null,
         Func<ControlLink?>? desk = null,
         IControllerProfiles? profiles = null,
-        ILinkTargets? naming = null)
+        ILinkTargets? naming = null,
+        string kind = LinkTargets.Machine)
     {
-        _machine = machine;
-        _named = named ?? machine;
+        _which = which;
+        _kind = kind;
+        _named = named ?? which;
         _desk = desk ?? Door;
         _profiles = profiles ?? new ControllerProfiles();
         _naming = naming ?? new LinkTargets();
@@ -101,16 +128,15 @@ public sealed class MachineLinks : IMachineMenu
     /// <inheritdoc/>
     public IReadOnlyList<MachineMenuItem> Read()
     {
-        string id = _machine() ?? "";
+        string id = _which() ?? "";
 
-        if (id.Length == 0 || Desk is not { } link)
-            return Array.Empty<MachineMenuItem>();
+        if (Desk is not { } link) return Array.Empty<MachineMenuItem>();
+
+        if (Names && id.Length == 0) return Array.Empty<MachineMenuItem>();
 
         string called = _named() is { Length: > 0 } word ? word : id;
 
-        if (KeyFor(id) is not { } key) return Array.Empty<MachineMenuItem>();
-
-        var offers = Templates(link, key)
+        var offers = Templates(link, id)
             .Select(one => Pointed(link, called, one.Key, one.Value))
             .ToList();
 
@@ -120,44 +146,45 @@ public sealed class MachineLinks : IMachineMenu
     }
 
     /// <summary>
-    /// The templates on this machine, which is its links cut by controller.
+    /// The templates on this thing, which is its links cut by controller.
     /// </summary>
     /// <remarks>
     /// Exactly the cards the MIDI CC page draws, by the same rule and for the same reason: one
     /// controller against one thing it is pointed at is what a template is, and two spellings of
-    /// that would eventually disagree about what this machine has.
+    /// that would eventually disagree about what this thing has.
     ///
-    /// By what the profile calls the device rather than by the port, since that is the name a
-    /// person reads and a device on two ports is one desk.
+    /// Cut by <see cref="ILinkTargets"/> and never by comparing an id here: how exact an id is is
+    /// that rule's business. A menu that names no particular one takes every link of its kind,
+    /// which is the mixer, where a link is on a strip and the whole desk is one thing to point a
+    /// controller at.
+    ///
+    /// Grouped by what the profile calls the device rather than by the port, since that is the
+    /// name a person reads and a device on two ports is one desk.
     /// </remarks>
     /// <param name="link">Where the links live.</param>
-    /// <param name="key">What this machine is to the rules, as <see cref="ILinkTargets.KeyOf"/> writes it.</param>
-    private IEnumerable<KeyValuePair<string, List<ControlMapping>>> Templates(ControlLink link, string key) =>
+    /// <param name="id">Which one, or nothing for every one of this kind.</param>
+    private IEnumerable<KeyValuePair<string, List<ControlMapping>>> Templates(ControlLink link, string id) =>
         link.Desk
-            .Where(one => string.Equals(_naming.KeyOf(one), key, StringComparison.Ordinal))
+            .Where(one => Mine(one, id))
             .GroupBy(one => _profiles.Called(one.Device), StringComparer.OrdinalIgnoreCase)
             .OrderBy(one => one.Key, StringComparer.OrdinalIgnoreCase)
             .Select(one => new KeyValuePair<string, List<ControlMapping>>(one.Key, one.ToList()));
 
-    /// <summary>
-    /// What this machine is to the rules, or nothing when those words describe no target here.
-    /// </summary>
-    /// <remarks>
-    /// Asked of <see cref="ILinkTargets"/> rather than spelled out, so the part and the MIDI CC
-    /// page's cards decide by one rule and cannot drift into listing different things. It is also
-    /// why nothing here compares an id itself: an id is exact, and how exact is that rule's
-    /// business and not this one's.
-    ///
-    /// The parameter is not part of the key and only has to be something, since a link cannot be
-    /// made without one. A machine that is not a machine here, which is an empty id, comes back
-    /// as nothing and the part says there is nothing open.
-    /// </remarks>
-    /// <param name="id">Which machine.</param>
-    private string? KeyFor(string id) =>
-        _naming.Point(LinkTargets.Machine, id, Anything) is { } made ? _naming.KeyOf(made) : null;
+    /// <summary>Whether that link is one of this menu's.</summary>
+    /// <param name="one">The link to place.</param>
+    /// <param name="id">Which one this menu is about, or nothing for every one of its kind.</param>
+    private bool Mine(ControlMapping one, string id) =>
+        string.Equals(_naming.KindOf(one), _kind, StringComparison.Ordinal)
+        && (!Names || string.Equals(_naming.IdOf(one), id, StringComparison.Ordinal));
 
-    /// <summary>A parameter to make a link with, since the key is about the target and not this.</summary>
-    private const string Anything = "any";
+    /// <summary>Whether this menu is about one particular thing rather than a whole kind.</summary>
+    /// <remarks>
+    /// A machine names itself and the mixer does not, and the difference decides two things: what
+    /// counts as one of this menu's links, and whether a menu with nothing named has anything to
+    /// be about at all. A machine with no id is a page with nothing open; the mixer with no id is
+    /// the mixer.
+    /// </remarks>
+    private bool Names => !string.Equals(_kind, LinkTargets.Mixer, StringComparison.Ordinal);
 
     /// <summary>
     /// One control surface pointed at this machine, and laying its template down again.

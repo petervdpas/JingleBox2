@@ -180,7 +180,7 @@ public sealed class InstrumentEditorViewModel : ObservableObject, Shortcuts.Inte
         History.Opened(instrument);
         _changed = changed;
 
-        MachineMenu = new Midi.MachineLinks(() => MachineId, () => MachineName);
+        MachineMenu = new Midi.ControlMenu(() => MachineId, () => MachineName);
 
         Named = new InstrumentName(this);
 

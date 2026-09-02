@@ -119,7 +119,7 @@ public sealed partial class MachineEditorViewModel : ObservableObject
             if (e.PropertyName == nameof(MachineUtilities.HasWork)) OnPropertyChanged(nameof(ShowsUtilities));
         };
 
-        PreviewMenu = new Midi.MachineLinks(
+        PreviewMenu = new Midi.ControlMenu(
             () => Project?.Id ?? "",
             () => Project?.Name ?? "")
         {

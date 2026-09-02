@@ -38,6 +38,32 @@ public partial class MixerView : UserControl
         LinkKey.Watch(this);
     }
 
+    /// <summary>What a machine offers, drawn as menu items. The same rule a machine's face uses.</summary>
+    private readonly Machines.Ui.Interfaces.IMenuLines _lines = new Machines.Ui.MenuLines();
+
+    /// <summary>
+    /// Shows what the hardware on this desk does to the mixer.
+    /// </summary>
+    /// <remarks>
+    /// The same button a machine's face carries and the same lines behind it. It is here in the
+    /// card's header rather than a part dropped on a panel because the mixer is drawn by this
+    /// program: there is no description to put a part into.
+    ///
+    /// Read when it is pressed rather than held, since what it answers moves under it: a knob
+    /// pointed at a strip a moment ago should be in the list the next time it opens.
+    /// </remarks>
+    /// <param name="sender">The button, which the menu opens under.</param>
+    /// <param name="e">Unused.</param>
+    private void MixerMenu_Pressed(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not TrackerViewModel tracker) return;
+        if (sender is not Control under) return;
+
+        if (tracker.MixerMenu.Read() is not { Count: > 0 } offers) return;
+
+        new MenuFlyout { ItemsSource = _lines.Listed(offers) }.ShowAt(under);
+    }
+
     /// <summary>
     /// Touching a strip anywhere picks its track.
     /// </summary>
