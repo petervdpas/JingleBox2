@@ -82,7 +82,18 @@ public sealed class LinkTargets : ILinkTargets
     };
 
     /// <inheritdoc/>
-    public string KeyOf(ControlMapping one) => KindOf(one) + ":" + IdOf(one);
+    /// <remarks>
+    /// The mixer is one target and not one per strip, which is why it is the one kind whose id is
+    /// left out of its key. A knob is pointed at the mixer: the desk in front of you has a fader
+    /// for every strip and what you want to keep, hand on or lay down again is the whole layout,
+    /// not four of them a track. Cut by strip it was four cards saying the same three words with
+    /// a number changed, and four files nobody could use.
+    ///
+    /// The strip is not lost by this. It is still what an individual link names, and a template
+    /// writes it on each of its lines: see <see cref="ControlTemplateControl.Strip"/>.
+    /// </remarks>
+    public string KeyOf(ControlMapping one) =>
+        one.Kind == ControlKind.Mix ? Mixer + ":" : KindOf(one) + ":" + IdOf(one);
 
     /// <inheritdoc/>
     public string KindOf(ControlMapping one) => one.Kind switch
@@ -120,6 +131,8 @@ public sealed class LinkTargets : ILinkTargets
 
         if (all.Count == 0) return "";
 
+        if (all[0].Kind == ControlKind.Mix) return "Mixer";
+
         if (all.Select(one => one.Owner).FirstOrDefault(one => one.Length > 0) is { Length: > 0 } named)
             return named;
 
@@ -133,9 +146,7 @@ public sealed class LinkTargets : ILinkTargets
             ControlKind.Instrument or ControlKind.Action =>
                 first.Machine.Length > 0 ? first.Machine : "Any machine",
             ControlKind.Insert => first.Plugin.Length > 0 ? first.Plugin : "An effect",
-            ControlKind.Mix => first.Track == Tracker.TrackerPlayer.MasterStrip
-                ? "Master"
-                : "Track " + (first.Track + 1).ToString(CultureInfo.InvariantCulture),
+            ControlKind.Mix => "Mixer",
             _ => "Transport"
         };
     }

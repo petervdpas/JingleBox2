@@ -60,4 +60,21 @@ public sealed class ControlTemplateControl
     /// </remarks>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int Track { get; set; }
+
+    /// <summary>
+    /// Which strip, on a mixer template, written the way the mixer says it.
+    /// </summary>
+    /// <remarks>
+    /// The master is the word master and a track is its number counting from one, which is what
+    /// the screen says and what a file read by people should say.
+    ///
+    /// On the line rather than on the target above, because the mixer is one thing to point a
+    /// controller at: what you keep and hand on is the whole layout of the desk, so a template
+    /// covers every strip that controller touches and each line says which. A template written
+    /// before this named its one strip in the target instead, and is still read that way.
+    ///
+    /// Nothing on any other kind of line, and left out of the file where it is empty.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Strip { get; set; } = "";
 }

@@ -135,20 +135,56 @@ public class ControlTemplateTests
         Assert.Equal("nanoKONTROL2", reading.Links[0].Device);
     }
 
-    /// <summary>A strip is written the way the mixer says it, and the master is not a number.</summary>
+    /// <summary>
+    /// A mixer template is the whole desk, and each line says which strip it is on.
+    /// </summary>
+    /// <remarks>
+    /// The mixer is one thing to point a controller at, so the target says only that it is the
+    /// mixer. A strip is written the way the mixer says it, the master being the word and a track
+    /// its number counting from one, because a file read by people should say what the screen
+    /// says.
+    /// </remarks>
     [Fact]
-    public void The_mixer_is_written_by_strip_and_read_back_to_the_same_one()
+    public void A_mixer_template_is_the_whole_desk_and_each_line_names_its_strip()
     {
-        var third = Templates.Describe("nanoKONTROL2", new[] { Fader(MixControl.Volume, 2, 0) })!;
-        var master = Templates.Describe("nanoKONTROL2", new[] { Fader(MixControl.Pan, JingleBox2.Tracker.TrackerPlayer.MasterStrip, 7) })!;
+        var desk = Templates.Describe("nanoKONTROL2", new[]
+        {
+            Fader(MixControl.Volume, 2, 0),
+            Fader(MixControl.Pan, JingleBox2.Tracker.TrackerPlayer.MasterStrip, 7)
+        })!;
 
-        Assert.Equal("3", third.Target.Id);
-        Assert.Equal("level", third.Controls[0].Parameter);
-        Assert.Equal("master", master.Target.Id);
-        Assert.Equal("pan", master.Controls[0].Parameter);
+        Assert.Equal("mixer", desk.Target.Kind);
+        Assert.Equal("", desk.Target.Id);
+        Assert.Equal("Mixer", desk.Target.Name);
 
-        Assert.Equal(2, Templates.Take(third).Links[0].Track);
-        Assert.Equal(JingleBox2.Tracker.TrackerPlayer.MasterStrip, Templates.Take(master).Links[0].Track);
+        Assert.Equal("3", desk.Controls[0].Strip);
+        Assert.Equal("level", desk.Controls[0].Parameter);
+        Assert.Equal("master", desk.Controls[1].Strip);
+        Assert.Equal("pan", desk.Controls[1].Parameter);
+
+        var back = Templates.Take(desk).Links;
+
+        Assert.Equal(2, back[0].Track);
+        Assert.Equal(JingleBox2.Tracker.TrackerPlayer.MasterStrip, back[1].Track);
+    }
+
+    /// <summary>
+    /// A mixer template written before the strip moved onto the line still reads.
+    /// </summary>
+    /// <remarks>
+    /// Those named their one strip in the target, since a card was a strip. A file on somebody's
+    /// disc outlives a decision about how cards are cut, so the target is still read where a line
+    /// says nothing.
+    /// </remarks>
+    [Fact]
+    public void A_mixer_template_that_names_its_strip_in_the_target_still_reads()
+    {
+        var older = Templates.Describe("nanoKONTROL2", new[] { Fader(MixControl.Volume, 2, 0) })!;
+
+        older.Target.Id = "3";
+        older.Controls[0].Strip = "";
+
+        Assert.Equal(2, Templates.Take(older).Links[0].Track);
     }
 
     /// <summary>A fader on a strip, as the mixer writes one down.</summary>

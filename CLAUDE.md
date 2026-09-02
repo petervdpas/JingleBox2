@@ -958,6 +958,17 @@ whole exercise and is worth writing down rather than summarising:
   controller nested inside, which drew the same templates one level down and made the card a
   thing no file could be written from. `docs/control-templates.md` is what is built and what is
   next
+- **The mixer is one card and not one per strip**, and it is the one kind whose id is left out of
+  its key. A knob is pointed at the mixer: the desk in front of you has a fader for every strip,
+  and what you keep, hand on or lay down again is the whole layout. Cut by strip it was a card per
+  fader saying the same three words with a number changed, and a file per fader nobody could use.
+  The master goes in with them, being a strip of the same desk, and the card is headed Mixer
+  rather than with whichever strip happened to come first
+- The strip is not lost by that. It is still what an individual link names, and a mixer template
+  writes it on each of its lines rather than once in the target: `ControlTemplateControl.Strip`,
+  the word master or the track's number counting from one, which is what the screen says. A
+  template written before the strip moved onto the line named its one strip in the target, and is
+  still read that way, since a file on somebody's disc outlives a decision about how cards are cut
 - The word for a machine, an effect or a mixer strip, taken together, is **target**, which is
   what `IControlTarget` has meant since the beginning rather than something invented for the
   page. It is deliberately not called a device, although that is what Renoise, Bitwig and

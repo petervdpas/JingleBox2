@@ -106,7 +106,7 @@ public sealed class ControlTemplates : IControlTemplates
             Target = new ControlTemplateTarget
             {
                 Kind = _targets.KindOf(all[0]),
-                Id = _targets.IdOf(all[0]),
+                Id = Strips(all[0]) ? "" : _targets.IdOf(all[0]),
                 Name = _targets.TitleOf(all)
             }
         };
@@ -121,7 +121,8 @@ public sealed class ControlTemplates : IControlTemplates
                 Name = one.Name,
                 Pickup = _targets.Said(one.Pickup),
                 Turn = _targets.Said(one.Turn),
-                Track = Pinned(one) ? one.Track + 1 : 0
+                Track = Pinned(one) ? one.Track + 1 : 0,
+                Strip = Strips(one) ? _targets.IdOf(one) : ""
             });
 
         return template;
@@ -145,7 +146,7 @@ public sealed class ControlTemplates : IControlTemplates
         {
             var one = _targets.Point(
                 template.Target?.Kind ?? "",
-                template.Target?.Id ?? "",
+                entry.Strip is { Length: > 0 } strip ? strip : template.Target?.Id ?? "",
                 entry.Parameter ?? "",
                 template.Target?.Name ?? "",
                 entry.Name ?? "");
@@ -226,6 +227,17 @@ public sealed class ControlTemplates : IControlTemplates
     /// <param name="one">The link to ask about.</param>
     private static bool Pinned(ControlMapping one) =>
         one.Scope == ControlScope.Fixed && one.Kind is ControlKind.Instrument or ControlKind.Insert;
+
+    /// <summary>
+    /// Whether a link names a strip, which is what makes a template cover the whole mixer.
+    /// </summary>
+    /// <remarks>
+    /// The mixer is one thing to point a controller at, so the target above says only that it is
+    /// the mixer and each line says which strip it is on. Everything else names one thing and
+    /// writes its id in the target, where it always was.
+    /// </remarks>
+    /// <param name="one">The link to ask about.</param>
+    private static bool Strips(ControlMapping one) => one.Kind == ControlKind.Mix;
 
     /// <summary>
     /// Which port on this computer is the controller the file names, or nothing.

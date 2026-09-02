@@ -117,24 +117,54 @@ public class ControlCardTests
         Assert.Single(keys);
     }
 
-    /// <summary>And two strips are two, since a link names the strip it was made on.</summary>
+    /// <summary>
+    /// The mixer is one card, however many strips are pointed at.
+    /// </summary>
+    /// <remarks>
+    /// A knob is pointed at the mixer, not at one strip of it: the desk in front of you has a
+    /// fader for every strip and what you keep, hand on or lay down again is the whole layout.
+    /// Cut by strip it was a card per fader saying the same three words with a number changed,
+    /// and a file per fader that nobody could use.
+    ///
+    /// The master goes in with them, since it is a strip of the same desk.
+    /// </remarks>
     [Fact]
-    public void Two_strips_are_two_cards()
+    public void The_mixer_is_one_card_however_many_strips()
     {
-        Assert.NotEqual(
-            Targets.KeyOf(MixLinks.On(MixControl.Volume, 0)),
-            Targets.KeyOf(MixLinks.On(MixControl.Volume, 1)));
+        var keys = new[]
+            {
+                MixLinks.On(MixControl.Volume, 0),
+                MixLinks.On(MixControl.Volume, 1),
+                MixLinks.On(MixControl.Pan, 2),
+                MixLinks.On(MixControl.Volume, JingleBox2.Tracker.TrackerPlayer.MasterStrip)
+            }
+            .Select(Targets.KeyOf)
+            .Distinct()
+            .ToList();
+
+        Assert.Single(keys);
     }
 
-    /// <summary>The master is not a track and is not counted among them.</summary>
+    /// <summary>And it is headed with the desk rather than with whichever strip came first.</summary>
     [Fact]
-    public void The_master_is_named_rather_than_numbered()
+    public void The_mixer_card_is_headed_with_the_desk()
     {
-        Assert.Equal("Master", Targets.TitleOf(
-            new[] { MixLinks.On(MixControl.Volume, JingleBox2.Tracker.TrackerPlayer.MasterStrip) }));
+        Assert.Equal("Mixer", Targets.TitleOf(new[] { MixLinks.On(MixControl.Volume, 2) }));
 
-        Assert.Equal("Track 3", Targets.TitleOf(
-            new[] { MixLinks.On(MixControl.Volume, 2) }));
+        Assert.Equal("Mixer", Targets.TitleOf(
+            new[] { MixLinks.On(MixControl.Volume, JingleBox2.Tracker.TrackerPlayer.MasterStrip) }));
+    }
+
+    /// <summary>A machine is still its own card, and two machines are still two.</summary>
+    /// <remarks>
+    /// The mixer is the one kind whose id is left out of its key, so this says the change did not
+    /// reach the rest: a knob on OddSkilla has nothing to do with the machine on the next box.
+    /// </remarks>
+    [Fact]
+    public void Two_machines_are_still_two_cards()
+    {
+        Assert.NotEqual(Targets.KeyOf(OnMachine("machine.one", "One", "cutoff")),
+            Targets.KeyOf(OnMachine("machine.two", "Two", "cutoff")));
     }
 
     /// <summary>

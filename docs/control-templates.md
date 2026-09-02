@@ -59,6 +59,27 @@ identical-looking panels the pointer happened to be over. Everything lands on th
 What an older song is still holding is still read, and is still displaced by an arriving link, so
 nothing laid down before this fights what is laid down today.
 
+## The mixer is one target
+
+A knob is pointed at the mixer, not at one strip of it. The desk in front of you has a fader for
+every strip, so what you keep, hand on or lay down again is the whole layout: cut by strip it was
+a card per fader saying the same three words with a number changed, and a file per fader that
+nobody could use. The master goes in with them, being a strip of the same desk.
+
+So the mixer is the one kind whose id is left out of `ILinkTargets.KeyOf`, and its card is headed
+Mixer rather than with whichever strip came first. The strip is not lost: it is still what an
+individual link names, and a mixer template writes it on each of its lines instead of once in the
+target.
+
+```json
+{ "control": "Slider 1", "channel": 1, "cc": 0, "parameter": "level", "strip": "1" }
+{ "control": "Knob 1",   "channel": 1, "cc": 16, "parameter": "pan",  "strip": "master" }
+```
+
+The word master or the track's number counting from one, which is what the screen says. A
+template written before the strip moved onto the line named its one strip in the target, and is
+still read that way, since a file on somebody's disc outlives a decision about how cards are cut.
+
 ## Why it can be handed to somebody else
 
 Every part of a link that decides anything is the same on every installation.
