@@ -264,8 +264,15 @@ public class MenuOptionsTests
     /// <remarks>
     /// Which is what a machine from a later version, or a hand-written file with a typo in it,
     /// looks like. A menu drawn nowhere would be a part that had silently vanished.
+    ///
+    /// The two lower corners are in that list on purpose. They were offered for a while and had
+    /// to go: a panel taller than its window scrolls, so the bottom of it is below the fold and
+    /// the button was really there with nobody able to see it. A machine saved while they existed
+    /// still opens, and its menu comes back to the corner a hand looks in.
     /// </remarks>
     [Theory]
+    [InlineData("bottomLeft")]
+    [InlineData("bottomRight")]
     [InlineData("somewhere")]
     [InlineData("")]
     public void A_corner_this_build_does_not_know_reads_as_the_upper_right(string said)
@@ -438,13 +445,13 @@ public class MenuOptionsTests
 
         var element = new MachineElement { Element = MachineElementKinds.Menu };
 
-        element.Properties[MachineMenuCorners.Property] = MachineMenuCorners.BottomLeft;
+        element.Properties[MachineMenuCorners.Property] = MachineMenuCorners.TopLeft;
 
         var picked = new ViewModels.MachineElementViewModel(element, edited: () => edits++);
 
         picked.Corner = picked.Corner;
 
-        Assert.Equal(MachineMenuCorners.BottomLeft, element.Properties[MachineMenuCorners.Property]);
+        Assert.Equal(MachineMenuCorners.TopLeft, element.Properties[MachineMenuCorners.Property]);
         Assert.Equal(0, edits);
     }
 
@@ -466,7 +473,7 @@ public class MenuOptionsTests
 
         var picked = new ViewModels.MachineElementViewModel(element, edited: () => edits++);
 
-        picked.Corner = picked.Corners[2];
+        picked.Corner = picked.Corners[1];
         Assert.Equal(1, edits);
 
         picked.Options[0].On = false;

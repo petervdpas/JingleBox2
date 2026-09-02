@@ -43,6 +43,10 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
 - `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
+- The tab along the top is **DESIGNER**, and it was MACHINES. The page is where a machine's face
+  is laid out, which is a job rather than a list of things: MACHINES read as the place your
+  machines are kept, and the place they are kept is the rack in the tracker and the registry in
+  SETTINGS. The types keep their names, since `MachineEditorViewModel` is what the thing is
 - `Themes/` - XAML resource dictionaries (Dark, Light, Neon, Industrial)
 - `native/` - BASS audio library binaries for win-x64, linux-x64, linux-arm64
 
@@ -1038,12 +1042,31 @@ whole exercise and is worth writing down rather than summarising:
   track's instrument window, which is where somebody actually sits with a machine and a
   controller. It is also the only shape that does not break the rule this file keeps in three
   places, that nothing is added to a machine's face from code, since here the machine asks for it
+- **The three bars on it are drawn and not written.** They were U+2630, and a character is at the
+  mercy of whichever font the machine running this falls back to: it came out a third of the
+  height of the cap and left of the middle, since the fallback's advance is wider than its ink.
+  `CapMark.Bars` on `PushButton` draws them to the cap's own size, so a machine asking for a
+  bigger button gets a bigger mark and nobody keeps two numbers in step. A cap with a word on it
+  draws the word: the mark is for the button whose meaning is a picture
+- Every machine that ships carries one, in the upper right, said in each file rather than left to
+  the default so they cannot drift apart the first time one is edited. It sits sixteen pixels in
+  from the corner, which is not decoration: the panel is almost always inside a scroll viewer and
+  the bar is drawn over the content's own right edge rather than beside it, so a Menu hard against
+  the corner has the bar through it. A machine that wants it elsewhere says so with a margin of
+  its own, which is honoured instead
 - **It is drawn over the panel rather than in it.** `Build` gives nothing back for a Menu and the
   panel puts it on a layer of its own, so where it is dropped in the tree makes no difference and
   the corner is the whole of where it is: laid out with the machine's controls it would take a
-  row of the face and push everything else about. All four corners are offered, chosen from a
-  list in the designer rather than typed, since a machine with its name badge in one and its logo
-  across another has to be able to put it out of the way. The top right is the default
+  row of the face and push everything else about. Two corners, both at the top, chosen from a
+  list in the designer rather than typed. The top right is the default, and the top left is there
+  for a machine whose own artwork wants that side
+- **The two lower corners were offered and had to go.** A panel taller than the window it is
+  shown in scrolls, and the bottom of the panel is then below the fold: the button was really
+  there and nobody could see it, which reads exactly like a machine whose change had not taken.
+  That is what "it is not updated, only a restart fixes it" turned out to be, and the registry
+  was innocent: a machine removed and added again in SETTINGS really does redraw the panel from
+  the new file, which was measured by doing it. A machine saved while the lower two existed still
+  opens and its menu comes back to the corner a hand looks in
 - **One menu to a machine**, and it is the only part with a limit: a second is either in the same
   corner drawing over the first or in another offering the same lines twice. Adding one where
   there is one already says so and names what to do instead, and turning another part into a menu

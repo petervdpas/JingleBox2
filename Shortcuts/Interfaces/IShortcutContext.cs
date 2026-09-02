@@ -7,7 +7,7 @@ namespace JingleBox2.Shortcuts.Interfaces;
 /// </summary>
 /// <remarks>
 /// Not every page wants every shortcut, and the ones it does want mean different things: saving
-/// on TRACKER is a song and on MACHINES is a machine, and on the pages that have nothing to save
+/// on TRACKER is a song and on DESIGNER is a machine, and on the pages that have nothing to save
 /// the keystroke should pass through rather than doing something surprising.
 ///
 /// So a page says what it can do rather than being told. The dispatcher starts at whatever has

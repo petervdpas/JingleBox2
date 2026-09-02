@@ -583,11 +583,11 @@
             <StackPanel Classes="cardBody">
               <TextBlock Classes="cardTitle" Text="Pages" />
 
-              <CheckBox Content="Show machine editor"
+              <CheckBox Content="Show the designer"
                         IsChecked="{Binding ShowMachineEditor}" />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
-                         Text="Puts the machines in the menu along the top, beside RECORD and TRACKER, for when the instrument is the work rather than the song. They are inside the tracker either way." />
+                         Text="Puts DESIGNER in the menu along the top, beside RECORD and TRACKER, for when the machine is the work rather than the song. It is inside the tracker either way." />
             </StackPanel>
           </Border>
 

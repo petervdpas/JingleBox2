@@ -16,6 +16,7 @@ using System.IO;
 using System.Linq;
 using JingleBox2.Machines.Interfaces;
 using JingleBox2.Machines.Records;
+using JingleBox2.Machines.Ui.Enums;
 using JingleBox2.Machines.Ui.Records;
 
 namespace JingleBox2.Machines.Ui;
@@ -2304,7 +2305,8 @@ public class MachinePanelView : Decorator
         var button = new PushButton
         {
             Label = element.Label.Length > 0 ? element.Label : null,
-            CapText = caption.Length > 0 ? caption : Bars,
+            CapText = caption.Length > 0 ? caption : null,
+            Mark = caption.Length > 0 ? CapMark.None : CapMark.Bars,
         };
 
         if (Measurement(element, "cap") is { } wide) button.CapWidth = wide;
@@ -2314,6 +2316,7 @@ public class MachinePanelView : Decorator
 
         button.HorizontalAlignment = across;
         button.VerticalAlignment = down;
+        button.Margin = new Thickness(CornerInset);
 
         button.Pressed += (_, _) => Offered(button, element);
 
@@ -2332,9 +2335,7 @@ public class MachinePanelView : Decorator
     private static readonly (string Said, HorizontalAlignment Across, VerticalAlignment Down)[] Corners =
     {
         (MachineMenuCorners.TopRight, HorizontalAlignment.Right, VerticalAlignment.Top),
-        (MachineMenuCorners.TopLeft, HorizontalAlignment.Left, VerticalAlignment.Top),
-        (MachineMenuCorners.BottomRight, HorizontalAlignment.Right, VerticalAlignment.Bottom),
-        (MachineMenuCorners.BottomLeft, HorizontalAlignment.Left, VerticalAlignment.Bottom)
+        (MachineMenuCorners.TopLeft, HorizontalAlignment.Left, VerticalAlignment.Top)
     };
 
     /// <summary>
@@ -2360,8 +2361,17 @@ public class MachinePanelView : Decorator
         return (Corners[0].Across, Corners[0].Down);
     }
 
-    /// <summary>What is on a Links part nobody has worded: the three bars every program uses.</summary>
-    private const string Bars = "\u2630";
+    /// <summary>
+    /// How far in from the corner a Menu sits.
+    /// </summary>
+    /// <remarks>
+    /// Wide enough to clear a scroll bar, because the panel is almost always inside one and the
+    /// bar is drawn over the content's own right edge rather than beside it: a Menu hard against
+    /// the corner has the bar through it, which is what it looked like. It reads as air round the
+    /// button rather than as a gap, and a machine that wants it somewhere else says so with a
+    /// margin of its own, which is honoured instead.
+    /// </remarks>
+    private const double CornerInset = 16;
 
     /// <summary>
     /// Asks what is on offer and shows it under the button that was pressed.

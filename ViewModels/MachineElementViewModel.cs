@@ -94,8 +94,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// difference: a menu is drawn over the panel rather than in it, so its corner is the whole
     /// of where it is.
     /// </remarks>
-    public IReadOnlyList<string> Corners { get; } =
-        new[] { TopRightSaid, TopLeftSaid, BottomRightSaid, BottomLeftSaid };
+    public IReadOnlyList<string> Corners { get; } = new[] { TopRightSaid, TopLeftSaid };
 
     /// <summary>What each corner is called on the page, against the word the file uses.</summary>
     /// <remarks>
@@ -108,11 +107,6 @@ public sealed partial class MachineElementViewModel : ObservableObject
     /// <inheritdoc cref="TopRightSaid"/>
     private const string TopLeftSaid = "Upper left";
 
-    /// <inheritdoc cref="TopRightSaid"/>
-    private const string BottomRightSaid = "Lower right";
-
-    /// <inheritdoc cref="TopRightSaid"/>
-    private const string BottomLeftSaid = "Lower left";
 
     /// <summary>Which corner this menu sits in.</summary>
     public string Corner
@@ -150,9 +144,7 @@ public sealed partial class MachineElementViewModel : ObservableObject
     private static readonly (string Said, string Page)[] Words =
     {
         (MachineMenuCorners.TopRight, TopRightSaid),
-        (MachineMenuCorners.TopLeft, TopLeftSaid),
-        (MachineMenuCorners.BottomRight, BottomRightSaid),
-        (MachineMenuCorners.BottomLeft, BottomLeftSaid)
+        (MachineMenuCorners.TopLeft, TopLeftSaid)
     };
 
     /// <summary>

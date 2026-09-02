@@ -50,7 +50,7 @@ public sealed class TrackerNoteAdapter : INoteTrigger
 
     /// <summary>The same, told which half is in front rather than working it out from a window.</summary>
     /// <remarks>
-    /// Asked of the page that is up, not of the page that exists. The machines page lives inside
+    /// Asked of the page that is up, not of the page that exists. The designer lives inside
     /// the tracker and is hidden rather than taken away when the pattern is in front, so a flag
     /// set when it was put together would stay set for the rest of the session and every note
     /// would go to the rack. A song with no instruments has nothing a note could mean, so it

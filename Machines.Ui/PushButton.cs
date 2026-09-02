@@ -237,7 +237,7 @@ public class PushButton : ThemedControl
         AffectsRender<PushButton>(
             LabelProperty, CapTextProperty, IsCheckedProperty, IsSelectedProperty, LitProperty, HasLampProperty,
             CapHeightProperty, CapWidthProperty, ShapeProperty, PointsProperty, ColourProperty,
-            FontSizeProperty, LampSizeProperty, LampBelowProperty, LampColourProperty);
+            FontSizeProperty, LampSizeProperty, LampBelowProperty, LampColourProperty, MarkProperty);
 
         AffectsMeasure<PushButton>(
             LabelProperty, CapTextProperty, HasLampProperty,
@@ -245,6 +245,25 @@ public class PushButton : ThemedControl
             LampBelowProperty);
 
         FocusableProperty.OverrideDefaultValue<PushButton>(true);
+    }
+
+    /// <summary>
+    /// A mark drawn on the cap instead of a word, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// Drawn to the cap's own size rather than set in a font size somebody has to keep in step
+    /// with it, which is what makes a button that says nothing still say something at any size.
+    /// A cap that has a word on it as well draws the word: the mark is for the button whose
+    /// meaning is a picture.
+    /// </remarks>
+    public static readonly StyledProperty<CapMark> MarkProperty =
+        AvaloniaProperty.Register<PushButton, CapMark>(nameof(Mark));
+
+    /// <inheritdoc cref="MarkProperty"/>
+    public CapMark Mark
+    {
+        get => GetValue(MarkProperty);
+        set => SetValue(MarkProperty, value);
     }
 
     /// <summary>What is written under the cap.</summary>
@@ -501,12 +520,17 @@ public class PushButton : ThemedControl
                 break;
         }
 
+        bool dark = seat.R * 0.299 + seat.G * 0.587 + seat.B * 0.114 > CapTextFlipsAt;
+
         if (!string.IsNullOrEmpty(CapText))
         {
-            var bright = seat.R * 0.299 + seat.G * 0.587 + seat.B * 0.114 > CapTextFlipsAt;
-            var text = Text(CapText, new SolidColorBrush(bright ? Colors.Black : Colors.White));
+            var text = Text(CapText, new SolidColorBrush(dark ? Colors.Black : Colors.White));
             context.DrawText(text,
                 new Point(middle - text.Width / 2, cap.Center.Y - text.Height / 2 + (Down ? 0.5 : 0)));
+        }
+        else if (Mark == CapMark.Bars)
+        {
+            DrawBars(context, cap, new SolidColorBrush(dark ? Colors.Black : Colors.White), Down ? 0.5 : 0);
         }
 
         double under = cap.Bottom;
@@ -631,6 +655,50 @@ public class PushButton : ThemedControl
     private FormattedText Text(string? text, IBrush brush) =>
         new(text ?? "", CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily.Default), FontSize, brush);
+
+    /// <summary>
+    /// Three bars across the middle of the cap, the mark every menu button wears.
+    /// </summary>
+    /// <remarks>
+    /// Sized from the cap rather than from a font, so a machine that asks for a bigger button
+    /// gets a bigger mark and nobody has to keep two numbers in step. Rounded at the ends,
+    /// because square ends at this size read as pixels rather than as a drawing.
+    ///
+    /// The bars take a little over half the width and a little over half the height between
+    /// them, which is what the character version looked like on a font that had it. Thin enough
+    /// to stay three bars at the smallest cap anybody would draw: a thickness under a pixel is
+    /// held up so the mark never fades out.
+    /// </remarks>
+    /// <param name="context">What to draw into.</param>
+    /// <param name="cap">The cap to draw on.</param>
+    /// <param name="ink">What to draw them in.</param>
+    /// <param name="down">How far the cap has sunk, so the mark sinks with it.</param>
+    private static void DrawBars(DrawingContext context, Rect cap, IBrush ink, double down)
+    {
+        double wide = Math.Max(cap.Width * BarsWidth, 2);
+        double thick = Math.Max(cap.Height * BarThickness, 1);
+        double gap = thick * BarGap;
+        double tall = thick * 3 + gap * 2;
+
+        double left = cap.Center.X - wide / 2;
+        double top = cap.Center.Y - tall / 2 + down;
+
+        for (int at = 0; at < 3; at++)
+        {
+            var bar = new Rect(left, top + at * (thick + gap), wide, thick);
+
+            context.DrawRectangle(ink, null, bar, thick / 2, thick / 2);
+        }
+    }
+
+    /// <summary>How much of the cap's width the bars take.</summary>
+    private const double BarsWidth = 0.55;
+
+    /// <summary>How thick each bar is, as a share of the cap's height.</summary>
+    private const double BarThickness = 0.09;
+
+    /// <summary>And how far apart they are, as a share of their own thickness.</summary>
+    private const double BarGap = 1.4;
 
     /// <summary>A triangle filling the cap, with its point in the direction asked for.</summary>
     private static StreamGeometry Triangle(Rect cap, Pointing points)

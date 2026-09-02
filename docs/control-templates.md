@@ -182,10 +182,16 @@ instrument window, which is where somebody actually sits with a machine and a co
 **It is drawn over the panel rather than in it**, so where it is dropped in the tree makes no
 difference and its corner is the whole of where it is. Laid out with the machine's own controls
 it would take a row of the face and push everything else about, and dropped into a column it
-would land wherever the drop happened rather than where a hand looks for it. All four corners are
-offered, since a machine with its name badge in one and its logo across another has to be able to
-put it out of the way; the top right is the default, being where every program has ever put this
-button.
+would land wherever the drop happened rather than where a hand looks for it. Two corners, both at the top: the top
+right by default, being where every program has ever put this button, and the top left for a
+machine whose own artwork wants that side.
+
+The two lower corners were offered for a while and had to go. A panel taller than the window it
+is shown in scrolls, and the bottom of the panel is then below the fold, so the button was really
+there with nobody able to see it. That is worth writing down because of how it presented: as a
+machine whose change had not taken, fixed only by restarting. The registry was innocent, and
+measured to be: removing a machine in SETTINGS and adding it back really does redraw the panel
+from the new file within the session.
 
 **One menu to a machine**, and it is the only part with a limit. A second one is either in the
 same corner drawing over the first or in another corner offering the same lines twice, and both

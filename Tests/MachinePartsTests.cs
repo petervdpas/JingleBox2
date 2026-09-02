@@ -90,6 +90,29 @@ public class MachinePartsTests
         Assert.Equal(5, seen);
     }
 
+    /// <summary>Every machine that ships carries a menu, in the corner every program puts one.</summary>
+    /// <remarks>
+    /// A machine without one is a machine you cannot point a controller at from its own face,
+    /// which is the whole reason the part exists. The top right is where a hand looks for it, so
+    /// the ones we ship all say so rather than leaving it to the default and drifting apart the
+    /// first time one of them is edited.
+    /// </remarks>
+    [Fact]
+    public void Every_machine_that_ships_carries_a_menu_in_the_upper_right()
+    {
+        foreach (var (name, panel) in Shipped())
+        {
+            var menu = Below(panel.Root).SingleOrDefault(one => one.Element == MachineElementKinds.Menu);
+
+            Assert.True(menu is not null, name + " has no Menu on its face");
+
+            Assert.True(
+                menu!.Properties.TryGetValue(MachineMenuCorners.Property, out string? corner)
+                && corner == MachineMenuCorners.TopRight,
+                name + " does not put its Menu in the upper right");
+        }
+    }
+
     /// <summary>And one of it, since two would say the same name twice.</summary>
     [Fact]
     public void No_machine_that_ships_carries_two_of_them()
