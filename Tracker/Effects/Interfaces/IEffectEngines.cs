@@ -1,5 +1,3 @@
-using JingleBox2.Audio.Plugins.Interfaces;
-
 namespace JingleBox2.Tracker.Effects.Interfaces;
 
 /// <summary>
@@ -38,6 +36,10 @@ public interface IEffectEngines
     /// </remarks>
     /// <param name="id">The id off an effect's manifest.</param>
     /// <param name="sampleRate">What the mix is running at, since a time is in seconds.</param>
-    /// <param name="maxFrames">The longest block it will ever be handed, so it can size itself once.</param>
-    IAudioInsert? Make(string? id, int sampleRate, int maxFrames);
+    /// <param name="maxFrames">
+    /// The longest block it will ever be handed. An effect of ours sizes itself from the rate
+    /// rather than from the block, since nothing here works a block at a time, but the question
+    /// is asked because a thing that goes on a chain may one day need it.
+    /// </param>
+    IEffectEngine? Make(string? id, int sampleRate, int maxFrames);
 }

@@ -79,11 +79,25 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// <inheritdoc/>
     public string FolderName { get; }
 
-    /// <inheritdoc/>
-    public string Shipped => _shipped ?? Path.Combine(AppContext.BaseDirectory, FolderName);
+    /// <summary>
+    /// The folder both worlds' folders sit inside, beside the program and under the app folder.
+    /// </summary>
+    /// <remarks>
+    /// The rack is what this installation has, and there are two kinds of box on it, so they are
+    /// kept together: <c>rack/machines</c> and <c>rack/effects</c> rather than two folders at the
+    /// top of everything. Written out rather than built, so the one folder name this depends on
+    /// can be found by looking for it.
+    /// </remarks>
+    public const string RackFolder = "rack";
 
     /// <inheritdoc/>
-    public string Installed => Path.Combine(_folder.Path(), FolderName);
+    public string Shipped => _shipped ?? Path.Combine(AppContext.BaseDirectory, RackFolder, FolderName);
+
+    /// <inheritdoc/>
+    public string Installed => Path.Combine(_folder.Path(), RackFolder, FolderName);
+
+    /// <summary>Where these used to live, before the two worlds were kept together.</summary>
+    private string Was => Path.Combine(_folder.Path(), FolderName);
 
     /// <summary>Reads one folder into a manifest, or nothing when there is no box in it.</summary>
     /// <param name="folder">The folder to read.</param>
@@ -243,6 +257,8 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
     /// </remarks>
     private void Seed()
     {
+        Moved();
+
         try
         {
             Directory.CreateDirectory(Installed);
@@ -281,6 +297,39 @@ public abstract class RackRegistry<T> : IRackRegistry<T> where T : class, IRackP
         }
 
         if (moved) Remember(offered);
+    }
+
+    /// <summary>
+    /// Carries what this installation already had into the rack folder, once.
+    /// </summary>
+    /// <remarks>
+    /// These sat at the top of the application folder before the two worlds were kept together.
+    /// Moved rather than left, and moved rather than copied: what is in there is this
+    /// installation's, machines somebody edited and presets they saved onto them, and seeding a
+    /// fresh folder from what ships would quietly leave all of that behind under a name nothing
+    /// reads any more.
+    ///
+    /// Only when there is nothing in the new place, so it happens once and never argues with a
+    /// folder somebody has since worked in. A move that fails is logged and let go: the worst of
+    /// it is a rack seeded from what ships, with the old folder still there to be carried by
+    /// hand.
+    /// </remarks>
+    private void Moved()
+    {
+        try
+        {
+            if (Directory.Exists(Installed) || !Directory.Exists(Was)) return;
+
+            if (Path.GetDirectoryName(Installed) is { Length: > 0 } rack) Directory.CreateDirectory(rack);
+
+            Directory.Move(Was, Installed);
+
+            Log.Write(LogArea.Machines, () => _word + " folder carried from " + Was + " to " + Installed);
+        }
+        catch (Exception ex)
+        {
+            Log.Fault(LogArea.Machines, "The " + _word + " folder could not be carried from " + Was, ex);
+        }
     }
 
     /// <summary>

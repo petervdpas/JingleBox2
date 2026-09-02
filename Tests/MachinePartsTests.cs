@@ -31,7 +31,7 @@ public class MachinePartsTests
     /// </remarks>
     private static IEnumerable<(string Name, Panel Panel)> Shipped()
     {
-        string folder = Path.Combine(AppContext.BaseDirectory, "machines");
+        string folder = Path.Combine(AppContext.BaseDirectory, "rack", "machines");
 
         Assert.True(Directory.Exists(folder), "the machines that ship are not beside the program");
 

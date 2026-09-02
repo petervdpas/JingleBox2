@@ -32,7 +32,7 @@
   <ItemGroup>
     <!-- The machines that ship. A machine is a project on disc, so the ones we supply are
          copied out beside the program and read at startup like any other. -->
-    <None Include="machines\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="rack\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <!-- The controller profiles and codecs that ship. A codec is a Lua file read at startup, and

@@ -134,7 +134,10 @@ thing a machine's colours are exempt from.
 
 ## On disc
 
-`effects/` beside `machines/`, one folder to an effect, `effect.json` at the top of it. The same
+`rack/effects/` beside `rack/machines/`, one folder to an effect, `effect.json` at the top of
+it. Both worlds' folders sit under `rack/`, beside the program for what ships and under the
+application folder for what this installation has, and what an installation already had at the
+top of the app folder is carried in once. The same
 shape as a machine's folder for the same reasons: `presets/` for what it ships with, `images/`
 for what is drawn on it, and the whole folder is what travels as a zip. No `sounds/`, since an
 effect plays nothing back.
@@ -235,8 +238,11 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    history, which asked the project what type it is instead of naming the machine's.
    `Tests/EffectDesignerTests.cs` is the seam: which world makes which id, which pages are
    offered, and a folder of one kind refusing to open as the other.
-4. **The delay end to end**: on the chain, saved and read back in a song, bypass through the new
-   part, pointable and automatable, with the tests including the refusals.
+4. **The delay.** The engine and the face are **done**: `Tracker/Effects/Delay.cs`, four knobs,
+   measured in `Tests/DelayTests.cs`, and `rack/effects/EchoBox/effect.json` on the rack's
+   Effects tab. What is left of this step is the chain: putting one on a track, writing it into
+   the song and reading it back, bypass through the new part, and pointing a controller or a lane
+   at it.
 5. **The other five engines.**
 
 ## Still open

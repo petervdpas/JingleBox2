@@ -1,0 +1,156 @@
+{
+  "Id": "effect.echobox",
+  "Name": "EchoBox",
+  "Summary": "Delay. What went past comes back later, darker each time.",
+  "Author": "Peter van de Pas",
+  "Version": "1.0",
+  "Theme": {
+    "Accent": "#4FB07A",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "time",
+      "Name": "Time",
+      "Unit": "ms",
+      "Min": 10,
+      "Max": 2000,
+      "Default": 375,
+      "Step": 1
+    },
+    {
+      "Key": "feedback",
+      "Name": "Feedback",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.95,
+      "Default": 0.35,
+      "Step": 0.01
+    },
+    {
+      "Key": "damp",
+      "Name": "Damp",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.3,
+      "Step": 0.01
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0.3,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "EchoBox",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Delay"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "time",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "headroom": "50",
+                    "lines": "1"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "feedback",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "headroom": "50",
+                    "lines": "1"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "damp",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "headroom": "50",
+                    "lines": "1"
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "headroom": "50",
+                    "lines": "1"
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

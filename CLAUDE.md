@@ -356,6 +356,30 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   plain copy, folders and all, since a preset folder that did not arrive is the first thing
   anybody would have to make by hand. `IMachineRegistry` is gone: every member of it was a fact
   about a rack
+- **The rack's two folders live together: `rack/machines` and `rack/effects`**, beside the
+  program for what ships and under the application folder for what this installation has. What an
+  installation already had at the top of the app folder is carried into the rack folder once, on
+  the first run that looks for it, and moved rather than copied: what is in there is somebody's
+  own, machines they have edited and presets they saved onto them, and seeding a fresh folder
+  from what ships would leave all of that behind under a name nothing reads any more. Only when
+  the new place is empty, so it happens once and never argues with a folder somebody has since
+  worked in
+- **EchoBox is the first effect of ours, and it is a delay.** `Tracker/Effects/Delay.cs` is the
+  engine, `rack/effects/EchoBox/effect.json` is the face, and `EffectEngines` is the one line
+  that ties the id to the class. Four knobs: time, feedback, damp and mix. The time glides rather
+  than jumps, since a delay line read from a different place on the next sample is a click and
+  every hardware delay either crossfades or slides; a time set before anything has been rendered
+  is where it starts rather than somewhere to glide from, so a song opening does not smear its
+  first repeats. The damping is one pole on what comes out of the line, which is both what you
+  hear and what goes back in, so each pass round loses more of the top
+- **A read position a hair below nought wraps to the length of the line itself**, which is one
+  frame past the end, and that is an index outside the array on the audio thread. Adding the line
+  back to a negative position lands exactly on the length once the arithmetic rounds, so the wrap
+  is done at both ends. It took an eight thousand frame block to find it and it would have shown
+  up as a crash on somebody else's buffer size. `Tests/DelayTests.cs` is where the rest of it is
+  measured rather than listened to: where the repeat lands, how far each one falls, that no mix
+  is bit for bit what went in, that the block size changes nothing, and what happens when it is
+  handed NaN, a time of a million seconds, a block longer than the buffer, or no buffer at all
 - **The effect world is built and empty, and empty is the honest state of it.** `EffectProject`
   is the manifest, `effect.json`, deliberately not `machine.json` with a flag on it: a folder is
   one thing or the other, and a reader that had to open the file to find out which is a reader

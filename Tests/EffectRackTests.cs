@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Files.Interfaces;
 using JingleBox2.Rack.Faces;
 using JingleBox2.Rack.Faces.Records;
@@ -43,7 +42,7 @@ public class EffectRackTests : IDisposable
             id is { Length: > 0 } && ids.Contains(id, StringComparer.OrdinalIgnoreCase);
 
         /// <inheritdoc/>
-        public IAudioInsert? Make(string? id, int sampleRate, int maxFrames) => null;
+        public IEffectEngine? Make(string? id, int sampleRate, int maxFrames) => null;
     }
 
     /// <summary>This test's own corner of the disc, thrown away afterwards.</summary>
@@ -53,8 +52,11 @@ public class EffectRackTests : IDisposable
     /// <summary>Where the effects that ship pretend to be.</summary>
     private string Shipped => System.IO.Path.Combine(_root, "beside", "effects");
 
-    /// <summary>And where this pretend installation keeps its own.</summary>
-    private string Installed => System.IO.Path.Combine(_root, "app", "effects");
+    /// <summary>And where this pretend installation keeps its own, under the rack folder.</summary>
+    private string Installed => System.IO.Path.Combine(_root, "app", "rack", "effects");
+
+    /// <summary>Where they sat before the two worlds were kept together.</summary>
+    private string Was => System.IO.Path.Combine(_root, "app", "effects");
 
     /// <summary>A registry pointed at this test's folders.</summary>
     private EffectRegistry Registry(params string[] engines) =>
@@ -175,12 +177,17 @@ public class EffectRackTests : IDisposable
         Assert.Empty(Registry().Load());
     }
 
-    /// <summary>The list that ships knows no id, and says so rather than throwing.</summary>
+    /// <summary>The list that ships knows what it was told about and nothing else.</summary>
+    /// <remarks>
+    /// An id nobody has written an engine for is the ordinary case for anything somebody else
+    /// made, and it has to be a plain no rather than a fault.
+    /// </remarks>
     [Fact]
-    public void The_real_engine_list_has_nothing_in_it_yet()
+    public void The_engine_list_answers_only_for_what_it_has()
     {
         var engines = new EffectEngines();
 
+        Assert.True(engines.Has(EffectEngines.EchoBox));
         Assert.False(engines.Has("effect.echo"));
         Assert.False(engines.Has(""));
         Assert.False(engines.Has(null));
@@ -322,6 +329,36 @@ public class EffectRackTests : IDisposable
         Assert.False(held.Has(null));
         Assert.Null(held.For("effect.room"));
         Assert.Single(held.All);
+    }
+
+    /// <summary>
+    /// What an installation already had is carried into the rack folder rather than left behind.
+    /// </summary>
+    /// <remarks>
+    /// The fault this exists to stop: the folder moved, so the new place is empty, so everything
+    /// shipped is offered again and what somebody had edited sits under a name nothing reads.
+    /// </remarks>
+    [Fact]
+    public void What_was_already_here_is_carried_into_the_rack_folder()
+    {
+        Effect(Was, "Echo", "effect.echo", "Mine");
+
+        var taken = Registry("effect.echo").Load();
+
+        Assert.Equal("Mine", Assert.Single(taken).Name);
+        Assert.True(File.Exists(System.IO.Path.Combine(Installed, "Echo", EffectProject.ManifestName)));
+        Assert.False(Directory.Exists(Was));
+    }
+
+    /// <summary>And only once: a folder somebody has since worked in is not argued with.</summary>
+    [Fact]
+    public void The_old_folder_is_left_alone_once_there_is_a_new_one()
+    {
+        Effect(Installed, "Echo", "effect.echo", "New place");
+        Effect(Was, "Echo", "effect.echo", "Old place");
+
+        Assert.Equal("New place", Assert.Single(Registry("effect.echo").Load()).Name);
+        Assert.True(Directory.Exists(Was));
     }
 
     /// <summary>The list is what was last read, not everything ever read.</summary>
