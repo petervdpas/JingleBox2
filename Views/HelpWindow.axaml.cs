@@ -3,6 +3,7 @@ using Avalonia.Interactivity;
 using JingleBox2.Help;
 using JingleBox2.Help.Records;
 using JingleBox2.Help.Interfaces;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -15,6 +16,11 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class HelpWindow : Window
 {
+    /// <summary>
+    /// Opens this window beside the application rather than over it, so it can be put behind.
+    /// </summary>
+    private static readonly IFreeWindow Free = new FreeWindow();
+
     /// <summary>Everything the app explains about itself, looked up by id.</summary>
     private static readonly IHelpText _help = new HelpText();
 
@@ -55,7 +61,7 @@ public partial class HelpWindow : Window
         _open = window;
         window.Closed += (_, _) => _open = null;
 
-        window.Show(owner);
+        Free.Show(window, owner);
     }
 
     /// <summary>

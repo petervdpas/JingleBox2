@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -15,6 +16,11 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class InstrumentWindow : Window
 {
+    /// <summary>
+    /// Opens this window beside the application rather than over it, so it can be put behind.
+    /// </summary>
+    private static readonly IFreeWindow Free = new FreeWindow();
+
     /// <summary>What is already open, so asking twice shows the window there is.</summary>
     private static readonly Dictionary<object, InstrumentWindow> Open = new();
 
@@ -38,8 +44,8 @@ public partial class InstrumentWindow : Window
     /// <remarks>
     /// The window coming to the front is what a knob pointed at "the track you are on" means,
     /// once there are panels open in windows of their own: the pattern cursor is on neither of
-    /// them. Nothing is applied by saying it; the mappings are walked per message, so the next
-    /// thing you touch resolves against this track instead.
+    /// them. That is said by <see cref="RemoteFocus"/> rather than here, since it is true of
+    /// every window with a face on it and was written out once per window until it was not.
     /// </remarks>
     public static void Show(object key, TrackInstrumentPanel designer, Window owner, Action? closed = null)
     {
@@ -55,17 +61,13 @@ public partial class InstrumentWindow : Window
 
         Open[key] = window;
 
-        window.Activated += (_, _) => designer.InFront();
-
         window.Closed += (_, _) =>
         {
-            designer.NotInFront();
-
             Open.Remove(key);
             closed?.Invoke();
         };
 
-        window.Show(owner);
+        Free.Show(window, owner);
     }
 
     /// <summary>Closes the window a thing has, if it has one.</summary>

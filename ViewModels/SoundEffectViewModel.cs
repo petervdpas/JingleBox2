@@ -24,7 +24,7 @@ namespace JingleBox2.ViewModels;
 /// A row rather than a thing, the same as a plugin's. The engine and its place in the chain both
 /// belong to somebody else and this holds neither.
 /// </remarks>
-public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot, ISoundEffectShown
+public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot, ISoundEffectShown, IInFront
 {
     /// <summary>How many of its controls the block prints, which is what a block has room for.</summary>
     private const int Readings = 3;
@@ -72,9 +72,7 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     /// <inheritdoc/>
     public string Where => _owner?.Label ?? "";
 
-    /// <summary>
-    /// This box's face came to the front, so it is the one being worked on.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// Which is what a link pointed at one of ours resolves against. A link names the effect and
     /// the key and never where it is standing, so something has to say which EchoBox, and the one
@@ -83,7 +81,8 @@ public sealed partial class SoundEffectViewModel : ObservableObject, IChainSlot,
     /// </remarks>
     public void InFront() => _chain.Front?.InFront(this);
 
-    /// <summary>And has gone, so the track you are on answers again.</summary>
+    /// <inheritdoc/>
+    /// <remarks>The track you are on answers again.</remarks>
     public void NotInFront() => _chain.Front?.Gone(this);
 
     /// <summary>What the effect is, which is the face, the parameters and the name.</summary>

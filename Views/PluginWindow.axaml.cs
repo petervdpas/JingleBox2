@@ -9,6 +9,7 @@ using JingleBox2.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -22,6 +23,11 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class PluginWindow : Window
 {
+    /// <summary>
+    /// Opens this window beside the application rather than over it, so it can be put behind.
+    /// </summary>
+    private static readonly IFreeWindow Free = new FreeWindow();
+
     /// <summary>What is already open, so a thing shows the window it has rather than another.</summary>
     private static readonly Dictionary<object, PluginWindow> Open = new();
 
@@ -234,7 +240,7 @@ public partial class PluginWindow : Window
             closed?.Invoke();
         };
 
-        window.Show(owner);
+        Free.Show(window, owner);
     }
 
     /// <summary>

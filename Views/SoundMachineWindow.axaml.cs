@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using JingleBox2.ViewModels;
 using System;
+using JingleBox2.Views.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -14,6 +15,11 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class SoundMachineWindow : Window
 {
+    /// <summary>
+    /// Opens this window beside the application rather than over it, so it can be put behind.
+    /// </summary>
+    private static readonly IFreeWindow Free = new FreeWindow();
+
     /// <summary>
     /// The one that is open, so a second request brings it forward rather than opening another.
     /// </summary>
@@ -73,6 +79,6 @@ public partial class SoundMachineWindow : Window
             inFront?.Invoke(false);
         };
 
-        window.Show(owner);
+        Free.Show(window, owner);
     }
 }

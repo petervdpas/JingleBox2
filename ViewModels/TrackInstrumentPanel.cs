@@ -20,7 +20,7 @@ namespace JingleBox2.ViewModels;
 /// rack is edited here, and what is edited is this song's, so two songs can use the same kick
 /// sounding differently.
 /// </remarks>
-public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevicePanel
+public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevicePanel, IInFront
 {
     /// <summary>How wide a panel's keyboard is, and where it has to be to show a note.</summary>
     private readonly IPanelKeyboard _keyboard = new PanelKeyboard();
@@ -96,9 +96,7 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     /// <summary>Which track this is the instrument of, for a title that says so.</summary>
     public int Track { get; }
 
-    /// <summary>
-    /// This panel's window came to the front, so its track is the one being worked on.
-    /// </summary>
+    /// <inheritdoc/>
     /// <remarks>
     /// What "the track you are on" means is the instrument window in front when there is one,
     /// and the pattern cursor otherwise: two panels open in their own windows and the cursor is
@@ -107,7 +105,8 @@ public sealed partial class TrackInstrumentPanel : ObservableObject, ISoundDevic
     /// </remarks>
     public void InFront() => _tracker?.PanelInFront(Track);
 
-    /// <summary>And has gone, so the cursor says where you are again.</summary>
+    /// <inheritdoc/>
+    /// <remarks>The cursor says where you are again.</remarks>
     public void NotInFront() => _tracker?.PanelGone(Track);
 
     /// <inheritdoc/>

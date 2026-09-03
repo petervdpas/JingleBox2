@@ -203,6 +203,8 @@ public partial class MainWindow : Window
         Views.DeckKeys.Deck = vm.Transport;
         Views.DeckKeys.ListenEverywhere();
 
+        Views.RemoteFocus.ListenEverywhere();
+
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
         _cfg = cfg;
