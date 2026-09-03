@@ -20,8 +20,23 @@ public sealed class ControlTemplateControl
     /// <summary>1 to 16, as the message says it.</summary>
     public int Channel { get; set; } = 1;
 
-    /// <summary>Which continuous controller, 0 to 127.</summary>
+    /// <summary>Which controller or note number, 0 to 127.</summary>
     public int Cc { get; set; }
+
+    /// <summary>
+    /// Which kind of message the control sends: the word <c>note</c>, or nothing for a
+    /// controller.
+    /// </summary>
+    /// <remarks>
+    /// A word rather than a number out of an enum, like everything else in this file, so it can
+    /// be read and corrected by somebody who has never seen this code.
+    ///
+    /// Left out of the file where it is empty, which is every line of every template written
+    /// before the pads joined this layer and almost every line since: a knob, a fader and a
+    /// button all send controllers, and it is pad boxes that send notes.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public string Sends { get; set; } = "";
 
     /// <summary>
     /// Which parameter, as the target itself names it.

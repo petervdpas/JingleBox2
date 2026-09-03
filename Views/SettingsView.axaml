@@ -361,25 +361,14 @@
             </StackPanel>
           </Border>
 
-          <!-- The desk's links, and the same list the tracker's MIDI CC page draws under the
-               song's own. Here because this is where the hardware is looked after; there
-               because that is where the pointing gesture is made. One list, two places. -->
-          <views:ControlLinksView DataContext="{Binding Links}" />
+          <!-- How many pads there are, and what one does when it is hit. Here because this is
+               where the hardware that hits them is looked after, and because they are what was
+               left of the MIDI page once the pad mapping table went: the pads are pointed at by
+               resting the pointer on one and touching the desk now, like everything else, so
+               there is no table under this any more and no page for these two to sit on.
 
-          </StackPanel>
-        </ScrollViewer>
-    </TabItem>
-
-
-    <TabItem Header="MIDI">
-        <ScrollViewer>
-          <StackPanel Spacing="12">
-
-
-          <!-- How many pads there are, and what one does when it is hit. Both are about the
-               pads the mapping underneath is mapping, so they are read together, and half the
-               width each so that neither looks like the more important one. Narrow the window
-               and they stack rather than squeezing one to a column of single letters. -->
+               Half the width each so that neither looks like the more important one. Narrow the
+               window and they stack rather than squeezing one to a column of single letters. -->
           <views:Beside Gap="12" Least="290" Even="True">
 
               <Border Classes="card" VerticalAlignment="Top">
@@ -458,15 +447,10 @@
 
           </views:Beside>
 
-
-          <!-- On the page rather than behind a button. It is about the devices listed above
-               it, and a dialog you have to open to see a mapping is one you have to close
-               again before you can look at anything else. -->
-          <views:MidiView DataContext="{Binding Midi}" />
-
           </StackPanel>
         </ScrollViewer>
     </TabItem>
+
 
     <TabItem Header="Plugins">
         <ScrollViewer>

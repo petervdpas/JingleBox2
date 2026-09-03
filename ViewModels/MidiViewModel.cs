@@ -42,13 +42,6 @@ public sealed partial class MidiViewModel : ObservableObject
     /// <summary>The ports, opened and closed from the jobs and listened to while learning.</summary>
     private readonly IMidiService _midi;
 
-    /// <summary>The pad row waiting for a key, or null when nothing is listening.</summary>
-    /// <remarks>
-    /// One at a time. Learning is a question with one answer, and two rows listening would both
-    /// take the same key press and neither would be the one you meant.
-    /// </remarks>
-    private PadMidiMappingViewModel? _learningTarget;
-
     /// <summary>Every port, connected or merely remembered. What the system offers.</summary>
     public ObservableCollection<MidiPortViewModel> Devices { get; } = new();
 
@@ -61,14 +54,6 @@ public sealed partial class MidiViewModel : ObservableObject
     /// </remarks>
     public ObservableCollection<ControlSurfaceViewModel> Surfaces { get; } = new();
 
-    /// <summary>Which message fires which pad, one row apiece.</summary>
-    /// <remarks>
-    /// Rows rather than the stored mappings themselves, because learning writes a mapping from
-    /// code rather than from the table, and a plain model would leave the table showing what was
-    /// there before the key was pressed.
-    /// </remarks>
-    public ObservableCollection<PadMidiMappingViewModel> Pads { get; }
-
     /// <summary>True when there is any port at all, so the page can say so rather than look empty.</summary>
     [ObservableProperty] private bool hasDevices;
 
@@ -80,12 +65,6 @@ public sealed partial class MidiViewModel : ObservableObject
 
     /// <summary>The line under the table saying what just happened, or what is wrong.</summary>
     [ObservableProperty] private string status = "";
-
-    /// <summary>The controller the pad mapping belongs to; blank when none is assigned.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasPadDevice))]
-    [NotifyPropertyChangedFor(nameof(PadDeviceSummary))]
-    private string padDevice = "";
 
     /// <summary>Reads the ports, opens the ones with a job, and starts listening for learning.</summary>
     /// <remarks>
@@ -108,11 +87,7 @@ public sealed partial class MidiViewModel : ObservableObject
         _midi = midi;
 
         _cfg.Midi ??= new MidiConfig();
-        _cfg.Midi.Pads ??= new();
         _cfg.Midi.Devices ??= new();
-
-        Pads = new ObservableCollection<PadMidiMappingViewModel>(
-            _cfg.Midi.Pads.Select(m => new PadMidiMappingViewModel(m)));
 
         ToggleMode = _cfg.Midi.ToggleMode;
 
@@ -121,28 +96,9 @@ public sealed partial class MidiViewModel : ObservableObject
         _midi.MessageReceived += OnMidi;
     }
 
-    /// <summary>True when something is pointed at the pads, so the mapping table means anything.</summary>
-    public bool HasPadDevice => PadDevice.Length > 0;
-
-    /// <summary>Line above the mapping table: a mapping without a pad controller does nothing.</summary>
-    public string PadDeviceSummary => HasPadDevice
-        ? $"These pads are triggered by '{PadDevice}'."
-        : "No controller drives the pads yet. Tick Pads in SETTINGS.";
-
     /// <summary>Reads the ports again, for hardware plugged in after the page was opened.</summary>
     /// <remarks>Always enabled: asking twice costs nothing and the answer can have changed.</remarks>
     public IRelayCommand RefreshDevicesCommand => new RelayCommand(RefreshDevices);
-
-    /// <summary>
-    /// Listens for the next key press and puts it on that row, or stops listening if it is already.
-    /// </summary>
-    /// <remarks>
-    /// Always enabled, including for a row nobody can learn on yet: the refusal is said in the
-    /// status line, where it can name the device and the reason, rather than by a greyed button
-    /// that says nothing.
-    /// </remarks>
-    public IRelayCommand<PadMidiMappingViewModel?> LearnCommand =>
-        new RelayCommand<PadMidiMappingViewModel?>(ToggleLearnFor);
 
     /// <summary>Reads the ports, merges them with what is remembered, and opens what has a job.</summary>
     private void RefreshDevices()
@@ -155,7 +111,6 @@ public sealed partial class MidiViewModel : ObservableObject
 
         Regroup();
 
-        UpdatePadDevice();
         ApplyBindings();
         Status = DescribeDevices();
     }
@@ -204,7 +159,6 @@ public sealed partial class MidiViewModel : ObservableObject
 
         Regroup();
 
-        UpdatePadDevice();
         ApplyBindings();
         SaveMidi();
 
@@ -220,7 +174,6 @@ public sealed partial class MidiViewModel : ObservableObject
     {
         _bindings.SetRole(_cfg.Midi.Devices, device.Name, device.Role);
 
-        UpdatePadDevice();
         ApplyBindings();
         SaveMidi();
 
@@ -245,14 +198,6 @@ public sealed partial class MidiViewModel : ObservableObject
 
         foreach (var device in wanted)
             _midi.Open(device);
-    }
-
-    /// <summary>Works out what is driving the pads, which is what the line above the table names.</summary>
-    /// <remarks>All of them, joined, since more than one controller can be pointed at the pads.</remarks>
-    private void UpdatePadDevice()
-    {
-        var pads = _bindings.DevicesWith(_cfg.Midi.Devices, MidiPortRole.Pads);
-        PadDevice = pads.Count == 0 ? "" : string.Join(", ", pads);
     }
 
     /// <summary>
@@ -310,99 +255,29 @@ public sealed partial class MidiViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Starts listening on one row, or stops if that row is already the one listening.
-    /// </summary>
-    /// <remarks>
-    /// Pressing the same button again cancels, which is the only way out for somebody who started
-    /// learning and then decided against it; pressing another row's moves the listening there
-    /// rather than leaving two rows lit.
-    /// </remarks>
-    private void ToggleLearnFor(PadMidiMappingViewModel? row)
-    {
-        if (row is null) return;
-
-        if (_learningTarget == row)
-        {
-            row.IsLearning = false;
-            _learningTarget = null;
-            Status = "Learn cancelled.";
-            return;
-        }
-
-        if (_learningTarget != null)
-            _learningTarget.IsLearning = false;
-
-        _learningTarget = row;
-        _learningTarget.IsLearning = true;
-
-        Status = $"Listening... Press a key/pad for Pad {row.PadIndex}.";
-    }
-
-    /// <summary>
     /// MIDI arrives on its own thread, so the status text and the learn result are handed to
     /// the UI thread before anything bound to them is touched.
     /// </summary>
     private void OnMidi(object? sender, MidiMessage msg) => Dispatcher.UIThread.Post(() => HandleMidi(msg));
 
+    /// <summary>Writes what this page holds back to the settings.</summary>
+    /// <remarks>
+    /// It used to write the pad mapping table as well, which was the only thing here that was
+    /// not already the settings' own object: the jobs a port is given are written straight onto
+    /// the settings by the rows themselves, so this is the save and nothing more.
+    /// </remarks>
+    private void SaveMidi() => _store.Save(_cfg);
+
     /// <summary>
-    /// Shows what arrived, and gives it to the row that is listening.
+    /// Says what arrived, so the page shows the wire.
     /// </summary>
     /// <remarks>
-    /// Only a press is learned: a key sends two messages and the one that lets go would overwrite
-    /// what the press just put there.
-    ///
-    /// And only from a device that drives the pads. A keyboard sitting on the tracker sends notes
-    /// the whole time somebody is playing, and without this the first of them would be learned as
-    /// a pad trigger.
+    /// A line rather than a mapping. Learning used to happen here, on a row of a table of its
+    /// own; the pads are pointed at by the same gesture as everything else now, so what is left
+    /// is the one thing this page is still the place for, which is telling somebody that the
+    /// message they just sent arrived at all.
     /// </remarks>
-    private void HandleMidi(MidiMessage msg)
-    {
+    private void HandleMidi(MidiMessage msg) =>
         Status = $"{msg.Device}: {msg.Type} ch{msg.Channel} val={msg.Value} data={msg.Data} on={msg.IsOn}";
 
-        if (_learningTarget is null)
-            return;
-
-        if (!msg.IsOn)
-            return;
-
-        var role = _bindings.RoleFor(_cfg.Midi.Devices, msg.Device);
-        if ((role & MidiPortRole.Pads) == 0)
-        {
-            Status = $"'{msg.Device}' does not drive the pads, so it cannot be learned here.";
-            return;
-        }
-
-        _learningTarget.Type = msg.Type;
-        _learningTarget.Channel = msg.Channel;
-        _learningTarget.Value = msg.Value;
-
-        _learningTarget.IsLearning = false;
-
-        Status = $"Learned Pad {_learningTarget.PadIndex}: {msg.Type} ch{msg.Channel} val={msg.Value}";
-        _learningTarget = null;
-
-        SaveMidi();
-    }
-
-    /// <summary>Writes the pad mappings and everything else on the page back to the settings.</summary>
-    private void SaveMidi()
-    {
-        _cfg.Midi.Pads = Pads.Select(p => p.ToModel()).ToList();
-        _store.Save(_cfg);
-    }
-
-    /// <summary>
-    /// Builds the mapping table again after the pad matrix was resized.
-    /// </summary>
-    /// <remarks>
-    /// The stored mappings have already been trimmed or extended by the settings on the way
-    /// through, so this only has to catch the table up with them.
-    /// </remarks>
-    /// <param name="newPadCount">How many pads there are now, kept for the caller's own reading.</param>
-    public void UpdatePadCount(int newPadCount)
-    {
-        Pads.Clear();
-        foreach (var m in _cfg.Midi.Pads)
-            Pads.Add(new PadMidiMappingViewModel(m));
-    }
 }

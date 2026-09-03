@@ -10,7 +10,14 @@ public enum MidiPortRole
     /// <summary>Nothing at all, which is what a controller is until somebody says otherwise.</summary>
     None = 0,
 
-    /// <summary>The pads on FIRE and PADS, through <see cref="MidiRouter"/>.</summary>
+    /// <summary>
+    /// The pads on FIRE and PADS, through <see cref="MidiControlRouter.Pads"/>.
+    /// </summary>
+    /// <remarks>
+    /// A port with this may fire pads, which is the whole of what it says. What a message fires
+    /// is a link like any other, so this is the gate rather than the mapping: a pad box that has
+    /// not been given this job fires nothing whatever it has been pointed at.
+    /// </remarks>
     Pads = 1,
 
     /// <summary>Notes into the tracker, which is a keyboard playing an instrument.</summary>

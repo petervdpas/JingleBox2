@@ -342,10 +342,32 @@
              their own ring, because they paint everything else about themselves; a control made
              of a template cannot, so it wears this instead. The colour is the panel's own link
              red, which is the part that has to match: plainly not a colour anything on the page
-             is wearing for its own reasons. -->
-        <Style Selector="ToggleButton.strip.offered /template/ ContentPresenter">
+             is wearing for its own reasons.
+
+             Any button that offers something, rather than the mixer's alone. It was written for
+             the strip buttons and named them, so every control that joined the gesture afterwards
+             wore the class and looked exactly as it always had: the pads on FIRE took a link
+             perfectly well and said nothing whatever about it, which reads as a gesture that is
+             not working rather than as a style nobody wrote. -->
+        <Style Selector="ToggleButton.offered /template/ ContentPresenter">
             <Setter Property="BorderBrush" Value="#FF2D2D" />
             <Setter Property="BorderThickness" Value="2" />
+        </Style>
+
+        <Style Selector="Button.offered /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#FF2D2D" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+
+        <!-- The wash as well, on the small dark buttons, where a border alone is two pixels on a
+             control the size of a fingernail. A pad is a hand's width of colour and keeps its
+             own: washing it red would say the pad had changed rather than that it is being
+             offered. -->
+        <Style Selector="ToggleButton.strip.offered /template/ ContentPresenter">
+            <Setter Property="Background" Value="#33FF2D2D" />
+        </Style>
+
+        <Style Selector="Button.offered /template/ ContentPresenter">
             <Setter Property="Background" Value="#33FF2D2D" />
         </Style>
 

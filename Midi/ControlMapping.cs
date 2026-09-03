@@ -48,11 +48,43 @@ public sealed class ControlMapping
     /// <summary>1 to 16, as the message says it.</summary>
     public int Channel { get; set; } = 1;
 
-    /// <summary>Which continuous controller, 0 to 127.</summary>
+    /// <summary>
+    /// Which number on that channel, 0 to 127: a controller number, or a note where
+    /// <see cref="Sends"/> says so.
+    /// </summary>
+    /// <remarks>
+    /// One number rather than one per kind of message, because a control sends one or the other
+    /// and two fields that have to agree is how they come to disagree. The name is what every
+    /// settings file already written spells it, and every link in one of those is a controller.
+    /// </remarks>
     public int Cc { get; set; }
+
+    /// <summary>
+    /// Which kind of message this control sends: a controller, or a note.
+    /// </summary>
+    /// <remarks>
+    /// Every link made before this was a knob, a fader or a button sending a controller, which is
+    /// what the default says, so a settings file written before this reads as exactly what it
+    /// was. Notes are here because a pad box sends them: the pads are pointed at by the same
+    /// gesture as everything else now, and a pad that would only answer a controller would be a
+    /// gesture that does nothing on most of the hardware people own.
+    ///
+    /// Only the press half of a note is ever answered. A note off is not a second press, which is
+    /// the line the pad router kept before this and the same one the two press branches in
+    /// <see cref="MidiControlRouter"/> keep.
+    /// </remarks>
+    public MidiMessageType Sends { get; set; } = MidiMessageType.ControlChange;
 
     /// <summary>What sort of thing it is pointed at, which decides which fields below are read.</summary>
     public ControlKind Kind { get; set; } = ControlKind.SoundDevice;
+
+    /// <summary>Which pad, counted from nought. Only read when the kind is a pad.</summary>
+    /// <remarks>
+    /// Its own field rather than <see cref="Track"/>, which a fixed mixer link uses: a pad is not
+    /// a track, and one number meaning two things is how a bound check written for one of them
+    /// comes to be applied to the other.
+    /// </remarks>
+    public int Pad { get; set; }
 
     /// <summary>Whether it follows the track you are working on or stays on one.</summary>
     public ControlScope Scope { get; set; } = ControlScope.Focused;
@@ -150,7 +182,9 @@ public sealed class ControlMapping
         Device = one.Device,
         Channel = one.Channel,
         Cc = one.Cc,
+        Sends = one.Sends,
         Kind = one.Kind,
+        Pad = one.Pad,
         Scope = one.Scope,
         Track = one.Track,
         Machine = one.Machine,
@@ -175,7 +209,8 @@ public sealed class ControlMapping
     /// </remarks>
     public bool Answers(MidiMessage message) =>
         message != null
-        && message.Type == MidiMessageType.ControlChange
+        && message.Type == Sends
+        && (Sends != MidiMessageType.Note || message.IsOn)
         && message.Channel == Channel
         && message.Value == Cc
         && (Device.Length == 0 || MidiService.SameName(Device, message.Device));
@@ -207,6 +242,8 @@ public sealed class ControlMapping
 
             ControlKind.Transport => other.Transport == Transport,
 
+            ControlKind.Pad => other.Pad == Pad,
+
             _ => false
         };
     }
@@ -214,6 +251,7 @@ public sealed class ControlMapping
     /// <summary>True when both are the same physical control on the same controller.</summary>
     public bool SameControl(ControlMapping other) =>
         other != null
+        && other.Sends == Sends
         && other.Channel == Channel
         && other.Cc == Cc
         && MidiService.SameName(other.Device, Device);

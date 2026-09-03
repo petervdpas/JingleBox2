@@ -12,9 +12,14 @@ namespace JingleBox2.Midi;
 /// button.
 ///
 /// It names no device, which is the one thing worth knowing about it. A device is pointed at
-/// the pads by name in SETTINGS, so by the time <see cref="MidiRouter"/> sees a message it has
-/// already been decided that this controller drives pads; a knob has no such gate and its
-/// mapping has to carry the controller it was learned on.
+/// the pads by name in SETTINGS, so by the time a message was matched it had already been
+/// decided that this controller drives pads; a knob has no such gate and its mapping has to
+/// carry the controller it was learned on.
+///
+/// Nothing makes one of these any more. The pads are pointed at with the same gesture as
+/// everything else, so what was a table of these is a card of links, and this type is left for
+/// one purpose: reading a settings file written before that and carrying its rows over. See
+/// <c>ConfigStore.PadsBecomeLinks</c> and <c>docs/pad-links.md</c>.
 /// </remarks>
 public sealed class MidiMapping
 {

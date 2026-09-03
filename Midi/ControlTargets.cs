@@ -74,11 +74,23 @@ public sealed class ControlTargets : IControlTargets
     /// ours is looked for on the track you are working on and on the rack, which is what this did
     /// before a face could be opened off a chain at all.
     /// </param>
+    /// <param name="pads">
+    /// The pads, for a button pointed at one. Optional, and without one a pad link finds nothing,
+    /// which is what a test with no window wants.
+    /// </param>
+    /// <param name="toggles">
+    /// Whether a pad hit twice stops rather than starting again. Asked per press rather than
+    /// held, since it is a setting somebody can change while the show is running. Left out, it is
+    /// toggle, which is what a pad box wants and what the setting defaults to.
+    /// </param>
     public ControlTargets(TrackerViewModel tracker, ISoundMachineProjects machines,
                           RackViewModel? rack = null, ITransportPresses? presses = null,
                           SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
-                          ViewModels.Interfaces.ISoundEffectInFront? front = null)
+                          ViewModels.Interfaces.ISoundEffectInFront? front = null,
+                          IPadTrigger? pads = null, Func<bool>? toggles = null)
     {
+        _pads = pads;
+        _toggles = toggles;
         _tracker = tracker;
         _machines = machines;
         _effects = effects;
@@ -89,6 +101,12 @@ public sealed class ControlTargets : IControlTargets
 
     /// <summary>The transport, where there is one.</summary>
     private readonly ITransportPresses? _presses;
+
+    /// <summary>The pads, where there are any.</summary>
+    private readonly IPadTrigger? _pads;
+
+    /// <summary>Whether a pad hit again stops it, asked each time it is hit.</summary>
+    private readonly Func<bool>? _toggles;
 
     /// <inheritdoc/>
     /// <remarks>
@@ -106,6 +124,8 @@ public sealed class ControlTargets : IControlTargets
     public IControlTarget? Find(ControlMapping mapping)
     {
         if (mapping is null) return null;
+
+        if (mapping.Kind == ControlKind.Pad) return OnPad(mapping);
 
         if (mapping.Kind == ControlKind.SoundDevice && OnFront(mapping) is { } ahead) return ahead;
 
@@ -697,6 +717,39 @@ public sealed class ControlTargets : IControlTargets
 
         return new Target(
             Said(key), 0, 1, () => 0, _ => _presses.Press(key), this, mapping);
+    }
+
+    /// <summary>
+    /// One pad, hit.
+    /// </summary>
+    /// <remarks>
+    /// Answered before anything else in <see cref="Find"/> and before a track is worked out at
+    /// all, because a pad is not on a track: the bound check below it is about the song's tracks
+    /// and would throw a pad number away for being past the end of a list it has nothing to do
+    /// with.
+    ///
+    /// Whether the pad is there is <see cref="IPadTrigger"/>'s to say, and it says it by doing
+    /// nothing: pads are made and unmade in the settings while the rest of the program is
+    /// running, so a link made against a matrix of sixteen outliving a cut down to nine is an
+    /// ordinary state rather than a fault. It is not forgotten either, so growing the matrix
+    /// back brings it with it.
+    /// </remarks>
+    private IControlTarget? OnPad(ControlMapping mapping)
+    {
+        if (_pads is null || mapping.Pad < 0) return null;
+
+        int pad = mapping.Pad;
+
+        return new Target(
+            "pad " + (pad + 1),
+            0,
+            1,
+            () => 0,
+            _ => _pads.TriggerPad(
+                pad,
+                _toggles?.Invoke() ?? true ? PadTriggerAction.Toggle : PadTriggerAction.Start),
+            this,
+            mapping);
     }
 
     /// <summary>What to call a transport key on a status line and in a list of links.</summary>

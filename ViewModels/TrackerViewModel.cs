@@ -2165,15 +2165,10 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// <summary>The rack: what this song has to play, and where an instrument comes from.</summary>
     private const string MachinesPage = "Machines";
 
-    /// <summary>The mixer: the song's tracks and the strip that is not one.</summary>
-    /// <summary>What this song's controller is pointed at, which travels in its file.</summary>
-    private const string ControlsPage = "Controls";
-
-    /// <summary>Which of the four pages is up. The pattern, since that is what a song is.</summary>
+    /// <summary>Which of the two pages is up. The pattern, since that is what a song is.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPattern))]
     [NotifyPropertyChangedFor(nameof(ShowsMachines))]
-    [NotifyPropertyChangedFor(nameof(ShowsControls))]
     private string page = PatternPage;
 
     /// <summary>True while the pattern is showing, which is where the music is written.</summary>
@@ -2181,17 +2176,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>True while the rack is showing.</summary>
     public bool ShowsMachines => Page == MachinesPage;
-
-    /// <summary>
-    /// True while the song's own controller layout is showing.
-    /// </summary>
-    /// <remarks>
-    /// Beside the rack and the mixer because it is the same kind of thing: something the song
-    /// holds, wanted while you are working on the song. It was only in the settings, which is
-    /// where the desk's layout belongs and is the wrong place entirely for this song's, since
-    /// it changes when the song does.
-    /// </remarks>
-    public bool ShowsControls => Page == ControlsPage;
 
     /// <summary>
     /// One track's automation, which exists only once something has told the tracker how to
@@ -2287,32 +2271,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty] private double lanesHeight = 120;
 
     /// <summary>
-    /// The templates: what the hardware is pointed at, whatever song is open.
-    /// </summary>
-    /// <remarks>
-    /// The very same list SETTINGS draws, handed in rather than built here, because two of them
-    /// would be two answers to one question and taking a link off one would leave the other
-    /// showing it. It is here at all because this is where a link is made: the gesture is
-    /// Ctrl+Shift+M over a machine on the rack, which is the button next along, and reading
-    /// what it did meant leaving the tracker for a settings page.
-    ///
-    /// There was a second list beside it, the song's own. A song no longer holds links of its
-    /// own: what a knob does to a machine is true of every song that plays that machine.
-    /// </remarks>
-    public ControlLinksViewModel? DeskControls
-    {
-        get => _deskControls;
-        set
-        {
-            _deskControls = value;
-            OnPropertyChanged();
-        }
-    }
-
-    /// <summary>Behind <see cref="DeskControls"/>, which is set from outside once.</summary>
-    private ControlLinksViewModel? _deskControls;
-
-    /// <summary>
     /// What the hardware on this desk does to the mixer, for the button in the mixer's corner.
     /// </summary>
     /// <remarks>
@@ -2335,7 +2293,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// pressing the lit button again is the way back.
     /// </remarks>
     public IRelayCommand<string> ShowCommand => new RelayCommand<string>(which =>
-        Page = which == Page || which is not (MachinesPage or ControlsPage)
+        Page = which == Page || which != MachinesPage
             ? PatternPage
             : which);
 

@@ -162,6 +162,22 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public ControlLinksViewModel Links { get; private set; } = null!;
 
     /// <summary>
+    /// What the hardware on this desk does to the pads, for the button in FIRE's corner.
+    /// </summary>
+    /// <remarks>
+    /// The same list a machine's own Menu shows and the same class behind it, pointed at the pads
+    /// instead of at one machine. It names no particular pad: the whole bank is one thing to
+    /// point a controller at, so what somebody wants to see is what their MPD218 does to the
+    /// pads rather than a menu per pad.
+    ///
+    /// Made here and never rebuilt, since it holds nothing and reads the links every time it is
+    /// worked.
+    /// </remarks>
+    public Rack.SoundDevices.Faces.Interfaces.IPanelMenu PadsMenu { get; } =
+        new JingleBox2.Midi.ControlMenu(
+            () => "", () => "the pads", kind: JingleBox2.Midi.LinkTargets.Pads);
+
+    /// <summary>
     /// Which MIDI ports this computer has, asked rather than held.
     /// </summary>
     /// <remarks>
@@ -1696,7 +1712,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         BuildLogParts();
 
-        var padRouter = new MidiRouter(_cfg.Midi, new PadTriggerAdapter(Pads));
+        var padTrigger = new PadTriggerAdapter(Pads);
 
         Keys = new MidiMonitor(new TrackerNoteAdapter(Tracker, Machines));
 
@@ -1708,7 +1724,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         ControlLink = new ControlLink(_cfg.Midi.Controls, () => _store.Save(_cfg));
 
         var targets = new ControlTargets(
-            Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront);
+            Tracker, _machines, Machines, new TransportPresses(Transport), _effects, _effectInFront,
+            padTrigger, () => _cfg.Midi.ToggleMode);
 
         var controlRouter = new MidiControlRouter(
             () => ControlLink.Mappings,
@@ -1729,7 +1746,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         Links = new ControlLinksViewModel(ControlLink, profiles: _profiles, ports: Ports);
 
-        Tracker.DeskControls = Links;
 
         var transport = new MidiTransportRouter(new TransportAdapter(Transport), _profiles);
 
@@ -1746,7 +1762,12 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         var dispatcher = new MidiDispatcher(
             _cfg.Midi,
-            padRouter.Handle,
+            msg =>
+            {
+                if (ControlLink.Handle(msg) is { } made) controlRouter.Caught(made);
+
+                controlRouter.Pads(msg);
+            },
             msg => { if (SelectedTab != UseTab) noteRouter.Handle(msg); },
             msg =>
             {
@@ -1984,8 +2005,6 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         EnsureProfilesInitialized(PadCount);
         BuildPadsFromSelectedProfile(PadCount);
-
-        Midi.UpdatePadCount(PadCount);
 
         _store.Save(_cfg);
 

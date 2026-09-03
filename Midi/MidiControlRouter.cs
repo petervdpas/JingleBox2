@@ -16,7 +16,9 @@ namespace JingleBox2.Midi;
 /// <remarks>
 /// The third router, and the same shape as the two before it: this one knows the mappings and
 /// nothing about the application, and an adapter reaches the things being moved. See
-/// <see cref="MidiRouter"/> for pads and <see cref="MidiNoteRouter"/> for notes.
+/// <see cref="MidiNoteRouter"/> for notes.
+///
+/// The pads come through here as well, by their own door: see <see cref="Pads"/>.
 ///
 /// A knob is not a key, and the difference is the whole of the work here. A key is an event: it
 /// happened, and the pad plays. A knob is a stream, around a hundred messages a second while a
@@ -199,6 +201,8 @@ public sealed class MidiControlRouter
 
         foreach (var mapping in mappings)
         {
+            if (mapping.Kind == ControlKind.Pad) continue;
+
             if (!mapping.Answers(message)) continue;
 
             answered = true;
@@ -217,6 +221,56 @@ public sealed class MidiControlRouter
             Apply(fallback, waiting, message.Data);
         }
     }
+
+    /// <summary>
+    /// The same, for a message from a port that has been given the pads.
+    /// </summary>
+    /// <remarks>
+    /// Its own door rather than a branch inside <see cref="Handle"/>, because the two are reached
+    /// through different jobs in SETTINGS: a port drives the pads, or the links, or both, and a
+    /// pad link answering on the knobs' door would have a pad box that was never given the pads
+    /// firing them anyway. The list of links is the one list either way; what differs is which
+    /// of them is being asked.
+    ///
+    /// None of the knob machinery is here and none of it applies. Pickup is about a value a hand
+    /// has to catch up with and a pad has no value; parking is about a control driven into an end
+    /// and a pad has no ends; and the press test the other two press kinds use reads a velocity
+    /// under 64 as a button coming up, which would mean a pad hit gently did nothing. A press is
+    /// a press: for a note that is <see cref="MidiMessage.IsOn"/>, which
+    /// <see cref="ControlMapping.Answers"/> has already asked, and for a controller it is the
+    /// half of its range a button sends on the way down.
+    /// </remarks>
+    /// <param name="message">What arrived on a port that drives the pads.</param>
+    public void Pads(MidiMessage message)
+    {
+        if (message is null) return;
+
+        if (message.Type is not (MidiMessageType.Note or MidiMessageType.ControlChange)) return;
+
+        var mappings = _mappings();
+        if (mappings is null) return;
+
+        foreach (var mapping in mappings)
+        {
+            if (mapping.Kind != ControlKind.Pad) continue;
+
+            if (!mapping.Answers(message)) continue;
+
+            if (message.Type == MidiMessageType.ControlChange && message.Data < Still) continue;
+
+            if (_targets.Find(mapping) is not { } target) continue;
+
+            target.Set(1);
+
+            Log.Write(LogArea.Midi, () =>
+                "pads: " + Sent(mapping) + " fired " + target.Name);
+        }
+    }
+
+    /// <summary>How to say which control a link is on, for a line in the log.</summary>
+    private static string Sent(ControlMapping mapping) =>
+        (mapping.Sends == MidiMessageType.Note ? "note " : "CC ")
+        + mapping.Cc + " ch" + mapping.Channel;
 
     /// <summary>
     /// One message against one thing it is pointed at.

@@ -7,9 +7,14 @@ namespace JingleBox2.Midi.Interfaces;
 /// </summary>
 /// <remarks>
 /// The seam between the wire and the pads, and it is the same shape as
-/// <see cref="INoteTrigger"/> for the same reason: <see cref="MidiRouter"/> knows the mappings
-/// and nothing about the application, and the adapter on the other side knows the pads and
-/// nothing about MIDI. Neither of them needs a window to be put a question to.
+/// <see cref="INoteTrigger"/> for the same reason: what is above it knows the links and nothing
+/// about the application, and the adapter on the other side knows the pads and nothing about
+/// MIDI. Neither of them needs a window to be put a question to.
+///
+/// What is above it is <see cref="ControlTargets"/> now, the same door a knob on a machine and a
+/// fader on the mixer are reached through, since a pad is pointed at by the same gesture as
+/// everything else. It was a router of its own over a table of its own, which was the second way
+/// of doing the one thing that layer is for.
 ///
 /// A pad number outside the range is an ordinary state rather than a fault: pads are made and
 /// unmade in SETTINGS while the rest of the program is running, and a mapping made against an

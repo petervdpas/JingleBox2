@@ -198,6 +198,13 @@ public sealed class ControlLink
     /// The link it just made, or null when it made none.
     /// </returns>
     /// <remarks>
+    /// A note is taken as well as a controller, and only its press half. Every link made before
+    /// the pads joined this layer was a knob or a button sending a controller; a pad box sends
+    /// notes, so a gesture that would only learn a controller is a gesture that does nothing on
+    /// most of the hardware people own. A note off arriving while something is offered is the
+    /// hand coming off the pad it just learned, and learning it a second time from that would
+    /// point the release at whatever was offered next.
+    ///
     /// Nothing is swallowed. Pointing mode used to eat the message that made a link, on the
     /// reasoning that a knob being assigned should not also be turning something, and that was
     /// wrong in the only way that matters: you point at a filter, turn the knob, and nothing
@@ -236,13 +243,16 @@ public sealed class ControlLink
 
         if (!_linking) return null;
 
-        if (message.Type != MidiMessageType.ControlChange) return null;
+        if (message.Type is not (MidiMessageType.ControlChange or MidiMessageType.Note)) return null;
+
+        if (message.Type == MidiMessageType.Note && !message.IsOn) return null;
 
         if (_offered is not { } wanted) return null;
 
         wanted.Device = message.Device ?? "";
         wanted.Channel = message.Channel;
         wanted.Cc = message.Value;
+        wanted.Sends = message.Type;
 
         Changing();
 
@@ -264,7 +274,8 @@ public sealed class ControlLink
         _changed();
 
         Log.Write(LogArea.Midi, () =>
-            "link: CC " + wanted.Cc + " ch" + wanted.Channel + " now moves "
+            "link: " + (wanted.Sends == MidiMessageType.Note ? "note " : "CC ")
+            + wanted.Cc + " ch" + wanted.Channel + " now moves "
             + (wanted.Name.Length > 0 ? wanted.Name : wanted.Key)
             + ", " + held + " on the desk");
 

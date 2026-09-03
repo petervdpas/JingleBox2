@@ -37,6 +37,24 @@ public interface ILinkTargets
     /// <param name="one">The link to place.</param>
     string KeyOf(ControlMapping one);
 
+    /// <summary>
+    /// Whether that kind is one thing to point a controller at rather than one of many.
+    /// </summary>
+    /// <remarks>
+    /// A machine is one of many and names itself: a knob pointed at OddSkilla has nothing to say
+    /// to the machine on the next box. The mixer and the pads are each one thing, because what
+    /// somebody keeps, hands on or lays down again is the whole layout of the desk rather than
+    /// one fader or one pad, and cut the other way they would be a card apiece saying the same
+    /// words with a number changed.
+    ///
+    /// Asked rather than spelled out wherever it is needed, and it is needed in two places that
+    /// must agree: how the cards and the template files are cut, and whether a menu with nothing
+    /// named has anything to be about. Two spellings of it would drift, and the way that fails is
+    /// a page listing what a corner menu says is not there.
+    /// </remarks>
+    /// <param name="kind">One of the words a link's kind is written down as.</param>
+    bool Whole(string kind);
+
     /// <summary>The one word for what sort of thing it is on: machine, effect, mixer or transport.</summary>
     /// <param name="one">The link to describe.</param>
     string KindOf(ControlMapping one);

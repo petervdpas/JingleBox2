@@ -38,6 +38,62 @@ public sealed class ConfigStore : IConfigStore
     /// </remarks>
     private const int FirstPadNote = 36;
 
+    /// <summary>
+    /// Turns the table of pad mappings an older settings file holds into links, once.
+    /// </summary>
+    /// <remarks>
+    /// The pads are pointed at by the same gesture as everything else now, so what was a list of
+    /// its own beside the links is a list of links. Read once and then emptied, which is the flag
+    /// that it has been done: an empty table is a table that has been carried over, and a fresh
+    /// installation has an empty one already.
+    ///
+    /// Nothing is thrown away and nothing is invented. Every row becomes a link naming no
+    /// controller, which reads as any of them, because a pad mapping never named one: the router
+    /// matched on the kind, the channel and the number alone and left it to the job ticked in
+    /// SETTINGS to say which port was allowed to fire pads. So a pad box that worked yesterday
+    /// works this morning, including the rows nobody ever learned, which are the notes 36 upwards
+    /// that made a pad box work out of the box.
+    ///
+    /// A row for a pad the matrix no longer has is carried over with the rest. A link naming pad
+    /// twelve on a bank of nine fires nothing and is not forgotten either, so growing the matrix
+    /// back brings it with it, which is the rule a link already keeps about a controller that is
+    /// not plugged in.
+    ///
+    /// Nothing is seeded for a fresh installation, which is a deliberate change from the table
+    /// this replaces. That table was filled in with notes 36 upwards on channel 1 for every pad
+    /// whether or not anybody had asked for it, and <see cref="DefaultLayout"/> has said the
+    /// opposite since it was written: a pad nobody has pointed at should do nothing rather than
+    /// something surprising. The seeded rows mostly did nothing anyway, since the pad boxes here
+    /// send on channel 10.
+    /// </remarks>
+    /// <param name="midi">The settings' MIDI half, whose two lists this moves between.</param>
+    private static void PadsBecomeLinks(MidiConfig midi)
+    {
+        if (midi.Pads.Count == 0) return;
+
+        foreach (var pad in midi.Pads)
+        {
+            if (pad.PadIndex < 0) continue;
+
+            var link = PadLinks.On(pad.PadIndex);
+
+            link.Sends = pad.Type == MidiMessageType.Note
+                ? MidiMessageType.Note
+                : MidiMessageType.ControlChange;
+
+            link.Channel = pad.Channel is >= 1 and <= 16 ? pad.Channel : 1;
+            link.Cc = pad.Value is >= 0 and <= 127 ? pad.Value : 0;
+
+            if (midi.Controls.Any(one => one.Kind == ControlKind.Pad && one.Pad == pad.PadIndex))
+                continue;
+
+            midi.Controls.Add(link);
+        }
+
+        midi.Pads.Clear();
+    }
+
+
     /// <summary>How a file is written whole, so a settings save cannot leave half of one.</summary>
     private readonly ISafeFile _files;
 
@@ -173,23 +229,9 @@ public sealed class ConfigStore : IConfigStore
 
         new MidiPortBindings().Normalize(cfg.Midi);
 
-        while (cfg.Midi.Pads.Count < padCount)
-        {
-            var i = cfg.Midi.Pads.Count;
-            cfg.Midi.Pads.Add(new MidiMapping
-            {
-                PadIndex = i,
-                Type = MidiMessageType.Note,
-                Channel = 1,
-                Value = FirstPadNote + i
-            });
-        }
+        cfg.Midi.Controls ??= new List<ControlMapping>();
 
-        while (cfg.Midi.Pads.Count > padCount)
-            cfg.Midi.Pads.RemoveAt(cfg.Midi.Pads.Count - 1);
-
-        for (int i = 0; i < cfg.Midi.Pads.Count; i++)
-            cfg.Midi.Pads[i].PadIndex = i;
+        PadsBecomeLinks(cfg.Midi);
 
         if (cfg.Profiles.Count == 0 && cfg.Pads.Count > 0)
         {

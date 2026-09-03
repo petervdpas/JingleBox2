@@ -13,8 +13,7 @@ namespace JingleBox2.Midi;
 /// <remarks>
 /// The second router, and the same shape as the first: this one knows the wire and nothing about
 /// the application, and an adapter on the far side of <see cref="INoteTrigger"/> knows where a
-/// note goes. See <see cref="MidiRouter"/> for pads and <see cref="MidiControlRouter"/> for
-/// knobs.
+/// note goes. See <see cref="MidiControlRouter"/> for knobs and for pads.
 ///
 /// Both halves of a key are passed on. What a release turns into is decided further along,
 /// where the setting for it lives: writing a note-off for every key that comes up fills a

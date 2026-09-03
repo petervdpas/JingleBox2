@@ -14,8 +14,8 @@ namespace JingleBox2.Midi;
 /// The fifth router, and the same shape as the four before it: this one knows a protocol and
 /// nothing about the application, and reaches the mixer through <see cref="IControlTargets"/>,
 /// which is the same door a link somebody made by hand writes through. See
-/// <see cref="MidiRouter"/> for pads, <see cref="MidiNoteRouter"/> for notes,
-/// <see cref="MidiControlRouter"/> for knobs and <see cref="MidiTransportRouter"/> for the
+/// <see cref="MidiNoteRouter"/> for notes,
+/// <see cref="MidiControlRouter"/> for knobs and for pads, and <see cref="MidiTransportRouter"/> for the
 /// transport, whose five buttons are deliberately not read here: they arrive on this same port
 /// and that router already answers them, and answering twice would stop what the press started.
 ///

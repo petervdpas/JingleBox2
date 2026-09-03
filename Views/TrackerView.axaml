@@ -129,14 +129,6 @@
                 Classes.active="{Binding ShowsMachines}"
                 Command="{Binding ShowCommand}" CommandParameter="Machines"
                 ToolTip.Tip="What is installed: the machines this song can take an instrument off." />
-
-        <!-- Here rather than only in the settings, because what a song has its controller
-             pointed at is a thing the song holds, like its patterns: it comes and goes with the
-             song, and the settings are where the desk's layout lives. -->
-        <Button Content="MIDI CC" Classes="page"
-                Classes.active="{Binding ShowsControls}"
-                Command="{Binding ShowCommand}" CommandParameter="Controls"
-                ToolTip.Tip="What this song has its controller pointed at, and which travels in its file." />
       </StackPanel>
       </Grid>
     </Border>
@@ -575,23 +567,6 @@
         </DataTemplate>
       </ContentControl.ContentTemplate>
     </ContentControl>
-
-    <!-- The templates, one card for each controller against each thing it is pointed at. Here
-         because this is where you make one: pointing at a machine on the rack is one button
-         away, and until now the only place to read the result was SETTINGS, which is a
-         different page in a different part of the application from the gesture that wrote it.
-         It is still in SETTINGS, since that is where the hardware is looked after, and it is
-         the same list rather than a copy of it: forgetting a link on either page is the same
-         act and both pages show it at once.
-
-         There were two lists here, this one and the song's own. A song no longer holds links:
-         what a knob does to a machine is true of every song that plays it, so a copy per song
-         was the same work done again and could be handed to nobody. -->
-    <!-- Each card as tall as what it holds, and the page scrolls when they are together taller
-         than the window. A list wants the room its contents want. -->
-    <ScrollViewer IsVisible="{Binding ShowsControls}" VerticalScrollBarVisibility="Auto">
-      <views:ControlLinksView DataContext="{Binding DeskControls}" />
-    </ScrollViewer>
 
     </Grid>
   </DockPanel>

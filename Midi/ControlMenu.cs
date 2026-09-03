@@ -182,9 +182,14 @@ public sealed class ControlMenu : IPanelMenu
     /// A machine names itself and the mixer does not, and the difference decides two things: what
     /// counts as one of this menu's links, and whether a menu with nothing named has anything to
     /// be about at all. A machine with no id is a page with nothing open; the mixer with no id is
-    /// the mixer.
+    /// the mixer, and so are the pads.
+    ///
+    /// Asked of the naming rule rather than answered here, which is the same reason this cuts its
+    /// templates by that rule: the pads arrived as a second kind that names nothing, and a menu
+    /// with its own list of which those are would have gone on returning an empty flyout while
+    /// the page beside it drew the card.
     /// </remarks>
-    private bool Names => !string.Equals(_kind, LinkTargets.Mixer, StringComparison.Ordinal);
+    private bool Names => !_naming.Whole(_kind);
 
     /// <summary>
     /// One control surface pointed at this machine, and laying its template down again.

@@ -64,6 +64,17 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     public int Index { get; }
 
     /// <summary>
+    /// What a hardware button is pointed at when the pointer is resting on this pad.
+    /// </summary>
+    /// <remarks>
+    /// The same shape a mixer strip's six have: a template, copied before it is handed over,
+    /// naming the pad and nothing about what is on it. A pad's own name is the recording somebody
+    /// put on it this morning, and a link named after that would be a link that lies the moment
+    /// the pad is filled with something else.
+    /// </remarks>
+    public Midi.ControlMapping PadLink => Midi.PadLinks.On(Index);
+
+    /// <summary>
     /// The effect on this pad. Set once the pad knows which engine it plays through, so a pad
     /// built without one simply has no slot rather than a broken one.
     /// </summary>

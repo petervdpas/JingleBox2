@@ -46,6 +46,14 @@ public sealed class LinkTargets : ILinkTargets
     /// <summary>The transport keys, which belong to no track and no song.</summary>
     public const string Transport = "transport";
 
+    /// <summary>The pads, which belong to no track either.</summary>
+    /// <remarks>
+    /// One target for all of them, the way the mixer is one for all its strips: what somebody
+    /// keeps or hands on is the whole pad layout, and cut by pad it would be sixteen cards
+    /// saying the same words with a number changed. Which pad is on each line instead.
+    /// </remarks>
+    public const string Pads = "pads";
+
     /// <summary>What the master strip is called, since it is not a track and has no number.</summary>
     private const string Master = "master";
 
@@ -106,7 +114,12 @@ public sealed class LinkTargets : ILinkTargets
     /// writes it on each of its lines: see <see cref="ControlTemplateControl.Strip"/>.
     /// </remarks>
     public string KeyOf(ControlMapping one) =>
-        one.Kind == ControlKind.Mix ? Mixer + ":" : KindOf(one) + ":" + IdOf(one);
+        Whole(KindOf(one)) ? KindOf(one) + ":" : KindOf(one) + ":" + IdOf(one);
+
+    /// <inheritdoc/>
+    public bool Whole(string kind) =>
+        string.Equals(kind, Mixer, StringComparison.Ordinal)
+        || string.Equals(kind, Pads, StringComparison.Ordinal);
 
     /// <inheritdoc/>
     public string KindOf(ControlMapping one) => one.Kind switch
@@ -114,6 +127,7 @@ public sealed class LinkTargets : ILinkTargets
         ControlKind.SoundDevice or ControlKind.Action => SoundDevice,
         ControlKind.Plugin => Plugin,
         ControlKind.Mix => Mixer,
+        ControlKind.Pad => Pads,
         _ => Transport
     };
 
@@ -134,6 +148,7 @@ public sealed class LinkTargets : ILinkTargets
         ControlKind.SoundDevice or ControlKind.Action => one.Key,
         ControlKind.Plugin => one.Parameter.ToString(CultureInfo.InvariantCulture),
         ControlKind.Mix => Strip.FirstOrDefault(each => each.What == one.Mix).Said ?? "",
+        ControlKind.Pad => (one.Pad + 1).ToString(CultureInfo.InvariantCulture),
         _ => Keys.FirstOrDefault(each => each.Key == one.Transport).Said ?? ""
     };
 
@@ -145,6 +160,8 @@ public sealed class LinkTargets : ILinkTargets
         if (all.Count == 0) return "";
 
         if (all[0].Kind == ControlKind.Mix) return "Mixer";
+
+        if (all[0].Kind == ControlKind.Pad) return "Pads";
 
         if (all.Select(one => one.Owner).FirstOrDefault(one => one.Length > 0) is { Length: > 0 } named)
             return named;
@@ -160,6 +177,7 @@ public sealed class LinkTargets : ILinkTargets
                 first.Machine.Length > 0 ? first.Machine : "A device",
             ControlKind.Plugin => first.Plugin.Length > 0 ? first.Plugin : "An effect",
             ControlKind.Mix => "Mixer",
+            ControlKind.Pad => "Pads",
             _ => "Transport"
         };
     }
@@ -170,7 +188,8 @@ public sealed class LinkTargets : ILinkTargets
         ControlKind.SoundDevice or ControlKind.Action => 0,
         ControlKind.Plugin => 1,
         ControlKind.Mix => 2,
-        _ => 3
+        ControlKind.Pad => 3,
+        _ => 4
     };
 
     /// <inheritdoc/>
@@ -247,6 +266,20 @@ public sealed class LinkTargets : ILinkTargets
                 Scope = ControlScope.Fixed,
                 Track = track,
                 Mix = Strip.First(each => Same(each.Said, parameter)).What
+            };
+        }
+
+        if (Same(kind, Pads))
+        {
+            if (!int.TryParse(parameter, NumberStyles.Integer, CultureInfo.InvariantCulture, out int shown)
+                || shown < 1)
+                return null;
+
+            return new ControlMapping
+            {
+                Kind = ControlKind.Pad,
+                Scope = ControlScope.Fixed,
+                Pad = shown - 1
             };
         }
 

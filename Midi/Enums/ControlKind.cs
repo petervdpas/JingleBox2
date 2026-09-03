@@ -50,5 +50,20 @@ public enum ControlKind
     /// The one kind that names neither a track nor a sound device. There is one transport and it
     /// is the same one from every page, so a button pointed at play means play.
     /// </remarks>
-    Transport
+    Transport,
+
+    /// <summary>
+    /// One pad, fired.
+    /// </summary>
+    /// <remarks>
+    /// A press like <see cref="Action"/> and <see cref="Transport"/> are, and pinned like a mixer
+    /// strip is: pad 3 is pad 3 from every page, so it names the pad and follows nothing.
+    ///
+    /// It is here at all because a pad box used to be pointed at the pads by a table of its own
+    /// in the settings, with its own storage and its own Learn button, which is a second way of
+    /// doing the one thing this whole layer is for. Two ways of doing one thing that answer
+    /// differently is the fault this codebase has already paid for once. See
+    /// <c>docs/pad-links.md</c>.
+    /// </remarks>
+    Pad
 }

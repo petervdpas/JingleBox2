@@ -16,6 +16,9 @@ namespace JingleBox2.Midi;
 /// <inheritdoc/>
 public sealed class ControlTemplates : IControlTemplates
 {
+    /// <summary>The word a line uses for a control that sends a note rather than a controller.</summary>
+    private const string Note = "note";
+
     /// <summary>What a target is called and which parameter, which the file and the page share.</summary>
     private readonly ILinkTargets _targets;
 
@@ -122,7 +125,8 @@ public sealed class ControlTemplates : IControlTemplates
                 Pickup = _targets.Said(one.Pickup),
                 Turn = _targets.Said(one.Turn),
                 Track = Pinned(one) ? one.Track + 1 : 0,
-                Strip = Strips(one) ? _targets.IdOf(one) : ""
+                Strip = Strips(one) ? _targets.IdOf(one) : "",
+                Sends = one.Sends == Enums.MidiMessageType.Note ? Note : ""
             });
 
         return template;
@@ -160,6 +164,9 @@ public sealed class ControlTemplates : IControlTemplates
             one.Device = found ? port : wanted;
             one.Channel = entry.Channel is >= 1 and <= 16 ? entry.Channel : 1;
             one.Cc = entry.Cc is >= 0 and <= 127 ? entry.Cc : 0;
+
+            if (string.Equals(entry.Sends, Note, System.StringComparison.OrdinalIgnoreCase))
+                one.Sends = Enums.MidiMessageType.Note;
 
             if (_targets.Pickup(entry.Pickup ?? "") is { } pickup) one.Pickup = pickup;
             if (_targets.Turn(entry.Turn ?? "") is { } turn) one.Turn = turn;

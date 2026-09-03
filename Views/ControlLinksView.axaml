@@ -74,8 +74,13 @@
 
                       <!-- Pressed when the guess was wrong. A button that repeats while
                            it is held sends what an encoder sends, so working it out from
-                           the values cannot be right every time. -->
+                           the values cannot be right every time.
+
+                           Not on a pad, which has no value for a hand to be reconciled with:
+                           a press is a press, and every setting behind this button would
+                           reach it with nothing to do. -->
                       <Button Grid.Column="3" Classes="page"
+                              IsVisible="{Binding Reads}"
                               Content="{Binding How}"
                               Command="{Binding NextCommand}"
                               ToolTip.Tip="What kind of control this is, worked out from what it sends. Press to say it is something else; press past the end to have it listen again." />

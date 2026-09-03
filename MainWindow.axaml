@@ -150,6 +150,18 @@
         <views:SettingsView />
       </TabItem>
 
+      <!-- The templates: one card for each controller against each thing it is pointed at. A
+           word of its own at the end of the strip rather than a button on the tracker, where it
+           began, because a template is a fact about the desk and not about the song: the same
+           page holds what a nanoKONTROL2 does to the mixer, which has nothing to do with any
+           pattern. It is the same list SETTINGS draws under Control Surfaces rather than a copy
+           of it, so forgetting a link on either is the same act and both show it at once. -->
+      <TabItem Header="MIDI CC">
+        <ScrollViewer Classes="tabRoot" VerticalScrollBarVisibility="Auto">
+          <views:ControlLinksView DataContext="{Binding Links}" />
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
 
     </Grid>

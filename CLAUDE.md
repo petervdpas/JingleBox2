@@ -71,7 +71,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   owns. The rack it used to hold is in `SoundDevices/`
 - `Tracker/Synth/` - The synth voice: waves, ADSR, modulation, and the preset bank
 - `ViewModels/` - MainViewModel (orchestrator), PadViewModel (per-pad), MidiViewModel
-- `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView) plus MidiView, hosted by the MidiMappingWindow dialog
+- `Views/` - Avalonia user controls (UseView, PadsView, TrackerView, RecordView, SettingsView)
 - The tab along the top is **DESIGNER**, and it holds both worlds on two tabs of its own,
   Machines and Effects. It was MACHINES. The page is where a machine's face
   is laid out, which is a job rather than a list of things: MACHINES read as the place your
@@ -84,7 +84,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 
 - **Playback**: PadViewModel → BassAudioEngine → BASS library → PadPlaybackChanged event → UI update
 - **Config**: PadViewModel property change → MainViewModel → ConfigStore.Save() → JSON file
-- **MIDI**: MidiService.MessageReceived → MidiDispatcher → (MidiRouter → PadTriggerAdapter → PadViewModel.TogglePlayCommand) or (MidiNoteRouter → TrackerNoteAdapter → TrackerViewModel)
+- **MIDI**: MidiService.MessageReceived → MidiDispatcher → (MidiControlRouter.Pads → ControlTargets → PadTriggerAdapter → PadViewModel.TogglePlayCommand) or (MidiNoteRouter → TrackerNoteAdapter → TrackerViewModel)
 - **Tracker**: TrackerPlayer clock → TrackerSequencer events → sample channels (TrackerSampleBank) or voices and plugins (TrackMixer → SynthOutput → one BASS stream)
 
 ### Key Classes
@@ -99,7 +99,34 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - `Vst3Messages` (Audio/Plugins/): The envelope a VST3 plugin's two halves post to each other. A host that refuses to supply one crashes plugins that do not check
 - `XEmbed` (Audio/Plugins/): The handshake a plugin window from another program waits for before it will draw
 - `ConfigStore` (Config/): JSON persistence with profile migration support
-- `MidiRouter` (Midi/): Maps MIDI messages to pad triggers with toggle/start modes
+- The pads are pointed at like everything else. A button on a pad box is learned by resting the
+  pointer on the pad on FIRE and hitting it, the link lands on the same layer every other link
+  does, and it turns up on MIDI CC as one card headed Pads with a line per pad, the way the mixer
+  is one card for every strip. FIRE carries the same Menu the mixer's card has, in its own upper
+  right corner. `docs/pad-links.md` is the design and the record.
+
+  It replaced a mapping table in SETTINGS with its own storage, its own Learn button and its own
+  matching rules in a router of its own, which was a second way of doing the one thing that layer
+  is for: two ways of doing one thing that answer differently is the fault this codebase has
+  already paid for once. `MidiRouter` and `MidiMapping`'s table are gone; the type is left only so
+  a settings file written before this can be read, and `ConfigStore.PadsBecomeLinks` carries every
+  row over once, naming no controller because the table never named one, and empties it.
+
+  Two things are genuinely new under it. A link can name a **note**, since a pad box sends notes
+  and every link before this was a knob or a button sending a controller: `ControlMapping.Sends`
+  says which, absent means controller, and only the press half of a note is ever answered. And the
+  pads have a door of their own on the control router, `MidiControlRouter.Pads`, because the job a
+  port is given in SETTINGS still decides what it may drive: a pad box that has not been given the
+  pads fires nothing whatever it has been pointed at. None of the knob machinery applies there, and
+  the reason is worth keeping: the press test the other two press kinds use reads anything under 64
+  as a button coming up, which for a note is a velocity, so a pad played softly would have done
+  nothing.
+
+  A fresh installation has nothing pointed at the pads, which is a deliberate change. The old table
+  was filled in with notes 36 upwards on channel 1 whether or not anybody asked, and `DefaultLayout`
+  has said the opposite since it was written: a pad nobody has pointed at should do nothing rather
+  than something surprising. Those seeded rows mostly did nothing anyway, since the pad boxes here
+  send on channel 10
 - `MidiDispatcher` (Midi/): Sends each message to the pads, the tracker, or both, by the device's role in SETTINGS
 - `MidiNoteRouter` (Midi/): Turns keyboard notes into tracker note entry
 - `TrackerPlayer` (Tracker/): Owns the clock and routes each event to a sample channel or a synth voice, through the track's mixer strip
@@ -1473,11 +1500,18 @@ whole exercise and is worth writing down rather than summarising:
   `ControllerLinks` and then `ControlTemplateLinks` for the same reason. The umbrella is not shown at all in the interface,
   where a card is headed with the thing itself and the sort of thing is a quiet word beside it,
   so nobody has to learn the word to read the page
-- The list is in two places and is one list rather than a copy: SETTINGS because that is where
-  the hardware is looked after, the tracker because that is where the pointing gesture is made,
-  one button along from the rack. `Views/ControlLinksView.axaml` is that one drawing, bound to
-  the list rather than to whoever holds one. It had been written out twice and the two had
-  already drifted apart by a column
+- The list is in one place, which is **MIDI CC**, the last word along the top.
+  `Views/ControlLinksView.axaml` is that one drawing, bound to the list rather than to whoever
+  holds one. It had once been written out twice and the two had already drifted apart by a column,
+  which is why it is one drawing however many pages want it.
+  It was a button on the tracker's own bar first, on the reasoning that the tracker is where the
+  pointing gesture is made, and that was wrong about what a template is: the same page holds what
+  a nanoKONTROL2 does to the mixer, which is a fact about the desk and about no song at all. A
+  word of its own, because a template is worked with rather than set up once. It was also drawn
+  at the foot of SETTINGS, Control Surfaces, which is where the hardware is looked after and is
+  therefore the one page it looks like it belongs on. It does not: two ways in to one list is two
+  places to go looking and one of them is always the wrong guess, and the list is long enough to
+  bury the device rows that page is actually for
 - `ControlMapping.Owner` is what a link is pointed at in the words on the front of it, beside
   the ids that decide. Separate from `Name`, which is the owner and the control run together:
   under a card headed OddSkilla the rows want the rest of the sentence, and there is no way back

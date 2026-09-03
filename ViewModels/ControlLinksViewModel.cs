@@ -582,8 +582,16 @@ public sealed class ControlLinkRow
     public string Control =>
         _profiles.Named(Mapping.Device, Mapping.Channel, Mapping.Cc) is { Length: > 0 } named
             ? named
-            : "CC " + Mapping.Cc.ToString(CultureInfo.InvariantCulture)
+            : Sent + " " + Mapping.Cc.ToString(CultureInfo.InvariantCulture)
               + "  ch " + Mapping.Channel.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Which kind of message the control sends, for the number to be read as.</summary>
+    /// <remarks>
+    /// A note and a controller are both a number between nought and 127 and they are not the
+    /// same thing: a pad box's note 44 has nothing to do with a fader's CC 44, and a column
+    /// calling both of them CC is a column saying two links are on one control.
+    /// </remarks>
+    private string Sent => Mapping.Sends == MidiMessageType.Note ? "note" : "CC";
 
     /// <summary>Which controller it was learned on, or nothing when it names none.</summary>
     public string Device => Mapping.Device;
@@ -637,10 +645,21 @@ public sealed class ControlLinkRow
     /// </remarks>
     public bool IsPinned =>
         Mapping.Scope == ControlScope.Fixed
-        && Mapping.Kind is not (ControlKind.Mix or ControlKind.Transport);
+        && Mapping.Kind is not (ControlKind.Mix or ControlKind.Transport or ControlKind.Pad);
 
     /// <summary>What kind of control it turned out to be, or that it is still listening.</summary>
-    public string How => ControlSense.Describe(Mapping.Pickup, Mapping.Turn);
+    /// <remarks>
+    /// Nothing on a pad, and the button is dead there. Pickup is how a hand and a value that
+    /// disagree are reconciled, and a pad has no value to disagree with: a press is a press. The
+    /// row would otherwise offer to change a control's behaviour between five settings, none of
+    /// which reaches it, and start out saying it was still listening for ever.
+    /// </remarks>
+    public string How => Mapping.Kind == ControlKind.Pad
+        ? ""
+        : ControlSense.Describe(Mapping.Pickup, Mapping.Turn);
+
+    /// <summary>Whether how it is read is a thing worth saying about this link at all.</summary>
+    public bool Reads => Mapping.Kind != ControlKind.Pad;
 
     /// <summary>
     /// Whether this belongs to the song that is open or to the desk.

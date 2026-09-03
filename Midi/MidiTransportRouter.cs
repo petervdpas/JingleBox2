@@ -12,8 +12,8 @@ namespace JingleBox2.Midi;
 /// <remarks>
 /// The fourth router, and the same shape as the three before it: this one knows the protocol
 /// and nothing about the application, and an adapter reaches the transport. See
-/// <see cref="MidiRouter"/> for pads, <see cref="MidiNoteRouter"/> for notes and
-/// <see cref="MidiControlRouter"/> for knobs.
+/// <see cref="MidiNoteRouter"/> for notes and <see cref="MidiControlRouter"/> for knobs and
+/// for pads.
 ///
 /// Mackie Control is what a controller speaks when it has been told which DAW it is talking to.
 /// It is a published protocol, and its transport buttons are notes at fixed numbers, pressed as
