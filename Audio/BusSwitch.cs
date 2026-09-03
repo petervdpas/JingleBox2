@@ -16,4 +16,22 @@ public sealed class BusSwitch : IBusSwitch
 
     /// <inheritdoc/>
     public bool Wanted => Environment.GetEnvironmentVariable(Variable) == "1";
+
+    /// <summary>
+    /// Says what the settings hold, for everything after this.
+    /// </summary>
+    /// <remarks>
+    /// Called once at startup before any output is opened, and again whenever the tick moves.
+    /// Written into the environment rather than kept in a field for the reason
+    /// <c>RealtimeThread.Wants</c> is: the answer has to be readable by things that hold no
+    /// settings, and it keeps one place where the question is asked.
+    ///
+    /// Which means a run started with <c>JB_BUS=1</c> on the command line is overruled by the
+    /// stored tick the moment this is called. That is the right way round now the tick exists:
+    /// the variable was how this was reached while there was nothing to tick, and a setting
+    /// somebody chose should not be quietly beaten by a shell.
+    /// </remarks>
+    /// <param name="wanted">Whether the summing is asked for.</param>
+    public static void Wants(bool wanted) =>
+        Environment.SetEnvironmentVariable(Variable, wanted ? "1" : "0");
 }

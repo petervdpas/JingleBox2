@@ -275,26 +275,52 @@ public sealed class BassAudioEngine : IAudioEngine
         {
             if (_currentDeviceId == deviceId) return;
 
-            StopAllAndFreeStreamsLocked();
-
-            CloseBussesLocked();
-
-            _asio.Close();
-
-            if (_currentDeviceId >= 0)
-                Bass.Free();
-
-            _currentDeviceId = deviceId;
-
-            var (kind, index) = _outputs.Which(deviceId);
-
-            if (!Bass.Init(kind == Enums.AudioOutputKind.Asio ? SilentDevice : index, _deviceRate))
-                throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
-
-            LoadPlugins();
-
-            OpenBussesLocked(kind == Enums.AudioOutputKind.Asio, index);
+            OpenLocked(deviceId);
         }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The same work as picking a device, without the shortcut that makes picking the one already
+    /// open do nothing. That shortcut is right for a picker, where choosing what is chosen should
+    /// cost nothing, and wrong for everything that changes how the device is opened rather than
+    /// which device it is: the bus is made in the opening, so with only the shortcut in the way a
+    /// tick would be stored, appear to be on, and mean nothing until the application was started
+    /// again.
+    /// </remarks>
+    public void ReopenOutput()
+    {
+        lock (_lock)
+        {
+            if (_currentDeviceId < 0) return;
+
+            OpenLocked(_currentDeviceId);
+        }
+    }
+
+    /// <summary>Lets the current device go and opens one, with the lock held.</summary>
+    /// <param name="deviceId">Which output, numbered across both lists.</param>
+    private void OpenLocked(int deviceId)
+    {
+        StopAllAndFreeStreamsLocked();
+
+        CloseBussesLocked();
+
+        _asio.Close();
+
+        if (_currentDeviceId >= 0)
+            Bass.Free();
+
+        _currentDeviceId = deviceId;
+
+        var (kind, index) = _outputs.Which(deviceId);
+
+        if (!Bass.Init(kind == Enums.AudioOutputKind.Asio ? SilentDevice : index, _deviceRate))
+            throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
+
+        LoadPlugins();
+
+        OpenBussesLocked(kind == Enums.AudioOutputKind.Asio, index);
     }
 
     /// <summary>

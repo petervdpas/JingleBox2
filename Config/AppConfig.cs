@@ -201,6 +201,15 @@ public sealed class AppConfig
     public bool RealtimeAudio { get; set; }
 
     /// <summary>
+    /// Whether everything this application plays is summed onto one bus before it leaves.
+    /// </summary>
+    /// <remarks>
+    /// Off in a settings file that has never heard of it, which is every file written before it
+    /// existed, so nothing anybody already has starts sounding different for this being added.
+    /// </remarks>
+    public bool OutputBus { get; set; }
+
+    /// <summary>
     /// How much audio the sound card holds ahead of what you hear, in frames.
     /// </summary>
     /// <remarks>

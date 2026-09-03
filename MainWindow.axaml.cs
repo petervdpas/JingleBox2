@@ -150,6 +150,7 @@ public partial class MainWindow : Window
         var cfg = _store.LoadOrCreateDefault();
 
         Audio.RealtimeThread.Wants(cfg.RealtimeAudio);
+        Audio.BusSwitch.Wants(cfg.OutputBus);
 
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>

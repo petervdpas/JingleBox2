@@ -231,6 +231,13 @@ public sealed class OutputBus : IOutputBus
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Said out loud, and it is the other half of the line <see cref="Add"/> writes. Without it a
+    /// log shows sources joining and never leaving, so whether anything is taken off has to be
+    /// inferred from the count starting again rather than read: a pad that finished and stayed on
+    /// the bus for ever looks exactly like a pad that was never fired again. Only for a source
+    /// that really was on, so a stranger stays as quiet as it always was.
+    /// </remarks>
     public void Remove(int source)
     {
         lock (_lock)
@@ -238,6 +245,8 @@ public sealed class OutputBus : IOutputBus
             if (!_sources.Remove(source)) return;
 
             RemoveLocked(source);
+
+            Log.Write(LogArea.Audio, () => "bus: source " + source + " is off, " + _sources.Count + " left");
         }
     }
 
@@ -291,6 +300,9 @@ public sealed class OutputBus : IOutputBus
         }
 
         foreach (int source in _sources) RemoveLocked(source);
+
+        if (_sources.Count > 0)
+            Log.Write(LogArea.Audio, () => "bus: " + _sources.Count + " source(s) taken off as the bus closes");
 
         _sources.Clear();
 

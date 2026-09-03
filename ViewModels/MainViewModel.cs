@@ -682,6 +682,45 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         }
     }
 
+    /// <summary>
+    /// Whether everything this application plays is summed onto one bus before it leaves.
+    /// </summary>
+    /// <remarks>
+    /// The output is opened again, which is what makes it take effect now rather than at the next
+    /// start: the bus is made when a device is opened, so nothing short of that can put a source
+    /// on it or take one off.
+    /// </remarks>
+    public bool OutputBus
+    {
+        get => _cfg.OutputBus;
+        set
+        {
+            if (_cfg.OutputBus == value) return;
+
+            _cfg.OutputBus = value;
+            _store.Save(_cfg);
+
+            Audio.BusSwitch.Wants(value);
+
+            ReopenDevice();
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(OutputBusHint));
+        }
+    }
+
+    /// <summary>What the switch means, said plainly enough to choose by.</summary>
+    public string OutputBusHint =>
+        _cfg.OutputBus
+            ? "The tracker, the pads and a take being auditioned are summed here and leave as one "
+              + "stream. That is the only arrangement an ASIO driver can carry, since the driver "
+              + "owns the card and can be handed one thing: with this off and a driver picked, the "
+              + "pads and RECORD are silent and nothing says so."
+            : "Each of them reaches the sound card on its own and the library sums them at the "
+              + "device, which is what this application has always done and what everything here "
+              + "has been listened to on. Switch it on if you use an ASIO driver, or to hear the "
+              + "arrangement the ASIO work is built on.";
+
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string RealtimeHint =>
         !RealtimeAvailable
@@ -710,6 +749,30 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// every plugin that has been told what it is fed at are all built from it.
     /// </remarks>
     private void ApplyAudioSizes() => Tracker.ApplyAudioSizes(Sizes, _cfg.RenderAheadMs);
+
+    /// <summary>
+    /// Opens the sound card again, which is what makes a change to the bus take effect now.
+    /// </summary>
+    /// <remarks>
+    /// The device rather than the tracker's stream, unlike <see cref="ApplyAudioSizes"/>: the bus
+    /// is made when a device is opened, so restarting the stream alone would put it back on
+    /// whichever arrangement was there before.
+    ///
+    /// A card that will not reopen is swallowed here the way it is everywhere else on this page:
+    /// it has already said so in the log, and a settings page can do nothing about it.
+    /// </remarks>
+    private void ReopenDevice()
+    {
+        try
+        {
+            _audio.ReopenOutput();
+
+            Tracker.ReopenAudio();
+        }
+        catch (Exception)
+        {
+        }
+    }
 
     /// <summary>
     /// What the slider is on: the size, and the latency it comes to.

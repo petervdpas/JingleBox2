@@ -129,6 +129,19 @@ public interface IAudioEngine : IDisposable
     IOutputBus Output { get; }
 
     /// <summary>
+    /// Opens the device that is already open, again.
+    /// </summary>
+    /// <remarks>
+    /// For a change to how the output is opened rather than to which output it is, which is what
+    /// turning the bus on or off is. <see cref="SetOutputDevice"/> deliberately does nothing when
+    /// handed the device it already has, so it cannot serve here.
+    ///
+    /// Nothing at all before any device has been opened, since the first one opened reads the new
+    /// answer anyway.
+    /// </remarks>
+    void ReopenOutput();
+
+    /// <summary>
     /// The pads' own bus, which is one source on <see cref="Output"/> however many pads are down.
     /// </summary>
     /// <remarks>
