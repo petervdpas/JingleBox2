@@ -716,7 +716,7 @@ public sealed class ControlTargets : IControlTargets
         var key = mapping.Transport;
 
         return new Target(
-            Said(key), 0, 1, () => 0, _ => _presses.Press(key), this, mapping);
+            Said(key), 0, 1, () => 0, _ => _presses.Press(key), this, mapping, pressed: true);
     }
 
     /// <summary>
@@ -749,7 +749,8 @@ public sealed class ControlTargets : IControlTargets
                 pad,
                 _toggles?.Invoke() ?? true ? PadTriggerAction.Toggle : PadTriggerAction.Start),
             this,
-            mapping);
+            mapping,
+            pressed: true);
     }
 
     /// <summary>What to call a transport key on a status line and in a list of links.</summary>
@@ -778,7 +779,8 @@ public sealed class ControlTargets : IControlTargets
             () => 0,
             _ => ControlActions.Current.Fire(mapping.Machine, mapping.Key),
             this,
-            mapping);
+            mapping,
+            pressed: true);
     }
 
     /// <summary>What a track is called in a target's name, which ends in the track it is on.</summary>
@@ -807,9 +809,16 @@ public sealed class ControlTargets : IControlTargets
         /// <param name="flips">
         /// True for a two-state target, so a momentary button flips it rather than holding it.
         /// </param>
+        /// <param name="pressed">
+        /// True where this is something done rather than a value moved: a pad, a machine's button,
+        /// a transport key. It decides how the write travels to the drawing thread, and two
+        /// presses inside one trip must both arrive where two positions must not.
+        /// </param>
         public Target(string name, double min, double max, Func<double> read, Action<double> write,
-                      ControlTargets desk, ControlMapping mapping, string unit = "", bool flips = false)
+                      ControlTargets desk, ControlMapping mapping, string unit = "", bool flips = false,
+                      bool pressed = false)
         {
+            _pressed = pressed;
             Name = name;
             Min = min;
             Max = max;
@@ -876,73 +885,43 @@ public sealed class ControlTargets : IControlTargets
             }
         }
 
+        /// <summary>Whether this is a press rather than a value, which decides how it travels.</summary>
+        private readonly bool _pressed;
+
         /// <inheritdoc/>
-        /// <remarks>Queued rather than written, so it lands on the drawing thread and coalesces.</remarks>
-        public void Set(double value) => _desk.Queue(_mapping, _write, value);
+        /// <remarks>
+        /// Queued rather than written, so it lands on the drawing thread. A value coalesces there
+        /// and a press does not: see <see cref="IControlWrites"/>.
+        /// </remarks>
+        public void Set(double value) => _desk.Queue(_mapping, _write, value, _pressed);
     }
 
     /// <summary>
-    /// What is waiting to be written, one value per mapping.
+    /// What a controller has done, on its way to the drawing thread.
     /// </summary>
     /// <remarks>
-    /// Per mapping and not a queue, so a knob swept from one end to the other writes once with
-    /// where it ended up rather than a hundred and twenty eight times through where it passed.
-    /// The sound is the same and the panel is drawn once.
+    /// A knob's position coalesces and a press does not, which is that rule's business rather
+    /// than this one's. Made here rather than handed in, since there is one of these per desk and
+    /// nothing above chooses how a write travels.
     /// </remarks>
-    private readonly Dictionary<ControlMapping, (Action<double> Write, double Value)> _waiting = new();
-
-    /// <summary>Whether a trip to the drawing thread is already booked.</summary>
-    private bool _posted;
+    private readonly IControlWrites _writes =
+        new ControlWrites(work => Dispatcher.UIThread.Post(work, DispatcherPriority.Input));
 
     /// <summary>The value on its way to a parameter, or nothing when none is.</summary>
-    private double? Waiting(ControlMapping mapping)
-    {
-        lock (_waiting)
-            return _waiting.TryGetValue(mapping, out var held) ? held.Value : null;
-    }
+    private double? Waiting(ControlMapping mapping) => _writes.Waiting(mapping);
 
     /// <summary>
-    /// Puts a value in the queue, and asks for one trip to the drawing thread if none is booked.
+    /// Puts a value or a press in the queue, on its way to the drawing thread.
     /// </summary>
     /// <remarks>
-    /// At <c>DispatcherPriority.Input</c>, so a hand on three knobs cannot starve the drawing of
-    /// the panels it is moving.
+    /// Which of the two it is is the target's own answer: a pad, a machine's button and a
+    /// transport key are pressed, and everything else is moved. See <see cref="IControlWrites"/>
+    /// for why the difference matters.
     /// </remarks>
-    private void Queue(ControlMapping mapping, Action<double> write, double value)
+    private void Queue(ControlMapping mapping, Action<double> write, double value, bool press)
     {
-        lock (_waiting)
-        {
-            _waiting[mapping] = (write, value);
-
-            if (_posted) return;
-            _posted = true;
-        }
-
-        Dispatcher.UIThread.Post(Write, DispatcherPriority.Input);
+        if (press) _writes.Pressed(write, value);
+        else _writes.Moved(mapping, write, value);
     }
 
-    /// <summary>
-    /// Puts everything that is waiting where it goes, on the drawing thread.
-    /// </summary>
-    /// <remarks>
-    /// Each write is swallowed on its own: one parameter that will not take a value is one knob
-    /// gone quiet, and letting it throw here would take the rest of the desk with it.
-    /// </remarks>
-    private void Write()
-    {
-        KeyValuePair<ControlMapping, (Action<double> Write, double Value)>[] due;
-
-        lock (_waiting)
-        {
-            due = _waiting.ToArray();
-            _waiting.Clear();
-            _posted = false;
-        }
-
-        foreach (var (_, held) in due)
-        {
-            try { held.Write(held.Value); }
-            catch (Exception) { }
-        }
-    }
 }

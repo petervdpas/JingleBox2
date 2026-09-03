@@ -11,6 +11,13 @@
 
     <Application.Styles>
         <FluentTheme />
+
+        <!-- The colour picker's own look. It is a control of the toolkit's kept in a package of
+             its own, so the Fluent theme above knows nothing about it and one dropped on a page
+             draws precisely nothing: the control is there, it takes the space, and there is no
+             template behind it. That is what it looked like the first time, and it is worth
+             saying out loud because the failure has no error attached to it. -->
+        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
         <!-- The brushes are named rather than built here out of a colour. A brush written inside
              a setter is one object shared by every card, and the colour it is built from is
              looked up once against the application, so a card standing on a machine's own panel

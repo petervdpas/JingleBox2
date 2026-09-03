@@ -73,6 +73,12 @@
     <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
+
+    <!-- The colour picker a pad is given its colour with: the toolkit's own, at the toolkit's
+         own version, rather than a spectrum drawn here. What this application draws itself is
+         what a machine's face is made of, because an outside machine has to be able to draw
+         the same things; a picker is a dialog and belongs to nobody. -->
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.1" />
     <PackageReference Include="Avalonia.Diagnostics" Version="11.3.20">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>

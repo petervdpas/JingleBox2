@@ -28,6 +28,17 @@
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="BorderBrush" Value="White"/>
     </Style>
+
+    <!-- The picker at the end of the row, cut to the size of a swatch so the row reads as one
+         row of colours with one more on the end rather than as a control that wandered in. -->
+    <Style Selector="ColorPicker.swatchPicker">
+      <Setter Property="Height" Value="26"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="3"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource BgBrush}">
@@ -234,6 +245,19 @@
                               Height="{Binding PadColor, Converter={StaticResource SelectedSwatchSize}, ConverterParameter='#F06292'}"
                               BorderThickness="{Binding PadColor, Converter={StaticResource IsSelectedColor}, ConverterParameter='#F06292'}"
                               Command="{Binding SetColorCommand}" CommandParameter="#F06292" />
+
+                      <!-- Anything else. The eight above are the colours somebody reaches for
+                           while building a bank and are one click each; this is the whole of the
+                           rest, with a box to type a code into for a pad that has to match
+                           something outside this program. The toolkit's own picker rather than
+                           one drawn here: what this application draws itself is what a machine's
+                           face is made of, because an outside machine has to be able to draw the
+                           same things, and a colour picker belongs to nobody. -->
+                      <ColorPicker Classes="swatchPicker"
+                                   Color="{Binding PadColorValue, Mode=TwoWay}"
+                                   IsAlphaVisible="False"
+                                   IsAlphaEnabled="False"
+                                   ToolTip.Tip="Any colour at all, by eye or by code." />
 
                       <!-- Clear: styled as a fixed-size "no colour" swatch with centred ✕ -->
                       <Button Classes="colorSwatch"

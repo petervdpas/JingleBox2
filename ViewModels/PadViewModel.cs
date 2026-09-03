@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -306,20 +307,55 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// Null rather than a fallback colour on purpose: the converter behind this reads null as
-    /// "unset", which puts the theme's own style back, and a pad that is playing wants exactly
-    /// that so the checked style can show it is on. A colour that will not parse is read as
+    /// "unset", which puts the theme's own style back. A colour that will not parse is read as
     /// none, since a pad painted from a broken setting is worse than one painted by the theme.
+    ///
+    /// **A pad keeps its own colour while it is playing**, and says it is playing by breathing
+    /// instead. It used to hand its background back to the theme so the checked style could
+    /// paint it, which cost the thing a wall of pads is for: every playing pad turned the same
+    /// colour, so which one you had fired was a question about which one had changed rather than
+    /// something you could see, and a pad whose own colour happened to be that one said nothing
+    /// at all. Fired from a pad box, where several are going at once, it read as the colours
+    /// having gone wrong.
     /// </remarks>
     public SolidColorBrush? PadBackground
     {
         get
         {
-            if (IsPlaying || string.IsNullOrWhiteSpace(PadColor))
-                return null;
+            if (string.IsNullOrWhiteSpace(PadColor)) return null;
 
             try { return new SolidColorBrush(Color.Parse(PadColor)); }
             catch { return null; }
         }
+    }
+
+    /// <summary>
+    /// The same colour as a colour, for a picker that deals in one rather than in a word.
+    /// </summary>
+    /// <remarks>
+    /// Written back as six hex digits, which is what every pad colour in every settings file
+    /// already is: the picker knows about transparency and a pad does not, since a pad you can
+    /// see through is a pad that is the page with lettering on it.
+    ///
+    /// A pad with no colour reads as the plain grey the dot uses, so the picker opens on
+    /// something rather than on black. Picking anything at all gives the pad a colour; the way
+    /// back to having none is the clear button beside the palette, since a picker has no way to
+    /// say "none" and one that tried would be a colour somebody could pick by accident.
+    /// </remarks>
+    public Color PadColorValue
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(PadColor))
+                try { return Color.Parse(PadColor); }
+                catch { }
+
+            return Color.FromRgb(80, 80, 80);
+        }
+        set => PadColor = "#"
+            + value.R.ToString("X2", CultureInfo.InvariantCulture)
+            + value.G.ToString("X2", CultureInfo.InvariantCulture)
+            + value.B.ToString("X2", CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -598,13 +634,8 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(PadBackground));
         OnPropertyChanged(nameof(PadPreviewBrush));
+        OnPropertyChanged(nameof(PadColorValue));
     }
-
-    /// <summary>
-    /// A pad that starts playing gives its background back to the theme, so the checked style
-    /// can show that it is on. See <see cref="PadBackground"/>.
-    /// </summary>
-    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(PadBackground));
 
     /// <summary>
     /// What a stored kind means on the page.
