@@ -42,6 +42,9 @@ public class WaveformView : ThemedControl
     /// <summary>Where a pan started, in pixels, or NaN while nothing is being panned.</summary>
     private double _panFrom = double.NaN;
 
+    /// <summary>Which presses mean the picture is being moved, shared with every other one.</summary>
+    private readonly IWaveformPress _press = new WaveformPress();
+
     /// <summary>One cursor for every picture: each instance would otherwise hold a platform handle.</summary>
     private static readonly Cursor PanCursor = new(StandardCursorType.SizeWestEast);
 
@@ -570,12 +573,10 @@ public class WaveformView : ThemedControl
     }
 
     /// <summary>
-    /// True when a press means "move what is on screen" rather than "take hold of something":
-    /// the middle button, or shift with the left one.
+    /// True when a press means "move what is on screen" rather than "take hold of something".
     /// </summary>
     private bool MeansPan(PointerPressedEventArgs e) =>
-        e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed ||
-        e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        _press.MeansPan(e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed, e.KeyModifiers);
 
     /// <summary>Takes hold of the picture itself, and keeps the pointer until it is let go.</summary>
     private void StartPan(PointerPressedEventArgs e, double x)

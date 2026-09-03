@@ -110,6 +110,9 @@ public partial class RecordingEditDialog : Window
     /// <summary>Whether the hand is dragging the picture sideways rather than a handle.</summary>
     private bool _panning;
 
+    /// <summary>Which presses mean the picture is being moved rather than what is drawn on it.</summary>
+    private readonly IWaveformPress _press = new WaveformPress();
+
     /// <summary>Where the press landed, which both the pan and the click test are measured from.</summary>
     private double _pressX;
 
@@ -381,8 +384,14 @@ public partial class RecordingEditDialog : Window
     /// </summary>
     /// <remarks>
     /// The pointer is captured either way, so a drag that leaves the canvas goes on being the
-    /// same drag. A press on nothing, with nothing to pan, is left uncaptured: the release then
-    /// reads as a click and drops the play cursor.
+    /// same drag.
+    ///
+    /// The pan gesture is asked about before the handles are, so it means the picture wherever
+    /// it lands: held over a handle it would otherwise move that handle, which is the one place
+    /// somebody panning is most likely to press.
+    ///
+    /// A pan with nowhere to pan to still reads as a click on release, which is what puts the
+    /// play cursor down.
     /// </remarks>
     private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -391,23 +400,26 @@ public partial class RecordingEditDialog : Window
         var point = e.GetPosition(_canvas);
         _pressX = point.X;
 
-        _dragging = _trim.HitTest(point.X, _viewport, CanvasWidth, TrimGrabTolerance);
+        _dragging = TrimHandle.None;
         _selecting = false;
+        _panning = false;
 
-        if (_dragging == TrimHandle.None)
+        if (_press.MeansPan(e.GetCurrentPoint(_canvas).Properties.IsMiddleButtonPressed, e.KeyModifiers))
         {
-            bool middle = e.GetCurrentPoint(_canvas).Properties.IsMiddleButtonPressed;
-
-            if (middle && _viewport.CanPan)
+            if (_viewport.CanPan)
             {
                 _panning = true;
                 _panStartScroll = _viewport.Scroll;
             }
-            else
-            {
-                _selectFrom = _viewport.XToFraction(point.X, CanvasWidth);
-            }
+
+            e.Pointer.Capture(_canvas);
+            return;
         }
+
+        _dragging = _trim.HitTest(point.X, _viewport, CanvasWidth, TrimGrabTolerance);
+
+        if (_dragging == TrimHandle.None)
+            _selectFrom = _viewport.XToFraction(point.X, CanvasWidth);
 
         e.Pointer.Capture(_canvas);
     }
@@ -422,9 +434,10 @@ public partial class RecordingEditDialog : Window
     /// trying to look at. It waits for the hand to travel past <see cref="ClickSlop"/> first, so
     /// a press that never moves is still a click and still only puts the play cursor down.
     ///
-    /// Panning moved to the middle button when the left one took up selecting. A pan to the
-    /// right moves the window earlier, so the audio tracks the cursor rather than running away
-    /// from it: the hand is dragging the recording, not the viewport.
+    /// Panning is <see cref="IWaveformPress"/>, which is Ctrl or the middle button, since the
+    /// left one on its own is drawing a region here. A pan to the right moves the window
+    /// earlier, so the audio tracks the cursor rather than running away from it: the hand is
+    /// dragging the recording, not the viewport.
     /// </remarks>
     private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
     {
