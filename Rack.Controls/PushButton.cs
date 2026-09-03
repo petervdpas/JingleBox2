@@ -532,6 +532,10 @@ public class PushButton : ThemedControl
         {
             DrawBars(context, cap, new SolidColorBrush(dark ? Colors.Black : Colors.White), Down ? 0.5 : 0);
         }
+        else if (Mark == CapMark.Window)
+        {
+            DrawWindow(context, cap, new SolidColorBrush(dark ? Colors.Black : Colors.White), Down ? 0.5 : 0);
+        }
 
         double under = cap.Bottom;
 
@@ -690,6 +694,42 @@ public class PushButton : ThemedControl
             context.DrawRectangle(ink, null, bar, thick / 2, thick / 2);
         }
     }
+
+    /// <summary>
+    /// A window with a title bar, drawn to the cap's own size.
+    /// </summary>
+    /// <remarks>
+    /// An outline and a filled strip along its top, which is the least that reads as a window
+    /// rather than as a square. Sized off the cap like the bars, so a machine asking for a bigger
+    /// button gets a bigger mark and nobody has to keep two numbers in step.
+    /// </remarks>
+    /// <param name="context">What to draw into.</param>
+    /// <param name="cap">The cap to draw on.</param>
+    /// <param name="ink">What to draw it in.</param>
+    /// <param name="down">How far the cap has sunk, so the mark sinks with it.</param>
+    private static void DrawWindow(DrawingContext context, Rect cap, IBrush ink, double down)
+    {
+        double wide = Math.Max(cap.Width * WindowWidth, 6);
+        double tall = Math.Max(cap.Height * WindowHeight, 5);
+        double thick = Math.Max(cap.Height * BarThickness, 1);
+
+        double left = cap.Center.X - wide / 2;
+        double top = cap.Center.Y - tall / 2 + down;
+
+        var frame = new Rect(left, top, wide, tall);
+
+        context.DrawRectangle(null, new Pen(ink, thick), frame, 1, 1);
+
+        var bar = new Rect(left, top, wide, Math.Max(thick * 2, 2));
+
+        context.DrawRectangle(ink, null, bar, 1, 1);
+    }
+
+    /// <summary>How much of the cap's width the little window takes.</summary>
+    private const double WindowWidth = 0.5;
+
+    /// <summary>And how much of its height.</summary>
+    private const double WindowHeight = 0.42;
 
     /// <summary>How much of the cap's width the bars take.</summary>
     private const double BarsWidth = 0.55;

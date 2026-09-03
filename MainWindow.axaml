@@ -86,11 +86,11 @@
         <!-- In a panel of its own so the page can be taken out into a window and put back, and
              only ever one of the two is in here. -->
         <Panel x:Name="MixerHost">
-          <views:MixerView x:Name="Mixer"
-                           DataContext="{Binding Tracker}"
-                           RecorderInput="{Binding $parent[TabItem].DataContext.RecorderInput}"
-                           RecorderPlay="{Binding $parent[TabItem].DataContext.RecorderPlay}"
-                           PadsStrip="{Binding $parent[TabItem].DataContext.PadsStrip}" />
+          <!-- The three strips that are not the song's are set from code rather than bound
+               through the tree. A binding written against the tab is a binding that resolves to
+               nothing the moment the page is taken out of the tab, which is exactly what
+               detaching does: the window opened with its headings and not one strip under them. -->
+          <views:MixerView x:Name="Mixer" DataContext="{Binding Tracker}" />
 
           <!-- What stands where the mixer stood while it is elsewhere. A page that falls back to
                nothing reads as a page that is broken rather than as one that has moved. -->

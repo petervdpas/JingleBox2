@@ -1558,6 +1558,19 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         Plugins = new PluginLibraryViewModel(store, cfg);
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus);
 
+        // The recording input has two faders on two pages and one gain underneath them, so each
+        // has to hear the other move. The mixer's writes reach RECORD already, since it writes
+        // the recorder's own property and RECORD is bound to it; this is the way back, which was
+        // missing and left the mixer showing whatever it was last dragged to.
+        //
+        // Nothing is created to say it: a strip that has never been looked at has no reading to
+        // correct, and asking for one here would build the whole thing at startup for a page
+        // nobody has opened.
+        Record.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(RecordViewModel.RecordGainDb)) recorderInput?.Reread();
+        };
+
         Takes = new TakeFilter(Record.Recordings);
 
         Designer.Browse = Takes;

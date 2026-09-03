@@ -115,6 +115,19 @@ public partial class MixerView : UserControl
         set => SetValue(PadsStripProperty, value);
     }
 
+    /// <summary>
+    /// Takes the page out into a window, or brings that window forward.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here puts it back: closing the window does that, which is the one way back and is
+    /// the one a window's own frame already offers. A second button that said dock would be a
+    /// second way to do what the cross in the corner does.
+    /// </remarks>
+    /// <param name="sender">Unused.</param>
+    /// <param name="e">Unused.</param>
+    private void Detach_Pressed(object? sender, RoutedEventArgs e) =>
+        this.FindAncestorOfType<MainWindow>()?.DetachMixer();
+
     /// <summary>What a machine offers, drawn as menu items. The same rule a machine's face uses.</summary>
     private readonly Rack.Controls.Interfaces.IMenuLines _lines = new Rack.Controls.MenuLines();
 

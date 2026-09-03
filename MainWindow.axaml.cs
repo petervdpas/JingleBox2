@@ -145,6 +145,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        DataContextChanged += (_, _) => HandMixerItsStrips();
+
         _routing = new AudioRoutingFactory().Create(_recording);
 
         var cfg = _store.LoadOrCreateDefault();
@@ -335,71 +337,51 @@ public partial class MainWindow : Window
 
         return (Math.Max(width, DefaultWidth), Math.Max(height, DefaultHeight));
     }
-    /// <summary>The mixer's window while it is in one, or nothing while it is on its tab.</summary>
-    /// <remarks>
-    /// Held so the same gesture brings it forward rather than opening a second one, and so
-    /// docking has something to close. Cleared where the page is given back rather than where the
-    /// window is closed, since a window shut from its own frame goes through the same door.
-    /// </remarks>
-    private Views.DetachedWindow? _mixerWindow;
-
     /// <summary>
-    /// Puts the mixer in a window of its own, or brings that window forward when it is already
-    /// in one.
+    /// The mixer's coming and going, which is one page's worth of a thing any page can do.
     /// </summary>
     /// <remarks>
-    /// The page itself is handed over rather than a second one built, which is what makes the
-    /// mixer in the window the mixer: the strips, the picked track, the folded chains and the
-    /// meters are the ones that were on the tab a moment ago. Two views of one page are two
-    /// pictures that can disagree, and both would poll their meters.
-    ///
-    /// What it was bound to goes with it, since a page taken out of a tab has nothing above it
-    /// any more and every binding on it would read null.
+    /// Made on the first ask rather than in the constructor, because it needs the named parts of
+    /// the window and those exist only once the markup has been read.
     /// </remarks>
-    public void DetachMixer()
-    {
-        if (_mixerWindow is { } already)
-        {
-            already.Activate();
+    private Views.Interfaces.IPageDetach? _mixerWindow;
 
-            return;
-        }
-
-        if (Mixer is not { } page) return;
-
-        MixerHost.Children.Remove(page);
-        MixerGone.IsVisible = true;
-
-        _mixerWindow = Views.DetachedWindow.Show(
-            page,
+    /// <inheritdoc cref="_mixerWindow"/>
+    private Views.Interfaces.IPageDetach MixerPage =>
+        _mixerWindow ??= new Views.PageDetach(
+            MixerHost,
+            Mixer,
+            MixerGone,
             "Mixer",
-            page.DataContext,
-            this,
-            (DataContext as ViewModels.MainViewModel)?.Transport,
-            back =>
-            {
-                _mixerWindow = null;
+            () => DataContext,
+            () => (DataContext as ViewModels.MainViewModel)?.Transport);
 
-                if (!MixerHost.Children.Contains(back)) MixerHost.Children.Insert(0, back);
-
-                MixerGone.IsVisible = false;
-            });
-
-        if (_mixerWindow != null) return;
-
-        MixerHost.Children.Insert(0, page);
-        MixerGone.IsVisible = false;
-    }
+    /// <summary>Takes the mixer out into a window of its own, or brings that window forward.</summary>
+    public void DetachMixer() => MixerPage.Out();
 
     /// <summary>Closes the mixer's window, which is what puts the page back.</summary>
-    /// <remarks>
-    /// Closing rather than moving the page here, so there is one way back and it is the one a
-    /// window's own frame takes.
-    /// </remarks>
-    public void DockMixer() => _mixerWindow?.Close();
+    public void DockMixer() => MixerPage.Back();
 
     /// <summary>Brings the mixer back onto its tab.</summary>
     /// <param name="sender">Unused.</param>
     /// <param name="e">Unused.</param>
     private void DockMixer_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => DockMixer();
+
+    /// <summary>
+    /// Hands the mixer the three strips that are not the song's.
+    /// </summary>
+    /// <remarks>
+    /// From code rather than from XAML, because the only way to name them in the markup is a
+    /// binding written against the tab the page sits in, and that resolves to nothing as soon as
+    /// the page is taken out of the tab. Set once here they are the page's own and travel with it
+    /// into a window and back.
+    /// </remarks>
+    private void HandMixerItsStrips()
+    {
+        if (DataContext is not ViewModels.MainViewModel main || Mixer == null) return;
+
+        Mixer.RecorderInput = main.RecorderInput;
+        Mixer.RecorderPlay = main.RecorderPlay;
+        Mixer.PadsStrip = main.PadsStrip;
+    }
 }

@@ -16,5 +16,16 @@ public enum CapMark
     None = 0,
 
     /// <summary>Three bars, which is what a menu button has looked like since menus existed.</summary>
-    Bars = 1
+    Bars = 1,
+
+    /// <summary>
+    /// A little window with a title bar, for the button that takes a page out into one.
+    /// </summary>
+    /// <remarks>
+    /// Drawn rather than written, the same reason the bars are: a character is at the mercy of
+    /// whichever font the machine running this falls back to, and the one that means this is not
+    /// in every font. A window is also what the thing about to happen looks like, where an arrow
+    /// or a cross would have to be learned.
+    /// </remarks>
+    Window = 2
 }

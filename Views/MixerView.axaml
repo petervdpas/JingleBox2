@@ -113,12 +113,21 @@
         <!-- The same button a machine's face carries, in the same corner, and the same lines
              behind it. The mixer is drawn by this program rather than described by anybody, so
              there is no part to drop and it goes in the card's own header. -->
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,10">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,10">
           <TextBlock Grid.Column="0" Classes="cardTitle" Text="Mixer" />
 
           <views:HelpBadge Grid.Column="1" Topic="mixer.strips" />
 
-          <ui:PushButton Grid.Column="3" x:Name="MixerMenuButton"
+          <!-- Out into a window of its own, and back again. In the header rather than only in the
+               menu because it is a thing you do rather than a thing you set, and a page you can
+               take out should say so where you can see it. Closing the window puts the page back,
+               so this is the only half that needs a button. -->
+          <ui:PushButton Grid.Column="3" x:Name="DetachButton"
+                         Mark="Window" CapWidth="30" CapHeight="20"
+                         Pressed="Detach_Pressed"
+                         ToolTip.Tip="Open the mixer in a window of its own. Closing that window puts it back here." />
+
+          <ui:PushButton Grid.Column="4" x:Name="MixerMenuButton"
                          Mark="Bars" CapWidth="30" CapHeight="20"
                          Pressed="MixerMenu_Pressed"
                          ToolTip.Tip="What your controllers do to the mixer. Point one at a template you have already made, or start learning." />
