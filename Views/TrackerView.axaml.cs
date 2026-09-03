@@ -1017,4 +1017,74 @@ public partial class TrackerView : UserControl
         >= Key.A and <= Key.Z => (char)('A' + (key - Key.A)),
         _ => '\0'
     };
+    /// <summary>The mixer's window while it is in one, or nothing while it is on this page.</summary>
+    /// <remarks>
+    /// Held so the same gesture can bring it forward rather than opening a second one, and so
+    /// docking has something to close. Cleared where the page is given back rather than where the
+    /// window is closed, since a window shut from its own frame goes through the same door.
+    /// </remarks>
+    private DetachedWindow? _mixerWindow;
+
+    /// <summary>Whether the mixer is in a window of its own.</summary>
+    public bool MixerDetached => _mixerWindow != null;
+
+    /// <summary>
+    /// Puts the mixer in a window of its own, or brings that window forward when it is already
+    /// in one.
+    /// </summary>
+    /// <remarks>
+    /// The page itself is handed over rather than a second one built, which is what makes the
+    /// mixer in the window the mixer: the strips, the picked track, the folded chains and the
+    /// meters are the ones that were on this page a moment ago.
+    ///
+    /// What it was bound to goes with it. The mixer reads the tracker's own view model, which it
+    /// inherits from this page, and a page with nothing above it inherits nothing.
+    /// </remarks>
+    public void DetachMixer()
+    {
+        if (_mixerWindow is { } already)
+        {
+            already.Activate();
+            return;
+        }
+
+        if (Mixer is not { } page) return;
+
+        MixerHost.Children.Remove(page);
+        MixerGone.IsVisible = true;
+
+        var owner = TopLevel.GetTopLevel(this) as Window;
+
+        _mixerWindow = DetachedWindow.Show(
+            page,
+            "Mixer",
+            DataContext,
+            owner,
+            (owner?.DataContext as MainViewModel)?.Transport,
+            back =>
+            {
+                _mixerWindow = null;
+
+                if (!MixerHost.Children.Contains(back)) MixerHost.Children.Insert(0, back);
+
+                MixerGone.IsVisible = false;
+            });
+
+        if (_mixerWindow != null) return;
+
+        MixerHost.Children.Insert(0, page);
+        MixerGone.IsVisible = false;
+    }
+
+    /// <summary>Closes the mixer's window, which is what puts the page back.</summary>
+    /// <remarks>
+    /// Closing rather than moving the page here, so there is one way back and it is the one a
+    /// window's own frame takes.
+    /// </remarks>
+    public void DockMixer() => _mixerWindow?.Close();
+
+    /// <summary>Brings the mixer back onto this page.</summary>
+    /// <param name="sender">Unused.</param>
+    /// <param name="e">Unused.</param>
+    private void DockMixer_Click(object? sender, RoutedEventArgs e) => DockMixer();
 }

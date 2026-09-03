@@ -131,6 +131,9 @@ jobs:
           $p4 = "out\${{ matrix.name }}\bassasio.dll"
           if (!(Test-Path $p4)) { Write-Host "WARNING: bassasio.dll missing (no ASIO output)" }
           else { Write-Host "OK: bassasio.dll present" }
+          $p5 = "out\${{ matrix.name }}\bassmix.dll"
+          if (!(Test-Path $p5)) { throw "bassmix.dll missing: nothing would be summed into one output" }
+          else { Write-Host "OK: bassmix.dll present" }
 
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')

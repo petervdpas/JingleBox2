@@ -54,6 +54,12 @@ public class MissingSoundMachineTests
         /// <inheritdoc/>
         public float GetPadChannelVolume(int padIndex) => throw Asked();
         /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IOutputBus Output => throw Asked();
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IOutputBus PadBus => throw Asked();
+        /// <inheritdoc/>
+        public JingleBox2.Audio.Interfaces.IOutputBus TakeBus => throw Asked();
+        /// <inheritdoc/>
         public void PlaySample(int padIndex, string filePath, float volume) => throw Asked();
         /// <inheritdoc/>
         public void PlayStream(int padIndex, string url, float volume) => throw Asked();

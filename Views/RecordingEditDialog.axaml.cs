@@ -81,7 +81,7 @@ public partial class RecordingEditDialog : Window
     private readonly TrimSelection _trim = new();
 
     /// <summary>What plays the preview, and what reports where it has got to.</summary>
-    private readonly WaveformPlayer _player = new();
+    private readonly WaveformPlayer _player;
 
     /// <summary>
     /// Where the picture is drawn. Found once the window is up rather than in the constructor,
@@ -167,8 +167,25 @@ public partial class RecordingEditDialog : Window
     /// context announcement fires on every reassignment and would otherwise leave the window
     /// subscribed to every take it had ever shown.
     /// </remarks>
-    public RecordingEditDialog()
+    public RecordingEditDialog() : this(null)
     {
+    }
+
+    /// <summary>The same, over the bus a take goes onto.</summary>
+    /// <remarks>
+    /// Two constructors rather than one with a default, because the toolkit's runtime XAML loader
+    /// looks for a public constructor taking nothing and an optional parameter is not one: with
+    /// only the defaulted version the page builds with a warning saying it cannot be reached that
+    /// way, and this build is kept at nought warnings.
+    /// </remarks>
+    /// <param name="takes">
+    /// The bus a take goes onto, or nothing to play it the way it always was. Handed in rather
+    /// than reached for, since this window is opened from RECORD and RECORD is what holds it.
+    /// </param>
+    public RecordingEditDialog(JingleBox2.Audio.Interfaces.IOutputBus? takes)
+    {
+        _player = new WaveformPlayer(takes);
+
         InitializeComponent();
 
         _player.PositionChanged += position =>

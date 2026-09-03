@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.ViewModels;
 
 namespace JingleBox2.Views;
@@ -59,9 +61,45 @@ public partial class MixerView : UserControl
         if (DataContext is not TrackerViewModel tracker) return;
         if (sender is not Control under) return;
 
-        if (tracker.MixerMenu.Read() is not { Count: > 0 } offers) return;
+        var offers = new List<PanelMenuItem> { Window() };
+
+        offers.AddRange(tracker.MixerMenu.Read());
 
         new MenuFlyout { ItemsSource = _lines.Listed(offers) }.ShowAt(under);
+    }
+
+    /// <summary>
+    /// The line that takes this page into a window of its own, or puts it back.
+    /// </summary>
+    /// <remarks>
+    /// Which of the two it says is answered by where this page is standing rather than by a flag
+    /// kept beside it. Detached, the page is inside a <see cref="DetachedWindow"/> and there is no
+    /// <see cref="TrackerView"/> above it at all, so the same walk answers both questions and the
+    /// two can never disagree.
+    ///
+    /// Always offered, and it is what made the button worth pressing. The menu used to return
+    /// early when nothing was pointed at the mixer, so on a desk with no controller learned the
+    /// hamburger did nothing whatever and said nothing about why.
+    /// </remarks>
+    private PanelMenuItem Window()
+    {
+        if (this.FindAncestorOfType<DetachedWindow>() is { } detached)
+        {
+            return new PanelMenuItem("Put the mixer back")
+            {
+                Tip = "Closes this window and puts the mixer back on the tracker's own page.",
+                Chosen = detached.Close,
+            };
+        }
+
+        var tracker = this.FindAncestorOfType<TrackerView>();
+
+        return new PanelMenuItem("Open in a window")
+        {
+            Tip = "Takes the mixer out onto a window of its own, so the pattern and the strips can be seen at once.",
+            Live = tracker != null,
+            Chosen = tracker == null ? null : tracker.DetachMixer,
+        };
     }
 
     /// <summary>

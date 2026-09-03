@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using JingleBox2.Audio.Interfaces;
 using ManagedBass;
 using System;
 
@@ -10,6 +11,26 @@ namespace JingleBox2.Waveform;
 /// </summary>
 public sealed class WaveformPlayer : IDisposable
 {
+    /// <summary>
+    /// The bus the take goes onto, or nothing to play it the ordinary way.
+    /// </summary>
+    /// <remarks>
+    /// A take auditioned here is one of the three things this application makes a sound with, and
+    /// under an ASIO driver the ordinary way reaches the silent device BASS was opened on: the
+    /// take plays, the position runs, and nobody hears it. On the bus it is a decoding channel
+    /// like the pads and the tracker.
+    ///
+    /// Optional and defaulted to nothing, so an editor dialog built on its own still works, and so
+    /// this class can be put a question to without an audio engine.
+    /// </remarks>
+    private readonly IOutputBus? _bus;
+
+    /// <summary>A player over a bus, or over none.</summary>
+    /// <param name="bus">Where the audio goes, or nothing to play it the way it always was.</param>
+    public WaveformPlayer(IOutputBus? bus = null) => _bus = bus;
+
+    /// <summary>Whether the take is going onto a bus rather than playing itself.</summary>
+    private bool OnBus => _bus is { IsOpen: true };
     /// <summary>How wide one sample is, which is sixteen bits everywhere in this app.</summary>
     private const int WavBytesPerSample = 2;
 
@@ -59,7 +80,7 @@ public sealed class WaveformPlayer : IDisposable
 
         if (totalFrames <= 0) return;
 
-        _channel = Bass.CreateStream(filePath, 0, 0, BassFlags.Default);
+        _channel = Bass.CreateStream(filePath, 0, 0, OnBus ? BassFlags.Decode : BassFlags.Default);
         if (_channel == 0) return;
 
         var info = Bass.ChannelGetInfo(_channel);
@@ -70,7 +91,10 @@ public sealed class WaveformPlayer : IDisposable
         _endBytes = (long)(Math.Clamp(endFraction, 0, 1) * totalFrames) * _bytesPerFrame;
 
         Bass.ChannelSetPosition(_channel, startFrame * _bytesPerFrame);
-        Bass.ChannelPlay(_channel);
+
+        if (OnBus) _bus!.Add(_channel);
+        else Bass.ChannelPlay(_channel);
+
         IsPlaying = true;
 
         PositionChanged?.Invoke((double)startFrame / _totalFrames);
@@ -99,6 +123,8 @@ public sealed class WaveformPlayer : IDisposable
 
         if (_channel != 0)
         {
+            _bus?.Remove(_channel);
+
             Bass.ChannelStop(_channel);
             Bass.StreamFree(_channel);
             _channel = 0;

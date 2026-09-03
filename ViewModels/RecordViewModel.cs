@@ -86,7 +86,10 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// Auditions a recording from the list. One at a time on purpose: this is for hearing
     /// what a take is, and two of them at once tells you nothing.
     /// </summary>
-    private readonly Waveform.WaveformPlayer _preview = new();
+    private readonly Waveform.WaveformPlayer _preview;
+
+    /// <summary>The bus a take goes onto, kept so the editing dialog is given the same one.</summary>
+    private readonly JingleBox2.Audio.Interfaces.IOutputBus? _takes;
 
     /// <summary>The take the preview is on, so its row can be put back to idle when it stops.</summary>
     private Recording? _playing;
@@ -294,8 +297,11 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// The preview's row goes back to idle when it stops, whether it ran out on its own or
     /// somebody stopped it, since those are the same thing to whoever is looking at the list.
     /// </remarks>
-    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing)
+    public RecordViewModel(IRecordingService recordingService, ILevelMeterService levelMeter, IWaveformService waveformService, ConfigStore configStore, AppConfig cfg, IAudioRouting routing, JingleBox2.Audio.Interfaces.IOutputBus? takes = null)
     {
+        _takes = takes;
+        _preview = new Waveform.WaveformPlayer(takes);
+
         _routing = routing;
 
         _cfg = cfg;
@@ -797,7 +803,7 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
             CurrentWaveform = _waveformService.AnalyzeFile(recording.FilePath);
 
-            var dialog = new RecordingEditDialog
+            var dialog = new RecordingEditDialog(_takes)
             {
                 DataContext = this
             };

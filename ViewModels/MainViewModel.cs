@@ -1346,7 +1346,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         Midi = new MidiViewModel(store, cfg, midiService, _profiles);
 
         Plugins = new PluginLibraryViewModel(store, cfg);
-        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing);
+        Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus);
 
         Takes = new TakeFilter(Record.Recordings);
 

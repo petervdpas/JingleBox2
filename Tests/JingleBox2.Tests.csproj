@@ -32,4 +32,29 @@
           LinkBase="controllers" />
   </ItemGroup>
 
+  <!--
+    The BASS libraries, beside the tests rather than only beside the application.
+
+    Anything here that opens a real channel needs the native, and the application's own copy
+    targets write into the application's output folder, which is not this one. Without this the
+    audio tests do not fail, which would be the honest outcome: they ask whether their subject is
+    available, find it is not, and leave. A suite that reports green because its subject is
+    missing says nothing for the rest of its life, which is the thing the tests themselves are
+    written to avoid.
+
+    Named one by one for the same reason the application's three targets are: a glob would take
+    whatever happened to be in the folder, and what is carried is a decision.
+  -->
+  <Target Name="CopyBassToTests" AfterTargets="Build" Condition="'$(OS)' != 'Windows_NT' And Exists('..\native\linux-x64\libbass.so')">
+    <Copy SourceFiles="..\native\linux-x64\libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\native\linux-x64\libbass_aac.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\linux-x64\libbass_aac.so')" />
+    <Copy SourceFiles="..\native\linux-x64\libbassmix.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\linux-x64\libbassmix.so')" />
+  </Target>
+
+  <Target Name="CopyBassToTestsWindows" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' And Exists('..\native\win-x64\bass.dll')">
+    <Copy SourceFiles="..\native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bass_aac.dll')" />
+    <Copy SourceFiles="..\native\win-x64\bassmix.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('..\native\win-x64\bassmix.dll')" />
+  </Target>
+
 </Project>

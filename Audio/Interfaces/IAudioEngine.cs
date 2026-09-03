@@ -122,6 +122,29 @@ public interface IAudioEngine : IDisposable
     /// <summary>The level that pad is set to play at, which is the fader and not the meter.</summary>
     float GetPadChannelVolume(int padIndex);
 
+    /// <summary>
+    /// Everything this application plays, summed, or a bus that is not open where the switch is
+    /// off. See <see cref="IOutputBus"/>.
+    /// </summary>
+    IOutputBus Output { get; }
+
+    /// <summary>
+    /// The pads' own bus, which is one source on <see cref="Output"/> however many pads are down.
+    /// </summary>
+    /// <remarks>
+    /// A sub-bus rather than each pad plugged into the output on its own, because the pads are one
+    /// thing to the desk: a fader over this is the pads against the song, and that is what a strip
+    /// on the mixer is.
+    /// </remarks>
+    IOutputBus PadBus { get; }
+
+    /// <summary>The take being auditioned on RECORD, as one source on <see cref="Output"/>.</summary>
+    /// <remarks>
+    /// Its own bus for the reason the pads have one: there is more than one thing that auditions a
+    /// take, the list on RECORD and the editing dialog, and to the desk they are one source.
+    /// </remarks>
+    IOutputBus TakeBus { get; }
+
     /// <summary>Plays a file on that pad, from the beginning, at that level.</summary>
     void PlaySample(int padIndex, string filePath, float volume);
 

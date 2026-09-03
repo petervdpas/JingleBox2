@@ -30,6 +30,27 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>How a device number names one out of two lists. Holds nothing.</summary>
     private readonly Interfaces.IAudioOutputs _outputs = new AudioOutputs();
 
+    /// <summary>Whether the summing is asked for at all. Off until it has been listened to.</summary>
+    private readonly Interfaces.IBusSwitch _wantsBus;
+
+    /// <summary>
+    /// Everything this application plays, summed. Nought of it is used while the switch is off.
+    /// </summary>
+    /// <remarks>
+    /// Three of them because there are three things that make sound and each is one strip: the
+    /// pads are one source however many are down, the take being auditioned is another, and the
+    /// tracker sums its own tracks and arrives as the third. A sub-bus is what makes that true,
+    /// since a mixer stream is itself a decoding channel and can be plugged into another one, and
+    /// its level is the strip's fader.
+    /// </remarks>
+    private readonly Interfaces.IOutputBus _output = new OutputBus();
+
+    /// <inheritdoc cref="_output"/>
+    private readonly Interfaces.IOutputBus _padBus = new OutputBus();
+
+    /// <inheritdoc cref="_output"/>
+    private readonly Interfaces.IOutputBus _takeBus = new OutputBus();
+
     /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
@@ -63,6 +84,12 @@ public sealed class BassAudioEngine : IAudioEngine
     /// </summary>
     private readonly SyncProcedure _endSync;
 
+    /// <summary>
+    /// The same, for a pad on the bus, which needs the add-on's own sync and runs on the mixing
+    /// thread. Kept for the same reason: the library holds the pointer.
+    /// </summary>
+    private readonly SyncProcedure _mixEndSync;
+
     /// <summary>Effects on pads, and the BASS handles that run them.</summary>
     private Plugins.Interfaces.IAudioInsert?[] _padInserts;
 
@@ -92,8 +119,14 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <param name="padCount">How many pads there are, which <see cref="Resize"/> can change.</param>
     /// <param name="deviceRate">What to open the card at, or nought for the default.</param>
     /// <param name="rate">The rule that decides, handed in so it can be asked without a card.</param>
-    public BassAudioEngine(int padCount = 8, int deviceRate = 0, Interfaces.IOutputRate? rate = null)
+    /// <param name="bus">Whether to sum onto one bus, handed in so it can be asked without a process.</param>
+    public BassAudioEngine(
+        int padCount = 8,
+        int deviceRate = 0,
+        Interfaces.IOutputRate? rate = null,
+        Interfaces.IBusSwitch? bus = null)
     {
+        _wantsBus = bus ?? new BusSwitch();
         _deviceRate = (rate ?? new OutputRate()).Chosen(deviceRate);
 
         _padStreams = new int[padCount];
@@ -105,6 +138,7 @@ public sealed class BassAudioEngine : IAudioEngine
         _padFadeOut = new double[padCount];
 
         _endSync = OnChannelEnd;
+        _mixEndSync = OnMixChannelEnd;
         _dspProcedure = OnPadDsp;
 
         _padInserts = new Plugins.Interfaces.IAudioInsert?[padCount];
@@ -134,8 +168,7 @@ public sealed class BassAudioEngine : IAudioEngine
             var handle = _padStreams[padIndex];
             if (handle == 0) return false;
 
-            var state = Bass.ChannelIsActive(handle);
-            return state == PlaybackState.Playing || state == PlaybackState.Stalled;
+            return SoundingLocked(handle);
         }
     }
 
@@ -164,16 +197,7 @@ public sealed class BassAudioEngine : IAudioEngine
             var handle = _padStreams[padIndex];
             if (handle == 0) return 0;
 
-            var state = Bass.ChannelIsActive(handle);
-            if (state != PlaybackState.Playing && state != PlaybackState.Stalled) return 0;
-
-            int raw = Bass.ChannelGetLevel(handle);
-            if (raw == -1) return 0;
-
-            int left = (raw >> 16) & 0xFFFF;
-            int right = raw & 0xFFFF;
-            float peak = Math.Max(left, right) / 32768f;
-            return Math.Clamp(peak, 0f, 1f);
+            return LevelLocked(handle);
         }
     }
 
@@ -190,15 +214,7 @@ public sealed class BassAudioEngine : IAudioEngine
 
                 if (handle == 0) continue;
 
-                var state = Bass.ChannelIsActive(handle);
-
-                if (state != PlaybackState.Playing && state != PlaybackState.Stalled) continue;
-
-                int raw = Bass.ChannelGetLevel(handle);
-
-                if (raw == -1) continue;
-
-                float peak = Math.Max((raw >> 16) & 0xFFFF, raw & 0xFFFF) / 32768f;
+                float peak = LevelLocked(handle);
 
                 if (peak > loudest) loudest = peak;
             }
@@ -261,6 +277,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
             StopAllAndFreeStreamsLocked();
 
+            CloseBussesLocked();
+
             _asio.Close();
 
             if (_currentDeviceId >= 0)
@@ -274,7 +292,90 @@ public sealed class BassAudioEngine : IAudioEngine
                 throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
 
             LoadPlugins();
+
+            OpenBussesLocked(kind == Enums.AudioOutputKind.Asio, index);
         }
+    }
+
+    /// <summary>
+    /// Opens the bus and its two sub-busses, with the lock held and BASS already up.
+    /// </summary>
+    /// <remarks>
+    /// Nothing at all while the switch is off, which is what keeps the old path exactly as it
+    /// was.
+    ///
+    /// The order matters and is the order of the audio: the sub-busses are made first and plugged
+    /// into the output, so that a pad played before the tracker has ever started still has
+    /// somewhere to go. What is played, or handed to the driver, is the output and never a source
+    /// on it: a stream that plays itself and is also pulled is the same audio leaving by two
+    /// routes.
+    ///
+    /// A driver that will not take the bus leaves everything open and silent rather than half
+    /// wired, and says so. The caller cannot usefully do anything about it, and tearing the bus
+    /// down here would put the application back on a path this run has already left.
+    /// </remarks>
+    /// <param name="pulled">Whether an ASIO driver drives the output rather than BASS playing it.</param>
+    /// <param name="device">Which ASIO driver, where one is being used.</param>
+    private void OpenBussesLocked(bool pulled, int device)
+    {
+        if (!_wantsBus.Wanted) return;
+
+        _output.BufferMs = StartingBufferMs();
+
+        if (!_output.Open(_deviceRate, BusChannels, pulled))
+        {
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                "bus: asked for and not available, so every source plays on its own as before");
+
+            return;
+        }
+
+        if (_padBus.Open(_deviceRate, BusChannels, true)) _output.Add(_padBus.Handle);
+        if (_takeBus.Open(_deviceRate, BusChannels, true)) _output.Add(_takeBus.Handle);
+
+        if (pulled)
+        {
+            if (!_asio.Open(device, _output.Handle, _deviceRate))
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                    "bus: the driver would not take the bus, so nothing will be heard");
+
+            return;
+        }
+
+        if (!Bass.ChannelPlay(_output.Handle))
+            Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                () => "bus: the bus would not play: " + Bass.LastError);
+    }
+
+    /// <summary>Lets the bus and its sub-busses go, with the lock held.</summary>
+    /// <remarks>
+    /// Before <c>Bass.Free</c>, since freeing the library takes every stream with it and a bus
+    /// asked to unplug a source that has already gone is a refusal for no reason.
+    /// </remarks>
+    private void CloseBussesLocked()
+    {
+        _takeBus.Close();
+        _padBus.Close();
+        _output.Close();
+    }
+
+    /// <summary>Stereo, which is what everything either side of the bus is written for.</summary>
+    private const int BusChannels = 2;
+
+    /// <summary>
+    /// What the bus holds ahead of the card until the tracker says what the settings ask for.
+    /// </summary>
+    /// <remarks>
+    /// The platform's own default rather than nothing, because nothing means the library's 500 ms
+    /// and a pad can be pressed before the tracker has ever started. Handing the bus the figure
+    /// this application has actually been listened to on is the honest opening position, and the
+    /// tracker overwrites it with whatever is stored the moment it joins.
+    /// </remarks>
+    private int StartingBufferMs()
+    {
+        var sizes = new AudioDefaults().Here;
+
+        return Math.Max(1, (int)Math.Round(sizes.BufferFrames * 1000.0 / Math.Max(1, _deviceRate)));
     }
 
     /// <summary>
@@ -330,6 +431,15 @@ public sealed class BassAudioEngine : IAudioEngine
 
     /// <inheritdoc/>
     public int OutputFrames => _asio.Frames;
+
+    /// <inheritdoc/>
+    public Interfaces.IOutputBus Output => _output;
+
+    /// <inheritdoc/>
+    public Interfaces.IOutputBus PadBus => _padBus;
+
+    /// <inheritdoc/>
+    public Interfaces.IOutputBus TakeBus => _takeBus;
 
     /// <inheritdoc/>
     public void SetPadSource(int padIndex, PadSourceKind kind, string? source)
@@ -431,8 +541,8 @@ public sealed class BassAudioEngine : IAudioEngine
 
             if (handle == 0)
             {
-                var flags = BassFlags.Prescan | BassFlags.Float
-                    | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default);
+                var flags = PadFlagsLocked(BassFlags.Prescan | BassFlags.Float
+                    | (_padLoops[padIndex] ? BassFlags.Loop : BassFlags.Default));
 
                 handle = Bass.CreateStream(filePath, Flags: flags);
                 if (handle == 0)
@@ -443,7 +553,7 @@ public sealed class BassAudioEngine : IAudioEngine
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
                 if (!_padLoops[padIndex])
-                    Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
+                    WatchEndLocked(handle, padIndex);
             }
 
             var fadeIn = _padFadeIn[padIndex];
@@ -451,16 +561,16 @@ public sealed class BassAudioEngine : IAudioEngine
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
                 Bass.ChannelSetPosition(handle, 0);
-                if (!Bass.ChannelPlay(handle))
-                    throw new InvalidOperationException($"ChannelPlay(file) failed: {Bass.LastError}");
+                if (!SoundLocked(handle))
+                    throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
                 Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
             }
             else
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
                 Bass.ChannelSetPosition(handle, 0);
-                if (!Bass.ChannelPlay(handle))
-                    throw new InvalidOperationException($"ChannelPlay(file) failed: {Bass.LastError}");
+                if (!SoundLocked(handle))
+                    throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
             }
 
             Raise(padIndex, PadPlaybackState.Playing);
@@ -513,7 +623,8 @@ public sealed class BassAudioEngine : IAudioEngine
                     "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\n" +
                     "Referer: https://www.mixcloud.com/\r\n";
 
-                var flags = BassFlags.AutoFree | BassFlags.StreamDownloadBlocks | BassFlags.Float;
+                var flags = PadFlagsLocked(BassFlags.StreamDownloadBlocks | BassFlags.Float)
+                    | (_padBus.IsOpen ? BassFlags.Default : BassFlags.AutoFree);
 
                 handle = Bass.CreateStream(urlWithHeaders, 0, flags, null);
                 if (handle == 0)
@@ -523,22 +634,22 @@ public sealed class BassAudioEngine : IAudioEngine
 
                 if (_padInserts[padIndex] != null) AttachDspLocked(padIndex, handle);
 
-                Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
+                WatchEndLocked(handle, padIndex);
             }
 
             var fadeIn = _padFadeIn[padIndex];
             if (fadeIn > 0)
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, 0f);
-                if (!Bass.ChannelPlay(handle))
-                    throw new InvalidOperationException($"ChannelPlay(url) failed: {Bass.LastError}");
+                if (!SoundLocked(handle))
+                    throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
                 Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex], (int)(fadeIn * 1000));
             }
             else
             {
                 Bass.ChannelSetAttribute(handle, ChannelAttribute.Volume, _padVolumes[padIndex]);
-                if (!Bass.ChannelPlay(handle))
-                    throw new InvalidOperationException($"ChannelPlay(url) failed: {Bass.LastError}");
+                if (!SoundLocked(handle))
+                    throw new InvalidOperationException($"the pad would not start: {Bass.LastError}");
             }
 
             Raise(padIndex, PadPlaybackState.Playing);
@@ -565,7 +676,7 @@ public sealed class BassAudioEngine : IAudioEngine
             var isStream = _padKinds[padIndex] == PadSourceKind.Stream;
 
             var fadeOut = _padFadeOut[padIndex];
-            if (fadeOut > 0 && Bass.ChannelIsActive(handle) == PlaybackState.Playing)
+            if (fadeOut > 0 && SoundingLocked(handle))
             {
                 Bass.ChannelSlideAttribute(handle, ChannelAttribute.Volume, 0f, (int)(fadeOut * 1000));
 
@@ -585,7 +696,7 @@ public sealed class BassAudioEngine : IAudioEngine
                                     FreeStreamLocked(capturedIndex);
                                 else
                                 {
-                                    Bass.ChannelStop(capturedHandle);
+                                    SilenceLocked(capturedHandle);
                                     Bass.ChannelSetPosition(capturedHandle, 0);
                                     Raise(capturedIndex, PadPlaybackState.Stopped);
                                 }
@@ -606,7 +717,7 @@ public sealed class BassAudioEngine : IAudioEngine
                 return;
             }
 
-            Bass.ChannelStop(handle);
+            SilenceLocked(handle);
             Bass.ChannelSetPosition(handle, 0);
             Raise(padIndex, PadPlaybackState.Stopped);
         }
@@ -681,6 +792,136 @@ public sealed class BassAudioEngine : IAudioEngine
         _currentDeviceId = 0;
 
         LoadPlugins();
+
+        OpenBussesLocked(false, 0);
+    }
+
+
+    /// <summary>
+    /// Starts a pad sounding, which is two different acts depending on where the audio goes.
+    /// </summary>
+    /// <remarks>
+    /// On the bus a pad is a decoding channel and sounding it is plugging it in; off the bus it
+    /// is an ordinary playing channel and sounding it is <c>ChannelPlay</c>. Every place that
+    /// starts, stops or asks about a pad goes through these three, so the difference between the
+    /// two paths is here and nowhere else. Written out at each call site it would be a dozen
+    /// chances for one of them to be forgotten, and a pad that quietly never joins the bus is
+    /// exactly the fault the bus exists to end.
+    /// </remarks>
+    /// <param name="handle">The pad's stream.</param>
+    /// <returns>False where it would not start.</returns>
+    private bool SoundLocked(int handle) =>
+        _padBus.IsOpen ? _padBus.Add(handle) : Bass.ChannelPlay(handle);
+
+    /// <inheritdoc cref="SoundLocked"/>
+    /// <param name="handle">The pad's stream.</param>
+    private void SilenceLocked(int handle)
+    {
+        if (_padBus.IsOpen)
+        {
+            _padBus.Remove(handle);
+
+            return;
+        }
+
+        Bass.ChannelStop(handle);
+    }
+
+    /// <inheritdoc cref="SoundLocked"/>
+    /// <remarks>
+    /// On the bus this cannot be asked of the channel. A decoding channel answers
+    /// <see cref="PlaybackState.Playing"/> for as long as it has data in it, whether or not
+    /// anything is pulling it, so a pad that has been stopped would go on reporting itself as
+    /// playing until its stream was let go. Being plugged in is the question, and the bus is what
+    /// knows the answer.
+    /// </remarks>
+    /// <param name="handle">The pad's stream.</param>
+    /// <returns>Whether it is sounding now.</returns>
+    private bool SoundingLocked(int handle) =>
+        _padBus.IsOpen
+            ? _padBus.Holds(handle)
+            : Bass.ChannelIsActive(handle) is PlaybackState.Playing or PlaybackState.Stalled;
+
+    /// <summary>
+    /// How loud a pad is, 0 to 1, and nought for one that is not sounding.
+    /// </summary>
+    /// <remarks>
+    /// **The two paths need different calls and picking the wrong one costs the audio itself.**
+    /// <c>Bass.ChannelGetLevel</c> measures by decoding data out of the channel, which is
+    /// harmless where the channel is being played by the library and is theft where it is a
+    /// source on a bus: every block it measured is a block the bus never got, so a meter would eat
+    /// the sound it was reporting on. The add-on's own reads the channel's buffer instead, which
+    /// is what the <see cref="BassFlags.MixerChanBuffer"/> given to every source is for.
+    /// </remarks>
+    /// <param name="handle">The pad's stream.</param>
+    private float LevelLocked(int handle)
+    {
+        if (!SoundingLocked(handle)) return 0;
+
+        int raw = _padBus.IsOpen
+            ? ManagedBass.Mix.BassMix.ChannelGetLevel(handle)
+            : Bass.ChannelGetLevel(handle);
+
+        if (raw == -1) return 0;
+
+        float peak = Math.Max((raw >> 16) & 0xFFFF, raw & 0xFFFF) / 32768f;
+
+        return Math.Clamp(peak, 0f, 1f);
+    }
+
+    /// <summary>
+    /// What a pad's stream is made with, which gains <see cref="BassFlags.Decode"/> on the bus.
+    /// </summary>
+    /// <remarks>
+    /// A source has to be a decoding channel or the bus refuses it, and the refusal would be a pad
+    /// that presses and makes no sound.
+    /// </remarks>
+    /// <param name="flags">What the pad wanted anyway.</param>
+    private BassFlags PadFlagsLocked(BassFlags flags) =>
+        _padBus.IsOpen ? flags | BassFlags.Decode : flags;
+
+    /// <summary>Watches a pad for its end, whichever path its audio takes.</summary>
+    /// <remarks>
+    /// **A source behind a mixer needs the add-on's own sync, and it fires on the mixing thread.**
+    /// A plain end sync on a decoding channel is never raised, since nothing is playing it, so
+    /// without this a pad would reach its end and go on being reported as playing for ever.
+    ///
+    /// Which is why the callback does as little as it can. It runs where the audio is rendered,
+    /// under a driver that is the ASIO thread with a deadline on it, and this class's lock is held
+    /// by everything a hand does on the PADS page. Taking that lock there would be the audio
+    /// thread waiting on the drawing thread, which is the one thing this codebase's own rule
+    /// forbids: on the audio path the loser refuses rather than waits. So the work is handed to
+    /// the pool and the mixing thread goes straight back to mixing.
+    /// </remarks>
+    /// <param name="handle">The pad's stream.</param>
+    /// <param name="padIndex">Which pad it is.</param>
+    private void WatchEndLocked(int handle, int padIndex)
+    {
+        if (!_padBus.IsOpen)
+        {
+            Bass.ChannelSetSync(handle, SyncFlags.End, 0, _endSync, new IntPtr(padIndex));
+
+            return;
+        }
+
+        ManagedBass.Mix.BassMix.ChannelSetSync(handle, SyncFlags.End, 0, _mixEndSync, new IntPtr(padIndex));
+    }
+
+    /// <summary>
+    /// A pad reached its end while on the bus, on the thread that renders the audio.
+    /// </summary>
+    /// <remarks>
+    /// Nothing here touches the lock or raises anything. See <see cref="WatchEndLocked"/>.
+    /// </remarks>
+    /// <param name="handle">The sync this came from.</param>
+    /// <param name="channel">The channel that ended.</param>
+    /// <param name="data">Unused.</param>
+    /// <param name="user">Which pad it was.</param>
+    private void OnMixChannelEnd(int handle, int channel, int data, IntPtr user)
+    {
+        int padIndex = user.ToInt32();
+
+        ThreadPool.UnsafeQueueUserWorkItem(_ => OnChannelEnd(handle, channel, data, new IntPtr(padIndex)), null);
     }
 
     /// <summary>Stops a pad and lets its stream go. Called holding the lock.</summary>
@@ -697,6 +938,8 @@ public sealed class BassAudioEngine : IAudioEngine
         _padStreams[padIndex] = 0;
 
         _padDsp[padIndex] = 0;
+
+        _padBus.Remove(handle);
 
         var state = Bass.ChannelIsActive(handle);
         if (state != PlaybackState.Stopped)

@@ -1,0 +1,43 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:JingleBox2.Views"
+        x:Class="JingleBox2.Views.DetachedWindow"
+        x:Name="Root"
+        Width="1150" Height="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BgBrush}">
+
+  <!--
+    The page sits inside the same twelve pixels it has in the window it came from, which is the
+    margin on the main window's own root. Held by a border of its own rather than by the window's
+    padding, so the page is put into something this file can see and the inset cannot quietly
+    depend on what a window template does with padding.
+
+    The transport stands at the top right, where it stands in the window this page came out of. A
+    detached page is still something you play, and going back to another window to press play is
+    the thing detaching was meant to avoid. It is the application's one transport rather than a
+    second one: two sets of caps disagreeing about one song is not two views of it.
+
+    Bound through the window's own Deck rather than through the data context, because the context
+    here belongs to the page and the page's context knows nothing about the transport.
+  -->
+  <DockPanel>
+    <views:Transport x:Name="Caps" DockPanel.Dock="Top"
+                     HorizontalAlignment="Right"
+                     Margin="12,10,12,0"
+                     CapWidth="34" CapHeight="26" Gap="4" Quiet="True"
+                     IsRecording="{Binding #Root.Deck.IsRecording}"
+                     IsPlaying="{Binding #Root.Deck.IsPlaying}"
+                     IsPaused="{Binding #Root.Deck.IsPaused}"
+                     CanRecord="{Binding #Root.Deck.CanRecord}"
+                     CanPlay="{Binding #Root.Deck.CanPlay}"
+                     CanPause="{Binding #Root.Deck.CanPause}"
+                     RecordCommand="{Binding #Root.Deck.RecordCommand}"
+                     PlayCommand="{Binding #Root.Deck.PlayCommand}"
+                     PauseCommand="{Binding #Root.Deck.PauseCommand}"
+                     StopCommand="{Binding #Root.Deck.StopCommand}"
+                     ToolTip.Tip="The same transport the rest of the application shows. A cap that is faint has nothing to do here." />
+
+    <Border x:Name="Host" Padding="12" />
+  </DockPanel>
+</Window>

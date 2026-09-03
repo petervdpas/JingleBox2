@@ -175,7 +175,34 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
     /// <inheritdoc/>
     public bool IsRunning => _handle != 0;
 
+    /// <summary>
+    /// Whether the mix is a source on the output bus rather than a channel that plays itself.
+    /// </summary>
+    /// <remarks>
+    /// Kept rather than asked, because <see cref="Level"/> is read from the drawing thread on a
+    /// timer and has no audio engine to put the question to. Volatile because the thread that
+    /// sets it is not the thread that reads it.
+    /// </remarks>
+    private volatile bool _onBus;
+
     /// <inheritdoc/>
+    /// <remarks>
+    /// **Which call is used decides whether reading the meter costs the music.**
+    /// <c>Bass.ChannelGetLevel</c> measures a decoding channel by decoding data out of it and
+    /// throwing it away, and on the bus this stream is a decoding channel: every poll of the
+    /// meter would take a slice of audio the mixer then never gets. The add-on's own reads the
+    /// channel's buffer instead, and its documentation says exactly why in one line, that the
+    /// mixer does not miss out on any data. That is what the
+    /// <see cref="ManagedBass.BassFlags.MixerChanBuffer"/> given to every source is for.
+    ///
+    /// It is worth saying what this sounded like, because nothing about it sounds like a meter.
+    /// The status bar polls this several times a second, so several times a second a piece of the
+    /// mix went missing. The render-ahead cushion drained, the shortfall was filled with silence,
+    /// and the distance between a note being fired by the clock and the same note being heard
+    /// wandered between nothing and the whole cushion. Forty milliseconds of wander is a third of
+    /// a sixteenth note at 120, so what a person hears is not a dropout, it is the whole song
+    /// coming apart in time.
+    /// </remarks>
     public float Level
     {
         get
@@ -184,7 +211,9 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
 
             if (handle == 0) return 0;
 
-            int raw = Bass.ChannelGetLevel(handle);
+            int raw = _onBus
+                ? ManagedBass.Mix.BassMix.ChannelGetLevel(handle)
+                : Bass.ChannelGetLevel(handle);
 
             if (raw == -1) return 0;
 
@@ -229,7 +258,10 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
             if (_sizes.UpdateThreads > 0)
                 Bass.Configure(Configuration.UpdateThreads, _sizes.UpdateThreads);
 
-            bool driven = audio.OutputKind == Enums.AudioOutputKind.Asio;
+            bool onBus = audio.Output.IsOpen;
+            bool driven = onBus || audio.OutputKind == Enums.AudioOutputKind.Asio;
+
+            _onBus = false;
 
             _procedure = Fill;
             _handle = Bass.CreateStream(SampleRate, Channels,
@@ -253,7 +285,25 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
 
             StartMixingAhead();
 
-            if (driven && audio.Feed(_handle, SampleRate)) return;
+            if (onBus)
+            {
+                audio.Output.BufferMs = BufferMs;
+
+                if (audio.Output.Add(_handle))
+                {
+                    _onBus = true;
+
+                    Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                        () => "the tracker is on the output bus, which holds " + BufferMs + " ms");
+
+                    return;
+                }
+
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                    "the bus would not take the tracker; playing it the ordinary way instead");
+            }
+
+            if (!onBus && driven && audio.Feed(_handle, SampleRate)) return;
 
             if (driven)
             {
@@ -287,6 +337,8 @@ public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
             if (_handle != 0)
             {
                 StopMixingAhead();
+
+                audio.Output.Remove(_handle);
 
                 Bass.StreamFree(_handle);
 

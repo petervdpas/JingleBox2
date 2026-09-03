@@ -78,6 +78,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="ManagedBass.Asio" Version="4.0.2" />
+    <PackageReference Include="ManagedBass.Mix" Version="4.0.2" />
     <PackageReference Include="ManagedBass.Wasapi" Version="4.0.2" />
     <PackageReference Include="MoonSharp" Version="2.0.0" />
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.94.2" />
@@ -103,17 +104,30 @@
       checkout without it builds and runs, lists no ASIO drivers, and says why when asked.
     -->
     <None Include="native\win-x64\bassasio.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="Exists('native\win-x64\bassasio.dll') And ('$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT'))" />
+    <!--
+      Summing what this application plays into one stream, which is un4seen's bassmix. Not in the
+      ManagedBass.Mix package either, so it is carried here like the rest of them. Not conditioned
+      on existing, unlike bassasio: ASIO absent is a shorter list of outputs, and this absent is
+      every source playing on its own again, which is the thing it exists to stop.
+    -->
+    <None Include="native\win-x64\bassmix.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'win-x64' Or ('$(RuntimeIdentifier)' == '' And '$(OS)' == 'Windows_NT')" />
     <None Include="native/linux-x64/libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass.so')">
       <TargetPath>runtimes/linux-x64/native/libbass.so</TargetPath>
     </None>
     <None Include="native/linux-x64/libbass_aac.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbass_aac.so')">
       <TargetPath>runtimes/linux-x64/native/libbass_aac.so</TargetPath>
     </None>
+    <None Include="native/linux-x64/libbassmix.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-x64' And Exists('native/linux-x64/libbassmix.so')">
+      <TargetPath>runtimes/linux-x64/native/libbassmix.so</TargetPath>
+    </None>
     <None Include="native/linux-arm64/libbass.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbass.so')">
       <TargetPath>runtimes/linux-arm64/native/libbass.so</TargetPath>
     </None>
     <None Include="native/linux-arm64/libbass_aac.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbass_aac.so')">
       <TargetPath>runtimes/linux-arm64/native/libbass_aac.so</TargetPath>
+    </None>
+    <None Include="native/linux-arm64/libbassmix.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" Condition="'$(RuntimeIdentifier)' == 'linux-arm64' And Exists('native/linux-arm64/libbassmix.so')">
+      <TargetPath>runtimes/linux-arm64/native/libbassmix.so</TargetPath>
     </None>
   </ItemGroup>
   <Target Name="SetVersionFromGit" BeforeTargets="GetAssemblyVersion;GenerateNuspec;BeforeCompile" Condition="'$(Version)' == '0.0.0-local'">
@@ -131,15 +145,18 @@
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
     <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
+    <Copy SourceFiles="native\win-x64\bassmix.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassmix.dll')" />
   </Target>
   <Target Name="CopyBassToLinuxOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
     <Copy SourceFiles="native/linux-x64/libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native/linux-x64/libbass_aac.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libbass_aac.so')" />
+    <Copy SourceFiles="native/linux-x64/libbassmix.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native/linux-x64/libbassmix.so')" />
   </Target>
   <Target Name="EnsureBassDllInPublish" AfterTargets="Publish" Condition="'$(RuntimeIdentifier)' == 'win-x64' And Exists('native\win-x64\bass.dll')">
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
     <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
+    <Copy SourceFiles="native\win-x64\bassmix.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassmix.dll')" />
   </Target>
 </Project>

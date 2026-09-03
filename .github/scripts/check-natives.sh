@@ -26,10 +26,13 @@ shipped=(
   "native/win-x64/bass_aac.dll|z/2/bass_aac24.zip|x64/bass_aac.dll"
   "native/win-x64/basswasapi.dll|basswasapi24.zip|x64/basswasapi.dll"
   "native/win-x64/bassasio.dll|bassasio14.zip|x64/bassasio.dll"
+  "native/win-x64/bassmix.dll|bassmix24.zip|x64/bassmix.dll"
   "native/linux-x64/libbass.so|bass24-linux.zip|libs/x86_64/libbass.so"
   "native/linux-arm64/libbass.so|bass24-linux.zip|libs/aarch64/libbass.so"
   "native/linux-x64/libbass_aac.so|z/2/bass_aac24-linux.zip|libs/x86_64/libbass_aac.so"
   "native/linux-arm64/libbass_aac.so|z/2/bass_aac24-linux.zip|libs/aarch64/libbass_aac.so"
+  "native/linux-x64/libbassmix.so|bassmix24-linux.zip|libs/x86_64/libbassmix.so"
+  "native/linux-arm64/libbassmix.so|bassmix24-linux.zip|libs/aarch64/libbassmix.so"
 )
 
 behind=0
