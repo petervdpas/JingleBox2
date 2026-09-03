@@ -20,6 +20,16 @@ public sealed class BassAudioEngine : IAudioEngine
     /// <summary>The add-ons beside the program, loaded once for the process.</summary>
     private readonly IBassPlugins _plugins = new BassPlugins();
 
+    /// <summary>The ASIO drivers, which are the other half of the output list.</summary>
+    /// <remarks>
+    /// Held rather than made per call, because it remembers whether the library is there at all
+    /// and finding that out costs a thrown exception where it is not.
+    /// </remarks>
+    private readonly Interfaces.IAsioDevices _asio = new AsioDevices();
+
+    /// <summary>How a device number names one out of two lists. Holds nothing.</summary>
+    private readonly Interfaces.IAudioOutputs _outputs = new AudioOutputs();
+
     /// <summary>Held for anything that touches a pad's state or calls into BASS.</summary>
     private readonly object _lock = new();
 
@@ -212,6 +222,12 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The system's endpoints first and the ASIO drivers after, which is the order somebody wants
+    /// them in: the system's is what everything already uses and ASIO is the deliberate choice.
+    /// A machine with no ASIO library adds nothing and says nothing, since that is every Linux
+    /// machine and it is not news.
+    /// </remarks>
     public IReadOnlyList<AudioOutput> GetOutputDevices()
     {
         var list = new List<AudioOutput>();
@@ -222,12 +238,21 @@ public sealed class BassAudioEngine : IAudioEngine
             list.Add(new AudioOutput(i, info.Name));
         }
 
+        list.AddRange(_asio.Devices);
+
         return list;
     }
 
     IEnumerable<AudioOutput> IAudioEngine.GetOutputDevices() => GetOutputDevices();
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// An ASIO driver is not a device BASS can be opened on. The driver owns the card, so BASS is
+    /// opened on its own silent device instead and everything that would have been played is
+    /// decoded and pulled through the driver, which is what <see cref="OutputKind"/> is for: the
+    /// tracker asks before it makes its stream, since a stream that plays itself and is also
+    /// pulled would be the same audio leaving by two routes.
+    /// </remarks>
     public void SetOutputDevice(int deviceId)
     {
         lock (_lock)
@@ -236,16 +261,56 @@ public sealed class BassAudioEngine : IAudioEngine
 
             StopAllAndFreeStreamsLocked();
 
+            _asio.Close();
+
             if (_currentDeviceId >= 0)
                 Bass.Free();
 
             _currentDeviceId = deviceId;
 
-            if (!Bass.Init(deviceId, _deviceRate))
+            var (kind, index) = _outputs.Which(deviceId);
+
+            if (!Bass.Init(kind == Enums.AudioOutputKind.Asio ? SilentDevice : index, _deviceRate))
                 throw new InvalidOperationException($"Bass.Init failed: {Bass.LastError}");
 
             LoadPlugins();
         }
+    }
+
+    /// <summary>
+    /// BASS's own device that plays nothing, which is what is opened behind an ASIO driver.
+    /// </summary>
+    /// <remarks>
+    /// Nought is not the first sound card, it is the one that decodes and outputs nothing at all.
+    /// Everything above BASS goes on working, and what is decoded is pulled out by whatever is
+    /// really driving the card.
+    /// </remarks>
+    private const int SilentDevice = 0;
+
+    /// <inheritdoc/>
+    public Enums.AudioOutputKind OutputKind
+    {
+        get
+        {
+            lock (_lock) return _outputs.Which(_currentDeviceId).Kind;
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool Feed(int stream, int rate, int frames)
+    {
+        int device;
+
+        lock (_lock)
+        {
+            var (kind, index) = _outputs.Which(_currentDeviceId);
+
+            if (kind != Enums.AudioOutputKind.Asio) return false;
+
+            device = index;
+        }
+
+        return _asio.Open(device, stream, rate, frames);
     }
 
     /// <inheritdoc/>

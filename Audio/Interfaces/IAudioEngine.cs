@@ -48,6 +48,30 @@ public interface IAudioEngine : IDisposable
     void SetOutputDevice(int deviceId);
 
     /// <summary>
+    /// Which way out the chosen output goes: the system's own path, or an ASIO driver.
+    /// </summary>
+    /// <remarks>
+    /// Asked before a stream is made rather than after, because the two want different streams. A
+    /// stream on the system's path plays itself; one going to an ASIO driver has to be a decoding
+    /// stream that the driver pulls from, and a stream that does both is the same audio leaving
+    /// by two routes at once.
+    /// </remarks>
+    Enums.AudioOutputKind OutputKind => Enums.AudioOutputKind.System;
+
+    /// <summary>
+    /// Puts a decoding stream on the chosen driver, for an output that has to be fed.
+    /// </summary>
+    /// <remarks>
+    /// False where the chosen output is the system's, which plays its own streams and needs
+    /// nobody to pull them, and false where the driver refused. A caller that is told no has a
+    /// stream nothing is pulling, and its answer is to play it the ordinary way.
+    /// </remarks>
+    /// <param name="stream">The decoding stream to pull from.</param>
+    /// <param name="rate">The rate to run the card at.</param>
+    /// <param name="frames">How many frames a block should be, or nought for the driver's own.</param>
+    bool Feed(int stream, int rate, int frames) => false;
+
+    /// <summary>
     /// Brings the sound up on the current device, if nothing has yet.
     /// </summary>
     /// <remarks>

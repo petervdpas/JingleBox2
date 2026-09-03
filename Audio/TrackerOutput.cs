@@ -219,8 +219,12 @@ public sealed class TrackerOutput : ITrackerOutput
             if (_sizes.UpdateThreads > 0)
                 Bass.Configure(Configuration.UpdateThreads, _sizes.UpdateThreads);
 
+            bool driven = audio.OutputKind == Enums.AudioOutputKind.Asio;
+
             _procedure = Fill;
-            _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
+            _handle = Bass.CreateStream(SampleRate, Channels,
+                driven ? BassFlags.Float | BassFlags.Decode : BassFlags.Float,
+                _procedure, IntPtr.Zero);
 
             Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, () =>
                 _handle == 0
@@ -236,6 +240,25 @@ public sealed class TrackerOutput : ITrackerOutput
             }
 
             StartMixingAhead();
+
+            if (driven && audio.Feed(_handle, SampleRate, _sizes.BufferFrames)) return;
+
+            if (driven)
+            {
+                Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio,
+                    "the driver would not take the mix; playing it the ordinary way instead");
+
+                Bass.StreamFree(_handle);
+
+                _procedure = Fill;
+                _handle = Bass.CreateStream(SampleRate, Channels, BassFlags.Float, _procedure, IntPtr.Zero);
+
+                if (_handle == 0)
+                {
+                    _procedure = null;
+                    return;
+                }
+            }
 
             Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, BufferMs / 1000f);
             Bass.ChannelPlay(_handle);

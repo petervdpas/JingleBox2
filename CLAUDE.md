@@ -2655,6 +2655,33 @@ whole exercise and is worth writing down rather than summarising:
 - A plugin's own window is given to it only once the window is really on screen at its full
   size. Handing over the one-pixel window Avalonia makes before the first layout is what killed
   Serum
+- **ASIO is read and the tracker goes out of it, and it is not finished.** ASIO is Steinberg's
+  driver standard on Windows, and the point of it is that the system's mixer is not in the path:
+  the buffer is the card's own, so the delay is a few milliseconds rather than the twenty a shared
+  path costs. `ManagedBass.Asio` is the wrapper and `bassasio.dll` is un4seen's add-on, which is
+  **not** in the package and has to be put in `native/win-x64/` by hand. The csproj copies it only
+  if it is there, so a checkout without it builds, runs, lists no drivers, and says why
+- **An ASIO driver is not a device BASS can be opened on**, which is the whole shape of the
+  change. The driver owns the card, so BASS is opened on its own silent device instead, the
+  tracker's stream is made a decoding one, and the driver pulls from it. A stream that plays
+  itself and is also pulled is the same audio leaving by two routes, which is why `OutputKind` is
+  asked before the stream is made rather than after
+- **One stored number names a device out of two lists that both start at nought.** The system's
+  endpoints keep the numbers they always had, so every settings file written before ASIO existed
+  goes on meaning what it meant, and the drivers are lifted clear at 1000 and up. `IAudioOutputs`
+  is the one place that composes and takes apart, because two fields that have to agree is how
+  the same fact comes to be written twice and then diverges
+- **A missing native library throws on the first call into it, not when the assembly loads**, so
+  whether ASIO is there at all can only be found out by asking and seeing. `AsioDevices.Present`
+  asks once and remembers, since the answer cannot change while the program runs and the question
+  costs a thrown exception where it is no. `Tests/AsioDevicesTests.cs` is that path and nothing
+  else: every machine the suite runs on has no ASIO, so what is pinned is that asking is safe,
+  the list is empty rather than an error, and opening one is refused rather than fatal
+- **What is not done is the pads.** With a driver picked, BASS is on its silent device, so the
+  tracker is heard and the pads are not: they are separate streams played the ordinary way and
+  the ordinary way now goes nowhere. Finishing it means one stream for everything, which is
+  BASSmix, another add-on and another restructuring of where the pads' audio goes. Until that is
+  built, ASIO is the tracker's alone and picking one silences FIRE
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
 - Startup errors logged to `startup.log` for debugging
