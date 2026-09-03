@@ -7,7 +7,68 @@
              x:Class="JingleBox2.Views.MixerView"
              x:DataType="vm:TrackerViewModel">
 
+  <UserControl.Resources>
+    <!-- A strip over something that is not a track: a badge, a fader and a meter, and nothing
+         else. No pan, no mute, no solo and no ducking, because none of those mean anything for
+         the recording input, the pads as a whole, or a take being auditioned. One template for
+         all three, since what differs between them is only what the fader writes to. -->
+    <DataTemplate x:Key="SourceStrip" x:DataType="vm:SourceStripViewModel">
+      <Border Classes="inset" Width="134">
+        <DockPanel>
+          <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
+            <Border Classes="badge" HorizontalAlignment="Center"
+                    ToolTip.Tip="{Binding Tip}">
+              <TextBlock Text="{Binding Label}" />
+            </Border>
+
+            <!-- Only where there is a bus underneath. The recording input has neither: panning
+                 what is being recorded is not something the recorder does, and a mute there
+                 would be recording nothing without saying so. No solo on any of them, because
+                 solo here is the song's and these are not in the song. -->
+            <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
+                     Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                     HorizontalAlignment="Center"
+                     IsVisible="{Binding OnABus}"
+                     Value="{Binding Pan}" />
+
+            <ToggleButton Classes="strip" Content="M"
+                          IsVisible="{Binding OnABus}"
+                          IsChecked="{Binding Mute}"
+                          ToolTip.Tip="Silence this, leaving its fader where it is." />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8"
+                      HorizontalAlignment="Center" Margin="0,2,0,0">
+            <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                      Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                      SmallStep="0.5" LargeStep="3"
+                      TrackLength="0"
+                      Ticks="6,0,-6,-12,-24,-40,-60"
+                      ToolTip.Tip="{Binding Tip}"
+                      Value="{Binding VolumeDecibels}" />
+
+            <ui:LevelMeter Width="22"
+                           VerticalAlignment="Stretch"
+                           Margin="0,23,0,24"
+                           Stereo="True"
+                           Left="{Binding Left}"
+                           Right="{Binding Right}" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <UserControl.Styles>
+    <!-- The word over a group of strips. Quiet, since it names the row rather than being part
+         of it: what the eye is looking for on this page is a fader, not a heading. -->
+    <Style Selector="TextBlock.groupTitle">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.55" />
+      <Setter Property="Margin" Value="2,0,0,0" />
+    </Style>
+
     <Style Selector="TextBlock.field">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Opacity" Value="0.8" />
@@ -130,8 +191,45 @@
           </ContentControl.ContentTemplate>
         </ContentControl>
 
+        <!-- Everything that is not the master, in its three groups, scrolling under it. The
+             master is docked to the right and outside this, so it stays put however far along
+             the tracks you have gone: it is the one strip you always want to be able to see.
+
+             The groups are labelled because the row is no longer all one kind of thing. Two of
+             them are the application's and one is the song's, and that difference decides what a
+             fader does: pulling a track down changes the song, pulling PADS down changes this
+             installation. -->
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Strips}">
+          <StackPanel Orientation="Horizontal" Spacing="18">
+
+            <!-- Each group is a DockPanel rather than a stack, so its title takes the line it
+                 needs and the strips under it take everything left. Stacked, every group was as
+                 tall as its own contents, which left the three shortest strips a third the
+                 height of the tracks beside them and their faders squeezed into what was left. -->
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Classes="groupTitle" Text="RECORDER" />
+
+              <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+                <ContentControl Content="{Binding $parent[views:MixerView].RecorderInput}"
+                                ContentTemplate="{StaticResource SourceStrip}" />
+
+                <ContentControl Content="{Binding $parent[views:MixerView].RecorderPlay}"
+                                ContentTemplate="{StaticResource SourceStrip}" />
+              </StackPanel>
+            </DockPanel>
+
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Classes="groupTitle" Text="PADS" />
+
+              <ContentControl Margin="0,6,0,0"
+                              Content="{Binding $parent[views:MixerView].PadsStrip}"
+                              ContentTemplate="{StaticResource SourceStrip}" />
+            </DockPanel>
+
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Classes="groupTitle" Text="TRACKER" />
+
+              <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding Strips}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <StackPanel Orientation="Horizontal" Spacing="10" />
@@ -230,8 +328,10 @@
                   </DockPanel>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+              </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+          </StackPanel>
         </ScrollViewer>
       </DockPanel>
     </Border>

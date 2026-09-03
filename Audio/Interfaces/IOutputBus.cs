@@ -39,6 +39,26 @@ public interface IOutputBus : IDisposable
     /// </remarks>
     bool Present { get; }
 
+    /// <summary>
+    /// Where this bus sits between the speakers, -1 hard left to 1 hard right.
+    /// </summary>
+    /// <remarks>
+    /// Kept here as well as written into the channel, for the reason <see cref="Level"/> is: the
+    /// stream is made again whenever the output changes and a setting that lived only in the
+    /// channel would go with it.
+    /// </remarks>
+    double Pan { get; set; }
+
+    /// <summary>
+    /// Whether this bus is silenced, without disturbing where its fader stands.
+    /// </summary>
+    /// <remarks>
+    /// Its own answer rather than a level of nought, because a mute has to be undone: turning the
+    /// fader down to silence it would lose where it was, which is the whole difference between a
+    /// mute and a fader. What reaches the channel is the two together.
+    /// </remarks>
+    bool Mute { get; set; }
+
     /// <summary>The stream everything is summed into, or nought before it is open.</summary>
     int Handle { get; }
 
@@ -61,6 +81,20 @@ public interface IOutputBus : IDisposable
     /// alignment of the tracks going, not a buffer being long.
     /// </remarks>
     int BufferMs { get; set; }
+
+    /// <summary>
+    /// What is leaving this bus, as two peaks from 0 to 1, and silence where it is not open.
+    /// </summary>
+    /// <remarks>
+    /// **Which call this makes depends on where the bus stands, and the wrong one eats the
+    /// audio.** A bus that plays itself can be measured the ordinary way, from its playback
+    /// buffer. A bus that is a source on another one is a decoding channel, and there the
+    /// ordinary call measures by decoding data out and throwing it away, so a meter would take
+    /// blocks the mix never gets. That is not a theory: it is what the tracker's own meter did for
+    /// an afternoon, and it presented as the whole song wandering out of time rather than as
+    /// anything to do with a meter.
+    /// </remarks>
+    (float Left, float Right) Reading { get; }
 
     /// <summary>Whether the bus is open and sources can be plugged into it.</summary>
     bool IsOpen { get; }

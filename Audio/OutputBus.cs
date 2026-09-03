@@ -38,6 +38,19 @@ public sealed class OutputBus : IOutputBus
     /// <summary>How much is held ahead of the card, kept for the same reason as the level.</summary>
     private int _bufferMs;
 
+    /// <summary>Where it sits between the speakers, kept for the same reason as the level.</summary>
+    private double _pan;
+
+    /// <summary>Whether it is silenced, kept for the same reason.</summary>
+    private bool _mute;
+
+    /// <summary>Whether a driver or another bus pulls this one, rather than it playing itself.</summary>
+    /// <remarks>
+    /// Remembered from the opening, because it is what decides how this bus can be metered and
+    /// there is no way to ask a handle which it is.
+    /// </remarks>
+    private bool _pulled;
+
     /// <inheritdoc/>
     public bool Present
     {
@@ -126,9 +139,7 @@ public sealed class OutputBus : IOutputBus
             {
                 _level = Math.Clamp(value, 0f, 1f);
 
-                if (_handle == 0) return;
-
-                Bass.ChannelSetAttribute(_handle, ChannelAttribute.Volume, _level);
+                SayLevelLocked();
             }
         }
     }
@@ -151,6 +162,8 @@ public sealed class OutputBus : IOutputBus
         {
             CloseLocked();
 
+            _pulled = pulled;
+
             var flags = BassFlags.Float | BassFlags.MixerNonStop | (pulled ? BassFlags.Decode : BassFlags.Default);
 
             try
@@ -172,7 +185,9 @@ public sealed class OutputBus : IOutputBus
                 return false;
             }
 
-            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Volume, _level);
+            SayLevelLocked();
+
+            Bass.ChannelSetAttribute(_handle, ChannelAttribute.Pan, (float)_pan);
 
             if (_bufferMs > 0)
                 Bass.ChannelSetAttribute(_handle, ChannelAttribute.Buffer, _bufferMs / 1000f);
@@ -187,6 +202,90 @@ public sealed class OutputBus : IOutputBus
             });
 
             return true;
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// NaN is refused rather than clamped, the same rule and the same reason as <see cref="Level"/>.
+    /// </remarks>
+    public double Pan
+    {
+        get { lock (_lock) return _pan; }
+
+        set
+        {
+            if (double.IsNaN(value)) return;
+
+            lock (_lock)
+            {
+                _pan = Math.Clamp(value, -1, 1);
+
+                if (_handle == 0) return;
+
+                Bass.ChannelSetAttribute(_handle, ChannelAttribute.Pan, (float)_pan);
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool Mute
+    {
+        get { lock (_lock) return _mute; }
+
+        set
+        {
+            lock (_lock)
+            {
+                if (_mute == value) return;
+
+                _mute = value;
+
+                SayLevelLocked();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Writes the level and the mute into the channel as the one number BASS has for both.
+    /// </summary>
+    /// <remarks>
+    /// Both go through here so neither can overwrite the other: setting the fader while muted
+    /// must not unmute, and unmuting must put back where the fader stands rather than unity.
+    /// </remarks>
+    private void SayLevelLocked()
+    {
+        if (_handle == 0) return;
+
+        Bass.ChannelSetAttribute(_handle, ChannelAttribute.Volume, _mute ? 0f : _level);
+    }
+
+    /// <inheritdoc/>
+    public (float Left, float Right) Reading
+    {
+        get
+        {
+            int handle;
+            bool pulled;
+
+            lock (_lock)
+            {
+                handle = _handle;
+                pulled = _pulled;
+            }
+
+            if (handle == 0) return (0, 0);
+
+            int raw = pulled
+                ? ManagedBass.Mix.BassMix.ChannelGetLevel(handle)
+                : Bass.ChannelGetLevel(handle);
+
+            if (raw == -1) return (0, 0);
+
+            float left = ((raw >> 16) & 0xFFFF) / 32768f;
+            float right = (raw & 0xFFFF) / 32768f;
+
+            return (Math.Clamp(left, 0f, 1f), Math.Clamp(right, 0f, 1f));
         }
     }
 

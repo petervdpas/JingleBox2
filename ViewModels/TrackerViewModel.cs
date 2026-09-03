@@ -1890,7 +1890,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         {
             string song = SongName.Length > 0 ? SongName : Unnamed;
 
-            if (ShowsMixer) return song + "  ·  mixer  ·  " + TrackCount + " tracks";
 
             if (ShowsMachines)
                 return song + "  ·  rack  ·  " + Song.Instruments.Count +
@@ -2161,8 +2160,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     private const string MachinesPage = "Machines";
 
     /// <summary>The mixer: the song's tracks and the strip that is not one.</summary>
-    private const string MixerPage = "Mixer";
-
     /// <summary>What this song's controller is pointed at, which travels in its file.</summary>
     private const string ControlsPage = "Controls";
 
@@ -2170,7 +2167,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsPattern))]
     [NotifyPropertyChangedFor(nameof(ShowsMachines))]
-    [NotifyPropertyChangedFor(nameof(ShowsMixer))]
     [NotifyPropertyChangedFor(nameof(ShowsControls))]
     private string page = PatternPage;
 
@@ -2179,9 +2175,6 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
     /// <summary>True while the rack is showing.</summary>
     public bool ShowsMachines => Page == MachinesPage;
-
-    /// <summary>True while the mixer is showing, which is the one page with no cursor on it.</summary>
-    public bool ShowsMixer => Page == MixerPage;
 
     /// <summary>
     /// True while the song's own controller layout is showing.
@@ -2336,7 +2329,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// pressing the lit button again is the way back.
     /// </remarks>
     public IRelayCommand<string> ShowCommand => new RelayCommand<string>(which =>
-        Page = which == Page || which is not (MachinesPage or MixerPage or ControlsPage)
+        Page = which == Page || which is not (MachinesPage or ControlsPage)
             ? PatternPage
             : which);
 

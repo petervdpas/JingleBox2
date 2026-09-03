@@ -38,6 +38,81 @@ public partial class MixerView : UserControl
         AddHandler(PointerPressedEvent, Touched, RoutingStrategies.Tunnel);
 
         LinkKey.Watch(this);
+
+        _meters = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(50) };
+        _meters.Tick += (_, _) => Read();
+
+        AttachedToVisualTree += (_, _) => _meters.Start();
+        DetachedFromVisualTree += (_, _) => _meters.Stop();
+    }
+
+    /// <summary>
+    /// What reads the three strips that are not the song's.
+    /// </summary>
+    /// <remarks>
+    /// The page's own rather than the tracker's, because the tracker polls while the mix is
+    /// sounding and these three are not the mix: a pad is fired and a take is auditioned with the
+    /// transport stopped, and an input meter shows what is arriving whether anything is playing at
+    /// all. It runs only while this page is on screen, which is what the two visual-tree events
+    /// are for, so a mixer nobody is looking at costs nothing.
+    /// </remarks>
+    private readonly Avalonia.Threading.DispatcherTimer _meters;
+
+    /// <summary>Reads the three meters again, on the drawing thread.</summary>
+    /// <remarks>
+    /// Through the strips themselves rather than through the page's own context: they are handed
+    /// in from outside and the page's context is the song, which knows nothing about them.
+    /// </remarks>
+    private void Read()
+    {
+        (RecorderInput as ViewModels.SourceStripViewModel)?.ReadMeter();
+        (RecorderPlay as ViewModels.SourceStripViewModel)?.ReadMeter();
+        (PadsStrip as ViewModels.SourceStripViewModel)?.ReadMeter();
+    }
+
+    /// <summary>
+    /// The recording input's strip, handed in rather than read off the data context.
+    /// </summary>
+    /// <remarks>
+    /// This page is bound to the song, because almost everything on it is the song's: the tracks,
+    /// the master, the chains, the lanes. These three are not. They belong to the application,
+    /// which is what makes them the reason the page moved out of the tracker in the first place.
+    ///
+    /// Handed in through a property rather than by re-pointing the page at the application and
+    /// prefixing forty bindings with the song, which is the same shape TrackerView already uses
+    /// for the rack it is given: the page keeps its own context and is told the few things that
+    /// come from further out.
+    /// </remarks>
+    public static readonly StyledProperty<object?> RecorderInputProperty =
+        AvaloniaProperty.Register<MixerView, object?>(nameof(RecorderInput));
+
+    /// <inheritdoc cref="RecorderInputProperty"/>
+    public object? RecorderInput
+    {
+        get => GetValue(RecorderInputProperty);
+        set => SetValue(RecorderInputProperty, value);
+    }
+
+    /// <summary>The take being auditioned, as a strip. See <see cref="RecorderInputProperty"/>.</summary>
+    public static readonly StyledProperty<object?> RecorderPlayProperty =
+        AvaloniaProperty.Register<MixerView, object?>(nameof(RecorderPlay));
+
+    /// <inheritdoc cref="RecorderPlayProperty"/>
+    public object? RecorderPlay
+    {
+        get => GetValue(RecorderPlayProperty);
+        set => SetValue(RecorderPlayProperty, value);
+    }
+
+    /// <summary>The pads, as one strip. See <see cref="RecorderInputProperty"/>.</summary>
+    public static readonly StyledProperty<object?> PadsStripProperty =
+        AvaloniaProperty.Register<MixerView, object?>(nameof(PadsStrip));
+
+    /// <inheritdoc cref="PadsStripProperty"/>
+    public object? PadsStrip
+    {
+        get => GetValue(PadsStripProperty);
+        set => SetValue(PadsStripProperty, value);
     }
 
     /// <summary>What a machine offers, drawn as menu items. The same rule a machine's face uses.</summary>
@@ -74,7 +149,7 @@ public partial class MixerView : UserControl
     /// <remarks>
     /// Which of the two it says is answered by where this page is standing rather than by a flag
     /// kept beside it. Detached, the page is inside a <see cref="DetachedWindow"/> and there is no
-    /// <see cref="TrackerView"/> above it at all, so the same walk answers both questions and the
+    /// <see cref="MainWindow"/> above it at all, so the same walk answers both questions and the
     /// two can never disagree.
     ///
     /// Always offered, and it is what made the button worth pressing. The menu used to return
@@ -92,13 +167,13 @@ public partial class MixerView : UserControl
             };
         }
 
-        var tracker = this.FindAncestorOfType<TrackerView>();
+        var main = this.FindAncestorOfType<MainWindow>();
 
         return new PanelMenuItem("Open in a window")
         {
-            Tip = "Takes the mixer out onto a window of its own, so the pattern and the strips can be seen at once.",
-            Live = tracker != null,
-            Chosen = tracker == null ? null : tracker.DetachMixer,
+            Tip = "Takes the mixer out onto a window of its own, so the desk and whatever else you are doing can be seen at once.",
+            Live = main != null,
+            Chosen = main == null ? null : main.DetachMixer,
         };
     }
 

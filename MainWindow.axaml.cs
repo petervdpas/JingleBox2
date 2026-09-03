@@ -335,4 +335,71 @@ public partial class MainWindow : Window
 
         return (Math.Max(width, DefaultWidth), Math.Max(height, DefaultHeight));
     }
+    /// <summary>The mixer's window while it is in one, or nothing while it is on its tab.</summary>
+    /// <remarks>
+    /// Held so the same gesture brings it forward rather than opening a second one, and so
+    /// docking has something to close. Cleared where the page is given back rather than where the
+    /// window is closed, since a window shut from its own frame goes through the same door.
+    /// </remarks>
+    private Views.DetachedWindow? _mixerWindow;
+
+    /// <summary>
+    /// Puts the mixer in a window of its own, or brings that window forward when it is already
+    /// in one.
+    /// </summary>
+    /// <remarks>
+    /// The page itself is handed over rather than a second one built, which is what makes the
+    /// mixer in the window the mixer: the strips, the picked track, the folded chains and the
+    /// meters are the ones that were on the tab a moment ago. Two views of one page are two
+    /// pictures that can disagree, and both would poll their meters.
+    ///
+    /// What it was bound to goes with it, since a page taken out of a tab has nothing above it
+    /// any more and every binding on it would read null.
+    /// </remarks>
+    public void DetachMixer()
+    {
+        if (_mixerWindow is { } already)
+        {
+            already.Activate();
+
+            return;
+        }
+
+        if (Mixer is not { } page) return;
+
+        MixerHost.Children.Remove(page);
+        MixerGone.IsVisible = true;
+
+        _mixerWindow = Views.DetachedWindow.Show(
+            page,
+            "Mixer",
+            page.DataContext,
+            this,
+            (DataContext as ViewModels.MainViewModel)?.Transport,
+            back =>
+            {
+                _mixerWindow = null;
+
+                if (!MixerHost.Children.Contains(back)) MixerHost.Children.Insert(0, back);
+
+                MixerGone.IsVisible = false;
+            });
+
+        if (_mixerWindow != null) return;
+
+        MixerHost.Children.Insert(0, page);
+        MixerGone.IsVisible = false;
+    }
+
+    /// <summary>Closes the mixer's window, which is what puts the page back.</summary>
+    /// <remarks>
+    /// Closing rather than moving the page here, so there is one way back and it is the one a
+    /// window's own frame takes.
+    /// </remarks>
+    public void DockMixer() => _mixerWindow?.Close();
+
+    /// <summary>Brings the mixer back onto its tab.</summary>
+    /// <param name="sender">Unused.</param>
+    /// <param name="e">Unused.</param>
+    private void DockMixer_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => DockMixer();
 }

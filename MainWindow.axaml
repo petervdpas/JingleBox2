@@ -75,6 +75,36 @@
         </ItemsPanelTemplate>
       </TabControl.ItemsPanel>
 
+      <!-- First, because the desk is where you start: what is coming in, what the pads are
+           doing, and what the song is doing, all on one row. It is also the one page that is
+           about the whole application rather than about one of its jobs.
+
+           The page keeps the song as its context, since almost everything on it is the song's.
+           The three strips that are not are handed in, the same way the tracker is handed the
+           rack it draws beside the pattern. -->
+      <TabItem Header="MIXER">
+        <!-- In a panel of its own so the page can be taken out into a window and put back, and
+             only ever one of the two is in here. -->
+        <Panel x:Name="MixerHost">
+          <views:MixerView x:Name="Mixer"
+                           DataContext="{Binding Tracker}"
+                           RecorderInput="{Binding $parent[TabItem].DataContext.RecorderInput}"
+                           RecorderPlay="{Binding $parent[TabItem].DataContext.RecorderPlay}"
+                           PadsStrip="{Binding $parent[TabItem].DataContext.PadsStrip}" />
+
+          <!-- What stands where the mixer stood while it is elsewhere. A page that falls back to
+               nothing reads as a page that is broken rather than as one that has moved. -->
+          <StackPanel x:Name="MixerGone" IsVisible="False"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+            <TextBlock Text="The mixer is in a window of its own."
+                       HorizontalAlignment="Center" Opacity="0.8" />
+            <Button Content="Bring it back" HorizontalAlignment="Center"
+                    Click="DockMixer_Click"
+                    ToolTip.Tip="Closes the window and puts the mixer back on this page." />
+          </StackPanel>
+        </Panel>
+      </TabItem>
+
       <TabItem Header="RECORD">
         <views:RecordView DataContext="{Binding Record}" />
       </TabItem>

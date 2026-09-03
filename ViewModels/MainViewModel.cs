@@ -265,7 +265,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     private ITransportDeck DeckForPage => SelectedTab switch
     {
         RecordTab => Record,
-        TrackerTab => Tracker,
+        MixerTab or TrackerTab => Tracker,
         _ => _padDeck!
     };
 
@@ -288,7 +288,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     private Shortcuts.Interfaces.IShortcutContext? Page => SelectedTab switch
     {
         RecordTab => Record,
-        TrackerTab => Tracker,
+        MixerTab or TrackerTab => Tracker,
         _ => null
     };
 
@@ -399,11 +399,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         if (_cfg.FreeTrackerPlugins)
         {
-            if (_wasOnTracker && value != TrackerTab) Tracker.LetGoOfPlugins();
-            else if (!_wasOnTracker && value == TrackerTab) Tracker.TakeUpPlugins();
+            bool onTracker = value is TrackerTab or MixerTab;
+
+            if (_wasOnTracker && !onTracker) Tracker.LetGoOfPlugins();
+            else if (!_wasOnTracker && onTracker) Tracker.TakeUpPlugins();
         }
 
-        _wasOnTracker = value == TrackerTab;
+        _wasOnTracker = value is TrackerTab or MixerTab;
 
         Transport?.Moved();
 
@@ -424,7 +426,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// Written out rather than "not settings", so that adding a page makes somebody decide
     /// which kind it is instead of quietly getting a transport it has no use for.
     /// </remarks>
-    public bool ShowsTransport => SelectedTab is UseTab or RecordTab or TrackerTab;
+    public bool ShowsTransport => SelectedTab is MixerTab or UseTab or RecordTab or TrackerTab;
 
     /// <summary>
     /// Room kept at the end of the tab strip for the transport, and none when it is away.
@@ -449,19 +451,22 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// The pages, in the order the tab strip has them. Written out, because the context the bar
     /// shows depends on which one is open and a number read off a control is not a name.
     /// </summary>
-    private const int RecordTab = 0;
+    private const int MixerTab = 0;
+
+    /// <summary>Where the takes are made.</summary>
+    private const int RecordTab = 1;
 
     /// <summary>Where the pads are laid out.</summary>
-    private const int PadsTab = 1;
+    private const int PadsTab = 2;
 
     /// <summary>And where they are played, which is FIRE.</summary>
-    private const int UseTab = 2;
+    private const int UseTab = 3;
 
     /// <summary>The song, and the rack beside it.</summary>
-    private const int TrackerTab = 3;
+    private const int TrackerTab = 4;
 
     /// <summary>Named for the sake of the list, though nothing asks about it by name.</summary>
-    private const int SettingsTab = 4;
+    private const int SettingsTab = 6;
 
     /// <summary>
     /// Tells the bar where you are now.
@@ -476,7 +481,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         UseTab or PadsTab => Pads.Count + (Pads.Count == 1 ? " pad" : " pads") +
                              "  ·  profile " + (string.IsNullOrWhiteSpace(SelectedProfileName) ? "default" : SelectedProfileName),
         RecordTab => Record.Context,
-        TrackerTab => Tracker.Context,
+        MixerTab or TrackerTab => Tracker.Context,
         _ => ""
     };
 
@@ -707,6 +712,96 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             OnPropertyChanged();
             OnPropertyChanged(nameof(OutputBusHint));
         }
+    }
+
+    /// <summary>The fader scale, so a level in decibels can be turned into what an engine wants.</summary>
+    private readonly UI.Interfaces.IGainScale _gain = new UI.GainScale();
+
+    /// <summary>Backing field for <see cref="RecorderInput"/>.</summary>
+    private SourceStripViewModel? recorderInput;
+
+    /// <summary>
+    /// The recording input, as a strip on the mixer.
+    /// </summary>
+    /// <remarks>
+    /// **On the desk and not in the mix.** Its fader is what RECORD is listening at and its meter
+    /// is what is coming in, so neither reaches the output bus: turning it down changes what a
+    /// take will hold rather than what you hear. It is on the page for the reason a hardware desk
+    /// puts its input channels on the desk, which is that this is where levels are set.
+    ///
+    /// Its own range rather than a track's, since a recording input's useful travel is not a
+    /// fader's: the recorder says what it will take.
+    /// </remarks>
+    public SourceStripViewModel RecorderInput =>
+        recorderInput ??= new SourceStripViewModel(
+            "IN",
+            "What RECORD is listening at, and what is coming in. This one sets what a take holds rather than what you hear.",
+            Record.MinGainDb,
+            Record.MaxGainDb,
+            () => Record.RecordGainDb,
+            value => Record.RecordGainDb = value,
+            () => (Record.LevelLeft, Record.LevelRight));
+
+    /// <summary>Backing field for <see cref="RecorderPlay"/>.</summary>
+    private SourceStripViewModel? recorderPlay;
+
+    /// <summary>
+    /// The take being auditioned on RECORD, as a strip.
+    /// </summary>
+    /// <remarks>
+    /// One strip for both the list on RECORD and the editing dialog, because to the desk they are
+    /// one source: they share a bus, and a fader over that bus is the auditioning against
+    /// everything else however many of them are open.
+    /// </remarks>
+    public SourceStripViewModel RecorderPlay =>
+        recorderPlay ??= Over("PLAY", "A take being auditioned on RECORD, against the rest of the mix.", _audio.TakeBus);
+
+    /// <summary>Backing field for <see cref="PadsStrip"/>.</summary>
+    private SourceStripViewModel? padsStrip;
+
+    /// <summary>
+    /// The pads, as one strip however many are down.
+    /// </summary>
+    /// <remarks>
+    /// One rather than one per pad, which is what the pads' own bus is for. A pad already has its
+    /// own level on PADS, and sixteen faders here would mostly be faders turning silence down;
+    /// what the desk wants is the pads against the song.
+    /// </remarks>
+    public SourceStripViewModel PadsStrip =>
+        padsStrip ??= Over("PADS", "Every pad, together, against the rest of the mix.", _audio.PadBus);
+
+    /// <summary>A strip over one of the output bus's own sub-busses.</summary>
+    /// <remarks>
+    /// A track's range and a track's scale, because these sit beside the tracks and a fader that
+    /// read differently from the one next to it would be a trap. The level is kept as an amplitude
+    /// by the bus and shown in decibels here, which is the arrangement a track already has.
+    /// </remarks>
+    /// <param name="label">What the badge says.</param>
+    /// <param name="tip">The longer version.</param>
+    /// <param name="bus">The sub-bus this strip is over.</param>
+    private SourceStripViewModel Over(string label, string tip, Audio.Interfaces.IOutputBus bus) =>
+        new(label,
+            tip,
+            _gain.MinimumDecibels,
+            _gain.MaximumDecibels,
+            () => _gain.ToDecibels(bus.Level),
+            value => bus.Level = (float)_gain.ToAmplitude(value),
+            () => bus.Reading,
+            bus);
+
+    /// <summary>
+    /// Reads the meter of every strip that is not a track's.
+    /// </summary>
+    /// <remarks>
+    /// Only these three: the tracks and the master are read by the tracker, which knows when
+    /// anything is sounding. These can sound with the transport stopped, since a pad and a take
+    /// audition owe the song nothing, so they are read whenever the page is up.
+    /// </remarks>
+    public void ReadSourceMeters()
+    {
+        RecorderInput.ReadMeter();
+        RecorderPlay.ReadMeter();
+        PadsStrip.ReadMeter();
     }
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>

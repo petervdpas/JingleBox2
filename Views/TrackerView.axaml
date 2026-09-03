@@ -130,11 +130,6 @@
                 Command="{Binding ShowCommand}" CommandParameter="Machines"
                 ToolTip.Tip="What is installed: the machines this song can take an instrument off." />
 
-        <Button Content="MIXER" Classes="page"
-                Classes.active="{Binding ShowsMixer}"
-                Command="{Binding ShowCommand}" CommandParameter="Mixer"
-                ToolTip.Tip="The levels, the panning and the inserts of this song's tracks." />
-
         <!-- Here rather than only in the settings, because what a song has its controller
              pointed at is a thing the song holds, like its patterns: it comes and goes with the
              song, and the settings are where the desk's layout lives. -->
@@ -580,28 +575,6 @@
         </DataTemplate>
       </ContentControl.ContentTemplate>
     </ContentControl>
-
-    <!-- Held in a border of its own so the page can be taken out of it and put back. A page in
-         a window of its own is the page itself rather than a second copy: two mixers would each
-         poll their meters while anything is sounding, for one set of levels, and could disagree
-         about which strip is picked. -->
-    <Panel x:Name="MixerHost" IsVisible="{Binding ShowsMixer}">
-      <views:MixerView x:Name="Mixer" />
-
-      <!-- What stands where the mixer stood while the mixer is elsewhere, and only ever one of
-           the two is in here. Whether this page is up at all is the one binding above, so
-           being on the pattern with the mixer detached shows neither. The rack's empty tab is
-           the same shape and for the same reason: a page that falls back to nothing reads as a
-           page that is broken rather than as a page that has moved. -->
-      <StackPanel x:Name="MixerGone" IsVisible="False"
-                  HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-        <TextBlock Text="The mixer is in a window of its own."
-                   HorizontalAlignment="Center" Opacity="0.8" />
-        <Button Content="Bring it back" Classes="page" HorizontalAlignment="Center"
-                Click="DockMixer_Click"
-                ToolTip.Tip="Closes the window and puts the mixer back on this page." />
-      </StackPanel>
-    </Panel>
 
     <!-- The templates, one card for each controller against each thing it is pointed at. Here
          because this is where you make one: pointing at a machine on the rack is one button
