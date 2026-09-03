@@ -199,25 +199,62 @@ public sealed class PluginEditorHost : NativeControlHost
 
     /// <summary>
     /// The plugin wants a different size, which is what happens when a panel folds out. The
-    /// control is made that size and Avalonia resizes the native window under it.
+    /// control is made that size and the plugin is told the size it now has.
     /// </summary>
     /// <remarks>
-    /// Put onto the drawing thread, because a plugin may ask from inside a call of its own, on
-    /// whichever thread that was.
+    /// Answered on the spot when the asking thread is the drawing thread, and only posted when it
+    /// is not. That is not tidiness, it is the contract: a plugin asks through the frame, and the
+    /// host has to resize the window and call the view back with its new size <em>before that
+    /// call returns</em>. A plugin that asks and is answered later has no way to know it was
+    /// heard, and the ones that ask from inside being given their window simply wait.
+    ///
+    /// Which is what a black window was. Vital and Arturia's boxes both ask to be resized from
+    /// inside <c>attached</c>, the answer was posted for later, and the call never came back: the
+    /// application looked alive, because a plugin waiting there pumps the message loop, and the
+    /// window stayed empty for ever. Then closing it took the application down, since nothing had
+    /// been marked as attached, so nothing was detached, and the window went away underneath a
+    /// plugin that was still drawing into it.
+    ///
+    /// The layout is run rather than merely asked for, because the native window under this
+    /// control is resized during a layout pass and the plugin is about to be told a size it does
+    /// not yet have.
+    ///
+    /// And nothing is gated on being attached. The one moment this matters most is the moment
+    /// before it: <c>attached</c> has not returned, so nothing is attached yet, and that is
+    /// exactly when the question is asked.
     /// </remarks>
     private void OnResizeRequested(int width, int height)
     {
         if (width <= 0 || height <= 0) return;
 
-        Dispatcher.UIThread.Post(() =>
+        if (Dispatcher.UIThread.CheckAccess()) Made(width, height);
+        else Dispatcher.UIThread.Post(() => Made(width, height));
+    }
+
+    /// <summary>Makes the window that size and tells the plugin it is.</summary>
+    /// <param name="width">How wide the plugin asked to be.</param>
+    /// <param name="height">How tall.</param>
+    private void Made(int width, int height)
+    {
+        _width = width;
+        _height = height;
+
+        InvalidateMeasure();
+
+        Measure(new Size(width, height));
+        Arrange(new Rect(0, 0, width, height));
+
+        Said("the plugin asked to be " + width + " by " + height + ", and has been told it is");
+
+        try
         {
-            _width = width;
-            _height = height;
-
-            InvalidateMeasure();
-
-            if (_attached) Editor?.Resized(width, height);
-        });
+            Editor?.Resized(width, height);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Plugins,
+                "the plugin threw while being told its new size", ex);
+        }
     }
 
     /// <summary>

@@ -92,7 +92,7 @@ dotnet publish -c Release -r win-x64      # Windows
 dotnet publish -c Release -r linux-x64    # Linux
 ```
 
-The BASS binaries in `native/` are copied to the output by the build.
+The BASS binaries in `native/` are copied to the output by the build. `bassasio.dll` is the ASIO add-on and is copied on Windows only; without it the output list has no ASIO drivers in it and SETTINGS says why.
 
 ---
 
@@ -153,7 +153,7 @@ JingleBox2/
 ├─ Tests/              # xunit, no window and no hardware
 ├─ Diagnostics/        # The log and the crash report
 ├─ machines/           # The machines that ship: a folder each, panel and presets inside
-├─ native/             # BASS binaries per platform
+├─ native/             # BASS binaries per platform, and bassasio for win-x64
 ├─ installer/windows/  # Inno Setup script
 └─ packaging/fedora/   # RPM spec and desktop entry
 ```

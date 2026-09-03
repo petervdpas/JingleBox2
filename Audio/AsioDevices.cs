@@ -55,8 +55,8 @@ public sealed class AsioDevices : IAsioDevices
                 {
                     _present = false;
                     _missing = OperatingSystem.IsWindows()
-                        ? "bassasio.dll is not beside the program, so no ASIO driver can be reached"
-                        : "ASIO is a Windows standard and there is no bassasio on this system";
+                        ? "bassasio.dll is not beside the program, so no ASIO driver can be reached."
+                        : "ASIO is a Windows standard, so there is none on this system.";
 
                     Log.Write(LogArea.Audio, () => "asio: not available, " + ex.GetType().Name);
                 }

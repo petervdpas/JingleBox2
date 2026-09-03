@@ -2659,8 +2659,19 @@ whole exercise and is worth writing down rather than summarising:
   driver standard on Windows, and the point of it is that the system's mixer is not in the path:
   the buffer is the card's own, so the delay is a few milliseconds rather than the twenty a shared
   path costs. `ManagedBass.Asio` is the wrapper and `bassasio.dll` is un4seen's add-on, which is
-  **not** in the package and has to be put in `native/win-x64/` by hand. The csproj copies it only
-  if it is there, so a checkout without it builds, runs, lists no drivers, and says why
+  **not** in the package: it is shipped here in `native/win-x64/` beside `bass.dll`, version
+  1.4.3. The csproj copies it only where it exists and only on Windows, so a checkout without it
+  still builds and runs and says why the list is empty
+- **Two silences, and they are not the same silence.** No ASIO library at all is a file that was
+  not shipped or a system ASIO was never made for; a library with nothing behind it is a machine
+  where no driver has been installed, which is most Windows machines until a card's own driver or
+  something like ASIO4ALL puts one there. In the picker both are an empty list and no reason, so
+  `IAudioEngine.OutputsMissing` says which of the two it is and SETTINGS shows it under the device
+- **The libraries were checked against what un4seen ships, by hash rather than by version.**
+  `bass.dll` 2.4.18, `basswasapi.dll` 2.4.4 and both `libbass.so` are byte for byte what is
+  current. `bass_aac` was a release behind on all three platforms and is 2.4.7.2 now; the two
+  Linux builds are exactly the same size as the ones they replace and a different hash, which is
+  why a size is no test. It is a decoder on the audio path and nobody has listened to it yet
 - **An ASIO driver is not a device BASS can be opened on**, which is the whole shape of the
   change. The driver owns the card, so BASS is opened on its own silent device instead, the
   tracker's stream is made a decoding one, and the driver pulls from it. A stream that plays
@@ -2682,6 +2693,31 @@ whole exercise and is worth writing down rather than summarising:
   the ordinary way now goes nowhere. Finishing it means one stream for everything, which is
   BASSmix, another add-on and another restructuring of where the pads' audio goes. Until that is
   built, ASIO is the tracker's alone and picking one silences FIRE
+- **Whether the libraries are current is asked once a month by CI, and asked by hash.**
+  `.github/scripts/check-natives.sh` downloads what un4seen ships, pulls out the eight files this
+  program carries, and compares them; `.github/workflows/natives.yml` runs it on the first of the
+  month and by hand. Not on a push, since the answer cannot change because of anything in a
+  commit, and monthly because these see a release once or twice a year each and `basswasapi` has
+  gone three years without one
+- Three answers, not two. Current, behind, and **moved**: every archive carries its version in its
+  own name, so `bassasio14.zip` becomes `bassasio15.zip` the day 1.5 ships and the download simply
+  answers 404. That is not a failure to check, it is the loudest answer there is, and it is
+  reported as one rather than passing quietly. A file that is not in the checkout at all is the
+  third way to fail
+- A failure there is a note rather than a broken build: what to do about a new decoder or output
+  driver is a decision, since both are on the audio path and nothing has been listened to. The
+  script was run against a checkout with a byte added, a file removed and an archive renamed, and
+  it reported all three and came back with 1, because a check that has never failed reports
+  nothing
+- **A native is copied by three targets that name each file one by one, and a fourth place lists
+  them again.** `CopyBassToOutput` for a plain build on Windows, `CopyBassToLinuxOutput` for one
+  here, `EnsureBassDllInPublish` for a Windows publish, and the release workflow's own check that
+  the payload really has them. The `<None>` item alone is not enough: it lands the file under
+  `native/win-x64/` in the output, which is not where a program looks, so the targets are what put
+  it beside the executable. Adding `bassasio.dll` and forgetting them meant a publish that carried
+  it in a folder nothing reads, and an installer that packed it there, and nothing anywhere saying
+  so. Proved by publishing for win-x64 and looking rather than by reading the csproj, which is the
+  only way this is ever going to be caught
 - BASS library binaries are copied to output via build targets in csproj
 - managed-midi API has obsolete warnings (suppressed via `<NoWarn>CS0618</NoWarn>`)
 - Startup errors logged to `startup.log` for debugging

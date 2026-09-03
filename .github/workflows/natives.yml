@@ -1,0 +1,26 @@
+# Whether the BASS libraries in native/ are still what un4seen ships.
+#
+# On a schedule rather than on a push, because it reaches out to somebody else's website and the
+# answer cannot change because of anything in a commit. Monthly: the four libraries this program
+# depends on see a release once or twice a year each, and basswasapi has gone three years without
+# one, so anything more often is noise.
+#
+# A failure here is not a broken build. It is a note that a library has moved on, and what to do
+# about it is a decision: a decoder or an output driver is on the audio path, so it is downloaded,
+# dropped into native/, and listened to before it is trusted.
+name: natives
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Are the BASS libraries current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare what is shipped with what un4seen ships
+        run: .github/scripts/check-natives.sh

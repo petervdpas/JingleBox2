@@ -288,6 +288,21 @@ public sealed class BassAudioEngine : IAudioEngine
     private const int SilentDevice = 0;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Two different silences, and they want different answers. No library at all is a file that
+    /// was not shipped or a system ASIO was never made for; a library with nothing behind it is a
+    /// machine where no ASIO driver has been installed, which is most Windows machines until a
+    /// card or a driver like ASIO4ALL puts one there. Both look identical in the picker, which is
+    /// an empty list and no reason.
+    /// </remarks>
+    public string OutputsMissing =>
+        !_asio.Present ? _asio.Missing
+        : _asio.Devices.Count == 0
+            ? "No ASIO driver is installed on this machine, so there is none to pick. "
+              + "One arrives with a card's own driver, or with something like ASIO4ALL."
+            : "";
+
+    /// <inheritdoc/>
     public Enums.AudioOutputKind OutputKind
     {
         get

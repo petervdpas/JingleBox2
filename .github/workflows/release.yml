@@ -124,6 +124,13 @@ jobs:
           $p3 = "out\${{ matrix.name }}\basswasapi.dll"
           if (!(Test-Path $p3)) { throw "basswasapi.dll missing at $p3 (RECORD would have no monitors)" }
           Write-Host "OK: basswasapi.dll present"
+          # ASIO is the low-latency output. Optional in the same way bass_aac is: without it the
+          # output list has no drivers in it and SETTINGS says why, which is a smaller feature set
+          # rather than a break. It is copied by its own line in the csproj, and a copy target that
+          # names each file one by one is exactly the kind that gets a new file forgotten.
+          $p4 = "out\${{ matrix.name }}\bassasio.dll"
+          if (!(Test-Path $p4)) { Write-Host "WARNING: bassasio.dll missing (no ASIO output)" }
+          else { Write-Host "OK: bassasio.dll present" }
 
       - name: Publish (Linux)
         if: startsWith(matrix.rid, 'linux')

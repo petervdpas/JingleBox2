@@ -142,15 +142,21 @@
 
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                 <TextBlock Grid.Column="0" Classes="label" Text="Output device:" />
+                <!-- No DisplayMemberBinding, so the device says what it is: an ASIO driver is
+                     often named after the same card as a system endpoint, and two identical
+                     lines that behave completely differently is a picker nobody can use. -->
                 <ComboBox Grid.Column="1"
                           ItemsSource="{Binding OutputDevices}"
                           SelectedItem="{Binding SelectedOutputDevice}"
-                          DisplayMemberBinding="{Binding Name}"
                           HorizontalAlignment="Stretch" />
               </Grid>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
                          Text="Where everything comes out: the pads, the tracker and whatever the plugins are playing." />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         IsVisible="{Binding HasOutputsMissing}"
+                         Text="{Binding OutputsMissing}" />
             </StackPanel>
           </Border>
 

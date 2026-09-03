@@ -1052,6 +1052,16 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <summary>Every output the card offers, filled once while starting.</summary>
     public ObservableCollection<AudioOutput> OutputDevices { get; } = new();
 
+    /// <summary>Why some outputs are not in that list, or nothing when they all are.</summary>
+    /// <remarks>
+    /// Read off the engine rather than worked out here: whether the ASIO library is beside the
+    /// program is a fact about the machine, and a page that guessed it would be guessing.
+    /// </remarks>
+    public string OutputsMissing => _audio.OutputsMissing;
+
+    /// <summary>True when there is a reason to show.</summary>
+    public bool HasOutputsMissing => OutputsMissing.Length > 0;
+
     /// <summary>
     /// The pads of the open profile, in the order they are laid out.
     /// </summary>

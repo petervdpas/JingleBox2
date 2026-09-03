@@ -59,6 +59,17 @@ public interface IAudioEngine : IDisposable
     Enums.AudioOutputKind OutputKind => Enums.AudioOutputKind.System;
 
     /// <summary>
+    /// Why some outputs are not in the list, or nothing when they all are.
+    /// </summary>
+    /// <remarks>
+    /// A picker that is simply missing the drivers somebody expects looks broken, and the reason
+    /// is never guessable from it: ASIO needs a library that is not part of this program and has
+    /// to be put beside it. Said here rather than worked out on the page, since the page cannot
+    /// know whether the file is there.
+    /// </remarks>
+    string OutputsMissing => "";
+
+    /// <summary>
     /// Puts a decoding stream on the chosen driver, for an output that has to be fed.
     /// </summary>
     /// <remarks>

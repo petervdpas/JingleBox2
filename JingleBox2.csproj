@@ -130,6 +130,7 @@
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
+    <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
   </Target>
   <Target Name="CopyBassToLinuxOutput" AfterTargets="Build" Condition="'$(RuntimeIdentifier)' == '' And '$(OS)' != 'Windows_NT' And Exists('native/linux-x64/libbass.so')">
     <Copy SourceFiles="native/linux-x64/libbass.so" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
@@ -139,5 +140,6 @@
     <Copy SourceFiles="native\win-x64\bass.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
     <Copy SourceFiles="native\win-x64\bass_aac.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bass_aac.dll')" />
     <Copy SourceFiles="native\win-x64\basswasapi.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\basswasapi.dll')" />
+    <Copy SourceFiles="native\win-x64\bassasio.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="Exists('native\win-x64\bassasio.dll')" />
   </Target>
 </Project>
