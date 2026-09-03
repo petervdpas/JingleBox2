@@ -355,7 +355,19 @@ public sealed class PluginEditorHost : NativeControlHost
             return;
         }
 
-        editor.Scaled(Scaling);
+        double scaling = Scaling;
+
+        Said("handing the window over, the screen is scaled by " + scaling);
+
+        try
+        {
+            editor.Scaled(scaling);
+        }
+        catch (Exception ex)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Plugins,
+                "the plugin threw while being told the screen's scaling", ex);
+        }
 
         try
         {

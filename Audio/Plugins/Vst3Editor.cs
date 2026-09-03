@@ -157,7 +157,10 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         {
             if (_view->Vtbl->Base.QueryInterface(_view, wanted, &found) != Vst3Abi.ResultOk
                 || found == null)
+            {
+                Said("the plugin works the screen's scaling out for itself");
                 return;
+            }
         }
 
         var scaling = (IPlugViewContentScale*)found;
@@ -165,7 +168,13 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         try
         {
             if (scaling->Vtbl != null && scaling->Vtbl->SetContentScaleFactor != null)
-                scaling->Vtbl->SetContentScaleFactor(scaling, (float)factor);
+            {
+                Said("telling the plugin the screen is scaled by " + factor);
+
+                int took = scaling->Vtbl->SetContentScaleFactor(scaling, (float)factor);
+
+                Said("the plugin answered " + took + " about the scaling");
+            }
         }
         finally
         {
