@@ -127,6 +127,7 @@
                          Pressed="Detach_Pressed"
                          ToolTip.Tip="Open the mixer in a window of its own. Closing that window puts it back here." />
 
+
           <ui:PushButton Grid.Column="4" x:Name="MixerMenuButton"
                          Mark="Bars" CapWidth="30" CapHeight="20"
                          Pressed="MixerMenu_Pressed"

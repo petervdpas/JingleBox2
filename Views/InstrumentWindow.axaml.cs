@@ -32,7 +32,6 @@ public partial class InstrumentWindow : Window
 
         LinkKey.Listen(this);
 
-        DeckKeys.Listen(this);
     }
 
     /// <summary>Opens the designer for a track's instrument, or brings its window forward.</summary>

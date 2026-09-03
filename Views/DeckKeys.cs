@@ -39,27 +39,41 @@ public static class DeckKeys
     public static TransportSwitch? Deck { get; set; }
 
     /// <summary>
-    /// Has a window answer the transport's keys while it is up.
+    /// Has every window in this application answer the transport's keys, once and for all.
     /// </summary>
     /// <remarks>
+    /// **Once for the type rather than once per window, which is the whole point.** Hung window by
+    /// window it was five calls that every new window had to remember, and the sixth forgot: the
+    /// mixer taken out into a window of its own answered neither key, and nothing anywhere said
+    /// why. That is the shape of fault this codebase has already paid for once, in the paste that
+    /// nearly stopped leaving an undo step, and it is the same lesson: the compiler cannot see a
+    /// listener that is merely never called.
+    ///
+    /// A class handler is the toolkit's own answer to it. Registered against
+    /// <see cref="Window"/> it applies to every instance of one, including every window written
+    /// after this, so there is nothing to remember and nothing to forget.
+    ///
     /// On the way down and before the focused control sees it, because otherwise the last button
-    /// pressed keeps the key: click Open and space opens the song again instead of playing it.
-    /// A space this took is swallowed on the way up as well, since buttons click on the key
-    /// coming up and do it whether or not they saw the press.
+    /// pressed keeps the key: click Open and space opens the song again instead of playing it. A
+    /// space this took is swallowed on the way up as well, since buttons click on the key coming
+    /// up and do it whether or not they saw the press.
+    ///
+    /// The keys held and the space taken are kept per window rather than in one place, because
+    /// two windows are two hands as far as this is concerned: a space held on one must not be the
+    /// reason a space on another is read as a repeat.
     /// </remarks>
-    /// <param name="window">The window to answer on.</param>
-    public static void Listen(InputElement window)
+    public static void ListenEverywhere()
     {
-        if (window is null) return;
+        if (_listening) return;
 
-        var held = new HeldKeys();
-        bool took = false;
+        _listening = true;
 
-        window.AddHandler(
-            InputElement.KeyDownEvent,
-            (_, e) =>
+        Window.KeyDownEvent.AddClassHandler<Window>(
+            (window, e) =>
             {
-                bool first = held.Pressed(e.Key);
+                var state = StateFor(window);
+
+                bool first = state.Held.Pressed(e.Key);
 
                 if (e.Handled) return;
 
@@ -67,7 +81,7 @@ public static class DeckKeys
 
                 if (wanted == DeckWant.None) return;
 
-                if (wanted == DeckWant.Toggle) took = true;
+                if (wanted == DeckWant.Toggle) state.Took = true;
 
                 if (first) Do(wanted);
 
@@ -75,19 +89,44 @@ public static class DeckKeys
             },
             RoutingStrategies.Tunnel);
 
-        window.AddHandler(
-            InputElement.KeyUpEvent,
-            (_, e) =>
+        Window.KeyUpEvent.AddClassHandler<Window>(
+            (window, e) =>
             {
-                held.Released(e.Key);
+                var state = StateFor(window);
 
-                if (e.Key != Key.Space || !took) return;
+                state.Held.Released(e.Key);
 
-                took = false;
+                if (e.Key != Key.Space || !state.Took) return;
+
+                state.Took = false;
                 e.Handled = true;
             },
             RoutingStrategies.Tunnel);
     }
+
+    /// <summary>Whether the handlers are already registered, since once is the point.</summary>
+    private static bool _listening;
+
+    /// <summary>What one window is holding down, and whether it took a space.</summary>
+    /// <param name="Held">Which keys are down, so a repeat is not read as a fresh press.</param>
+    private sealed record WindowKeys(HeldKeys Held)
+    {
+        /// <summary>Whether a space was taken here and so must be swallowed coming up.</summary>
+        public bool Took { get; set; }
+    }
+
+    /// <summary>What each window is holding, made on first sight of that window.</summary>
+    /// <remarks>
+    /// Keyed by the window and holding no strong opinion about when a window goes: a table of a
+    /// handful of entries that outlives a closed window costs nothing, where a subscription to
+    /// every window's closing would be the per-window bookkeeping this exists to remove.
+    /// </remarks>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, WindowKeys> _windows = new();
+
+    /// <inheritdoc cref="_windows"/>
+    /// <param name="window">The window the key arrived on.</param>
+    private static WindowKeys StateFor(Window window) =>
+        _windows.GetValue(window, _ => new WindowKeys(new HeldKeys()));
 
     /// <summary>
     /// What a keystroke is asking for, which is the whole of the rule and no keystrokes.
@@ -122,6 +161,14 @@ public static class DeckKeys
         };
 
     /// <summary>Works the transport, where there is one to work.</summary>
+    /// <remarks>
+    /// **Record is asked for and never worked out here.** This used to read the deck's
+    /// <c>IsRecording</c> and reach for Stop when it was set, which is right for a page that
+    /// records a take and wrong for one where record is an arm: on the tracker it armed the
+    /// pattern and then called Stop for ever after, so the arm could not be turned off with the
+    /// key that turned it on. What a second press means differs per deck and each deck already
+    /// knows, so the key says what was pressed and the deck says what that does.
+    /// </remarks>
     /// <param name="wanted">What the key asked for.</param>
     private static void Do(DeckWant wanted)
     {
@@ -134,7 +181,6 @@ public static class DeckKeys
             return;
         }
 
-        if (deck.IsRecording) deck.StopCommand.Execute(null);
-        else if (deck.CanRecord) deck.RecordCommand.Execute(null);
+        if (deck.CanRecord) deck.RecordCommand.Execute(null);
     }
 }

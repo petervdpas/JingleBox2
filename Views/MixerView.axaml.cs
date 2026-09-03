@@ -42,7 +42,16 @@ public partial class MixerView : UserControl
         _meters = new Avalonia.Threading.DispatcherTimer { Interval = System.TimeSpan.FromMilliseconds(50) };
         _meters.Tick += (_, _) => Read();
 
-        AttachedToVisualTree += (_, _) => _meters.Start();
+        AttachedToVisualTree += (_, _) =>
+        {
+            _meters.Start();
+
+            // The button that takes the page out has nothing to offer once the page is out. It is
+            // hidden rather than left to do nothing, and the way back is the window's own frame,
+            // which every window already has in the corner this button would be near.
+            DetachButton.IsVisible = this.FindAncestorOfType<DetachedWindow>() == null;
+        };
+
         DetachedFromVisualTree += (_, _) => _meters.Stop();
     }
 

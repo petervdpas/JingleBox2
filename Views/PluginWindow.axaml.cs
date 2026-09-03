@@ -51,7 +51,6 @@ public partial class PluginWindow : Window
     {
         InitializeComponent();
 
-        DeckKeys.Listen(this);
 
         AddHandler(InputElement.KeyDownEvent, Pressed, RoutingStrategies.Tunnel);
 

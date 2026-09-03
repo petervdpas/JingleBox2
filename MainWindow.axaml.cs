@@ -201,7 +201,7 @@ public partial class MainWindow : Window
         Shortcuts.ShortcutKeys.Listen(this);
 
         Views.DeckKeys.Deck = vm.Transport;
-        Views.DeckKeys.Listen(this);
+        Views.DeckKeys.ListenEverywhere();
 
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
@@ -351,10 +351,11 @@ public partial class MainWindow : Window
         _mixerWindow ??= new Views.PageDetach(
             MixerHost,
             Mixer,
-            MixerGone,
+            null,
             "Mixer",
             () => DataContext,
-            () => (DataContext as ViewModels.MainViewModel)?.Transport);
+            () => (DataContext as ViewModels.MainViewModel)?.Transport,
+            MixerAway);
 
     /// <summary>Takes the mixer out into a window of its own, or brings that window forward.</summary>
     public void DetachMixer() => MixerPage.Out();
@@ -362,10 +363,34 @@ public partial class MainWindow : Window
     /// <summary>Closes the mixer's window, which is what puts the page back.</summary>
     public void DockMixer() => MixerPage.Back();
 
-    /// <summary>Brings the mixer back onto its tab.</summary>
-    /// <param name="sender">Unused.</param>
-    /// <param name="e">Unused.</param>
-    private void DockMixer_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => DockMixer();
+    /// <summary>
+    /// Takes the mixer's tab away while its page is in a window, and puts it back after.
+    /// </summary>
+    /// <remarks>
+    /// The tab goes rather than standing there empty. A page in a window leaves a tab with
+    /// nothing in it, and a whole tab spent saying "this is elsewhere" is worse than a tab strip
+    /// that is one shorter for as long as the window is open.
+    ///
+    /// Somewhere else has to be shown when the tab being hidden is the one you are on, since a
+    /// hidden tab still counts and the page would simply go blank. The tracker is the neighbour
+    /// and is what somebody mixing was most likely looking at. Coming back, the tab is not only
+    /// shown but chosen: closing that window is asking for the mixer, so it should be in front.
+    /// </remarks>
+    /// <param name="away">True as the page leaves, false as it comes home.</param>
+    private void MixerAway(bool away)
+    {
+        MixerTab.IsVisible = !away;
+
+        if (DataContext is not ViewModels.MainViewModel main) return;
+
+        main.SelectedTab = away ? TrackerTabIndex : MixerTabIndex;
+    }
+
+    /// <summary>Where the mixer's tab sits, which is first.</summary>
+    private const int MixerTabIndex = 0;
+
+    /// <summary>And the tracker's, which is where you are sent while the mixer is away.</summary>
+    private const int TrackerTabIndex = 4;
 
     /// <summary>
     /// Hands the mixer the three strips that are not the song's.

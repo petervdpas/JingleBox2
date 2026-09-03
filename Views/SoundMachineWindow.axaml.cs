@@ -38,7 +38,6 @@ public partial class SoundMachineWindow : Window
 
         LinkKey.Listen(this);
 
-        DeckKeys.Listen(this);
     }
 
     /// <summary>

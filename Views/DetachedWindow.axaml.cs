@@ -45,6 +45,13 @@ public partial class DetachedWindow : Window
     /// <summary>What to do with the page when this window closes.</summary>
     private Action<Control>? _back;
 
+    /// <summary>What this window puts around the page, on each side.</summary>
+    /// <remarks>The border's own padding, which is the twelve the page has in its tab.</remarks>
+    private const double Inset = 12;
+
+    /// <summary>And the height of the row the transport stands in, where there is one.</summary>
+    private const double CapsRow = 46;
+
     /// <summary>Builds the window.</summary>
     public DetachedWindow() => InitializeComponent();
 
@@ -68,7 +75,9 @@ public partial class DetachedWindow : Window
     /// <param name="page">The page itself.</param>
     /// <param name="title">What to call the window.</param>
     /// <param name="context">What the page was bound to where it came from.</param>
-    /// <param name="owner">The window it came out of, which this one stays in front of.</param>
+    /// <param name="owner">
+    /// The window it came out of, used to take its size from and nothing else.
+    /// </param>
     /// <param name="deck">The application's transport, or nothing for a page that plays none.</param>
     /// <param name="back">Called with the page when this window closes.</param>
     /// <returns>The window, so a caller can bring it forward again, or nothing where there is no page.</returns>
@@ -91,6 +100,19 @@ public partial class DetachedWindow : Window
         };
 
         window.Caps.IsVisible = deck != null;
+
+        // The window opens the size the page already is, rather than a figure written here. A
+        // fixed size is wrong for every page but the one it was measured on, and it was wrong for
+        // this one: the mixer came out with its last strips cut off the right hand edge.
+        //
+        // The page's own rendered size plus what this window puts around it: the border's padding
+        // on both sides, and the row the transport stands in where there is one.
+        if (page.Bounds.Width > 1 && page.Bounds.Height > 1)
+        {
+            window.Width = page.Bounds.Width + Inset * 2;
+            window.Height = page.Bounds.Height + Inset * 2 + (deck != null ? CapsRow : 0);
+        }
+
         window.Host.Child = page;
 
         window.Closed += (_, _) =>
@@ -101,8 +123,13 @@ public partial class DetachedWindow : Window
             window._back?.Invoke(held);
         };
 
-        if (owner != null) window.Show(owner);
-        else window.Show();
+        // Shown without an owner, deliberately. An owned window is always in front of the one
+        // that owns it, which is right for a dialog and wrong for a page: a mixer you have taken
+        // out is a thing you put beside the application, or behind it, and one that cannot go
+        // behind is one you end up moving out of the way instead. Nothing is lost by it either,
+        // since the application shuts down when its main window closes rather than when the last
+        // window does.
+        window.Show();
 
         return window;
     }

@@ -1120,6 +1120,12 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// Arming for typing rather than starting a recording: what the tracker records is
     /// keystrokes into a pattern, not audio.
     /// </remarks>
+    /// <remarks>
+    /// Both presses, since on this page record is an arm rather than a take: the first arms the
+    /// pattern for note entry and the second disarms it. Stopping the transport is a different
+    /// act and deliberately leaves the arm alone, which is why a key that reached for Stop here
+    /// armed the track and could never disarm it.
+    /// </remarks>
     void ITransportDeck.Record() => IsRecording = !IsRecording;
 
     /// <inheritdoc/>

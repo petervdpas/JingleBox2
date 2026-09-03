@@ -400,7 +400,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     bool ITransportDeck.CanPause => false;
 
     /// <inheritdoc/>
-    void ITransportDeck.Record() => StartRecordingCommand.Execute(null);
+    /// <remarks>
+    /// The whole gesture, both presses: starting where nothing is being recorded and stopping
+    /// where something is. Record is one button and one key, and what a second press of it means
+    /// is this page's business rather than the key handler's, which cannot know that arming a
+    /// track and starting a take are different things.
+    /// </remarks>
+    void ITransportDeck.Record()
+    {
+        if (IsRecording) StopRecordingCommand.Execute(null);
+        else StartRecordingCommand.Execute(null);
+    }
 
     /// <inheritdoc/>
     /// <remarks>The take whose picture is up, which is the one the buttons underneath are about.</remarks>

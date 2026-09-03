@@ -54,7 +54,6 @@ public partial class SoundEffectWindow : Window
 
         LinkKey.Listen(this);
 
-        DeckKeys.Listen(this);
 
         _remote = new SoundDeviceRemote(Face, () => Device?.Effect);
 
