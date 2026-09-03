@@ -32,6 +32,14 @@ public sealed partial class SourceStripViewModel : ObservableObject
     /// <summary>What the meter should show, as two peaks from 0 to 1.</summary>
     private readonly Func<(float Left, float Right)> _meter;
 
+    /// <summary>Told after a solo moves, so the whole row can be worked out again.</summary>
+    /// <remarks>
+    /// Solo is not a fact about one strip: it means only this, which is a statement about every
+    /// source at once. So the strip records what was pressed and hands the answering to whatever
+    /// knows the whole row.
+    /// </remarks>
+    private readonly Action? _soloed;
+
     /// <summary>The bus this strip is over, or nothing where there is none.</summary>
     /// <remarks>
     /// Only a strip over a bus has a pan and a mute. The recording input has neither: panning
@@ -52,6 +60,7 @@ public sealed partial class SourceStripViewModel : ObservableObject
     /// The bus underneath, which is what gives the strip a pan and a mute. Nothing for a strip
     /// that is over something else, which is the recording input.
     /// </param>
+    /// <param name="soloed">Told after the solo moves, so the whole row can be worked out again.</param>
     public SourceStripViewModel(
         string label,
         string tip,
@@ -60,9 +69,11 @@ public sealed partial class SourceStripViewModel : ObservableObject
         Func<double> read,
         Action<double> write,
         Func<(float Left, float Right)> meter,
-        Audio.Interfaces.IOutputBus? bus = null)
+        Audio.Interfaces.IOutputBus? bus = null,
+        Action? soloed = null)
     {
         _bus = bus;
+        _soloed = soloed;
 
         Label = label;
         Tip = tip;
@@ -101,6 +112,53 @@ public sealed partial class SourceStripViewModel : ObservableObject
 
             OnPropertyChanged();
         }
+    }
+
+    /// <summary>Backing field for <see cref="Solo"/>.</summary>
+    private bool solo;
+
+    /// <summary>
+    /// Whether this is the only thing being heard.
+    /// </summary>
+    /// <remarks>
+    /// Recorded here and answered elsewhere: what a solo does is pause every source that is not
+    /// soloed, which only the output bus knows how to do because only it knows them all.
+    ///
+    /// Which also means a solo here is nothing like a track's. A track's solo is the song's, is
+    /// saved in the song file, and picks among the tracks; this picks among the things the
+    /// application is playing, so soloing the pads silences the whole song rather than part of it.
+    /// </remarks>
+    public bool Solo
+    {
+        get => solo;
+        set
+        {
+            if (solo == value) return;
+
+            solo = value;
+
+            OnPropertyChanged();
+
+            _soloed?.Invoke();
+        }
+    }
+
+    /// <summary>Backing field for <see cref="CanSolo"/>.</summary>
+    private bool canSolo;
+
+    /// <summary>
+    /// Whether soloing is possible at all, which is only while there is one output stream.
+    /// </summary>
+    /// <remarks>
+    /// A solo is worked out by the bus, so with the bus off there is nothing that knows every
+    /// source and nothing that could pause the others. The button is left where it is and goes
+    /// grey rather than coming and going: a control that vanishes takes the strip's layout with
+    /// it, and one that is dark and says why is the same answer without the movement.
+    /// </remarks>
+    public bool CanSolo
+    {
+        get => canSolo;
+        set => SetProperty(ref canSolo, value);
     }
 
     /// <summary>Whether it is silenced, with its fader left where it stands.</summary>

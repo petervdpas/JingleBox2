@@ -151,6 +151,26 @@ public interface IOutputBus : IDisposable
     /// <param name="source">The channel that was plugged in.</param>
     void Remove(int source);
 
+    /// <summary>
+    /// Hears only these sources, and every one of them, or all of them where none is named.
+    /// </summary>
+    /// <remarks>
+    /// **This is what a solo is, and the bus is the only place it can be done honestly.** Solo
+    /// means only this, so it is a statement about every source at once rather than a flag on
+    /// one, and the bus is the only thing that knows them all. Written as a mute on each of the
+    /// others it would have to remember what each was before and would fight the mutes somebody
+    /// set by hand.
+    ///
+    /// A source that is not heard is paused rather than turned down, which is the add-on's own
+    /// <see cref="ManagedBass.BassFlags.MixerChanPause"/>: it stops being asked for audio at all,
+    /// so it costs nothing while it is silent and its own level is left where it stands.
+    ///
+    /// The tracker needs no special case and is not named here. It is a source on this bus like
+    /// the others, so soloing the pads pauses it along with everything else not named.
+    /// </remarks>
+    /// <param name="sources">What to hear, or nothing at all to hear everything.</param>
+    void HearOnly(System.Collections.Generic.IReadOnlyCollection<int> sources);
+
     /// <summary>Whether a source is on the bus.</summary>
     /// <param name="source">The channel to ask about.</param>
     bool Holds(int source);

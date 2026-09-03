@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using JingleBox2.Audio.Interfaces;
 using JingleBox2.Diagnostics;
 using JingleBox2.Diagnostics.Enums;
@@ -326,6 +327,37 @@ public sealed class OutputBus : IOutputBus
             Log.Write(LogArea.Audio, () => "bus: source " + source + " is on, " + _sources.Count + " in all");
 
             return true;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void HearOnly(IReadOnlyCollection<int> sources)
+    {
+        lock (_lock)
+        {
+            if (_handle == 0) return;
+
+            foreach (int source in _sources)
+            {
+                bool heard = sources.Count == 0 || sources.Contains(source);
+
+                try
+                {
+                    BassMix.ChannelFlags(
+                        source,
+                        heard ? BassFlags.Default : BassFlags.MixerChanPause,
+                        BassFlags.MixerChanPause);
+                }
+                catch (Exception ex)
+                {
+                    Log.Fault(LogArea.Audio, "a source could not be paused or let go on the bus", ex);
+                }
+            }
+
+            Log.Write(LogArea.Audio, () =>
+                sources.Count == 0
+                    ? "bus: hearing all " + _sources.Count + " sources again"
+                    : "bus: hearing " + sources.Count + " of " + _sources.Count + " sources");
         }
     }
 

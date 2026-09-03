@@ -31,10 +31,21 @@
                      IsVisible="{Binding OnABus}"
                      Value="{Binding Pan}" />
 
-            <ToggleButton Classes="strip" Content="M"
-                          IsVisible="{Binding OnABus}"
-                          IsChecked="{Binding Mute}"
-                          ToolTip.Tip="Silence this, leaving its fader where it is." />
+            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center"
+                        IsVisible="{Binding OnABus}">
+              <ToggleButton Classes="strip" Content="M"
+                            IsChecked="{Binding Mute}"
+                            ToolTip.Tip="Silence this, leaving its fader where it is." />
+
+              <!-- Grey rather than gone while there is no bus: a solo is worked out by the bus,
+                   which is the only thing that knows every source, so with one output stream off
+                   there is nothing to pause the others with. Left in place so the strip does not
+                   change shape when the setting moves. -->
+              <ToggleButton Classes="strip" Content="S"
+                            IsEnabled="{Binding CanSolo}"
+                            IsChecked="{Binding Solo}"
+                            ToolTip.Tip="Hear only this. Needs One output stream in SETTINGS, since a solo silences everything else and only the one bus knows what everything else is." />
+            </StackPanel>
           </StackPanel>
 
           <StackPanel Orientation="Horizontal" Spacing="8"

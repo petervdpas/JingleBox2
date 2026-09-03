@@ -787,7 +787,57 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
             () => _gain.ToDecibels(bus.Level),
             value => bus.Level = (float)_gain.ToAmplitude(value),
             () => bus.Reading,
-            bus);
+            bus,
+            ApplySolo);
+
+    /// <summary>
+    /// Works out what the row's solos come to and tells the output bus.
+    /// </summary>
+    /// <remarks>
+    /// One pass over the whole row rather than a change to whichever button was pressed, because
+    /// solo means only this and that is a statement about every source at once. Nothing soloed is
+    /// said as an empty list, which the bus reads as hearing everything: the difference between
+    /// "solo nothing" and "solo everything" is a distinction nobody wants to make with a button.
+    ///
+    /// The tracker is not named and needs no case of its own. It is a source on that bus like the
+    /// other two, so soloing the pads pauses it with everything else that was not named, and the
+    /// song's own track solos go on meaning what they meant inside it.
+    /// </remarks>
+    private void ApplySolo()
+    {
+        var heard = new List<int>();
+
+        if (RecorderPlay.Solo && _audio.TakeBus.Handle != 0) heard.Add(_audio.TakeBus.Handle);
+        if (PadsStrip.Solo && _audio.PadBus.Handle != 0) heard.Add(_audio.PadBus.Handle);
+
+        _audio.Output.HearOnly(heard);
+    }
+
+    /// <summary>
+    /// Says whether soloing is possible, which is only while everything is on one bus.
+    /// </summary>
+    /// <remarks>
+    /// Called when the output is opened again, which is what ticking the setting does, and once at
+    /// startup. A solo that was on when the bus went away is dropped rather than left standing:
+    /// the button would be lit and nothing would be soloed.
+    /// </remarks>
+    private void SaySoloable()
+    {
+        bool can = _audio.Output.IsOpen;
+
+        RecorderPlay.CanSolo = can;
+        PadsStrip.CanSolo = can;
+
+        if (can)
+        {
+            ApplySolo();
+
+            return;
+        }
+
+        RecorderPlay.Solo = false;
+        PadsStrip.Solo = false;
+    }
 
     /// <summary>
     /// Reads the meter of every strip that is not a track's.
@@ -867,6 +917,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         catch (Exception)
         {
         }
+
+        SaySoloable();
     }
 
     /// <summary>
@@ -2013,6 +2065,8 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
                 Tracker.ReopenAudio();
+
+                SaySoloable();
 
                 OnPropertyChanged(nameof(DrivenHint));
                 OnPropertyChanged(nameof(OutputSizesHint));
