@@ -312,7 +312,7 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <inheritdoc/>
-    public bool Feed(int stream, int rate, int frames)
+    public bool Feed(int stream, int rate)
     {
         int device;
 
@@ -325,8 +325,11 @@ public sealed class BassAudioEngine : IAudioEngine
             device = index;
         }
 
-        return _asio.Open(device, stream, rate, frames);
+        return _asio.Open(device, stream, rate);
     }
+
+    /// <inheritdoc/>
+    public int OutputFrames => _asio.Frames;
 
     /// <inheritdoc/>
     public void SetPadSource(int padIndex, PadSourceKind kind, string? source)

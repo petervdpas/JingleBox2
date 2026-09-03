@@ -204,6 +204,9 @@ public sealed unsafe class Vst3Editor : IPluginEditor
         }
 
         _attached = true;
+
+        Said("the plugin took window " + window + " and is in it");
+
         return true;
     }
 
@@ -220,10 +223,17 @@ public sealed unsafe class Vst3Editor : IPluginEditor
     /// <inheritdoc/>
     public void Detach()
     {
-        if (_disposed || !_attached) return;
+        if (_disposed || !_attached)
+        {
+            Said("not taking the window back: "
+                 + (_disposed ? "the view is gone" : "it was never in one"));
+            return;
+        }
 
         _attached = false;
         _view->Vtbl->Removed(_view);
+
+        Said("the plugin has been taken out of its window");
     }
 
     /// <inheritdoc/>

@@ -78,9 +78,19 @@ public interface IAudioEngine : IDisposable
     /// stream nothing is pulling, and its answer is to play it the ordinary way.
     /// </remarks>
     /// <param name="stream">The decoding stream to pull from.</param>
-    /// <param name="rate">The rate to run the card at.</param>
-    /// <param name="frames">How many frames a block should be, or nought for the driver's own.</param>
-    bool Feed(int stream, int rate, int frames) => false;
+    /// <param name="rate">The rate the mix is made at.</param>
+    bool Feed(int stream, int rate) => false;
+
+    /// <summary>
+    /// How many frames a block is on the output that is really running, or nought where the
+    /// output does not decide that for itself.
+    /// </summary>
+    /// <remarks>
+    /// An ASIO driver does: its own panel sets the block, this program does not choose one, and
+    /// what somebody sees on a settings page has to be the number the card is actually running
+    /// rather than the one a slider about the system's own path happens to be on.
+    /// </remarks>
+    int OutputFrames => 0;
 
     /// <summary>
     /// Brings the sound up on the current device, if nothing has yet.

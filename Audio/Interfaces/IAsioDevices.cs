@@ -48,16 +48,46 @@ public interface IAsioDevices
     /// The stream is put on the first pair of outputs, joined so one call carries both. A card
     /// with more outputs than that is left alone: what goes where is a routing question and a
     /// stereo mix has one answer.
+    ///
+    /// **How big a block is is the driver's to say, and there is no parameter for it.** An ASIO
+    /// driver has its own control panel and that is where a card's block size is set; the driver
+    /// then reports that setting as the one it prefers. A host that overrides it is fighting the
+    /// panel, and what comes out is a card running blocks it was never set up for. The size this
+    /// program's own buffer slider names is a BASS setting about a shared output path, which is
+    /// exactly the path ASIO takes out of the picture, so it has no business here.
+    ///
+    /// The rate is what the mix is made at rather than an order. A card that will not move to it,
+    /// which is any card clocked from outside, keeps the rate it is on and the mix is resampled
+    /// into it: the alternative is a stream pulled at a rate it was not made at, which is the
+    /// whole song playing sharp with nothing anywhere saying why.
     /// </remarks>
     /// <param name="index">Which driver, counting from nought.</param>
     /// <param name="stream">The decoding BASS stream to pull from.</param>
-    /// <param name="rate">The rate to run the card at.</param>
-    /// <param name="frames">How many frames a block should be, or nought for the driver's own.</param>
-    bool Open(int index, int stream, int rate, int frames);
+    /// <param name="rate">The rate the mix is made at.</param>
+    bool Open(int index, int stream, int rate);
 
     /// <summary>Stops and lets the driver go, which gives the card back.</summary>
     void Close();
 
     /// <summary>How far behind the card is, in frames, or nought when nothing is open.</summary>
     int Latency { get; }
+
+    /// <summary>
+    /// How many frames a block is, as the driver has it, or nought when nothing is open.
+    /// </summary>
+    /// <remarks>
+    /// Read back rather than remembered from what was asked for, since nothing is asked for: this
+    /// is the number in the driver's own panel, and it is the one a person looking at that panel
+    /// expects to see said back to them.
+    /// </remarks>
+    int Frames { get; }
+
+    /// <summary>
+    /// What the card is really running at, in hertz, or nought when nothing is open.
+    /// </summary>
+    /// <remarks>
+    /// Not necessarily the rate it was opened with. A card clocked from something else refuses to
+    /// be moved, and this says what it settled on.
+    /// </remarks>
+    int Rate { get; }
 }

@@ -838,6 +838,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// topped up every twenty.
     /// </remarks>
     public string OutputSizesHint =>
+        DrivenHint +
         "Running with " + Sizes.BufferFrames + " frames of buffer" +
         (_cfg.OutputBufferSize <= 0 ? " (this machine's default)" : "") + ", " +
         MillisecondsFor(Sizes.BufferFrames) + " ms, topped up every " +
@@ -849,6 +850,30 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         "underneath us already and Windows is not the same. All three take effect at once, so the " +
         "right one can be found by listening. If the sound goes strange afterwards, restart: " +
         "reopening the output is not the same as starting clean, and the setting is remembered.";
+
+    /// <summary>
+    /// What an ASIO driver is really doing, said before the three sizes when one is running.
+    /// </summary>
+    /// <remarks>
+    /// **How big a block is is the driver's, and the slider under this is not about it.** An ASIO
+    /// driver has its own control panel, that panel is where the block size is set, and this
+    /// program asks for nothing else: a host that overrode it would be fighting the panel. So a
+    /// card whose panel says 256 runs 256, and a page saying "running with 1024 frames of buffer"
+    /// beside it is describing the system's own path, which is the path an ASIO driver takes out
+    /// of the picture altogether.
+    ///
+    /// Empty on the system's own output, where the slider is the whole answer and a sentence
+    /// about drivers would be noise.
+    /// </remarks>
+    public string DrivenHint =>
+        _audio.OutputKind != Audio.Enums.AudioOutputKind.Asio ? ""
+        : _audio.OutputFrames <= 0
+            ? "The driver has the card. Its own control panel decides how big a block is, and it "
+              + "has not said what it is on. The three below are about the system's own output "
+              + "path, which is not in use. "
+            : "The driver has the card, in blocks of " + _audio.OutputFrames + " frames, which is "
+              + "what its own control panel is set to and is the only place that is decided. The "
+              + "three below are about the system's own output path, which is not in use. ";
 
     /// <summary>
     /// How far ahead of the sound card the tracker mixes, offered as words rather than numbers.
@@ -1830,6 +1855,9 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
                 _audio.SetOutputDevice(SelectedOutputDevice.Id);
 
                 Tracker.ReopenAudio();
+
+                OnPropertyChanged(nameof(DrivenHint));
+                OnPropertyChanged(nameof(OutputSizesHint));
             }
 
             SaveNow();

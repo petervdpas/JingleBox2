@@ -2688,6 +2688,37 @@ whole exercise and is worth writing down rather than summarising:
   costs a thrown exception where it is no. `Tests/AsioDevicesTests.cs` is that path and nothing
   else: every machine the suite runs on has no ASIO, so what is pinned is that asking is safe,
   the list is empty rather than an error, and opening one is refused rather than fatal
+- **How big an ASIO block is is the driver's, and this program asks for nothing.** It used to pass
+  the buffer slider's frame count straight into `BassAsio.Start`, so a card whose own panel was set
+  to 256 was made to run blocks of 1024 because a slider about the system's output path happened to
+  be there. That slider is a BASS setting about the shared path, which is the exact path an ASIO
+  driver takes out of the picture, so it has no business deciding this. `AsioDevices` reads the
+  driver's preferred length, which is its panel setting said back, uses it, and reports it: SETTINGS
+  says what the card is really running rather than a number about a path that is not in use
+- The rate is asked for and never insisted on either. Setting it throws rather than answering when
+  the card will not have it, and a card clocked from something else is that case, so what it is
+  really on is read back afterwards and the mix is resampled into it through
+  `BassAsio.ChannelSetRate`. The alternative is a stream pulled at a rate it was not made at, which
+  is the whole song playing sharp with nothing anywhere saying why
+- **A buffer that has to be twice another program's is one of two faults and they want opposite
+  answers**, and from a chair the two are the same stutter. Either the mixing is genuinely
+  expensive, in which case the block is nearly all used up and the work has to get cheaper, or it is
+  cheap and late, in which case the block is mostly idle and what is wrong is when the thread runs.
+  `IRenderCost` is that measurement: every block is timed against its own length in real time, and
+  one line every five seconds names the worst, the mean and how many went over. Both places that
+  render go through it, since the question is the same wherever the mixing is being done
+- Beside it, what the runtime collected over the same stretch, because the second fault has an
+  obvious suspect in a managed language and the block timings alone cannot see it. A mean of 15%
+  with a worst of 200% is a pause, and no amount of making the mixing faster would touch it. The
+  pause total is every thread that was stopped rather than this one in particular, so it is an
+  upper bound rather than a measurement, which is the right direction: no collections at all rules
+  the theory out
+- **It was measured before it was argued about.** 32 synth voices through `TrackMixer.Render`, in
+  Debug, on Linux: mean 15 to 16% of each block's own time at 128, 256, 512 and 1024 frames, and
+  nothing collected over thousands of blocks. Flat regardless of block size, so there is no fixed
+  per-block overhead worth naming, and allocation-free on the render path. Whatever is forcing a
+  bigger buffer on Windows than another host needs, the mixer's own arithmetic is not it, and
+  rewriting that arithmetic in another language would buy the sixth of a block it already uses
 - **What is not done is the pads.** With a driver picked, BASS is on its silent device, so the
   tracker is heard and the pads are not: they are separate streams played the ordinary way and
   the ordinary way now goes nowhere. Finishing it means one stream for everything, which is

@@ -10,8 +10,18 @@ namespace JingleBox2.Audio;
 /// <remarks>
 /// Through BASS, as a stream BASS pulls from on its own thread.
 /// </remarks>
-public sealed class TrackerOutput : ITrackerOutput
+public sealed class TrackerOutput(IRenderCost? cost = null) : ITrackerOutput
 {
+    /// <summary>
+    /// What a block of mixing costs against the time it had, said in the log now and then.
+    /// </summary>
+    /// <remarks>
+    /// Both places that render go through it, since a machine that needs a bigger buffer than
+    /// another program does is asking one question and the answer is the same wherever the
+    /// mixing happens to be being done.
+    /// </remarks>
+    private readonly IRenderCost _cost = cost ?? new RenderCost();
+
     /// <summary>What the engine runs at when nothing better is known.</summary>
     public const int DefaultSampleRate = 44100;
 
@@ -239,9 +249,11 @@ public sealed class TrackerOutput : ITrackerOutput
                 return;
             }
 
+            _cost.Fresh();
+
             StartMixingAhead();
 
-            if (driven && audio.Feed(_handle, SampleRate, _sizes.BufferFrames)) return;
+            if (driven && audio.Feed(_handle, SampleRate)) return;
 
             if (driven)
             {
@@ -444,6 +456,8 @@ public sealed class TrackerOutput : ITrackerOutput
                 continue;
             }
 
+            long began = System.Diagnostics.Stopwatch.GetTimestamp();
+
             try
             {
                 mixer.Render(_aheadScratch, AheadChunkFrames);
@@ -453,6 +467,8 @@ public sealed class TrackerOutput : ITrackerOutput
                 Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Audio, "mixing ahead", error);
                 Array.Clear(_aheadScratch, 0, AheadChunkFrames * Channels);
             }
+
+            Cost(began, AheadChunkFrames);
 
             lock (_queueLock)
             {
@@ -523,6 +539,30 @@ public sealed class TrackerOutput : ITrackerOutput
     /// <inheritdoc/>
     public long Underruns => _short;
 
+    /// <summary>
+    /// Times one block of mixing and writes the stretch down when there is one to write.
+    /// </summary>
+    /// <remarks>
+    /// The clock is read here rather than inside the cost keeper, so that what is measured is the
+    /// mixing and not the bookkeeping around it.
+    ///
+    /// Counted whether or not the log is on, and only the writing is gated: a stretch that only
+    /// began being counted when somebody opened SETTINGS would report the five seconds after the
+    /// switch was thrown rather than what has been happening.
+    /// </remarks>
+    /// <param name="began">The timestamp taken before the mixing.</param>
+    /// <param name="frames">How many frames were mixed.</param>
+    private void Cost(long began, int frames)
+    {
+        double milliseconds =
+            (System.Diagnostics.Stopwatch.GetTimestamp() - began) * 1000.0
+            / System.Diagnostics.Stopwatch.Frequency;
+
+        string? line = _cost.Took(frames, milliseconds, SampleRate);
+
+        if (line != null) Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Audio, line);
+    }
+
     /// <summary>Fills one block for the sound card, on its own thread.</summary>
     /// <remarks>
     /// A full buffer is always returned: handing back less would tell BASS the stream has ended.
@@ -553,8 +593,18 @@ public sealed class TrackerOutput : ITrackerOutput
 
         if (_scratch.Length < samples) _scratch = new float[samples];
 
-        if (_cushion > 0) TakeAhead(_scratch, samples);
-        else Mixer.Render(_scratch, samples / Channels);
+        if (_cushion > 0)
+        {
+            TakeAhead(_scratch, samples);
+        }
+        else
+        {
+            long began = System.Diagnostics.Stopwatch.GetTimestamp();
+
+            Mixer.Render(_scratch, samples / Channels);
+
+            Cost(began, samples / Channels);
+        }
 
         Marshal.Copy(_scratch, 0, buffer, samples);
 

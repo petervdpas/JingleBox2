@@ -51,10 +51,33 @@ public class AsioDevicesTests
     [Fact]
     public void Opening_one_is_refused()
     {
-        Assert.False(_asio.Open(0, 12345, 48000, 256));
-        Assert.False(_asio.Open(-1, 12345, 48000, 256));
-        Assert.False(_asio.Open(0, 0, 48000, 256));
-        Assert.False(_asio.Open(0, 12345, 0, 256));
+        Assert.False(_asio.Open(0, 12345, 48000));
+        Assert.False(_asio.Open(-1, 12345, 48000));
+        Assert.False(_asio.Open(0, 0, 48000));
+        Assert.False(_asio.Open(0, 12345, 0));
+    }
+
+    /// <summary>With nothing open there is no block and no rate, rather than a leftover.</summary>
+    /// <remarks>
+    /// Both are the driver's own answers read back, so nought is the only honest thing to say
+    /// where no driver has answered. A settings page reading either of these has to be able to
+    /// tell "the card is on 256" from "there is no card".
+    /// </remarks>
+    [Fact]
+    public void Nothing_open_has_no_block_and_no_rate()
+    {
+        Assert.Equal(0, _asio.Frames);
+        Assert.Equal(0, _asio.Rate);
+
+        _asio.Open(0, 12345, 48000);
+
+        Assert.Equal(0, _asio.Frames);
+        Assert.Equal(0, _asio.Rate);
+
+        _asio.Close();
+
+        Assert.Equal(0, _asio.Frames);
+        Assert.Equal(0, _asio.Rate);
     }
 
     /// <summary>Closing one that was never open is safe, however often.</summary>

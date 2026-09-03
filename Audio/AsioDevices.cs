@@ -36,6 +36,12 @@ public sealed class AsioDevices : IAsioDevices
     /// <summary>Which driver is open, or minus one.</summary>
     private int _open = -1;
 
+    /// <summary>How many frames a block is, as the driver has it.</summary>
+    private int _frames;
+
+    /// <summary>What the card settled on, in hertz.</summary>
+    private int _rate;
+
     /// <inheritdoc/>
     public bool Present
     {
@@ -133,7 +139,19 @@ public sealed class AsioDevices : IAsioDevices
     }
 
     /// <inheritdoc/>
-    public bool Open(int index, int stream, int rate, int frames)
+    public int Frames
+    {
+        get { lock (_lock) return _frames; }
+    }
+
+    /// <inheritdoc/>
+    public int Rate
+    {
+        get { lock (_lock) return _rate; }
+    }
+
+    /// <inheritdoc/>
+    public bool Open(int index, int stream, int rate)
     {
         if (!Present || index < 0 || stream == 0 || rate <= 0) return false;
 
@@ -150,15 +168,14 @@ public sealed class AsioDevices : IAsioDevices
                 }
 
                 _open = index;
+                _frames = BlockLocked(index);
+                _rate = RateLocked(rate, index);
 
-                if (!BassAsio.CheckRate(rate))
+                if (_rate <= 0)
                 {
-                    Said("the card will not run at " + rate + " Hz", index);
                     CloseLocked();
                     return false;
                 }
-
-                BassAsio.Rate = rate;
 
                 if (!BassAsio.ChannelEnableBass(false, FirstPair, stream, true))
                 {
@@ -167,7 +184,14 @@ public sealed class AsioDevices : IAsioDevices
                     return false;
                 }
 
-                if (!BassAsio.Start(frames > 0 ? frames : 0, 0))
+                if (_rate != rate && !BassAsio.ChannelSetRate(false, FirstPair, rate))
+                {
+                    Said("the mix could not be resampled from " + rate + " Hz", index);
+                    CloseLocked();
+                    return false;
+                }
+
+                if (!BassAsio.Start(_frames, 0))
                 {
                     Said("the driver would not start", index);
                     CloseLocked();
@@ -175,9 +199,9 @@ public sealed class AsioDevices : IAsioDevices
                 }
 
                 Log.Write(LogArea.Audio, () =>
-                    "asio: driver " + index + " is running at " + rate + " Hz, "
-                    + (frames > 0 ? frames + " frames a block" : "the driver's own block")
-                    + ", " + Latency + " frames behind");
+                    "asio: driver " + index + " is running at " + _rate + " Hz in blocks of "
+                    + _frames + " frames, " + Latency + " frames behind"
+                    + (_rate == rate ? "" : ", with the mix resampled from " + rate + " Hz"));
 
                 return true;
             }
@@ -188,6 +212,70 @@ public sealed class AsioDevices : IAsioDevices
                 return false;
             }
         }
+    }
+
+    /// <summary>
+    /// How big a block the driver wants, with the lock held and the driver open.
+    /// </summary>
+    /// <remarks>
+    /// The preferred length is the driver's own panel setting said back, which is why nothing here
+    /// asks for anything else. Nought when the driver will not say, which BASSASIO reads as "use
+    /// whatever you were going to", so the answer is the same either way.
+    /// </remarks>
+    /// <param name="index">Which driver it is, for the log.</param>
+    private static int BlockLocked(int index)
+    {
+        if (!BassAsio.GetInfo(out var info))
+        {
+            Said("the driver would not say what block it wants", index);
+            return 0;
+        }
+
+        Log.Write(LogArea.Audio, () =>
+            "asio: driver " + index + " takes blocks of " + info.MinBufferLength + " to "
+            + info.MaxBufferLength + " frames in steps of " + info.BufferLengthGranularity
+            + " and is set to " + info.PreferredBufferLength);
+
+        return info.PreferredBufferLength;
+    }
+
+    /// <summary>
+    /// Settles what the card runs at, with the lock held and the driver open.
+    /// </summary>
+    /// <remarks>
+    /// The rate is asked for and never insisted on. Setting it throws rather than answering when
+    /// the card will not have it, and a card clocked from something else is exactly that case, so
+    /// what it is really on is read back afterwards rather than assumed from the call having
+    /// returned. Nought only where the card will not say at all, which is a driver nothing can be
+    /// done with.
+    /// </remarks>
+    /// <param name="wanted">The rate the mix is made at.</param>
+    /// <param name="index">Which driver it is, for the log.</param>
+    private static int RateLocked(int wanted, int index)
+    {
+        try
+        {
+            if (BassAsio.CheckRate(wanted)) BassAsio.Rate = wanted;
+            else Said("the card will not run at " + wanted + " Hz", index);
+        }
+        catch (Exception)
+        {
+            Said("the card would not be moved to " + wanted + " Hz", index);
+        }
+
+        try
+        {
+            int running = (int)Math.Round(BassAsio.Rate);
+
+            if (running > 0) return running;
+        }
+        catch (Exception)
+        {
+        }
+
+        Said("the card would not say what rate it is on", index);
+
+        return 0;
     }
 
     /// <inheritdoc/>
@@ -206,6 +294,8 @@ public sealed class AsioDevices : IAsioDevices
         if (_open < 0) return;
 
         _open = -1;
+        _frames = 0;
+        _rate = 0;
 
         try
         {
