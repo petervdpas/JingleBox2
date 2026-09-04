@@ -2726,6 +2726,67 @@ whole exercise and is worth writing down rather than summarising:
   the panel offers to start it again. Set `JB_PLUGINS_INPROCESS=1` to load them in this process
   instead, and `JB_PLUGIN_TRACE=1` to have the child write what it is doing to
   `/tmp/jinglebox-plugin-<pid>.log`
+- **Every platform, and Windows was the exception for two years for a reason that was not
+  true.** `IPluginHost.Isolated` read `!OperatingSystem.IsWindows() && !InProcessAsked`, and the
+  remark under it said the embedding used here only works within one process, so a VST3 plugin
+  had to be loaded into this one for its interface to answer a mouse. That is not how Windows
+  works: a window whose parent belongs to another program draws, resizes and answers a mouse
+  exactly as one in the same process does, which is how every host that bridges plugins does it.
+  The only thing crossing a process boundary really costs there is the keyboard, because Windows
+  keeps focus per thread, and that is two calls
+- **What the exception actually cost was a plugin split across two threads, and it is worth
+  knowing the shape because nothing about it looks like a threading fault.** Loading a plugin is
+  seconds, so it is done off the drawing thread, rightly, and `TrackerPlayer.Start` says so in
+  its own remarks: it runs off the lock and off whatever thread asked, which is the thread pool.
+  The window is then made and handed over on the drawing thread. VST3 asks for a view and the
+  controller behind it to live on one thread, and a toolkit that binds its own message thread
+  where it was built, which is most of them, blocks for ever when `attached` arrives on a
+  different one. Two plugins loading in the same millisecond in the log is the tell that they
+  were never on the drawing thread at all
+- From a chair that is a grey rectangle where an interface should be, so it reads as a window
+  that will not draw and every hour spent on it goes into the window. It is not: it is a call
+  that never comes back. `IPlugView::attached` was entered and never returned, and the log said
+  so by omission, since the line after it never appeared while the lines before it all did. **A
+  path where every branch writes a line is one where a missing line is evidence**, which is the
+  whole reason `Vst3Editor.Attach` says what the plugin answered as well as what it was asked
+- A plugin in its own process cannot have that fault, because there is one thread and it does
+  everything in turn: the process loads the plugin, makes its view, hands it the window, and
+  then goes on pumping for it. That is what fixed it, and it is why the fix is one line
+- **A plugin's process has no toolkit, so nothing was draining its Win32 queue, and that half
+  had to exist first.** `PluginRunLoop`'s own remarks said Windows "has a message pump already
+  running before the plugin arrives", which is true of the application's process and false of a
+  plugin's: a window nobody pumps gets no paint, no timer and no mouse. `IWindowMessages` is that
+  half, and it is the one place the two platforms differ in the child: `WindowsMessages` waits on
+  `MsgWaitForMultipleObjectsEx` and drains with `PeekMessage`, and `NoWindowMessages` waits on
+  the knock and nothing else, since X11 has no per-thread queue and a plugin asks for a run loop
+  instead. The wait belongs to the pump rather than being a wait on the knock because a thread
+  asleep on an event alone is not woken by a message arriving
+- The two are deliberately separate and neither is the other. `PluginRunLoop` is what a plugin
+  asks the host to hold for it; `IWindowMessages` is what the system holds for any thread with a
+  window on it. Bounded at 512 messages a turn, or a plugin repainting under a drag would keep
+  the bridge waiting for the length of the gesture
+- **One sharing flag was the whole of what stopped the bridge running on Windows.**
+  `BridgeBlock.Open` used `MemoryMappedFile.CreateFromFile(path, ...)`, and the overload taking a
+  path opens with sharing for reading only while the parent holds the same file mapped: a sharing
+  violation, an unhandled exception, and a child gone before it had loaded anything. Linux has no
+  mandatory locking, so it had always worked there and the difference was one default nobody had
+  to think about. Both sides open a `FileStream` with `FileShare.ReadWrite` now, which is still
+  one code path
+- And it cost a round trip because the child died silently. All the parent can see is an exit
+  code, which it reports as the plugin having stopped unexpectedly: true, and 0xE0434352 for
+  every managed fault there is. `PluginHostProcess.Run` catches and writes what happened now, and
+  flushes before the code goes back, since the log is written by a thread about to stop existing.
+  `BridgeBlock.Open`'s remarks had promised exactly this and only the missing file kept it
+- **Two things cross-process costs on Windows and both are in `NativeWindow`.** `ShareInput` is
+  `AttachThreadInput`, because focus is kept per thread and without it a plugin takes the mouse
+  perfectly and never sees a key, which is a preset name typed into nothing. `ReadScalingProperly`
+  says this process reads the screen per monitor, because a process with no toolkit says nothing
+  and Windows quietly tells it a screen at 150% is a smaller screen at 100%, so the window it
+  draws is stretched by the system inside an aware parent. Said before the plugin loads, since
+  Windows refuses to change its mind once anything has asked. `Account` is the third and reads a
+  window and what is inside it, the counterpart of `XEmbed.Complete`'s account: the before and
+  after of a handover, where "nothing inside it" becoming a `VSTGUI` or `JUCE_` child at the full
+  size is the proof that a plugin really drew
 - A plugin's own window is given to it only once the window is really on screen at its full
   size. Handing over the one-pixel window Avalonia makes before the first layout is what killed
   Serum

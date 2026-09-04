@@ -88,12 +88,14 @@ public interface IPluginHost
     /// not a machine with no plugins.
     /// </summary>
     /// <remarks>
-    /// In a process of its own on every platform, Windows included, where plugins are otherwise
-    /// loaded into this one. Scanning is the one thing that needs nothing from the window
-    /// embedding that keeps Windows in-process: the child opens each bundle, asks what is in it,
-    /// writes a list and goes away. And it is the worst place to be running somebody else's code
-    /// unprotected, because a plugin that dies while being asked what it is would take the
-    /// application down every time it started, before anybody had chosen to use it.
+    /// In a process of its own, like everything else here now: the child opens each bundle, asks
+    /// what is in it, writes a list and goes away. It used to be the one thing that was isolated
+    /// on Windows as well, back when a plugin being used was not, which is worth remembering only
+    /// because it was the standing proof that a child process worked on Windows at all.
+    ///
+    /// It is also the worst place to be running somebody else's code unprotected, because a
+    /// plugin that dies while being asked what it is would take the application down every time
+    /// it started, before anybody had chosen to use it.
     /// </remarks>
     List<PluginInfo> Scan(IReadOnlyList<string> folders);
 }
