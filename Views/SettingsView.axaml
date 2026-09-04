@@ -442,6 +442,13 @@
 
                 <TextBlock Classes="cardHint" TextWrapping="Wrap"
                            Text="On, a pad keeps playing until it is hit again. Off, it plays for as long as the pad is held." />
+
+                <CheckBox Content="Pulse while playing"
+                          IsChecked="{Binding PulseWhilePlaying}"
+                          Margin="0,8,0,0" />
+
+                <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                           Text="A pad that is playing walks through the colours either side of its own, so a bank says what is going without being read. It is the one thing on FIRE that draws while nothing has changed; off, a playing pad is told apart by its ring and its meters." />
               </StackPanel>
             </Border>
 

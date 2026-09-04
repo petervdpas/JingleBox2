@@ -1924,6 +1924,27 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     public int MostPads => ExtendedPadMatrix ? PadMatrix.Most : PadMatrix.Usual;
 
     /// <summary>
+    /// Whether a playing pad walks through the colours either side of its own.
+    /// </summary>
+    /// <remarks>
+    /// Read by the pads themselves through the page they are drawn on, so switching it off takes
+    /// the drawing away rather than leaving it running behind a pad that no longer shows it.
+    /// </remarks>
+    public bool PulseWhilePlaying
+    {
+        get => _cfg.PulseWhilePlaying;
+        set
+        {
+            if (_cfg.PulseWhilePlaying == value) return;
+
+            _cfg.PulseWhilePlaying = value;
+            _store.Save(_cfg);
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// Whether rows and columns move together, as the bracket between them shows.
     /// </summary>
     /// <remarks>

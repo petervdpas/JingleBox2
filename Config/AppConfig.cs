@@ -104,6 +104,21 @@ public sealed class AppConfig
     public bool ExtendedPadMatrix { get; set; }
 
     /// <summary>
+    /// Whether a pad that is playing walks through the colours beside its own.
+    /// </summary>
+    /// <remarks>
+    /// On unless somebody says otherwise, since a bank of pads with nothing moving on it is a
+    /// bank you have to read to know what is going. It is a setting rather than simply how pads
+    /// look because it is the one thing on the page that draws while nothing has changed: a pad
+    /// that walks asks for a frame thirty times a second, and somebody running a show on a
+    /// machine with nothing to spare should be able to say no.
+    ///
+    /// A pad still says it is playing without it: the ring around it is the theme's accent while
+    /// it sounds, and its meters move.
+    /// </remarks>
+    public bool PulseWhilePlaying { get; set; } = true;
+
+    /// <summary>
     /// Whether the machine editor is a page of its own along the top.
     /// </summary>
     /// <remarks>

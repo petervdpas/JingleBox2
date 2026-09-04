@@ -51,33 +51,6 @@
       <Setter Property="Background" Value="{Binding $parent[ToggleButton].Background}"/>
     </Style>
 
-    <!-- The breath itself: a wash over the pad's own colour rather than a second colour, so what
-         moves is the pad's own brightness. Over the whole pad and under everything on it, so the
-         lettering and the meters are not what is pulsing.
-
-         Nought when it is not playing, which is what keeps this off the frame clock: the
-         animation is on the class, and the class follows what the pad is doing. -->
-    <Style Selector="Border.breath">
-      <Setter Property="Opacity" Value="0"/>
-      <Setter Property="IsHitTestVisible" Value="False"/>
-      <Setter Property="Background" Value="#FFFFFF"/>
-      <Setter Property="CornerRadius" Value="12"/>
-    </Style>
-
-    <Style Selector="Border.breath.playing">
-      <Style.Animations>
-        <Animation Duration="0:0:1.4" IterationCount="INFINITE" PlaybackDirection="Alternate"
-                   Easing="SineEaseInOut">
-          <KeyFrame Cue="0%">
-            <Setter Property="Opacity" Value="0.0"/>
-          </KeyFrame>
-          <KeyFrame Cue="100%">
-            <Setter Property="Opacity" Value="0.16"/>
-          </KeyFrame>
-        </Animation>
-      </Style.Animations>
-    </Style>
-
     <Style Selector="Border.profileBar">
       <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
@@ -141,8 +114,11 @@
                             Background="{Binding PadBackground,
                                          Converter={StaticResource NullToUnset}}">
                 <Grid>
-                  <!-- The breath, under everything else on the pad. -->
-                  <Border Classes="breath" Classes.playing="{Binding IsPlaying}" />
+                  <!-- What a playing pad wears, under everything else on it. -->
+                  <views:PadPulse Colour="{Binding PadColorValue}"
+                                  Playing="{Binding IsPlaying}"
+                                  Corner="12"
+                                  IsVisible="{Binding $parent[ItemsControl].DataContext.PulseWhilePlaying}" />
 
                   <!-- Pad title centred -->
                   <TextBlock Text="{Binding Title}"

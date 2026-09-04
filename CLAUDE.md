@@ -2568,6 +2568,46 @@ whole exercise and is worth writing down rather than summarising:
   where the sound comes from how fast the position moves rather than where it is. It is the
   first machine that would need an engine of its own rather than a described panel over an
   existing one, and the first thing that would want a parameter delivered uncoalesced
+- **A pad that is playing keeps its own colour and walks through the ones beside it.** It used to
+  be repainted in the theme's checked colour, which cost the thing a wall of pads is for: every
+  playing pad turned the same colour, so which one you had fired was a question about which one
+  had changed rather than something you could see, and a pad whose own colour happened to be that
+  one said nothing at all. `Views/PadPulse.cs` is the control and `IPulseColour` is the rule, in
+  hue rather than in red, green and blue, since the neighbours of a colour are a fact about the
+  wheel: twenty two degrees either side, which is about the width of one colour on the palette, so
+  a red pad reaches towards orange and never arrives. The brightness moves a little with it, which
+  is for the pads with no colour of their own: grey has no hue to walk. A control that draws
+  rather than a style that animates, because what it draws depends on the pad's own colour and an
+  animation in a style can only move between colours written into it
+
+- Two things had to change for that and the second is why the first looked like it had failed.
+  `PadViewModel.PadBackground` deliberately answered nothing while a pad played, so the theme
+  would paint it; and this toolkit paints a checked `ToggleButton` with the accent from inside its
+  own template, where a background set on the button cannot reach. Both are said now, and the
+  ring around a playing pad stays: a colour that moves says a pad is going and an edge says which
+
+- It is a setting, `PulseWhilePlaying`, on SETTINGS, Control Surfaces, beside toggle mode, and on
+  unless somebody says otherwise. It is the one thing on FIRE that draws while nothing has
+  changed, so somebody running a show on a machine with nothing to spare can say no. What it
+  costs was measured rather than assumed, by throwing that switch with four pads playing: 108.6%
+  of one core against 110.5%, which is about half a percent of a core per walking pad, in a Debug
+  build on a software rendered display with no GPU. It asks for a frame at the screen's rate and
+  redraws at most thirty times a second, keeps one brush and one delegate rather than making them
+  per frame, and asks for nothing at all once the pad stops
+
+- **A press from a control surface is not coalesced, and a knob's position is.** Writes from the
+  hardware are queued for the drawing thread and were coalesced per link, which is right for a
+  knob, where a sweep sends a hundred positions and only where it ended up matters, and wrong for
+  a press: two pad hits arriving before the screen was drawn became one, so a pad in toggle mode
+  was left playing when it had been told to stop and the light disagreed with the hand that played
+  it. Measured on the wire at two note ons in the same millisecond, one toggle; ten milliseconds
+  apart it always worked, which is why it read as random. `IControlWrites` and `ControlWrites` are
+  that rule, with the trip to the drawing thread handed in so it can be pumped by hand in a test:
+  a value replaces whatever has not landed, a press is kept beside every other press in order,
+  presses run first, and one trip carries the lot. Bounded at sixty four presses a trip, since a
+  hand cannot make sixty four between two frames. It reached the transport's keys and a machine's
+  buttons too, which have gone through that queue since they were written
+
 - Two places things are stored, on purpose: instruments (the shelf of sounds you own, where a
   new one starts) and songs (patterns plus their own copies of the instruments they use). There
   was a third, a preset bank, and it went when the library stopped reaching into songs: a sound
