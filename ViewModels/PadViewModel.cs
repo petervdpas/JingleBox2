@@ -255,6 +255,17 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string status = "";
 
     /// <summary>Whether it is sounding, which the engine says rather than the command that started it.</summary>
+    /// <remarks>
+    /// Set from the engine's own word when a pad starts, stops or goes wrong, and asked again on
+    /// every tick of the progress timer while it says yes. The second half is not belt and braces:
+    /// everything on the pad that says it is going hangs off this one flag, so a pad whose ending
+    /// was never announced sits lit, with its ring on and its colour walking, until somebody
+    /// presses it. Asked rather than assumed, it corrects itself within a twentieth of a second
+    /// whatever the reason, and the reason can be anything from a stream that dropped to a device
+    /// that was taken away underneath it.
+    ///
+    /// Only ever asked while it says yes, so a bank of quiet pads asks nothing.
+    /// </remarks>
     [ObservableProperty] private bool isPlaying;
 
     /// <summary>How far through it is, nought to one, and nought when it is not playing.</summary>
@@ -482,6 +493,8 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _progressTimer.Tick += (_, _) =>
         {
+            if (IsPlaying && !_audio.IsPadPlaying(Index)) IsPlaying = false;
+
             if (IsPlaying)
             {
                 PlaybackProgress = _audio.GetPadProgress(Index);
