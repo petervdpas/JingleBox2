@@ -2798,6 +2798,24 @@ whole exercise and is worth writing down rather than summarising:
   the ordinary way now goes nowhere. Finishing it means one stream for everything, which is
   BASSmix, another add-on and another restructuring of where the pads' audio goes. Until that is
   built, ASIO is the tracker's alone and picking one silences FIRE
+- **A folder that moves takes CI's checks with it, and a check counting nought is the only
+  reason the release did not go out empty.** The rack moved from `machines/` at the top of the
+  tree to `rack/machines` and `rack/effects` when the two worlds were split, and the release
+  workflow went on counting the old folder in five places: the shared script, the Windows step
+  written out in PowerShell, and the RPM and the .deb, which grep a path inside the package. Every
+  one of them found nought files, which is what the guard reads as the check itself being broken,
+  so v2.4.0 failed on all four platforms rather than shipping an application with no machines,
+  no effects and nothing to make a sound with. That guard is why the shape is worth keeping: a
+  count that must not be nought says so, since a check that silently has nothing to check reports
+  nothing for the rest of its life
+- The script is `verify-rack.sh` now rather than `verify-machines.sh`, and it walks both worlds
+  because a folder is one or the other: a machine is described by `machine.json` and an effect by
+  `effect.json`, which is the one word that differs between the two passes. It was proved by
+  publishing and breaking the payload four ways rather than by reading it, which is the only way
+  this is ever caught: a whole box gone, an effect without its manifest, a machine without its
+  manifest, and a machine missing a preset, the last three with the file count made right again
+  so that only the branch under test could catch them
+
 - **Whether the libraries are current is asked once a month by CI, and asked by hash.**
   `.github/scripts/check-natives.sh` downloads what un4seen ships, pulls out the eight files this
   program carries, and compares them; `.github/workflows/natives.yml` runs it on the first of the
