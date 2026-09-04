@@ -23,6 +23,8 @@ using JingleBox2.Audio.Plugins.Interfaces;
 using JingleBox2.Audio.Plugins;
 using JingleBox2.Controllers.Interfaces;
 using JingleBox2.SoundDevices.SoundMachines;
+using ShortcutAction = JingleBox2.Shortcuts.Enums.ShortcutAction;
+using IShortcutContext = JingleBox2.Shortcuts.Interfaces.IShortcutContext;
 
 namespace JingleBox2.ViewModels;
 
@@ -40,7 +42,7 @@ namespace JingleBox2.ViewModels;
 /// than on a page view model of their own, because two pages show them: PADS is where they are
 /// laid out and FIRE is where they are played.
 /// </remarks>
-public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfaces.IShortcutContext
+public sealed partial class MainViewModel : ObservableObject, IShortcutContext
 {
     /// <summary>What is known about the controllers plugged in. Holds a cache, so it is shared rather than made twice.</summary>
     /// <summary>
@@ -301,7 +303,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// So the window hands off to the page rather than the page waiting to be found. Anything
     /// that does have focus is still asked first and still wins.
     /// </remarks>
-    private Shortcuts.Interfaces.IShortcutContext? Page => SelectedTab switch
+    private IShortcutContext? Page => SelectedTab switch
     {
         RecordTab => Record,
         MixerTab or TrackerTab => Tracker,
@@ -320,16 +322,45 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// deck is, so a page added later has to say what saving on it means instead of quietly
     /// inheriting somebody else's answer.
     /// </remarks>
-    bool Shortcuts.Interfaces.IShortcutContext.Can(Shortcuts.Enums.ShortcutAction action) => action switch
+    bool IShortcutContext.Can(ShortcutAction action) => action switch
     {
         _ when Page?.Can(action) == true => true,
 
-        Shortcuts.Enums.ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
+        ShortcutAction.Save => SelectedTab == TrackerTab && Tracker.SaveCommand.CanExecute(null),
 
-        Shortcuts.Enums.ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
-        Shortcuts.Enums.ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
+        ShortcutAction.Undo => OnThePads && PadHistory.CanUndo,
+        ShortcutAction.Redo => OnThePads && PadHistory.CanRedo,
 
-        _ => false
+        _ => PageFor(action) is { } tab && (tab != DesignerTab || ShowMachineEditor)
+    };
+
+    /// <summary>
+    /// Which page along the top a shortcut is pointed at, or nothing when it is not pointed at
+    /// one.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than worked out from the order of the enum, for the reason the tab
+    /// numbers are written out at all: a number read off a control is not a name, and an action
+    /// that quietly meant whichever page happened to be fifth would move the day a page is added
+    /// in the middle.
+    ///
+    /// DESIGNER is the one that can be absent, since it is in the strip only when SETTINGS asks
+    /// for it. A key pointed at a page that is not there does nothing rather than putting
+    /// somebody on a page they have hidden, and the key carries on to whatever else might want
+    /// it.
+    /// </remarks>
+    /// <param name="action">The shortcut that arrived.</param>
+    private static int? PageFor(ShortcutAction action) => action switch
+    {
+        ShortcutAction.Mixer => MixerTab,
+        ShortcutAction.Record => RecordTab,
+        ShortcutAction.Pads => PadsTab,
+        ShortcutAction.Fire => UseTab,
+        ShortcutAction.Tracker => TrackerTab,
+        ShortcutAction.Designer => DesignerTab,
+        ShortcutAction.Settings => SettingsTab,
+        ShortcutAction.MidiCc => MidiCcTab,
+        _ => null
     };
 
     /// <summary>
@@ -348,7 +379,7 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// page is asked whether it can before being asked to, since an action it declines has to
     /// reach the answer below rather than being swallowed by whoever was offered it first.
     /// </remarks>
-    void Shortcuts.Interfaces.IShortcutContext.Do(Shortcuts.Enums.ShortcutAction action)
+    void IShortcutContext.Do(ShortcutAction action)
     {
         if (Page is { } page && page.Can(action))
         {
@@ -359,16 +390,21 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
 
         switch (action)
         {
-            case Shortcuts.Enums.ShortcutAction.Save when SelectedTab == TrackerTab:
+            case ShortcutAction.Save when SelectedTab == TrackerTab:
                 Tracker.SaveCommand.Execute(null);
                 break;
 
-            case Shortcuts.Enums.ShortcutAction.Undo when OnThePads:
+            case ShortcutAction.Undo when OnThePads:
                 PadsBack(PadHistory.Undo());
                 break;
 
-            case Shortcuts.Enums.ShortcutAction.Redo when OnThePads:
+            case ShortcutAction.Redo when OnThePads:
                 PadsBack(PadHistory.Redo());
+                break;
+
+            default:
+                if (PageFor(action) is { } tab && (tab != DesignerTab || ShowMachineEditor))
+                    SelectedTab = tab;
                 break;
         }
     }
@@ -481,8 +517,14 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// <summary>The song, and the rack beside it.</summary>
     private const int TrackerTab = 4;
 
+    /// <summary>Where a machine's face is laid out, and only in the strip when it is asked for.</summary>
+    private const int DesignerTab = 5;
+
     /// <summary>Named for the sake of the list, though nothing asks about it by name.</summary>
     private const int SettingsTab = 6;
+
+    /// <summary>The control templates, which is the last word along the top.</summary>
+    private const int MidiCcTab = 7;
 
     /// <summary>
     /// Tells the bar where you are now.
@@ -1300,6 +1342,16 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
     /// </remarks>
     public PluginLibraryViewModel Plugins { get; private set; } = new();
 
+    /// <summary>
+    /// The shortcuts page in SETTINGS: the system's keys, and a key of your own on each page.
+    /// </summary>
+    /// <remarks>
+    /// Given the settings to write into rather than reaching for them, since what it hands back
+    /// is only what differs from the defaults and this is the one object that knows where that
+    /// goes.
+    /// </remarks>
+    public ShortcutsViewModel Shortcuts { get; }
+
     /// <summary>Every output the card offers, filled once while starting.</summary>
     public ObservableCollection<AudioOutput> OutputDevices { get; } = new();
 
@@ -1572,6 +1624,13 @@ public sealed partial class MainViewModel : ObservableObject, Shortcuts.Interfac
         Midi = new MidiViewModel(store, cfg, midiService, _profiles);
 
         Plugins = new PluginLibraryViewModel(store, cfg);
+
+        Shortcuts = new ShortcutsViewModel(keys =>
+        {
+            cfg.Shortcuts = keys.Count > 0 ? keys : null;
+            store.Save(cfg);
+        });
+
         Record = new RecordViewModel(recordingService, new LevelMeterService(), waveformService, store, cfg, routing, _audio.TakeBus);
 
         // The recording input has two faders on two pages and one gain underneath them, so each

@@ -205,6 +205,8 @@ public partial class MainWindow : Window
 
         Views.RemoteFocus.ListenEverywhere();
 
+        Views.HelpKey.ListenEverywhere();
+
         vm.MatrixSizeChanged += OnMatrixSizeChanged;
 
         _cfg = cfg;

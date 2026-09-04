@@ -160,7 +160,7 @@ public static class LinkKey
     /// </remarks>
     private static void Pressed(object? sender, KeyEventArgs e)
     {
-        if (e.Handled || e.Key != Key.M) return;
+        if (e.Handled || Shortcuts.LearningKeys.On || e.Key != Key.M) return;
         if (e.KeyModifiers != (KeyModifiers.Control | KeyModifiers.Shift)) return;
 
         if (!Pointable) return;

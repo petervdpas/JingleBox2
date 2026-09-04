@@ -8,6 +8,15 @@ namespace JingleBox2.Shortcuts.Enums;
 /// for something nothing offers. Adding one is adding a member here and a line in
 /// <see cref="ShortcutActions.Everything"/>, and every page that does not answer it simply says it
 /// cannot.
+///
+/// **Two kinds, and the difference is who decides.** The first four are the system's: what they
+/// do is a fact about the application, every page answers them for itself, and they are not
+/// yours to move. The rest are a page along the top, they ship on no key at all, and putting one
+/// on a key is the whole of what the shortcuts page in SETTINGS is for.
+///
+/// The names are what a settings file holds, so they do not change once written down. The order
+/// does not matter for that reason, which is why a page's word rather than a verb is the right
+/// name here: a key pointed at TRACKER is asking for TRACKER.
 /// </remarks>
 public enum ShortcutAction
 {
@@ -27,5 +36,29 @@ public enum ShortcutAction
     Undo,
 
     /// <summary>And the last thing undone, done again.</summary>
-    Redo
+    Redo,
+
+    /// <summary>The mixer.</summary>
+    Mixer,
+
+    /// <summary>RECORD, where the takes are made.</summary>
+    Record,
+
+    /// <summary>PADS, where they are laid out.</summary>
+    Pads,
+
+    /// <summary>FIRE, where they are played.</summary>
+    Fire,
+
+    /// <summary>TRACKER, the song and the rack beside it.</summary>
+    Tracker,
+
+    /// <summary>DESIGNER, which is only there when it has been asked for in SETTINGS.</summary>
+    Designer,
+
+    /// <summary>SETTINGS.</summary>
+    Settings,
+
+    /// <summary>MIDI CC, the control templates.</summary>
+    MidiCc
 }

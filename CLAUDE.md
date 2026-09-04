@@ -2197,6 +2197,125 @@ whole exercise and is worth writing down rather than summarising:
   to pages that correctly say they cannot, because **there is no undo anywhere in this
   application**: not a stack, not a history, not a type with the word in it. `docs/shortcuts.md`
   is the plan, and the point in it is that undo belongs to each context rather than to the app
+- **Ctrl+H opens the help on one page listing every key the application answers.** `Views/HelpKey.cs`
+  is that door, a class handler on `Window` like `DeckKeys` and for the same reason: hung window
+  by window it is a call every new window has to remember, and the one that forgets is a window
+  where the key silently does nothing. `HelpKey.Wants` is the rule with no window in it. Nothing
+  is asked about where the keyboard is, unlike the transport's two: a space in a name is a space,
+  and no text box anywhere does anything with Ctrl+H, so somebody stuck halfway through a dialog
+  is exactly who wants it
+- The page names the keys that are written into the application and reads the four that are a
+  setting off the map as it is asked for. A page that spelled Save, Delete, Undo and Redo out
+  would go on saying Ctrl+Z after somebody had moved undo to F2, which is two spellings of one
+  fact drifting apart, the fault this codebase has already paid for twice. `IShortcutSheet` is
+  those four lines and the file carries a `{keys}` hole they go into, so the prose around them is
+  written where all the other prose is. It walks every action rather than naming four, so one
+  added later turns up without anybody being told
+- **And writing that page is what found out that the settings page for shortcuts does not
+  exist.** Everything under it does: `ShortcutMap` sets, `AppConfig.Shortcuts` stores only what
+  differs from the defaults so a default can still be improved, and `IShortcutActions.Everything`
+  says in its own remarks that a settings page builds itself from it. Nobody built the page, so
+  the four keys are what they ship as and there is nowhere to change them. The help said "in
+  SETTINGS under Shortcuts" for about an hour, which is the shape of fault worth naming: help
+  text is the one place in an application where a feature can be described into existence, since
+  nothing compiles it and nothing runs it
+- **The help is markdown files, one to a topic, in `Help/Topics/` and linked into the output as
+  `help/`.** Lowercase and linked out for the reason the controller profiles are: a folder called
+  `help` beside the `Help` the code is in differs only in case, which is two folders here and one
+  on Windows. The file's name is the topic's id, so `Topic="settings.engine"` beside the engine
+  card is `settings.engine.md` and adding a topic is adding a file. The first heading is the
+  title, the paragraph under it is the summary the list and the tooltip show, and the rest is the
+  page, so a file read by somebody who has never seen this code is a page that reads correctly on
+  its own
+- It was ten string literals in a C# file, and prose in source is prose nobody edits: it cannot
+  be read without the braces around it and a paragraph rewritten is a rebuild. The ids stay as
+  constants all the same, because a file is what somebody writes and a constant is what a search
+  finds. That the two agree is not left to anybody's memory: `Tests/HelpTopicTests.cs` reads the
+  folder and the constants and says they are the same set in both directions, since a constant
+  with no file is a badge that opens nothing and a file with no constant is a page somebody wrote
+  and quietly lost. It also reads every `HelpBadge` in every layout, which is the only thing that
+  would ever catch one pointing at a topic that was renamed: XAML cannot reach a const, so the
+  compiler has nothing to say about it
+- **`Help/Markdown.cs` is the markdown this application understands, and it is ours.** Sections,
+  paragraphs, list lines, bold and the code marks a key name is written in. It was a package for
+  about ten minutes: the only build of the obvious one that works with this toolkit is an alpha,
+  and this is the application whose release is the one build nobody gets to take back. What it
+  would have bought is the half of markdown the help does not use
+- The rule that earns the whole thing on its own is the plain one every markdown has: **a run of
+  lines with nothing blank between them is one paragraph, and where the line ends is not where
+  the paragraph breaks**. Shown as it is written in a control that wraps, prose breaks twice,
+  once where somebody typed and again where the window ran out, and comes out ragged at every
+  width but the one it was written for. That was in the help window for exactly as long as it
+  took to drag the splitter across. An indented line under a bullet belongs to that bullet for
+  the same reason, and without it a list line stopped in the middle of its own sentence and the
+  rest stood underneath as prose
+- It reads rather than refuses. A mark that is never closed is the characters it is made of, so
+  an asterisk somebody meant as an asterisk does not turn the rest of a page bold; a file that
+  will not open at all is written down and passed over, since one topic that will not read is one
+  topic and not the whole help. `Views/MarkdownView.cs` is the other half and is only the look:
+  one TextBlock per block, which is the whole reason this exists, since a TextBlock is one size
+  and one weight and a heading inside one had to be shouty capitals. A key is drawn in the same
+  monospaced face the pattern uses
+- Drawing it rather than showing it fixed something that was already wrong: the engine topic has
+  said something in double asterisks since it was written, and until now it rendered as the
+  asterisks
+- The help window's two panes have the same handle the designer's do, and both columns have a
+  floor, since a splitter with none can be dragged until one pane is not there and a pane that is
+  gone is one nobody can take hold of to bring back. A topic's title and its summary are two
+  lines of prose in a fixed column, so a list of them is either wrapping where it need not or
+  taking room the page it explains would rather have, and which of those is true depends on the
+  wording rather than on the window
+- **Writing that page found out that the shortcuts page in SETTINGS did not exist.** Everything
+  under it did, and had for a long time: `ShortcutMap` sets, `AppConfig.Shortcuts` stores only
+  what differs from the defaults, and `IShortcutActions` says in its own remarks that a settings
+  page builds itself from it. Nobody had built the page, and the help said where it was for about
+  an hour. That is a shape worth naming: **help text is the one place in an application where a
+  feature can be described into existence**, since nothing compiles it and nothing runs it
+- **There are two kinds of shortcut and the difference is who decides.** System shortcuts are
+  what the application does rather than where it goes, and they are not yours to move: the
+  transport's `Space` and `Ctrl+R`, the pointing mode's `Ctrl+Shift+M`, the help's `Ctrl+H`, and
+  Save, Delete, Undo and Redo. Page shortcuts are a key onto a page along the top, they ship on
+  nothing at all, and they are the whole of what the page in SETTINGS sets
+- The guard is in `IShortcutMap.Set` rather than only off the page, because the page is not the
+  only way in: a settings file is a file, and one edited by hand to move Save is asking for
+  something this does not offer. Refused quietly, since the same call reads that file at startup
+  and a line in a settings file is not worth a start that fails
+- **`ISystemKeys` is one list of what cannot be changed, and it has to be, because they come from
+  two places.** Four are actions delivered through the map; the rest are written into a door of
+  their own and nothing delivers those through the map, since a door answers before the map is
+  consulted at all. The card in SETTINGS showed only the map's four for about an hour, and the
+  answer to a key being missing from it is not to put that key in the map, which would be two
+  ways of delivering one keystroke, but to have one list of what the application answers. Both
+  the settings card and the help page's system section are filled from it
+- **A page shortcut is `Ctrl+Alt` and a letter, and nothing else**, which is `ShortcutCatcher`.
+  The narrowness is what makes it safe: everything else here is a letter with Ctrl, or with Ctrl
+  and Shift, or on its own, so a page key cannot land on top of something that already works and
+  nobody has to know what is taken before choosing one. Letters rather than any key, since a
+  digit with those two modifiers is a character on several layouts and a function key is where a
+  window manager tends to live. A keystroke it refuses leaves the row still waiting rather than
+  stopping, which would read as the press having been taken and gone wrong
+- Three of the catcher's answers are not a shortcut, and each is a hand doing something other
+  than choosing. **A modifier on its own is a hand arriving**, and a row that took the first key
+  it was given would learn Ctrl every single time, since Ctrl goes down before the letter does.
+  Escape is changing your mind and Backspace is taking the key off, both only when they arrive
+  alone: what those two mean on their own is a fact about them being alone
+- **And a page shortcut does nothing while a caret is blinking, which is the rule that decided
+  the whole thing.** On a Dutch or a German layout AltGr is delivered as Ctrl+Alt, and the
+  characters behind it are how somebody types a bracket or a euro sign. A name that jumped to
+  another page halfway through being typed would be the worst kind of fault, since nothing on the
+  screen would say why. `ShortcutKeys` now answers only Save while typing, where it used to name
+  three actions it would refuse
+- **`LearningKeys` is the gate every key door asks before answering, and it exists because of the
+  order keys arrive in.** Every key here is heard on the way down, at the window, before whatever
+  has the keyboard sees it, which is right the rest of the time and is what stops the last button
+  pressed keeping the space bar. While a row is listening it is exactly wrong. Four places asking
+  one question rather than one place answering for all of them, since they are four keystrokes on
+  four routes and what they share is only the moment. The page clears it on every way out, the
+  page losing the keyboard included: a gate left set would leave the application deaf to its own
+  keys for the rest of the session
+- The row's buttons are clicked rather than bound to a command, because the page answers the
+  keystroke that follows and the two belong together: which row is listening and which row is
+  about to hear a key are one fact
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

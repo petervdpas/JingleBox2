@@ -63,19 +63,25 @@ public class ShortcutTests
     }
 
     /// <summary>An action put on another key is not left answering to the old one as well.</summary>
+    /// <remarks>
+    /// Asked of a page rather than of Save, since the system's four are not moveable at all:
+    /// see <c>Tests/MenuShortcutTests.cs</c>. Everything about the map is the same either way,
+    /// which is the point of asking it here.
+    /// </remarks>
     [Fact]
     public void Moving_an_action_takes_the_old_key_with_it()
     {
         var map = new ShortcutMap();
 
-        map.Set(ShortcutAction.Save, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Tracker, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Tracker, KeyGesture.Parse("Ctrl+E"));
 
-        Assert.Equal(ShortcutAction.Save, map.Match(Key.W, KeyModifiers.Control));
-        Assert.Null(map.Match(Key.S, KeyModifiers.Control));
+        Assert.Equal(ShortcutAction.Tracker, map.Match(Key.E, KeyModifiers.Control));
+        Assert.Null(map.Match(Key.W, KeyModifiers.Control));
 
         var written = Assert.Single(map.Given());
-        Assert.Equal("Save", written.Action);
-        Assert.Equal("Ctrl+W", written.Keys);
+        Assert.Equal("Tracker", written.Action);
+        Assert.Equal("Ctrl+E", written.Keys);
     }
 
     /// <summary>Putting an action on a key takes it off whatever had that key.</summary>
@@ -88,11 +94,11 @@ public class ShortcutTests
     {
         var map = new ShortcutMap();
 
-        map.Set(ShortcutAction.Save, KeyGesture.Parse("Ctrl+W"));
-        map.Set(ShortcutAction.Delete, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Tracker, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Record, KeyGesture.Parse("Ctrl+W"));
 
-        Assert.Equal(ShortcutAction.Delete, map.Match(Key.W, KeyModifiers.Control));
-        Assert.Equal("", map.Said(ShortcutAction.Save));
+        Assert.Equal(ShortcutAction.Record, map.Match(Key.W, KeyModifiers.Control));
+        Assert.Equal("", map.Said(ShortcutAction.Tracker));
     }
 
     /// <summary>A changed key survives the round trip, and the rest is still as it shipped.</summary>
@@ -100,30 +106,40 @@ public class ShortcutTests
     public void What_was_stored_comes_back()
     {
         var map = new ShortcutMap();
-        map.Set(ShortcutAction.Save, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Tracker, KeyGesture.Parse("Ctrl+W"));
 
         var second = new ShortcutMap();
         second.Take(map.Given());
 
-        Assert.Equal(ShortcutAction.Save, second.Match(Key.W, KeyModifiers.Control));
+        Assert.Equal(ShortcutAction.Tracker, second.Match(Key.W, KeyModifiers.Control));
         Assert.Equal(ShortcutAction.Undo, second.Match(Key.Z, KeyModifiers.Control));
     }
 
     /// <summary>An action switched off comes back off, not back at its default.</summary>
     /// <remarks>
     /// Taking a shortcut away is a decision, and storing nothing for it would be storing the
-    /// same thing as never having touched it.
+    /// same thing as never having touched it. Shown on a page rather than on Save, which cannot
+    /// be taken off at all, by setting one and then clearing it: what is stored has to say the
+    /// difference between a page nobody touched and one somebody emptied.
     /// </remarks>
     [Fact]
     public void A_shortcut_taken_off_stays_off()
     {
         var map = new ShortcutMap();
-        map.Set(ShortcutAction.Save, null);
+        map.Set(ShortcutAction.Fire, KeyGesture.Parse("Ctrl+W"));
 
         var second = new ShortcutMap();
         second.Take(map.Given());
 
-        Assert.Null(second.Match(Key.S, KeyModifiers.Control));
+        Assert.Equal(ShortcutAction.Fire, second.Match(Key.W, KeyModifiers.Control));
+
+        second.Set(ShortcutAction.Fire, null);
+
+        var third = new ShortcutMap();
+        third.Take(second.Given());
+
+        Assert.Null(third.Match(Key.W, KeyModifiers.Control));
+        Assert.Equal("", third.Said(ShortcutAction.Fire));
     }
 
     /// <summary>A settings file with nonsense in it loses that line and keeps the rest.</summary>
@@ -138,13 +154,14 @@ public class ShortcutTests
 
         map.Take(new List<ShortcutBinding>
         {
-            new() { Action = "Save", Keys = "Ctrl+Shift+Q" },
+            new() { Action = "Pads", Keys = "Ctrl+Shift+Q" },
             new() { Action = "Nonsense", Keys = "Ctrl+P" },
-            new() { Action = "Delete", Keys = "not a keystroke" }
+            new() { Action = "Mixer", Keys = "not a keystroke" }
         });
 
-        Assert.Equal(ShortcutAction.Save, map.Match(Key.Q, KeyModifiers.Control | KeyModifiers.Shift));
+        Assert.Equal(ShortcutAction.Pads, map.Match(Key.Q, KeyModifiers.Control | KeyModifiers.Shift));
         Assert.Null(map.Match(Key.P, KeyModifiers.Control));
+        Assert.Equal("", map.Said(ShortcutAction.Mixer));
         Assert.Equal(ShortcutAction.Delete, map.Match(Key.D, KeyModifiers.Control));
     }
 
@@ -153,11 +170,12 @@ public class ShortcutTests
     public void Reset_puts_everything_back()
     {
         var map = new ShortcutMap();
-        map.Set(ShortcutAction.Save, KeyGesture.Parse("Ctrl+W"));
+        map.Set(ShortcutAction.Tracker, KeyGesture.Parse("Ctrl+W"));
 
         map.Reset();
 
         Assert.Equal(ShortcutAction.Save, map.Match(Key.S, KeyModifiers.Control));
+        Assert.Null(map.Match(Key.W, KeyModifiers.Control));
         Assert.Empty(map.Given());
     }
 
@@ -172,6 +190,13 @@ public class ShortcutTests
         foreach (var (action, name, keys) in _actions.Everything)
         {
             Assert.False(string.IsNullOrWhiteSpace(name));
+
+            if (keys.Length == 0)
+            {
+                Assert.False(_actions.Fixed(action), name + " ships on no key, so it must be settable");
+                continue;
+            }
+
             Assert.NotNull(KeyGesture.Parse(keys));
             Assert.Equal(name, _actions.Named(action));
         }

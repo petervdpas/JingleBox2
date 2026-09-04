@@ -68,8 +68,17 @@ public sealed class ShortcutMap : IShortcutMap
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// A system shortcut is refused here rather than merely left off the settings page, because
+    /// the page is not the only way in: a settings file is a file, and one that has been edited
+    /// by hand to move Save is asking for something this does not offer. Refused quietly, since
+    /// the same call reads that file at startup and a line in a settings file is not worth a
+    /// start that fails.
+    /// </remarks>
     public void Set(ShortcutAction action, KeyGesture? gesture)
     {
+        if (_actions.Fixed(action)) return;
+
         if (gesture is null)
         {
             _held.Remove(action);
@@ -97,6 +106,8 @@ public sealed class ShortcutMap : IShortcutMap
         {
             if (one is null) continue;
             if (!Enum.TryParse(one.Action, ignoreCase: true, out ShortcutAction action)) continue;
+
+            if (_actions.Fixed(action)) continue;
 
             if (one.Keys.Length == 0) { _held.Remove(action); continue; }
 

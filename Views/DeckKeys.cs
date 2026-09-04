@@ -77,7 +77,7 @@ public static class DeckKeys
 
                 if (e.Handled) return;
 
-                var wanted = Wants(e.Key, e.KeyModifiers, Focused(window));
+                var wanted = Wants(e.Key, e.KeyModifiers, Focused(window) || Shortcuts.LearningKeys.On);
 
                 if (wanted == DeckWant.None) return;
 
@@ -132,9 +132,11 @@ public static class DeckKeys
     /// What a keystroke is asking for, which is the whole of the rule and no keystrokes.
     /// </summary>
     /// <remarks>
-    /// Out here so it can be put a question to without a window or a keyboard. Two things are
+    /// Out here so it can be put a question to without a window or a keyboard. Three things are
     /// left alone whatever the key: a text box, where a space is a space and Ctrl+R is somebody
-    /// typing, and a combo box with its list open, where space takes the row that is lit.
+    /// typing, a combo box with its list open, where space takes the row that is lit, and a
+    /// shortcut being learned, where the whole point is that the key reaches the row waiting for
+    /// it rather than the thing that usually answers.
     /// </remarks>
     /// <param name="key">The key that went down.</param>
     /// <param name="modifiers">What was held with it.</param>

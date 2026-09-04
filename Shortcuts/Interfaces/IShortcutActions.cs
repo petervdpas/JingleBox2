@@ -21,6 +21,23 @@ public interface IShortcutActions
     /// </remarks>
     IReadOnlyList<(ShortcutAction Action, string Name, string Default)> Everything { get; }
 
+    /// <summary>
+    /// Whether that one is the system's, so it may be read and not moved.
+    /// </summary>
+    /// <remarks>
+    /// The four the application ships with are what they are: what Save does is a fact about
+    /// this program, every page answers it for itself, and a settings page that could move it
+    /// would be offering to change something that is not a preference. What is a preference is
+    /// a key onto a page along the top, which ships on nothing at all until somebody puts one
+    /// there.
+    ///
+    /// Asked here rather than decided by the page that draws the list, since it is also what
+    /// <c>IShortcutMap.Set</c> refuses on, and a rule spelled in two places is a rule that will
+    /// eventually be spelled differently.
+    /// </remarks>
+    /// <param name="action">The shortcut being asked about.</param>
+    bool Fixed(ShortcutAction action);
+
     /// <summary>What to call one, for a page listing them.</summary>
     /// <remarks>
     /// Falls back to the member's own name for an action nobody has given a wording to, which

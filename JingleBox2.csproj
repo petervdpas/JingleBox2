@@ -44,6 +44,10 @@
          Windows and macOS see one folder, git checks both into it, and this glob then sweeps the
          C# sources into the output as content. -->
     <None Include="Controllers\Profiles\**\*" CopyToOutputDirectory="PreserveNewest" Link="controllers\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- The help topics, one markdown file to a topic. Linked out as plain "help" for the same
+         reason the profiles are linked out as "controllers": that differs from the Help\ source
+         folder only in case, which is two folders here and one on Windows. -->
+    <None Include="Help\Topics\**\*" CopyToOutputDirectory="PreserveNewest" Link="help\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <!-- The contract compiles itself. Without this the host's own globs would swallow its

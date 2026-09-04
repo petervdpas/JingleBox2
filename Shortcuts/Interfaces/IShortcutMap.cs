@@ -46,6 +46,11 @@ public interface IShortcutMap
     /// <remarks>
     /// Whatever else was on that keystroke loses it, which is the rule that keeps one key doing
     /// one job.
+    ///
+    /// A system shortcut is refused. What Save does is a fact about this application rather than
+    /// a preference, and the guard is here rather than on the page that draws the list because
+    /// the page is not the only way in: the same call reads a settings file that may have been
+    /// edited by hand.
     /// </remarks>
     void Set(ShortcutAction action, KeyGesture? gesture);
 

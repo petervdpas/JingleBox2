@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Reactive;
 using Avalonia.Platform.Storage;
@@ -41,6 +42,54 @@ public partial class SettingsView : UserControl
         InitializeComponent();
 
         this.GetObservable(BoundsProperty).Subscribe(new AnonymousObserver<Rect>(Shape));
+
+        AddHandler(KeyDownEvent, Learning, RoutingStrategies.Tunnel);
+
+        LostFocus += (_, _) => Shortcuts?.Stop();
+    }
+
+    /// <summary>The shortcuts page, when this page has a view model behind it.</summary>
+    private ShortcutsViewModel? Shortcuts => (DataContext as MainViewModel)?.Shortcuts;
+
+    /// <summary>Starts or stops listening on the row that was clicked.</summary>
+    /// <param name="sender">The button on that row.</param>
+    /// <param name="e">Ignored: which row it is comes from the button's own row.</param>
+    private void OnListenForKey(object? sender, RoutedEventArgs e)
+    {
+        if (Row(sender) is { } row) Shortcuts?.ListenCommand.Execute(row);
+    }
+
+    /// <summary>Takes the key off the row that was clicked.</summary>
+    /// <param name="sender">The button on that row.</param>
+    /// <param name="e">Ignored, as above.</param>
+    private void OnClearKey(object? sender, RoutedEventArgs e)
+    {
+        if (Row(sender) is { } row) Shortcuts?.ClearCommand.Execute(row);
+    }
+
+    /// <summary>Which row a button on it belongs to.</summary>
+    /// <param name="sender">The button that was clicked.</param>
+    private static ShortcutRowViewModel? Row(object? sender) =>
+        (sender as Control)?.DataContext as ShortcutRowViewModel;
+
+    /// <summary>
+    /// A key arrived while a shortcut row was listening for one.
+    /// </summary>
+    /// <remarks>
+    /// Heard on the way down and before anything else, which is the whole of what makes this
+    /// work: the keys somebody is most likely to want are the ones something already answers,
+    /// and Ctrl+H, the space bar and Ctrl+S would each be taken by their own door before a
+    /// listening row ever saw them. Nothing is swallowed unless a row really was listening, so
+    /// the page is as it was the rest of the time.
+    ///
+    /// The listening stops when the page loses the keyboard, since a row left waiting would
+    /// take whatever was pressed on the way back to it.
+    /// </remarks>
+    private void Learning(object? sender, KeyEventArgs e)
+    {
+        if (Shortcuts is not { } keys) return;
+
+        if (keys.Took(e.Key, e.KeyModifiers)) e.Handled = true;
     }
 
     /// <summary>Sections down the side while there is room, across the top when there is not.</summary>

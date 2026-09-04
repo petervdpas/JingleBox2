@@ -56,21 +56,27 @@ public static class ShortcutKeys
     /// A key arrived: work out what it asks for, find who can do it, and let them.
     /// </summary>
     /// <remarks>
-    /// Three of the four are refused while a caret is blinking. Undo in a box somebody is
+    /// **Save is the only one answered while a caret is blinking.** Undo in a box somebody is
     /// typing in is the box's own undo, and taking it would be taking away the only thing that
-    /// keystroke has ever meant there. Save is not like that: saving while typing a name is a
-    /// perfectly sensible thing to ask for, and no text box has ever done anything with it.
+    /// keystroke has ever meant there. Saving while typing a name is a perfectly sensible thing
+    /// to ask for, and no text box has ever done anything with Ctrl+S.
+    ///
+    /// A page shortcut is refused there for a different reason, and it is the one that decided
+    /// the rule rather than a list of three actions. A page key is Ctrl+Alt and a letter, and on
+    /// a good many keyboard layouts AltGr is delivered as exactly that: on a Dutch or a German
+    /// layout the characters behind AltGr are how somebody types a bracket or a euro sign. A
+    /// name that jumped to another page halfway through being typed would be the worst kind of
+    /// fault, since nothing on the screen would say why.
     ///
     /// A page that throws is written down and nothing more. One page that will not do a thing
     /// is one page, not a broken keyboard.
     /// </remarks>
     private static void Pressed(object? sender, KeyEventArgs e)
     {
-        if (e.Handled) return;
+        if (e.Handled || LearningKeys.On) return;
         if (Map.Match(e.Key, e.KeyModifiers) is not { } action) return;
 
-        if (Typing(sender) && action is ShortcutAction.Undo or ShortcutAction.Redo or ShortcutAction.Delete)
-            return;
+        if (Typing(sender) && action != ShortcutAction.Save) return;
 
         if (Asked(sender, action) is not { } context) return;
 

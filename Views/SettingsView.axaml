@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:JingleBox2.ViewModels"
+             xmlns:sr="clr-namespace:JingleBox2.Shortcuts.Records"
              xmlns:views="clr-namespace:JingleBox2.Views"
              xmlns:ui="clr-namespace:JingleBox2.Rack.Controls;assembly=JingleBox2.Rack.Controls"
              x:Class="JingleBox2.Views.SettingsView"
@@ -594,6 +595,73 @@
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
                          Text="Puts DESIGNER in the menu along the top, beside RECORD and TRACKER, for when the machine is the work rather than the song. It is inside the tracker either way." />
+            </StackPanel>
+          </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+    </TabItem>
+
+    <!-- What a key does. The system's four are shown and cannot be moved: what Save does is a
+         fact about this application rather than a preference. What is a preference is a key onto
+         a page along the top, which ships on nothing at all. -->
+    <TabItem Header="Shortcuts">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="Page shortcuts" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="Put a key on a page and it takes you there from wherever you are. Click the key, then press Ctrl+Alt and a letter: that is what a page shortcut is, and nothing else is taken. Escape leaves it as it was and Backspace takes it off." />
+
+              <ItemsControl ItemsSource="{Binding Shortcuts.Menu}" Margin="0,4,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ShortcutRowViewModel">
+                    <Grid ColumnDefinitions="140,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,6">
+                      <TextBlock Grid.Column="0" Classes="label" Text="{Binding Name}"
+                                 VerticalAlignment="Center" />
+
+                      <!-- Clicked rather than bound to a command, because the page answers the
+                           keystroke that follows it and the two belong together: which row is
+                           listening and which row is about to hear a key are one fact. -->
+                      <ToggleButton Grid.Column="1" MinWidth="150"
+                                    Content="{Binding Said}"
+                                    IsChecked="{Binding Listening}"
+                                    Click="OnListenForKey" />
+
+                      <Button Grid.Column="2" Content="Clear"
+                              IsEnabled="{Binding HasKey}"
+                              Click="OnClearKey" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Button Content="Clear them all" HorizontalAlignment="Left"
+                      IsEnabled="{Binding Shortcuts.AnySet}"
+                      Command="{Binding Shortcuts.ClearAllCommand}" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="card">
+            <StackPanel Classes="cardBody">
+              <TextBlock Classes="cardTitle" Text="System shortcuts" />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap"
+                         Text="These are what the application does rather than where it goes, so they stay where they are. The first four work in whatever window is in front of you; the rest are answered by each page for itself." />
+
+              <ItemsControl ItemsSource="{Binding Shortcuts.System}" Margin="0,4,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="sr:SystemKey">
+                    <Grid ColumnDefinitions="140,*" ColumnSpacing="8" Margin="0,0,0,4">
+                      <TextBlock Grid.Column="0" Classes="label" Text="{Binding Keys}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Does}" TextWrapping="Wrap" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
             </StackPanel>
           </Border>
 
