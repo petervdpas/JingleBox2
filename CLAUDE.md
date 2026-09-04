@@ -2333,6 +2333,23 @@ whole exercise and is worth writing down rather than summarising:
   into the map, so every row said "not set" on a machine with eight keys saved while the strip
   beside it drew all eight underlines. From a chair that is a settings page that has lost your
   work. It follows `Changed` now, like the strip: the map is what knows
+- **The help was then read against the code, and three topics described things that had been
+  taken out.** The MIDI page's still explained the Pad Mapping table, which went when the pads
+  moved onto the link layer; two of them sent somebody to an INSTRUMENTS page that has never
+  existed under that name; and one named an "Add to library" button that is nowhere in any
+  layout. None of that is a defect a compiler or a test could have found, which is the whole
+  point of reading it: **help text is the one part of an application that goes stale silently**,
+  since nothing builds it and nothing runs it
+- Three more were true and had stopped being the whole truth, which is the commoner shape. The
+  mixer's said nothing about the master, the meters, or touching a strip picking its track; the
+  engine's said nothing about ASIO or the two switches under the buffer; and the chain's still
+  said plugin everywhere, after our own effects went on chains beside them
+- **Nine topics were missing altogether**, and the pages with the most explaining to do had the
+  least: the pads, RECORD, the pattern, songs and packing, automation, the registry, the
+  templates page, and the output device. `Help/Topics/` is nineteen files now, and every one is
+  reachable from the page it explains: `Tests/HelpTopicTests.cs` reads every `HelpBadge` in every
+  layout and says the topic it names exists, which is the only thing that would ever catch a
+  badge pointing at a renamed topic, since XAML cannot reach a const
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

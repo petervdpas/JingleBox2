@@ -50,10 +50,13 @@
       <views:Beside DockPanel.Dock="Top" Gap="12" Least="330" Margin="0,0,0,12">
 
       <Border Classes="card" VerticalAlignment="Top">
-        <Grid ColumnDefinitions="*,Auto"
+        <Grid ColumnDefinitions="*,Auto,Auto"
               ColumnSpacing="10"
               RowDefinitions="Auto,Auto"
               RowSpacing="10">
+
+          <views:HelpBadge Grid.Row="0" Grid.Column="2" Topic="pads.laying-out"
+                           VerticalAlignment="Center" />
 
           <ComboBox Grid.Row="0" Grid.Column="0"
                     ItemsSource="{Binding ProfileNames}"

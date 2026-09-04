@@ -9,9 +9,10 @@ on Linux it lives in ~/.clap and /usr/lib/clap. VST3 is the one nearly everythin
 ships, Serum included, and it lives in ~/.vst3 and /usr/lib/vst3.
 
 Effects from either format go in the same chain, side by side, on a pad or a tracker
-track. Instruments are a different thing: they take notes rather than audio, so they
-are kept out of effect chains and turned into tracker instruments instead, on the
-INSTRUMENTS page. Only VST3 instruments can be played so far.
+track, and beside the effects this application ships. Instruments are a different
+thing: they take notes rather than audio, so they are kept out of effect chains and
+are picked as a track's instrument instead, from the rack beside the pattern. Only
+VST3 instruments can be played so far.
 
 Windows plugins are not Linux plugins. A Windows VST3 holds a .dll and needs wine
 and yabridge to run at all; what is listed here is what runs natively.
@@ -32,3 +33,16 @@ makes hosts crash.
 
 Folders of your own are searched before the standard ones, and are kept with the
 rest of the settings.
+
+A plugin cannot be pointed at with a controller, and that is a decision rather than a
+gap. A plugin is somebody else's program and brings its own MIDI learn, which it
+keeps itself, so a link made here would be a second mapping beside the plugin's own
+with no way to make the two agree. Remote control is for the machines and effects
+this installation owns, and for the mixer. `Ctrl+Shift+M` on a plugin's window says
+so rather than doing nothing.
+
+Behind **Knobs** in a plugin's window is a control per parameter, drawn by this
+application. It is the fallback for a plugin that draws nothing, and it is also how
+you see what a plugin is holding: the knobs are built the first time you ask and
+never otherwise, since reading two thousand parameters into two thousand controls is
+a visible pause and Serum answers with 2622.

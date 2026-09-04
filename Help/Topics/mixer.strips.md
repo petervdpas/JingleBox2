@@ -3,12 +3,37 @@
 One strip per track: level, placement, mute, solo and ducking.
 
 One strip per track. Solo silences every track that is not soloed, and mute beats
-solo on the same strip.
+solo on the same strip. Touching a strip anywhere picks its track, so the pattern,
+the chain and the automation follow what your hand is on.
 
 The side chain at the bottom of a strip ducks that track while another one sounds:
 pick the track to listen to, how far down this one goes, and how long it takes to
 come back. The attack is always fast, because a slow one leaves the kick fighting
 the track it is meant to be clearing room for.
 
-The mix is part of the song and is saved with it. Moves are heard straight away,
-even in the middle of a take.
+## The master
+
+The strip on the right is a strip without being a track. It has a level, a place and
+one effect chain the whole song goes through, and it is applied in that order with
+the saturation last, so the fader cannot put the mix back outside it.
+
+It has no solo, since soloing everything is what it is already doing, and no ducking,
+since everything is summed by the time it is reached. Its meter reads what is
+leaving, which makes it the one meter on the page measuring what you actually hear.
+
+Its effects and its automation fold open underneath it, and they are the master's own
+rather than the ones under the pattern, which follow wherever the cursor is.
+
+## Meters
+
+A track's meter is worked out from the voices sounding on it, so it falls on its own.
+The master's is a peak off the last buffer, so it says nothing once it is older than
+a moment: a reading that stayed lit after the music stopped would be reporting the
+last thing that played for the rest of the session.
+
+## Where it is kept
+
+The mix is part of the song and is saved with it. Moves are heard straight away, even
+in the middle of a take. A note played by hand goes through the track's own fader,
+mute and placement, so what you hear under your fingers is what the part will sound
+like.

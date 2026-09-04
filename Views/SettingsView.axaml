@@ -139,7 +139,10 @@
                sound goes through rather than above every page in the app. -->
           <Border Classes="card">
             <StackPanel Classes="cardBody">
-              <TextBlock Classes="cardTitle" Text="Output" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Output" />
+                <views:HelpBadge Topic="settings.output" />
+              </StackPanel>
 
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
                 <TextBlock Grid.Column="0" Classes="label" Text="Output device:" />
@@ -285,7 +288,7 @@
             <StackPanel Classes="cardBody">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBlock Classes="cardTitle" Text="Control Surfaces" />
-                <views:HelpBadge Topic="settings.midi-input" />
+                <views:HelpBadge Topic="settings.control-surfaces" />
               </StackPanel>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
@@ -436,7 +439,10 @@
 
             <Border Classes="card" VerticalAlignment="Top">
               <StackPanel Classes="cardBody">
-                <TextBlock Classes="cardTitle" Text="Pad behaviour" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Classes="cardTitle" Text="Pad behaviour" />
+                  <views:HelpBadge Topic="pads.laying-out" />
+                </StackPanel>
 
                 <CheckBox Content="Toggle mode (press again to stop)"
                           IsChecked="{Binding Midi.ToggleMode}" />
@@ -611,7 +617,10 @@
 
           <Border Classes="card">
             <StackPanel Classes="cardBody">
-              <TextBlock Classes="cardTitle" Text="Page shortcuts" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Page shortcuts" />
+                <views:HelpBadge Topic="app.shortcuts" />
+              </StackPanel>
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap"
                          Text="Put a key on a page and it takes you there from wherever you are. Click the key, then press Ctrl+Alt and a letter: that is what a page shortcut is, and nothing else is taken. Escape leaves it as it was and Backspace takes it off." />
@@ -679,7 +688,10 @@
                those it does not have beside those it does. -->
           <Border Classes="card">
             <StackPanel Classes="cardBody">
-              <TextBlock Classes="cardTitle" Text="Machines" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Machines" />
+                <views:HelpBadge Topic="settings.registry" />
+              </StackPanel>
 
               <WrapPanel Orientation="Horizontal">
                 <Button Content="Import a machine..." Click="OnImportMachine"
@@ -727,7 +739,10 @@
                afterwards, which is a track's chain rather than a song's instrument list. -->
           <Border Classes="card">
             <StackPanel Classes="cardBody">
-              <TextBlock Classes="cardTitle" Text="Effects" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="cardTitle" Text="Effects" />
+                <views:HelpBadge Topic="settings.registry" />
+              </StackPanel>
 
               <WrapPanel Orientation="Horizontal">
                 <Button Content="Import an effect..." Click="OnImportEffect"

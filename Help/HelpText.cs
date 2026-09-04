@@ -21,8 +21,12 @@ public sealed class HelpText : IHelpText
 {
     /// <summary>Which device a take is recorded from, and what a loopback is.</summary>
     public const string SettingsRecordingInput = "settings.recording-input";
-    /// <summary>Which ports the pads and the tracker listen to, and what each one is for.</summary>
-    public const string SettingsMidiInput = "settings.midi-input";
+    /// <summary>What each piece of hardware is allowed to do, and how one is pointed at a control.</summary>
+    public const string SettingsControlSurfaces = "settings.control-surfaces";
+    /// <summary>Where the sound comes out, and what an ASIO driver is.</summary>
+    public const string SettingsOutput = "settings.output";
+    /// <summary>What this installation has, and how a box arrives or leaves.</summary>
+    public const string SettingsRegistry = "settings.registry";
     /// <summary>What the audio engine runs at, and how far ahead it mixes.</summary>
     public const string SettingsEngine = "settings.engine";
     /// <summary>What the log writes down, area by area.</summary>
@@ -41,6 +45,18 @@ public sealed class HelpText : IHelpText
     public const string DesignerWorlds = "designer.worlds";
     /// <summary>Every key the application answers.</summary>
     public const string AppShortcuts = "app.shortcuts";
+    /// <summary>What a pad plays, and what happens when it is hit.</summary>
+    public const string PadsLayingOut = "pads.laying-out";
+    /// <summary>Making a take, trimming it, and where it goes.</summary>
+    public const string RecordTakes = "record.takes";
+    /// <summary>How the pattern grid is read and written.</summary>
+    public const string TrackerPattern = "tracker.pattern";
+    /// <summary>What a song holds and how one travels.</summary>
+    public const string TrackerSong = "tracker.song";
+    /// <summary>A control moving over the lines of a pattern.</summary>
+    public const string TrackerAutomation = "tracker.automation";
+    /// <summary>What your hardware is pointed at, and how a template travels.</summary>
+    public const string MidiTemplates = "midi.templates";
 
     /// <summary>
     /// Where the topics are: <c>help/</c> beside the program.

@@ -35,6 +35,34 @@ Those four take effect at once: the output is closed and opened again as you cha
 them, so the right value can be found by listening rather than by restarting between
 guesses.
 
+Two switches sit under them and neither is about how much audio is held.
+**Real-time audio** asks the machine to let the threads that must not be late take
+their turn ahead of everything else, so a browser laying out a page cannot delay the
+sound. **One output stream** sums the tracker, the pads and a take being auditioned
+into a single stream rather than handing the sound card one each.
+
+## ASIO
+
+On Windows the output picker lists ASIO drivers as well as the system's own outputs.
+ASIO is Steinberg's driver standard, and the point of it is that the system's mixer
+is not in the path: the buffer is the card's own, so the delay is a few milliseconds
+rather than the twenty a shared path costs.
+
+How big an ASIO block is belongs to the driver, not to the slider above: what the
+card's own panel is set to is what it runs, and the reading under the device says
+what that turned out to be. The rate is asked for rather than insisted on, since a
+card clocked from something else will refuse, and the mix is resampled into whatever
+it is really on.
+
+An empty list means one of two things and the page says which: no ASIO on this system
+at all, or ASIO present with no driver installed, which is most Windows machines until
+a card's own driver or something like ASIO4ALL puts one there.
+
+**With a driver picked, the pads are silent.** The driver owns the card, so the
+tracker is handed to it and the pads, which are separate streams played the ordinary
+way, have nowhere to go. Finishing that means one stream for everything and it is not
+built yet, so ASIO is the tracker's alone for now.
+
 **If the sound goes strange after changing one, restart the app.** Reopening the
 output while everything else is still running is not the same as starting clean:
 plugins are still loaded, threads are already going, and the sound card has been
