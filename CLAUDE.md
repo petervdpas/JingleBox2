@@ -2402,6 +2402,27 @@ whole exercise and is worth writing down rather than summarising:
 - A press on a picture with markers now marks a stretch; one on a picture without them pans, as
   it always did. Holding the pan modifier pans either way and is asked first. Nothing is marked
   on the press itself, or every press would throw away what was already marked
+- **The zoom goes to four hundred rather than ten, and raising the number was the smaller half.**
+  Drawing never limited it: `WaveformGeometry.Build` walks only the peaks on screen, so zooming
+  in is cheaper to draw rather than dearer. What limited it was the picture, read into a fixed
+  5000 peaks whatever the recording's length. At ten times zoom a peak was already 1.7 pixels
+  wide in an 850 pixel window, so sixteen bought a little and twenty bought less: past that, more
+  zoom only draws the same peaks bigger. Raising the ceiling alone would have been the fault this
+  file keeps naming, a setting that says something the thing behind it cannot do
+- **So `WaveformService` reads 200000 peaks now, and it is nearly free.** The samples are walked
+  once either way, since the buckets divide the frames between them, so what the extra buys is
+  bookkeeping: 9 to 12 ms became 20 to 28 on a sixteen second stereo take, and 20 KB became
+  800 KB. Held to the frame count for a short one, or a take is read into more peaks than it has
+  frames, which is buckets of one sample repeated and a picture claiming detail that is not there
+- Which puts 500 peaks across the window at the far end, the same 1.7 pixels each it always had,
+  and forty milliseconds of a sixteen second take on screen: close enough to see a click and take
+  it out. **Audacity is the yardstick and does it differently**, keeping summaries at two
+  resolutions and reading the samples themselves once you are close enough, so it goes past one
+  sample to the pixel, which on that take would be about 830 times. Doing the same here means the
+  picture asking for what it needs at the zoom it is at rather than being handed one array; this
+  is the cheap nine tenths of it
+- Measured on a real recording rather than on a tone. A steady sine's envelope is a solid block
+  at every zoom and says nothing about resolution, which is an hour nobody needs to spend twice
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

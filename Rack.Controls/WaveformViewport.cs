@@ -14,8 +14,21 @@ public sealed class WaveformViewport
     /// <summary>The whole file on screen, which is as far out as there is anything to see.</summary>
     public const double MinZoom = 1;
 
-    /// <summary>A tenth of the file across the width, which is as far in as this goes.</summary>
-    public const double MaxZoom = 10;
+    /// <summary>
+    /// A four hundredth of the recording across the width, which is as far in as this goes.
+    /// </summary>
+    /// <remarks>
+    /// Not limited by what it costs to draw: only the peaks on screen are walked, so zooming in
+    /// is cheaper than zooming out. What limits it is how many peaks the recording was read
+    /// into, and while that was five thousand this could not usefully pass about ten: a peak was
+    /// already two pixels wide there and more zoom only drew the same peaks bigger.
+    ///
+    /// At two hundred thousand peaks, four hundred times leaves five hundred of them across an
+    /// ordinary window, which is a peak every pixel or two and still a waveform rather than the
+    /// data behind one. On a sixteen second take that is forty milliseconds across the window,
+    /// which is close enough to see a click and take it out.
+    /// </remarks>
+    public const double MaxZoom = 400;
 
     /// <summary>How many times over the file would fit in the width, so 1 is the whole of it.</summary>
     public double Zoom { get; private set; } = MinZoom;

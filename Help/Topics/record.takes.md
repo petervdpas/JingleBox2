@@ -23,6 +23,10 @@ The magnifying glasses take you closer and further out, about the middle of what
 on screen; the wheel does the same, about the pointer. Drag with `Ctrl` held to move
 a zoomed picture sideways rather than marking a new region.
 
+It goes in a long way: at the far end a sixteen second take shows about forty
+milliseconds across the window, which is close enough to find a click and mark it
+out.
+
 **Play plays what is marked**, from its beginning to its end, and the cursor runs
 across it. Moving an end while it is playing moves what is playing with it, so
 dragging the end back to where you are listening stops it: what is playing is the
