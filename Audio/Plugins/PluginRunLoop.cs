@@ -10,10 +10,18 @@ namespace JingleBox2.Audio.Plugins;
 /// The clock and the doorbell a Linux plugin expects the host to hold for it.
 /// </summary>
 /// <remarks>
-/// Every other platform gives a plugin a run loop for free: Windows has a message pump and
-/// macOS has a run loop, both already running before the plugin arrives. X11 has no such thing,
-/// so the host is expected to hold one. A plugin hands over a timer, or a file it wants to be
-/// told about when there is something to read on it, and the host is expected to come back.
+/// Every other platform gives a plugin a run loop for free, *in a process that has a toolkit*:
+/// Windows has a message pump and macOS has a run loop. X11 has no such thing, so the host is
+/// expected to hold one. A plugin hands over a timer, or a file it wants to be told about when
+/// there is something to read on it, and the host is expected to come back.
+///
+/// The words in italics were missing here and cost a release. This once said the pump was
+/// "already running before the plugin arrives", which is true of the application's process and
+/// false of a plugin's: a plugin host process builds no toolkit, so nothing was ever going to
+/// start one for it, and on Windows a plugin's window sat there getting no paint, no timer and
+/// no mouse. <see cref="Bridge.Interfaces.IWindowMessages"/> is the half that was missing, and
+/// the two are deliberately separate: this is what a plugin asks the host to hold for it, that
+/// is what the system holds for any thread with a window on it.
 ///
 /// Both standards ask for the same thing in different words. VST3 calls it IRunLoop and hands
 /// over C++ objects; CLAP calls it timer support and posix fd support and hands over numbers.

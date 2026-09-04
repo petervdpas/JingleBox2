@@ -19,8 +19,7 @@ namespace JingleBox2.Audio.Plugins.Interfaces;
 public interface IPluginHost
 {
     /// <summary>
-    /// True when plugins are given a process of their own, which is Linux and macOS. Windows
-    /// loads them into this one.
+    /// True when plugins are given a process of their own, which is every platform.
     /// </summary>
     /// <remarks>
     /// A plugin in its own process cannot take the application down, so everything the crash
@@ -28,12 +27,28 @@ public interface IPluginHost
     /// wrong in a plugin is fatal any more. See <see cref="PluginCrashGuard"/>, which stands
     /// down while this is true.
     ///
-    /// Windows is the exception because of how a plugin's window is handed over there: the
-    /// embedding used here only works within one process, so a VST3 plugin has to be loaded into
-    /// this one for its own interface to answer a mouse at all.
+    /// **Windows was the exception and should never have been.** The reason written here was
+    /// that the embedding used only works within one process, and that is not true of Windows: a
+    /// window whose parent belongs to another program draws, resizes and answers a mouse exactly
+    /// as one in the same process does, which is how every host that bridges plugins does it.
+    /// The only thing cross-process costs there is the keyboard, because Windows keeps focus per
+    /// thread, and that is two calls: see <see cref="NativeWindow.ShareInput"/>.
+    ///
+    /// What the exception really cost was a plugin split across two threads. A plugin loaded
+    /// into this process is loaded off the drawing thread, rightly, since loading one is seconds;
+    /// but its window is then created and handed over on the drawing thread. VST3 asks for a
+    /// view and the controller behind it to live on one thread, and a plugin whose toolkit binds
+    /// its own message thread where it was built, which is most of them, blocks for ever when
+    /// <c>attached</c> arrives on a different one. That is what a grey plugin window on Windows
+    /// was: not a window that would not draw, but a call that never came back.
+    ///
+    /// A plugin in its own process cannot have that fault, because there is one thread and it
+    /// does everything: the process loads the plugin, makes its view and hands it the window in
+    /// turn, on the thread that then goes on pumping for it.
     ///
     /// <c>JB_PLUGINS_INPROCESS=1</c> turns it off everywhere, which is how a plugin is debugged
-    /// with the application's own debugger attached.
+    /// with the application's own debugger attached. It is the one way back to the old behaviour
+    /// and it brings the old fault with it.
     /// </remarks>
     bool Isolated { get; }
 

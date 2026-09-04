@@ -553,12 +553,13 @@ internal sealed unsafe class BridgeBlock : IDisposable
 
         path = Path.Combine(folder, "jinglebox-plugin-" + Environment.ProcessId + "-" + Guid.NewGuid().ToString("N") + ".block");
 
-        using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite))
-        {
-            stream.SetLength(size);
-        }
+        var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite);
 
-        var file = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, size, MemoryMappedFileAccess.ReadWrite);
+        stream.SetLength(size);
+
+        var file = MemoryMappedFile.CreateFromFile(
+            stream, null, size, MemoryMappedFileAccess.ReadWrite, HandleInheritability.None, leaveOpen: false);
+
         var view = file.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
 
         var block = new BridgeBlock(file, view, path, maxFrames);
@@ -577,16 +578,42 @@ internal sealed unsafe class BridgeBlock : IDisposable
     /// Nothing rather than an exception: the parent may have gone away between starting this
     /// process and this process getting far enough to look, and a child that throws on the way
     /// up leaves no account of itself at all.
+    ///
+    /// That was the promise and only the missing file kept it. Opening the mapping itself threw,
+    /// and a plugin's process is exactly where nobody sees a throw: the parent reads an exit code
+    /// and says the plugin stopped unexpectedly, which is true and says nothing about why.
+    ///
+    /// **The file is shared for writing by both sides, and it has to be said out loud.** The
+    /// parent holds the same file mapped, and the overload that takes a path opens with sharing
+    /// for reading only, so the child's open is a sharing violation on Windows. Nothing on Linux
+    /// enforces that, which is why this worked there for as long as Windows never ran it: the
+    /// whole platform difference was one default nobody had to think about.
     /// </remarks>
     /// <param name="path">Where the parent said it was.</param>
     public static BridgeBlock? Open(string path)
     {
         if (!File.Exists(path)) return null;
 
-        var info = new FileInfo(path);
+        FileStream stream;
 
-        var file = MemoryMappedFile.CreateFromFile(path, FileMode.Open, null, info.Length, MemoryMappedFileAccess.ReadWrite);
-        var view = file.CreateViewAccessor(0, info.Length, MemoryMappedFileAccess.ReadWrite);
+        try
+        {
+            stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+        }
+        catch (Exception bad)
+        {
+            Diagnostics.Log.Fault(Diagnostics.Enums.LogArea.Plugins,
+                "the shared block at '" + path + "' would not open", bad);
+
+            return null;
+        }
+
+        long length = stream.Length;
+
+        var file = MemoryMappedFile.CreateFromFile(
+            stream, null, length, MemoryMappedFileAccess.ReadWrite, HandleInheritability.None, leaveOpen: false);
+
+        var view = file.CreateViewAccessor(0, length, MemoryMappedFileAccess.ReadWrite);
 
         byte* start = null;
         view.SafeMemoryMappedViewHandle.AcquirePointer(ref start);

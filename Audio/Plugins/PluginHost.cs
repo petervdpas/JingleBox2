@@ -19,7 +19,7 @@ public sealed class PluginHost : IPluginHost
     private readonly IVst3Scanner _vst3 = new Vst3Scanner();
 
     /// <inheritdoc/>
-    public bool Isolated => !OperatingSystem.IsWindows() && !InProcessAsked;
+    public bool Isolated => !InProcessAsked;
 
     /// <summary>True when somebody has asked for plugins in this process, whatever the platform.</summary>
     private bool InProcessAsked =>

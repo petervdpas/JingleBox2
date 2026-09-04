@@ -408,7 +408,11 @@ public sealed class PluginEditorHost : NativeControlHost
 
         try
         {
+            Said("calling attach on " + editor.GetType().Name);
+
             _attached = editor.Attach(_handle);
+
+            Said("attach came back " + _attached);
         }
         catch (Exception ex)
         {

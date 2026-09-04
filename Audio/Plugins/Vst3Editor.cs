@@ -195,7 +195,12 @@ public sealed unsafe class Vst3Editor : IPluginEditor
 
         using var platform = new NativeText(Vst3Abi.PlatformWindowType);
 
+        Said("about to hand the plugin window " + window + " as a " + Vst3Abi.PlatformWindowType
+             + "; " + NativeWindow.Account(window));
+
         int took = _view->Vtbl->Attached(_view, (void*)window, platform.Pointer);
+
+        Said("the plugin answered " + took + " to being given the window; " + NativeWindow.Account(window));
 
         if (took != Vst3Abi.ResultOk)
         {

@@ -35,6 +35,14 @@ public static class PluginHostProcess
     private static readonly IPluginHost _plugins = new PluginHost();
 
     /// <summary>
+    /// What the window server wants doing on the plugin's thread, which is a pump on Windows
+    /// and nothing at all on X11. See <see cref="IWindowMessages"/> for why that is the only
+    /// place the two platforms differ in here.
+    /// </summary>
+    private static readonly IWindowMessages _messages =
+        OperatingSystem.IsWindows() ? new WindowsMessages() : new NoWindowMessages();
+
+    /// <summary>
     /// Messages read off the socket and waiting for the one thread the plugin may be touched
     /// from. The reader thread never calls into the plugin itself, only puts things here.
     /// </summary>
@@ -144,6 +152,12 @@ public static class PluginHostProcess
     /// number on every line. A plugin falling over then leaves its account of it beside what
     /// the application was doing at the time, which is the whole reason the folder is passed in
     /// rather than worked out again.
+    ///
+    /// **Nothing here is allowed to throw its way out of the process.** All the parent can see
+    /// of a child that did is an exit code, and it reports that as the plugin having stopped
+    /// unexpectedly, which is true and useless: 0xE0434352 for every managed fault there is. So
+    /// whatever went wrong is written down and flushed before the code goes back, because the
+    /// log is written by a thread that is about to stop existing.
     /// </remarks>
     public static int Run(string[] args)
     {
@@ -153,7 +167,17 @@ public static class PluginHostProcess
 
         Log.Open(folder.Length > 0 ? folder : new Files.AppFolder().Path(), _trace, LogArea.Plugins);
 
-        return args[0] == PluginBridge.ScanArgument ? Scan(args) : Serve(args);
+        try
+        {
+            return args[0] == PluginBridge.ScanArgument ? Scan(args) : Serve(args);
+        }
+        catch (Exception error)
+        {
+            Log.Fault(LogArea.Plugins, "this plugin's process stopped on the way up", error);
+            Log.Flush();
+
+            return 6;
+        }
     }
 
     /// <summary>Writes a line about what this plugin's process is doing.</summary>
@@ -230,6 +254,9 @@ public static class PluginHostProcess
         bool asInstrument = args[8] == "instrument";
 
         XErrors.Catch(System.IO.Path.GetFileName(path));
+
+        string scaling = NativeWindow.ReadScalingProperly();
+        if (scaling.Length > 0) Say(scaling);
 
         Socket control;
         Socket audio;
@@ -338,6 +365,13 @@ public static class PluginHostProcess
     /// queue and is done in turn: the run loop's errands, the knobs to send home, and the
     /// messages the reader thread took off the socket.
     ///
+    /// The thread has a second master, and forgetting it is what made a plugin's window on
+    /// Windows a grey rectangle. The window server knocks here too, and a window whose queue
+    /// nobody drains gets no paint, no timer and no mouse. <see cref="IWindowMessages"/> is that
+    /// half: a real pump on Windows, and nothing on X11, where a plugin asks for a run loop
+    /// instead. It is also why the wait belongs to it rather than being a wait on the knock: a
+    /// thread asleep on an event alone is not woken by a message arriving.
+    ///
     /// A CLAP plugin with a window open is also asked now and then what its knobs are set to.
     /// It hands one back at the end of a block and at no other time, so a plugin on a track
     /// nobody is playing would otherwise keep whatever its own window did to itself. Only while
@@ -357,7 +391,7 @@ public static class PluginHostProcess
 
         while (_running)
         {
-            Knock.WaitOne(5);
+            _messages.Wait(Knock, 5);
 
             if (Log.On(LogArea.Plugins) && Environment.TickCount64 - census > CensusMilliseconds)
             {
@@ -596,9 +630,15 @@ public static class PluginHostProcess
     /// Puts the plugin's interface inside a window the parent owns.
     /// </summary>
     /// <remarks>
-    /// The window belongs to another program, which X11 allows, and the plugin draws straight
-    /// into it. Once it has, whatever the plugin put in there is told it is embedded: some
-    /// toolkits wait for that handshake before they will draw anything at all. See XEmbed.
+    /// The window belongs to another program, and the plugin draws straight into it. Both
+    /// platforms allow that and each wants a different word afterwards. On X11 whatever the
+    /// plugin put in there is told it is embedded, since some toolkits wait for that handshake
+    /// before they will draw anything at all: see <see cref="XEmbed"/>. On Windows the parenting
+    /// is the whole of the drawing, and the one thing left is the keyboard, which is kept per
+    /// thread and so has to be tied across the two: see <see cref="NativeWindow.ShareInput"/>.
+    ///
+    /// Each of the three says nothing on the platform it is not for, so the line reads as one
+    /// account either way.
     ///
     /// The size goes back with the answer, since a plugin often has its own opinion once it has
     /// really drawn.
@@ -621,7 +661,7 @@ public static class PluginHostProcess
             return;
         }
 
-        Say("embedding: " + XEmbed.Complete(window));
+        Say("embedding: " + XEmbed.Complete(window) + NativeWindow.Account(window) + NativeWindow.ShareInput(window));
 
         control.Send(BridgeCall.Ok, _body.Pair(editor.Size.Width, editor.Size.Height));
     }
