@@ -633,10 +633,18 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   begins with, what the manifest is called, the word in a sentence on the status line, whether the
   folder can be carried somewhere else, and whether there is a zip and a presets page. Nothing
   else in the page knows which world it is in, and the wording is built from the word rather than
-  written twice: `The machine` and `The effect` are one heading. An effect offers no Export, since
-  a zip needs an importer at the other end and there is none, and no Presets page, since a
-  machine's preset is an instrument file and an effect has no instrument. `IDesignProject` is what
-  the page edits, implemented by both projects, and not one member of it is about notes or audio
+  written twice: `The machine` and `The effect` are one heading. `IDesignProject` is what the page
+  edits, implemented by both projects, and not one member of it is about notes or audio.
+
+  **This paragraph said for a while that an effect offers no Export and no Presets page, and
+  both had stopped being true.** Export was refused because a zip needs an importer at the other
+  end and there was none, and SETTINGS imports an effect now; the presets page was refused
+  because a machine's preset is an instrument file and an effect has no instrument, which was an
+  argument about how presets happened to be stored rather than about what an effect is, and it
+  is answered a few bullets down by the form `SoundEffectPresets` fills. `SoundEffectWorld.Exports`
+  and `HasPresets` both read true. Worth leaving the correction in rather than the sentence
+  alone: **a note in this file goes stale the same way help text does**, and the tell here was
+  that it disagreed with another bullet in the same document
 - **The two things that were written for machines and were never about them came out.**
   `IPanelImages` is the pictures in a folder, added under the next free number, swept when nothing
   names them, renumbered so there are no gaps, and one at a time when the last element showing one
@@ -2350,6 +2358,50 @@ whole exercise and is worth writing down rather than summarising:
   reachable from the page it explains: `Tests/HelpTopicTests.cs` reads every `HelpBadge` in every
   layout and says the topic it names exists, which is the only thing that would ever catch a
   badge pointing at a renamed topic, since XAML cannot reach a const
+- **RECORD's picture was drawn by hand and so had no play cursor at all.** The position was
+  arriving from the player ten times a second and nothing put it on the screen: the page held a
+  bare `Canvas` and built a `Path` into it from its own code-behind, where `WaveformView` has
+  drawn a playhead all along. It is that control now, `Playhead` bound to a new property on the
+  view model, and about 130 lines of drawing came out of `RecordView.axaml.cs`. **Three pictures
+  of one recording is two too many**: the machine panels already used the control, and what was
+  left was this page and the trim dialog
+- The trim dialog is the one that is still its own, and it is the harder half: it has zoom
+  buttons, and `WaveformView` keeps its viewport private. Unifying it means deciding what a
+  published control exposes about zooming, since `Rack.Controls` is what an outside machine links
+  against and everything public in it is a promise
+- **What is playing in the trim dialog is the selection, and the selection moving now reaches
+  it.** The end was told to the player when Play was pressed and stayed where it was told, so
+  dragging a handle inwards while a take played left the cursor running past the selection and on
+  to the end of the file, which is exactly what it looks like: a cursor outside the marked
+  region. `WaveformPlayer.PlayUntil` moves the end while it plays and stops it where the new end
+  is already behind the position, which is what dragging the end back past what you are hearing
+  means. The place a click put the cursor is forgotten at the same time, since after the handles
+  have moved the thing somebody means by Play is the selection they have just made
+- **And then the trim dialog stopped drawing its own waveform.** It had a canvas, a viewport,
+  two trim handles, a selection tint, a playhead marker and the pointer handling for all of it,
+  some six hundred lines, every piece of which `WaveformView` already had. It is 340 lines now
+  and the picture is the control. **Two things kept them apart and both were small**: the control
+  could not be zoomed from a button, and it had no way to drag a region out from nothing. Neither
+  is a reason to keep a second waveform; both are now the control's, so a machine's face gets
+  them too
+- `WaveformView.Zoom` and `Scroll` are the new public surface, two way, clamped rather than
+  refused, since a caller doubling the zoom at the far end means as far as it goes. They are each
+  other's cause, the wheel writing them and a caller writing the viewport, so one flag guards
+  both directions: what is written back is where the viewport settled rather than what was asked
+  for
+- **The minimum gap between two handles is a share of what is on screen and not of the whole
+  recording.** The dialog had that rule and the control had a fixed five thousandths, which at
+  ten times zoom is a tenth of the window, exactly where somebody is working when they want a
+  fine cut. The number is a distance on the screen, so what it is a fraction of has to be the
+  screen
+- `IWaveformRegion` is the rule with no control in it: how far each end may travel and what a
+  drag marks out. It is `TrimSelection` moved into the published assembly and made stateless,
+  which is what let its tests survive the deletion. A rule that decides where a handle lands is
+  the kind of thing that is wrong by a hair and stays wrong for a year, and it had a test suite
+  that would otherwise have gone in the bin with the class
+- A press on a picture with markers now marks a stretch; one on a picture without them pans, as
+  it always did. Holding the pan modifier pans either way and is asked first. Nothing is marked
+  on the press itself, or every press would throw away what was already marked
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

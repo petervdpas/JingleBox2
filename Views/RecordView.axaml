@@ -137,7 +137,16 @@
                   BorderBrush="{DynamicResource BorderBrush}"
                   BorderThickness="1"
                   CornerRadius="4">
-            <Canvas Height="120" Name="RecordWaveformCanvas" />
+            <!-- The one waveform control, the same one a machine's face draws its take with,
+                 rather than a canvas of this page's own. It was drawn here by hand and so had
+                 no play cursor: the position was arriving from the player and nothing put it on
+                 the screen. Read only here, since trimming is what Edit is for. -->
+            <ui:WaveformView Height="120"
+                             Peaks="{Binding CurrentWaveform.PeakData}"
+                             Playhead="{Binding Playhead}"
+                             ShowMarkers="False"
+                             ShowLoop="False"
+                             Placeholder="No recording picked" />
           </Border>
 
           <!-- Under the picture, where they act on the take you are looking at. On the rows

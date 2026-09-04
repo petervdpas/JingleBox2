@@ -226,6 +226,17 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
     /// <summary>The picture of the take that is picked, or null while there is none to show.</summary>
     [ObservableProperty] private WaveformData? currentWaveform;
 
+    /// <summary>
+    /// How far through the take being previewed, from 0 to 1, and minus one when none is.
+    /// </summary>
+    /// <remarks>
+    /// The picture on this page had no play cursor at all, which is the one thing somebody
+    /// watching a take play is looking for: the position was arriving here from the player all
+    /// along and nothing was drawing it. Minus one rather than nought when nothing is playing,
+    /// since nought is the start of the take and is a place the cursor really can be.
+    /// </remarks>
+    [ObservableProperty] private double playhead = -1;
+
     /// <summary>What the next take will be called.</summary>
     /// <remarks>
     /// Filled in with the next unused name so that pressing record twice does not stop to ask
@@ -331,11 +342,14 @@ public sealed partial class RecordViewModel : ObservableObject, ITransportDeck, 
 
         Recordings.CollectionChanged += (_, _) => ValidateName();
 
+        _preview.PositionChanged += at => Playhead = at;
+
         _preview.Stopped += () =>
         {
             if (_playing != null) _playing.IsPlaying = false;
             _playing = null;
             IsPreviewing = false;
+            Playhead = -1;
         };
 
         RecordingName = NextRecordingName(RecordingNames.DefaultBaseName);

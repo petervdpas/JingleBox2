@@ -1,19 +1,13 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using JingleBox2.Audio;
-using JingleBox2.Rack.Controls;
-using JingleBox2.Audio.Records;
 using JingleBox2.ViewModels;
 using System;
-using System.ComponentModel;
 using System.Linq;
-using JingleBox2.Rack.Controls.Records;
 using JingleBox2.Audio.Interfaces;
-using JingleBox2.Rack.Controls.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -27,84 +21,36 @@ namespace JingleBox2.Views;
 /// </remarks>
 public partial class RecordView : UserControl
 {
-    /// <summary>A recording's outline, and which part of it a viewport is showing.</summary>
-    private readonly IWaveformGeometry _shape = new WaveformGeometry();
-
     /// <summary>The one door recordings come in through. Holds nothing, so one is enough.</summary>
     private readonly IRecordingImport _import = new RecordingImport();
 
     /// <summary>
-    /// The whole recording, no zoom and no scroll, which is the only view this page's picture
-    /// ever shows. Windowing a take is the slice editor's job.
-    /// </summary>
-    private static readonly WaveformViewport FullView = new();
-
-    /// <summary>How much of the accent the outline is painted with, as the slice editor does.</summary>
-    private const double WaveformOpacity = 0.85;
-
-    /// <summary>
-    /// Where the shape of the current take is drawn. Found once the page is up rather than in
-    /// the constructor, since it does not exist until the template has been applied.
-    /// </summary>
-    private Canvas? _recordWaveformCanvas;
-
-    /// <summary>
-    /// Builds the page, and keeps the picture and the input in step with what it is showing.
-    /// </summary>
-    /// <remarks>
-    /// The canvas is stretch-sized, so the shape is drawn again whenever its layout size
-    /// changes: a picture drawn once would be the right shape at the wrong width for the rest
-    /// of the session.
-    ///
-    /// The data context can arrive after the page is already up, which is why the input is
-    /// opened from here as well as from the attach. Getting that wrong is silent: the meter
-    /// simply never moves.
-    /// </remarks>
-    public RecordView()
-    {
-        InitializeComponent();
-        this.Loaded += (s, e) =>
-        {
-            _recordWaveformCanvas = this.FindControl<Canvas>("RecordWaveformCanvas");
-            if (_recordWaveformCanvas != null)
-            {
-                _recordWaveformCanvas.SizeChanged += (_, _) => DrawWaveform(CurrentWaveform());
-                DrawWaveform(CurrentWaveform());
-            }
-        };
-
-        this.DataContextChanged += (s, e) =>
-        {
-            if (_subscribedVm != null)
-                _subscribedVm.PropertyChanged -= OnViewModelPropertyChanged;
-
-            _subscribedVm = this.DataContext as RecordViewModel;
-
-            if (_subscribedVm != null)
-            {
-                _subscribedVm.PropertyChanged += OnViewModelPropertyChanged;
-                DrawWaveform(_subscribedVm.CurrentWaveform);
-            }
-
-            UpdateMonitoring();
-        };
-    }
-
-    /// <summary>
-    /// The view model whose changes are being listened to, kept so the subscription can be
-    /// dropped when the page is pointed at another one.
-    /// </summary>
-    private RecordViewModel? _subscribedVm;
-
-    /// <summary>
-    /// The view model currently holding the input open. Separate from <see cref="_subscribedVm"/>
-    /// because a page can be listening to a view model without the input being open: the input
-    /// follows whether the page is on screen, the subscription follows what it is showing.
+    /// The view model currently holding the input open, which is nothing while the page is not
+    /// on screen: the input follows whether anybody is looking at this page, and it is let go of
+    /// on the way out because holding a capture device open for a tab nobody is watching is rude
+    /// to whatever else wants the microphone.
     /// </summary>
     private RecordViewModel? _monitoring;
 
     /// <summary>Whether the page is up, which is what decides whether the input is held open.</summary>
     private bool _onScreen;
+
+    /// <summary>
+    /// Builds the page.
+    /// </summary>
+    /// <remarks>
+    /// The picture is a <c>WaveformView</c> in the layout now rather than a canvas drawn from
+    /// here, so there is nothing to draw and nothing to subscribe to: what the take looks like
+    /// and where the play cursor is are both bindings. The data context can arrive after the
+    /// page is up, which is why the input is opened from here as well as from the attach, and
+    /// getting that wrong is silent, since the meter simply never moves.
+    /// </remarks>
+    public RecordView()
+    {
+        InitializeComponent();
+
+        this.DataContextChanged += (_, _) => UpdateMonitoring();
+    }
 
     /// <summary>
     /// A theme swap and other re-templating detach this page and put it straight back. Closing
@@ -237,57 +183,4 @@ public partial class RecordView : UserControl
     private void Routes_DropDownOpened(object? sender, EventArgs e) =>
         (DataContext as RecordViewModel)?.RefreshRoutesCommand.Execute(null);
 
-    /// <summary>The shape of the take being shown, or nothing when there is none.</summary>
-    private WaveformData? CurrentWaveform() => (this.DataContext as RecordViewModel)?.CurrentWaveform;
-
-    /// <summary>
-    /// Draws the picture again when the take being shown changes. Only that one property: a
-    /// picture is expensive to build and nothing else on the page changes it.
-    /// </summary>
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
-    {
-        if (args.PropertyName == nameof(RecordViewModel.CurrentWaveform))
-            DrawWaveform(CurrentWaveform());
-    }
-
-    /// <summary>
-    /// Draws the take's shape across the canvas, or clears it when there is no take.
-    /// </summary>
-    /// <remarks>
-    /// A null shape is an ordinary state rather than a fault: it is what is left after the
-    /// recording being shown was deleted.
-    ///
-    /// Measured off <c>Bounds</c> and not off <c>Width</c> and <c>Height</c>, which are the
-    /// requested sizes and are NaN unless XAML set them. This canvas is stretch-sized, so they
-    /// always are.
-    ///
-    /// The palette is read at draw time rather than held in a field, because a theme swap has
-    /// to reach this and the colour keys are only right once the new sheet is the one being
-    /// asked. The outline is built by the same builder the slice editor uses, at the default
-    /// viewport, so the two pictures of one take cannot disagree about its shape.
-    /// </remarks>
-    private void DrawWaveform(WaveformData? waveform)
-    {
-        if (_recordWaveformCanvas == null) return;
-
-        _recordWaveformCanvas.Children.Clear();
-
-        if (waveform == null) return;
-
-        double canvasWidth = _recordWaveformCanvas.Bounds.Width;
-        double canvasHeight = _recordWaveformCanvas.Bounds.Height;
-        float[] peakData = waveform.PeakData;
-
-        if (peakData.Length == 0 || canvasWidth <= 0 || canvasHeight <= 0) return;
-
-        var palette = ThemePalette.From(this);
-
-        var waveformPath = new Path
-        {
-            Data = _shape.Build(peakData, FullView, canvasWidth, canvasHeight),
-            Fill = palette.AccentBrush,
-            Opacity = WaveformOpacity
-        };
-        _recordWaveformCanvas.Children.Add(waveformPath);
-    }
 }

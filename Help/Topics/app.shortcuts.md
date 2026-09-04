@@ -32,6 +32,11 @@ one clear of everything above: every other key here is a letter with `Ctrl`, or 
 `Ctrl+Shift`, or on its own, so a page key cannot land on top of something that
 already works and nobody has to know what is taken before choosing one.
 
+**The letter is underlined on the tab**, which is where you will look for it once you
+have set it. A letter that is not in the page's name marks nothing rather than
+guessing: `Ctrl+Alt+Q` on MIXER is a perfectly good shortcut and there is nothing in
+MIXER to underline.
+
 Click the key beside a page, then press `Ctrl+Alt` and the letter you want. Anything
 else is ignored and it goes on waiting. `Escape` leaves it as it was and `Backspace`
 takes it off. One key does one job, so putting a letter on a page takes it off

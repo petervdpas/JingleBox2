@@ -138,6 +138,33 @@ public sealed class WaveformPlayer : IDisposable
         Stopped?.Invoke();
     }
 
+    /// <summary>
+    /// Moves where the region ends, while it is playing.
+    /// </summary>
+    /// <remarks>
+    /// The end is told to this when playing starts, and it used to stay where it was told: in
+    /// the trim dialog the handles could be dragged in while a take played and the cursor ran
+    /// straight past the selection and on to the end of the file. What is playing is meant to be
+    /// the selection, so the selection moving has to reach the thing that is playing it.
+    ///
+    /// A new end already behind the position stops it, which is what dragging the end back past
+    /// what you are hearing means.
+    ///
+    /// Nothing at all while nothing is playing, since the end is an argument to
+    /// <see cref="Play"/> and there is no region to move.
+    /// </remarks>
+    /// <param name="endFraction">Where the region now ends, 0 to 1.</param>
+    public void PlayUntil(double endFraction)
+    {
+        if (!IsPlaying || _channel == 0 || _totalFrames <= 0) return;
+
+        long frame = (long)(Math.Clamp(endFraction, 0, 1) * _totalFrames);
+
+        _endBytes = frame * _bytesPerFrame;
+
+        if (Bass.ChannelGetPosition(_channel) >= _endBytes) Stop();
+    }
+
     /// <summary>Reads where playback has got to, and stops it at the end of the region.</summary>
     /// <remarks>
     /// The state is compared against Stopped rather than tested for Playing, because

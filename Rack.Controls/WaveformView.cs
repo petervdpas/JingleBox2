@@ -55,6 +55,38 @@ public class WaveformView : ThemedControl
     private const double MinGap = 0.005;
 
     /// <summary>
+    /// The closest two handles may be brought, as things are zoomed at this moment.
+    /// </summary>
+    /// <remarks>
+    /// A fraction of what is on screen rather than of the whole recording, or the gap is five
+    /// pixels when the whole take is shown and a tenth of the window when it is zoomed right in,
+    /// which is exactly where somebody is working when they want a fine region. The number is a
+    /// distance on the screen; what it is a fraction of has to be the screen too.
+    /// </remarks>
+    private double Gap => MinGap * _view.VisibleFraction;
+
+    /// <summary>How far the two ends may travel, and what a drag marks out.</summary>
+    private readonly IWaveformRegion _region = new WaveformRegion();
+
+    /// <summary>Both ends of what is marked, which every rule about one of them needs.</summary>
+    private Records.Region Marked => new(Start, End);
+
+    /// <summary>Where a drag that is marking a stretch began, or NaN when none is.</summary>
+    private double _drawFrom = double.NaN;
+
+    /// <summary>Where that press landed on the screen, which the click test is measured from.</summary>
+    private double _drawX;
+
+    /// <summary>
+    /// How far a press may move before it is marking a stretch rather than being a click.
+    /// </summary>
+    /// <remarks>
+    /// A hand moves a pixel or two on the way down, and without this every press on the picture
+    /// would throw away whatever was already marked.
+    /// </remarks>
+    private const double DrawSlop = 4;
+
+    /// <summary>
     /// Backs <see cref="Peaks"/>: the recording already reduced to one figure per column.
     /// </summary>
     /// <remarks>
@@ -122,6 +154,41 @@ public class WaveformView : ThemedControl
     public static readonly StyledProperty<double> PlayheadProperty =
         AvaloniaProperty.Register<WaveformView, double>(nameof(Playhead), -1);
 
+    /// <summary>
+    /// How far into the picture it is zoomed: one is the whole recording, ten is a tenth of it.
+    /// </summary>
+    /// <remarks>
+    /// Public because a picture somebody is working in has a zoom, and every way of changing it
+    /// but one was already inside this control: the wheel zooms about the pointer and a drag
+    /// pans, and a page that wanted a pair of buttons had nothing to press. The trim dialog is
+    /// that page and it drew its own waveform for years partly because of this.
+    ///
+    /// Two way, so it can be kept: a face that is zoomed in on the tail of a take is a place
+    /// somebody chose to be, and losing it every time the page is rebuilt is the same nuisance
+    /// as losing a scroll position.
+    ///
+    /// Held between one and ten by <see cref="WaveformViewport"/>, which owns the arithmetic;
+    /// what is written here is clamped rather than refused, since a caller doubling the zoom at
+    /// the far end means "as far as it goes".
+    ///
+    /// The middle of what is on screen stays where it is. Zooming from a button has no pointer
+    /// to keep still, unlike the wheel, and the alternative is the picture sliding sideways
+    /// under somebody who pressed a magnifying glass.
+    /// </remarks>
+    public static readonly StyledProperty<double> ZoomProperty =
+        AvaloniaProperty.Register<WaveformView, double>(
+            nameof(Zoom), WaveformViewport.MinZoom, defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>Where the left edge of the picture is, as a fraction of the whole recording.</summary>
+    /// <remarks>
+    /// Nought whenever the whole of it is on screen, since there is then nowhere to scroll to.
+    /// Two way for the same reason the zoom is, and clamped the same way: past the end means the
+    /// end.
+    /// </remarks>
+    public static readonly StyledProperty<double> ScrollProperty =
+        AvaloniaProperty.Register<WaveformView, double>(
+            nameof(Scroll), 0, defaultBindingMode: BindingMode.TwoWay);
+
     /// <summary>Which piece is being worked on, or -1 for none.</summary>
     public static readonly StyledProperty<int> SelectedSliceProperty =
         AvaloniaProperty.Register<WaveformView, int>(
@@ -167,7 +234,8 @@ public class WaveformView : ThemedControl
         AffectsRender<WaveformView>(
             PeaksProperty, PlaceholderProperty, ShowMarkersProperty, ShowLoopProperty,
             StartProperty, EndProperty, LoopStartProperty, LoopEndProperty,
-            SlicePointsProperty, SelectedSliceProperty, PlayheadProperty);
+            SlicePointsProperty, SelectedSliceProperty, PlayheadProperty,
+            ZoomProperty, ScrollProperty);
 
         ClipToBoundsProperty.OverrideDefaultValue<WaveformView>(true);
     }
@@ -177,6 +245,20 @@ public class WaveformView : ThemedControl
     {
         get => GetValue(PeaksProperty);
         set => SetValue(PeaksProperty, value);
+    }
+
+    /// <inheritdoc cref="ZoomProperty"/>
+    public double Zoom
+    {
+        get => GetValue(ZoomProperty);
+        set => SetValue(ZoomProperty, value);
+    }
+
+    /// <inheritdoc cref="ScrollProperty"/>
+    public double Scroll
+    {
+        get => GetValue(ScrollProperty);
+        set => SetValue(ScrollProperty, value);
     }
 
     /// <inheritdoc cref="PlaceholderProperty"/>
@@ -276,7 +358,11 @@ public class WaveformView : ThemedControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == PeaksProperty) _view.ZoomTo(WaveformViewport.MinZoom);
+        if (change.Property == PeaksProperty) Zoom = WaveformViewport.MinZoom;
+
+        if (change.Property == ZoomProperty) Look(zoomed: true);
+
+        if (change.Property == ScrollProperty) Look(zoomed: false);
 
         if (change.Property != SlicePointsProperty) return;
 
@@ -285,6 +371,78 @@ public class WaveformView : ThemedControl
         _watching = SlicePoints;
 
         if (_watching != null) _watching.CollectionChanged += OnSlicePointsChanged;
+    }
+
+    /// <summary>Whether the picture and its two numbers are already being brought into step.</summary>
+    /// <remarks>
+    /// They are each other's cause: a wheel moves the viewport and the numbers have to follow, a
+    /// caller moves a number and the viewport has to follow, and each of those writes the other.
+    /// One flag rather than one per direction, since only one of the two can be happening.
+    /// </remarks>
+    private bool _looking;
+
+    /// <summary>
+    /// Puts the viewport where the two numbers say, and says back where it really went.
+    /// </summary>
+    /// <remarks>
+    /// Which of the two moved decides what is done, because they are not interchangeable: a
+    /// zoom holds the middle of the view still and works out a new left edge for itself, so
+    /// applying the old scroll afterwards would undo exactly that and slide the picture.
+    ///
+    /// What is written back is what the viewport settled on rather than what was asked for. A
+    /// caller doubling the zoom at the far end means "as far as it goes", and the number it can
+    /// read afterwards is where it got to.
+    /// </remarks>
+    /// <param name="zoomed">True when the zoom moved, false when the left edge did.</param>
+    private void Look(bool zoomed)
+    {
+        if (_looking) return;
+
+        _looking = true;
+
+        try
+        {
+            if (zoomed) _view.ZoomTo(Zoom);
+            else _view.ScrollTo(Scroll);
+
+            Said();
+        }
+        finally
+        {
+            _looking = false;
+        }
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Says where the picture really is, for whoever is bound to it.
+    /// </summary>
+    /// <remarks>
+    /// Called after the wheel and after a pan as well as from <see cref="Look"/>, since those
+    /// two move the viewport directly and a number nobody updated is a number that lies.
+    /// </remarks>
+    private void Said()
+    {
+        Zoom = _view.Zoom;
+        Scroll = _view.Scroll;
+    }
+
+    /// <summary>Says where the picture went, guarded so it cannot chase its own writes.</summary>
+    private void Settled()
+    {
+        if (_looking) return;
+
+        _looking = true;
+
+        try
+        {
+            Said();
+        }
+        finally
+        {
+            _looking = false;
+        }
     }
 
     /// <summary>The list of boundaries was edited by somebody else, so the picture is stale.</summary>
@@ -568,6 +726,8 @@ public class WaveformView : ThemedControl
 
         if (!_view.ZoomAt(wanted, e.GetPosition(this).X, Bounds.Width)) return;
 
+        Settled();
+
         InvalidateVisual();
         e.Handled = true;
     }
@@ -615,20 +775,51 @@ public class WaveformView : ThemedControl
             return;
         }
 
-        if (!ShowMarkers) return;
-
-        _dragging = Nearest(x);
-
-        if (_dragging == Handle.None && _view.CanPan)
+        if (!ShowMarkers)
         {
-            StartPan(e, x);
+            if (_view.CanPan) StartPan(e, x);
+
             return;
         }
 
-        if (_dragging == Handle.None) return;
+        _dragging = Nearest(x);
+
+        if (_dragging == Handle.None)
+        {
+            StartDrawing(e, x);
+            return;
+        }
 
         e.Pointer.Capture(this);
         Move(x);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// A press that landed on neither handle begins marking a stretch out from nothing.
+    /// </summary>
+    /// <remarks>
+    /// The gesture every audio editor has, and the one this control was missing: the two ends
+    /// could be dragged and a stretch could not be drawn, so marking the middle of a take meant
+    /// dragging one end all the way in and then the other, past everything you were trying to
+    /// look at. The trim dialog had it and drew its own waveform to get it.
+    ///
+    /// Nothing is marked on the press itself. The hand has to travel first, or every press on
+    /// the picture would throw away what was already marked, and the press is also how a
+    /// stretch is left alone while something else is being read off the picture.
+    ///
+    /// A press on nothing pans instead where there are no markers at all, which is a picture
+    /// with no stretch to mark: there the only thing a drag can mean is moving what is on
+    /// screen. Holding the pan modifier still pans either way, and is asked first.
+    /// </remarks>
+    /// <param name="e">The press, whose pointer is captured.</param>
+    /// <param name="x">Where it landed.</param>
+    private void StartDrawing(PointerPressedEventArgs e, double x)
+    {
+        _drawFrom = At(x);
+        _drawX = x;
+
+        e.Pointer.Capture(this);
         e.Handled = true;
     }
 
@@ -695,9 +886,26 @@ public class WaveformView : ThemedControl
             double x = e.GetPosition(this).X;
 
             _view.ScrollTo(_view.Scroll - _view.PanDistance(x - _panFrom, Bounds.Width));
+
+            Settled();
             _panFrom = x;
 
             InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+
+        if (!double.IsNaN(_drawFrom))
+        {
+            double x = e.GetPosition(this).X;
+
+            if (Math.Abs(x - _drawX) <= DrawSlop) return;
+
+            var drawn = _region.Drawn(_drawFrom, At(x), Gap);
+
+            Start = drawn.Start;
+            End = drawn.End;
+
             e.Handled = true;
             return;
         }
@@ -726,6 +934,14 @@ public class WaveformView : ThemedControl
         {
             _panFrom = double.NaN;
             Cursor = Cursor.Default;
+            e.Pointer.Capture(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (!double.IsNaN(_drawFrom))
+        {
+            _drawFrom = double.NaN;
             e.Pointer.Capture(null);
             e.Handled = true;
             return;
@@ -790,23 +1006,23 @@ public class WaveformView : ThemedControl
         switch (_dragging)
         {
             case Handle.Start:
-                Start = Math.Min(at, End - MinGap);
+                Start = _region.Started(at, Marked, Gap);
                 if (LoopStart < Start) LoopStart = Start;
                 if (LoopEnd < Start) LoopEnd = Start;
                 break;
 
             case Handle.End:
-                End = Math.Max(at, Start + MinGap);
+                End = _region.Ended(at, Marked, Gap);
                 if (LoopEnd > End) LoopEnd = End;
                 if (LoopStart > End) LoopStart = End;
                 break;
 
             case Handle.LoopStart:
-                LoopStart = Math.Clamp(at, Start, Math.Max(Start, LoopEnd - MinGap));
+                LoopStart = Math.Clamp(at, Start, Math.Max(Start, LoopEnd - Gap));
                 break;
 
             case Handle.LoopEnd:
-                LoopEnd = Math.Clamp(at, Math.Min(End, LoopStart + MinGap), End);
+                LoopEnd = Math.Clamp(at, Math.Min(End, LoopStart + Gap), End);
                 break;
         }
     }
@@ -861,9 +1077,9 @@ public class WaveformView : ThemedControl
         double to = points[selected + 1];
 
         if (_dragging == Handle.LoopStart)
-            LoopStart = Math.Clamp(at, from, Math.Max(from, Math.Min(to, LoopEnd) - MinGap));
+            LoopStart = Math.Clamp(at, from, Math.Max(from, Math.Min(to, LoopEnd) - Gap));
         else if (_dragging == Handle.LoopEnd)
-            LoopEnd = Math.Clamp(at, Math.Min(to, Math.Max(from, LoopStart) + MinGap), to);
+            LoopEnd = Math.Clamp(at, Math.Min(to, Math.Max(from, LoopStart) + Gap), to);
     }
 
     /// <summary>Where in the recording a click landed, as a fraction of it.</summary>
@@ -921,8 +1137,8 @@ public class WaveformView : ThemedControl
 
         if (points == null || index < 0 || index >= points.Count) return;
 
-        double lowest = index > 0 ? points[index - 1] + MinGap : 0;
-        double highest = index < points.Count - 1 ? points[index + 1] - MinGap : 1;
+        double lowest = index > 0 ? points[index - 1] + Gap : 0;
+        double highest = index < points.Count - 1 ? points[index + 1] - Gap : 1;
 
         if (highest < lowest) return;
 
@@ -952,8 +1168,8 @@ public class WaveformView : ThemedControl
         int index = 0;
         while (index < points.Count && points[index] < at) index++;
 
-        if (index > 0 && at - points[index - 1] < MinGap) return;
-        if (index < points.Count && points[index] - at < MinGap) return;
+        if (index > 0 && at - points[index - 1] < Gap) return;
+        if (index < points.Count && points[index] - at < Gap) return;
 
         points.Insert(index, at);
 

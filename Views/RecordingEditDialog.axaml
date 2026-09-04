@@ -92,12 +92,20 @@
                    Text="{Binding CurrentWaveform.TotalSamples, StringFormat='Samples: {0}'}"
                    Opacity="0.7" FontSize="12" />
 
+        <!-- The one waveform control, the same one a machine's face and RECORD draw with. This
+             window drew its own for years: a canvas, a viewport, trim handles, a selection
+             tint, a playhead marker and the pointer handling for all of it, every piece of
+             which the control already had. What it did not have was a way to zoom from a
+             button, which is what kept the two apart. -->
         <Border Background="{DynamicResource BgBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="4"
                 MinHeight="160">
-          <Canvas Name="EditWaveformCanvas" ClipToBounds="True" />
+          <ui:WaveformView Name="Waveform"
+                           Peaks="{Binding CurrentWaveform.PeakData}"
+                           ShowMarkers="True"
+                           ShowLoop="False" />
         </Border>
       </DockPanel>
     </Border>

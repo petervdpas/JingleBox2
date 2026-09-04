@@ -11,7 +11,7 @@ song can be given, and what has a panel.
 
 **Add** takes a shipped box and registers it here. **Remove** unregisters one, and
 that is not losing it: the shipped copy stays where it was and can be taken again.
-**Import** reads a zip somebody handed you.
+**Import a machine...** and **Import an effect...** read a zip somebody handed you.
 
 What is recorded is what has been *offered*, not what is present. So a machine
 written after your folder was made still arrives on a new version, and one you threw

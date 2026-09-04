@@ -1,15 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Shapes;
-using Avalonia.Input;
 using JingleBox2.ViewModels;
 using JingleBox2.Waveform;
-using System;
-using System.ComponentModel;
 using JingleBox2.Rack.Controls;
-using JingleBox2.Waveform.Enums;
-using JingleBox2.Rack.Controls.Records;
-using JingleBox2.Rack.Controls.Interfaces;
 
 namespace JingleBox2.Views;
 
@@ -18,85 +11,38 @@ namespace JingleBox2.Views;
 /// selected, and lifted to full level.
 /// </summary>
 /// <remarks>
-/// Wiring only: pointer and button events in, redraws out. The viewport maths, the trim rules
-/// and the playback lifecycle live in JingleBox2.Waveform, and the outline building in
-/// JingleBox2.Rack.Controls, where the panel's own picture of a recording needs it too. That is
-/// what makes those testable without a window; there is nothing here that could be.
+/// Buttons in, a file rewritten out. The picture is <c>WaveformView</c>, the same control a
+/// machine's face and RECORD draw with, so what a region is, how far its ends may travel, what
+/// a drag across the picture marks out, how the wheel zooms and where the play cursor goes are
+/// all its business rather than this window's.
+///
+/// This window drew its own for years: a canvas, a viewport, two trim handles, a selection
+/// tint, a playhead marker and the pointer handling for all of it, some six hundred lines. Two
+/// things kept them apart and both were small. The control could not be zoomed from a button,
+/// which is what the two magnifying glasses do, and it had no way to drag a region out from
+/// nothing, which is the gesture this window was written to have. Both are the control's now,
+/// and a machine's face gets them as well.
 ///
 /// Both edits rewrite the file where it lies rather than making a new take, so the window
 /// stays open afterwards and the picture is drawn again from what is now on the disc.
 /// </remarks>
 public partial class RecordingEditDialog : Window
 {
-    /// <summary>A recording's outline, and which part of it a viewport is showing.</summary>
-    private readonly IWaveformGeometry _shape = new WaveformGeometry();
-
-    /// <summary>How wide a trim handle is drawn. Narrow, because it is a boundary and not a control.</summary>
-    private const double TrimHandleWidth = 3;
-
-    /// <summary>
-    /// How near the pointer has to be to a handle to take hold of it. Wider than the handle is
-    /// drawn, because three pixels is not something a hand can be expected to hit.
-    /// </summary>
-    private const double TrimGrabTolerance = 10;
-
-    /// <summary>
-    /// How far a press may move and still count as a click rather than a drag. Without this,
-    /// dropping the play cursor would be impossible: a hand moves a pixel or two on the way
-    /// down and the release would be read as a pan of nothing.
-    /// </summary>
-    private const double ClickSlop = 4;
-
-    /// <summary>How much closer the buttons take you. A step you can see in one press.</summary>
-    private const double ButtonZoomStep = 1.5;
-
-    /// <summary>
-    /// How much one notch of the wheel takes you, which is gentler than a button, since a wheel
-    /// is turned several notches at a time and a button is pressed once.
-    /// </summary>
-    private const double WheelZoomStep = 1.25;
-
-    /// <summary>
-    /// What the picture is painted with, read fresh on every redraw.
-    /// </summary>
-    /// <remarks>
-    /// The same four parts the slice editor draws and in the same colours: the outline in the
-    /// accent, the centre line in the muted text colour, the playhead in the text colour. The
-    /// handles are the one exception, taking the theme's danger colour, because they are the
-    /// only thing here that has to be found rather than looked at, and in a theme built out of
-    /// one hue the playhead and the handle would otherwise be the same line twice.
-    /// </remarks>
-    private ThemePalette Palette => ThemePalette.From(this);
-
-    /// <summary>What the pointer looks like over a picture that can be dragged sideways.</summary>
-    private static readonly Cursor PanCursor = new(StandardCursorType.Hand);
-
-    /// <summary>What the pointer looks like over a trim handle, which moves in one axis only.</summary>
-    private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
-
-    /// <summary>How much of the file is on screen and where, which every X on the canvas goes through.</summary>
-    private readonly WaveformViewport _viewport = new();
-
-    /// <summary>What would survive the cut, as two fractions of the file.</summary>
-    private readonly TrimSelection _trim = new();
-
     /// <summary>What plays the preview, and what reports where it has got to.</summary>
     private readonly WaveformPlayer _player;
 
     /// <summary>
-    /// Where the picture is drawn. Found once the window is up rather than in the constructor,
-    /// since it does not exist until the template has been applied.
+    /// The picture, which is the one waveform control this application has.
     /// </summary>
-    private Canvas? _canvas;
+    /// <remarks>
+    /// Found once the window is up rather than in the constructor, since it does not exist until
+    /// the template has been applied. It owns what a region is and what is on screen: this
+    /// window used to own both and drew the lot itself.
+    /// </remarks>
+    private WaveformView? _waveform;
 
     /// <summary>Kept because its wording is written to: it says Play or Stop as the preview runs.</summary>
     private Button? _playButton;
-
-    /// <summary>
-    /// The line showing where playback has got to, kept apart from the rest of the picture so
-    /// it can be moved without the outline being built again.
-    /// </summary>
-    private Rectangle? _playheadMarker;
 
     /// <summary>
     /// The RECORD page's view model, which owns the take being edited. Kept so its changes can
@@ -104,59 +50,20 @@ public partial class RecordingEditDialog : Window
     /// </summary>
     private RecordViewModel? _vm;
 
-    /// <summary>Which handle the hand has hold of, or none when it has hold of neither.</summary>
-    private TrimHandle _dragging = TrimHandle.None;
-
-    /// <summary>Whether the hand is dragging the picture sideways rather than a handle.</summary>
-    private bool _panning;
-
-    /// <summary>Which presses mean the picture is being moved rather than what is drawn on it.</summary>
-    private readonly IWaveformPress _press = new WaveformPress();
-
-    /// <summary>Where the press landed, which both the pan and the click test are measured from.</summary>
-    private double _pressX;
-
-    /// <summary>
-    /// Where the window was when the pan began. The pan is worked out from the press rather
-    /// than from the last move, so a drag that stops and starts again does not drift.
-    /// </summary>
-    private double _panStartScroll;
-
-    /// <summary>Where playback starts, as a fraction of the file. Null means the trim start.</summary>
-    private double? _playStart;
-
-    /// <summary>
-    /// Live position while playing. Null when stopped, which is what makes the marker fall back
-    /// to showing the play cursor rather than freezing where the preview ended.
-    /// </summary>
-    private double? _playhead;
-
     /// <summary>Guards against a second Apply landing while the file is being rewritten.</summary>
     private bool _applying;
 
     /// <summary>The same, for a rename: the file is moving and cannot move twice.</summary>
     private bool _renaming;
 
-    /// <summary>How wide the picture is, which is what every fraction is converted through.</summary>
-    /// <remarks>
-    /// What it was given rather than what it was told to be. The canvas had a width written on
-    /// it and the window could not be resized, so the two were the same number; now the picture
-    /// takes whatever the window has left and only its bounds know how much that is.
-    /// </remarks>
-    private double CanvasWidth => _canvas?.Bounds.Width ?? 0;
+    /// <summary>How much closer the buttons take you. A step you can see in one press.</summary>
+    private const double ButtonZoomStep = 1.5;
 
-    /// <summary>Where a drag that is drawing a region began, as a fraction of the take.</summary>
-    private double _selectFrom;
+    /// <summary>Where the region begins, or the start of the take before the picture is up.</summary>
+    private double RegionStart => _waveform?.Start ?? 0;
 
-    /// <summary>
-    /// True once a press that landed on neither handle has moved far enough to be a selection.
-    /// </summary>
-    /// <remarks>
-    /// Not set on the press itself, deliberately: a press that never moves is a click, and a
-    /// click puts the play cursor down and must leave the region alone. Waiting for the hand to
-    /// travel is what lets one gesture be both.
-    /// </remarks>
-    private bool _selecting;
+    /// <summary>And where it ends.</summary>
+    private double RegionEnd => _waveform?.End ?? 1;
 
     /// <summary>
     /// Builds the window and wires the picture up: the player's reports in, the pointer
@@ -193,357 +100,77 @@ public partial class RecordingEditDialog : Window
 
         _player.PositionChanged += position =>
         {
-            _playhead = position;
-            UpdatePlayhead();
+            if (_waveform != null) _waveform.Playhead = position;
         };
 
         _player.Stopped += () =>
         {
-            _playhead = null;
-            UpdatePlayhead();
+            if (_waveform != null) _waveform.Playhead = -1;
+
             SetPlayButtonContent("▶ Play");
         };
 
         Loaded += (_, _) =>
         {
             _playButton = this.FindControl<Button>("PlayButton");
-            _canvas = this.FindControl<Canvas>("EditWaveformCanvas");
+            _waveform = this.FindControl<WaveformView>("Waveform");
 
-            if (_canvas == null) return;
+            if (_waveform == null) return;
 
-            _canvas.SizeChanged += (_, _) => Redraw();
-
-            _canvas.PointerPressed += Canvas_PointerPressed;
-            _canvas.PointerMoved += Canvas_PointerMoved;
-            _canvas.PointerReleased += Canvas_PointerReleased;
-            _canvas.PointerWheelChanged += Canvas_PointerWheelChanged;
-
-            Redraw();
+            _waveform.PropertyChanged += RegionMoved;
         };
 
         DataContextChanged += (_, _) =>
         {
-            if (_vm != null) _vm.PropertyChanged -= ViewModelPropertyChanged;
-
             _vm = DataContext as RecordViewModel;
-
-            if (_vm != null) _vm.PropertyChanged += ViewModelPropertyChanged;
-            Redraw();
         };
 
         Closing += (_, _) =>
         {
             _player.Dispose();
-            if (_vm != null) _vm.PropertyChanged -= ViewModelPropertyChanged;
+
+            if (_waveform != null) _waveform.PropertyChanged -= RegionMoved;
         };
     }
 
     /// <summary>
-    /// Draws the picture again when the take being shown changes. Only that one property: the
-    /// outline can carry thousands of points and nothing else on the page changes it.
-    /// </summary>
-    private void ViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(RecordViewModel.CurrentWaveform))
-            Redraw();
-    }
-
-    /// <summary>
-    /// Builds the whole picture: the outline, the centre line, the selection, the two handles
-    /// and the playhead.
+    /// The region moved on the picture, so what is playing has to move with it.
     /// </summary>
     /// <remarks>
-    /// The centre line goes on top of the fill rather than behind it. The outline is mirrored
-    /// around that exact row, so behind it the line would be hidden everywhere except in true
-    /// silence, which is the one place nobody needs it.
-    ///
-    /// The playhead is kept as a field so playback can move it without the outline being built
-    /// again.
+    /// The end was told to the player when Play was pressed and stayed where it was told, so
+    /// dragging a handle inwards while a take played left the cursor running past the region
+    /// and on to the end of the file. What is playing is the region, so the region moving has
+    /// to reach it, and dragging the end back past what you are hearing stops it.
     /// </remarks>
-    private void Redraw()
+    /// <param name="sender">The picture. Not read: there is one.</param>
+    /// <param name="e">Which of its properties moved.</param>
+    private void RegionMoved(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
-        if (_canvas == null) return;
-
-        _canvas.Children.Clear();
-        _playheadMarker = null;
-
-        var waveform = _vm?.CurrentWaveform;
-        double width = CanvasWidth;
-        double height = _canvas.Bounds.Height;
-
-        if (waveform == null || waveform.PeakData.Length == 0 || width <= 0 || height <= 0) return;
-
-        _canvas.Cursor = _viewport.CanPan ? PanCursor : Cursor.Default;
-
-        var palette = Palette;
-
-        _canvas.Children.Add(new Path
-        {
-            Data = _shape.Build(waveform.PeakData, _viewport, width, height),
-            Fill = palette.AccentBrush,
-            Opacity = 0.85
-        });
-
-        _canvas.Children.Add(new Line
-        {
-            StartPoint = new Point(0, height / 2),
-            EndPoint = new Point(width, height / 2),
-            Stroke = palette.MutedBrush,
-            StrokeThickness = 1,
-            Opacity = 0.5
-        });
-
-        AddSelectionOverlay(width, height);
-
-        double startX = _viewport.FractionToX(_trim.Start, width);
-        double endX = _viewport.FractionToX(_trim.End, width);
-        AddTrimHandle(startX, width, height);
-        AddTrimHandle(endX - TrimHandleWidth, width, height);
-
-        _playheadMarker = new Rectangle
-        {
-            Fill = palette.TextBrush,
-            Width = 1.5,
-            Height = height,
-            Opacity = 0.9,
-            IsHitTestVisible = false
-        };
-        Canvas.SetTop(_playheadMarker, 0);
-        _canvas.Children.Add(_playheadMarker);
-
-        UpdatePlayhead();
+        if (e.Property == WaveformView.EndProperty) _player.PlayUntil(RegionEnd);
     }
 
     /// <summary>
-    /// Tints what would survive the cut, clipped to the canvas so a selection running off
-    /// either edge is drawn only as far as there is room for it.
-    /// </summary>
-    private void AddSelectionOverlay(double width, double height)
-    {
-        double left = Math.Max(0, _viewport.FractionToX(_trim.Start, width));
-        double right = Math.Min(width, _viewport.FractionToX(_trim.End, width));
-
-        if (right <= left) return;
-
-        var selection = new Rectangle
-        {
-            Fill = Palette.AccentBrush,
-            Width = right - left,
-            Height = height,
-            Opacity = 0.2
-        };
-        Canvas.SetLeft(selection, left);
-        Canvas.SetTop(selection, 0);
-        _canvas!.Children.Add(selection);
-    }
-
-    /// <summary>
-    /// Paints a handle only when its true position is on screen. One scrolled out of view
-    /// stays where it belongs in the file rather than being pinned to the canvas edge, where
-    /// it would look grabbable but point at the wrong sample.
-    /// </summary>
-    private void AddTrimHandle(double x, double width, double height)
-    {
-        if (x + TrimHandleWidth < 0 || x > width) return;
-
-        var handle = new Rectangle
-        {
-            Fill = Palette.DangerBrush,
-            Width = TrimHandleWidth,
-            Height = height,
-            Opacity = 0.9,
-            Cursor = ResizeCursor
-        };
-        Canvas.SetLeft(handle, x);
-        Canvas.SetTop(handle, 0);
-        _canvas!.Children.Add(handle);
-    }
-
-    /// <summary>
-    /// Moves the playhead without rebuilding the outline, which can carry thousands of points
-    /// and would otherwise be regenerated ten times a second during playback.
-    /// </summary>
-    private void UpdatePlayhead()
-    {
-        if (_playheadMarker == null) return;
-
-        double? fraction = _playhead ?? _playStart;
-        if (fraction is null)
-        {
-            _playheadMarker.IsVisible = false;
-            return;
-        }
-
-        double x = _viewport.FractionToX(fraction.Value, CanvasWidth);
-        _playheadMarker.IsVisible = _viewport.IsOnScreen(x, CanvasWidth);
-        Canvas.SetLeft(_playheadMarker, x);
-    }
-
-    /// <summary>
-    /// Takes hold of a handle if the press landed near one, and of the picture otherwise.
+    /// Takes the picture closer, about the middle of what is on screen.
     /// </summary>
     /// <remarks>
-    /// The pointer is captured either way, so a drag that leaves the canvas goes on being the
-    /// same drag.
-    ///
-    /// The pan gesture is asked about before the handles are, so it means the picture wherever
-    /// it lands: held over a handle it would otherwise move that handle, which is the one place
-    /// somebody panning is most likely to press.
-    ///
-    /// A pan with nowhere to pan to still reads as a click on release, which is what puts the
-    /// play cursor down.
+    /// There is no pointer to hold still, unlike the wheel, so the middle is what stays. The
+    /// control clamps at its own ends, and a press at the far end means "as far as it goes"
+    /// rather than nothing.
     /// </remarks>
-    private void Canvas_PointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (_canvas == null) return;
-
-        var point = e.GetPosition(_canvas);
-        _pressX = point.X;
-
-        _dragging = TrimHandle.None;
-        _selecting = false;
-        _panning = false;
-
-        if (_press.MeansPan(e.GetCurrentPoint(_canvas).Properties.IsMiddleButtonPressed, e.KeyModifiers))
-        {
-            if (_viewport.CanPan)
-            {
-                _panning = true;
-                _panStartScroll = _viewport.Scroll;
-            }
-
-            e.Pointer.Capture(_canvas);
-            return;
-        }
-
-        _dragging = _trim.HitTest(point.X, _viewport, CanvasWidth, TrimGrabTolerance);
-
-        if (_dragging == TrimHandle.None)
-            _selectFrom = _viewport.XToFraction(point.X, CanvasWidth);
-
-        e.Pointer.Capture(_canvas);
-    }
-
-    /// <summary>
-    /// Moves a handle, draws a new region, or pans, depending on what the press landed on.
-    /// </summary>
-    /// <remarks>
-    /// **A drag on the picture draws a region**, which is the gesture every audio editor has and
-    /// the one this was missing: only the two handles could be moved, so selecting the middle of
-    /// a take meant dragging one end all the way in and then the other, past everything you were
-    /// trying to look at. It waits for the hand to travel past <see cref="ClickSlop"/> first, so
-    /// a press that never moves is still a click and still only puts the play cursor down.
-    ///
-    /// Panning is <see cref="IWaveformPress"/>, which is Ctrl or the middle button, since the
-    /// left one on its own is drawing a region here. A pan to the right moves the window
-    /// earlier, so the audio tracks the cursor rather than running away from it: the hand is
-    /// dragging the recording, not the viewport.
-    /// </remarks>
-    private void Canvas_PointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (_canvas == null) return;
-        if (!e.GetCurrentPoint(_canvas).Properties.IsLeftButtonPressed && !_panning) return;
-
-        var point = e.GetPosition(_canvas);
-
-        if (_panning)
-        {
-            _viewport.ScrollTo(_panStartScroll - _viewport.PanDistance(point.X - _pressX, CanvasWidth));
-        }
-        else if (_dragging != TrimHandle.None)
-        {
-            _trim.Move(_dragging, _viewport.XToFraction(point.X, CanvasWidth), TrimSelection.MinGapFor(_viewport));
-        }
-        else
-        {
-            if (!_selecting && Math.Abs(point.X - _pressX) <= ClickSlop) return;
-
-            _selecting = true;
-
-            _trim.Select(
-                _selectFrom,
-                _viewport.XToFraction(point.X, CanvasWidth),
-                TrimSelection.MinGapFor(_viewport));
-        }
-
-        Redraw();
-    }
-
-    /// <summary>
-    /// Lets go, and drops the play cursor if the press turned out to be a click.
-    /// </summary>
-    /// <remarks>
-    /// A press that never moved a handle, never drew a region and travelled less than
-    /// <see cref="ClickSlop"/> is a click, whether or not it was also panning: a pan of nothing
-    /// has done nothing, and asking the hand to hold still to within a pixel would make the play
-    /// cursor unusable.
-    /// </remarks>
-    private void Canvas_PointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (_canvas != null && _dragging == TrimHandle.None && !_selecting)
-        {
-            var point = e.GetPosition(_canvas);
-            if (Math.Abs(point.X - _pressX) <= ClickSlop)
-                SetPlayStart(_viewport.XToFraction(point.X, CanvasWidth));
-        }
-
-        _dragging = TrimHandle.None;
-        _selecting = false;
-        _panning = false;
-        e.Pointer.Capture(null);
-    }
-
-    /// <summary>
-    /// The wheel zooms about the pointer, so what is under it stays under it.
-    /// </summary>
-    /// <remarks>
-    /// Handled whether or not the zoom moved anything, since a wheel at the end of its range
-    /// scrolling the window behind the picture is not what the gesture meant.
-    /// </remarks>
-    private void Canvas_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
-    {
-        if (_canvas == null || CanvasWidth <= 0) return;
-
-        var point = e.GetPosition(_canvas);
-        double factor = e.Delta.Y > 0 ? WheelZoomStep : 1 / WheelZoomStep;
-
-        if (_viewport.ZoomAt(_viewport.Zoom * factor, point.X, CanvasWidth))
-            Redraw();
-
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// Drops the play cursor, clamped into the trim region so Play always previews audio that
-    /// will survive the cut. Seeks straight away if something is already playing.
-    /// </summary>
-    private void SetPlayStart(double fraction)
-    {
-        _playStart = _trim.Clamp(fraction);
-
-        if (_player.IsPlaying)
-            _player.SeekTo(_playStart.Value);
-        else
-            _playhead = null;
-
-        UpdatePlayhead();
-    }
-
-    /// <summary>
-    /// Closer in, about the middle of what is showing rather than about the pointer, since a
-    /// button press says nothing about where the pointer is on the picture.
-    /// </summary>
+    /// <param name="sender">The button. Not read.</param>
+    /// <param name="e">Ignored.</param>
     private void ZoomIn_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _viewport.ZoomTo(_viewport.Zoom * ButtonZoomStep);
-        Redraw();
+        if (_waveform != null) _waveform.Zoom *= ButtonZoomStep;
     }
 
     /// <summary>Further out, by the same step, and stopping at the whole file.</summary>
+    /// <inheritdoc cref="ZoomIn_Click"/>
+    /// <param name="sender">The button. Not read.</param>
+    /// <param name="e">Ignored.</param>
     private void ZoomOut_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        _viewport.ZoomTo(_viewport.Zoom / ButtonZoomStep);
-        Redraw();
+        if (_waveform != null) _waveform.Zoom /= ButtonZoomStep;
     }
 
     /// <summary>
@@ -565,8 +192,8 @@ public partial class RecordingEditDialog : Window
 
         _player.Play(
             _vm.SelectedRecordingForEdit.FilePath,
-            _trim.Clamp(_playStart ?? _trim.Start),
-            _trim.End,
+            RegionStart,
+            RegionEnd,
             _vm.CurrentWaveform.TotalSamples);
 
         if (_player.IsPlaying)
@@ -642,9 +269,7 @@ public partial class RecordingEditDialog : Window
 
         try
         {
-            if (!await _vm.SilenceAsync(_trim.Start, _trim.End)) return;
-
-            Redraw();
+            await _vm.SilenceAsync(RegionStart, RegionEnd);
         }
         finally
         {
@@ -664,14 +289,14 @@ public partial class RecordingEditDialog : Window
 
         try
         {
-            if (!await _vm.ApplyTrimAsync(_trim.Start, _trim.End)) return;
+            if (!await _vm.ApplyTrimAsync(RegionStart, RegionEnd)) return;
 
-            _trim.Reset();
-            _playStart = null;
-            _playhead = null;
-            _viewport.ZoomTo(WaveformViewport.MinZoom);
+            if (_waveform is not { } picture) return;
 
-            Redraw();
+            picture.Start = 0;
+            picture.End = 1;
+            picture.Playhead = -1;
+            picture.Zoom = WaveformViewport.MinZoom;
         }
         finally
         {
@@ -695,7 +320,7 @@ public partial class RecordingEditDialog : Window
 
         try
         {
-            if (await _vm.NormalizeAsync()) Redraw();
+            await _vm.NormalizeAsync();
         }
         finally
         {

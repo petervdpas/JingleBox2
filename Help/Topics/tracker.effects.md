@@ -1,6 +1,6 @@
 # Track effects
 
-The chain of plugins on the track the cursor is on.
+The effects on the track the cursor is on, ours and the plugins alike.
 
 The effects on the track the cursor is on, in the order the audio goes through them.
 Moving the cursor to another track changes what this row is about.
