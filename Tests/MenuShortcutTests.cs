@@ -385,6 +385,29 @@ public class MenuShortcutTests
         Assert.False(LearningKeys.On);
     }
 
+    /// <summary>
+    /// The page follows the map rather than only writing to it.
+    /// </summary>
+    /// <remarks>
+    /// It is built while the window is, before the settings file has been read into the map, so
+    /// a page that only read once showed every row as not set on a machine where eight keys were
+    /// saved, while the tab strip beside it drew all eight underlines. From a chair that is a
+    /// settings page that has lost your work.
+    /// </remarks>
+    [Fact]
+    public void The_page_shows_a_key_set_after_it_was_built()
+    {
+        IShortcutMap map = new ShortcutMap();
+        var page = Page(map);
+
+        Assert.All(page.Menu, row => Assert.Equal("", row.Keys));
+
+        map.Take(new[] { new ShortcutBinding { Action = "Fire", Keys = "Ctrl+Alt+F" } });
+
+        Assert.Equal("Ctrl+Alt+F", page.Menu.First(one => one.Action == ShortcutAction.Fire).Keys);
+        Assert.True(page.AnySet);
+    }
+
     /// <summary>A keystroke with nothing listening is left alone.</summary>
     /// <remarks>
     /// It answers false so the key carries on to whatever else might want it, rather than being

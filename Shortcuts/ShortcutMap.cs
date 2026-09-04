@@ -39,12 +39,20 @@ public sealed class ShortcutMap : IShortcutMap
     public ShortcutMap() => Reset();
 
     /// <inheritdoc/>
+    public event EventHandler? Changed;
+
+    /// <summary>Says something moved, for whoever is drawing a key somewhere else.</summary>
+    private void Moved() => Changed?.Invoke(this, EventArgs.Empty);
+
+    /// <inheritdoc/>
     public void Reset()
     {
         _held.Clear();
 
         foreach (var (action, _, keys) in _actions.Everything)
             if (Read(keys) is { } gesture) _held[action] = gesture;
+
+        Moved();
     }
 
     /// <inheritdoc/>
@@ -81,9 +89,13 @@ public sealed class ShortcutMap : IShortcutMap
 
         if (gesture is null)
         {
-            _held.Remove(action);
+            if (_held.Remove(action)) Moved();
+
             return;
         }
+
+        if (For(action) is { } now && now.Key == gesture.Key && now.KeyModifiers == gesture.KeyModifiers)
+            return;
 
         foreach (var other in _held.Where(one =>
                      one.Key != action
@@ -93,6 +105,8 @@ public sealed class ShortcutMap : IShortcutMap
             _held.Remove(other);
 
         _held[action] = gesture;
+
+        Moved();
     }
 
     /// <inheritdoc/>
@@ -113,6 +127,8 @@ public sealed class ShortcutMap : IShortcutMap
 
             if (Read(one.Keys) is { } gesture) Set(action, gesture);
         }
+
+        Moved();
     }
 
     /// <inheritdoc/>

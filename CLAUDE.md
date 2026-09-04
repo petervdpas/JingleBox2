@@ -2316,6 +2316,23 @@ whole exercise and is worth writing down rather than summarising:
 - The row's buttons are clicked rather than bound to a command, because the page answers the
   keystroke that follows and the two belong together: which row is listening and which row is
   about to hear a key are one fact
+- **The tab strip underlines the letter its page's shortcut uses**, which is how every
+  application that has ever had a menu bar tells you the key without spending a line on it, and
+  the only place that can say it where somebody is looking when they want it. `ShortcutLabel` is
+  the header on each tab and `IShortcutLetter` is the rule: the first occurrence, case blind. A
+  letter that is not in the word marks nothing rather than guessing, since Ctrl+Alt+Q on MIXER is
+  a perfectly good shortcut and there is nothing in MIXER to underline; a page on no key is drawn
+  plain, which is every page on a fresh installation
+- **Which made the map say when it moves.** `IShortcutMap.Changed`, raised only when something
+  really changed, because a page shortcut is now drawn in two places: on the settings page that
+  set it, which is looking at it already, and as an underline along the top, which is not. The
+  strip is built when the window is, so without it the mark would sit under the letter of a key
+  somebody had just moved
+- **And that turned up a fault in the settings page itself, which was writing to the map and not
+  reading it.** The page is built while the window is, before the settings file has been read
+  into the map, so every row said "not set" on a machine with eight keys saved while the strip
+  beside it drew all eight underlines. From a chair that is a settings page that has lost your
+  work. It follows `Changed` now, like the strip: the map is what knows
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

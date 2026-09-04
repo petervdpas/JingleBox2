@@ -29,6 +29,13 @@ namespace JingleBox2.ViewModels;
 /// Every row is rebuilt from the map after any change, rather than the one row that was touched
 /// being written to. One key does one job, so putting a key on a row takes it off whatever else
 /// had it, and the row that lost it has to say so without anybody remembering to tell it.
+///
+/// **And it follows the map rather than only writing to it**, which is not the same thing and is
+/// what was missing. This is built while the window is, before the settings file has been read
+/// into the map, so a page that only read once showed every row as not set on a machine where
+/// eight keys were saved, while the tab strip beside it drew all eight underlines. From a chair
+/// that is a settings page that has lost your work. The map is what knows and the map says when
+/// it moves.
 /// </remarks>
 public sealed partial class ShortcutsViewModel : ObservableObject
 {
@@ -86,6 +93,8 @@ public sealed partial class ShortcutsViewModel : ObservableObject
         foreach (var (action, name, _) in _actions.Everything)
             if (!_actions.Fixed(action))
                 Menu.Add(new ShortcutRowViewModel(action, name, locked: false));
+
+        _map.Changed += (_, _) => Show();
 
         Show();
     }

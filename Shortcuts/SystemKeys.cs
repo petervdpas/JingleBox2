@@ -38,7 +38,7 @@ public sealed class SystemKeys : ISystemKeys
             var keys = new List<SystemKey>
             {
                 new("Space", "starts the transport and stops it again"),
-                new("Ctrl+R", "records"),
+                new("Ctrl+R", "starts a recording and stops it again"),
                 new("Ctrl+Shift+M", "turns the pointing mode over, for aiming a knob on your hardware at a control"),
                 new("Ctrl+H", "opens the help on the keys")
             };

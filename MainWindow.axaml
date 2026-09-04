@@ -82,7 +82,10 @@
            The page keeps the song as its context, since almost everything on it is the song's.
            The three strips that are not are handed in, the same way the tracker is handed the
            rack it draws beside the pattern. -->
-      <TabItem Header="MIXER" x:Name="MixerTab">
+      <TabItem x:Name="MixerTab">
+        <TabItem.Header>
+          <views:ShortcutLabel Word="MIXER" For="Mixer" />
+        </TabItem.Header>
         <!-- In a panel of its own so the page can be taken out into a window and put back, and
              only ever one of the two is in here. -->
         <Panel x:Name="MixerHost">
@@ -94,22 +97,34 @@
         </Panel>
       </TabItem>
 
-      <TabItem Header="RECORD">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="RECORD" For="Record" />
+        </TabItem.Header>
         <views:RecordView DataContext="{Binding Record}" />
       </TabItem>
 
-      <TabItem Header="PADS">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="PADS" For="Pads" />
+        </TabItem.Header>
         <views:PadsView />
       </TabItem>
 
-      <TabItem Header="FIRE">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="FIRE" For="Fire" />
+        </TabItem.Header>
         <views:UseView />
       </TabItem>
 
       <!-- The instruments and the mixer are pages of the tracker rather than tabs beside it:
            the mixer mixes its tracks and the rack is where a song takes its instruments from,
            and nothing outside the tracker uses either. -->
-      <TabItem Header="TRACKER">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="TRACKER" For="Tracker" />
+        </TabItem.Header>
         <views:TrackerView DataContext="{Binding Tracker}"
                            Instruments="{Binding $parent[TabItem].DataContext.Machines}" />
       </TabItem>
@@ -122,7 +137,10 @@
            and which of the two worlds you are laying out is a choice inside it, the same way the
            rack itself has Machines and Effects. Each keeps its own project, its own undo and its
            own unsaved changes, so switching between them loses nothing. -->
-      <TabItem Header="DESIGNER" IsVisible="{Binding ShowMachineEditor}">
+      <TabItem IsVisible="{Binding ShowMachineEditor}">
+        <TabItem.Header>
+          <views:ShortcutLabel Word="DESIGNER" For="Designer" />
+        </TabItem.Header>
         <TabControl Classes="worlds" Padding="0">
           <TabControl.Styles>
             <!-- The two worlds, at the size of a choice inside a page rather than a heading.
@@ -146,7 +164,10 @@
         </TabControl>
       </TabItem>
 
-      <TabItem Header="SETTINGS">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="SETTINGS" For="Settings" />
+        </TabItem.Header>
         <views:SettingsView />
       </TabItem>
 
@@ -156,7 +177,10 @@
            page holds what a nanoKONTROL2 does to the mixer, which has nothing to do with any
            pattern. It is the same list SETTINGS draws under Control Surfaces rather than a copy
            of it, so forgetting a link on either is the same act and both show it at once. -->
-      <TabItem Header="MIDI CC">
+      <TabItem>
+        <TabItem.Header>
+          <views:ShortcutLabel Word="MIDI CC" For="MidiCc" />
+        </TabItem.Header>
         <ScrollViewer Classes="tabRoot" VerticalScrollBarVisibility="Auto">
           <views:ControlLinksView DataContext="{Binding Links}" />
         </ScrollViewer>

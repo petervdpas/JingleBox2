@@ -23,6 +23,21 @@ namespace JingleBox2.Shortcuts.Interfaces;
 /// </remarks>
 public interface IShortcutMap
 {
+    /// <summary>
+    /// Something moved: a key was put on an action, taken off one, or the lot were put back.
+    /// </summary>
+    /// <remarks>
+    /// The map is what knows, so the map is what says so. It exists because a page shortcut is
+    /// drawn twice: on the settings page that set it, which is looking at it already, and as an
+    /// underline in the tab strip along the top, which is not. Without this the strip would go on
+    /// marking the letter of a key somebody had just moved, and would be right again only after
+    /// whatever redrew it next.
+    ///
+    /// Raised only when something really changed, so a page that writes the same key back over
+    /// itself does not have every tab redraw for nothing.
+    /// </remarks>
+    event System.EventHandler? Changed;
+
     /// <summary>Puts every one back to what it ships as.</summary>
     void Reset();
 
