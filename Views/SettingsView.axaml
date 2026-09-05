@@ -259,6 +259,16 @@
                         ToolTip.Tip="Reads the drive's curve off a table instead of asking the system for it. About six times cheaper a sample, and 161 dB from what it replaces." />
 
               <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding FastDriveCurveHint}" />
+
+              <!-- Beside the other three because it is the same kind of thing: the shape of the
+                   path rather than how much audio is held in it. This one changes no sample at
+                   all, only when a plugin in its own process is asked for its block. -->
+              <CheckBox Margin="0,6,0,0"
+                        Content="Overlap plugin blocks"
+                        IsChecked="{Binding OverlapPlugins}"
+                        ToolTip.Tip="Starts every track's chain before waiting for any of them, so plugin processes wake at the same time rather than one after another." />
+
+              <TextBlock Classes="cardHint" TextWrapping="Wrap" Text="{Binding OverlapPluginsHint}" />
             </StackPanel>
           </Border>
 

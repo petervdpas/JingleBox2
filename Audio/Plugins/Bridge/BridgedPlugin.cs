@@ -21,7 +21,7 @@ namespace JingleBox2.Audio.Plugins.Bridge;
 /// an instrument goes quiet, both of which are what a missing box on a desk sounds like, and
 /// <see cref="Stopped"/> is raised so somebody can say so and offer to start it again.
 /// </remarks>
-public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPluginWindowSource
+public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPluginWindowSource, IOverlappable
 {
     /// <summary>How a message body is written down and read back. Holds nothing, so one is enough.</summary>
     private readonly IBridgeBody _body = new BridgeBody();
@@ -409,6 +409,104 @@ public sealed unsafe class BridgedPlugin : IPluginEffect, IPluginInstrument, IPl
     /// frames at once than the block was made for. A crossing that fails leaves the rest of the
     /// buffer as it was, which for an effect is the audio going past untouched.
     /// </remarks>
+    /// <summary>The process a block was begun on, so the same one is collected from.</summary>
+    /// <remarks>
+    /// Held rather than looked up again, because a plugin that fell over between the two halves
+    /// is started again as a different process, and collecting from the new one would be waiting
+    /// for an answer nobody was asked for.
+    /// </remarks>
+    private PluginProcess? _crossing;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Refused, by answering false, whenever the block would have to be carried in more than one
+    /// crossing: the shared memory is one buffer each way, so a chunked block is several round
+    /// trips in a row and there is nothing to overlap inside it. The caller then does the
+    /// ordinary blocking thing, which is what every block did before this existed.
+    ///
+    /// An effect's input is copied in here rather than at the collection, since this is the
+    /// moment the other side starts reading it.
+    /// </remarks>
+    public bool Begin(float[] buffer, int frames)
+    {
+        _crossing = null;
+
+        if (buffer == null || frames <= 0 || frames > _maxFrames) return false;
+
+        var process = _process;
+        if (process == null || !process.Alive || !process.Enter()) return false;
+
+        int samples = frames * PluginBridge.Channels;
+
+        if (samples > buffer.Length)
+        {
+            process.Leave();
+            return false;
+        }
+
+        var block = process.Block;
+
+        if (_asInstrument)
+        {
+            new Span<float>(block.Input, samples).Clear();
+        }
+        else
+        {
+            fixed (float* source = buffer)
+            {
+                Buffer.MemoryCopy(source, block.Input, (long)samples * sizeof(float), (long)samples * sizeof(float));
+            }
+        }
+
+        if (!process.Ask(frames))
+        {
+            process.Leave();
+            return false;
+        }
+
+        _crossing = process;
+
+        return true;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// One crossing is the whole of the work here, so this always answers false: a plugin has
+    /// nothing after itself. A block that did not come back leaves silence for an instrument,
+    /// which is the only thing that could be right, and leaves an effect's audio as it arrived,
+    /// which is what a bypassed effect does and is what the blocking path already did.
+    /// </remarks>
+    public bool Advance(float[] buffer, int frames)
+    {
+        var process = _crossing;
+
+        _crossing = null;
+
+        if (process == null) return false;
+
+        try
+        {
+            int samples = frames * PluginBridge.Channels;
+
+            if (!process.Collect(frames))
+            {
+                if (_asInstrument) Array.Clear(buffer, 0, Math.Min(samples, buffer.Length));
+                return false;
+            }
+
+            fixed (float* destination = buffer)
+            {
+                Buffer.MemoryCopy(process.Block.Output, destination, (long)samples * sizeof(float), (long)samples * sizeof(float));
+            }
+        }
+        finally
+        {
+            process.Leave();
+        }
+
+        return false;
+    }
+
     private void Run(PluginProcess process, float[] buffer, int frames)
     {
         int done = 0;

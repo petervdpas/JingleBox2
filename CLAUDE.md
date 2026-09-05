@@ -975,6 +975,127 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   this has been going. Where the music is is already on the screen twice, as the playhead and as
   the order slot. It holds on a pause and goes to nought on a stop, since a pause is somewhere you
   come back from and the next play starts from wherever the cursor is
+- **The plugin bridge was chased next, and the answer is not in the bridge.** The song that started
+  it is one or two of our voices and five plugins in five processes, and the mixing was reading a
+  mean of 55% of every block. `IRenderCost` cannot say what that was spent on: a block spent inside
+  somebody's synthesis and a block spent getting there and back are one number to the mixing thread
+  and they want opposite answers. A plugin that is expensive is a plugin, and the only things to do
+  about it are fewer of them or a longer block; a crossing that is expensive is this application's
+  own, is fixed cost paid once per plugin per block whatever the plugin is doing, and grows with
+  the number of plugins rather than with the music
+- **So the same block is measured at both ends now.** `IBridgeCost` is the parent's half, one per
+  plugin process, said in the same words the mixing already reports in so the two lines can be read
+  together: `bridge: ZamAutoSat 500 crossings, worst 5% of the time they had, mean 2%, 0.231 ms
+  each`. The child's half is on the line it already wrote every two seconds, everything between the
+  block arriving and the answer going back, which is the plugin's own work and the two buffer
+  copies either side of it. **What the parent saw and the child did not is the crossing**
+- Measured on a trivial CLAP saturator, so that nothing in the answer is somebody's synthesis:
+  round trip **0.227 ms**, the child's side **0.050**, so **0.177 ms is the crossing**, which is
+  78% of it. Five plugins at a 512 frame block is 0.89 ms of every 11.6, or **7.6% of every block
+  spent getting there and back before any plugin does any work**
+- **Real-time scheduling does not touch it**, which was the obvious suspect and is worth writing
+  down as ruled out. The same plugin with the tick on and its audio thread confirmed at real time,
+  priority 5: 0.237 ms against 0.231. Priority decides who runs when the machine is awake
+- **What it is, measured rather than reasoned about: waking a thread that has been asleep for ten
+  milliseconds.** The identical Unix socket round trip, thread to thread, in the same build on the
+  same machine, is **8.0 microseconds back to back and 145.1 once every 10 ms**, which is the whole
+  of the bridge's 177 and eighteen times the socket itself. Not the socket, not the process
+  boundary, not the serialising, and nothing in this application's own code. It is the machine
+  coming out of idle, and that is also why priority changed nothing: a priority says who runs, and
+  a core that has gone to sleep has to be woken first
+- **Which answers the oldest question in this file.** The section above opens by asking why the
+  buffer here has to be twice another program's, and names two possible faults. It is neither of
+  them exactly: the wakeup is paid once per plugin per block, so it is a fixed cost per block, and
+  the only thing that makes it smaller as a share is a longer block. At 512 frames five plugins
+  cost 7.6% of the block in wakeups alone; at 2048 the same wakeups are 1.9%. **A host with the
+  plugins in its own process pays none of it**, which is the difference being compared against
+- Three ways out, and none of them is a change to the bridge's own code. The blocks can be made
+  longer, which works today and is what the buffer slider already does. The machine's idle
+  governor can be told not to go so deep, which is what every Linux audio guide says and is
+  somebody's machine rather than this program. Or the crossings can stop being serial: plugins on
+  one chain must go in order, since the audio flows through them, but **two tracks' chains are
+  independent and are currently waited on one after another**, so five plugins pay five wakeups
+  where they could overlap and pay about one. That last one is the real lever and it is done, below
+- **`IOverlappable` is a run of audio work that can be started, left in flight and come back to**,
+  and it is one contract because a plugin and a chain are the same shape: `Begin` starts and says
+  whether anything is now outstanding, `Advance` collects what is and starts whatever comes next.
+  A bridged plugin's `Begin` puts the block in the shared memory and asks; its `Advance` waits and
+  copies the answer out. A chain's `Begin` walks its own boxes until it reaches one that can be
+  left in flight, doing everything before it where it stands
+- **So the width is the number of tracks and never the number of plugins**, which is the whole of
+  what may be overlapped and is worth being exact about. A chain is audio flowing through boxes in
+  order, so the second box cannot start until the first has finished; two tracks' chains work on
+  their own busses and nothing on one reads the other, so those really are independent. The mixer
+  begins every track, then drives rounds: each round collects what was outstanding and asks for
+  whatever is next, so at any moment every track has one crossing in flight
+- Both places a crossing happens go through it: the plugin instruments in `RenderBusses` and the
+  insert chains in `ApplyInserts`. **Not one sample changes**, and that is checked rather than
+  argued: `Tests/OverlappedMixerTests.cs` renders the same three tracks both ways and compares the
+  block sample for sample. It also pins the interleaving, since **a run that collected each track
+  before starting the next would leave an identical block and save nothing whatever**, which is a
+  change that passes every test about audio and does not work
+- `PluginProcess.Render` is now `Ask` and `Collect` with the old name calling both, so the
+  blocking path is the two halves run together rather than a second spelling of them. A block too
+  long to cross in one go is refused by `Begin`, which answers false, and the caller does the
+  ordinary chunked thing: there is one buffer each way, so a chunked block is several round trips
+  in a row and there is nothing to overlap inside it
+- **A run once begun is always driven to its end**, and the one comparison that makes that certain
+  is worth its cost. A box left holding an answer nobody collected refuses every block after it,
+  for the rest of the session, and from a chair that is one plugin going silent for no reason
+  anybody can see. So a chain settles anything left in flight before it starts a new run, and the
+  abandoned answer lands on the block at hand rather than being thrown away, which is a moment of
+  a plugin's output in the wrong place against that plugin being dead until a restart
+- `Audio.OverlapSwitch` is the switch and it is a tick in SETTINGS, Engine, beside the other three.
+  **Off by default although the audio is identical**, which is a different reason from the fast
+  drive curve's: there is nothing to listen to here, and what ships off is a change to the audio
+  path in a program where a plugin lives in another process and can die between the asking and the
+  answer
+- **Then it was measured on a real song, and the song is what made the numbers worth having.**
+  Gruber: three tracks with plugin chains on them, one plugin instrument, and five plugin
+  processes between them. Twelve five second windows each way, the transport stopped in between,
+  the switch the only thing changed:
+
+  | | one track at a time | begun together |
+  |---|---|---|
+  | mean of each window's mean | **69.0%** | **64.3%** |
+  | the range those means fell in | 66 to 72 | 60 to 68 |
+  | blocks over budget in every five seconds | **28.6** | **19.3** |
+  | worst block | 255% | 259% |
+
+- **A third fewer blocks go over**, and the two ranges barely touch, so it is a real shift rather
+  than a quiet afternoon: the serial half never came under 66 and the overlapped half never went
+  over 68
+- **The worst block did not move and should not have.** 255% of the time it had is a pause and not
+  the mixing, which is the distinction the render cost line was built to make in the first place,
+  and nothing about when a plugin is asked for its block reaches it
+- **And the mean only came down four points because one plugin is the critical path.** The same
+  log says what Gruber is actually spending its block on, which is the thing measuring both ends
+  of the crossing was for:
+
+  | | round trip | its own side |
+  |---|---|---|
+  | Serum 2 | 4.946 ms | **3.2 ms** |
+  | Serum 2 FX | 1.593 ms | 1.8 ms |
+  | Serum 2 FX, the second one | 0.907 ms | 1.7 ms |
+  | ZamDelay | 0.907 ms | **0.09 ms** |
+
+- Three Serum processes are about 6.8 milliseconds of an 11.6 millisecond block, and that is
+  somebody else's arithmetic: a wavetable synth oversamples and this application has no reach into
+  it. **Overlapping cannot make the longest chain shorter**, and what it removed is the other three
+  queueing behind that one. ZamDelay beside it at 0.09 ms is the whole point of measuring both
+  ends rather than one: two boxes on the same chain, and one of them costs twenty times the other
+- **The gap between the two ends is 1.8 ms here against 0.177 in the empty case**, which is the
+  same finding from the other side. With four plugin processes each wanting two or three
+  milliseconds of every eleven, the mixing thread is not merely waking an idle core, it is waiting
+  to be given one back. So the crossing grows with how loaded the machine is, which is exactly why
+  overlapping is worth more on a busy song than the empty measurement suggested
+- **None of this is the OS-specific half of the bridge, which is worth being exact about since
+  that was the worry.** The audio path is a Unix domain socket and a shared memory block, and both
+  are one code path on Windows and here; what differs per platform is the window handover, the
+  message pump a plugin's process needs, and the sharing flag on the mapped file, and not one of
+  those is on the path a block takes. The cause found here exists on both, since both have idle
+  states and a scheduler, and the numbers will not be the same. The line the log now prints is what
+  says what they are on the machine that is actually playing
 - **An effect has presets, and the page for them is a form rather than a file.** It said no for a
   while, on the reasoning that a machine's preset is an instrument file and an effect has no
   instrument. That was an argument about how presets happened to be stored here rather than about

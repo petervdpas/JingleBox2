@@ -1,4 +1,6 @@
 using JingleBox2.Audio.Plugins.Bridge.Enums;
+using JingleBox2.Diagnostics;
+using JingleBox2.Diagnostics.Enums;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -122,7 +124,8 @@ internal sealed class PluginProcess : IDisposable
     /// The operating system telling us the child exited is subscribed to here as well as the
     /// two sockets noticing, because a process can die without either socket being in use.
     /// </remarks>
-    private PluginProcess(Process child, BridgeLink control, BridgeLink audio, BridgeBlock block, string blockPath)
+    private PluginProcess(Process child, BridgeLink control, BridgeLink audio, BridgeBlock block, string blockPath,
+                          string name, int sampleRate)
     {
         _child = child;
         _control = control;
@@ -141,6 +144,37 @@ internal sealed class PluginProcess : IDisposable
 
         _child.EnableRaisingEvents = true;
         _child.Exited += (_, _) => Bury();
+
+        _rate = sampleRate;
+        _cost = new BridgeCost(name);
+    }
+
+    /// <summary>The rate the audio is made at, which is what turns a crossing's frames into time.</summary>
+    private readonly int _rate;
+
+    /// <summary>
+    /// What the crossings are costing, said every few seconds beside the mixing's own line.
+    /// </summary>
+    /// <remarks>
+    /// Read and written only from inside <see cref="Render"/>, which one thread is in at a time,
+    /// so it needs no lock of its own on a path that may not take one.
+    /// </remarks>
+    private readonly BridgeCost _cost;
+
+    /// <summary>
+    /// Counts one crossing and writes the stretch down when there is a stretch to write.
+    /// </summary>
+    /// <remarks>
+    /// The line is built only when there is one to build, so an ordinary crossing costs the
+    /// arithmetic and nothing else: this is the audio thread, called once per plugin per block.
+    /// </remarks>
+    /// <param name="frames">How many frames that crossing carried.</param>
+    /// <param name="milliseconds">How long the round trip took.</param>
+    private void Counted(int frames, double milliseconds)
+    {
+        string? line = _cost.Crossed(frames, milliseconds, _rate);
+
+        if (line != null) Log.Write(LogArea.Audio, line);
     }
 
     /// <summary>The shared memory the audio crosses in. Only touched between Enter and Leave.</summary>
@@ -253,7 +287,8 @@ internal sealed class PluginProcess : IDisposable
 
             audioSocket.ReceiveTimeout = PluginBridge.FirstBlockTimeoutMilliseconds;
 
-            var bridge = new PluginProcess(child, new BridgeLink(controlSocket), new BridgeLink(audioSocket), block, blockPath);
+            var bridge = new PluginProcess(child, new BridgeLink(controlSocket), new BridgeLink(audioSocket), block, blockPath,
+                                          plugin.Name, sampleRate);
 
             if (!bridge.Greet())
             {
@@ -496,18 +531,92 @@ internal sealed class PluginProcess : IDisposable
     /// </remarks>
     public bool Render(int frames)
     {
-        if (!_alive) return false;
+        if (!Ask(frames)) return false;
+
+        return Collect(frames);
+    }
+
+    /// <summary>When the block outstanding now was asked for, so the crossing can be measured.</summary>
+    /// <remarks>
+    /// Written by <see cref="Ask"/> and read by <see cref="Collect"/>, both of which run on the
+    /// mixing thread and never at the same time for one process: a second block cannot be asked
+    /// for while one is outstanding, because the shared memory a block crosses in is one buffer.
+    /// </remarks>
+    private long _asked;
+
+    /// <summary>Whether a block has been asked for and not yet collected.</summary>
+    private bool _outstanding;
+
+    /// <summary>Whether a block has been asked for and is still owed.</summary>
+    public bool Outstanding => _outstanding;
+
+    /// <summary>
+    /// Asks for a block and comes straight back without waiting for it.
+    /// </summary>
+    /// <remarks>
+    /// **The half of a crossing that costs almost nothing.** What a crossing really costs is
+    /// waking a process that has been asleep for a block, which is around 145 microseconds here
+    /// against 8 for the socket itself, and that cost is paid between this and
+    /// <see cref="Collect"/> rather than inside either. So several plugins asked before any of
+    /// them is collected wake at the same time and are woken once between them rather than once
+    /// each.
+    ///
+    /// The input for the block has to be in the shared memory already, since this is the moment
+    /// the other side starts reading it, and nothing may touch it again until the answer is back.
+    ///
+    /// Asking twice without collecting is refused rather than allowed to overwrite: there is one
+    /// buffer each way, so the second ask would be handing the plugin a block it is already
+    /// halfway through.
+    /// </remarks>
+    /// <param name="frames">How many frames this crossing carries.</param>
+    /// <returns>Whether the request went. False means the plugin has gone and nothing is owed.</returns>
+    public bool Ask(int frames)
+    {
+        if (!_alive || _outstanding) return false;
 
         Span<byte> message = stackalloc byte[8];
 
         message[0] = (byte)BridgeCall.Process;
         BitConverter.TryWriteBytes(message.Slice(4, 4), frames);
 
+        _asked = Stopwatch.GetTimestamp();
+
         try
         {
             int sent = _audio.Socket.Send(message);
             if (sent != 8) { Bury("stopped mid-block"); return false; }
 
+            _outstanding = true;
+
+            return true;
+        }
+        catch (Exception)
+        {
+            Bury("stopped while a block was in it");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Waits for a block that <see cref="Ask"/> has already asked for.
+    /// </summary>
+    /// <remarks>
+    /// Answering false leaves nothing outstanding, whether the plugin died, timed out or was
+    /// never asked, so a caller that gives up on one crossing is not left owing a collection that
+    /// will never come.
+    /// </remarks>
+    /// <param name="frames">The frames that crossing carried, for the measurement.</param>
+    /// <returns>Whether the block came back.</returns>
+    public bool Collect(int frames)
+    {
+        if (!_outstanding) return false;
+
+        _outstanding = false;
+
+        if (!_alive) return false;
+
+        try
+        {
             Span<byte> reply = stackalloc byte[8];
             int read = 0;
 
@@ -523,6 +632,8 @@ internal sealed class PluginProcess : IDisposable
                 _patient = false;
                 _audio.Socket.ReceiveTimeout = PluginBridge.BlockTimeoutMilliseconds;
             }
+
+            Counted(frames, Stopwatch.GetElapsedTime(_asked).TotalMilliseconds);
 
             return reply[0] == (byte)BridgeCall.Rendered;
         }

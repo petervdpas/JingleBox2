@@ -808,6 +808,30 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
         }
     }
 
+    /// <summary>
+    /// Whether a block's crossings to plugin processes are begun together rather than in turn.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is reopened and nothing reloaded. It is read once a block, so the switch lands on
+    /// the next block mixed and a song can be sat with and heard both ways.
+    /// </remarks>
+    public bool OverlapPlugins
+    {
+        get => _cfg.OverlapPlugins;
+        set
+        {
+            if (_cfg.OverlapPlugins == value) return;
+
+            _cfg.OverlapPlugins = value;
+            _store.Save(_cfg);
+
+            Audio.OverlapSwitch.Wants(value);
+
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(OverlapPluginsHint));
+        }
+    }
+
     /// <summary>The fader scale, so a level in decibels can be turned into what an engine wants.</summary>
     private readonly UI.Interfaces.IGainScale _gain = new UI.GainScale();
 
@@ -959,6 +983,19 @@ public sealed partial class MainViewModel : ObservableObject, IShortcutContext
               + "device, which is what this application has always done and what everything here "
               + "has been listened to on. Switch it on if you use an ASIO driver, or to hear the "
               + "arrangement the ASIO work is built on.";
+
+    /// <summary>What the switch means, said plainly enough to choose by.</summary>
+    public string OverlapPluginsHint =>
+        _cfg.OverlapPlugins
+            ? "Every track's chain is started before any of them is waited for, so the plugin "
+              + "processes wake at the same time instead of one after another. A crossing costs "
+              + "about a fifth of a millisecond and almost all of it is waking a process that has "
+              + "been asleep for a block, so this is worth the most where there are several "
+              + "plugins on several tracks. Not one sample is different."
+            : "Each track's chain is waited for before the next is started, which is what this "
+              + "application has always done. Switch it on if songs with several plugins on "
+              + "several tracks break up: the log's bridge line says what a crossing is costing "
+              + "on this machine, and it is the number this changes.";
 
     /// <summary>What the switch means, said plainly enough to choose by.</summary>
     public string FastDriveCurveHint =>

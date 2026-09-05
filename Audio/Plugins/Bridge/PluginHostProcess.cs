@@ -132,6 +132,24 @@ public static class PluginHostProcess
     /// <summary>How many blocks have gone through, so the log can say whether audio is running.</summary>
     private static long _blocks;
 
+    /// <summary>
+    /// How long this side has spent on those blocks, in the stopwatch's own ticks.
+    /// </summary>
+    /// <remarks>
+    /// Everything between the block arriving and the answer going back, so it is the plugin's own
+    /// work plus the two buffer copies either side of it and nothing else. Held against the
+    /// parent's measurement of the same block: what the parent saw and this did not is the
+    /// crossing, which is this application's cost, and what this side spent is the plugin's,
+    /// which is not.
+    ///
+    /// Ticks rather than milliseconds, because this is added to on the audio thread once a block
+    /// and turned into a time once every couple of seconds by the thread that says it.
+    /// </remarks>
+    private static long _spent;
+
+    /// <summary>The dearest single block of the stretch, in the same ticks.</summary>
+    private static long _worst;
+
     /// <summary>Blocks that came out with something in them since the last census.</summary>
     private static long _sounded;
 
@@ -410,11 +428,23 @@ public static class PluginHostProcess
                 _sounded = 0;
                 _loudest = 0;
 
+                long since = blocks - counted;
+                double inside = _spent * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                double dearest = _worst * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+
+                _spent = 0;
+                _worst = 0;
+
                 Say("run loop: " + rounds + " rounds taking " + spent.ToString("0") + " ms in the plugin; " +
                     PluginRunLoop.Census() +
-                    "; " + (blocks - counted) + " blocks of audio in the last two seconds, " +
+                    "; " + since + " blocks of audio in the last two seconds, " +
                     sounded + " of them with something in them, loudest " +
                     loudest.ToString("F4", System.Globalization.CultureInfo.InvariantCulture) +
+                    (since > 0
+                        ? "; " + (inside / since).ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) +
+                          " ms on this side of the block each, worst " +
+                          dearest.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)
+                        : "") +
                     ((_plugin as ClapEffect)?.IsWaitingToSpeak == true ? "; the plugin is waiting to say something" : ""));
 
                 counted = blocks;
@@ -829,6 +859,8 @@ public static class PluginHostProcess
 
             _blocks++;
 
+            long began = System.Diagnostics.Stopwatch.GetTimestamp();
+
             int frames = BitConverter.ToInt32(message, 4);
             if (frames <= 0 || frames > maxFrames) frames = Math.Min(Math.Max(frames, 0), maxFrames);
 
@@ -869,6 +901,11 @@ public static class PluginHostProcess
             }
 
             BitConverter.TryWriteBytes(reply.AsSpan(4, 4), frames);
+
+            long took = System.Diagnostics.Stopwatch.GetTimestamp() - began;
+
+            _spent += took;
+            if (took > _worst) _worst = took;
 
             try
             {

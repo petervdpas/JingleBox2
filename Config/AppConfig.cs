@@ -241,6 +241,17 @@ public sealed class AppConfig
     public bool FastDriveCurve { get; set; }
 
     /// <summary>
+    /// Whether a block's crossings to plugin processes are begun together rather than in turn.
+    /// </summary>
+    /// <remarks>
+    /// Off in a settings file that has never heard of it, which is every file written before it
+    /// existed. The audio is identical either way, since what changes is when a plugin is asked
+    /// rather than what it is asked; it ships off because it is the audio path in a program where
+    /// a plugin lives in another process and can die between the asking and the answer.
+    /// </remarks>
+    public bool OverlapPlugins { get; set; }
+
+    /// <summary>
     /// How much audio the sound card holds ahead of what you hear, in frames.
     /// </summary>
     /// <remarks>

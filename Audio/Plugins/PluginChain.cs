@@ -14,7 +14,7 @@ namespace JingleBox2.Audio.Plugins;
 /// device switched off is stepped over rather than taken out, which is what makes bypass
 /// something you can hold down and hear.
 /// </remarks>
-public sealed class PluginChain : IAudioInsert
+public sealed class PluginChain : IAudioInsert, IOverlappable
 {
     /// <summary>The chain in the order a person edits it. Only ever touched under the lock.</summary>
     private readonly List<Slot> _devices = new();
@@ -163,5 +163,136 @@ public sealed class PluginChain : IAudioInsert
             {
             }
         }
+    }
+
+    /// <summary>The chain this run is walking, or nothing when no run is in flight.</summary>
+    /// <remarks>
+    /// The snapshot taken when the run began rather than the live list, so a device dropped onto
+    /// the chain halfway through a block does not appear in the middle of that block's audio.
+    /// </remarks>
+    private Slot[]? _run;
+
+    /// <summary>How far along that snapshot the run has got.</summary>
+    private int _at;
+
+    /// <summary>The device whose work is in flight, or nothing between rounds.</summary>
+    private IOverlappable? _flying;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A run left half finished is finished here before a new one starts. That cannot happen
+    /// while the mixer drives this to the end, which it does, and it costs one comparison to be
+    /// certain: a device left holding an answer nobody collected would refuse every block after
+    /// it, for the rest of the session, and the symptom would be one plugin going silent for no
+    /// reason anybody could see.
+    /// </remarks>
+    public bool Begin(float[] buffer, int frames)
+    {
+        Settle(buffer, frames);
+
+        Slot[] chain;
+
+        lock (_lock)
+        {
+            if (_devices.Count == 0) return false;
+
+            if (_stale)
+            {
+                _snapshot = _devices.ToArray();
+                _stale = false;
+            }
+
+            chain = _snapshot;
+        }
+
+        _run = chain;
+        _at = 0;
+
+        return Push(buffer, frames);
+    }
+
+    /// <inheritdoc/>
+    public bool Advance(float[] buffer, int frames)
+    {
+        Settle(buffer, frames);
+
+        return Push(buffer, frames);
+    }
+
+    /// <summary>Collects whatever is in flight, whatever happened to it.</summary>
+    /// <param name="buffer">The audio the run is on.</param>
+    /// <param name="frames">How many frames are in it.</param>
+    private void Settle(float[] buffer, int frames)
+    {
+        var flying = _flying;
+
+        _flying = null;
+
+        if (flying == null) return;
+
+        try
+        {
+            flying.Advance(buffer, frames);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Walks on until something is in flight or the chain is finished.
+    /// </summary>
+    /// <remarks>
+    /// A device that cannot be left in flight is simply done here, which is every effect of ours,
+    /// every bypassed slot, and a plugin handed a block too long to cross in one go. So a chain
+    /// of our own effects behaves exactly as it always did and never reports anything in flight.
+    /// </remarks>
+    /// <param name="buffer">The audio the run is on.</param>
+    /// <param name="frames">How many frames are in it.</param>
+    /// <returns>Whether something is now in flight.</returns>
+    private bool Push(float[] buffer, int frames)
+    {
+        var chain = _run;
+
+        if (chain == null) return false;
+
+        while (_at < chain.Length)
+        {
+            var device = chain[_at++];
+
+            if (device.Bypassed) continue;
+
+            if (device.Insert is IOverlappable overlappable)
+            {
+                bool flying;
+
+                try
+                {
+                    flying = overlappable.Begin(buffer, frames);
+                }
+                catch (Exception)
+                {
+                    flying = false;
+                }
+
+                if (flying)
+                {
+                    _flying = overlappable;
+                    return true;
+                }
+            }
+
+            try
+            {
+                device.Insert.Process(buffer, frames);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        _run = null;
+
+        return false;
     }
 }

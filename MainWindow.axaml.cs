@@ -173,6 +173,7 @@ public partial class MainWindow : Window
         Diagnostics.Log.Open(new Files.AppFolder().Path(), cfg.WriteLog, Areas(cfg));
 
         Audio.TangentSwitch.Wants(cfg.FastDriveCurve);
+        Audio.OverlapSwitch.Wants(cfg.OverlapPlugins);
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.App, () =>
             "settings read from " + _store.ConfigPath + ", " + cfg.Rows + " by " + cfg.Columns + " pads");

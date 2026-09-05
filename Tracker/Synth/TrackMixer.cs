@@ -1622,6 +1622,11 @@ public sealed class TrackMixer : ITrackMixer
             Array.Clear(_busses[track]!, 0, samples);
         }
 
+        bool overlap = Audio.OverlapSwitch.Wanted;
+        bool waiting = false;
+
+        Array.Clear(_flying, 0, MaxTracks);
+
         for (int track = 0; track < MaxTracks; track++)
         {
             var instrument = instruments[track];
@@ -1629,6 +1634,13 @@ public sealed class TrackMixer : ITrackMixer
 
             var bus = _busses[track];
             if (bus == null) continue;
+
+            if (overlap && instrument is IOverlappable run && run.Begin(bus, frames))
+            {
+                _flying[track] = true;
+                waiting = true;
+                continue;
+            }
 
             try
             {
@@ -1640,9 +1652,31 @@ public sealed class TrackMixer : ITrackMixer
                 Array.Clear(bus, 0, samples);
             }
 
-            if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
+            Played(track, bus, samples, instrument);
+        }
 
-            Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
+        while (waiting)
+        {
+            waiting = false;
+
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                if (!_flying[track]) continue;
+
+                var instrument = instruments[track];
+                var bus = _busses[track];
+
+                if (instrument is not IOverlappable run || bus == null)
+                {
+                    _flying[track] = false;
+                    continue;
+                }
+
+                _flying[track] = run.Advance(bus, frames);
+
+                if (_flying[track]) waiting = true;
+                else Played(track, bus, samples, instrument);
+            }
         }
 
         for (int index = 0; index < sounding; index++)
@@ -1653,6 +1687,25 @@ public sealed class TrackMixer : ITrackMixer
             var target = track >= 0 && track < MaxTracks ? _busses[track] : _loose;
             if (target != null) voice.Render(target, frames);
         }
+    }
+
+    /// <summary>
+    /// What a plugin instrument left on its bus: written down if anybody is reading, then placed.
+    /// </summary>
+    /// <remarks>
+    /// The two things that happen after an instrument has played, whether it played where it
+    /// stands or was begun in one round and collected in another. One place rather than two, so
+    /// the overlapped path and the ordinary one cannot come to differ about what a bus gets.
+    /// </remarks>
+    /// <param name="track">Which strip it is.</param>
+    /// <param name="bus">What it played onto.</param>
+    /// <param name="samples">How much of that bus this block is about.</param>
+    /// <param name="instrument">What played, for the log.</param>
+    private void Played(int track, float[] bus, int samples, IPluginInstrument instrument)
+    {
+        if (Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio)) _census[track].Played(Peak(bus, samples), instrument);
+
+        Place(bus, samples, _instrumentGain[track], _instrumentPan[track]);
     }
 
     /// <summary>
@@ -1684,9 +1737,32 @@ public sealed class TrackMixer : ITrackMixer
     ///
     /// An insert that throws costs that block and no more; the bus is left holding whatever the
     /// plugin managed before it gave up.
+    ///
+    /// **The tracks are walked twice rather than once, and the second walk is why.** A chain
+    /// holding a plugin in its own process is mostly not working: a crossing costs 0.177
+    /// milliseconds here against 0.008 for the socket it goes down, and almost all of that is a
+    /// process that has been asleep for a block being woken. Asked one track after another, five
+    /// plugins pay five wakeups; begun together and collected after, they wake together.
+    ///
+    /// So the first pass begins every track's chain and the rounds after it collect what came
+    /// back and ask for whatever is next. **Not one sample changes**, because each chain is still
+    /// walked in its own order on its own bus, and two tracks were never in any order to begin
+    /// with: nothing on one reads the other. The width is the number of tracks rather than the
+    /// number of plugins, since a chain's second box cannot start until its first has finished.
+    ///
+    /// An insert that cannot be left in flight is done where it stands, which is every effect of
+    /// ours and every chain with the switch off, so the ordinary arrangement is one pass with a
+    /// comparison in it. <see cref="Audio.OverlapSwitch"/> is that switch.
     /// </remarks>
     private void ApplyInserts(int frames)
     {
+        bool overlap = Audio.OverlapSwitch.Wanted;
+        bool watching = Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio);
+        int samples = frames * 2;
+        bool waiting = false;
+
+        Array.Clear(_flying, 0, MaxTracks);
+
         for (int track = 0; track < MaxTracks; track++)
         {
             if (!_sounding[track]) continue;
@@ -1699,9 +1775,14 @@ public sealed class TrackMixer : ITrackMixer
             var bus = _busses[track];
             if (bus == null) continue;
 
-            bool watching = Diagnostics.Log.On(Diagnostics.Enums.LogArea.Audio);
-            int samples = frames * 2;
-            float before = watching ? Peak(bus, samples) : 0f;
+            _before[track] = watching ? Peak(bus, samples) : 0f;
+
+            if (overlap && insert is IOverlappable run && run.Begin(bus, frames))
+            {
+                _flying[track] = true;
+                waiting = true;
+                continue;
+            }
 
             try
             {
@@ -1712,9 +1793,47 @@ public sealed class TrackMixer : ITrackMixer
                 _census[track].Note(error.Message);
             }
 
-            if (watching) _census[track].Inserted(before, Peak(bus, samples), insert);
+            if (watching) _census[track].Inserted(_before[track], Peak(bus, samples), insert);
+        }
+
+        while (waiting)
+        {
+            waiting = false;
+
+            for (int track = 0; track < MaxTracks; track++)
+            {
+                if (!_flying[track]) continue;
+
+                IAudioInsert? insert;
+                lock (_lock) insert = _inserts[track];
+
+                var bus = _busses[track];
+
+                if (insert is not IOverlappable run || bus == null)
+                {
+                    _flying[track] = false;
+                    continue;
+                }
+
+                _flying[track] = run.Advance(bus, frames);
+
+                if (_flying[track]) waiting = true;
+                else if (watching) _census[track].Inserted(_before[track], Peak(bus, samples), insert);
+            }
         }
     }
+
+    /// <summary>Which tracks still have chain work in flight, so a round knows who to drive.</summary>
+    /// <remarks>
+    /// Fields rather than anything on the stack, because this is the audio thread: one array of
+    /// thirty two apiece lives as long as the mixer and allocates nothing per block.
+    /// </remarks>
+    private readonly bool[] _flying = new bool[MaxTracks];
+
+    /// <summary>What each track's bus peaked at before its chain touched it, for the log.</summary>
+    /// <remarks><inheritdoc cref="_flying" path="/remarks"/></remarks>
+    private readonly float[] _before = new float[MaxTracks];
+
 
     /// <summary>
     /// Adds one track into the mix, through its side chain if it has one. The key is read
