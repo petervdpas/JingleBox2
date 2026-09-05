@@ -1,0 +1,11 @@
+{
+  "Name": "Telephone",
+  "Effect": "effect.sweeper",
+  "cutoff": 1400,
+  "resonance": 0.45,
+  "drive": 2.5,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 1,
+  "mix": 1.0
+}

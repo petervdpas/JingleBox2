@@ -3,7 +3,7 @@
   "Name": "OddSkilla",
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
-  "Version": "1.15",
+  "Version": "1.16",
   "Engine": "",
   "Theme": {
     "Accent": "#E2A03F",
@@ -128,6 +128,16 @@
       "Saved": true
     },
     {
+      "Key": "even_drive",
+      "Name": "Drive keeps",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1,
+      "Saved": true
+    },
+    {
       "Key": "level",
       "Name": "Level",
       "Unit": " dB",
@@ -165,6 +175,16 @@
       "Max": 0.98,
       "Default": 0,
       "Step": 0.01,
+      "Saved": true
+    },
+    {
+      "Key": "filter_first",
+      "Name": "Order",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1,
       "Saved": true
     },
     {
@@ -451,7 +471,7 @@
               "Properties": {
                 "cell": "26",
                 "gap": "4",
-                "columns": "3 3 3 3 3 3"
+                "columns": "4 3 3 3 3 3 3 3"
               },
               "Children": [
                 {
@@ -521,6 +541,17 @@
                     "tip": "What happens to the note this track is still sounding when the next one lands on it. Cut stops it; Release lets it play its own release under the new note; Sustain leaves it holding until an OFF."
                   },
                   "Children": []
+                },
+                {
+                  "Element": "Switch",
+                  "Parameter": "even_drive",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "options": "Peak,Loudness",
+                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this machine has always done and lets the knob add about five decibels on the way up. Loudness holds the area instead, so the knob changes the tone and not the level. Peak is what every preset written before this was made against."
+                  },
+                  "Children": []
                 }
               ]
             }
@@ -541,9 +572,20 @@
               "Properties": {
                 "cell": "26",
                 "gap": "4",
-                "columns": "3 3 3 3 3 3"
+                "columns": "5 4 3 3 3 3 3"
               },
               "Children": [
+                {
+                  "Element": "Switch",
+                  "Parameter": "filter_first",
+                  "Label": "",
+                  "Properties": {
+                    "span": "5",
+                    "options": "Drive first,Filter first",
+                    "tip": "Which comes first. Drive first squares the wave up and then takes the top off what it made, which is what this machine has always done; Filter first shapes the wave and then rounds off what is left, so a resonant peak is not applied to something already squared off."
+                  },
+                  "Children": []
+                },
                 {
                   "Element": "Knob",
                   "Parameter": "cutoff",

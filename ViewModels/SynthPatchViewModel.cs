@@ -64,6 +64,46 @@ public sealed class SynthPatchViewModel : ObservableObject
     /// <summary>Duty only means anything to the pulse wave, so the row hides for the others.</summary>
     public bool IsPulse => _patch.Wave == SynthWave.Pulse;
 
+    /// <summary>
+    /// Whether the drive holds its loudness rather than its peak.
+    /// </summary>
+    /// <remarks>
+    /// Written out rather than going through <see cref="Set(Action{double}, double, double,
+    /// double, double, string[])"/>, which is about a number in a range and would read a switch
+    /// as a value 0.0001 away from another value.
+    /// </remarks>
+    public bool EvenDrive
+    {
+        get => _patch.EvenDrive;
+        set
+        {
+            if (_patch.EvenDrive == value) return;
+
+            _patch.EvenDrive = value;
+            Bump();
+
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
+    /// <summary>Whether the filter runs before the drive rather than after it.</summary>
+    /// <remarks><inheritdoc cref="EvenDrive" path="/remarks"/></remarks>
+    public bool FilterFirst
+    {
+        get => _patch.FilterFirst;
+        set
+        {
+            if (_patch.FilterFirst == value) return;
+
+            _patch.FilterFirst = value;
+            Bump();
+
+            OnPropertyChanged();
+            _changed();
+        }
+    }
+
     /// <summary>How wide the pulse is, which only the pulse wave hears.</summary>
     public double Duty
     {

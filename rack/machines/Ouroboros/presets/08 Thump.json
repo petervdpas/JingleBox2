@@ -11,7 +11,7 @@
   "cutoff": 150,
   "resonance": 0.15,
   "env_amp": 1,
-  "volume": 0.6,
+  "volume": 0.25,
   "attack": 0,
   "sustain": 0,
   "decay": 120,

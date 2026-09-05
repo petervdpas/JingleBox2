@@ -1,0 +1,11 @@
+{
+  "Name": "Open",
+  "Effect": "effect.sweeper",
+  "cutoff": 20000,
+  "resonance": 0.0,
+  "drive": 1.0,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 0,
+  "mix": 1.0
+}

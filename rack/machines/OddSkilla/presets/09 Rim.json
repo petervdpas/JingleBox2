@@ -12,7 +12,7 @@
   "sustain": 0,
   "release": 8,
   "drive": 1,
-  "level": 0,
+  "level": -12.5,
   "cutoff": 0.848023,
   "resonance": 0.6,
   "vib_rate": 0,

@@ -272,12 +272,30 @@ Reverb and the compressor are each a piece of work on their own and go last for 
    effect's id and what its knobs were at, and a knob pointed at one resolves against the chain
    in front of you. What is left of the step is the footswitch, which is bypass as a part on the
    face rather than the power button on the block, and a lane over the pattern.
-5. **The other five engines.**
+5. **The filter and the drive. Done.** `SoundDevices/SoundEffects/Sweep.cs` is Sweeper, four
+   poles with a drive in front of them, three modes and a cutoff that glides in cents;
+   `Drive.cs` is Roaster, a tilt into a curve into a centring filter, with the level the curve
+   costs given back. Both ship six presets. The plan said these two were cheap because the maths
+   was already written per voice in `Tracker/Synth/`, and that held: what moved across was the
+   arithmetic and not the class, since a voice is mono and short lived and a track is two
+   channels running for a show.
+
+   Two faults the tests caught that reading would not have. The high pass was the band pass
+   under another name, because four poles read as high then low is a band exactly as low then
+   high is; and the drive stepped a fifth of its level off its own stop, because the fade was on
+   the makeup rather than on the curve, which is the synth's own trap arrived at from a new
+   direction. A third was caught by measuring rather than by thinking: the bias cannot be taken
+   out by subtracting what the curve does to it, since once the curve saturates the offset is
+   not that number, so it comes out with a filter.
+
+6. **The other three engines.** Reverb, EQ and the compressor.
 
 ## Still open
 
 - **What the six are called.** A machine is not called Sampler, it is called Zampler, and a pedal
-  wants the same treatment. Nothing about the design waits on it, but the folders do.
+  wants the same treatment. Three are named: EchoBox, Sweeper and Roaster. The names are the
+  manifest's business and are somebody's to edit; the ids under them are not, since a chain
+  writes those down.
 - Nothing about where the designer lives: both worlds are tabs inside DESIGNER, which is the one
   switch under Looks that already decides whether the workshop is shown at all.
 - **Whether an effect can be pointed at while its face is not in front of you.** A machine link

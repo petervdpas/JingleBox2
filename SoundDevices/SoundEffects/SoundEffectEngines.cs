@@ -25,6 +25,8 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
         new(StringComparer.OrdinalIgnoreCase)
         {
             [EchoBox] = (id, rate, _) => new Delay(rate, id),
+            [Sweeper] = (id, rate, _) => new Sweep(rate, id),
+            [Roaster] = (id, rate, _) => new Drive(rate, id),
         };
 
     /// <summary>
@@ -36,6 +38,14 @@ public sealed class SoundEffectEngines : ISoundEffectEngines
     /// called on the rack is the manifest's business and is somebody's to edit; this is not.
     /// </remarks>
     public const string EchoBox = "effect.echobox";
+
+    /// <summary>Sweeper, which is a resonant filter with a drive into it.</summary>
+    /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
+    public const string Sweeper = "effect.sweeper";
+
+    /// <summary>Roaster, which is a drive.</summary>
+    /// <remarks><inheritdoc cref="EchoBox" path="/remarks"/></remarks>
+    public const string Roaster = "effect.roaster";
 
     /// <inheritdoc/>
     public bool Has(string? id) => id is { Length: > 0 } && Built.ContainsKey(id);

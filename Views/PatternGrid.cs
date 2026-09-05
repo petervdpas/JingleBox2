@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Data;
@@ -35,10 +36,6 @@ public sealed class PatternGrid : ThemedControl
     /// <summary>Where typing goes: the line, the track and which column of it.</summary>
     public static readonly StyledProperty<PatternCursor> EditCursorProperty =
         AvaloniaProperty.Register<PatternGrid, PatternCursor>(nameof(EditCursor), PatternCursor.Start);
-
-    /// <inheritdoc cref="PlayingLine"/>
-    public static readonly StyledProperty<int> PlayingLineProperty =
-        AvaloniaProperty.Register<PatternGrid, int>(nameof(PlayingLine), -1);
 
     /// <summary>Which rows are shaded: every beat, and more strongly every fourth of them.</summary>
     public static readonly StyledProperty<int> LinesPerBeatProperty =
@@ -83,7 +80,7 @@ public sealed class PatternGrid : ThemedControl
     /// </summary>
     static PatternGrid()
     {
-        AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty, PlayingLineProperty,
+        AffectsRender<PatternGrid>(PatternProperty, EditCursorProperty,
             LinesPerBeatProperty, RowHeightProperty, DropTargetTrackProperty,
             BeforeProperty, AfterProperty, HalfViewProperty);
         AffectsMeasure<PatternGrid>(PatternProperty, RowHeightProperty,
@@ -124,13 +121,6 @@ public sealed class PatternGrid : ThemedControl
     {
         get => GetValue(EditCursorProperty);
         set => SetValue(EditCursorProperty, value);
-    }
-
-    /// <summary>The line the player is on, or -1 when stopped.</summary>
-    public int PlayingLine
-    {
-        get => GetValue(PlayingLineProperty);
-        set => SetValue(PlayingLineProperty, value);
     }
 
     /// <inheritdoc cref="LinesPerBeatProperty"/>
@@ -323,8 +313,8 @@ public sealed class PatternGrid : ThemedControl
         var bounds = new Rect(Bounds.Size);
         var palette = ThemePalette.From(this);
 
-        var text = palette.TextBrush;
-        var muted = palette.MutedBrush;
+        var text = palette.Text;
+        var muted = palette.Muted;
 
         double contentHeight = metrics.ContentHeight(pattern.Lines);
 
@@ -352,9 +342,6 @@ public sealed class PatternGrid : ThemedControl
             else if (line % lpb == 0)
                 context.FillRectangle(beatShade, new Rect(0, y, rowWidth, RowHeight));
 
-            if (line == PlayingLine)
-                context.FillRectangle(palette.AccentTint(60), new Rect(0, y, rowWidth, RowHeight));
-
             DrawRow(context, metrics, pattern, line, y, text, muted);
         }
 
@@ -365,7 +352,7 @@ public sealed class PatternGrid : ThemedControl
 
     /// <summary>One line: its number in the gutter, then every note column of every track.</summary>
     private void DrawRow(DrawingContext context, PatternMetrics metrics, Pattern pattern,
-        int line, double y, IBrush text, IBrush muted)
+        int line, double y, Color text, Color muted)
     {
         DrawText(context, line.ToString("00", CultureInfo.InvariantCulture), 0, y, muted);
 
@@ -416,8 +403,8 @@ public sealed class PatternGrid : ThemedControl
     private void DrawNeighbours(DrawingContext context, PatternMetrics metrics,
         ThemePalette palette, double rowWidth, int lines)
     {
-        var ghost = palette.MutedBrush;
-        var text = palette.TextBrush;
+        var ghost = palette.Muted;
+        var text = palette.Text;
 
         using var faded = context.PushOpacity(GhostOpacity);
 
@@ -449,7 +436,7 @@ public sealed class PatternGrid : ThemedControl
     /// in the space above or below the pattern.
     /// </summary>
     private void DrawGhost(DrawingContext context, PatternMetrics metrics, ThemePalette palette,
-        Pattern pattern, int line, double y, double rowWidth, IBrush text, IBrush muted)
+        Pattern pattern, int line, double y, double rowWidth, Color text, Color muted)
     {
         context.FillRectangle(palette.RowShade(0x0A), new Rect(0, y, rowWidth, RowHeight));
 
@@ -537,14 +524,74 @@ public sealed class PatternGrid : ThemedControl
         context.DrawRectangle(new Pen(palette.AccentBrush, 1), area);
     }
 
-    /// <summary>One piece of lettering, sat on the middle of its row whatever height that is.</summary>
-    private void DrawText(DrawingContext context, string text, double x, double y, IBrush brush)
+    /// <summary>
+    /// One piece of lettering, sat on the middle of its row whatever height that is.
+    /// </summary>
+    /// <remarks>
+    /// Laid out once for each thing it ever has to say, and kept. A pattern is a wall of the same
+    /// few dozen strings drawn over and over, and laying one out is not free: it is a shaping run
+    /// with buffers behind it. Made fresh for every cell of every frame this alone was allocating
+    /// **48 megabytes a second** with a pattern on screen and the transport running, which the
+    /// runtime answered with sixty collections and a third of a second of every thread stopped in
+    /// every five, and a third of a second of stopped threads is a stumble in the audio however
+    /// little the mixing itself is doing. On any other page the same transport allocated 0.1.
+    ///
+    /// Keyed by the colour rather than by the brush, because <see cref="ThemePalette"/> hands back
+    /// a new brush on every read: a cache keyed on the object would never hit once and would grow
+    /// for ever, which is the same fault one layer along.
+    ///
+    /// Emptied when the lettering is remeasured, which is the only thing that can make what is in
+    /// here wrong, and again if it ever grows past what a pattern could honestly need.
+    /// </remarks>
+    private void DrawText(DrawingContext context, string text, double x, double y, Color colour)
     {
-        var formatted = new FormattedText(text, CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight, _typeface, _fontSize, brush);
+        var key = (text, colour.ToUInt32());
+
+        if (!_lettering.TryGetValue(key, out var formatted))
+        {
+            if (_lettering.Count > MostLettering) _lettering.Clear();
+
+            formatted = new FormattedText(text, CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight, _typeface, _fontSize, Ink(colour));
+
+            _lettering[key] = formatted;
+        }
 
         context.DrawText(formatted, new Point(x, y + (RowHeight - formatted.Height) / 2));
     }
+
+    /// <summary>The brush for a colour, made once.</summary>
+    /// <remarks>
+    /// Two of them in practice, and they are held for the same reason the lettering is: a brush
+    /// made per cell is a brush the collector has to take away again.
+    /// </remarks>
+    /// <param name="colour">What to paint with.</param>
+    private IBrush Ink(Color colour)
+    {
+        if (_inks.TryGetValue(colour.ToUInt32(), out var brush)) return brush;
+
+        brush = new SolidColorBrush(colour);
+        _inks[colour.ToUInt32()] = brush;
+
+        return brush;
+    }
+
+    /// <summary>Every string this grid has had to draw, laid out, by what it says and its colour.</summary>
+    private readonly Dictionary<(string Text, uint Colour), FormattedText> _lettering = new();
+
+    /// <summary>And a brush for each colour it has been asked for.</summary>
+    private readonly Dictionary<uint, IBrush> _inks = new();
+
+    /// <summary>
+    /// How much lettering is kept before the lot is thrown away and gathered again.
+    /// </summary>
+    /// <remarks>
+    /// A pattern says a few hundred different things: a hundred and twenty note names and a blank,
+    /// two hundred and fifty six instrument numbers, as many volumes, and the effect column. Two
+    /// colours apiece. Past this something is being drawn that was not foreseen, and starting
+    /// again costs one frame where growing without end costs the session.
+    /// </remarks>
+    private const int MostLettering = 4096;
 
     /// <summary>
     /// Puts the cursor where the click landed, and decides what happens to the block.
@@ -719,12 +766,27 @@ public sealed class PatternGrid : ThemedControl
     /// </remarks>
     private void EnsureMetrics()
     {
+        if (_measuredAt == RowHeight) return;
+
+        _measuredAt = RowHeight;
         _fontSize = Math.Max(9, RowHeight - 5);
         _typeface = new Typeface(PatternFont.Family);
 
         var probe = new FormattedText("0", CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight, _typeface, _fontSize, Brushes.White);
         _charWidth = probe.Width > 0 ? probe.Width : _fontSize * 0.6;
+
+        _lettering.Clear();
     }
+
+    /// <summary>
+    /// The row height the lettering was last measured at, or nought before it ever was.
+    /// </summary>
+    /// <remarks>
+    /// The row height is the only thing this measurement depends on, and it hardly ever moves,
+    /// so measuring on every frame was a font lookup and a shaping run for an answer that was
+    /// already correct. Nought rather than a flag, since no row is nought high.
+    /// </remarks>
+    private double _measuredAt;
 
 }

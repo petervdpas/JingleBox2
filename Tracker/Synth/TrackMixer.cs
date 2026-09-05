@@ -1827,28 +1827,21 @@ public sealed class TrackMixer : ITrackMixer
     private int _room;
 
     /// <summary>Below this the bus is a wire; above it, it bends. Roughly -3 dB.</summary>
-    public const float Knee = 0.7f;
+    public const float Knee = Audio.OutputCurve.Knee;
 
     /// <summary>
-    /// Saturates rather than clipping. A chord of voices can sum past full scale, and a hard
-    /// clip on that sounds like a fault; this bends instead.
+    /// Saturates rather than clipping, and silences what is not a number.
     /// </summary>
     /// <remarks>
-    /// Bending starts at the knee rather than at zero. Recordings come through here too now,
-    /// and a curve applied from the bottom up would quietly reshape every sample in the song
-    /// on its way out, which is not the bus's business. Only what is loud enough to be a
-    /// problem is touched.
+    /// The rule itself is <see cref="Audio.Interfaces.IOutputCurve"/>, one layer down, because
+    /// the tracker's mix is not the only way out: a pad leaves through its own stream, and a
+    /// guard on one of the two is a guard on half the application.
     /// </remarks>
-    public static float SoftClip(float value)
-    {
-        float magnitude = MathF.Abs(value);
-        if (magnitude <= Knee) return value;
+    /// <param name="value">The sample as whatever made it left it.</param>
+    public static float SoftClip(float value) => Curve.Bend(value);
 
-        float over = (magnitude - Knee) / (1 - Knee);
-        float shaped = Knee + (1 - Knee) * MathF.Tanh(over);
-
-        return value < 0 ? -shaped : shaped;
-    }
+    /// <summary>The one curve everything leaving goes through.</summary>
+    private static readonly Audio.Interfaces.IOutputCurve Curve = new Audio.OutputCurve();
 
     /// <inheritdoc/>
     /// <remarks>

@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using JingleBox2.Rack.SoundDevices;
 using JingleBox2.Rack.SoundDevices.Faces;
+using JingleBox2.Rack.SoundDevices.Interfaces;
 using JingleBox2.Tracker;
 using JingleBox2.SoundDevices.SoundMachines;
 using System;
@@ -45,6 +47,14 @@ public sealed partial class SoundMachinePresetDesk : ObservableObject
     /// <summary>How a preset file is read and written.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
     private static readonly ISoundMachinePresetFile PresetFiles = new SoundMachinePresetFile();
+
+    /// <summary>How loud one note of a preset really gets, by rendering it.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IPresetLoudness Loud = new PresetLoudness();
+
+    /// <summary>How much room a device has to leave under full scale.</summary>
+    /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
+    private static readonly IHeadroom Room = new Headroom();
 
     /// <summary>Whether two paths are one file, by this machine's rules.</summary>
     private readonly IFilePaths _paths = new FilePaths();
@@ -114,6 +124,36 @@ public sealed partial class SoundMachinePresetDesk : ObservableObject
     [ObservableProperty] private bool moved;
 
     /// <summary>
+    /// How much room the picked preset leaves under full scale, in the words the page shows.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than left to whoever picks the preset up afterwards, because this is the page
+    /// where the number that decides it is typed. A level knob reading nought says nothing about
+    /// how loud a preset is: the drive, the resonance and the envelope are all in the same chain
+    /// and each can add several decibels without saying so, which is how every preset this
+    /// application shipped came to be at full scale on one note with every level knob at nought.
+    /// The only honest answer is the one the engine gives, and it costs about fifteen
+    /// milliseconds, so it can be given while somebody is looking at the preset.
+    ///
+    /// Empty where there is nothing to say: no preset picked, or one whose loudness is not the
+    /// machine's to answer, which is any preset that plays a recording somebody else made.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLoudness))]
+    private string loudness = "";
+
+    /// <summary>True when there is a reading to show.</summary>
+    public bool HasLoudness => Loudness.Length > 0;
+
+    /// <summary>True when the picked preset is louder than a device should ship.</summary>
+    /// <remarks>
+    /// Drawn rather than refused. Nothing here stops a preset being saved loud, since a machine
+    /// built to be slammed is allowed to exist and the person building it should have to mean it;
+    /// what this does is make the number impossible to miss at the moment it is being chosen.
+    /// </remarks>
+    [ObservableProperty] private bool cramped;
+
+    /// <summary>
     /// Reads the picked preset's file and builds the form from it.
     /// </summary>
     /// <remarks>
@@ -132,6 +172,8 @@ public sealed partial class SoundMachinePresetDesk : ObservableObject
         Moved = false;
         Form = null;
         Browses = false;
+        Loudness = "";
+        Cramped = false;
         _held = null;
 
         if (value == null) return;
@@ -181,13 +223,64 @@ public sealed partial class SoundMachinePresetDesk : ObservableObject
                 new SoundMachineProjectShape(
                     project?.Panel,
                     (IReadOnlyList<Parameter>?)project?.Parameters ?? Array.Empty<Parameter>()),
-                () => Moved = true,
+                Touched,
                 Folder);
+
+            Listen();
         }
         catch (Exception ex)
         {
             Problem = "It could not be read: " + ex.Message;
         }
+    }
+
+    /// <summary>
+    /// Said by the form when a line was filled in, which makes the loudness reading stale.
+    /// </summary>
+    /// <remarks>
+    /// The reading is of the file on the disc, since that is the only shape the engine can be
+    /// handed, so a form somebody has typed into is describing a preset that no longer exists.
+    /// Leaving the old number there would be worse than leaving none: it reads as a measurement
+    /// of what is on the screen. It comes back on saving, which is the moment somebody wants it.
+    /// </remarks>
+    private void Touched()
+    {
+        Moved = true;
+
+        if (HasLoudness) Loudness = "Not measured since you changed it. Save the preset.";
+
+        Cramped = false;
+    }
+
+    /// <summary>
+    /// Plays one note of the picked preset at several pitches and says how loud it got.
+    /// </summary>
+    /// <remarks>
+    /// Read off the disc rather than out of the form, because what renders a preset is the engine
+    /// and what the engine is handed is an instrument, which is what the preset reader makes of a
+    /// file. So this is called where the file and the form agree: on picking one, and on saving.
+    ///
+    /// A preset the reader will not read, or one on a machine this build has no engine for, says
+    /// nothing rather than nought. Nought is a real reading and means silence, which is a
+    /// different thing from not having asked.
+    /// </remarks>
+    private void Listen()
+    {
+        Loudness = "";
+        Cramped = false;
+
+        if (Picked is not { } one || _project() is not { } machine) return;
+        if (PresetFiles.Read(one.Path, machine) is not { } sound) return;
+        if (Loud.Peak(sound) is not { } peak) return;
+
+        double left = Room.Room(peak);
+
+        Cramped = Room.Cramped(peak);
+
+        Loudness = Cramped
+            ? $"One note peaks {left:F1} dB under full scale, which is {Room.Least - left:F1} dB " +
+              $"louder than a preset should ship. Nobody can play a chord on it."
+            : $"One note peaks {left:F1} dB under full scale.";
     }
 
     /// <summary>The preset itself, which every line on the page reads and writes.</summary>
@@ -420,6 +513,7 @@ public sealed partial class SoundMachinePresetDesk : ObservableObject
             Problem = "";
             Moved = false;
 
+            Listen();
             Reread();
         }
         catch (Exception ex)

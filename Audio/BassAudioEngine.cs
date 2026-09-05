@@ -1119,6 +1119,16 @@ public sealed class BassAudioEngine : IAudioEngine
     }
 
     /// <summary>
+    /// The curve everything leaving this engine goes through, the same one the master uses.
+    /// </summary>
+    /// <remarks>
+    /// A pad's audio never touches the tracker's mixer, so the guard on the master reached none
+    /// of it: an effect on a pad's chain handing back a NaN wrote it straight back into the
+    /// sound library's own buffer and out of the card. One rule and both ways out.
+    /// </remarks>
+    private static readonly Interfaces.IOutputCurve Leaving = new OutputCurve();
+
+    /// <summary>
     /// One piece of a block: out of the channel's buffer, through the effect, and back in.
     /// Returns false when the effect fell over, which costs the rest of that block only.
     /// </summary>
@@ -1166,6 +1176,8 @@ public sealed class BassAudioEngine : IAudioEngine
         {
             return false;
         }
+
+        Leaving.Bend(scratch, frames * 2);
 
         if (channels == 1)
         {

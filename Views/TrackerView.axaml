@@ -343,12 +343,21 @@
             <ScrollViewer x:Name="GridScroll" Grid.Row="0"
                           HorizontalScrollBarVisibility="Auto"
                           VerticalScrollBarVisibility="Auto">
+              <!-- The pattern, and the transport's band laid over it rather than drawn into it.
+
+                   Two controls because they change at completely different rates. The pattern
+                   changes when somebody edits it; the band moves every line the transport
+                   reaches, and while it was a property on the grid that meant repainting every
+                   piece of lettering on the page eight times a second, which allocated 48 MB a
+                   second on the drawing thread and stopped every thread in the process long
+                   enough to be heard in the audio. The band takes no clicks, so the grid under
+                   it still answers the mouse exactly as before. -->
+              <Panel>
               <views:PatternGrid x:Name="Grid"
                                  Pattern="{Binding CurrentPattern}"
                                  Before="{Binding PatternBefore}"
                                  After="{Binding PatternAfter}"
                                  EditCursor="{Binding Cursor, Mode=TwoWay}"
-                                 PlayingLine="{Binding PlayingLine}"
                                  LinesPerBeat="{Binding LinesPerBeat}"
                                  Selection="{Binding Selection, Mode=TwoWay}">
 
@@ -462,6 +471,11 @@
                   </ContextMenu>
                 </views:PatternGrid.ContextMenu>
               </views:PatternGrid>
+
+              <views:PlayingLineMark x:Name="Playhead" PlayingLine="{Binding PlayingLine}"
+                                     RowHeight="{Binding #Grid.RowHeight}"
+                                     TopPad="{Binding #Grid.HalfView}" />
+              </Panel>
             </ScrollViewer>
 
             <!-- Each strip asks for what it wants and the pattern is measured in what is

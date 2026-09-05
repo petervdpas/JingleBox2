@@ -43,6 +43,10 @@ public sealed class HelpText : IHelpText
     public const string MixerStrips = "mixer.strips";
     /// <summary>What the designer's two tabs are, and what a machine and an effect each are.</summary>
     public const string DesignerWorlds = "designer.worlds";
+    /// <summary>Dropping parts on a face and saying what each one turns.</summary>
+    public const string DesignerLayingOut = "designer.laying-out";
+    /// <summary>How loud a preset should be, and why a level knob cannot answer that.</summary>
+    public const string DesignerHeadroom = "designer.headroom";
     /// <summary>Every key the application answers.</summary>
     public const string AppShortcuts = "app.shortcuts";
     /// <summary>What a pad plays, and what happens when it is hit.</summary>

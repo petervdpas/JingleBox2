@@ -1,0 +1,11 @@
+{
+  "Name": "Take The Mud",
+  "Effect": "effect.sweeper",
+  "cutoff": 180,
+  "resonance": 0.1,
+  "drive": 1.0,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 2,
+  "mix": 1.0
+}

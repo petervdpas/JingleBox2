@@ -1,0 +1,11 @@
+{
+  "Name": "Sing",
+  "Effect": "effect.sweeper",
+  "cutoff": 900,
+  "resonance": 0.92,
+  "drive": 4.0,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 0,
+  "mix": 0.85
+}

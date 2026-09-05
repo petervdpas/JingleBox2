@@ -550,6 +550,151 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   silently and correctly, and what somebody hears is a control that did not move. It also says out
   loud when it cannot find the folder, since a test that quietly passes where its subject is
   missing reports nothing for the rest of its life
+- **A device has to leave room, and every preset this application shipped was at full scale.**
+  Eighteen of OddSkilla's twenty peaked between 0.96 and 1.000 on one note with every level knob
+  sitting at nought, and three were over it; all eight of Ouroboros's were between 0.45 and 1.00.
+  One note filling the output means the second note is already past the end, so a chord, or any
+  second track, drove the master's saturation as a waveshaper rather than as a safety net. The
+  reported symptom was a song crackling, and the crackle was real: at the drive and the two
+  level knobs one song actually used, the peak into the master was 4.21 and 80% of the samples
+  were past full scale, with the worst step between two neighbouring samples after bending at
+  0.418, which is an edge with content all the way up
+- **A level knob cannot answer how loud a preset is**, which is why nobody had noticed. The level
+  is one term in a chain whose other terms are not marked in decibels. The drive squares a saw up
+  and its makeup is peak-normalised, so it holds the peak while the loudness climbs: measured on
+  that song's patch, drive 1 to 8.1 took the RMS from 0.339 to 0.642, **+5.6 dB**, from a control
+  whose own remarks say it changes the tone and not the loudness. Then the resonant filter sits
+  *after* the drive, boosting a wave that is already squared off: the same patch peaks 0.866 at
+  resonance nought and 1.057 at 0.30. So the only honest answer is the one the engine gives
+- **`IHeadroom` is the rule and it is in the published assembly**, because this is an SDK and a
+  machine somebody else writes has to be able to read what is expected of it. It knows nothing
+  about audio: how much room one note has to leave, what room a measured peak leaves, and whether
+  that is short. `Headroom.LeastDecibels` is **12**, and that is arithmetic rather than taste.
+  Four notes of equal level sum to twelve decibels above one when they line up, so a four note
+  chord at unity still arrives under full scale; eight tracks of unrelated material sum to about
+  nine
+- **There is no standard for a preset, and there are two for the signal around it.** EBU R 68 and
+  SMPTE RP 155 put alignment level, where one lone signal is expected to sit, at -18 dBFS and
+  -20 dBFS. EBU R 128 puts a finished programme at -23 LUFS with a true peak ceiling of -1 dBTP.
+  Neither is about presets and both say the same thing about them, which is that one signal has no
+  business being near the top. Twelve lands between those and the ceiling, which is where a device
+  that also has to be audible beside somebody's own normalised takes can honestly sit
+- **`IPresetLoudness` is the measurement and it is application code**, since it needs an engine
+  and the engines are compiled in. It renders one note at nine pitches two octaves either side of
+  middle C, because the answer moves with pitch: a filter at a fixed frequency is open under a low
+  note and shut over a high one. Fixed rate and a pinned noise seed, so the same preset answers
+  the same number on every machine and twice running. It answers **nothing** rather than nought
+  for a sampler, a kit, a recording or a plugin: those are as loud as the take somebody put on
+  them, and a number there would send whoever read it to turn down a knob that is not the cause
+- **The reading is on the designer's presets page, under the preset's own name**, in warm colour
+  when it is short, with a help badge on `designer.headroom` beside it. That is the guidance the
+  whole exercise is for: the number is chosen on that page and could not be worked out by looking
+  at it, so the page plays the preset and says what came out. About fifteen milliseconds, which is
+  one frame, so it can be given while somebody is looking. It goes stale the moment a line is
+  edited and says so rather than showing the old number, since a measurement of the file read as a
+  measurement of the form is worse than none; it comes back on saving
+- **Said and not enforced.** Nothing refuses a loud preset, because a machine built to be slammed
+  is entitled to exist and whoever built it should have to mean it. What is refused is a *shipped*
+  one: `Tests/PresetHeadroomTests.cs` walks `rack/machines`, renders every preset this build has an
+  engine for, and names the one that is over. It also pins the other end, that none of them is so
+  quiet nobody would pick it, because the fix for the first fault is to turn everything down and
+  half a bank dropped too far reads as broken rather than as quiet
+- The twenty eight generated presets now land between 12.0 and 12.5 dB of room. OddSkilla's went
+  to about -12 dB on the `level` knob and Ouroboros's to about a quarter on its `volume`, each
+  normalised to the ceiling rather than shifted by a constant, since a preset is picked on its own
+  and every one of them should audition at a comparable level. Nothing in anybody's song moved: a
+  song owns its instruments with their own settings, and what changes is where a preset picked
+  from now on starts
+- **Both reasons a preset went loud are now switches, and a switch here is a parameter on the
+  box.** Not a tick in SETTINGS, which would change every song at once and travel with nothing, and
+  not a control on a mixer strip, which is levels and sends and has no business holding a fact
+  about somebody's drive knob. It is the rule `NewNoteAction` already keeps: a fact about the
+  sound, wherever it is played, saved with the instrument and with the preset. As a parameter it
+  goes in `machine.json` and `effect.json`, travels in the song and in the zip, and can be pointed
+  at by a knob and automated, none of which a tick box can do
+- **`SynthPatch.EvenDrive` is what the drive is levelled out by**, and it is two switches rather
+  than one because they are two things and one of them is a feature. Peak is `1/tanh(drive)`,
+  which maps full scale to full scale: it holds the height of the wave and says nothing about its
+  area, and a drive squares a wave up, so the knob added 5.5 dB while its own summary said it
+  gets no louder. Loudness works the correction out from the wave the drive is actually handed,
+  which is `ISaturation.Evenly` over one period from `IOscillator.Period`
+- **`SynthPatch.FilterFirst` is a tone control that happens to be the other half of the fix.**
+  Drive into filter and filter into drive are two different instruments, which is why real synths
+  put the choice on the front panel; what it also does is stop a resonant peak being applied to a
+  wave that has already been squared off, which is the difference between the same patch peaking
+  0.866 and 1.057. Measured on the patch the crackle was reported on: both off is peak 1.0566 with
+  the knob adding +5.50 dB, Loudness alone is 0.6516 and +1.30, and both together are 0.4511 and
+  +0.64
+- **The makeup has to be measured against what reaches the drive, not against the oscillator.**
+  With the filter first it is the filter's output that is driven, and a correction worked out from
+  the raw wave was 3.33 dB out; running the oscillator through a filter of its own for two
+  thousand samples and measuring the next thousand brings it to 0.64. A filter of its own rather
+  than the voice's, which has not started and must be handed the note with no memory in it. It is
+  constructor work on whichever thread started the note, never on the audio thread
+- **An effect cannot be handed the wave it is about to work on**, so `ILoudnessMakeup` measures
+  what went past instead: two running mean squares either side of the curve at fifty milliseconds
+  and the square root of their ratio. One pair for the whole effect and not one a side, since a
+  correction worked out per side is a gain that drifts between them and moves the stereo image
+  about. One while either follower is under `Faintest`, because a ratio of two numbers that are
+  both nearly nought is noise and it would be applied to the first sample of whatever plays next.
+  On a steady tone it is exact: Roaster at amount 24 went from +8.79 dB to +0.00
+- Roaster gets `even`, Sweeper gets `even` and `filter_first`, OddSkilla gets `even_drive` and
+  `filter_first`. **Ouroboros gets neither, and that is not an oversight**: its chain is
+  oscillator, filter, amplifier with no drive anywhere in it, so one switch has nothing to level
+  and the other has nothing to reorder
+- **Every one of them defaults to what happened before**, which is the whole reason they could be
+  added without anybody hearing them first. A patch on disc says nothing about either field and
+  reads back as off, and `Tests/DriveSwitchTests.cs` pins the off numbers to three decimal places
+  rather than only comparing the switches with each other: a test that says two settings differ
+  passes just as happily when both of them have moved
+- The shipped effect presets gained the new keys at nought rather than being left silent about
+  them, since `Tests/ShippedPresetTests.cs` says a shipped preset sets every control the effect
+  has, and a preset that leaves one out is a control that quietly stays wherever the last preset
+  left it
+- **The audio stumbled and the fault was the pattern grid.** Reported as OddSkilla being too much
+  for the output, and it was neither OddSkilla nor the output: the same stumble was in another
+  song and had been there all along. The log said which of the two faults it was in one line.
+  Mean block cost 3% of the time it had, worst 113 to 221%, and beside it 40 gen-0 collections and
+  450 ms of every thread stopped in every five second window. **A block that is cheap on average
+  and occasionally enormous is not slow code, it is a pause**, and no amount of making the mixing
+  faster would have touched it
+- Which is why `IRenderCost` says how much was allocated as well as what was collected. Two of the
+  three numbers were there and the third is the one that says where to look: collections say
+  something is stopping the world, a rate in megabytes a second says how hard it is being asked
+  to. Every thread rather than this one, because here the thread that allocates and the thread
+  that suffers are never the same: the mixing allocates nothing at all
+- **Measured rather than guessed at, by moving one thing at a time.** The same transport running
+  with the pattern on screen allocated **48 MB/s**; with the mixer on screen instead, **0.1**; on
+  the pattern with the transport stopped, **0.1**. So it was the pattern being drawn while the
+  transport ran, and nothing else in the program
+- The cause was a property. `PlayingLine` was on the grid and in `AffectsRender`, so every line
+  the transport reached repainted the whole page: at 120 beats a minute and four lines to the
+  beat that is eight repaints a second, and each one drew a piece of lettering for every field of
+  every cell of every line. Thirteen hundred `DrawText` calls to move a highlight bar
+- **Laying the lettering out once and keeping it took 48 MB/s to 20**, which is worth having on
+  its own since it is paid on every repaint for any reason. `EnsureMetrics` was also making a
+  `Typeface` and measuring a probe glyph on every frame for an answer that only moves with the row
+  height. The cache is keyed by the colour and not by the brush, because `ThemePalette` hands back
+  a **new brush on every read**: keyed on the object it would never have hit once and would have
+  grown for ever
+- **What was left was Avalonia's own cost of asking for text to be drawn**, about two kilobytes a
+  call whatever it says, which no amount of caching on this side reaches. Proved by drawing the
+  same page with the cell text skipped: 95 MB became 2.2. So the only way down is fewer calls
+- **So the band moved off the grid.** `Views/PlayingLineMark.cs` is one filled rectangle in a
+  `Panel` over the grid inside the same scroll viewer, taking no clicks, and the grid no longer
+  knows what line is playing. It repaints when somebody edits something; the transport repaints a
+  rectangle. **48 MB/s to 0.7**, the pause from 350 ms to 40 in every five seconds, and the worst
+  block from 221% of its own time to 11%
+- The band is over the lettering now rather than under it, which is the one visible difference and
+  is a fifth of an opacity: it washes the text instead of sitting behind it. Under would mean the
+  grid painting no background of its own, and a control with no background takes no clicks, which
+  the grid very much does
+- The shape is worth keeping because it is not about tracker grids. **A property that changes
+  many times a second must not be on a control that is expensive to draw.** `AffectsRender` says
+  nothing about how much work a repaint is, so the cheapest possible thing to say and the dearest
+  possible thing to draw end up on the same invalidation. `Views/AutomationCurve.cs` has
+  `PlayingLine` in its own `AffectsRender` and is the same shape waiting to happen; it is folded
+  away by default and draws a handful of points, so it is left alone knowingly rather than missed
 - **An effect has presets, and the page for them is a form rather than a file.** It said no for a
   while, on the reasoning that a machine's preset is an instrument file and an effect has no
   instrument. That was an argument about how presets happened to be stored here rather than about
@@ -2423,6 +2568,127 @@ whole exercise and is worth writing down rather than summarising:
   is the cheap nine tenths of it
 - Measured on a real recording rather than on a tone. A steady sine's envelope is a solid block
   at every zoom and says nothing about resolution, which is an hour nobody needs to spend twice
+- **A plugin showing the host's knobs is the fallback working, and the fault is upstream of it.**
+  `docs/plugin-faces-on-windows.md` is the note for whoever picks up the Serum symptom on that
+  machine: what it means exactly, the three places the chain can end, the log lines each branch
+  writes, and two things already ruled out from here. The crash guard is the one worth naming,
+  since it is the obvious suspect and is wrong: `IsBlocked` stands down whenever plugins are
+  isolated, and Windows has been isolated since the bridge went everywhere, so the blocked list
+  in SETTINGS cannot cause this any more
+- The tell to look for is a **missing** line rather than a present one. `Vst3Editor` writes at
+  every step of the handover on purpose, so silence after `about to hand the plugin window` means
+  the call never returned, which is how the original Windows fault was found
+- **Two more effects of ours: Sweeper and Roaster**, which is the plan's filter and drive.
+  `SoundDevices/SoundEffects/Sweep.cs` is four poles with a drive in front of them, three modes
+  and a cutoff that glides in cents rather than in hertz, since a sweep that moves evenly in
+  hertz crawls through the two octaves anybody is listening to and leaps through the eight nobody
+  is. `Drive.cs` is a tilt into a curve into a centring filter. Six presets apiece, and the ids
+  are `effect.sweeper` and `effect.roaster`, which a chain writes down and which never change
+- The plan said these two were cheap because the maths was written already, per voice, in
+  `Tracker/Synth/`, and that held: **what moves across is the arithmetic and not the class**,
+  since a voice is mono and short lived and a track is two channels running for the length of a
+  show
+- **Three faults, and the tests found all three.** The high pass was the band pass under another
+  name, because four poles read as high then low is a band exactly as low then high is. The drive
+  stepped a fifth of its level the moment the knob left its stop, because the fade was on the
+  makeup rather than on the curve: the makeup levels the curve at full scale and nowhere else, so
+  fading it in leaves the curve arriving at full strength. That is the synth's own trap arrived
+  at from a new direction, which is worth knowing about a trap that has been written down once
+- The third only a measurement would have found. **A bias cannot be taken out by subtracting what
+  the curve does to it**: driven hard, a signal leaned by 0.4 spends most of its time against the
+  top of the curve, so what comes out is nearly constant and subtracting `tanh(bias * amount)`
+  leaves a step three quarters of full scale. It comes out with a filter, since what is left when
+  a signal is taken away from itself a moment ago is whatever moved, and an offset is precisely
+  the part that does not
+- **A held key stacked up voices, and the log said so in two numbers.** One key held for a
+  couple of seconds took the mixer from one voice to forty eight, which is where it starts
+  stealing, and what reached the master summed to 4.34 where full scale is one: four times too
+  much into the master's saturation, heard as crackle. The collector heard it too, 345 ms of
+  every thread stopped in one five second window with blocks hitting 182% of the 11.6 ms they
+  had. **The machine was never the problem**: the quiet windows either side read two per cent and
+  nothing collected
+- The cause was one rule covering one of its two cases. `EnterNote` dropped a repeated key only
+  while another key was down, which is the chord case and is written up in its own remarks; a
+  single held key fell through to the preview, and each repeat started a voice holding for
+  `HeldNoteSeconds`, which is ten. At thirty repeats a second that is sixty voices alive at once
+  from one finger
+- **Writing and sounding are two acts and a repeat wants one without the other.**
+  `INotePress` is the three answers on their own, out where they can be put a question to without
+  a song or a keyboard: nothing under a chord, write without sounding on a repeat, sound and
+  write on a fresh key. It was one call returning early, which is why the missing case was
+  invisible
+- Worth keeping the shape as well as the fix: **the symptom was audio and the fault was a
+  keyboard**, and no amount of reading the synth would have found it. What found it was the log's
+  own voice count beside its render cost, and the first thing that ruled the audio out was
+  rendering the song's exact patch in a test: worst sample step 0.043, nothing over 0.15 in 51200
+  samples
+- **Nothing that is not a real number reaches the sound card, and there was more than one way
+  out.** `IOutputCurve` is the last thing a sample goes through: what is merely too loud is bent,
+  since a chord summing past full scale is music and a hard corner on it sounds like a fault, and
+  what is not a number is silenced, since it is the absence of a sample rather than a loud one.
+  The master already bent, through `SoftClip`, and it could not survive a NaN: every comparison
+  against one is false, so it failed the test against the knee and `Tanh` handed one straight
+  back
+- The other way out had no guard at all. A pad never touches the tracker's mixer, so an effect on
+  a pad's chain handing back a NaN wrote it into the sound library's own buffer and out of the
+  card. One rule, one layer down, and both ways out go through it
+- **What that protects is not the card.** A converter puts out a bounded voltage whatever the
+  bits say, and no signal a program plays will damage one; software that sits on the hardware and
+  writes its registers, its clocks or its firmware is a different matter entirely and is real,
+  which is worth saying plainly rather than calling it a myth. This application has no path to
+  any of that, since everything leaves through BASS. What a bad buffer genuinely endangers is the
+  speakers and whoever is in the room: NaN at the converters commonly arrives as full scale noise
+- The test that was there said a poisoned block does not **outlive** the plugin that poisoned it,
+  which is a weaker promise than it looks: it rendered with the poison, took it away, and checked
+  the block after. What was missing was the block **during**, which is the one that reaches
+  somebody's speakers
+- **Every meter carries a clip lamp, and it belongs to the meter rather than to the strip.** A
+  light assembled per strip in the layout is the same three lines written three times with one
+  eventually forgotten; in `LevelMeter` it reaches the tracks, the master, the recorder, the pads
+  and any machine's face at once. It reads the level before the meter clamps it, since the bar
+  clamps to full scale and a lamp worked out from the clamped number could never fire
+- `IClipHold` is the rule, with the moment handed in rather than read off a clock, which is what
+  lets a two second hold be asked about without waiting two seconds. Latched, held, and put out
+  by a click, because a clip is an instant and a light nobody sees is a light that is not there.
+  A clock that jumps backwards puts it out rather than stranding it lit for ever
+- **A strip is six rows now, and everything on it lands in one of them.** Badge, pan, mute and
+  solo, the fader with its meter, the level reading, and the side chain. Only the fourth grows,
+  so the strips fill the page and every other row is at the same height on every strip, which is
+  what lets a mixer be read across. All three strip shapes use the same six, and the two that
+  have no side chain leave the last row empty rather than being a different shape
+- It was a `DockPanel`, and a dock panel has no places in it: it gives the rest of the room to
+  whichever child is **written last**. Adding a line of text after the fader handed the room to
+  the text and squeezed the fader and its meter into a band along the top of the strip. That is
+  not a thing to remember, it is a thing to stop being possible, which is what the rows are for
+- **The level reading is the strip's rather than the fader's**, and that is forced rather than
+  chosen: a fader is as wide as the longest reading it can show, so with the word inside that
+  string it claimed the width of `Level: -60.0 dB`, which on a 134 pixel strip is all of it, and
+  the meter beside it was squeezed out of existence, clip lamp and all. The strip is wider than
+  the fader and has the room the fader has not. `Fader.ShowValue` is how a fader is told the
+  reading is somebody else's, and it leaves it out of the measuring as well as the drawing
+- The reading is signed, `+0.0;-0.0;0.0`, so a fader above unity says so rather than leaving the
+  sign to be inferred from a number without one
+- The meter is inset by the clip lamp's own room and the fader is pushed down by the same amount,
+  so the two travels line up. Done the other way, by pulling the meter up, the lamp went through
+  the mute and solo buttons above it
+- It took three goes and two broken layouts to get there, and the reason each time was the same:
+  changing the shape before reading the container. The rows are the fix for that as much as for
+  the reading
+- It was drawn wrong three times before it was right, and every one is the same mistake: building
+  something beside the thing that already existed. Four pixels at a quarter opacity, which could
+  not be told from the meter's own frame, and **a lamp nobody can find while it is off is one
+  nobody trusts when it is on**. Then a cap across the bar, which reads as the bar running out of
+  room rather than as a lamp. Then a round lamp that called `Led.DrawLamp` when lit and drew its
+  own circle when dark, so a dark clip lamp and the dark lamp on a machine's face were two
+  different drawings. Both states go through the one call now, and the halo comes with it, which
+  matters because nobody is looking straight at a clip light when it fires
+- **A face is written in the panel's own vocabulary, and a property it does not know is ignored
+  in silence.** Both faces were written first with invented names, `spacing` and `padding` and
+  `size`, and drew as a cramped default with the labels truncated: the words are `cell`,
+  `columns`, `span`, `dial`, `gap`, `caption` and `corner`. Silence is right, since a face from a
+  later version has to open at all, and it is also how a face comes to look wrong for no visible
+  reason. `Help/Topics/designer.laying-out.md` says so, which is the topic that was missing: the
+  designer had one about what a machine and an effect are and nothing about laying a face out
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
   a row of boxes with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what

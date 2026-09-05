@@ -1,0 +1,10 @@
+{
+  "Name": "Warm",
+  "Effect": "effect.roaster",
+  "amount": 2.0,
+  "even": 0,
+  "tilt": -0.2,
+  "bias": 0.0,
+  "level": 0.0,
+  "mix": 1.0
+}

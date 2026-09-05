@@ -137,7 +137,7 @@ public partial class TrackerView : UserControl
         Grid.GetObservable(PatternGrid.EditCursorProperty)
             .Subscribe(new AnonymousObserver<PatternCursor>(FollowCursor));
 
-        Grid.GetObservable(PatternGrid.PlayingLineProperty)
+        Playhead.GetObservable(PlayingLineMark.PlayingLineProperty)
             .Subscribe(new AnonymousObserver<int>(FollowPlayhead));
     }
 

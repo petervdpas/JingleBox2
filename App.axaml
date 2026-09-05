@@ -534,6 +534,19 @@
             </Setter>
         </Style>
 
+        <!-- The same colour on a line of prose, for a reading that says something is wrong
+             rather than a button that would do something about it. Written out here rather than
+             set on each TextBlock, because a colour that means one thing has to come from one
+             place: the two on the presets page are a refusal and a level that would not fit in a
+             mix, and both want the same warmth. Full strength, so it beats cardHint's opacity
+             where the two are worn together. -->
+        <Style Selector="TextBlock.danger">
+            <Setter Property="Foreground">
+                <SolidColorBrush Color="{DynamicResource Color.Danger}" />
+            </Setter>
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+
         <!-- The two halves of having unsaved work, coloured rather than starred: a star is a
              character somebody has to know the meaning of and it moves the button's width as it
              comes and goes, where a colour is read without being decoded and from across the

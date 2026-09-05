@@ -1,0 +1,226 @@
+{
+  "Id": "effect.sweeper",
+  "Name": "Sweeper",
+  "Summary": "Filter. Four poles, a drive into them, and a cutoff that glides.",
+  "Author": "Peter van de Pas",
+  "Version": "1.1",
+  "Theme": {
+    "Accent": "#7A6CE0",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "cutoff",
+      "Name": "Cutoff",
+      "Unit": "Hz",
+      "Min": 20,
+      "Max": 20000,
+      "Default": 12000,
+      "Step": 1
+    },
+    {
+      "Key": "resonance",
+      "Name": "Reso",
+      "Unit": "",
+      "Min": 0,
+      "Max": 0.98,
+      "Default": 0.2,
+      "Step": 0.01
+    },
+    {
+      "Key": "drive",
+      "Name": "Drive",
+      "Unit": "",
+      "Min": 1,
+      "Max": 8,
+      "Default": 1,
+      "Step": 0.01
+    },
+    {
+      "Key": "even",
+      "Name": "Drive keeps",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "filter_first",
+      "Name": "Order",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "mode",
+      "Name": "Mode",
+      "Unit": "",
+      "Min": 0,
+      "Max": 2,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Sweeper",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Filter"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 3 3 4 5 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "cutoff",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "Where the filter turns over. It glides rather than jumps, so a sweep sounds like a sweep and not like a click a message."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "resonance",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How hard it rings at the cutoff. Near the top it is nearly singing, which is what the drive is there to lean on."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "drive",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How hard the signal is pushed into the filter, in front of it rather than after. This is what makes a resonant sweep sound like an instrument instead of a whistle."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "even",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Peak,Loudness",
+                    "width": "100",
+                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this effect has always done and lets the knob add several decibels on the way up. Loudness measures what actually went past and gives that back instead, so the knob changes the tone and not the level. Peak is what every chain written before this was made against."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "filter_first",
+                  "Label": "",
+                  "Properties": {
+                    "span": "5",
+                    "options": "Drive first,Filter first",
+                    "width": "120",
+                    "tip": "Which comes first. Drive first squares the signal up and the poles take the top off what it made, which is the screaming filter this effect was written as; Filter first shapes the signal and the curve rounds off what is left, so the resonance is not ringing on something that is already square."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "mode",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "options": "Low,Band,High",
+                    "width": "78",
+                    "tip": "Low keeps the weight, high keeps the air, band keeps only what is around the cutoff."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been through it."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

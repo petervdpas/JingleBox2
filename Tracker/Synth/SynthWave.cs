@@ -20,6 +20,17 @@ public sealed class Oscillator : IOscillator
     };
 
     /// <inheritdoc/>
+    public void Period(SynthWave wave, double duty, Span<double> into, Random? noise)
+    {
+        for (int at = 0; at < into.Length; at++)
+        {
+            double random = noise is null ? 0.0 : noise.NextDouble() * 2.0 - 1.0;
+
+            into[at] = Sample(wave, (at + 0.5) / into.Length, duty, random);
+        }
+    }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// A phase that is not a finite number starts again at nought. It cannot be brought back
     /// inside the cycle by arithmetic: every comparison against NaN is false, so it passed

@@ -95,6 +95,12 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
     /// <summary>How much it rings at the corner.</summary>
     private const string ResonanceKey = "resonance";
 
+    /// <summary>Whether the drive holds its loudness rather than its peak.</summary>
+    private const string EvenDriveKey = "even_drive";
+
+    /// <summary>Whether the filter runs before the drive rather than after it.</summary>
+    private const string FilterFirstKey = "filter_first";
+
     /// <summary>How fast the pitch wobbles.</summary>
     private const string VibratoRateKey = "vib_rate";
 
@@ -155,6 +161,8 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
 
         CutoffKey => patch.FilterCutoff,
         ResonanceKey => patch.FilterResonance,
+        EvenDriveKey => patch.EvenDrive ? 1 : 0,
+        FilterFirstKey => patch.FilterFirst ? 1 : 0,
         VibratoRateKey => patch.VibratoRateHz,
         VibratoDepthKey => patch.VibratoDepthCents,
         TremoloRateKey => patch.TremoloRateHz,
@@ -203,6 +211,8 @@ public sealed class SynthValues(SynthPatchViewModel patch, TrackerInstrument ins
             CutoffKey => Moved(patch.FilterCutoff, value, () => patch.FilterCutoff = value),
             ResonanceKey => Moved(
                 patch.FilterResonance, value, () => patch.FilterResonance = value),
+            EvenDriveKey => Moved(patch.EvenDrive, value, on => patch.EvenDrive = on),
+            FilterFirstKey => Moved(patch.FilterFirst, value, on => patch.FilterFirst = on),
             VibratoRateKey => Moved(patch.VibratoRateHz, value, () => patch.VibratoRateHz = value),
             VibratoDepthKey => Moved(
                 patch.VibratoDepthCents, value, () => patch.VibratoDepthCents = value),

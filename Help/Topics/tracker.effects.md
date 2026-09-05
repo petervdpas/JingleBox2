@@ -15,6 +15,18 @@ effects this application ships come first, since that list is short and known an
 plugin list runs to hundreds; ours load in this process with nothing to find on disc.
 After them are the CLAP and VST3 effects this machine has.
 
+Three ship at the moment, each with presets to start from:
+
+- **EchoBox** is a delay. The repeats darken as they go, and the time glides rather
+  than jumping, so moving it sounds like a tape slowing rather than like a click.
+- **Sweeper** is a filter: four poles, low, band or high, with a drive in front of
+  them. The drive is what makes a resonant sweep sound like an instrument instead of
+  a whistle, and the cutoff glides for the same reason the delay's time does.
+- **Roaster** is a drive. The tilt chooses which end gets bitten, up for a desk and
+  down for an amplifier; the bias leans the signal off centre, which is the half of a
+  valve people actually like; and what the curve costs in level is given back, so you
+  are comparing the sound and not the loudness.
+
 A box opens that effect's controls in a window of its own, and its power button
 switches it off without taking it out, so it can be heard in and out. Right click a
 box to move it earlier or later, or to remove it. Each box prints its first few

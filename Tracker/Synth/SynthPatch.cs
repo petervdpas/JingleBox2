@@ -153,6 +153,38 @@ public sealed class SynthPatch
     /// <summary>How much the filter rings at its cutoff. Zero is a plain roll off.</summary>
     public double FilterResonance { get; set; }
 
+    /// <summary>
+    /// True when the drive holds its loudness rather than its peak, so the knob changes the tone
+    /// and not the level.
+    /// </summary>
+    /// <remarks>
+    /// False is what the drive has always done and is therefore the default: the makeup maps full
+    /// scale to full scale, which holds the height of the wave and says nothing about its area. A
+    /// saw driven hard is nearly a square, the square is the same height and far fuller, and the
+    /// measured cost on a real patch is 5.6 dB of loudness added by a control this class's own
+    /// summary says gets no louder.
+    ///
+    /// A setting rather than a repair, and false rather than true, because every song already
+    /// written was made against the old behaviour and is entitled to sound exactly as it did.
+    /// It travels with the patch, so it is in the song, in the preset and in the zip, which is
+    /// the whole reason it is here and not a tick box in SETTINGS.
+    /// </remarks>
+    public bool EvenDrive { get; set; }
+
+    /// <summary>True when the filter runs before the drive rather than after it.</summary>
+    /// <remarks>
+    /// False is what the voice has always done and is the default for the same reason as
+    /// <see cref="EvenDrive"/>.
+    ///
+    /// This is a tone control and not only a repair. Drive into filter and filter into drive are
+    /// two different instruments, which is why real synths put the choice on the front panel: the
+    /// first squares the wave up and then takes the top off it, and the second shapes the wave and
+    /// then rounds what is left. What it also does is stop a resonant peak being applied to a wave
+    /// that has already been squared off, which is what pushed this machine's presets past full
+    /// scale: the same patch peaks 0.866 with the resonance down and 1.057 with it at 0.30.
+    /// </remarks>
+    public bool FilterFirst { get; set; }
+
     /// <summary>A copy that shares nothing, for a voice that must not feel an edit mid note.</summary>
     public SynthPatch Clone() => new()
     {
@@ -172,7 +204,9 @@ public sealed class SynthPatch
         PitchEnvSemitones = PitchEnvSemitones,
         PitchEnvMs = PitchEnvMs,
         FilterCutoffHz = FilterCutoffHz,
-        FilterResonance = FilterResonance
+        FilterResonance = FilterResonance,
+        EvenDrive = EvenDrive,
+        FilterFirst = FilterFirst
     };
 
     /// <summary>
@@ -204,6 +238,8 @@ public sealed class SynthPatch
         PitchEnvMs = other.PitchEnvMs;
         FilterCutoffHz = other.FilterCutoffHz;
         FilterResonance = other.FilterResonance;
+        EvenDrive = other.EvenDrive;
+        FilterFirst = other.FilterFirst;
 
         Clamp();
     }

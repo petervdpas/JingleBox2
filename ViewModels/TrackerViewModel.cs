@@ -2560,6 +2560,23 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// not somebody filling a column: it is a hand resting on a chord, and every repeat would
     /// spray a single note down the pattern under the chord that was just written. Hardware
     /// never reaches this, since a key that is down cannot be pressed again.
+    ///
+    /// The three answers are <see cref="Tracker.Interfaces.INotePress"/>, out on their own so
+    /// what a press means can be put a question to without a song or a keyboard.
+    ///
+    /// **A repeat writes and does not sound**, which is the other half of that rule and was
+    /// missing. The note it would sound is already sounding: the first press started a voice and
+    /// the key has not come up, so a second one is the same note twice. Held for a couple of
+    /// seconds that is sixty voices, at thirty repeats a second, each alive for
+    /// <see cref="HeldNoteSeconds"/>.
+    ///
+    /// It was measured rather than reasoned about, in a log taken while somebody held one key:
+    /// the mixer went from one voice to forty eight in two seconds, which is where it starts
+    /// stealing, and what reached the master summed to 4.34 where full scale is one. So the same
+    /// hold was heard twice over, as four times too much signal into the master's saturation and
+    /// as the collector reacting to the churn, 345 ms of every thread stopped in one five second
+    /// window with blocks hitting 182% of the time they had. The machine was not struggling: the
+    /// quiet windows either side of it read 2% and nothing collected.
     /// </remarks>
     public void EnterNote(Note note, int volume)
     {
@@ -2567,11 +2584,13 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
 
         bool again = _holding.Contains(note.Semitone);
 
-        if (again && _holding.Count > 1) return;
+        var wanted = _pressed.Wants(again, _holding.Count);
+
+        if (wanted == Tracker.Enums.NoteWant.Nothing) return;
 
         bool chord = _chordLine >= 0 && _holding.Count > 0 && !again;
 
-        PreviewNote(note, volume);
+        if (wanted == Tracker.Enums.NoteWant.SoundAndWrite) PreviewNote(note, volume);
 
         _holding.Add(note.Semitone);
 
@@ -2639,6 +2658,9 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
     /// are the same hand.
     /// </remarks>
     private readonly HashSet<int> _holding = new();
+
+    /// <summary>What a press means, given what is already held.</summary>
+    private readonly Tracker.Interfaces.INotePress _pressed = new Tracker.NotePress();
 
     /// <summary>Which line the chord being played is being written on, or -1 when none is.</summary>
     private int _chordLine = -1;

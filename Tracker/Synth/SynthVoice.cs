@@ -84,6 +84,48 @@ public sealed class SynthVoice : IVoice
 
     private readonly ToneFilter _filter;
 
+    /// <summary>Whether the filter runs before the drive, off the patch.</summary>
+    /// <remarks>
+    /// Held rather than read per sample, like the drive above it and for the same reason: this is
+    /// the inner loop of the audio thread and the patch cannot change under a voice anyway, since
+    /// the voice owns a copy of it.
+    /// </remarks>
+    private readonly bool _filterFirst;
+
+    /// <summary>
+    /// How many points of the wave the loudness-holding makeup is worked out over.
+    /// </summary>
+    /// <remarks>
+    /// One period, sampled evenly. Enough that a pulse at either end of its width is described
+    /// rather than missed: the narrowest this machine allows is a twentieth, which is still a
+    /// dozen points. It is walked once when a note starts and never again.
+    /// </remarks>
+    private const int ShapePoints = 256;
+
+    /// <summary>
+    /// How many real samples the makeup is worked out over when the filter runs first.
+    /// </summary>
+    /// <remarks>
+    /// A period of the wave is the exact answer while the drive is fed the oscillator, since the
+    /// shape of a wave does not depend on how fast it is played. It is the wrong question once the
+    /// filter is in front, because what a filter does depends on the note against the cutoff, so
+    /// what reaches the drive has to be produced rather than described.
+    ///
+    /// At the mixer's rate this is about twenty milliseconds, which is a whole cycle of anything
+    /// down to the bottom of a bass guitar and several cycles of everything anybody plays above
+    /// that. Eight kilobytes of stack, taken and given back inside the constructor.
+    /// </remarks>
+    private const int FilteredPoints = 1024;
+
+    /// <summary>How many samples the filter is run before any of it is measured.</summary>
+    /// <remarks>
+    /// A filter starts empty, so its first output is a rise from silence rather than the signal,
+    /// and a resonant one rings on its own for a while after being hit with anything. Measuring
+    /// through that would read the filter waking up rather than the wave the drive is about to be
+    /// handed.
+    /// </remarks>
+    private const int SettleSamples = 2048;
+
     /// <summary>This voice's own noise, seeded per voice so two noise hits are not the same noise.</summary>
     private readonly Random _noise;
 
@@ -116,7 +158,8 @@ public sealed class SynthVoice : IVoice
         _pitchEnvSeconds = _patch.PitchEnvMs / 1000.0;
 
         _drive = _patch.Drive;
-        _driveMakeup = Shaper.Makeup(_drive);
+        _driveMakeup = _patch.EvenDrive ? EvenMakeup(noiseSeed) : Shaper.Makeup(_drive);
+        _filterFirst = _patch.FilterFirst;
         _filter = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
         _noise = new Random(noiseSeed);
 
@@ -218,7 +261,7 @@ public sealed class SynthVoice : IVoice
             _phase = Shapes.Wrap(_phase + frequency * step);
 
             double sample = Shapes.Sample(_patch.Wave, _phase, _patch.Duty, _noise.NextDouble() * 2.0 - 1.0);
-            double value = _filter.Process(Drive(sample)) * level * TremoloAt(_time) * Gain;
+            double value = Shaped(sample) * level * TremoloAt(_time) * Gain;
 
             int index = frame * 2;
             buffer[index] += (float)(value * left);
@@ -229,10 +272,89 @@ public sealed class SynthVoice : IVoice
     }
 
     /// <summary>
+    /// The drive and the filter, in whichever order the patch asks for.
+    /// </summary>
+    /// <remarks>
+    /// Two different instruments rather than two spellings of one. Drive into filter squares the
+    /// wave up and then takes the top off what it made; filter into drive shapes the wave and then
+    /// rounds off what is left, which is also what stops a resonant peak being applied to
+    /// something already squared off.
+    /// </remarks>
+    private double Shaped(double sample) =>
+        _filterFirst ? Drive(_filter.Process(sample)) : _filter.Process(Drive(sample));
+
+    /// <summary>
     /// Rounds the wave off into itself. Applied before the envelope, so a note keeps its shape
     /// as it decays instead of losing its edge along with its level.
     /// </summary>
     private double Drive(double sample) => Shaper.Apply(sample, _drive, _driveMakeup);
+
+    /// <summary>
+    /// The makeup that leaves this patch's own wave as loud as it arrived.
+    /// </summary>
+    /// <remarks>
+    /// The wave is drawn out here rather than guessed at, because a makeup that held the loudness
+    /// of a sine would be wrong for a saw and wronger for a narrow pulse. On the stack and gone
+    /// before the constructor returns: this runs on whichever thread started the note, never on
+    /// the audio thread, so a few hundred hyperbolic tangents is affordable exactly once.
+    ///
+    /// Noise is the one wave whose shape is not a function of phase, so it is sampled from its own
+    /// seed rather than from the voice's, which would take the first two hundred and fifty six
+    /// values out of the noise somebody is about to hear.
+    /// </remarks>
+    /// <param name="noiseSeed">This voice's seed, used for a throwaway sequence of its own.</param>
+    private double EvenMakeup(int noiseSeed)
+    {
+        var noise = _patch.Wave == SynthWave.Noise ? new Random(noiseSeed) : null;
+
+        if (!_patch.FilterFirst)
+        {
+            Span<double> period = stackalloc double[ShapePoints];
+
+            Shapes.Period(_patch.Wave, _patch.Duty, period, noise);
+
+            return Shaper.Evenly(_drive, period);
+        }
+
+        Span<double> filtered = stackalloc double[FilteredPoints];
+
+        Filtered(filtered, noise);
+
+        return Shaper.Evenly(_drive, filtered);
+    }
+
+    /// <summary>
+    /// Runs the oscillator through a filter of its own until it has settled, then keeps what comes
+    /// out next.
+    /// </summary>
+    /// <remarks>
+    /// A filter of its own rather than the voice's, which has not started yet and must be handed
+    /// the note with no memory in it: a voice whose filter had already been run for two thousand
+    /// samples would begin the note part way into its own attack.
+    ///
+    /// The note is taken at its base pitch with nothing modulating it. The vibrato and the pitch
+    /// envelope move it while it plays, and a makeup that moved with them would be a gain
+    /// following the pitch, which is a fault rather than a correction.
+    /// </remarks>
+    /// <param name="into">Filled with what reaches the drive.</param>
+    /// <param name="noise">This voice's throwaway noise, or nothing for the waves that need none.</param>
+    private void Filtered(Span<double> into, Random? noise)
+    {
+        var settling = new ToneFilter(_patch.FilterCutoffHz, _patch.FilterResonance, _sampleRate);
+
+        double phase = 0;
+        double step = _baseFrequency / _sampleRate;
+
+        for (int at = 0; at < SettleSamples + into.Length; at++)
+        {
+            phase = Shapes.Wrap(phase + step);
+
+            double random = noise is null ? 0.0 : noise.NextDouble() * 2.0 - 1.0;
+            double sample = settling.Process(Shapes.Sample(_patch.Wave, phase, _patch.Duty, random));
+
+            if (at >= SettleSamples) into[at - SettleSamples] = sample;
+        }
+    }
 
     /// <summary>Amplitude modulation between full and (1 - depth).</summary>
     private double TremoloAt(double time)

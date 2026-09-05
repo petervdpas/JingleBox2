@@ -1,0 +1,10 @@
+{
+  "Name": "Destroy",
+  "Effect": "effect.roaster",
+  "amount": 24.0,
+  "even": 0,
+  "tilt": 0.0,
+  "bias": 0.4,
+  "level": -6.0,
+  "mix": 1.0
+}

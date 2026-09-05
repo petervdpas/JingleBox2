@@ -24,6 +24,42 @@ public sealed class Saturation : ISaturation
     public double Makeup(double drive) => Driven(drive) ? 1.0 / Math.Tanh(drive) : 1.0;
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Measured against the curve at full strength rather than against the faded blend, which is
+    /// what <see cref="Makeup"/> does and for the same reason: the fade is there to stop the knob
+    /// stepping as it leaves its stop, and a makeup that moved with it would be correcting the
+    /// correction.
+    ///
+    /// Root mean square rather than anything weighted. What is being held is the level the knob
+    /// used to add, and the ear reads that as loudness over the handful of harmonics a drive
+    /// moves; a loudness measure with a curve in it would be a second opinion nobody asked for
+    /// inside a control that has to be predictable.
+    /// </remarks>
+    public double Evenly(double drive, ReadOnlySpan<double> shape)
+    {
+        if (!Driven(drive) || shape.Length == 0) return 1.0;
+
+        double dry = 0;
+        double wet = 0;
+
+        foreach (double sample in shape)
+        {
+            if (!double.IsFinite(sample)) continue;
+
+            double driven = Math.Tanh(sample * drive);
+
+            dry += sample * sample;
+            wet += driven * driven;
+        }
+
+        if (dry <= 0 || wet <= 0) return 1.0;
+
+        double makeup = Math.Sqrt(dry / wet);
+
+        return double.IsFinite(makeup) ? makeup : 1.0;
+    }
+
+    /// <inheritdoc/>
     public double Apply(double sample, double drive, double makeup)
     {
         if (sample == 0 || !Driven(drive)) return sample;

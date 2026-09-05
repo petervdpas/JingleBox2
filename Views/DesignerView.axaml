@@ -179,6 +179,7 @@
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <TextBlock Classes="chevron" Text="▾" VerticalAlignment="Center" />
                 <TextBlock Classes="cardTitle" Text="Parts" />
+                <views:HelpBadge Topic="designer.laying-out" VerticalAlignment="Center" />
               </StackPanel>
             </ToggleButton>
 
@@ -760,10 +761,29 @@
                     ToolTip.Tip="Writes the file back. Anything it plays from outside the machine is brought inside first, so the preset arrives whole on somebody else's disc." />
           </Grid>
 
+          <!-- What the preset does to a meter, measured by playing it rather than by reading its
+               level knob, because the level knob cannot answer it: the drive, the resonance and
+               the envelope are in the same chain and each adds several decibels without saying
+               so. Every preset this application shipped was at full scale on one note with every
+               level knob sitting at nought, which is a mix that distorts the moment two things
+               play and nothing on any page that said why.
+
+               Said and not enforced. Saving a loud preset is still allowed, since a machine built
+               to be slammed is entitled to exist; what this does is put the number in front of
+               whoever is choosing it, at the moment they choose it. -->
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8" Margin="0,10,0,0"
+                IsVisible="{Binding PresetDesk.HasLoudness}">
+            <TextBlock Grid.Column="0" Classes="cardHint" VerticalAlignment="Center"
+                       Classes.danger="{Binding PresetDesk.Cramped}"
+                       Text="{Binding PresetDesk.Loudness}" />
+
+            <views:HelpBadge Grid.Column="1" Topic="designer.headroom" VerticalAlignment="Center" />
+          </Grid>
+
           <!-- What is wrong with it, said where the mistake is rather than at the moment of
                saving. -->
-          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint" TextWrapping="Wrap"
-                     Margin="0,8,0,0" Foreground="{DynamicResource DangerBrush}"
+          <TextBlock DockPanel.Dock="Bottom" Classes="cardHint danger" TextWrapping="Wrap"
+                     Margin="0,8,0,0"
                      IsVisible="{Binding PresetDesk.HasProblem}"
                      Text="{Binding PresetDesk.Problem}" />
 

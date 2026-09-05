@@ -1,0 +1,11 @@
+{
+  "Name": "Under Water",
+  "Effect": "effect.sweeper",
+  "cutoff": 420,
+  "resonance": 0.55,
+  "drive": 1.8,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 0,
+  "mix": 1.0
+}

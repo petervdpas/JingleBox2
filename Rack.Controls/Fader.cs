@@ -191,6 +191,26 @@ public class Fader : ThemedControl
     public static readonly StyledProperty<string> TicksProperty =
         AvaloniaProperty.Register<Fader, string>(nameof(Ticks), "");
 
+    /// <summary>
+    /// Whether the fader writes its own reading under itself.
+    /// </summary>
+    /// <remarks>
+    /// Off where the reading is written by whatever the fader stands in, which is what a mixer
+    /// strip does: there it says "Level: +6.0 dB" across the whole strip, and a fader that also
+    /// drew a number would be saying it twice.
+    ///
+    /// It has to be the strip that writes it rather than the fader, and the reason is a rule
+    /// this control keeps: **it is as wide as the longest reading it can show**. Put a word
+    /// inside that string and the fader claims the width of "Level: -60.0 dB", which on a strip
+    /// is the whole of it, and the meter beside it is squeezed out of existence, clip lamp and
+    /// all. That was tried and it is what happened.
+    ///
+    /// The reading is left out of the measuring as well as the drawing, or the fader would go on
+    /// reserving room for a number it no longer shows.
+    /// </remarks>
+    public static readonly StyledProperty<bool> ShowValueProperty =
+        AvaloniaProperty.Register<Fader, bool>(nameof(ShowValue), true);
+
     /// <summary>Whether each mark is written out as well as drawn.</summary>
     public static readonly StyledProperty<bool> ShowTickLabelsProperty =
         AvaloniaProperty.Register<Fader, bool>(nameof(ShowTickLabels), true);
@@ -271,11 +291,11 @@ public class Fader : ThemedControl
         AffectsRender<Fader>(LinkGlow.LitProperty);
 
         AffectsRender<Fader>(
-            ValueProperty, MinimumProperty, MaximumProperty, LabelProperty,
+            ValueProperty, MinimumProperty, MaximumProperty, LabelProperty, ShowValueProperty,
             UnitProperty, FormatProperty, TrackLengthProperty, TicksProperty, ShowTickLabelsProperty);
 
         AffectsMeasure<Fader>(
-            LabelProperty, UnitProperty, FormatProperty, TrackLengthProperty,
+            LabelProperty, ShowValueProperty, UnitProperty, FormatProperty, TrackLengthProperty,
             TicksProperty, ShowTickLabelsProperty, MinimumProperty, MaximumProperty);
     }
 
@@ -363,6 +383,13 @@ public class Fader : ThemedControl
         set => SetValue(TicksProperty, value);
     }
 
+    /// <inheritdoc cref="ShowValueProperty"/>
+    public bool ShowValue
+    {
+        get => GetValue(ShowValueProperty);
+        set => SetValue(ShowValueProperty, value);
+    }
+
     /// <inheritdoc cref="ShowTickLabelsProperty"/>
     public bool ShowTickLabels
     {
@@ -403,7 +430,7 @@ public class Fader : ThemedControl
         double throwLength = TrackLength > 0 ? TrackLength : MinimumTrackLength;
 
         var widest = BuildText(
-            _number.Widest(Value, Minimum, Maximum, Format, Unit),
+            ShowValue ? _number.Widest(Value, Minimum, Maximum, Format, Unit) : "",
             ValueFontSize, PatternFont.Family, Brushes.Black);
 
         double width = Math.Max(CapWidth, Math.Max(label.Width, widest.Width)) + ScaleWidth();
@@ -433,7 +460,7 @@ public class Fader : ThemedControl
         DrawScale(context, palette, trackTop, trackLength);
         DrawTrack(context, palette, trackTop, trackLength);
 
-        context.DrawText(value, new Point(
+        if (ShowValue) context.DrawText(value, new Point(
             (Bounds.Width - value.Width) / 2,
             trackTop + trackLength + CapHeight / 2 + TextGap));
 

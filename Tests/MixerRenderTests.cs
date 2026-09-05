@@ -430,6 +430,53 @@ public class MixerRenderTests
     /// that the next block, with the plugin gone, is clean again: a bad number must not be left
     /// somewhere that outlives the thing that made it.
     /// </summary>
+    /// <summary>
+    /// Nonsense never reaches the card, not even while it is being made.
+    /// </summary>
+    /// <remarks>
+    /// The test below says a poisoned block does not outlive the plugin that poisoned it, which
+    /// is a different and weaker promise: it renders with the poison, takes it away, and looks
+    /// at the block after. **This looks at the block during**, which is the one that reaches
+    /// somebody's speakers.
+    ///
+    /// It went out unchanged before. The master's curve bends infinity and 1e30 down to one on
+    /// its own, since both compare and both saturate, but a NaN fails the comparison against the
+    /// knee, because every comparison with a NaN is false, and then Tanh hands one back. A
+    /// buffer of NaN is undefined at the converters and commonly arrives as full scale noise,
+    /// which is how tweeters and ears are damaged by software: the card itself is never at risk
+    /// from what it is asked to play.
+    /// </remarks>
+    [Fact]
+    public void Nonsense_never_reaches_the_card()
+    {
+        var mixer = new TrackMixer(Rate);
+        mixer.SetInstrument(0, new Poison());
+
+        var during = Block(mixer, Card);
+
+        Assert.All(during, sample => Assert.True(float.IsFinite(sample), "a sample of " + sample + " left the mixer"));
+    }
+
+    /// <summary>Every shape of nonsense is bent or silenced, none of it passed on.</summary>
+    /// <remarks>
+    /// Silence for anything that is not a real number, NaN and both infinities alike, since none
+    /// of them is a loud sample: they are the absence of one. Everything that is a number is
+    /// bent to within full scale however large it is, so a sample of 1e30 is music that was too
+    /// loud and comes back as one rather than as nothing.
+    /// </remarks>
+    [Theory]
+    [InlineData(float.NaN, 0f)]
+    [InlineData(float.PositiveInfinity, 0f)]
+    [InlineData(float.NegativeInfinity, 0f)]
+    [InlineData(1e30f, 1f)]
+    [InlineData(-1e30f, -1f)]
+    [InlineData(0.5f, 0.5f)]
+    public void The_last_stage_lets_nothing_dangerous_out(float given, float expected)
+    {
+        Assert.Equal(expected, TrackMixer.SoftClip(given), 3);
+    }
+
+    /// <summary>And a poisoned block does not outlive the plugin that poisoned it.</summary>
     [Fact]
     public void Nonsense_from_a_plugin_does_not_outlive_it()
     {

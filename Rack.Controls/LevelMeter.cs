@@ -90,6 +90,26 @@ public class LevelMeter : ThemedControl
     /// Backs <see cref="ShowPeak"/>: a mark riding the loudest recent moment, so a transient is
     /// readable after it has gone.
     /// </summary>
+    /// <summary>
+    /// Whether the meter carries a clip light: a small mark at the loud end, lit when what it
+    /// was shown went past full scale.
+    /// </summary>
+    /// <remarks>
+    /// On the meter rather than beside it, and drawn by the meter rather than dropped next to
+    /// one, because a meter that shows level and not overload is half a meter, and because there
+    /// is more than one meter on a desk: a light per strip assembled by hand is the same three
+    /// lines written three times and one of them eventually forgotten.
+    ///
+    /// It can be turned off for a meter where it would be noise, which is any meter reading
+    /// something that cannot clip.
+    /// </remarks>
+    public static readonly StyledProperty<bool> ShowClipProperty =
+        AvaloniaProperty.Register<LevelMeter, bool>(nameof(ShowClip), true);
+
+    /// <summary>
+    /// Backs <see cref="ShowPeak"/>: a mark riding the loudest recent moment, so a transient is
+    /// readable after it has gone.
+    /// </summary>
     public static readonly StyledProperty<bool> ShowPeakProperty =
         AvaloniaProperty.Register<LevelMeter, bool>(nameof(ShowPeak), true);
 
@@ -121,8 +141,49 @@ public class LevelMeter : ThemedControl
     static LevelMeter()
     {
         AffectsRender<LevelMeter>(
-            LeftProperty, RightProperty, StereoProperty, OrientationProperty,
+            LeftProperty, RightProperty, StereoProperty, OrientationProperty, ShowClipProperty,
             MinimumDecibelsProperty, ShowPeakProperty);
+    }
+
+    /// <summary>How loud the left is, nought to one as amplitude rather than as decibels.</summary>
+    /// <inheritdoc cref="ShowClipProperty"/>
+    public bool ShowClip
+    {
+        get => GetValue(ShowClipProperty);
+        set => SetValue(ShowClipProperty, value);
+    }
+
+    /// <summary>Whether what this has been shown went past full scale, and for how long after.</summary>
+    private readonly IClipHold _clip = new ClipHold();
+
+    /// <summary>How wide across the clip lamp is drawn, at the loud end of the bar.</summary>
+    /// <remarks>
+    /// As wide as a narrow meter will take, and round rather than a cap across the bar: a cap reads as the bar having run out of room and a lamp reads as a lamp.
+    /// Lit it is drawn through <see cref="Led.DrawLamp"/>, the same call the panels' own lamps
+    /// go through, so it gets the halo they have. That is most of what makes a clip light work,
+    /// since nobody is looking straight at it when it fires.
+    /// </remarks>
+    private const double ClipMark = 11;
+
+    /// <summary>How far the lamp stands off the bar, so the two read as two things.</summary>
+    private const double ClipGap = 2;
+
+    /// <summary>
+    /// Puts the clip light out. A press on the meter is how a desk does it.
+    /// </summary>
+    /// <remarks>
+    /// Not marked handled, so a press that also means something to whatever the meter is
+    /// standing on still reaches it: on the mixer, touching a strip anywhere picks its track,
+    /// and a meter that swallowed that would make the light cost you the selection.
+    /// </remarks>
+    /// <param name="e">The press.</param>
+    protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        _clip.Clear();
+
+        InvalidateVisual();
     }
 
     /// <summary>How loud the left is, nought to one as amplitude rather than as decibels.</summary>
@@ -184,6 +245,8 @@ public class LevelMeter : ThemedControl
         var palette = ThemePalette.From(this);
         double now = _clock.Elapsed.TotalSeconds;
 
+        bool over = ShowClip && _clip.Saw(Loudest(), now);
+
         double left = Math.Clamp(double.IsNaN(Left) ? 0 : Left, 0, 1);
         double right = Stereo ? Math.Clamp(double.IsNaN(Right) ? 0 : Right, 0, 1) : 0;
 
@@ -192,9 +255,12 @@ public class LevelMeter : ThemedControl
 
         if (Falling(left, _leftPeak) || (Stereo && Falling(right, _rightPeak))) NextFrame();
 
+        var room = Bars(width, height);
+
         if (!Stereo)
         {
-            DrawBar(context, palette, new Rect(0, 0, width, height), left, _leftPeak);
+            DrawBar(context, palette, room, left, _leftPeak);
+            DrawClip(context, palette, width, height, over);
             return;
         }
 
@@ -202,17 +268,101 @@ public class LevelMeter : ThemedControl
 
         if (Orientation == Orientation.Vertical)
         {
-            double each = (width - gap) / 2;
-            DrawBar(context, palette, new Rect(0, 0, each, height), left, _leftPeak);
-            DrawBar(context, palette, new Rect(each + gap, 0, each, height), right, _rightPeak);
+            double each = (room.Width - gap) / 2;
+            DrawBar(context, palette, new Rect(room.X, room.Y, each, room.Height), left, _leftPeak);
+            DrawBar(context, palette, new Rect(room.X + each + gap, room.Y, each, room.Height), right, _rightPeak);
         }
         else
         {
-            double each = (height - gap) / 2;
-            DrawBar(context, palette, new Rect(0, 0, width, each), left, _leftPeak);
-            DrawBar(context, palette, new Rect(0, each + gap, width, each), right, _rightPeak);
+            double each = (room.Height - gap) / 2;
+            DrawBar(context, palette, new Rect(room.X, room.Y, room.Width, each), left, _leftPeak);
+            DrawBar(context, palette, new Rect(room.X, room.Y + each + gap, room.Width, each), right, _rightPeak);
         }
+
+        DrawClip(context, palette, width, height, over);
     }
+
+    /// <summary>
+    /// The loudest of what it was shown, before anything is clamped.
+    /// </summary>
+    /// <remarks>
+    /// Before, deliberately: the drawing clamps to full scale because there is no more bar to
+    /// fill, and a light worked out from the clamped number could never say anything, since
+    /// everything over one arrives as one.
+    /// </remarks>
+    private double Loudest()
+    {
+        double left = Left;
+        double right = Stereo ? Right : 0;
+
+        if (double.IsNaN(left) || double.IsNaN(right)) return double.NaN;
+
+        return Math.Max(left, right);
+    }
+
+    /// <summary>
+    /// Draws the clip mark at the loud end of the meter.
+    /// </summary>
+    /// <remarks>
+    /// At the end the bar fills towards, so it reads as the bar having run out of room rather
+    /// than as a lamp somebody put nearby. Over the bar rather than beside it, since the meter
+    /// is often the narrowest thing on a strip and there is no room beside it.
+    /// </remarks>
+    /// <param name="context">Where it is drawn.</param>
+    /// <param name="palette">The theme's colours.</param>
+    /// <param name="width">How wide the meter is.</param>
+    /// <param name="height">And how tall.</param>
+    /// <param name="lit">Whether it is lit at this moment.</param>
+    private void DrawClip(DrawingContext context, ThemePalette palette, double width, double height, bool lit)
+    {
+        if (!ShowClip) return;
+
+        var shape = Lamp(width, height);
+
+        if (shape.Width <= 0 || shape.Height <= 0) return;
+
+        double radius = Math.Min(ClipMark, Math.Min(shape.Width, shape.Height)) / 2;
+
+        var centre = new Point(shape.X + shape.Width / 2, shape.Y + shape.Height / 2);
+
+        Led.DrawLamp(context, centre, radius, palette.Danger, lit);
+    }
+
+    /// <summary>
+    /// Where the lamp sits: at the end the bar fills towards.
+    /// </summary>
+    /// <remarks>
+    /// Both states go through <see cref="Led.DrawLamp"/>, which is what makes this the same lamp
+    /// a machine's face carries rather than one that merely looks like it: the dome, the rim, the
+    /// gloss and the halo are drawn once for the whole application, and the dark state is that
+    /// same lamp with its colour dimmed rather than a circle drawn another way.
+    ///
+    /// **A lamp nobody can find while it is off is one nobody trusts when it is on.** The first
+    /// version was four pixels at a quarter opacity and could not be told from the meter's own
+    /// frame; the second was a cap across the bar, which reads as the bar running out of room
+    /// rather than as a lamp. The whole value of a clip light is knowing it was there and dark a
+    /// moment ago.
+    /// </remarks>
+    /// <param name="width">How wide the meter is.</param>
+    /// <param name="height">And how tall.</param>
+    private Rect Lamp(double width, double height) =>
+        Orientation == Orientation.Vertical
+            ? new Rect(0, 0, width, ClipMark)
+            : new Rect(width - ClipMark, 0, ClipMark, height);
+
+    /// <summary>What is left for the bars once the lamp has had its room.</summary>
+    /// <remarks>
+    /// Taken out of the meter rather than drawn over it, or the loudest part of the bar, which
+    /// is the part somebody is looking at when it matters, would be behind the lamp.
+    /// </remarks>
+    /// <param name="width">How wide the meter is.</param>
+    /// <param name="height">And how tall.</param>
+    private Rect Bars(double width, double height) =>
+        !ShowClip
+            ? new Rect(0, 0, width, height)
+            : Orientation == Orientation.Vertical
+                ? new Rect(0, ClipMark + ClipGap, width, Math.Max(0, height - ClipMark - ClipGap))
+                : new Rect(0, 0, Math.Max(0, width - ClipMark - ClipGap), height);
 
     /// <summary>Whether the mark is above the bar, and so has somewhere left to fall to.</summary>
     private bool Falling(double level, double peak) =>

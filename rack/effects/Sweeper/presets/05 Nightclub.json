@@ -1,0 +1,11 @@
+{
+  "Name": "Nightclub",
+  "Effect": "effect.sweeper",
+  "cutoff": 260,
+  "resonance": 0.35,
+  "drive": 3.0,
+  "even": 0,
+  "filter_first": 0,
+  "mode": 0,
+  "mix": 1.0
+}

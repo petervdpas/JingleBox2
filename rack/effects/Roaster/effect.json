@@ -1,0 +1,205 @@
+{
+  "Id": "effect.roaster",
+  "Name": "Roaster",
+  "Summary": "Drive. Tilted, biased, bitten, and given its level back.",
+  "Author": "Peter van de Pas",
+  "Version": "1.1",
+  "Theme": {
+    "Accent": "#E08A3C",
+    "Face": 0.68,
+    "Panel": 0.52,
+    "Edge": 0.1,
+    "Mark": 0.35,
+    "Row": 0.18,
+    "RowOver": 0.3,
+    "RowPicked": 0.58
+  },
+  "Parameters": [
+    {
+      "Key": "amount",
+      "Name": "Drive",
+      "Unit": "",
+      "Min": 1,
+      "Max": 24,
+      "Default": 1,
+      "Step": 0.1
+    },
+    {
+      "Key": "even",
+      "Name": "Drive keeps",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 0,
+      "Step": 1
+    },
+    {
+      "Key": "tilt",
+      "Name": "Tilt",
+      "Unit": "",
+      "Min": -1,
+      "Max": 1,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "bias",
+      "Name": "Bias",
+      "Unit": "",
+      "Min": -0.5,
+      "Max": 0.5,
+      "Default": 0,
+      "Step": 0.01
+    },
+    {
+      "Key": "level",
+      "Name": "Level",
+      "Unit": "dB",
+      "Min": -24,
+      "Max": 12,
+      "Default": 0,
+      "Step": 0.1
+    },
+    {
+      "Key": "mix",
+      "Name": "Mix",
+      "Unit": "",
+      "Min": 0,
+      "Max": 1,
+      "Default": 1,
+      "Step": 0.01
+    }
+  ],
+  "Panel": {
+    "Root": {
+      "Element": "Column",
+      "Parameter": "",
+      "Label": "",
+      "Properties": {
+        "gap": "10",
+        "align": "stretch"
+      },
+      "Children": [
+        {
+          "Element": "Menu",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "corner": "topRight"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Label",
+          "Parameter": "",
+          "Label": "Roaster",
+          "Properties": {
+            "style": "section"
+          },
+          "Children": []
+        },
+        {
+          "Element": "Preset",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {},
+          "Children": []
+        },
+        {
+          "Element": "Group",
+          "Parameter": "",
+          "Label": "",
+          "Properties": {
+            "caption": "Drive"
+          },
+          "Children": [
+            {
+              "Element": "Strip",
+              "Parameter": "",
+              "Label": "",
+              "Properties": {
+                "cell": "26",
+                "gap": "6",
+                "columns": "3 4 3 3 3 3"
+              },
+              "Children": [
+                {
+                  "Element": "Knob",
+                  "Parameter": "amount",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How hard the signal is pushed into the curve. What it costs is given back, so you are comparing the sound rather than the loudness. Which cost is given back is the switch beside it: the height of the wave, or its loudness."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Choice",
+                  "Parameter": "even",
+                  "Label": "",
+                  "Properties": {
+                    "span": "4",
+                    "options": "Peak,Loudness",
+                    "width": "100",
+                    "tip": "What the drive is levelled out by. Peak holds the height of the wave, which is what this effect has always done and lets the knob add several decibels on the way up. Loudness measures what actually went past and gives that back instead, so the knob changes the tone and not the level. Peak is what every chain written before this was made against."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "tilt",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "Which end gets bitten. Up drives the top and leaves the weight alone, which is a desk; down drives the bottom, which is an amplifier."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "bias",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How far the signal leans off centre before it is bitten. Off centre adds the even harmonics, which is the half of a valve people actually like."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "level",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "What comes out, after the curve has been paid for."
+                  },
+                  "Children": []
+                },
+                {
+                  "Element": "Knob",
+                  "Parameter": "mix",
+                  "Label": "",
+                  "Properties": {
+                    "span": "3",
+                    "dial": "44",
+                    "lines": "1",
+                    "tip": "How much of what you hear has been driven. Kept back it is parallel drive: the weight stays and the bite is added under it."
+                  },
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

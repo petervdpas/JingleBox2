@@ -14,8 +14,12 @@
          all three, since what differs between them is only what the fader writes to. -->
     <DataTemplate x:Key="SourceStrip" x:DataType="vm:SourceStripViewModel">
       <Border Classes="inset" Width="134">
-        <DockPanel>
-          <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
+        <!-- The same six rows every strip here uses, so a row of them lines up: badge, pan,
+             mute and solo, the fader and its meter, the reading, and the side chain. This shape
+             has no side chain, so its last row stays empty rather than the rows being different
+             from one strip to the next. -->
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+          <StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
             <Border Classes="badge" HorizontalAlignment="Center"
                     ToolTip.Tip="{Binding Tip}">
               <TextBlock Text="{Binding Label}" />
@@ -25,14 +29,17 @@
                  what is being recorded is not something the recorder does, and a mute there
                  would be recording nothing without saying so. No solo on any of them, because
                  solo here is the song's and these are not in the song. -->
-            <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
-                     Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
-                     HorizontalAlignment="Center"
-                     IsVisible="{Binding OnABus}"
-                     Value="{Binding Pan}" />
+          </StackPanel>
 
-            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center"
-                        IsVisible="{Binding OnABus}">
+          <ui:Knob Grid.Row="1" Label="Pan" Format="0.00" DefaultValue="0"
+                   Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                   HorizontalAlignment="Center" Margin="0,8,0,0"
+                   IsVisible="{Binding OnABus}"
+                   Value="{Binding Pan}" />
+
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4"
+                      HorizontalAlignment="Center" Margin="0,8,0,0"
+                      IsVisible="{Binding OnABus}">
               <ToggleButton Classes="strip" Content="M"
                             IsChecked="{Binding Mute}"
                             ToolTip.Tip="Silence this, leaving its fader where it is." />
@@ -45,12 +52,12 @@
                             IsEnabled="{Binding CanSolo}"
                             IsChecked="{Binding Solo}"
                             ToolTip.Tip="Hear only this. Needs One output stream in SETTINGS, since a solo silences everything else and only the one bus knows what everything else is." />
-            </StackPanel>
           </StackPanel>
 
-          <StackPanel Orientation="Horizontal" Spacing="8"
-                      HorizontalAlignment="Center" Margin="0,2,0,0">
-            <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
+                      HorizontalAlignment="Center" Margin="0,8,0,0">
+            <ui:Fader ShowValue="False" Unit=" dB" Format="+0.0;-0.0;0.0" DefaultValue="0"
+                      Margin="0,13,0,0"
                       Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
                       SmallStep="0.5" LargeStep="3"
                       TrackLength="0"
@@ -60,12 +67,18 @@
 
             <ui:LevelMeter Width="22"
                            VerticalAlignment="Stretch"
-                           Margin="0,23,0,24"
+                           Margin="0,0,0,7"
                            Stereo="True"
                            Left="{Binding Left}"
                            Right="{Binding Right}" />
           </StackPanel>
-        </DockPanel>
+
+          <!-- The reading is the strip's rather than the fader's: see the note on the track
+               strip below for why a fader cannot carry the word. -->
+          <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,4,0,0"
+                     FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                     Text="{Binding VolumeDecibels, StringFormat='Level: {0:+0.0;-0.0;0.0} dB'}" />
+        </Grid>
       </Border>
     </DataTemplate>
   </UserControl.Resources>
@@ -166,47 +179,53 @@
           <ContentControl.ContentTemplate>
             <DataTemplate x:DataType="vm:TrackStripViewModel">
               <Border Classes="inset" Width="134">
-                <DockPanel>
-            <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
-              <Border Classes="badge" HorizontalAlignment="Center"
-                      ToolTip.Tip="The whole mix, after every track.">
-                <TextBlock Text="{Binding Label}" />
-              </Border>
+                <!-- The same six rows the other two strip shapes use, so the master lines up
+                     with the tracks beside it. It has no side chain, so its last row is empty. -->
+                <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+                  <Border Grid.Row="0" Classes="badge" HorizontalAlignment="Center"
+                          ToolTip.Tip="The whole mix, after every track.">
+                    <TextBlock Text="{Binding Label}" />
+                  </Border>
 
-              <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
-                          Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
-                          HorizontalAlignment="Center"
-                          views:Pointable.Offers="{Binding PanLink}"
-                          Value="{Binding Pan}" />
+                  <ui:Knob Grid.Row="1" Label="Pan" Format="0.00" DefaultValue="0"
+                              Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                              HorizontalAlignment="Center" Margin="0,8,0,0"
+                              views:Pointable.Offers="{Binding PanLink}"
+                              Value="{Binding Pan}" />
 
-              <!-- Mute and no solo. Soloing the master would mean soloing everything, which is
-                   what it is already doing. -->
-              <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                            views:Pointable.Offers="{Binding MuteLink}"
-                            ToolTip.Tip="Silence the whole mix" />
-            </StackPanel>
+                  <!-- Mute and no solo. Soloing the master would mean soloing everything, which
+                       is what it is already doing. -->
+                  <ToggleButton Grid.Row="2" Classes="strip" Content="M" IsChecked="{Binding Mute}"
+                                HorizontalAlignment="Center" Margin="0,8,0,0"
+                                views:Pointable.Offers="{Binding MuteLink}"
+                                ToolTip.Tip="Silence the whole mix" />
 
-            <StackPanel Orientation="Horizontal" Spacing="8"
-                        HorizontalAlignment="Center" Margin="0,2,0,0">
-              <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
-                           Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
-                           TrackLength="0"
-                           Ticks="6,0,-6,-12,-24,-40,-60"
-                           views:Pointable.Offers="{Binding LevelLink}"
-                           ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
-                           Value="{Binding VolumeDecibels}" />
+                  <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
+                              HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <ui:Fader ShowValue="False" Unit=" dB" Format="+0.0;-0.0;0.0" DefaultValue="0"
+                                 Margin="0,13,0,0"
+                                 Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
+                                 TrackLength="0"
+                                 Ticks="6,0,-6,-12,-24,-40,-60"
+                                 views:Pointable.Offers="{Binding LevelLink}"
+                                 ToolTip.Tip="The last thing between the mix and the card. Double click to go back to unity."
+                                 Value="{Binding VolumeDecibels}" />
 
-              <!-- What is leaving, which is the one meter on this page measuring the thing you
-                   actually hear. -->
-              <ui:LevelMeter Width="22"
-                                VerticalAlignment="Stretch"
-                                Margin="0,23,0,24"
-                                Stereo="True"
-                                Left="{Binding Left}"
-                                Right="{Binding Right}"
-                                ToolTip.Tip="What is leaving, after every track and the master's own effect." />
-                </StackPanel>
-                </DockPanel>
+                    <!-- What is leaving, which is the one meter on this page measuring the thing
+                         you actually hear. -->
+                    <ui:LevelMeter Width="22"
+                                      VerticalAlignment="Stretch"
+                                      Margin="0,0,0,7"
+                                      Stereo="True"
+                                      Left="{Binding Left}"
+                                      Right="{Binding Right}"
+                                      ToolTip.Tip="What is leaving, after every track and the master's own effect." />
+                  </StackPanel>
+
+                  <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,4,0,0"
+                             FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                             Text="{Binding VolumeDecibels, StringFormat='Level: {0:+0.0;-0.0;0.0} dB'}" />
+                </Grid>
               </Border>
             </DataTemplate>
           </ContentControl.ContentTemplate>
@@ -265,10 +284,22 @@
                      fader picks its strip on the way past rather than instead of moving it. -->
                 <Border Classes="inset" Width="134"
                         Classes.selected="{Binding IsSelected}">
-                  <!-- The fader and the meter take whatever height is left, so the strips
-                       grow with the page instead of leaving a hole under the buttons. -->
-                  <DockPanel>
-                    <StackPanel DockPanel.Dock="Top" Spacing="8" HorizontalAlignment="Center">
+                  <!-- **Six rows, and everything on a strip lands in one of them.** It was a
+                       dock panel, which has no places in it: a dock panel gives the rest of the
+                       room to whichever child is written last, so adding a line of text after
+                       the fader handed the room to the text and squeezed the fader and its meter
+                       into a band along the top. That is not a thing to remember, it is a thing
+                       to stop being possible.
+
+                       The rows, in order: the badge, the pan knob, the mute and solo pair, the
+                       fader and its meter, the level reading, and the side chain. Only the
+                       fourth grows, so the strips fill the page and every other row is where it
+                       is on every strip: a mixer has to read across.
+
+                       All three strip shapes here use these same six, which is what makes a row
+                       of them line up. -->
+                  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+                    <StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
                       <!-- The instrument is on the badge rather than under it. A name can be
                            any length, and a line for it would make one strip taller than the
                            next, which is the one thing a row of strips must not do. -->
@@ -277,27 +308,29 @@
                         <TextBlock Text="{Binding Label}" />
                       </Border>
 
-                      <ui:Knob Label="Pan" Format="0.00" DefaultValue="0"
-                                  Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
-                                  HorizontalAlignment="Center"
-                                  views:Pointable.Offers="{Binding PanLink}"
-                                  Value="{Binding Pan}" />
+                    </StackPanel>
 
-                      <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
-                        <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
-                                      views:Pointable.Offers="{Binding MuteLink}"
-                                      ToolTip.Tip="Mute this track" />
+                    <ui:Knob Grid.Row="1" Label="Pan" Format="0.00" DefaultValue="0"
+                                Minimum="-1" Maximum="1" SmallStep="0.05" LargeStep="0.25"
+                                HorizontalAlignment="Center" Margin="0,8,0,0"
+                                views:Pointable.Offers="{Binding PanLink}"
+                                Value="{Binding Pan}" />
 
-                        <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
-                                      views:Pointable.Offers="{Binding SoloLink}"
-                                      ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
-                      </StackPanel>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4"
+                                HorizontalAlignment="Center" Margin="0,8,0,0">
+                      <ToggleButton Classes="strip" Content="M" IsChecked="{Binding Mute}"
+                                    views:Pointable.Offers="{Binding MuteLink}"
+                                    ToolTip.Tip="Mute this track" />
+
+                      <ToggleButton Classes="strip" Content="S" IsChecked="{Binding Solo}"
+                                    views:Pointable.Offers="{Binding SoloLink}"
+                                    ToolTip.Tip="Solo: while any track is soloed, the others are silent" />
                     </StackPanel>
 
                     <!-- The side chain, along the bottom of the strip: the track it
                          listens to, how far down it goes, and how long it takes to come back.
                          Every strip's is at the same height, so a mixer reads across. -->
-                    <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,10,0,0">
+                    <StackPanel Grid.Row="5" Spacing="4" Margin="0,10,0,0">
                       <TextBlock Classes="cardHint" HorizontalAlignment="Center" Text="Duck from" />
 
                       <ComboBox HorizontalAlignment="Stretch"
@@ -326,9 +359,10 @@
                     <!-- The fader and the meter side by side, as they sit on a desk: the
                          hand is on one and the eye is on the other. Zero track length means
                          both take whatever height is left in the strip. -->
-                    <StackPanel Orientation="Horizontal" Spacing="8"
-                                HorizontalAlignment="Center" Margin="0,2,0,0">
-                      <ui:Fader Label="Level" Unit=" dB" Format="0.0" DefaultValue="0"
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
+                                HorizontalAlignment="Center" Margin="0,8,0,0">
+                      <ui:Fader ShowValue="False" Unit=" dB" Format="+0.0;-0.0;0.0" DefaultValue="0"
+                                   Margin="0,13,0,0"
                                    views:Pointable.Offers="{Binding LevelLink}"
                                    Minimum="-60" Maximum="6" SmallStep="0.5" LargeStep="3"
                                    TrackLength="0"
@@ -336,17 +370,29 @@
                                    ToolTip.Tip="Unity is 0 dB. Double click to go back to it."
                                    Value="{Binding VolumeDecibels}" />
 
-                      <!-- Inset to line the bar up with the fader's travel, which starts
-                           below its label and ends above its reading. -->
+                      <!-- The lamp takes the top of the meter, so the bars start below it. The
+                           fader is pushed down by the same amount and the two travels line up;
+                           doing it the other way, by pulling the meter up, put the lamp through
+                           the mute and solo buttons above. -->
                       <ui:LevelMeter Width="22"
                                         VerticalAlignment="Stretch"
-                                        Margin="0,23,0,24"
+                                        Margin="0,0,0,7"
                                         Stereo="True"
                                         Left="{Binding Left}"
                                         Right="{Binding Right}"
                                         ToolTip.Tip="What this track is sounding, left and right." />
                     </StackPanel>
-                  </DockPanel>
+
+                    <!-- The reading is the strip's rather than the fader's, and that is not a
+                         preference: **a fader is as wide as the longest reading it can show**,
+                         so with the word inside that string it claimed the width of
+                         "Level: -60.0 dB", which on a 134 pixel strip is all of it, and the
+                         meter beside it was squeezed out of existence. The strip is wider than
+                         the fader and has the room the fader has not. -->
+                    <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,4,0,0"
+                               FontFamily="{x:Static ui:PatternFont.Family}" FontSize="11"
+                               Text="{Binding VolumeDecibels, StringFormat='Level: {0:+0.0;-0.0;0.0} dB'}" />
+                  </Grid>
                 </Border>
               </DataTemplate>
               </ItemsControl.ItemTemplate>

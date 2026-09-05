@@ -54,17 +54,24 @@ public class ShippedPresetTests
         Assert.NotEmpty(Directory.GetDirectories(Shipped));
     }
 
-    /// <summary>EchoBox ships with presets, and every one of them reads.</summary>
+    /// <summary>Every effect that ships brings presets, and every one of them reads.</summary>
     /// <remarks>
     /// The count is not pinned. What matters is that there are some and that each is whole, since
     /// pinning it would make adding one a test to fix rather than a file to write.
+    ///
+    /// Named one by one rather than walked, unlike the two tests below, because this one is
+    /// about what is missing: an effect that shipped without its presets folder would be walked
+    /// straight past by a loop over what is there.
     /// </remarks>
-    [Fact]
-    public void EchoBox_ships_presets_and_every_one_reads()
+    [Theory]
+    [InlineData("EchoBox")]
+    [InlineData("Sweeper")]
+    [InlineData("Roaster")]
+    public void Every_shipped_effect_brings_presets(string name)
     {
-        string folder = Path.Combine(Shipped, "EchoBox");
+        string folder = Path.Combine(Shipped, name);
 
-        Assert.True(Directory.Exists(folder), "EchoBox is not where it ships");
+        Assert.True(Directory.Exists(folder), name + " is not where it ships");
 
         var effect = SoundEffectProject.Open(folder);
 

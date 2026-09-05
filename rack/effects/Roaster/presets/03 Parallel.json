@@ -1,0 +1,10 @@
+{
+  "Name": "Parallel",
+  "Effect": "effect.roaster",
+  "amount": 12.0,
+  "even": 0,
+  "tilt": 0.2,
+  "bias": 0.15,
+  "level": -3.0,
+  "mix": 0.35
+}

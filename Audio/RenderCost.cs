@@ -40,6 +40,25 @@ public sealed class RenderCost : IRenderCost
     /// <summary>How long the runtime had spent collecting when the stretch began.</summary>
     private TimeSpan _pausedAt = GC.GetTotalPauseDuration();
 
+    /// <summary>
+    /// How much the whole process had allocated when the stretch began.
+    /// </summary>
+    /// <remarks>
+    /// The third number, and the one that says what to go and look at. Collections and pauses say
+    /// that something is stopping the world; they do not say how hard it is being asked to. A rate
+    /// in megabytes a second is a size somebody can hold against a suspect: a few hundred kilobytes
+    /// is the runtime breathing, and tens of megabytes is a loop somewhere making a fresh object
+    /// per item per frame.
+    ///
+    /// Every thread, not this one, because the thread that allocates and the thread that suffers
+    /// are usually not the same one here: the mixing allocates nothing at all and is stopped by
+    /// whatever the drawing is doing.
+    ///
+    /// Imprecise on purpose. The exact form walks every thread's allocation context and is
+    /// expensive; the loose one reads a counter, and the question is a rate rather than a total.
+    /// </remarks>
+    private long _allocatedAt = GC.GetTotalAllocatedBytes(false);
+
     /// <summary>How many collections of each generation there had been when the stretch began.</summary>
     private readonly int[] _collectedAt = new int[Generations];
 
@@ -56,6 +75,7 @@ public sealed class RenderCost : IRenderCost
         _over = 0;
 
         _pausedAt = GC.GetTotalPauseDuration();
+        _allocatedAt = GC.GetTotalAllocatedBytes(false);
 
         for (int generation = 0; generation < Generations; generation++)
             _collectedAt[generation] = GC.CollectionCount(generation);
@@ -120,15 +140,19 @@ public sealed class RenderCost : IRenderCost
     private string Collecting()
     {
         double paused = (GC.GetTotalPauseDuration() - _pausedAt).TotalMilliseconds;
+        double seconds = Math.Max(1, Environment.TickCount64 - _began) / 1000.0;
+        double rate = (GC.GetTotalAllocatedBytes(false) - _allocatedAt) / 1048576.0 / seconds;
+
+        string made = rate.ToString("0.0", CultureInfo.InvariantCulture) + " MB/s allocated";
 
         int gen0 = GC.CollectionCount(0) - _collectedAt[0];
         int gen1 = GC.CollectionCount(1) - _collectedAt[1];
         int gen2 = GC.CollectionCount(2) - _collectedAt[2];
 
         return gen0 + gen1 + gen2 == 0
-            ? "nothing was collected"
+            ? "nothing was collected, " + made
             : gen0 + "/" + gen1 + "/" + gen2 + " collections (gen 0/1/2), "
-              + paused.ToString("0.0", CultureInfo.InvariantCulture) + " ms paused";
+              + paused.ToString("0.0", CultureInfo.InvariantCulture) + " ms paused, " + made;
     }
 
     /// <summary>A fraction as a whole percentage, which is as fine as this is worth reading.</summary>

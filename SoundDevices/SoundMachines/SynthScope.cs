@@ -1,3 +1,4 @@
+using JingleBox2.Tracker.Synth.Enums;
 using JingleBox2.Tracker.Synth;
 using JingleBox2.ViewModels;
 using System;
@@ -86,7 +87,7 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IPanelScope
         if (into.Length == 0) return;
 
         var sound = patch.Patch;
-        double makeup = Shaper.Makeup(sound.Drive);
+        double makeup = Makeup(sound);
 
         double semitones = Motion.Tuning(sound)
             + (running ? Motion.MotionAt(sound, seconds) : 0);
@@ -108,6 +109,35 @@ public sealed class SynthScope(SynthPatchViewModel patch) : IPanelScope
             into[step] = Shaper.Apply(sample, sound.Drive, makeup);
         }
     }
+
+    /// <summary>
+    /// What the drive is levelled out by, which the patch's own switch decides.
+    /// </summary>
+    /// <remarks>
+    /// Asked here as well as in the voice, so that throwing the switch changes the picture and the
+    /// sound together. Without it the drawn wave would go on being the peak-levelled one while
+    /// what came out of the speakers was the loudness-levelled one, which reads as a scope that is
+    /// broken rather than as a picture of a different setting.
+    ///
+    /// The filter is not in this picture and never was, so the other switch does not reach it.
+    /// </remarks>
+    /// <param name="sound">The patch being drawn.</param>
+    private double Makeup(SynthPatch sound)
+    {
+        if (!sound.EvenDrive) return Shaper.Makeup(sound.Drive);
+
+        Span<double> shape = stackalloc double[ShapePoints];
+
+        Shapes.Period(
+            sound.Wave, sound.Duty, shape,
+            sound.Wave == SynthWave.Noise ? new Random(NoiseSeed) : null);
+
+        return Shaper.Evenly(sound.Drive, shape);
+    }
+
+    /// <summary>How many points of the wave the loudness-holding makeup is worked out over.</summary>
+    /// <remarks>The voice's own number, since the two have to answer the same.</remarks>
+    private const int ShapePoints = 256;
 
     /// <inheritdoc/>
     /// <remarks>

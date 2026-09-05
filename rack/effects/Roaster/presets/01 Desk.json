@@ -1,0 +1,10 @@
+{
+  "Name": "Desk",
+  "Effect": "effect.roaster",
+  "amount": 3.5,
+  "even": 0,
+  "tilt": 0.35,
+  "bias": 0.08,
+  "level": -1.0,
+  "mix": 1.0
+}
