@@ -58,7 +58,7 @@ public sealed partial class PluginChainViewModel : ObservableObject
     {
         Plugins = plugins;
         _effects = effects;
-        _engines = engines ?? new SoundDevices.SoundEffects.SoundEffectEngines();
+        _engines = engines ?? new SoundDevices.SoundEffects.SoundEffectEngines(effects);
         Front = front;
 
         _poll = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(PollMilliseconds) };

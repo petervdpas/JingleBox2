@@ -4,7 +4,7 @@
   "Summary": "Oscillator synth. Wave, envelope, filter and modulation, generated as it plays.",
   "Author": "Peter van de Pas",
   "Version": "1.16",
-  "Engine": "",
+  "Engine": "Synth",
   "Theme": {
     "Accent": "#E2A03F",
     "Face": 0.68,

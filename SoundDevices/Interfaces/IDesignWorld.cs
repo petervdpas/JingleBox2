@@ -104,4 +104,21 @@ public interface IDesignWorld
     /// <param name="project">The project being written out.</param>
     /// <param name="zipPath">Where the file goes.</param>
     void Export(IDesignProject project, string zipPath);
+    /// <summary>
+    /// Whether that id belongs to a device this program ships.
+    /// </summary>
+    /// <remarks>
+    /// A device is known by its id and by nothing else, so one of somebody's own carrying a
+    /// shipped id is that device as far as the registry is concerned: the start-up pass brings
+    /// the shipped copy over the top of it and an afternoon's work is gone. That is deliberate,
+    /// since it is how a corrected device reaches anybody, and there is nothing in a folder that
+    /// could say who wrote what is in it.
+    ///
+    /// So the only place it can be caught is where somebody chooses the id, which is why this is
+    /// asked in the designer rather than anywhere the pass itself runs. Asked of the world
+    /// because each keeps its own folder of what ships.
+    /// </remarks>
+    /// <param name="id">The id to ask about.</param>
+    bool Ships(string? id);
+
 }

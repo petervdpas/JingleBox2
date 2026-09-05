@@ -4,6 +4,7 @@
   "Summary": "Delay. What went past comes back later, darker each time.",
   "Author": "Peter van de Pas",
   "Version": "1.0",
+  "Engine": "Delay",
   "Theme": {
     "Accent": "#4FB07A",
     "Face": 0.68,

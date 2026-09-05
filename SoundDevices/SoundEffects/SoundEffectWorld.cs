@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using System.Linq;
 using JingleBox2.Rack.SoundDevices.Faces.Records;
 using JingleBox2.SoundDevices.Interfaces;
 
@@ -85,4 +86,9 @@ public sealed class SoundEffectWorld : IDesignWorld
     {
         if (project is SoundEffectProject effect) _crates.Export(effect, zipPath);
     }
+
+    /// <inheritdoc/>
+    /// <remarks>Read off the shipped folder each time, since a device can arrive into it.</remarks>
+    public bool Ships(string? id) =>
+        id is { Length: > 0 } && _registry.In(_registry.Shipped).Any(one => one.Id == id);
 }

@@ -45,9 +45,16 @@ public sealed class SoundMachineRack : ISoundMachineRack
     /// </param>
     /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
     /// <param name="files">How a file is written whole, defaulted to the real one.</param>
-    public SoundMachineRack(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null)
+    /// <param name="portable">
+    /// How a path under the application folder is stored, defaulted to the real one. What a
+    /// device on the rack names is almost always inside that folder, and a full path written
+    /// there is a path that means nothing on another machine or after the folder moves.
+    /// </param>
+    public SoundMachineRack(string appName = AppFolder.AppName, IAppFolder? folder = null,
+                            ISafeFile? files = null, ISongPaths? portable = null)
     {
         _files = files ?? new SafeFile();
+        _portable = portable ?? new SongPaths(folder: folder);
 
         Folder = Path.Combine((folder ?? new AppFolder()).Path(appName), "instruments");
         Directory.CreateDirectory(Folder);
@@ -55,6 +62,19 @@ public sealed class SoundMachineRack : ISoundMachineRack
 
     /// <summary>How a file is written whole, so an instrument save cannot leave half of one.</summary>
     private readonly ISafeFile _files;
+
+    /// <summary>
+    /// How the recordings a device names are stored, so the rack survives moving machine.
+    /// </summary>
+    /// <remarks>
+    /// The same rule a song already kept, applied one layer along. What a device on the rack
+    /// names is a take off the shelf or a wave inside a device's own folder, and both of those
+    /// are inside the application folder, which is somewhere different on every machine and
+    /// spelled differently on every platform. Written whole, a kit carried to another computer is
+    /// sixteen pads pointing at somebody else's home directory, and nothing says so: the pads are
+    /// simply silent.
+    /// </remarks>
+    private readonly ISongPaths _portable;
 
     /// <inheritdoc/>
     public string PathFor(string id) => Path.Combine(Folder, id + Extension);
@@ -86,12 +106,29 @@ public sealed class SoundMachineRack : ISoundMachineRack
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Packed for the file and put straight back, rather than copied: the rack hands out the
+    /// instruments it holds and the pages on screen are looking at these very objects, so an
+    /// instrument left holding <c>{app}/</c> names after a save is one that plays nothing until
+    /// it is read again. In a <c>finally</c>, since a write that throws must not leave it that
+    /// way either.
+    /// </remarks>
     public void Save(TrackerInstrument instrument)
     {
         if (instrument is null) return;
 
         instrument.EnsureId();
-        _files.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
+
+        try
+        {
+            _portable.PackInto(instrument);
+
+            _files.Write(PathFor(instrument.Id), JsonSerializer.Serialize(instrument, JsonOptions));
+        }
+        finally
+        {
+            _portable.UnpackInto(instrument);
+        }
     }
 
     /// <inheritdoc/>
@@ -169,7 +206,7 @@ public sealed class SoundMachineRack : ISoundMachineRack
     /// worked out from the loop flag an older build wrote. Anything that will not read at all
     /// is one instrument missing rather than a rack that refuses to open.
     /// </remarks>
-    private static TrackerInstrument? Read(string path)
+    private TrackerInstrument? Read(string path)
     {
         try
         {
@@ -182,6 +219,8 @@ public sealed class SoundMachineRack : ISoundMachineRack
             instrument.Patch ??= new SynthPatch();
             instrument.Patch.Clamp();
             instrument.EnsureShape();
+
+            _portable.UnpackInto(instrument);
 
             return instrument;
         }

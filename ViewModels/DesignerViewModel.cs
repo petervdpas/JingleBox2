@@ -415,7 +415,7 @@ public sealed partial class DesignerViewModel : ObservableObject
     {
         Project = _world.New();
 
-        Status = "A new " + _world.Word + ". Save it somewhere to start keeping it.";
+        Status = "A new " + _world.Word + ". Save it somewhere to start keeping it." + Warning;
     });
 
     /// <summary>
@@ -518,7 +518,7 @@ public sealed partial class DesignerViewModel : ObservableObject
             if (carry && Project.IsSaved) _world.CopyInto(Project, folder!);
 
             Project.Save(folder);
-            Status = "Saved " + Project.Version + " to " + Project.Folder;
+            Status = "Saved " + Project.Version + " to " + Project.Folder + Warning;
 
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(Folder));
@@ -536,6 +536,28 @@ public sealed partial class DesignerViewModel : ObservableObject
             Status = "Could not save: " + ex.Message;
         }
     }
+
+
+    /// <summary>
+    /// The sentence to add when what is open carries the id of a device that ships, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// A warning rather than a refusal, deliberately. Putting an edited device back over the copy
+    /// that ships is a real thing to want, it is what Save as exists for, and refusing the id
+    /// would take it away. What it must not do is happen quietly: the start-up pass brings the
+    /// shipped copy over the top of an installed one, so a device of somebody's own under a
+    /// shipped id opens the next morning as the device that ships, with nothing anywhere having
+    /// said so.
+    ///
+    /// Said where the id is chosen, which is the only place it can be caught, and said on both
+    /// New and Save because those are the two moments somebody decides what they are making.
+    /// </remarks>
+    private string Warning =>
+        Project is { } project && _world.Ships(project.Id)
+            ? "  Careful: '" + project.Id + "' is the id of a " + _world.Word +
+              " that ships, so the next start will bring the shipped copy over the top of this " +
+              "one. Give it an id of your own unless you mean to replace what ships."
+            : "";
 
     /// <summary>True when saving needs somewhere to save to.</summary>
     public bool NeedsFolder => Project is { IsSaved: false };

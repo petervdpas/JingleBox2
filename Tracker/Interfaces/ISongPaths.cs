@@ -1,10 +1,16 @@
 namespace JingleBox2.Tracker.Interfaces;
 
 /// <summary>
-/// Writes the recordings a song plays as names that survive the folder moving, and reads them
-/// back as the paths this machine actually has.
+/// Everything one instrument plays, written so it survives the folder moving and read back as
+/// the paths this machine actually has.
 /// </summary>
 /// <remarks>
+/// The rule itself is <see cref="JingleBox2.Files.Interfaces.IPortablePath"/>, which is about a
+/// path and knows nothing about instruments; this is that rule walked over everything one
+/// instrument names. It is here rather than in <c>Files/</c> for exactly that reason: the walk
+/// knows what a kit, a sampler and a chopped take are, and the thing that keeps every stored path
+/// in this application honest must not know about any of them.
+///
 /// A song stores a full path for every recording an instrument plays, and almost all of them
 /// are inside the application's own folder: a machine's presets, or a take off the shelf. That
 /// folder is somewhere different on every machine and under a different name on every platform,

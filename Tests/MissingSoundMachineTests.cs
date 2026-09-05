@@ -93,6 +93,8 @@ public class MissingSoundMachineTests
     /// <summary>A projects list holding exactly the machines named, and nothing else.</summary>
     private static ISoundMachineProjects Holding(params string[] ids)
     {
+        JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.Forget();
+
         var projects = new SoundMachineProjects();
 
         projects.Keep(Array.ConvertAll(ids, id => new SoundMachineProject { Id = id }));

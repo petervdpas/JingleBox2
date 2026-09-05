@@ -4,7 +4,7 @@
   "Summary": "Mono synth. One oscillator, noise, a sweeping filter, and glide.",
   "Author": "Peter van de Pas",
   "Version": "1.02",
-  "Engine": "",
+  "Engine": "Mono synth",
   "Theme": {
     "Accent": "#9B6DD6",
     "Face": 0.68,

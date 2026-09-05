@@ -18,7 +18,19 @@ public sealed class SoundMachineShelfViewModel : RackShelfViewModel<SoundMachine
     /// <summary>Reads what is installed and what is on offer.</summary>
     /// <param name="machines">Where what was read is kept for the run.</param>
     public SoundMachineShelfViewModel(ISoundMachineProjects machines)
-        : base(new SoundMachineRegistry(), new SoundMachineArchive(), "machine") => _machines = machines;
+        : this(machines, new SoundMachineRegistry())
+    {
+    }
+
+    /// <summary>The one registry, made once and handed to the archive that reads the same folders.</summary>
+    /// <remarks>
+    /// Two of them would be two answers to what this installation has, which is the fault this
+    /// codebase keeps naming. The archive is given the registry rather than left to make its own.
+    /// </remarks>
+    /// <param name="machines">Where what was read is kept for the run.</param>
+    /// <param name="registry">Which folders are read, and what the archive is told about them.</param>
+    private SoundMachineShelfViewModel(ISoundMachineProjects machines, SoundMachineRegistry registry)
+        : base(registry, new SoundMachineArchive(registry), "machine") => _machines = machines;
 
     /// <inheritdoc/>
     protected override void Kept(IReadOnlyList<SoundMachineProject> found) => _machines.Keep(found);

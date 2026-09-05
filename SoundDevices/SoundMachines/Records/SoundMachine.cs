@@ -21,6 +21,11 @@ namespace JingleBox2.SoundDevices.SoundMachines.Records;
 /// it needs from the panel that shows it.
 /// </remarks>
 /// <param name="Kind">Which engine is behind it, which is what a song's own file says.</param>
+/// <param name="Id">
+/// Its own name in files, which is the machine's and not the engine's. A machine is made in the
+/// designer and carries the id it was made under, so there may be any number of them on one
+/// engine: two kits are two machines with two ids, both playing the Kit engine.
+/// </param>
 /// <param name="Name">What it calls itself, read off its project rather than written here.</param>
 /// <param name="Summary">The sentence under its name on the rack, in the machine's own words.</param>
 /// <param name="IsOurs">
@@ -31,6 +36,7 @@ namespace JingleBox2.SoundDevices.SoundMachines.Records;
 /// <param name="Theme">The colours it is painted in, its own and not the app's.</param>
 public sealed record SoundMachine(
     TrackerInstrumentKind Kind,
+    string Id,
     string Name,
     string Summary,
     bool IsOurs,
@@ -38,15 +44,6 @@ public sealed record SoundMachine(
 {
     /// <summary>The machine's own colour, which is where everything it is painted with starts.</summary>
     public string Colour => Theme.Accent;
-    /// <summary>
-    /// What this machine is called in files, which is the id the contract asks for.
-    /// </summary>
-    /// <remarks>
-    /// The same string a machine's own slot on the rack uses, because they are the same fact:
-    /// "machine.zampler" is what a Zampler is, whether it is the box on the shelf or the line
-    /// in a song saying which machine an instrument was made on.
-    /// </remarks>
-    string ISoundDevice.Id => SlotId;
 
     /// <summary>
     /// The instrument id a machine's own slot in the rack uses.
@@ -60,15 +57,7 @@ public sealed record SoundMachine(
     /// Written out one by one rather than made from the name, so the strings that end up in
     /// people's instrument files can be found by looking for them.
     /// </remarks>
-    public string SlotId => Kind switch
-    {
-        TrackerInstrumentKind.Synth => "machine.oddskilla",
-        TrackerInstrumentKind.Sample => "machine.recording",
-        TrackerInstrumentKind.MonoSynth => "machine.ouroboros",
-        TrackerInstrumentKind.Kit => "machine.bongabong",
-        TrackerInstrumentKind.Sampler => "machine.zampler",
-        _ => ""
-    };
+    public string SlotId => Id;
 
     /// <summary>
     /// True when that id is a machine's own slot rather than something you made.
@@ -78,7 +67,9 @@ public sealed record SoundMachine(
     /// decides whether a file on the shelf is retired, and a machine thrown out in SETTINGS must
     /// leave its settings exactly where they were for when it is added back.
     /// </remarks>
-    public static bool IsSlot(string? id) => !string.IsNullOrEmpty(id) && KindOf(id) is not null;
+    public static bool IsSlot(string? id) =>
+        !string.IsNullOrEmpty(id)
+        && (KindOf(id) is not null || Registered.Any(one => one.IsOurs && one.Id == id));
 
     /// <summary>
     /// The machine whose slot that is, or null when the id is an ordinary instrument.
@@ -94,7 +85,8 @@ public sealed record SoundMachine(
     /// it says no for exactly the machines this stands in for.
     /// </remarks>
     public static SoundMachine? SlotFor(string? id) =>
-        KindOf(id) is { } kind ? For(kind) : null;
+        Registered.FirstOrDefault(one => one.IsOurs && one.Id == id)
+        ?? (KindOf(id) is { } kind ? For(kind) with { Id = id! } : null);
 
     /// <summary>
     /// A plugin is not a machine project and never will be.
@@ -109,6 +101,7 @@ public sealed record SoundMachine(
     /// </remarks>
     public static readonly SoundMachine Plugin = new(
         TrackerInstrumentKind.Plugin,
+        "plugin",
         "Plugin",
         "A VST3 or CLAP instrument, playing in a process of its own.",
         false,
@@ -164,21 +157,28 @@ public sealed record SoundMachine(
     public static IReadOnlyList<SoundMachine> All => Installed.Append(Plugin).ToList();
 
     /// <summary>
-    /// The machines on the rack: installed here, in the order they are offered.
+    /// The machines this installation has registered, by name.
     /// </summary>
     /// <remarks>
-    /// A machine is its project. Without one there is no panel to draw, no presets to offer and
-    /// nothing a box on the rack could do, so a machine thrown out in SETTINGS comes off the rack
-    /// with it and comes back when it is added again.
+    /// Alphabetical, and it has to be. It used to be a reading order written into the
+    /// application, the plainest engine first and the odd one last, which was a possible thing to
+    /// curate while there were five soundmachines whose names this file already knew. A device is
+    /// made in the designer and named by whoever made it, so there is no such list to keep: the
+    /// only order that means anything to somebody looking for one is the order they would look
+    /// in. By name, since that is what is on the screen, and by id after it so that two devices
+    /// sharing a name still sit in a settled order rather than swapping about between runs.
     ///
-    /// What it left behind stays where it was. The slot file on the shelf is still a machine's,
-    /// since <see cref="IsSlot"/> asks the engines and not this, so nothing retires it and adding
-    /// the machine back brings the box back with whatever was set on it.
+    /// A soundmachine is its project. Without one there is no panel to draw and no presets to
+    /// offer, so one thrown out in SETTINGS comes off the rack with it and comes back when it is
+    /// registered again.
+    ///
+    /// What it left behind stays where it was: the settings file on the shelf is left alone, so
+    /// registering the soundmachine again brings back whatever was set on it.
     /// </remarks>
     public static IReadOnlyList<SoundMachine> Installed =>
-        Offered.Select(kind => Registered.FirstOrDefault(one => one.Kind == kind))
-            .Where(one => one is not null)
-            .Select(one => one!)
+        Registered.Where(one => one.IsOurs)
+            .OrderBy(one => one.Name, System.StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(one => one.Id, System.StringComparer.OrdinalIgnoreCase)
             .ToList();
 
     /// <summary>Forgets every machine read off disc, for a list about to be read again.</summary>
@@ -198,17 +198,20 @@ public sealed record SoundMachine(
     /// An id this build has no engine for is refused rather than added as a box that cannot
     /// sound, which is what makes a machines folder from a later version harmless.
     /// </remarks>
-    public static bool Register(string id, string name, string summary, PanelTheme theme)
+    public static bool Register(string id, string name, string summary, PanelTheme theme, string? engine = null)
     {
-        var kind = KindOf(id);
+        if (string.IsNullOrWhiteSpace(id)) return false;
 
-        if (kind is not { } engine) return false;
+        var kind = EngineNamed(engine) ?? KindOf(id);
 
-        Registered.RemoveAll(one => one.Kind == engine);
+        if (kind is not { } behind) return false;
+
+        Registered.RemoveAll(one => one.IsOurs && one.Id == id);
 
         Registered.Add(new SoundMachine(
-            engine,
-            string.IsNullOrWhiteSpace(name) ? Engine(engine) : name,
+            behind,
+            id,
+            string.IsNullOrWhiteSpace(name) ? Engine(behind) : name,
             summary ?? "",
             true,
             theme ?? new PanelTheme("#7B838C")));
@@ -216,11 +219,51 @@ public sealed record SoundMachine(
         return true;
     }
 
-    /// <summary>Which engine that slot id is for, or nothing when this build has none.</summary>
-    private static TrackerInstrumentKind? KindOf(string? id) =>
-        Offered.Where(kind => new SoundMachine(kind, "", "", true, Bare).SlotId == id)
-            .Select(kind => (TrackerInstrumentKind?)kind)
-            .FirstOrDefault();
+    /// <summary>
+    /// Which engine one of the five original ids is for, or nothing for any other id.
+    /// </summary>
+    /// <remarks>
+    /// The machines that shipped before a machine could name its own engine, and the whole of
+    /// what this is for. Their manifests say nothing in <c>Engine</c>, and every song and rack
+    /// file on anybody's disc names them, so the mapping cannot go: it is what lets those five
+    /// keep working while every machine made from now on carries its engine in its own file.
+    ///
+    /// Nothing else consults it. A machine that names its engine is registered on the engine it
+    /// names, whatever it calls itself.
+    /// </remarks>
+    private static TrackerInstrumentKind? KindOf(string? id) => id switch
+    {
+        "machine.oddskilla" => TrackerInstrumentKind.Synth,
+        "machine.recording" => TrackerInstrumentKind.Sample,
+        "machine.ouroboros" => TrackerInstrumentKind.MonoSynth,
+        "machine.bongabong" => TrackerInstrumentKind.Kit,
+        "machine.zampler" => TrackerInstrumentKind.Sampler,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Which engine a manifest is naming, or nothing when it names none this build has.
+    /// </summary>
+    /// <remarks>
+    /// The word a machine writes in its own <c>Engine</c> field, read loosely on purpose: the
+    /// name a person types and the name the enum uses are not the same string, and a machine
+    /// refused over a space would be refused with nothing on any screen saying why.
+    /// </remarks>
+    /// <param name="engine">What the manifest says, which is usually nothing at all.</param>
+    public static TrackerInstrumentKind? EngineNamed(string? engine)
+    {
+        string want = new string((engine ?? "").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        return want switch
+        {
+            "synth" => TrackerInstrumentKind.Synth,
+            "monosynth" => TrackerInstrumentKind.MonoSynth,
+            "sampler" => TrackerInstrumentKind.Sampler,
+            "kit" => TrackerInstrumentKind.Kit,
+            "recording" or "sample" => TrackerInstrumentKind.Sample,
+            _ => null,
+        };
+    }
 
     /// <summary>The colour of a machine that is not here to say what colour it is.</summary>
     private static readonly PanelTheme Bare = new("#7B838C");
@@ -255,7 +298,24 @@ public sealed record SoundMachine(
     /// </remarks>
     public static SoundMachine For(TrackerInstrumentKind kind) =>
         Registered.FirstOrDefault(one => one.Kind == kind)
-        ?? new SoundMachine(kind, Engine(kind), "Not installed here.", kind != TrackerInstrumentKind.Plugin, Bare);
+        ?? new SoundMachine(kind, Named(kind), Engine(kind), "Not installed here.", kind != TrackerInstrumentKind.Plugin, Bare);
+
+    /// <summary>The id one of the five original machines has, or nothing for anything else.</summary>
+    /// <remarks>
+    /// The other way round from <see cref="KindOf"/>, and only ever used to name a machine that
+    /// is not here: what stands in for one has to be called something, and for the five that
+    /// shipped before ids were free the honest answer is the id every song already writes.
+    /// </remarks>
+    /// <param name="kind">The engine behind the machine that is missing.</param>
+    private static string Named(TrackerInstrumentKind kind) => kind switch
+    {
+        TrackerInstrumentKind.Synth => "machine.oddskilla",
+        TrackerInstrumentKind.Sample => "machine.recording",
+        TrackerInstrumentKind.MonoSynth => "machine.ouroboros",
+        TrackerInstrumentKind.Kit => "machine.bongabong",
+        TrackerInstrumentKind.Sampler => "machine.zampler",
+        _ => "",
+    };
 
     /// <summary>Its name, so a machine can be dropped straight into a list or a status line.</summary>
     public override string ToString() => Name;

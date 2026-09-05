@@ -58,7 +58,8 @@ public sealed class SoundEffectRegistry : RackRegistry<SoundEffectProject>
     protected override SoundEffectProject? Open(string folder) => SoundEffectProject.Open(folder);
 
     /// <inheritdoc/>
-    protected override bool Register(SoundEffectProject project) => _engines.Has(project.Id);
+    protected override bool Register(SoundEffectProject project) =>
+        _engines.HasEngine(_engines.EngineOf(project.Id, project.Engine));
 
     /// <inheritdoc/>
     protected override bool Take(SoundEffectProject project) => _archive.Add(project) != null;

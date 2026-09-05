@@ -97,6 +97,9 @@ public sealed class ConfigStore : IConfigStore
     /// <summary>How a file is written whole, so a settings save cannot leave half of one.</summary>
     private readonly ISafeFile _files;
 
+    /// <summary>How a path under the application folder is stored, so the settings travel.</summary>
+    private readonly IPortablePath _portable;
+
     /// <inheritdoc/>
     public string ConfigPath { get; }
 
@@ -109,9 +112,17 @@ public sealed class ConfigStore : IConfigStore
     /// </param>
     /// <param name="folder">Where the application keeps its things, defaulted to the real one.</param>
     /// <param name="files">How a file is written whole, defaulted to the real one.</param>
-    public ConfigStore(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null)
+    /// <param name="portable">
+    /// How a path under the application folder is stored, defaulted to the real one. A settings
+    /// file is not carried between machines, but the folder it sits in moves often enough on one:
+    /// an account renamed, a home directory moved, a different <c>XDG_CONFIG_HOME</c>. Every pad
+    /// then points at a folder that is not there and the wall goes silent with nothing said.
+    /// </param>
+    public ConfigStore(string appName = AppFolder.AppName, IAppFolder? folder = null, ISafeFile? files = null,
+                       IPortablePath? portable = null)
     {
         _files = files ?? new SafeFile();
+        _portable = portable ?? new PortablePath(folder: folder);
 
         var dir = (folder ?? new AppFolder()).Path(appName);
         Directory.CreateDirectory(dir);
@@ -130,6 +141,7 @@ public sealed class ConfigStore : IConfigStore
                 var cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? new AppConfig();
                 Brought(cfg);
                 Normalize(cfg);
+                Sources(cfg, _portable.Unpack);
                 return cfg;
             }
         }
@@ -149,8 +161,56 @@ public sealed class ConfigStore : IConfigStore
         cfg.Version = AppConfig.CurrentVersion;
 
         Normalize(cfg);
-        var json = JsonSerializer.Serialize(cfg, JsonOptions);
-        _files.Write(ConfigPath, json);
+
+        try
+        {
+            Sources(cfg, _portable.Pack);
+
+            var json = JsonSerializer.Serialize(cfg, JsonOptions);
+            _files.Write(ConfigPath, json);
+        }
+        finally
+        {
+            Sources(cfg, _portable.Unpack);
+        }
+    }
+
+    /// <summary>
+    /// Every pad's source, both ways, so the settings survive the folder moving.
+    /// </summary>
+    /// <remarks>
+    /// A pad plays a take off the shelf, which lives in the application folder, and that folder
+    /// is somewhere different on every machine and spelled differently on every platform. Written
+    /// whole, a settings file carried to another computer is a wall of pads pointing at somebody
+    /// else's home directory, and nothing says so: the pads are simply silent.
+    ///
+    /// A pad may hold a stream instead, and a URL is not under the application folder, so it goes
+    /// through untouched without anything here having to know the difference. Every profile as
+    /// well as the live list, since the profiles are what a settings file actually holds and the
+    /// live one is a copy of whichever is selected.
+    ///
+    /// Both directions are one walk, so a place a source can hide cannot be packed and then not
+    /// unpacked.
+    /// </remarks>
+    /// <param name="cfg">The settings to go over, in place.</param>
+    /// <param name="convert">Which direction, which is Pack on the way out and Unpack on the way in.</param>
+    private static void Sources(AppConfig cfg, Func<string, string> convert)
+    {
+        if (cfg is null) return;
+
+        foreach (var pad in cfg.Pads) Over(pad);
+
+        foreach (var profile in cfg.Profiles)
+        {
+            if (profile?.Pads is null) continue;
+
+            foreach (var pad in profile.Pads) Over(pad);
+        }
+
+        void Over(PadConfig? pad)
+        {
+            if (pad is not null) pad.Source = convert(pad.Source ?? "");
+        }
     }
 
     /// <summary>

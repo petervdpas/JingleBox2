@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using JingleBox2.Tracker.Enums;
 using JingleBox2.SoundDevices.SoundMachines.Interfaces;
 
@@ -10,19 +11,32 @@ public sealed class SoundMachineProjects : RackSoundDevices<SoundMachineProject>
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Through the slot id, which is the one string a kind and a folder on disc have in common.
-    /// A kind that has no slot has no machine to be missing, so it is never refused: that is the
-    /// plugin, and everything else that is not one of the engines this build ships.
+    /// A kind that is not a device of ours has no machine to be missing, so it is never refused:
+    /// that is the plugin, whose absence is the plugin itself and has an answer of its own. Asked
+    /// of the machine rather than of its id, since a plugin now carries an id like anything else
+    /// and an empty string is no longer what marks it out.
+    ///
+    /// Still asked by engine, which is as far as the question can be taken while a song's
+    /// instrument writes down the engine it plays and not the device it came off. So it asks
+    /// after **every** device registered on that engine and not the first of them: with one
+    /// device to an engine those were the same answer, and they stopped being the same the day a
+    /// second kit could exist. An instrument is let through while any device on its engine is on
+    /// the rack, which is the truthful answer to a question phrased in engines.
     /// </remarks>
     public bool Has(TrackerInstrumentKind kind)
     {
-        string slot = JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.For(kind).SlotId;
+        var stands = JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.For(kind);
 
-        if (slot.Length == 0) return true;
+        if (!stands.IsOurs) return true;
 
-        if (For(slot) is null) return false;
+        var ids = JingleBox2.SoundDevices.SoundMachines.Records.SoundMachine.Installed
+            .Where(one => one.Kind == kind)
+            .Select(one => one.SlotId)
+            .ToList();
 
-        return _rack is null || _rack.Contains(slot);
+        if (ids.Count == 0) ids.Add(stands.SlotId);
+
+        return ids.Any(id => id.Length == 0 || (For(id) is not null && (_rack is null || _rack.Contains(id))));
     }
 
     /// <summary>Which machines are on the rack, or nothing while nobody has said.</summary>

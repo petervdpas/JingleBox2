@@ -120,16 +120,39 @@ public class RackSoundDeviceTests
         Assert.Single(effects.All);
     }
 
-    /// <summary>The order they were read in is the order they are listed in.</summary>
+    /// <summary>
+    /// Devices are listed by name, whatever order the folders were read in.
+    /// </summary>
+    /// <remarks>
+    /// This said the order read is the order kept, which was the disc's order and is not an order
+    /// at all: it only looked like one while each world held a handful of devices whose names
+    /// were written into the application. A device is made in the designer and named by whoever
+    /// made it, so the only order that means anything is the one somebody would look in.
+    ///
+    /// Sorted where the list is kept rather than where it is drawn, so the rack, the pickers and
+    /// the shelf in SETTINGS cannot come out in three different orders.
+    /// </remarks>
     [Fact]
-    public void The_order_read_is_the_order_kept()
+    public void Devices_are_kept_in_alphabetical_order()
     {
         var effects = Effects(
-            new SoundEffectProject { Id = "effect.one" },
-            new SoundEffectProject { Id = "effect.two" },
-            new SoundEffectProject { Id = "effect.three" });
+            new SoundEffectProject { Id = "effect.one", Name = "Zither" },
+            new SoundEffectProject { Id = "effect.two", Name = "anvil" },
+            new SoundEffectProject { Id = "effect.three", Name = "Marimba" });
 
-        Assert.Equal(new[] { "effect.one", "effect.two", "effect.three" },
+        Assert.Equal(new[] { "anvil", "Marimba", "Zither" },
+            new List<string>(Array.ConvertAll(new List<SoundEffectProject>(effects.All).ToArray(), one => one.Name)));
+    }
+
+    /// <summary>Two devices sharing a name still sit in a settled order rather than flickering.</summary>
+    [Fact]
+    public void Two_devices_of_one_name_are_settled_by_id()
+    {
+        var effects = Effects(
+            new SoundEffectProject { Id = "effect.b", Name = "Twin" },
+            new SoundEffectProject { Id = "effect.a", Name = "Twin" });
+
+        Assert.Equal(new[] { "effect.a", "effect.b" },
             new List<string>(Array.ConvertAll(new List<SoundEffectProject>(effects.All).ToArray(), one => one.Id)));
     }
 

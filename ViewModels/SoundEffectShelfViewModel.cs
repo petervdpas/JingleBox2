@@ -18,7 +18,19 @@ public sealed class SoundEffectShelfViewModel : RackShelfViewModel<SoundEffectPr
     /// <summary>Reads what is installed and what is on offer.</summary>
     /// <param name="effects">Where what was read is kept for the run.</param>
     public SoundEffectShelfViewModel(ISoundEffectProjects effects)
-        : base(new SoundEffectRegistry(), new SoundEffectArchive(), "effect") => _effects = effects;
+        : this(effects, new SoundEffectRegistry())
+    {
+    }
+
+    /// <summary>The one registry, made once and handed to the archive that reads the same folders.</summary>
+    /// <remarks>
+    /// The machines' half keeps the same rule, and for the same reason: two registries over one
+    /// pair of folders are two answers to what this installation has.
+    /// </remarks>
+    /// <param name="effects">Where what was read is kept for the run.</param>
+    /// <param name="registry">Which folders are read, and what the archive is told about them.</param>
+    private SoundEffectShelfViewModel(ISoundEffectProjects effects, SoundEffectRegistry registry)
+        : base(registry, new SoundEffectArchive(registry), "effect") => _effects = effects;
 
     /// <inheritdoc/>
     protected override void Kept(IReadOnlyList<SoundEffectProject> found) => _effects.Keep(found);

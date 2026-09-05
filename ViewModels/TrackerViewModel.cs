@@ -1043,7 +1043,7 @@ public sealed partial class TrackerViewModel : ObservableObject, IInstrumentAudi
         typedVelocity = config?.TypedVelocity ?? false;
         recordNoteOffs = config?.RecordNoteOffs ?? false;
 
-        _player = new TrackerPlayer(audio, machines);
+        _player = new TrackerPlayer(audio, machines, effects);
         _player.UseSampleRate(config?.EngineSampleRate ?? Audio.TrackerOutput.FollowDevice);
 
         _player.UseSizes(new Audio.AudioDefaults().Chosen(new Audio.Records.AudioSizes(

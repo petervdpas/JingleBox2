@@ -34,12 +34,25 @@ public class SoundEffectRackTests : IDisposable
         public string Path(string appName) => path;
     }
 
-    /// <summary>An engine list that knows exactly the ids it was told about.</summary>
-    private sealed class Knows(params string[] ids) : ISoundEffectEngines
+    /// <summary>
+    /// An engine list that knows exactly the engines it was told about.
+    /// </summary>
+    /// <remarks>
+    /// An effect that names no engine is taken to want the one its id is named after, so a test
+    /// handing this a list of ids still says what it always said: these are the ones this build
+    /// can make and nothing else is.
+    /// </remarks>
+    private sealed class Knows(params string[] engines) : ISoundEffectEngines
     {
         /// <inheritdoc/>
-        public bool Has(string? id) =>
-            id is { Length: > 0 } && ids.Contains(id, StringComparer.OrdinalIgnoreCase);
+        public bool Has(string? id) => HasEngine(EngineOf(id, null));
+
+        /// <inheritdoc/>
+        public bool HasEngine(string? engine) =>
+            engine is { Length: > 0 } && engines.Contains(engine, StringComparer.OrdinalIgnoreCase);
+
+        /// <inheritdoc/>
+        public string? EngineOf(string? id, string? named) => named is { Length: > 0 } ? named : id;
 
         /// <inheritdoc/>
         public ISoundEffectEngine? Make(string? id, int sampleRate, int maxFrames) => null;

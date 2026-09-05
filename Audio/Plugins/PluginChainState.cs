@@ -130,7 +130,21 @@ public sealed class PluginChainState : IPluginChainState
     private readonly IPluginHost _plugins = new PluginHost();
 
     /// <summary>Which effects of ours this build can make, for the boxes that are not plugins.</summary>
-    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines _engines = new SoundDevices.SoundEffects.SoundEffectEngines();
+    private readonly SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines _engines;
+
+    /// <summary>
+    /// Takes the engine list, or the ordinary one, which knows only the effects that shipped.
+    /// </summary>
+    /// <remarks>
+    /// A chain writes down an effect's id and never its engine, so putting one back means looking
+    /// the id up in what this installation has registered. Handed one built over that list, an
+    /// effect somebody made in the designer comes back off a chain like any other; handed none,
+    /// only the three whose ids the application still recognises do. Every caller that has the
+    /// list gives it, and the default is there for a test that has no registry at all.
+    /// </remarks>
+    /// <param name="engines">Which engines can be made, and how an id is resolved to one.</param>
+    public PluginChainState(SoundDevices.SoundEffects.Interfaces.ISoundEffectEngines? engines = null) =>
+        _engines = engines ?? new SoundDevices.SoundEffects.SoundEffectEngines();
 
     /// <inheritdoc/>
     public PluginChainConfig Capture(PluginChain? chain, bool patches = false)

@@ -17,7 +17,7 @@ namespace JingleBox2.SoundDevices;
 /// <typeparam name="T">The manifest a device of this kind is read into.</typeparam>
 public abstract class RackSoundDevices<T> : IRackSoundDevices<T> where T : class, IRackProject
 {
-    /// <summary>What was read, in the order it was read, which is the order the rack shows.</summary>
+    /// <summary>What was read, by name, which is the order the rack shows.</summary>
     private readonly List<T> _found = new();
 
     /// <summary>And the same by id, since that is how everything downstream asks.</summary>
@@ -38,6 +38,32 @@ public abstract class RackSoundDevices<T> : IRackSoundDevices<T> where T : class
             _found.Add(one);
             _byId[one.Id] = one;
         }
+
+        _found.Sort(ByName);
+    }
+
+    /// <summary>
+    /// Puts two devices in the order somebody would look for them in.
+    /// </summary>
+    /// <remarks>
+    /// Alphabetical, and sorted once here rather than at each of the places that draw a list, so
+    /// the rack, the pickers and the shelf in SETTINGS cannot come out in three different orders.
+    ///
+    /// It used to be the order the folders happened to be read in, which is the disc's and is not
+    /// an order at all. That was survivable while a world held a handful of devices whose names
+    /// were known here; a device is made in the designer and named by whoever made it, so there
+    /// is no curated list to fall back on and the only useful order is by name.
+    ///
+    /// By the id after the name, so that two devices sharing a name sit in a settled order
+    /// instead of swapping places between runs, which would read as the list flickering.
+    /// </remarks>
+    /// <param name="left">One device.</param>
+    /// <param name="right">And the one it is being placed against.</param>
+    private static int ByName(T left, T right)
+    {
+        int byName = string.Compare(left.Name, right.Name, StringComparison.CurrentCultureIgnoreCase);
+
+        return byName != 0 ? byName : string.Compare(left.Id, right.Id, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc/>

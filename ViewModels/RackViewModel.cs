@@ -388,13 +388,23 @@ public sealed partial class RackViewModel : ObservableObject, ISoundDevicePanel,
     /// Runs on every open and does nothing on all but the first, because afterwards the only
     /// things left are the ones it keeps.
     /// </remarks>
-    private void Rack()
+/// <remarks>
+    /// What is retired is what is neither a registered device nor anything this rack has ever
+    /// been offered. The second half is what keeps somebody's settings: a device unregistered in
+    /// SETTINGS comes off the rack, and its settings must be exactly where they were when it is
+    /// registered again, which was true of the five that shipped only because their ids were
+    /// written into the application. A device made in the designer has no such standing, so the
+    /// rack's own record is what gives it one.
+    /// </remarks>
+        private void Rack()
     {
         int retired = 0;
 
+        var known = _rack.Shelved;
+
         foreach (var instrument in _rack.List())
         {
-            if (SoundMachine.IsSlot(instrument.Id)) continue;
+            if (SoundMachine.IsSlot(instrument.Id) || known.Contains(instrument.Id)) continue;
 
             string name = instrument.Name;
 

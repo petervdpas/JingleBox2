@@ -4,7 +4,7 @@
   "Summary": "One of your recordings, pitched by resampling.",
   "Author": "Peter van de Pas",
   "Version": "1.03",
-  "Engine": "",
+  "Engine": "Recording",
   "Theme": {
     "Accent": "#3FA6A0",
     "Face": 0.68,

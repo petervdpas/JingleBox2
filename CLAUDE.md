@@ -52,7 +52,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   when a machine was a thing a song played and nothing else, and had been false ever since: not
   one file in any of the three is about a pattern, a clock or a song. What stayed behind is what
   a song owns, and `TrackerInstrument` is the whole reason the line falls there, since **a
-  soundmachine used in a song is an instrument**: `SoundMachine` is the box, `SoundMachinePreset` is a
+  soundmachine used in a song is an instrument**: `SoundMachine` is the device, `SoundMachinePreset` is a
   sound you start from, and neither is in a song.
 
   The namespaces are `JingleBox2.SoundDevices`, `JingleBox2.SoundDevices.SoundMachines` and
@@ -302,24 +302,106 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   through. `Tests/MixerIsolationTests.cs` plays a note on one track and asks what every other
   track is sounding, because everything in here is indexed by track number and indexed things go
   wrong quietly
-- `SoundMachineRack` (Tracker/): What you have, in `%APPDATA%/JingleBox2/instruments/`, one file
-  each. The machines, one apiece under their own names, and the plugins you have added. Nothing
-  else: anything that is neither is moved to `instruments/retired/` on the next open, since
-  there is no longer any way to make one. A machine cannot be renamed, deleted or duplicated; a
-  plugin can be deleted but takes its name from the VST3 or CLAP
+- `SoundMachineRack` (SoundDevices/SoundMachines/): What you have, in
+  `%APPDATA%/JingleBox2/instruments/`, one file
+  each, holding your settings for it. What is retired to `instruments/retired/` on the next open
+  is what is neither registered now nor anything this rack has ever been offered, which is a
+  plugin somebody shelved before plugins stopped being shelved. **The second half of that test is
+  what keeps your settings**: unregistering a device takes it off the rack and must leave what you
+  set on it exactly where it was, for when it is registered again, and that was true of the five
+  that shipped only because their ids were written into the application. A device made in DESIGNER
+  has no such standing, so `shelved.txt` is what gives it one. What sits on the rack cannot be
+  renamed there, since that would be renaming the device; a plugin can be deleted but takes its
+  name from the VST3 or CLAP
 - **Engine, machine and instrument are three words and not one.** They are the three layers of
   the same thing and confusing any two of them leads somewhere wrong, so:
   - An **engine** is what makes the sound. There are six, they are `TrackerInstrumentKind`, they
     are compiled into the application, and their numbers are in every song ever saved so they do
     not move. An engine has no face and no name a person sees
   - A **machine** is a face over an engine: a folder holding `machine.json`, its badge, its
-    presets and its own `sounds`, made in the designer and travelling as a zip. It carries no
-    engine and cannot: which engine it is on is decided by its id, and `SoundMachine.Register` refuses
-    an id it has no engine for. That is why a machine designed under a new id is read off disc
-    and never reaches the rack, and it is the one thing standing between here and a machine
-    somebody else can ship
+    presets and its own `sounds`, made in the designer and travelling as a zip. **It names the
+    engine it plays, in its own manifest, and its id is its own.** Any number of machines can
+    name one engine, so two kits are two machines
   - An **instrument** is a machine in use: your name, your settings, its own id, stored with the
     song. Two of them can come off one machine
+
+- **Which engine a device plays was worked out from its id, and that was the fault under half of
+  this file.** `SoundMachine.SlotId` was a switch of five strings and
+  `SoundEffectEngines.Built` was a dictionary keyed by three, so there could only ever be five
+  soundmachines and three effects, their ids were decided here rather than by whoever made them,
+  and a device designed in DESIGNER under any other id was read off disc, refused in silence, and
+  never reached the registry, the rack or a song. Registering a second machine on one engine
+  quietly threw the first away
+- **The door for the other way was already there and was dead.** `SoundMachineProject.Engine` was
+  a real property, read out of every `machine.json`, and passed to nothing. The field decides now,
+  both worlds have one, and `SoundEffectProject` grew the matching property
+- **The whole model is four steps and each only sees the one before it: designer, registry, rack,
+  song.** A device is made in DESIGNER or imported as a zip; it is registered in SETTINGS, System,
+  which is the only list that answers whether this installation has it; a registered device can be
+  on the rack; and **a song can only use what is on the rack**. `Tests/DeviceFlowTests.cs` walks
+  it, for a soundmachine as far as the track and for an effect one step further onto that track's
+  chain, with removal at each point. Every layer had its own tests and the walk had none, which is
+  how the coupling survived: each layer was right about the question it was asked
+- **The two worlds differ in exactly one thing, which is what a song does with the device.** A
+  soundmachine is played, so it becomes an instrument on a track; an effect is not, so it becomes
+  a slot on a track's chain. Everything before that is one act done twice, and fixing the
+  identity in one world and not the other was the same fault this file names everywhere else
+- **The three ids that shipped are grandfathered and nothing else is.** `KindOf` and
+  `SoundEffectEngines.Was` map the eight original ids to their engines and are consulted only
+  where a manifest is silent, since every song, rack file and chain on anybody's disc names them.
+  Compared without regard to case, like every other id here. The eight shipped manifests name
+  their engines out loud now, and `Tests/ShippedEngineTests.cs` holds them to it, including that
+  the engine each names is the one its id used to imply: a shipped device that quietly moved
+  engines would open every song that plays it and sound like something else
+- **An effect's engine is resolved from the id the chain wrote down**, since a chain writes an
+  id and never an engine and that is still right. `SoundEffectEngines` takes the registered list
+  to look it up in, so `PluginChainState`, `TrackerPlayer`, `PadViewModel` and
+  `PluginChainViewModel` all hand it one. Without that an effect somebody made would load on the
+  rack and vanish off a chain
+- **The rack is in alphabetical order, sorted once in `RackSoundDevices<T>.Keep`.** It was the
+  order the folders were read in, which is the disc's and is not an order; it only looked like one
+  because the five that shipped had a curated reading order written into the application, the
+  plainest engine first. There is no such list for a device somebody makes and names themselves.
+  By name, then by id, so two devices sharing a name sit still rather than swapping between runs.
+  Sorted where the list is kept rather than where it is drawn, so the rack, the pickers and the
+  shelf in SETTINGS cannot come out in three different orders
+- **Remove in SETTINGS did nothing, and said "Could not remove" while doing it.**
+  `SoundMachineArchive` was constructed `base(registry!, paths)`, so a default-built one put a
+  null straight into the field `Remove` dereferences; the catch around it reported a
+  `NullReferenceException` as a failure to remove. `SoundEffectArchive` wrote `??` where the
+  machine one wrote `!`, which is why effects removed fine and machines never had. The
+  constructor's own documentation had said all along that one made without a registry "builds one
+  and hands itself over". Both shelves now build one registry and hand it to their archive, since
+  two registries over one pair of folders are two answers to what this installation has
+- **The start-up pass is the most dangerous thing in this half of the program**, because it runs
+  unattended on every start over the one folder holding somebody's own work, and
+  `Tests/RefreshKeepsYoursTests.cs` is the seven rules it keeps. It walks only the files that
+  ship, so a preset you saved, a device you made and anything else in a folder is never looked at
+  and **nothing is ever deleted**. It overwrites only where the shipped file is newer, so an edit
+  of yours is kept. It never opens `instruments/`, where your settings for a device live
+- **The one way to lose work is to give your own device a shipped device's id**, and that is by
+  design: a device is known by its id and by nothing else, so the pass brings the shipped copy
+  over the top and an afternoon opens as the device that ships. Nothing downstream can tell them
+  apart, since there is nothing in a folder that says who wrote what is in it. So it is caught
+  where the id is chosen: `IDesignWorld.Ships` is the question and DESIGNER says so on New and on
+  Save. A warning and not a refusal, because putting an edited device back over the copy that
+  ships is what Save as exists for; what it may not do is happen quietly
+- **A path stored under the application folder is stored so it can be found again, and that was
+  true of songs alone.** The rack wrote a kit's sixteen pads and a sampler's zones as full paths
+  into a home directory, and the settings wrote every pad the same way, so a folder that moved or
+  an account that was renamed left them pointing at nothing with nothing said: the pads are simply
+  silent. `IPortablePath` in `Files/` is the rule on its own, `{app}/` and forward slashes,
+  knowing nothing about songs, devices or pads and unable to, or the thing that keeps every stored
+  path honest would depend on all three. `ISongPaths` keeps the instrument walk over it, which is
+  forced rather than tidy: the walk knows what a kit, a sampler and a chopped take are
+- Applied in `SoundMachineRack` and `ConfigStore` now. **Packed around the write in a `finally`
+  rather than on a copy**, because the rack hands out the very objects the pages are looking at
+  and one left holding `{app}/` after a save plays nothing until it is read off disc again, which
+  reads as saving having broken the sound. A path outside the folder is left exactly as it was,
+  since it is somewhere the user chose or somebody else's plugin, and an `http://` stream goes
+  through untouched without anything needing to know it is a URL. Nothing to migrate: `Unpack`
+  returns an unstored path unchanged, so every file already written reads as it did and the first
+  save rewrites it
 
 - **The registry is what this installation has, and it is the only thing that answers that.**
   Two folders and only one of them is yours. Beside the program is what ships: a source to take
@@ -386,8 +468,8 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   answer about whether a zip has to be imported, and it shows it while somebody is looking at
   it. A machine's own recordings do travel with it, inside the zip
 
-- A machine is a fixture on the rack while it is registered: one of each, fixed name, and gone
-  from the rack when it is unregistered in SETTINGS, System. It used to say always there, which
+- A machine is on the rack while it is registered, and gone from the rack when it is unregistered
+  in SETTINGS, System. It used to say always there, which
   was written before the registry existed and had been quietly untrue ever since: the registry is
   what this installation has and is the only thing that answers that. `TrackerInstrument`
   is the data type for both a machine and an instrument, but the rack's types say machine
@@ -416,7 +498,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `RackViewModel` and `RackView` are the page with the two tabs; `PanelElementViewModel`,
   `PanelElementPropertyViewModel`, `MenuOptionViewModel`, `ParameterViewModel` and `PreviewValues`
   are the designer's, which serves both; `IPanelTint`, `PanelTint`, `PanelShades`,
-  `PanelColoursDialog` and `PanelColours` are a box's own colours, which an effect has as much as
+  `PanelColoursDialog` and `PanelColours` are a device's own colours, which an effect has as much as
   a machine. What kept its name is what only the instrument world has: `SoundMachineWindow`,
   `SoundMachineShelfViewModel`, `SoundMachinePresetDesk`, `MissingSoundMachineDialog`, `SoundMachineRack`,
   `SoundMachineProject`, and the preview parts for a kit, a keyboard, zones and slices
@@ -444,7 +526,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   be handed. `IChainSlot` is the block both kinds draw as, named in XAML for the reason
   `IRackRow` is: a compiled binding needs a type and a block drawn twice would be two templates
   drifting apart
-- **A chain entry says which world its box came out of, and absent means plugin.**
+- **A chain entry says which world it came out of, and absent means plugin.**
   `PluginSlotConfig.Effect` is the effect's own id and nothing else is written: no path, since
   it is not a file on this computer, and no state lump, since everything it holds is in its
   parameters. Every chain already on somebody's disc has no such field and is read as what it was.
@@ -455,7 +537,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   it is made rather than known by the class, because a face is a face over an engine and one
   engine may one day be behind several faces. The keys are the engine's own, so a song can be
   written down without the face: what a chain holds is an id and a handful of numbers
-- **Which box a link on one of ours reaches is the one whose face is in front, and it used to be
+- **Which effect a link on one of ours reaches is the one whose face is in front, and it used to be
   the chain of the track you are on.** That is right while you are working in the pattern and
   wrong in three separate ways the moment a face is open in a window, which is exactly when a hand
   is reaching for a knob. A track's chain follows the cursor, so a face left open while an
@@ -463,7 +545,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   on the mixer and follows nothing, so it never matched the cursor at all. And a pad's chain is
   not on a track in the first place, so no answer phrased as a track number could ever have
   reached it: a knob pointed at an effect on a pad moved nothing, ever. `ISoundEffectInFront` is the
-  one answer, `ISoundEffectShown` is the three things a link needs about a box (which effect, where it
+  one answer, `ISoundEffectShown` is the three things a link needs about an effect (which effect, where it
   is standing, and what its knobs stand at), and `SoundEffectWindow` says both halves, on opening as
   well as on being brought forward, since whether a window hears that it was activated is the
   window manager's business
@@ -472,7 +554,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   raises `Said` and redraws the face; an effect on a chain wrote straight into the engine. The
   sound changed, every knob on the screen stayed where it was, and from a chair that reads as a
   link that was never made rather than as a picture that is stale. `ControlTargets.Reaching` is
-  the one builder both ways of arriving at a box go through, so there is one answer to what a
+  the one builder both ways of arriving at an effect go through, so there is one answer to what a
   write does
 - **A knob is pointed at one of ours on a chain, and the link names the effect and the key.**
   Not the slot and not the track: the same two words a machine link uses, for the same reason,
@@ -514,21 +596,21 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   and the swap; `RackShelfViewModel<T>` is the list in SETTINGS, System with its Import, Add and
   Remove. What each world supplies is two answers, the name of the file at the top of a folder and
   how a folder is read, so `SoundMachineArchive` and `SoundEffectArchive` are a dozen lines
-  apiece. The one thing that differs downstream is where a box goes afterwards: a machine
+  apiece. The one thing that differs downstream is where a device goes afterwards: a machine
   becomes an instrument in a song, an effect goes on a track's chain, which is the same
   difference a plugin instrument has from a plugin effect
 - **`Ships` was answering no for every file of every machine that ships.** It compared the path
   under the installed folder with the same path under the shipped one, and those never match: a
-  box installs into a folder named after its **id**, since that is the one name that cannot
+  device installs into a folder named after its **id**, since that is the one name that cannot
   collide by accident, while it ships in a folder named whatever its author called it. OddSkilla
   ships in `OddSkilla` and installs as `machine.oddskilla`. So a song packed for somebody else
   carried a copy of the presets they already had. It reads the folder's id and looks the shipped
-  box up by that now
+  device up by that now
 - **A preset nobody can pick is a preset nobody has.** The shelf, the page and six files were all
   in place and EchoBox's face had no picker on it, and nothing anywhere filled one for an effect.
   `SoundEffectPresetNames` is the picker's list, made fresh each time a face asks for it so a
   preset saved in the designer turns up without the two being wired together, and supplied in all
-  three places an effect's face is drawn: the box on a chain and its own window, the rack row, and
+  three places an effect's face is drawn: the slot on a chain and its own window, the rack row, and
   the designer's preview. `ElementKinds.Preset` is on EchoBox's face above the Delay group
 - **Picking one writes through `IPanelValues` and never into the engine**, which is the rule this
   codebase has already paid for once with a hardware knob: a value written past the panel's own
@@ -606,7 +688,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   song owns its instruments with their own settings, and what changes is where a preset picked
   from now on starts
 - **Both reasons a preset went loud are now switches, and a switch here is a parameter on the
-  box.** Not a tick in SETTINGS, which would change every song at once and travel with nothing, and
+  device.** Not a tick in SETTINGS, which would change every song at once and travel with nothing, and
   not a control on a mixer strip, which is levels and sends and has no business holding a fact
   about somebody's drive knob. It is the rule `NewNoteAction` already keeps: a fact about the
   sound, wherever it is played, saved with the instrument and with the preset. As a parameter it
@@ -914,7 +996,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   that was added to have a switch at all. That is the price of the thing being switchable, it is
   paid where it does not matter, and it is smaller than what turning the switch on gives back
 - **The switch is a tick in SETTINGS, Engine, and that is a different answer from the last two
-  switches on this path.** `EvenDrive` and `FilterFirst` are parameters on the box because they
+  switches on this path.** `EvenDrive` and `FilterFirst` are parameters on the device because they
   are facts about the sound: saved with the instrument, carried in the song and in the zip, and
   worth pointing a knob at. This is a fact about how much time this computer has, which is where
   the buffer sizes and the real-time switch already live. **A song that sounded different on two
@@ -1020,11 +1102,11 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   and it is one contract because a plugin and a chain are the same shape: `Begin` starts and says
   whether anything is now outstanding, `Advance` collects what is and starts whatever comes next.
   A bridged plugin's `Begin` puts the block in the shared memory and asks; its `Advance` waits and
-  copies the answer out. A chain's `Begin` walks its own boxes until it reaches one that can be
+  copies the answer out. A chain's `Begin` walks its own slots until it reaches one that can be
   left in flight, doing everything before it where it stands
 - **So the width is the number of tracks and never the number of plugins**, which is the whole of
-  what may be overlapped and is worth being exact about. A chain is audio flowing through boxes in
-  order, so the second box cannot start until the first has finished; two tracks' chains work on
+  what may be overlapped and is worth being exact about. A chain is audio flowing through slots in
+  order, so the second cannot start until the first has finished; two tracks' chains work on
   their own busses and nothing on one reads the other, so those really are independent. The mixer
   begins every track, then drives rounds: each round collects what was outstanding and asks for
   whatever is next, so at any moment every track has one crossing in flight
@@ -1040,7 +1122,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   ordinary chunked thing: there is one buffer each way, so a chunked block is several round trips
   in a row and there is nothing to overlap inside it
 - **A run once begun is always driven to its end**, and the one comparison that makes that certain
-  is worth its cost. A box left holding an answer nobody collected refuses every block after it,
+  is worth its cost. A slot left holding an answer nobody collected refuses every block after it,
   for the rest of the session, and from a chair that is one plugin going silent for no reason
   anybody can see. So a chain settles anything left in flight before it starts a new run, and the
   abandoned answer lands on the block at hand rather than being thrown away, which is a moment of
@@ -1083,7 +1165,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   somebody else's arithmetic: a wavetable synth oversamples and this application has no reach into
   it. **Overlapping cannot make the longest chain shorter**, and what it removed is the other three
   queueing behind that one. ZamDelay beside it at 0.09 ms is the whole point of measuring both
-  ends rather than one: two boxes on the same chain, and one of them costs twenty times the other
+  ends rather than one: two effects on the same chain, and one of them costs twenty times the other
 - **The gap between the two ends is 1.8 ms here against 0.177 in the empty case**, which is the
   same finding from the other side. With four plugin processes each wanting two or three
   milliseconds of every eleven, the mixing thread is not merely waking an idle core, it is waiting
@@ -1145,14 +1227,16 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   that can be wrong. `SoundEffectRegistry` reads `effects/` by the rack's rules, `SoundEffectProjects`
   holds what was found for the run, and the rack's Effects tab is that list. `ISoundEffectEngines`
   is the gate, and its table was empty for exactly as long as there were no engines: an effect
-  that could be had and makes no sound is the box this codebase refuses to put on a rack, so the
+  that could be had and makes no sound is the device this codebase refuses to put on a rack, so the
   first entry arrived with the engine that does the work rather than before it. EchoBox, Sweeper
-  and Roaster are in it now. There is deliberately no enum of effect engines with
+  and Roaster are in it now, keyed by the **engine** rather than by the effect's id, which is what
+  lets any number of effects name one. There is deliberately no enum of effect engines with
   numbers in it, unlike `TrackerInstrumentKind`: a song says which engine an instrument is on, and
   a chain writes down an effect's id and never its engine, so nothing here is ever written to a
-  file and there is no number to keep still
+  file and there is no number to keep still. Which is why the id has to be looked up in what is
+  registered to reach an engine at all, and why `SoundEffectEngines` is handed that list
 - **Registered and on the rack are the same fact for an effect, which they are not for a
-  machine.** A machine's box can be taken off the rack and put back, because the box is an
+  machine.** A machine can be taken off the rack and put back, because what sits there is an
   instrument you own with your own settings on it; an effect has nothing of the sort, since one in
   use is a slot on a track's chain. So the Effects tab has no picker beside it and no shelf file:
   what is registered is what is there, and losing one is unregistering it in SETTINGS. The rows
@@ -1196,7 +1280,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   `IPanelImages` is the pictures in a folder, added under the next free number, swept when nothing
   names them, renumbered so there are no gaps, and one at a time when the last element showing one
   goes; `IFolderCopy` is a folder carried whole, empty folders included, which is what taking a
-  shipped box and what Save as both are. `DesignHistory` went the same way: a step is the
+  shipped device and what Save as both are. `DesignHistory` went the same way: a step is the
   project's own JSON, and it used to name the machine's type on both sides of the trip, where it
   now asks the project what it is. So a world added later needs nothing in any of the three
 - **The rack holds devices, and a device is a soundmachine or an effect.** That is the word the
@@ -1210,7 +1294,7 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
   - a **soundmachine** is a device that is played. Notes go in and sound comes out, and in a song
     it becomes an **instrument**: your name, your settings, its own id
   - an **effect** is a device that is not played. A whole track's audio goes in and comes back
-    changed, and in a song it is a box on a track's chain
+    changed, and in a song it is a slot on a track's chain
   So the only difference between the two kinds of device is what happens to it once it is in a
   song, which is the same difference a plugin instrument has from a plugin effect. Everywhere
   else, where there were two of something there is now one: `IRackRegistry`, `RackArchive`,
@@ -1248,12 +1332,12 @@ dotnet publish -c Release -r linux-x64  # Publish for Linux
 - Which means the rack cannot be rebuilt from the registry on every open, or a machine taken off
   would be back the next morning with nothing to say why. `ISoundMachineRack.Shelved` is the record,
   `instruments/shelved.txt`, one id to a line: a machine this rack has never been offered gets
-  its box, and one it has been offered is left alone whether or not the box is still there. The
+  its place, and one it has been offered is left alone whether or not it is still there. The
   registry's own `offered.txt` is the same rule for the same reason, and this is that rule one
   layer in
 - Each tab's picker offers what is registered and not already on the rack, which is empty in the
   ordinary case and is the truth: there is nothing to add. What it puts back is the machine's own
-  box, under the machine's own slot id, because it is that machine's box and not a second one. A
+  place, under the machine's own slot id, because it is that machine's and not a second one. A
   variant set up differently is a Duplicate, which is a different act with a different button.
   The effects tab has no picker at all, since an effect cannot be shelved: what is registered is
   what is there
@@ -1321,7 +1405,7 @@ place by carrying meaning.
 
 Which then says something about every other use of those words. If two things answer to one
 name, either they are the same thing, in which case there should be one of them, or one of
-them is misnamed. `device` was the bad case: it meant a box on the rack, a MIDI port, a sound
+them is misnamed. `device` was the bad case: it meant a device on the rack, a MIDI port, a sound
 card and a plugin on a chain, four things, so it named none of them and had become the bag
 `Helper` and `Manager` always become. Each of the four has its own word now: `SoundDevice`,
 `MidiPort`, `AudioOutput`, and a `Slot` on a chain. `TrackerEffect` was the same fault in
@@ -1334,7 +1418,7 @@ says it now, right through: `SoundMachine` is the record, and `SoundMachineRack`
 `SoundMachinePaths`, `SoundMachineWatch`, `SoundMachineWorld`, `SoundMachineValuesFor`,
 `SoundMachinePresetFile`, `SoundMachinePreset`, `SoundMachinePresets`, `MissingSoundMachine` and
 `MissingSoundMachines` with their interfaces. `SoundMachineWindow` and `SoundEffectWindow` are the
-two windows a box opens in, named the same way and named as a pair, since before this one said
+two windows a device opens in, named the same way and named as a pair, since before this one said
 machine and the other said effect and only one of them was a word this file uses.
 
 The pages and dialogs went the same way, because a name half applied is worse than the old one:
@@ -1358,15 +1442,15 @@ chain. And the umbrella: `ISoundDevice`, `SoundDeviceLinks`, `SoundDeviceRemote`
 
 **The SDK has no two worlds in it, and thinking it did is what kept a folder empty.**
 `Rack.SoundDevices` held `Faces/` for what both worlds draw out of and `SoundMachines/` for what
-only a played box has, and the obvious question was where the matching `SoundEffects/` had got
+only a played device has, and the obvious question was where the matching `SoundEffects/` had got
 to. The answer was not that an effect needs nothing. It was that the split is not world-shaped at
 all.
 
 Asked one at a time, most of the nine were not about being played. `IPanelNotes` is what a key is
 called, and a delay with its time in note values wants exactly that. `IPanelTakes` is where a
-panel finds out about the recordings a box names, which is a convolution reverb's impulse
+panel finds out about the recordings a device names, which is a convolution reverb's impulse
 response as much as a sampler's. `IPanelLocation` is where the track has got to, and an effect
-sits on a track. `IPanelPatch` is a box's settings as it keeps them. The same test caught two in
+sits on a track. `IPanelPatch` is a device's settings as it keeps them. The same test caught two in
 the shared folder going the other way: `IPanelScope` had been written up as a synth tracing its
 own wave, when the contract is fill this buffer with the shape you are making, and a compressor
 tracing its gain reduction is the same call; and `IPanelPresets` was called a machine thing
@@ -1376,9 +1460,9 @@ fact about effects, since every delay ever built ships presets.
 So the contracts are named for the part they serve and they live together: `IPanelKeys`,
 `IPanelPads`, `IPanelZones`, `IPanelSlices`, `IPanelTakes`, `IPanelNotes`, `IPanelPatch` and
 `IPanelLocation`, beside `IPanelValues`, `IPanelMenu`, `IPanelPresets`, `IPanelScope` and
-`IPanelOrder`. Whether a given box answers one is a fact about that box rather than about which
+`IPanelOrder`. Whether a given device answers one is a fact about that device rather than about which
 of two worlds it is in. The two worlds are real where the difference is real, which is what a
-song does with the box, and that is application code: `SoundDevices/SoundMachines/` and
+song does with the device, and that is application code: `SoundDevices/SoundMachines/` and
 `SoundDevices/SoundEffects/`.
 
 `IInstrumentName` kept its own word, because it is the instrument's name in the song and an
@@ -1633,7 +1717,7 @@ application. Documentation goes stale exactly where nobody is made to read it.
 dotnet test Tests/JingleBox2.Tests.csproj
 ```
 
-1707 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
+1814 of them, in about twenty five seconds, with no window and no hardware. They run in CI on every push
 and every pull request, on Linux **and** Windows, because two of them are genuinely platform
 specific: a path is written with a separator that is not the same character on the two systems,
 and those are exactly the tests that would pass on one machine for a year and fail on somebody
@@ -2179,7 +2263,7 @@ whole exercise and is worth writing down rather than summarising:
 - The word for a machine, an effect or a mixer strip, taken together, is **target**, which is
   what `IControlTarget` has meant since the beginning rather than something invented for the
   page. It is deliberately not called a device, although that is what Renoise, Bitwig and
-  Ableton all call it: this is a page about MIDI, where device already means the box on the
+  Ableton all call it: this is a page about MIDI, where device already means the thing on the
   desk, and the two ends of the wire may not share a name. `ControlDeviceLinks` became
   `ControllerLinks` and then `ControlTemplateLinks` for the same reason. The umbrella is not shown at all in the interface,
   where a card is headed with the thing itself and the sort of thing is a quiet word beside it,
@@ -2961,7 +3045,7 @@ whole exercise and is worth writing down rather than summarising:
 - `Views/SoundDeviceHelpWindow.axaml` is the window, and it is deliberately not
   `HelpWindow`: no topic list, no search, the device's name and its one line at the top, and the
   page on a plate in the device's own colours. One window per device, so a page can be left open
-  beside the box while somebody works it. All eight devices that ship carry one, and
+  beside the device while somebody works it. All eight devices that ship carry one, and
   `Tests/ShippedHelpTests.cs` walks both rack folders and says so, including that a page starts
   with its own device's name, which is how a copied file that was never edited fails.
   `verify-rack.sh` refuses a release payload that lost one, since `help.md` is neither json nor
@@ -3305,7 +3389,7 @@ whole exercise and is worth writing down rather than summarising:
   reason. `Help/Topics/designer.laying-out.md` says so, which is the topic that was missing: the
   designer had one about what a machine and an effect are and nothing about laying a face out
 - The chain under the pattern is blocks rather than pills, and the point of the change is that
-  a row of boxes with names on them tells you the order of the effects and nothing at all about
+  a row of blocks with names on them tells you the order of the effects and nothing at all about
   the sound. A plugin block now prints its first four controls and what they read, which is what
   Renoise and Bitwig both do and the reason both put the controls in the chain rather than behind
   it. Asked of the plugin itself rather than of its panel, because the panel is built the first
@@ -3999,7 +4083,7 @@ whole exercise and is worth writing down rather than summarising:
   because a folder is one or the other: a machine is described by `machine.json` and an effect by
   `effect.json`, which is the one word that differs between the two passes. It was proved by
   publishing and breaking the payload four ways rather than by reading it, which is the only way
-  this is ever caught: a whole box gone, an effect without its manifest, a machine without its
+  this is ever caught: a whole device gone, an effect without its manifest, a machine without its
   manifest, and a machine missing a preset, the last three with the file count made right again
   so that only the branch under test could catch them
 

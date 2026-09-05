@@ -4,7 +4,7 @@
   "Summary": "A kit. Sixteen pads, one recording to a key, sounding over each other.",
   "Author": "Peter van de Pas",
   "Version": "1.02",
-  "Engine": "",
+  "Engine": "Kit",
   "Theme": {
     "Accent": "#D2504A",
     "Face": 0.68,

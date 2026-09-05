@@ -4,6 +4,7 @@
   "Summary": "Filter. Four poles, a drive into them, and a cutoff that glides.",
   "Author": "Peter van de Pas",
   "Version": "1.1",
+  "Engine": "Filter",
   "Theme": {
     "Accent": "#7A6CE0",
     "Face": 0.68,

@@ -36,7 +36,7 @@ public sealed class TrackerPlayer : ITrackerPlayer
     private readonly IPluginHost _plugins = new PluginHost();
 
     /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
-    private readonly IPluginChainState _chains = new PluginChainState();
+    private readonly IPluginChainState _chains;
 
     /// <summary>What the mix adds up to, mute and solo included.</summary>
     /// <remarks>Shared rather than one apiece: it holds nothing of its own.</remarks>
@@ -122,10 +122,17 @@ public sealed class TrackerPlayer : ITrackerPlayer
     /// it, which answers that every machine is missing: a player built without being told what is
     /// installed is a player that has not been wired up, and silence says so.
     /// </param>
-    public TrackerPlayer(IAudioEngine audio, ISoundMachineProjects? machines = null)
+    /// <param name="effects">
+    /// What this installation has registered, for turning the id a chain wrote down back into an
+    /// engine. Left out, only the effects whose ids the application still recognises come back.
+    /// </param>
+    public TrackerPlayer(IAudioEngine audio, ISoundMachineProjects? machines = null,
+                         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null)
     {
         _audio = audio;
         _machines = machines ?? new SoundDevices.SoundMachines.SoundMachineProjects();
+        _chains = new Audio.Plugins.PluginChainState(
+            new SoundDevices.SoundEffects.SoundEffectEngines(effects));
 
         _watch = new System.Threading.Timer(_ => Muster(), null, WatchMilliseconds, WatchMilliseconds);
     }

@@ -106,6 +106,27 @@ public sealed class SoundEffectProject : IRackProject, IDesignProject, ISoundDev
     /// <summary>Bumped by whoever makes it, and shown beside the name on the rack.</summary>
     public string Version { get; set; } = "1.0";
 
+    /// <summary>
+    /// Which engine it plays, by name.
+    /// </summary>
+    /// <remarks>
+    /// A device is a face over an engine. The face is this folder, made in the designer and named
+    /// by whoever made it; the engine is compiled into the application, has no face and no name a
+    /// person sees, and is what actually makes or works on the sound. This is the one line that
+    /// joins them, and it is the device's own to write.
+    ///
+    /// It used to be worked out from the id instead, by a list of names written into the
+    /// application, which meant there could only ever be as many devices as there were engines
+    /// and one made in the designer under any other id was read off disc and silently never
+    /// reached the rack. So the id is the device's own now and this says what it plays. Any
+    /// number of devices can name one engine: two kits are two devices.
+    ///
+    /// Empty means the ones that shipped before this existed, whose ids are in every song and
+    /// chain on anybody's disc and are still understood. An engine this build has not got is read
+    /// and passed over, which is what makes a folder from a later version harmless.
+    /// </remarks>
+    public string Engine { get; set; } = "";
+
     /// <summary>Its colours, which are its own and not the application's.</summary>
     public PanelTheme Theme { get; set; } = new("#7B838C");
 

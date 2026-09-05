@@ -58,7 +58,7 @@ public sealed class SoundMachineRegistry : RackRegistry<SoundMachineProject>
     /// says it is, and what colour it wears are the machine's own and are read from its folder.
     /// </remarks>
     protected override bool Register(SoundMachineProject project) =>
-        SoundMachine.Register(project.Id, project.Name, project.Summary, project.Theme);
+        SoundMachine.Register(project.Id, project.Name, project.Summary, project.Theme, project.Engine);
 
     /// <inheritdoc/>
     /// <remarks>

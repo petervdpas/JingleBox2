@@ -34,7 +34,14 @@ namespace JingleBox2.ViewModels;
 public sealed partial class PadViewModel : ObservableObject, IDisposable
 {
     /// <summary>A chain of effects, written down and read back. Holds nothing, so one is enough.</summary>
-    private readonly IPluginChainState _chains = new PluginChainState();
+    /// <remarks>
+    /// Not readonly, and it is the one field here that is not. A chain writes down an effect's id
+    /// and never its engine, so putting one back means looking the id up in what this
+    /// installation has registered, and a pad does not learn that list until
+    /// <see cref="UsePlugins"/> is called. Until then it is the plain one, which knows only the
+    /// effects whose ids the application still recognises.
+    /// </remarks>
+    private IPluginChainState _chains = new PluginChainState();
 
     /// <summary>The fader scale, so a reading in decibels can be checked without a window.</summary>
     private readonly IGainScale _gain = new GainScale();
@@ -94,6 +101,9 @@ public sealed partial class PadViewModel : ObservableObject, IDisposable
         SoundDevices.SoundEffects.Interfaces.ISoundEffectProjects? effects = null,
         Interfaces.ISoundEffectInFront? front = null)
     {
+        _chains = new PluginChainState(
+            new SoundDevices.SoundEffects.SoundEffectEngines(effects));
+
         Effect = new PluginChainViewModel(plugins, effects, front: front)
         {
             Target = new PadPluginTarget(_audio, Index)

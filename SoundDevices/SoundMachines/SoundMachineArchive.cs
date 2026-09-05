@@ -27,7 +27,7 @@ public sealed class SoundMachineArchive : RackArchive<SoundMachineProject>
     /// the rule off this system.
     /// </param>
     public SoundMachineArchive(IRackRegistry<SoundMachineProject>? registry = null, ISoundMachinePaths? paths = null)
-        : base(registry!, paths)
+        : base(registry ?? new SoundMachineRegistry(), paths)
     {
     }
 

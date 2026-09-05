@@ -4,7 +4,7 @@
   "Summary": "Recordings across the keyboard. Each zone has a range and a root to transpose from.",
   "Author": "Peter van de Pas",
   "Version": "1.03",
-  "Engine": "",
+  "Engine": "Sampler",
   "Theme": {
     "Accent": "#4E86D8",
     "Face": 0.68,
