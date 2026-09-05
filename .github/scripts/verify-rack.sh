@@ -70,6 +70,15 @@ check() {
       echo "ERROR: $name is missing presets"
       exit 1
     fi
+
+    # And its own page, which is the one file here that is neither json nor wav and so is
+    # counted by nothing above. A device whose help did not ship opens a window saying it has
+    # none, which reads as the author having written nothing rather than as a payload with a
+    # hole in it. Only where there is one to ship: a device is allowed to carry no page.
+    if [ -f "$box/help.md" ] && [ ! -f "$OUT/$RACK/$world/$name/help.md" ]; then
+      echo "ERROR: $name arrived without its help.md"
+      exit 1
+    fi
   done
 }
 
