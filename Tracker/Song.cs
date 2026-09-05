@@ -56,14 +56,16 @@ public sealed class Song
     /// Which kind of machine this song was last written on, in one word.
     /// </summary>
     /// <remarks>
-    /// Set on every save rather than kept from where the song began, since what anything wants to
-    /// know is whether the paths **in this file** could mean anything here, and the paths were
-    /// written by whoever saved it last.
+    /// **Written on rather than made on**, and the difference is the whole of what it is for: it
+    /// is set on every save rather than carried from where the song began, since what anything
+    /// wants to know is whether the paths **in this file** could mean anything here, and those
+    /// were written by whoever saved it last. A song begun on Linux and saved on Windows has
+    /// Windows paths in it and says so.
     ///
     /// Empty in every song written before it existed, which reads back as unknown and behaves
     /// exactly as before. See <see cref="Interfaces.IMachineWord"/> for what the word is for.
     /// </remarks>
-    public string MadeOn { get; set; } = "";
+    public string WrittenOn { get; set; } = "";
 
     /// <summary>Beats a minute. Held to its range by <see cref="Normalize"/> on the way in.</summary>
     public double Bpm { get; set; } = TrackerTiming.DefaultBpm;

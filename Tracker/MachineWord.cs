@@ -32,7 +32,7 @@ public sealed class MachineWord : IMachineWord
     /// machine with their paths looked at all along, and a change that stopped looking at them
     /// would lose recordings that are found today.
     /// </remarks>
-    public bool Travelled(string? made) =>
-        !string.IsNullOrWhiteSpace(made)
-        && !string.Equals(made, Here, StringComparison.OrdinalIgnoreCase);
+    public bool Travelled(string? written) =>
+        !string.IsNullOrWhiteSpace(written)
+        && !string.Equals(written, Here, StringComparison.OrdinalIgnoreCase);
 }

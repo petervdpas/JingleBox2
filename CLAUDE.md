@@ -1966,11 +1966,18 @@ whole exercise and is worth writing down rather than summarising:
   that can only ever be right or silent is worth keeping even when you doubt it fires**, and the
   log says which one found it, so the first run on another machine answers the question rather
   than either of us being right in advance
-- **And a song says which kind of machine wrote it now.** `Song.MadeOn` is one word, stamped on
+- **And a song says which kind of machine wrote it now.** `Song.WrittenOn` is one word, stamped on
   every save rather than kept from where the song began, since what anybody wants to know is
   whether the paths in the file in front of them mean anything on this computer and those were
   written by whoever saved it last. Empty in every song already on anybody's disc, which reads
   back as unknown, and unknown behaves exactly as before
+- **Written on and not made on, and not `HostOS` either.** Made on implies where the song began,
+  which is the thing it deliberately does not record: a song begun here and saved on Windows has
+  Windows paths in it and has to say Windows. The log line was already saying "was written on",
+  so the field and the sentence about it disagreed until the field was renamed. Host is worse
+  again, since a host in this codebase is the thing that hosts a plugin and nothing else, and one
+  word meaning two things is the fault `device` already cost a rename for; nothing in the song
+  model abbreviates either, which is why it is `LinesPerBeat` and not `LPB`
 - Which lets the path comparison be skipped rather than merely failing. That looked like it bought
   nothing, since two paths from two operating systems cannot match anyway, and there is one case
   where it does: **a settings file carried between machines** puts the other computer's paths into

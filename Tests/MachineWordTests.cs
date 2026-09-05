@@ -80,8 +80,8 @@ public class MachineWordTests
             var back = store.Load(path);
 
             Assert.NotNull(back);
-            Assert.Equal(_word.Here, back!.MadeOn);
-            Assert.False(_word.Travelled(back.MadeOn));
+            Assert.Equal(_word.Here, back!.WrittenOn);
+            Assert.False(_word.Travelled(back.WrittenOn));
         }
         finally
         {

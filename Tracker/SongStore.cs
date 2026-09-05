@@ -47,14 +47,14 @@ public sealed class SongStore : ISongStore
     /// <param name="song">The song that was just read.</param>
     private static void Travelled(Song song)
     {
-        bool travelled = Machine.Travelled(song.MadeOn);
+        bool travelled = Machine.Travelled(song.WrittenOn);
 
         Audio.Plugins.SongOrigin.Wants(travelled);
 
         if (!travelled) return;
 
         Diagnostics.Log.Write(Diagnostics.Enums.LogArea.Tracker, () =>
-            $"'{song.Name}' was written on {song.MadeOn} and this is {Machine.Here}: " +
+            $"'{song.Name}' was written on {song.WrittenOn} and this is {Machine.Here}: " +
             "the paths in it are not compared here, so plugins and recordings are found by name");
     }
 
@@ -743,8 +743,8 @@ public sealed class SongStore : ISongStore
         public string Name { get; set; } = "";
         public string Description { get; set; } = "";
 
-        /// <inheritdoc cref="Song.MadeOn"/>
-        public string MadeOn { get; set; } = "";
+        /// <inheritdoc cref="Song.WrittenOn"/>
+        public string WrittenOn { get; set; } = "";
 
         public double Bpm { get; set; } = TrackerTiming.DefaultBpm;
         public int LinesPerBeat { get; set; } = TrackerTiming.DefaultLinesPerBeat;
@@ -815,7 +815,7 @@ public sealed class SongStore : ISongStore
             Version = Current,
             Name = song.Name,
             Description = song.Description,
-            MadeOn = Machine.Here,
+            WrittenOn = Machine.Here,
             Bpm = song.Bpm,
             LinesPerBeat = song.LinesPerBeat,
             PlayMode = song.PlayMode,
@@ -946,7 +946,7 @@ public sealed class SongStore : ISongStore
             {
                 Name = Name,
                 Description = Description,
-                MadeOn = MadeOn,
+                WrittenOn = WrittenOn,
                 Bpm = Bpm,
                 LinesPerBeat = LinesPerBeat,
                 PlayMode = PlayMode,

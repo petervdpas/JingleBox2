@@ -25,6 +25,6 @@ public interface IMachineWord
     /// <summary>
     /// Whether a path written by a song from there could mean anything here.
     /// </summary>
-    /// <param name="made">The word the song carries, or nothing when it does not carry one.</param>
-    bool Travelled(string? made);
+    /// <param name="written">The word the song carries, or nothing when it does not carry one.</param>
+    bool Travelled(string? written);
 }
